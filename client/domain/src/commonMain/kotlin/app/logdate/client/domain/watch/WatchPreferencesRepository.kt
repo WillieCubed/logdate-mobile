@@ -2,6 +2,8 @@ package app.logdate.client.domain.watch
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
 /** Typed reads and writes of the preferences this device shares with its paired device. */
@@ -28,14 +30,19 @@ interface WatchPreferencesRepository {
 
 class DefaultWatchPreferencesRepository(
     private val store: StampedPreferenceStore,
+    private val prepare: suspend () -> Unit = {},
 ) : WatchPreferencesRepository {
     override fun <T> observe(key: SharedPreferenceKey<T>): Flow<T> =
-        store
-            .observe()
-            .map { entries -> key.read(entries[key.name]) }
+        flow {
+            prepare()
+            emitAll(store.observe())
+        }.map { entries -> key.read(entries[key.name]) }
             .distinctUntilChanged()
 
-    override suspend fun <T> get(key: SharedPreferenceKey<T>): T = key.read(store.snapshot()[key.name])
+    override suspend fun <T> get(key: SharedPreferenceKey<T>): T {
+        prepare()
+        return key.read(store.snapshot()[key.name])
+    }
 
     override suspend fun <T> set(
         key: SharedPreferenceKey<T>,

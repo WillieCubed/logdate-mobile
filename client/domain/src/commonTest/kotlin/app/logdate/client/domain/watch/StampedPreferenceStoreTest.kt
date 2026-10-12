@@ -1,9 +1,12 @@
 package app.logdate.client.domain.watch
 
+import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.domain.recommendation.FakeKeyValueStorage
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.Stamped
 import app.logdate.client.sync.peer.state.StateMerger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
@@ -131,6 +134,87 @@ class StampedPreferenceStoreTest {
     ) : Clock {
         override fun now(): Instant = Instant.fromEpochMilliseconds(millis)
     }
+
+    @Test
+    fun `initialization persists a missing preference and retains other preferences`() =
+        runTest {
+            val store = store()
+            store.write("window.days", JsonPrimitive(30))
+            assertTrue(store.initializeMissing(KEY, JsonPrimitive(true)))
+            assertEquals(JsonPrimitive(true), store.snapshot()[KEY]?.value)
+            assertEquals(JsonPrimitive(30), store.snapshot()["window.days"]?.value)
+        }
+
+    @Test
+    fun `initialization preserves an explicit off choice`() =
+        runTest {
+            val store = store()
+            val explicit = store.write(KEY, JsonPrimitive(false))
+            assertTrue(store.initializeMissing(KEY, JsonPrimitive(true)))
+            assertEquals(explicit, store.snapshot()[KEY])
+        }
+
+    @Test
+    fun `initialization never replaces unreadable stored preferences`() =
+        runTest {
+            storage.putString(StampedPreferenceStore.STORAGE_KEY, "not json")
+            assertFalse(store().initializeMissing(KEY, JsonPrimitive(true)))
+            assertEquals("not json", storage.getString(StampedPreferenceStore.STORAGE_KEY))
+        }
+
+    @Test
+    fun `initialization does not report a dropped default write as persisted`() =
+        runTest {
+            val dropping =
+                object : KeyValueStorage by storage {
+                    override suspend fun putString(
+                        key: String,
+                        value: String,
+                    ) = Unit
+                }
+            assertFalse(StampedPreferenceStore(dropping, PeerRole.PHONE).initializeMissing(KEY, JsonPrimitive(false)))
+        }
+
+    @Test
+    fun `watch choice delivered after initialization still wins`() =
+        runTest {
+            val store = store()
+            assertTrue(store.initializeMissing(KEY, JsonPrimitive(true)))
+            val watchChoice = Stamped(JsonPrimitive(false), NOW - 100)
+            assertTrue(store.adopt(mapOf(KEY to watchChoice)))
+            assertEquals(watchChoice, store.snapshot()[KEY])
+        }
+
+    @Test
+    fun `watch adoption racing initialization preserves the watch choice and unrelated fields`() =
+        runTest {
+            val entered = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            var pause = true
+            val delayed =
+                object : KeyValueStorage by storage {
+                    override suspend fun getString(key: String): String? {
+                        if (pause) {
+                            pause = false
+                            entered.complete(Unit)
+                            resume.await()
+                        }
+                        return storage.getString(key)
+                    }
+                }
+            val store = StampedPreferenceStore(delayed, PeerRole.PHONE, StateMerger(clock), clock)
+            val initialize = async { store.initializeMissing(KEY, JsonPrimitive(true)) }
+            entered.await()
+            val adopt =
+                async {
+                    store.adopt(mapOf(KEY to Stamped(JsonPrimitive(false), NOW - 100), "window.days" to Stamped(JsonPrimitive(30), NOW)))
+                }
+            resume.complete(Unit)
+            assertTrue(initialize.await())
+            assertTrue(adopt.await())
+            assertEquals(JsonPrimitive(false), store.snapshot()[KEY]?.value)
+            assertEquals(JsonPrimitive(30), store.snapshot()["window.days"]?.value)
+        }
 
     private companion object {
         const val NOW = 1_760_000_000_000

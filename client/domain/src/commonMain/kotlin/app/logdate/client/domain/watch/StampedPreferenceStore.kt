@@ -37,6 +37,27 @@ class StampedPreferenceStore(
 
     suspend fun snapshot(): Map<String, Stamped> = decode(storage.getString(STORAGE_KEY))
 
+    /** Initializes an absent preference without replacing a choice made on either device. */
+    suspend fun initializeMissing(
+        name: String,
+        value: JsonElement,
+    ): Boolean =
+        mutex.withLock {
+            val text = storage.getString(STORAGE_KEY)
+            val current =
+                try {
+                    if (text == null) emptyMap() else WearJson.json.decodeFromString(entriesSerializer, text)
+                } catch (e: IllegalArgumentException) {
+                    Napier.e("Cannot initialize unreadable shared preferences", e)
+                    return@withLock false
+                }
+            if (name in current) return@withLock true
+            // An imported legacy default must lose to a user choice delivered later by the peer.
+            val stamped = Stamped(value, Long.MIN_VALUE)
+            persist(current + (name to stamped))
+            snapshot()[name] == stamped
+        }
+
     suspend fun write(
         name: String,
         value: JsonElement,

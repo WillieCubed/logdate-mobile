@@ -71,6 +71,7 @@ import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
+import app.logdate.client.domain.reminders.LegacyReminderMigration
 import app.logdate.client.domain.reminders.ReminderPreferences
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
@@ -112,6 +113,7 @@ import app.logdate.client.domain.watch.WatchPreferencesRepository
 import app.logdate.client.intelligence.availability.RewindAIAvailability
 import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.events.EventNamingExtractor
+import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.peer.state.PeerRole
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -299,7 +301,13 @@ val domainModule: Module =
 
         // Preferences shared with a paired watch. The watch app binds its own store with its role.
         single { StampedPreferenceStore(storage = get(), localRole = PeerRole.PHONE) }
-        single<WatchPreferencesRepository> { DefaultWatchPreferencesRepository(get()) }
+        single(createdAtStart = true) {
+            LegacyReminderMigration(get(), get(), get<UserStateRepository>().userData, get())
+        }
+        single<WatchPreferencesRepository> {
+            val migration = get<LegacyReminderMigration>()
+            DefaultWatchPreferencesRepository(get()) { migration.ensure() }
+        }
         factory { ReminderPreferences(get(), get()) }
         factory { EnrichMarkLocationUseCase(marks = get(), locationHistory = get(), watchPreferences = get()) }
     }
