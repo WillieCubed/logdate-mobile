@@ -102,7 +102,7 @@ kotlin {
 }
 
 play {
-    // Wear OS releases go to the form factor's own track. Internal testing is wear:qa.
+    // Wear OS releases go to the form factor's own track. LogDate internal testing is wear:internal.
     track.set(release.wearPlayTrack)
     defaultToAppBundles.set(true)
     // Keyless: CI signs in with Workload Identity Federation as the Play service account.

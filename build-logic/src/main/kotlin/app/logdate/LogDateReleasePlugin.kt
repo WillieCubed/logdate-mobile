@@ -55,7 +55,7 @@ open class LogDateReleaseExtension(
             ?: project.providers.gradleProperty("logdate.play.track").orNull
             ?: "internal"
 
-    /** The same track on the Wear OS form factor, which Play names differently for Internal testing. */
+    /** The same track on the Wear OS form factor, with its registered form-factor prefix. */
     val wearPlayTrack: String get() = WearPlayTrack.forTrack(playTrack)
 
     val signing: ReleaseSigning? by lazy {

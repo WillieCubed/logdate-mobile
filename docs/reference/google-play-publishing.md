@@ -239,9 +239,10 @@ not be published.
 ### How it publishes
 
 The `publish-internal` job publishes the phone bundle, then, when
-`LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` is `true`, the watch bundle to the `wear:qa` track.
-Play names a form factor's tracks `wear:<default track name>`, and the default name of Internal
-testing is `qa`, so the phone's `internal` is the watch's `wear:qa` (`WearPlayTrack` in `build-logic`).
+`LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` is `true`, the watch bundle to the `wear:internal` track.
+The authenticated Play API confirmed this alias for LogDate on October 11, 2026
+([track inspection](https://github.com/WillieCubed/logdate-mobile/actions/runs/38191150146)).
+`WearPlayTrack` in `build-logic` adds the `wear:` prefix to the phone track alias.
 Beta and production are `wear:beta` and `wear:production`. The two publishes run one after the other in one
 job because Play assigns both apps version codes from a single sequence, and two uploads racing for
 the next code would collide.
@@ -251,17 +252,19 @@ phone's internal release.
 
 ### One-time Play Console setup
 
-These steps happen in Play Console and cannot be done or checked from this repository:
+Configure these in Play Console, then verify the registered tracks through the API:
 
 1. Add the Wear OS form factor to the LogDate app.
 2. Create the first Wear OS release, by hand, as the phone's first release had to be.
 3. Confirm your account is on the internal testers list for the Wear OS form factor, and that its
-   Internal testing track exists. Play calls it `wear:qa` in the API.
+   Internal testing track exists. LogDate's registered API alias is `wear:internal`.
 4. Set the repository variable `LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` to `true`.
 
-Then install LogDate from the Play Store on the watch. The track name comes from Google's list of
-form factor tracks (`wear:production`, `wear:beta`, `wear:qa`). If the first publish is rejected anyway,
-upload the bundle by hand for that release.
+Then install LogDate from the Play Store on the watch. If publishing reports a missing track,
+run **Inspect Android Play tracks** from GitHub Actions. It lists the app's actual tracks and
+release versions through a discarded edit, without publishing. Google's general documentation
+uses `wear:qa` as an example; that alias returned 404 for LogDate even after creating its internal
+track. Use the registered API alias rather than guessing from the Console's display label.
 
 ### Building locally
 

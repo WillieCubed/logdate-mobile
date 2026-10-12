@@ -9,8 +9,8 @@ import kotlin.test.assertEquals
  */
 class WearPlayTrackTest {
     @Test
-    fun `internal testing is the qa track of the Wear form factor`() {
-        assertEquals("wear:qa", WearPlayTrack.forTrack("internal"))
+    fun `internal testing uses the registered Wear internal track`() {
+        assertEquals("wear:internal", WearPlayTrack.forTrack("internal"))
     }
 
     @Test
