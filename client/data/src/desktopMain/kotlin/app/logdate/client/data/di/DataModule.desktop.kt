@@ -94,6 +94,7 @@ import app.logdate.client.repository.timeline.ActivityTimelineRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
+import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.shared.config.configModule
 import kotlinx.coroutines.flow.combine
 import kotlinx.serialization.json.Json
@@ -217,7 +218,12 @@ actual val dataModule: Module =
 
         // Places
         single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }
-        single<MarkedMomentRepository> { OfflineFirstMarkedMomentRepository(get()) }
+        single<MarkedMomentRepository> {
+            OfflineFirstMarkedMomentRepository(get(), RoomSyncTransactionManager(get<app.logdate.client.database.LogDateDatabase>()))
+        }
+        single<app.logdate.client.repository.moments.SyncableMarkedMomentRepository> {
+            get<MarkedMomentRepository>() as app.logdate.client.repository.moments.SyncableMarkedMomentRepository
+        }
 
         // Events
         single<EventRepository> { OfflineFirstEventRepository(get(), get()) }

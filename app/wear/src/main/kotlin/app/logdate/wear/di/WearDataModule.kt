@@ -6,6 +6,7 @@ import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
+import app.logdate.client.data.moments.OfflineFirstMarkedMomentRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
@@ -24,9 +25,12 @@ import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.moments.MarkedMomentRepository
+import app.logdate.client.repository.moments.SyncableMarkedMomentRepository
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
@@ -93,6 +97,9 @@ val wearDataModule =
         includes(conflictResolverModule)
         includes(permissionsModule)
         includes(locationModule)
+        single {
+            OfflineFirstMarkedMomentRepository(get(), get<SyncTransactionManager>(WatchCloud))
+        } binds arrayOf(MarkedMomentRepository::class, SyncableMarkedMomentRepository::class)
 
         // JSON serialization
         single {
