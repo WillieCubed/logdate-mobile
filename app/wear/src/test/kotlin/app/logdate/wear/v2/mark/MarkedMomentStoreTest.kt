@@ -23,7 +23,8 @@ class MarkedMomentStoreTest {
     private val deliveries = FakePeerDeliveryDao()
     private val syncMetadataService = mockk<SyncMetadataService>(relaxed = true)
     private val now = Instant.fromEpochMilliseconds(1_760_000_000_000L)
-    private val store = MarkedMomentStore(marks, deliveries, syncMetadataService, clock = FixedClock(now))
+    private val store =
+        MarkedMomentStore(marks, deliveries, syncMetadataService, clock = FixedClock(now), transactions = MarkTestTransactions)
     private val mark =
         MarkedMomentEntity(
             id = Uuid.random(),
@@ -79,6 +80,96 @@ class MarkedMomentStoreTest {
 
             coVerify(exactly = 0) { syncMetadataService.enqueuePending(any(), any(), any()) }
             assertNull(delivery())
+        }
+
+    @Test
+    fun `late sensors preserve phone resolution and server version`() =
+        runTest {
+            val resolved =
+                mark.copy(
+                    state = MarkedMomentState.FILLED,
+                    caption = "Remember this",
+                    resolvedNoteIds = Uuid.random().toString(),
+                    syncVersion = 9,
+                    lastUpdated =
+                        now + 10.seconds,
+                )
+            marks.upsert(resolved)
+            store.update(mark.copy(heartRateBpm = 72, lastUpdated = now + 5.seconds))
+            val saved = assertNotNull(marks.rows[mark.id])
+            assertEquals(MarkedMomentState.FILLED, saved.state)
+            assertEquals(resolved.caption, saved.caption)
+            assertEquals(resolved.resolvedNoteIds, saved.resolvedNoteIds)
+            assertEquals(9L, saved.syncVersion)
+            assertEquals(72, saved.heartRateBpm)
+            assertEquals(now.toEpochMilliseconds() + 10_001, saved.lastUpdated.toEpochMilliseconds())
+            assertEquals(saved.lastUpdated.toEpochMilliseconds(), delivery()?.contentVersion)
+        }
+
+    @Test
+    fun `sensor replay cannot revive a deleted or missing capture`() =
+        runTest {
+            store.update(mark.copy(heartRateBpm = 72))
+            assertNull(marks.rows[mark.id])
+            val deleted = mark.copy(deletedAt = now + 1.seconds)
+            marks.upsert(deleted)
+            store.update(mark.copy(heartRateBpm = 72))
+            store.create(mark)
+            assertEquals(deleted, marks.rows[mark.id])
+            assertNull(delivery())
+            coVerify(exactly = 0) { syncMetadataService.enqueuePending(any(), any(), any()) }
+        }
+
+    @Test
+    fun `duplicate creation and repeated sensors preserve the delivery attempt`() =
+        runTest {
+            store.create(mark)
+            val sensed = mark.copy(heartRateBpm = 72, latitude = 1.0, longitude = 2.0, locationAccuracy = 3f, lastUpdated = now + 5.seconds)
+            store.update(sensed)
+            val waiting = assertNotNull(delivery()).copy(attempts = 3, nextAttemptAt = 9000)
+            deliveries.upsert(waiting)
+            store.create(mark)
+            store.update(sensed)
+            assertEquals(sensed, marks.rows[mark.id])
+            assertEquals(waiting, delivery())
+            coVerify(exactly = 1) { syncMetadataService.enqueuePending(any(), any(), PendingOperation.CREATE) }
+            coVerify(exactly = 1) { syncMetadataService.enqueuePending(any(), any(), PendingOperation.UPDATE) }
+        }
+
+    @Test
+    fun `sensor callback cannot change capture identity or unknown states`() =
+        runTest {
+            marks.upsert(mark)
+            store.update(mark.copy(originDeviceId = "other-watch", heartRateBpm = 72))
+            store.update(mark.copy(capturedAt = now + 1.seconds, heartRateBpm = 72))
+            assertEquals(mark, marks.rows[mark.id])
+            val future = mark.copy(state = "FUTURE_STATE")
+            marks.upsert(future)
+            store.update(mark.copy(heartRateBpm = 72))
+            assertEquals(future, marks.rows[mark.id])
+            assertNull(delivery())
+        }
+
+    @Test
+    fun `heart rate callback does not erase the newer location`() =
+        runTest {
+            val current = mark.copy(latitude = 1.0, longitude = 2.0, locationAccuracy = 3f)
+            marks.upsert(current)
+            store.update(mark.copy(heartRateBpm = 72, lastUpdated = now + 1.seconds))
+            assertEquals(current.copy(heartRateBpm = 72, lastUpdated = now + 1.seconds), marks.rows[mark.id])
+        }
+
+    @Test
+    fun `late sensors cannot replace readings already stored`() =
+        runTest {
+            val current = mark.copy(latitude = 1.0, longitude = 2.0, locationAccuracy = 3f, heartRateBpm = 80)
+            marks.upsert(current)
+            store.update(
+                mark.copy(latitude = 4.0, longitude = 5.0, locationAccuracy = 6f, heartRateBpm = 72, lastUpdated = now + 5.seconds),
+            )
+            assertEquals(current, marks.rows[mark.id])
+            assertNull(delivery())
+            coVerify(exactly = 0) { syncMetadataService.enqueuePending(any(), any(), any()) }
         }
 
     private suspend fun delivery() =

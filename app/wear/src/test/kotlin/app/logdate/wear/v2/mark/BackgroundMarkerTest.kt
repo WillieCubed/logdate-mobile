@@ -23,7 +23,13 @@ class BackgroundMarkerTest {
             featureFlags = featureFlags,
             markMoment =
                 MarkMomentUseCase(
-                    store = MarkedMomentStore(marks, FakePeerDeliveryDao(), mockk<SyncMetadataService>(relaxed = true)),
+                    store =
+                        MarkedMomentStore(
+                            marks,
+                            FakePeerDeliveryDao(),
+                            mockk<SyncMetadataService>(relaxed = true),
+                            transactions = MarkTestTransactions,
+                        ),
                     deviceId = { "watch-1" },
                     place = { null },
                     heartRate = HeartRateSampler.None,

@@ -135,7 +135,13 @@ class MarkViewModelTest {
     private fun viewModel(sensorBpm: Int? = 68): MarkViewModel {
         val markMoment =
             MarkMomentUseCase(
-                store = MarkedMomentStore(marks, FakePeerDeliveryDao(), mockk<SyncMetadataService>(relaxed = true)),
+                store =
+                    MarkedMomentStore(
+                        marks,
+                        FakePeerDeliveryDao(),
+                        mockk<SyncMetadataService>(relaxed = true),
+                        transactions = MarkTestTransactions,
+                    ),
                 deviceId = { "watch-1" },
                 place = { null },
                 heartRate = HeartRateSampler { if (WatchPermission.HEART_RATE in granted) sensorBpm else null },

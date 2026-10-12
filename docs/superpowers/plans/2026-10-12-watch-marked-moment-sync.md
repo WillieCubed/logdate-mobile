@@ -68,7 +68,7 @@ Files: create client/sync/.../cloud/CloudMomentDataSource.kt and moment payload 
 
 ## Task 4: Authenticated peer ingestion and return window
 
-- [ ] Make watch capture-store creation and late sensor updates transactional and merge against current resolution/tombstones.
+- [x] Make watch capture-store creation and late sensor updates transactional and merge against current resolution/tombstones. Preserve existing sensor readings, exact capture identity, millisecond clocks, no-op delivery attempts and current returned projections; verify actual Wear Room rollback of mark/outbox/ledger.
 
 Files: create WatchMomentIngestor alongside app/compose-main/.../sync/v2/receipts/WatchRecordIngestorV2.kt; extend watch capture delivery, receipt ledger, listener dispatch, WatchWindowPublisher and WindowApplier with separate MOMENT envelopes.
 

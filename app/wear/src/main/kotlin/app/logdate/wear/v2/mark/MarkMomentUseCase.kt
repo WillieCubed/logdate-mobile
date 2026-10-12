@@ -60,8 +60,7 @@ class MarkMomentUseCase(
                 heartRateBpm = bpm ?: mark.heartRateBpm,
                 lastUpdated = clock.now(),
             )
-        store.update(enriched)
-        return enriched
+        return store.update(enriched) ?: mark
     }
 
     private suspend fun <T> attempt(

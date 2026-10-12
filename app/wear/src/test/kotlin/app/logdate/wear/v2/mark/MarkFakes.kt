@@ -3,6 +3,7 @@ package app.logdate.wear.v2.mark
 import app.logdate.client.database.dao.moments.MarkedMomentDao
 import app.logdate.client.database.dao.sync.PeerDeliveryDao
 import app.logdate.client.database.entities.moments.MarkedMomentEntity
+import app.logdate.client.sync.SyncTransactionManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -45,3 +46,7 @@ class FakeMarkedMomentDao : MarkedMomentDao {
 class FakePeerDeliveryDao :
     PeerDeliveryDao by app.logdate.wear.sync.v2.delivery
         .MemoryPeerDeliveryDao()
+
+object MarkTestTransactions : SyncTransactionManager {
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
+}

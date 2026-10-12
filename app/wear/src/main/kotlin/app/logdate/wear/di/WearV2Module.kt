@@ -11,6 +11,7 @@ import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
@@ -122,7 +123,14 @@ val wearV2Module =
         single { PermissionPrompts(checker = get(), store = get()) }
 
         single { QuickNoteWriter(notesRepository = get(), locationCaptureCoordinator = get()) }
-        single { MarkedMomentStore(markedMomentDao = get(), peerDeliveryDao = get(), syncMetadataService = get()) }
+        single {
+            MarkedMomentStore(
+                markedMomentDao = get(),
+                peerDeliveryDao = get(),
+                syncMetadataService = get(),
+                transactions = get<SyncTransactionManager>(WatchCloud),
+            )
+        }
         single<HeartRateSampler> {
             val checker = get<PermissionChecker>()
             try {

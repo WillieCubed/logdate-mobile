@@ -124,11 +124,25 @@ class MarkMomentUseCaseTest {
             assertEquals(enriched, marks.rows[mark.id])
         }
 
+    @Test
+    fun `enrichment returns the current resolved mark rather than the old capture`() =
+        runTest {
+            bpm = 72
+            val useCase = useCase()
+            val capture = useCase.mark()
+            val resolved = capture.copy(state = MarkedMomentState.FILLED, caption = "Resolved on phone", syncVersion = 7)
+            marks.upsert(resolved)
+            clock.advance(5.seconds)
+            val enriched = useCase.enrich(capture)
+            assertEquals(resolved.copy(heartRateBpm = 72, lastUpdated = clock.start + 5.seconds), enriched)
+            assertEquals(enriched, marks.rows[capture.id])
+        }
+
     private fun useCase(
         readPlace: suspend () -> NoteLocation? = { place },
         sensor: HeartRateSampler = HeartRateSampler { bpm },
     ) = MarkMomentUseCase(
-        store = MarkedMomentStore(marks, FakePeerDeliveryDao(), syncMetadataService, clock),
+        store = MarkedMomentStore(marks, FakePeerDeliveryDao(), syncMetadataService, clock, MarkTestTransactions),
         deviceId = { "watch-1" },
         place = readPlace,
         heartRate = sensor,
