@@ -5,6 +5,7 @@ import app.logdate.client.domain.streak.toStreakDay
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.peer.state.PeerRole
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -20,22 +21,23 @@ class CoordinatedReminderClaims(
     private val peer: ReminderClaimPeer,
     private val isCurrent: suspend (PeerDeliveryContext) -> Boolean,
     private val enabled: suspend () -> Boolean,
+    private val available: suspend (LocalDate) -> Boolean = { true },
     private val clock: Clock = Clock.System,
     private val timeZone: suspend () -> TimeZone = { TimeZone.currentSystemDefault() },
     private val dayStartHour: suspend () -> Int = { DEFAULT_STREAK_DAY_START_HOUR },
 ) {
     suspend fun tryClaim(context: PeerDeliveryContext): ReminderDayClaim? {
-        if (!context.isValid() || !enabled() || !isCurrent(context)) return null
+        if (!context.isValid() || !enabled() || !isCurrent(context) || !available(today())) return null
         val claim = ReminderDayClaim(context, today(), Uuid.random().toString(), role)
         if (!claims.begin(claim)) return null
         val granted = withTimeoutOrNull(5_000) { peer.request(claim) }
-        if (granted == false || !canUse(claim) || !claims.commit(claim)) return null
-        return claim.takeIf { canUse(it) }
+        if (granted == false || !canUse(claim) || !available(claim.day) || !claims.commit(claim)) return null
+        return claim.takeIf { canUse(it) && available(it.day) }
     }
 
     suspend fun grant(claim: ReminderDayClaim): Boolean {
-        if (claim.role == role || !canUse(claim) || !claims.grantPeer(claim)) return false
-        return canUse(claim)
+        if (claim.role == role || !canUse(claim) || !available(claim.day) || !claims.grantPeer(claim)) return false
+        return canUse(claim) && available(claim.day)
     }
 
     suspend fun acceptsDelegated(claim: ReminderDayClaim): Boolean = claim.role != role && canUse(claim)

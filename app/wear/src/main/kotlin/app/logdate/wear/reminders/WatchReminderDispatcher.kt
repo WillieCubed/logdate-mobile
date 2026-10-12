@@ -1,51 +1,55 @@
 package app.logdate.wear.reminders
 
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-/** Decides whether a trigger becomes a reminder, posts it, and counts it toward the daily limit. */
+/** Decides whether a trigger becomes a reminder, reserves it, then records successful posting. */
 class WatchReminderDispatcher(
     private val preferences: WatchReminderPreferences,
     private val notifier: NudgeNotifier,
     private val clock: Clock = Clock.System,
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    private val authorize: suspend () -> Boolean = { true },
 ) {
-    /** Reminds after a workout that ended at [endedAt]. @return true when a reminder was shown. */
-    @Synchronized
-    fun onWorkoutEnded(endedAt: Instant): Boolean {
-        if (!preferences.enabled.value) return false
-        val now = clock.now()
-        if (!WatchReminderRules.workoutReminderDue(now, endedAt, preferences.lastReminderAt(), timeZone())) return false
-        return post(WatchReminder.WORKOUT_ENDED, now)
-    }
+    private val mutex = Mutex()
 
-    @Synchronized
-    fun onEveningCheck(
+    suspend fun onWorkoutEnded(endedAt: Instant): Boolean =
+        deliverIfDue(WatchReminder.WORKOUT_ENDED) { now ->
+            WatchReminderRules.workoutReminderDue(now, endedAt, preferences.lastReminderAt(), timeZone())
+        }
+
+    suspend fun onEveningCheck(
         phoneReachable: Boolean,
         momentsToday: Int,
-    ): Boolean {
-        if (!preferences.enabled.value) return false
-        val now = clock.now()
-        if (!WatchReminderRules.eveningReminderDue(
-                now,
-                preferences.lastReminderAt(),
-                momentsToday,
-                phoneReachable,
-                timeZone(),
-            )
-        ) {
-            return false
+    ): Boolean =
+        deliverIfDue(WatchReminder.EVENING) { now ->
+            WatchReminderRules.eveningReminderDue(now, preferences.lastReminderAt(), momentsToday, phoneReachable, timeZone())
         }
-        return post(WatchReminder.EVENING, now)
-    }
 
-    private fun post(
+    private suspend fun authorized(): Boolean =
+        try {
+            authorize()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.w("The watch's daily reminder could not be reserved", e)
+            false
+        }
+
+    private suspend fun deliverIfDue(
         reminder: WatchReminder,
-        now: Instant,
-    ): Boolean {
-        if (!notifier.post(reminder)) return false
-        preferences.setLastReminderAt(now)
-        return true
-    }
+        due: (Instant) -> Boolean,
+    ): Boolean =
+        mutex.withLock {
+            if (!preferences.enabled.value || !due(clock.now()) || !authorized()) return@withLock false
+            val now = clock.now()
+            if (!preferences.enabled.value || !due(now) || !notifier.post(reminder)) return@withLock false
+            preferences.setLastReminderAt(clock.now())
+            true
+        }
 }

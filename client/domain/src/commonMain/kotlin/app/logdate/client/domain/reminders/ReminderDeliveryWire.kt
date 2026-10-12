@@ -28,6 +28,7 @@ data class ReminderDeliveryResponse(
 
 class ReminderDeliveryResponder(
     private val claims: CoordinatedReminderClaims,
+    private val budget: DeviceReminderBudget,
     private val enabled: suspend () -> Boolean,
     private val post: (ReminderTrigger, Int) -> Boolean,
     private val recordPostedAt: suspend (Instant) -> Unit,
@@ -52,7 +53,9 @@ class ReminderDeliveryResponder(
         val status =
             if (!claims.consumeDelegated(claim)) {
                 ReminderDeliveryStatus.ALREADY_HANDLED
-            } else if (!enabled()) {
+            } else if (!budget.consume(claim.day)) {
+                ReminderDeliveryStatus.ALREADY_HANDLED
+            } else if (!claims.acceptsDelegated(claim) || !enabled()) {
                 ReminderDeliveryStatus.NOT_POSTED
             } else if (post(delivery.trigger, delivery.openMarks)) {
                 recordPostedAt(clock.now())

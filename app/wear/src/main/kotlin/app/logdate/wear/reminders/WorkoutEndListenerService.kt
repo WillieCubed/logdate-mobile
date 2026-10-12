@@ -96,6 +96,7 @@ class WorkoutWatcher(
     private val awaitExperience: suspend () -> Unit = {},
 ) {
     private val activation = Mutex()
+    private val events = Mutex()
 
     /** Serializes callbacks while the persisted rollout state loads on a cold process start. */
     suspend fun onActivityWhenReady(
@@ -108,17 +109,17 @@ class WorkoutWatcher(
         }
 
     /** @return true when [kind] ended a workout and a reminder was shown. */
-    @Synchronized
-    fun onActivity(
+    suspend fun onActivity(
         kind: ActivityKind,
         changedAt: Instant,
-    ): Boolean {
-        if (!experienceEnabled() || kind == ActivityKind.UNKNOWN) return false
-        if (transitions.lastChangeAt()?.let { changedAt <= it } == true) return false
-        val endedAt = workoutEndedAt(transitions.last(), kind, changedAt)
-        transitions.record(kind, changedAt)
-        return endedAt != null && dispatcher.onWorkoutEnded(endedAt)
-    }
+    ): Boolean =
+        events.withLock {
+            if (!experienceEnabled() || kind == ActivityKind.UNKNOWN) return@withLock false
+            if (transitions.lastChangeAt()?.let { changedAt <= it } == true) return@withLock false
+            val endedAt = workoutEndedAt(transitions.last(), kind, changedAt)
+            transitions.record(kind, changedAt)
+            endedAt != null && dispatcher.onWorkoutEnded(endedAt)
+        }
 }
 
 /** Health Services binds this while reminders are on and reports each change in the person's activity. */

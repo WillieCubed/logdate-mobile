@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.domain.reminders.CoordinatedReminderClaims
+import app.logdate.client.domain.reminders.DeviceReminderBudget
 import app.logdate.client.domain.reminders.ReminderClaimPeer
 import app.logdate.client.domain.reminders.ReminderDayClaim
 import app.logdate.client.domain.reminders.ReminderDayClaims
@@ -90,6 +91,7 @@ class ReminderDeliveryRuntimeTest {
             fun responder() =
                 ReminderDeliveryResponder(
                     coordinator(),
+                    DeviceReminderBudget(storage),
                     { preferences.enabled.value },
                     post = { trigger, marks -> WatchNudgeNotifier(context).post(trigger, marks) },
                     recordPostedAt = { preferences.setLastReminderAt(it) },

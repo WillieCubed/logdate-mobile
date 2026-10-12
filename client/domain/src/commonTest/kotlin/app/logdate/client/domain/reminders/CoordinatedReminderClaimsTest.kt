@@ -49,6 +49,52 @@ class CoordinatedReminderClaimsTest {
     )
 
     @Test
+    fun standalonePostWhilePeerAnswersInvalidatesThePendingClaim() =
+        runTest {
+            var available = true
+            val claims =
+                CoordinatedReminderClaims(
+                    ReminderDayClaims(phoneStore, PeerRole.PHONE),
+                    PeerRole.PHONE,
+                    ReminderClaimPeer {
+                        available = false
+                        true
+                    },
+                    isCurrent = { true },
+                    enabled = { true },
+                    available = { available },
+                    clock = clock,
+                    timeZone = { TimeZone.UTC },
+                )
+            assertNull(claims.tryClaim(context))
+        }
+
+    @Test
+    fun alreadyUsedDeviceBudgetRefusesLocalAndIncomingClaims() =
+        runTest {
+            val claims =
+                CoordinatedReminderClaims(
+                    ReminderDayClaims(phoneStore, PeerRole.PHONE),
+                    PeerRole.PHONE,
+                    ReminderClaimPeer { error("No transport should be started") },
+                    isCurrent = { true },
+                    enabled = { true },
+                    available = { false },
+                    clock = clock,
+                    timeZone = { TimeZone.UTC },
+                )
+            assertNull(claims.tryClaim(context))
+            val incoming =
+                ReminderDayClaim(
+                    context,
+                    LocalDate(2026, 10, 12),
+                    "00000000-0000-4000-8000-000000000001",
+                    PeerRole.WATCH,
+                )
+            assertFalse(claims.grant(incoming))
+        }
+
+    @Test
     fun offlineClaimReservesTheDayAcrossRestart() =
         runTest {
             assertNotNull(coordinator().tryClaim(context))

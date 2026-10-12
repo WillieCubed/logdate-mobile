@@ -10,10 +10,17 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
+import app.logdate.client.domain.reminders.CoordinatedReminderClaims
+import app.logdate.client.domain.reminders.DeviceReminderBudget
+import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
+import app.logdate.client.domain.streak.toStreakDay
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.peer.state.PeerRole
+import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
@@ -99,8 +106,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.TimeZone
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /** Koin module for the redesigned watch app. Only the new app's screens resolve anything from it. */
@@ -298,7 +307,29 @@ val wearV2Module =
                 enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
             )
         }
-        single { WatchReminderDispatcher(preferences = get(), notifier = get()) }
+        single {
+            val claims = get<CoordinatedReminderClaims>()
+            val budget = get<DeviceReminderBudget>()
+            val peers = get<WatchDeliveryPeer>()
+            val states = get<PeerStateStore>()
+            WatchReminderDispatcher(
+                preferences = get(),
+                notifier = get(),
+                authorize = authorize@{
+                    val peer = peers.current()
+                    val phone = states.documents(PeerRole.PHONE).first()[peer?.phoneNode]?.phone
+                    val capable = peer?.takeIf { phone?.features?.contains(WearFeatures.REMINDERS) == true }
+                    val claim = capable?.let { claims.tryClaim(it) ?: return@authorize false }
+                    val day =
+                        Clock.System.now().toStreakDay(
+                            phone?.zone?.let(TimeZone::of) ?: TimeZone.currentSystemDefault(),
+                            phone?.dayStartHour ?: DEFAULT_STREAK_DAY_START_HOUR,
+                        )
+                    if (claim != null && claim.day != day) return@authorize false
+                    budget.consume(day)
+                },
+            )
+        }
         single<ReminderPermissions> { AndroidReminderPermissions(get()) }
         single<ActivityRegistration> { HealthServicesActivityRegistration(get()) }
         single<ActivityTransitionStore> {

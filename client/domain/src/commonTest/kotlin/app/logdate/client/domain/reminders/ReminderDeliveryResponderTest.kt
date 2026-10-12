@@ -50,6 +50,7 @@ class ReminderDeliveryResponderTest {
     private fun responder() =
         ReminderDeliveryResponder(
             coordinator(),
+            DeviceReminderBudget(storage),
             { enabled },
             post = { trigger, marks ->
                 posts += trigger to marks
@@ -72,6 +73,15 @@ class ReminderDeliveryResponderTest {
         assertIs<Decoded.Supported<ReminderDeliveryResponse>>(
             WearJson.decode(requireNotNull(responder.answer("phone", request())), 1, ReminderDeliveryResponse.serializer()),
         ).value.also { assertEquals(claim, it.claim) }.status
+
+    @Test
+    fun earlierStandalonePostPreventsADelegatedPost() =
+        runTest {
+            assertTrue(DeviceReminderBudget(storage).consume(LocalDate(2026, 10, 12)))
+            assertTrue(coordinator().grant(claim))
+            assertEquals(ReminderDeliveryStatus.ALREADY_HANDLED, status())
+            assertEquals(emptyList(), posts)
+        }
 
     @Test
     fun grantedPhoneReminderPostsWithMarksAndRecordsActualPostTime() =
@@ -120,6 +130,7 @@ class ReminderDeliveryResponderTest {
             val responder =
                 ReminderDeliveryResponder(
                     coordinator(),
+                    DeviceReminderBudget(storage),
                     { true },
                     post = { trigger, marks ->
                         posts += trigger to marks
