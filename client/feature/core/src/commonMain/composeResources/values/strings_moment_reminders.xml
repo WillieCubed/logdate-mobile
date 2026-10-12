@@ -1,0 +1,27 @@
+<resources>
+    <string name="phone_reminders_title">Reminders</string>
+    <string name="phone_reminders_daily_limit">At most one reminder a day, on your phone or watch.</string>
+    <string name="phone_reminders_save_failed">Couldn’t save your reminder preference. Try again.</string>
+    <string name="phone_reminders_notifications_title">Notifications</string>
+    <string name="phone_reminders_notifications_ready">Notifications allowed</string>
+    <string name="phone_reminders_notifications_missing">Notification access is off</string>
+    <string name="phone_reminders_notifications_fix">Allow notifications</string>
+    <string name="phone_reminders_places_title">New places</string>
+    <string name="phone_reminders_places_ready">Ready when you arrive somewhere new and stay a while.</string>
+    <string name="phone_reminders_places_missing">Needs Places, location access, and location history.</string>
+    <string name="phone_reminders_places_fix">Set up Places</string>
+    <string name="phone_reminders_campfire_title">Campfire</string>
+    <string name="phone_reminders_campfire_ready">Ready when your campfire needs a moment to keep going.</string>
+    <string name="phone_reminders_campfire_missing">Campfire tracking is off</string>
+    <string name="phone_reminders_campfire_fix">Set up campfire</string>
+    <string name="phone_reminders_wind_down_title">Wind-down</string>
+    <string name="phone_reminders_wind_down_body">During your waking hours, when you haven’t written or have marked moments to finish.</string>
+    <string name="phone_reminders_wind_down_fix">Adjust your day</string>
+    <string name="phone_reminders_supplements_title">Drafts and memories</string>
+    <string name="phone_reminders_supplements_body">A draft to finish or an older entry to revisit. These share the same daily reminder.</string>
+    <string name="phone_reminders_workout_title">After a workout</string>
+    <string name="phone_reminders_workout_unavailable">Unavailable</string>
+    <string name="phone_reminders_places_consent_title">Add places to your moments?</string>
+    <string name="phone_reminders_places_consent_body">Use location history to recognize places and add them to moments on your phone and watch. You choose whether to record location history in Places settings.</string>
+    <string name="phone_reminders_places_consent_confirm">Enable Places</string>
+</resources>

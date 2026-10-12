@@ -68,7 +68,7 @@ fun SimpleSettingsItem(
     title: String,
     description: String,
     overline: String? = null,
-    onClick: () -> Unit = {},
+    onClick: (() -> Unit)? = {},
     enabled: Boolean = LocalSettingsEnabled.current,
     action: @Composable () -> Unit,
 ) {
@@ -86,7 +86,13 @@ fun SimpleSettingsItem(
             Modifier
                 .fillMaxWidth()
                 .disabledAlpha(enabled)
-                .clickable(enabled = enabled) { onClick() },
+                .then(
+                    if (onClick == null) {
+                        Modifier
+                    } else {
+                        Modifier.clickable(enabled = enabled, onClick = onClick)
+                    },
+                ),
     )
 }
 
@@ -250,6 +256,7 @@ fun SettingsNavigationItem(
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
     enabled: Boolean = LocalSettingsEnabled.current,
+    onClickLabel: String? = null,
 ) {
     ListItem(
         headlineContent = { Text(text = title) },
@@ -269,6 +276,6 @@ fun SettingsNavigationItem(
         modifier =
             Modifier
                 .disabledAlpha(enabled)
-                .clickable(enabled = enabled, onClick = onClick),
+                .clickable(enabled = enabled, onClickLabel = onClickLabel, onClick = onClick),
     )
 }

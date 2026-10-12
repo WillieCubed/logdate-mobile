@@ -33,6 +33,7 @@ import app.logdate.feature.core.settings.ui.MemoriesSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
 import app.logdate.feature.core.settings.ui.RecoveryPhraseEntrySettingsScreen
+import app.logdate.feature.core.settings.ui.ReminderSettingsFix
 import app.logdate.feature.core.settings.ui.ResetAppSettingsScreen
 import app.logdate.feature.core.settings.ui.ResetSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsCategoryNavigationScreen
@@ -266,7 +267,17 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         BirthdaySettingsScreen(onBack = onBack)
     }
     taggedEntry<RecommendationSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Memories, categories)) {
-        RecommendationSettingsScreen(onBack = onBack)
+        RecommendationSettingsScreen(
+            onBack = onBack,
+            onReminderFix = { fix ->
+                when (fix) {
+                    ReminderSettingsFix.PLACES -> onNavigateTo(LocationSettingsRoute)
+                    ReminderSettingsFix.STREAKS -> onNavigateTo(StreakSettingsRoute)
+                    ReminderSettingsFix.SLEEP -> onNavigateTo(DayBoundarySettingsRoute)
+                    ReminderSettingsFix.NOTIFICATIONS -> Unit
+                }
+            },
+        )
     }
     taggedEntry<DevicesRoute>(metadata = settingsDetailMetadata(SettingsCategory.Devices, categories)) {
         DevicesScreen(onBackClick = onBack)

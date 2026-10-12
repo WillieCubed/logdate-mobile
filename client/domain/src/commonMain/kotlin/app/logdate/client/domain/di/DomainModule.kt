@@ -71,6 +71,7 @@ import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.PlaceFamiliarityRepository
+import app.logdate.client.domain.reminders.ReminderPreferences
 import app.logdate.client.domain.restore.PreviewArchiveUseCase
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.domain.rewind.DeleteRewindUseCase
@@ -299,5 +300,6 @@ val domainModule: Module =
         // Preferences shared with a paired watch. The watch app binds its own store with its role.
         single { StampedPreferenceStore(storage = get(), localRole = PeerRole.PHONE) }
         single<WatchPreferencesRepository> { DefaultWatchPreferencesRepository(get()) }
+        factory { ReminderPreferences(get(), get()) }
         factory { EnrichMarkLocationUseCase(marks = get(), locationHistory = get(), watchPreferences = get()) }
     }

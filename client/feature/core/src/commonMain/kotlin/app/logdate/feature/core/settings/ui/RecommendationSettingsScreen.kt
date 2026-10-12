@@ -24,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.ui.adaptive.FoldableBookLayout
@@ -69,6 +71,7 @@ import logdate.client.feature.core.generated.resources.use_recommendations
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_confirm
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Clock
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -84,7 +87,14 @@ fun RecommendationSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MemoriesSettingsViewModel = koinViewModel(),
+    onReminderFix: (ReminderSettingsFix) -> Unit = {},
 ) {
+    val flags = koinInject<FeatureFlagStore>()
+    val remindersEnabled by remember(flags) { flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) }.collectAsState(false)
+    if (remindersEnabled) {
+        ReminderSettingsScreen(onBack = onBack, onFix = onReminderFix)
+        return
+    }
     val uiState by viewModel.uiState.collectAsState()
 
     RecommendationSettingsContent(
