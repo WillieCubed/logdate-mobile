@@ -18,6 +18,8 @@ import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.answerPhoneRequest
+import app.logdate.client.sync.v2.window.WatchWindowPublisher
+import app.logdate.client.sync.v2.window.WindowResyncResponder
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.wearable.CapabilityInfo
@@ -42,18 +44,10 @@ import kotlinx.coroutines.withContext
 import java.io.InputStream
 
 /**
- * Receives data items from the paired Wear OS watch via the Data Layer API.
- *
- * Handles notes, journals, journal-content associations, health snapshots, the watch's state
- * document, and the audio files that go with watch audio notes. Notes and audio go through [WatchNoteIngestor], which queues
- * them for cloud backup once they are complete and tells the watch they arrived. Journals and
- * associations go through [WatchJournalIngestor], which queues them for cloud backup too.
- *
- * For new notes, a notification is posted so the user can tap to expand the note
- * in the editor (entry handoff).
- *
- * Koin resilience: If DI is not ready when data arrives, retries up to
- * [MAX_KOIN_RETRIES] times with a short delay before dropping the event.
+ * Receives watch captures, journals, shared state, media, and library requests.
+ * Ingestors preserve cloud-backup queues and post entry handoff notifications.
+ * Library resync uses the requesting watch's verified link; older watches retain their pull path.
+ * Koin resolution retries when the service wakes before dependency injection is ready.
  */
 open class PhoneDataLayerListenerService : WearableListenerService() {
     protected open val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -141,6 +135,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
                 }
 
                 messageEvent.path == WearAudioRequestPaths.SYNC_REQUEST_PATH -> {
+                    if (publishWindowInstead(messageEvent.sourceNodeId)) return@launch
                     val syncBridge = resolvePhoneWearSyncBridge() ?: return@launch
                     syncBridge.publishNotesToWatch(sourceNodeId = messageEvent.sourceNodeId)
                 }
@@ -242,13 +237,17 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         path: String,
         request: ByteArray,
     ): ByteArray? {
-        if (path != WearPaths.RECEIPTS || !receiptsActive()) return null
+        if (path != WearPaths.RECEIPTS && path != WearPaths.WINDOW_RESYNC) return null
+        if (path == WearPaths.RECEIPTS && !receiptsActive()) return null
         val koin = resolveKoin()
         if (koin == null) {
             Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the watch's $path request fails and is asked again")
             return null
         }
-        return koin.get<WatchReceiptResponder>().answer(nodeId, request)
+        return when (path) {
+            WearPaths.WINDOW_RESYNC -> koin.get<WindowResyncResponder>().answer(nodeId, request)
+            else -> koin.get<WatchReceiptResponder>().answer(nodeId, request)
+        }
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
@@ -438,9 +437,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         peerStates.accept(watchNode, StateDocumentCodec.fromDataMap(event.data), PeerRole.WATCH)
     }
 
-    /**
-     * Resolves the Koin instance, retrying with a short delay if DI isn't ready yet.
-     */
+    /** Retries briefly when dependency injection is not ready. */
     private suspend fun resolveKoin(): org.koin.core.Koin? {
         repeat(MAX_KOIN_RETRIES) { attempt ->
             try {
@@ -456,12 +453,12 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         return null
     }
 
+    protected open suspend fun publishWindowInstead(nodeId: String): Boolean =
+        resolveKoin()?.get<WatchWindowPublisher>()?.publishInstead(nodeId) == true
+
     protected open suspend fun resolvePhoneWearSyncBridge(): PhoneWearSyncBridge? = resolveKoin()?.get()
 
-    /**
-     * The phone's own Data Layer node, whose writes come back to it as data events, or null when Play
-     * services cannot say, in which case every change is acted on.
-     */
+    /** Identifies this phone's own writes, which the Data Layer sends back as events. */
     protected open suspend fun localNodeId(): String? {
         cachedLocalNodeId?.let { return it }
         return try {

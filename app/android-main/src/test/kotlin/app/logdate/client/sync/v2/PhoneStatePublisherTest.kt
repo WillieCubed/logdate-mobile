@@ -1,7 +1,10 @@
 package app.logdate.client.sync.v2
 
+import app.logdate.client.domain.streak.CampfireState
+import app.logdate.client.domain.streak.FirePhase
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.Decoded
+import app.logdate.client.sync.peer.state.CampfireSnapshot
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerDocument
 import app.logdate.client.sync.peer.state.PeerRole
@@ -232,5 +235,24 @@ class PhoneStatePublisherTest {
     private companion object {
         const val FLAG_KEY = "watch_experience_v2_enabled"
         const val PHONE_V2 = "logdate_phone_sync_v2"
+    }
+
+    @Test
+    fun `the phone's campfire crosses as its phase and run and whether it is lit today`() {
+        val state =
+            CampfireState(
+                phase = FirePhase.BURNING,
+                loggedToday = true,
+                runDays = 6,
+                size = null,
+                longestRunDays = 9,
+                totalDaysJournaled = 40,
+                isRekindled = false,
+            )
+
+        assertEquals(
+            CampfireSnapshot(phase = "BURNING", runDays = 6, litToday = true, computedAt = 5),
+            state.toSnapshot(Instant.fromEpochMilliseconds(5)),
+        )
     }
 }

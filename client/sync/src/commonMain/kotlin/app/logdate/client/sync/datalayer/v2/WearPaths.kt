@@ -53,6 +53,18 @@ object WearPaths {
         id: Uuid,
     ): String = "$TOMBSTONE_PREFIX${kind.pathSegment}/$id"
 
+    fun windowItem(
+        kind: RecordKind,
+        id: Uuid,
+        context: PeerDeliveryContext,
+    ): String = "${windowItem(kind, id)}/${context.linkPathSegment}"
+
+    fun windowTombstone(
+        kind: RecordKind,
+        id: Uuid,
+        context: PeerDeliveryContext,
+    ): String = "${windowTombstone(kind, id)}/${context.linkPathSegment}"
+
     /** A record made on the watch, on its way to the phone. */
     fun watchRecord(
         kind: RecordKind,
@@ -84,9 +96,9 @@ object WearPaths {
         return "$BODY_PREFIX$sha256Hex"
     }
 
-    fun parseWindowItem(path: String): RecordPath? = parse(path, WINDOW_PREFIX)
+    fun parseWindowItem(path: String): RecordPath? = parseWindow(path, WINDOW_PREFIX)
 
-    fun parseWindowTombstone(path: String): RecordPath? = parse(path, TOMBSTONE_PREFIX)
+    fun parseWindowTombstone(path: String): RecordPath? = parseWindow(path, TOMBSTONE_PREFIX)
 
     fun parseWatchRecord(path: String): RecordPath? {
         if (!path.startsWith(RECORD_PREFIX)) return null
@@ -134,6 +146,21 @@ object WearPaths {
         val operation = parts.getOrNull(4)
         if (operation != null && CaptureIdentity.of(record.id.toString(), operation) == null) return null
         return record.copy(linkId = linkId, operationId = operation)
+    }
+
+    private fun parseWindow(
+        path: String,
+        prefix: String,
+    ): RecordPath? {
+        if (!path.startsWith(prefix)) return null
+        val parts = path.removePrefix(prefix).split('/')
+        if (parts.size == 2) return parse(path, prefix)
+        if (parts.size != 3 || !LINK_PATH_SEGMENT.matches(parts[2])) return null
+        val record = parse(prefix + parts.take(2).joinToString("/"), prefix) ?: return null
+        val linkId = parts[2].replace('-', '+').replace('_', '/') + "="
+        val bytes = LinkWire.decodeKey(linkId) ?: return null
+        if (LinkWire.encodeKey(bytes) != linkId) return null
+        return record.copy(linkId = linkId)
     }
 
     private fun parse(

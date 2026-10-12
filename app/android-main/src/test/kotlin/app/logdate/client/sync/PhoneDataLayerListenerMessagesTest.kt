@@ -9,6 +9,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -157,6 +158,26 @@ class PhoneDataLayerListenerMessagesTest : PhoneDataLayerListenerFixture() {
             advanceUntilIdle()
 
             coVerify(exactly = 1) { syncBridge.publishNotesToWatch("watch-node") }
+        }
+
+    @Test
+    fun `a window watch requests its bounded library without a legacy pull`() =
+        runTest {
+            val syncBridge = mockk<PhoneWearSyncBridge>(relaxed = true)
+            val requested = mutableListOf<String>()
+            val service =
+                TestPhoneDataLayerListenerService(
+                    serviceScope = this,
+                    syncBridge = syncBridge,
+                    windowPull = {
+                        requested += it
+                        true
+                    },
+                )
+            service.onMessageReceived(message(path = WearAudioRequestPaths.SYNC_REQUEST_PATH, sourceNodeId = "watch-node"))
+            advanceUntilIdle()
+            assertEquals(listOf("watch-node"), requested)
+            coVerify(exactly = 0) { syncBridge.publishNotesToWatch(any()) }
         }
 
     @Test

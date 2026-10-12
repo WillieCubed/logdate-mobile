@@ -1,11 +1,14 @@
 package app.logdate.di
 
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
+import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
+import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.domain.watch.StampedPreferenceStore
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -65,16 +68,19 @@ import app.logdate.client.sync.v2.receipts.WatchPeerMessageSender
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.WatchRecordIngestorV2
+import app.logdate.client.sync.v2.toSnapshot
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 import java.io.File
+import kotlin.time.Clock
 
 /** Koin module for the phone's side of the version 2 watch protocol. */
 val phoneWatchSyncV2Module =
     module {
+        includes(phoneWatchWindowModule)
         single {
             val clients = PhoneLinkClientFactory(get(), get())
             LinkCodeMinter(sessions = get(), clientsFor = clients::capture)
@@ -87,6 +93,8 @@ val phoneWatchSyncV2Module =
         single {
             val sessions = get<SessionStorage>()
             val watchPreferences = get<StampedPreferenceStore>()
+            val preferences = get<LogdatePreferencesDataSource>()
+            val campfire = get<ObserveCampfireUseCase>()
             PhoneStatePublisher(
                 v2Enabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                 channel = get(),
@@ -94,8 +102,22 @@ val phoneWatchSyncV2Module =
                 peerStates = get(),
                 sharedPreferences = watchPreferences.observe(),
                 adoptWatchPreferences = { shared -> watchPreferences.adopt(shared) },
-                features = setOf(WearFeatures.PREFS, WearFeatures.LINK_CLOUD, WearFeatures.RECEIPTS, WearFeatures.OPERATION_RECEIPTS),
-                parts = sessions.getSessionFlow().map { PhoneStateParts(cloud = cloudPresence(it)) },
+                features =
+                    setOf(
+                        WearFeatures.PREFS,
+                        WearFeatures.LINK_CLOUD,
+                        WearFeatures.RECEIPTS,
+                        WearFeatures.OPERATION_RECEIPTS,
+                        WearFeatures.WINDOW,
+                    ),
+                parts =
+                    combine(sessions.getSessionFlow(), campfire()) { session, fire ->
+                        PhoneStateParts(
+                            cloud = cloudPresence(session),
+                            dayStartHour = preferences.getPreferences().dayStartHour ?: DEFAULT_STREAK_DAY_START_HOUR,
+                            campfire = fire?.toSnapshot(Clock.System.now()),
+                        )
+                    },
             )
         }
         single<PairKeyVault> { SecureStoragePairKeyVault(get(), prefix = "phone.watch_link.pair_key.") }

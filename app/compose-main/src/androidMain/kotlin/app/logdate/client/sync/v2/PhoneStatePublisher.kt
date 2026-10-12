@@ -1,6 +1,7 @@
 package app.logdate.client.sync.v2
 
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.domain.streak.CampfireState
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocol
@@ -24,12 +25,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 data class PhoneStateParts(
     val cloud: CloudPresence = CloudPresence.UNKNOWN,
     val dayStartHour: Int = 0,
     val campfire: CampfireSnapshot? = null,
 )
+
+/** The campfire as the phone computed it; the watch's window is too short to compute a long run itself. */
+fun CampfireState.toSnapshot(at: Instant): CampfireSnapshot =
+    CampfireSnapshot(phase = phase.name, runDays = runDays, litToday = loggedToday, computedAt = at.toEpochMilliseconds())
 
 /**
  * Publishes this phone's state document whenever the Labs watch switch, account state or shared preferences

@@ -191,6 +191,7 @@ open class PhoneDataLayerListenerFixture {
         private val channelBytes: ByteArray = ByteArray(0),
         private val localNode: String? = "phone-node",
         private val receiptsEnabled: Boolean = false,
+        private val windowPull: suspend (String) -> Boolean = { false },
     ) : PhoneDataLayerListenerService() {
         val closedChannels = mutableListOf<ChannelClient.Channel>()
 
@@ -209,6 +210,8 @@ open class PhoneDataLayerListenerFixture {
         override suspend fun resolveSyncDependencies(): PhoneDataLayerSyncDependencies? = syncDependencies
 
         override suspend fun receiptsActive(): Boolean = receiptsEnabled
+
+        override suspend fun publishWindowInstead(nodeId: String): Boolean = windowPull(nodeId)
 
         override suspend fun localNodeId(): String? = localNode
 

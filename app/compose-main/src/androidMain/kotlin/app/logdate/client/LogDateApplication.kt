@@ -29,6 +29,7 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.v2.PhoneStatePublisher
 import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
+import app.logdate.client.sync.v2.window.WatchWindowPublisher
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.di.initializeKoin
@@ -156,6 +157,8 @@ class LogdateApplication :
         startPhoneStatePublishing()
         startWatchLinking()
         startWatchReceipts()
+        runCatching { get<WatchWindowPublisher>().start(get()) }
+            .onFailure { Napier.w("Failed to start publishing watch libraries", it) }
     }
 
     /** Tells watches when their notes are backed up; a failure here must not stop startup. */
