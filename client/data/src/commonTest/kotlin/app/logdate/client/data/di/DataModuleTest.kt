@@ -61,6 +61,8 @@ private class FakePreferencesDataStore : DataStore<Preferences> {
 private class FakePlaceDao : PlaceDao {
     private val placesFlow = MutableStateFlow<List<PlaceEntity>>(emptyList())
 
+    override suspend fun insertIfAbsent(place: PlaceEntity): Long = -1
+
     override suspend fun insert(place: PlaceEntity) = Unit
 
     override suspend fun insertAll(places: List<PlaceEntity>) = Unit

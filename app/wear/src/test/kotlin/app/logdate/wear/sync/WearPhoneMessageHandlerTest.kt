@@ -163,4 +163,18 @@ class WearPhoneMessageHandlerTest {
             coEvery { ackHandler.onNoteAcknowledged(any(), any()) } throws CancellationException("stopped")
             assertFailsWith<CancellationException> { handler.onMessage(WearAudioRequestPaths.noteAckPath(Uuid.random())) }
         }
+
+    @Test
+    fun `when the phone returns its library is reconciled after pending changes are sent`() =
+        runTest {
+            val order = mutableListOf<String>()
+            coEvery { syncManager.fullSync() } answers {
+                order += "sync"
+                app.logdate.client.sync
+                    .SyncResult(success = true)
+            }
+            val withWindow = WearPhoneMessageHandler(ackHandler, syncManager, phoneReturned = { order += "window" })
+            withWindow.onPhoneReachable()
+            assertEquals(listOf("sync", "window"), order)
+        }
 }

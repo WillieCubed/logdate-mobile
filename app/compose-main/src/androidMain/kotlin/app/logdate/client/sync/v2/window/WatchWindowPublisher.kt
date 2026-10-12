@@ -147,17 +147,20 @@ class WatchWindowPublisher(
         if (plan.dropped > 0) Napier.w("${plan.dropped} note(s) do not fit the watch's library window; the most recent are chosen")
         requireCurrent(peer)
         val previous = manifest.read(peer)
+        val interrupted = manifest.beginPublication(peer)
+        requireCurrent(peer)
         val published = previous.items.toMutableMap()
         val tombstones = previous.tombstones.toMutableMap()
         val counts = Counts()
         plan.members.forEach { member ->
-            write(peer, all.getValue(member.id), member, bodies.getValue(member.id), published, tombstones, counts)
+            write(peer, all.getValue(member.id), member, bodies.getValue(member.id), published, tombstones, counts, interrupted)
         }
         val inWindow = plan.members.mapTo(HashSet()) { it.id.toString() }
         (published.keys - inWindow).forEach { id -> remove(peer, id, published, tombstones, now, counts) }
         clearOldTombstones(peer, tombstones, inWindow, now, counts)
         requireCurrent(peer)
         manifest.write(peer, PublishedWindow(published, tombstones))
+        if (counts.failed == 0) manifest.finishPublication(peer)
         requireCurrent(peer)
         val members =
             plan.members.mapNotNull { member ->
@@ -190,12 +193,20 @@ class WatchWindowPublisher(
         published: MutableMap<String, PublishedItem>,
         tombstones: MutableMap<String, Long>,
         counts: Counts,
+        interrupted: Boolean,
     ) {
         val id = member.id.toString()
         val version = note.lastUpdated.toEpochMilliseconds()
         val wanted = PublishedItem(version, member.reasons)
         val existing = published[id]
-        if (existing != null && existing.contentVersion == version && existing.reasons == member.reasons && existing.revision > 0) return
+        if (!interrupted &&
+            existing != null &&
+            existing.contentVersion == version &&
+            existing.reasons == member.reasons &&
+            existing.revision > 0
+        ) {
+            return
+        }
         val envelope =
             RecordEnvelope(
                 kind = RecordKind.NOTE,
@@ -220,7 +231,7 @@ class WatchWindowPublisher(
         requireCurrent(peer)
         val revision = manifest.reserveRevision(peer)
         requireCurrent(peer)
-        if (id in tombstones) {
+        if (id in tombstones || interrupted) {
             if (!items.deleteOwn(WearPaths.windowTombstone(RecordKind.NOTE, member.id, peer))) {
                 counts.failed++
                 return

@@ -17,6 +17,7 @@ class WearPhoneMessageHandler(
     private val syncManager: SyncManager,
     private val receiptsPushed: suspend (String?, ByteArray) -> Int = { _, _ -> 0 },
     private val legacyAcksAllowed: suspend () -> Boolean = { true },
+    private val phoneReturned: suspend () -> Unit = {},
 ) {
     suspend fun onMessage(
         path: String,
@@ -84,6 +85,7 @@ class WearPhoneMessageHandler(
     private suspend fun sendPendingChanges() {
         try {
             syncManager.fullSync()
+            phoneReturned()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

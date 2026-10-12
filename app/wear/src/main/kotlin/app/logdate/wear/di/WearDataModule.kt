@@ -6,7 +6,7 @@ import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
-import app.logdate.client.data.notes.EmptyNotePlaceResolver
+import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.notes.StoredMediaReferenceMigration
@@ -70,6 +70,7 @@ import app.logdate.wear.sync.v2.delivery.WatchCaptureProtocol
 import app.logdate.wear.sync.v2.delivery.WatchNoteDelivery
 import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
+import app.logdate.wear.sync.v2.window.WindowReconciler
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
@@ -139,6 +140,7 @@ val wearDataModule =
                 syncManager = get(),
                 receiptsPushed = receipts::apply,
                 legacyAcksAllowed = { !protocol.active() },
+                phoneReturned = { get<WindowReconciler>().resync() },
             )
         }
         single { WearDeadLetterMigration(deadLetterStore = get(), syncMetadataService = get()) }
@@ -217,7 +219,7 @@ val wearDataModule =
         }
 
         // Notes
-        single<NotePlaceResolver> { EmptyNotePlaceResolver }
+        single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalNotesRepository> {
             OfflineFirstJournalNotesRepository(
                 textNoteDao = get(),
@@ -230,6 +232,7 @@ val wearDataModule =
                 notePlaceResolver = get(),
                 syncManagerProvider = { get() },
                 syncMetadataService = get(),
+                transcriptionRepository = get<TranscriptionRepository>(),
                 mediaReferences = get(),
             )
         }

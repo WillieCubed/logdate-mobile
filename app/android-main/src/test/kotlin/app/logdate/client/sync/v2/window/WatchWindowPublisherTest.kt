@@ -416,6 +416,21 @@ class WatchWindowPublisherTest {
             assertTrue(items.puts.isEmpty())
         }
 
+    @Test
+    fun `a crash after a removal write cannot hide an unchanged returning note`() =
+        runTest {
+            notesFlow.value = listOf(recent)
+            publisher.publishIfActive("watch")
+            notesFlow.value = emptyList()
+            items.afterPut = { throw IllegalStateException("process died before manifest save") }
+            assertFailsWith<IllegalStateException> { publisher.publishIfActive("watch") }
+            items.afterPut = {}
+            notesFlow.value = listOf(recent)
+            publisher.publishIfActive("watch")
+            assertEquals(WearPaths.windowItem(RecordKind.NOTE, recent.uid, peer), items.puts.last().first)
+            assertEquals("3", items.puts.last().second[WindowTombstoneDataMap.KEY_REVISION])
+        }
+
     private fun text(
         content: String,
         at: Instant,

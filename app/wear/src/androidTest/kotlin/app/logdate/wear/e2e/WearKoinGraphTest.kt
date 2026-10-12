@@ -46,6 +46,16 @@ class WearKoinGraphTest {
     }
 
     @Test
+    fun libraryWindowResolvesAndRemainsInactiveBeforeRollout() =
+        runBlocking {
+            koin.get<app.logdate.wear.sync.v2.window.WindowMembershipStore>()
+            koin.get<app.logdate.wear.sync.v2.window.WindowApplier>()
+            koin.get<app.logdate.wear.sync.v2.window.WindowItemSource>()
+            assertFalse(koin.get<app.logdate.wear.sync.v2.window.WindowProtocol>().active())
+            kotlin.test.assertNull(koin.get<app.logdate.wear.sync.v2.window.WindowReconciler>().resync())
+        }
+
+    @Test
     fun linkBindingsResolveWithoutMintingAnIdentity() {
         koin.get<WatchLinkCoordinator>()
         koin.get<LinkInstaller>()

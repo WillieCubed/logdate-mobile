@@ -20,6 +20,8 @@ import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
 import app.logdate.wear.sync.v2.WatchStateMirror
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.sync.v2.link.answerWearRequest
+import app.logdate.wear.sync.v2.window.WindowDataEvents
+import app.logdate.wear.sync.v2.window.WindowItem
 import app.logdate.wear.v2.surfaces.SurfaceUpdater
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.wearable.CapabilityInfo
@@ -174,6 +176,7 @@ class WearDataLayerListenerService : WearableListenerService() {
             for (event in syncEvents) {
                 processEvent(event, koin, notesRepository, journalRepository)
             }
+            koin.get<WindowDataEvents>().finishBatch()
             koin.getOrNull<SurfaceUpdater>()?.refreshForSync()
         }
     }
@@ -192,8 +195,13 @@ class WearDataLayerListenerService : WearableListenerService() {
 
         try {
             when {
-                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, notesRepository, koin.get())
-                NoteDataMapper.isNotePath(path) -> handleNoteSync(path, event.data, notesRepository)
+                koin.get<WindowDataEvents>().consume(WindowItem(event.sourceNodeId.orEmpty(), path, event.data)) -> Unit
+                NoteDataMapper.isDeletePath(
+                    path,
+                ) -> if (koin.get<WindowDataEvents>().legacyNotesAllowed()) handleNoteDelete(path, notesRepository, koin.get())
+                NoteDataMapper.isNotePath(
+                    path,
+                ) -> if (koin.get<WindowDataEvents>().legacyNotesAllowed()) handleNoteSync(path, event.data, notesRepository)
                 JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, journalRepository)
                 JournalDataMapper.isJournalPath(path) -> handleJournalSync(path, event.data, journalRepository)
                 AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, koin)

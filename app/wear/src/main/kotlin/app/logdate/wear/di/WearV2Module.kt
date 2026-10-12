@@ -41,6 +41,7 @@ import app.logdate.wear.reminders.WatchReminders
 import app.logdate.wear.reminders.WorkManagerEveningReminderWork
 import app.logdate.wear.reminders.WorkoutWatcher
 import app.logdate.wear.sync.deleteLocalAudio
+import app.logdate.wear.sync.v2.window.WindowProtocol
 import app.logdate.wear.v2.archive.ArchiveViewModel
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
 import app.logdate.wear.v2.flow.FlowViewModel
@@ -165,7 +166,7 @@ val wearV2Module =
             ObserveCampfireUseCase(
                 notesRepository = get(),
                 streakSettingsRepository = WatchStreakSettings(get()),
-                dayBoundaryPreferences = WatchDayBoundaryPreferences(phoneDayStartHour = { null }),
+                dayBoundaryPreferences = WatchDayBoundaryPreferences(phoneDayStartHour = get<WindowProtocol>()::dayStartHour),
             )
         }
         single {

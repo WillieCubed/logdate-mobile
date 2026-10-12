@@ -45,6 +45,16 @@ class WindowManifestStore(
         storage.putString(key(peer), WearJson.encode(PublishedWindow.serializer(), window))
     }
 
+    suspend fun beginPublication(peer: PeerDeliveryContext): Boolean {
+        val interrupted = storage.getString(key(peer) + ".publishing") != null
+        storage.putString(key(peer) + ".publishing", "1")
+        return interrupted
+    }
+
+    suspend fun finishPublication(peer: PeerDeliveryContext) {
+        storage.remove(key(peer) + ".publishing")
+    }
+
     suspend fun reserveRevision(peer: PeerDeliveryContext): Long =
         allocating.withLock {
             val previous = revision(peer)

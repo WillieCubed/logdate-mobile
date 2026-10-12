@@ -50,6 +50,8 @@ class WearManifestFiltersTest {
             RemoteCameraDeviceDataMapper.PATH_CAMERA_DEVICES,
             RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT,
             WearPaths.STATE,
+            WearPaths.windowItem(app.logdate.client.sync.datalayer.v2.RecordKind.NOTE, noteId),
+            WearPaths.windowTombstone(app.logdate.client.sync.datalayer.v2.RecordKind.NOTE, noteId),
         ).forEach { path -> assertResolvesToListener(DataClient.ACTION_DATA_CHANGED, path) }
     }
 

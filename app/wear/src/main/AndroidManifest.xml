@@ -109,6 +109,12 @@
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:path="/logdate/state" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/v2/p2w/window/" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/v2/p2w/tombstone/" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />

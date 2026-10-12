@@ -11,6 +11,9 @@ import kotlin.uuid.Uuid
 
 @Dao
 interface PlaceDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(place: PlaceEntity): Long
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(place: PlaceEntity)
 
