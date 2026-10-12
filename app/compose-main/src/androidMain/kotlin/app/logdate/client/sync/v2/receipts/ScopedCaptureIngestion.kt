@@ -4,20 +4,21 @@ import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.RecordEnvelopeCodec
 import app.logdate.client.sync.datalayer.v2.WearPaths
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.EnvelopeDataMap
 import java.io.InputStream
 
 /** Binds each event to its current source and keeps overlapping work on the same per-link ingestor. */
 class ScopedCaptureIngestion(
     private val peers: PhoneDeliveryPeers,
-    private val create: (PeerDeliveryContext) -> WatchRecordIngestorV2,
+    private val create: (PeerDeliveryContext, String?) -> WatchRecordIngestorV2,
 ) {
     private class Lease(
         val ingestor: WatchRecordIngestorV2,
         var users: Int = 0,
     )
 
-    private val leases = mutableMapOf<PeerDeliveryContext, Lease>()
+    private val leases = mutableMapOf<Pair<PeerDeliveryContext, String?>, Lease>()
 
     suspend fun onRecord(
         sourceNodeId: String?,
@@ -28,7 +29,8 @@ class ScopedCaptureIngestion(
         val peer = peers.current(source) ?: return
         val envelope = (EnvelopeDataMap.fromDataMap(data) as? Decoded.Supported)?.value ?: return
         if (envelope.context != peer) return
-        using(peer) { ingestor ->
+        if (envelope.operationId != null && CaptureIdentity.of(envelope.id, envelope.operationId) == null) return
+        using(peer, envelope.operationId) { ingestor ->
             val unbound = data + (EnvelopeDataMap.KEY_ENVELOPE to RecordEnvelopeCodec.encode(envelope.copy(context = null)))
             ingestor.onRecord(path, unbound)
         }
@@ -43,18 +45,20 @@ class ScopedCaptureIngestion(
         val peer = peers.current(source) ?: return
         val record = WearPaths.parseRecordMedia(path) ?: return
         if (record.linkId != peer.linkId) return
-        using(peer) { it.onMedia(WearPaths.recordMedia(record.kind, record.id), input) }
+        using(peer, record.operationId) { it.onMedia(WearPaths.recordMedia(record.kind, record.id), input) }
     }
 
     private suspend fun using(
         peer: PeerDeliveryContext,
+        operationId: String?,
         block: suspend (WatchRecordIngestorV2) -> Unit,
     ) {
-        val lease = synchronized(leases) { leases.getOrPut(peer) { Lease(create(peer)) }.also { it.users++ } }
+        val key = peer to operationId
+        val lease = synchronized(leases) { leases.getOrPut(key) { Lease(create(peer, operationId)) }.also { it.users++ } }
         try {
             if (peers.isCurrent(peer)) block(lease.ingestor)
         } finally {
-            synchronized(leases) { if (--lease.users == 0) leases.remove(peer) }
+            synchronized(leases) { if (--lease.users == 0) leases.remove(key) }
         }
     }
 }

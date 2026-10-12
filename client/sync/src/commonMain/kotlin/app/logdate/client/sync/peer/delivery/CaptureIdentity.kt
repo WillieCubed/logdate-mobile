@@ -8,6 +8,12 @@ class CaptureIdentity private constructor(
     val ledgerKey: String get() = "$recordId@$operationId"
 
     companion object {
+        fun fromLedgerKey(key: String): CaptureIdentity? {
+            val split = key.indexOf('@')
+            if (split < 0) return null
+            return of(key.substring(0, split), key.substring(split + 1))
+        }
+
         fun of(
             recordId: String,
             operationId: String?,

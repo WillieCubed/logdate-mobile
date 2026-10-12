@@ -247,6 +247,25 @@ class ScopedPhoneReceiptsTest {
             coVerify(exactly = 0) { notes.getNoteById(any()) }
         }
 
+    @Test
+    fun `earlier capture history cannot acknowledge a new operation with the same version`() =
+        runTest {
+            link()
+            received(context)
+            assertNull(book.receiptFor(context, query.copy(operationId = "new-operation")))
+        }
+
+    @Test
+    fun `a stored operation is acknowledged with its exact operation identity`() =
+        runTest {
+            link()
+            ledger.track(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, "$id@operation", 5)
+            val receipt = book.receiptFor(context, query.copy(operationId = "operation"))
+            assertEquals("operation", receipt?.operationId)
+            assertEquals(id.toString(), receipt?.id)
+            assertEquals(ReceiptState.BACKED_UP, receipt?.state)
+        }
+
     private suspend fun link(peer: PeerDeliveryContext = context) {
         links.recordSuccess(
             LinkTarget(peer.watchNode, "Watch"),

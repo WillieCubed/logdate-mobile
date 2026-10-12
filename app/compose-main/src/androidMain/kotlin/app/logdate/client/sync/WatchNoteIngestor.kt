@@ -93,6 +93,7 @@ class WatchNoteIngestor(
     private val acknowledger: WatchNoteAcknowledger,
     private val notifier: WatchNoteNotifier,
     private val noteDataMapper: NoteDataMapper = NoteDataMapper(),
+    private val canAcknowledgeExistingAudio: suspend (JournalNote, Map<String, String>?) -> Boolean = { _, _ -> true },
 ) {
     private class NoteLock {
         val mutex = Mutex()
@@ -139,7 +140,7 @@ class WatchNoteIngestor(
         }
         val existing = notesRepository.getNoteById(noteId)
         if (existing != null) {
-            acknowledger.acknowledge(noteId, existing.lastUpdated)
+            if (canAcknowledgeExistingAudio(existing, null)) acknowledger.acknowledge(noteId, existing.lastUpdated)
             return@withNoteLock
         }
         if (!audioStore.writeAudio(noteId, source)) {
@@ -164,7 +165,7 @@ class WatchNoteIngestor(
     ) {
         val existing = notesRepository.getNoteById(note.uid)
         if (existing != null) {
-            acknowledger.acknowledge(note.uid, existing.lastUpdated)
+            if (canAcknowledgeExistingAudio(existing, data)) acknowledger.acknowledge(note.uid, existing.lastUpdated)
             return
         }
         audioStore.stashMetadata(note.uid, data)

@@ -7,12 +7,14 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
 import app.logdate.client.domain.watch.StampedPreferenceStore
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.FileWatchAudioStore
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.client.sync.WatchCaptureReceipt
 import app.logdate.client.sync.WatchNoteIngestor
 import app.logdate.client.sync.WatchNoteNotifier
 import app.logdate.client.sync.datalayer.NoteDataMapper
@@ -22,6 +24,7 @@ import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import app.logdate.client.sync.peer.delivery.PeerScopes
@@ -154,7 +157,8 @@ val phoneWatchSyncV2Module =
             val notifier = get<WatchNoteNotifier>()
             val mapper = get<NoteDataMapper>()
             val files = androidContext().filesDir
-            ScopedCaptureIngestion(peers) { peer ->
+            val mediaFiles = get<MediaFileResolver>()
+            ScopedCaptureIngestion(peers) { peer, operation ->
                 val guarded =
                     WatchCaptureNotes(
                         notes,
@@ -164,14 +168,22 @@ val phoneWatchSyncV2Module =
                         { get<SyncManager>().sync() },
                         provenance::remember,
                     )
-                val acknowledger = ReceiptAcknowledger(ledger, receipts, peer)
+                val acknowledger = ReceiptAcknowledger(ledger, receipts, peer, operation)
                 val ingestor =
                     WatchNoteIngestor(
                         guarded,
-                        FileWatchAudioStore.scoped(File(files, "audio_notes"), File(files, "watch_incoming"), peer),
+                        FileWatchAudioStore.scoped(
+                            File(files, "audio_notes"),
+                            File(files, "watch_incoming"),
+                            peer,
+                            operationId = operation,
+                        ),
                         acknowledger,
                         notifier,
                         mapper,
+                        canAcknowledgeExistingAudio = { note, data ->
+                            operation == null || WatchCaptureReceipt.existingAudioMatches(note, data, mediaFiles::filePath)
+                        },
                     )
                 WatchRecordIngestorV2(
                     ingestMetadata = ingestor::onNoteMetadata,
@@ -180,12 +192,14 @@ val phoneWatchSyncV2Module =
                     acknowledger = acknowledger,
                     rejection =
                         RecordRejection { kind, id ->
-                            receipts.reject(peer, kind, id)
+                            receipts.reject(peer, kind, id, operation)
                             Unit
                         },
                     mapper = mapper,
+                    operationId = operation,
                     receivedVersion = { id ->
-                        ledger.get(peer.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, id.toString())?.contentVersion
+                        val key = operation?.let { CaptureIdentity.of(id.toString(), it)?.ledgerKey } ?: id.toString()
+                        ledger.get(peer.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, key)?.contentVersion
                     },
                 )
             }

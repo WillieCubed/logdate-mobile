@@ -5,6 +5,7 @@ import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.audioDigest
 import app.logdate.client.sync.datalayer.copyToDigesting
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -188,8 +189,10 @@ class FileWatchAudioStore(
             incomingDirectory: File,
             context: PeerDeliveryContext,
             ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            operationId: String? = null,
         ): FileWatchAudioStore {
-            val scope = context.linkPathSegment
+            require(operationId == null || CaptureIdentity.of("note", operationId) != null) { "Invalid capture operation" }
+            val scope = context.linkPathSegment + (operationId?.let { "/operations/$it" } ?: "")
             return FileWatchAudioStore(
                 File(audioDirectory, "watch_links/$scope"),
                 File(incomingDirectory, "v2/$scope"),

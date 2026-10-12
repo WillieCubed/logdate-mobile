@@ -239,7 +239,9 @@ class WatchNoteDelivery(
                 return failed(entry, "its data could not be sent")
             }
             if (!isCurrent(peer) || !outbox.isCurrentOperation(EntityType.NOTE, capture.pending)) return Step()
-            if (audio != null && !transport.sendFile(WearPaths.recordMedia(RecordKind.NOTE, audio.uid, peer), audio.mediaRef)) {
+            if (audio != null &&
+                !transport.sendFile(WearPaths.recordMedia(RecordKind.NOTE, audio.uid, peer, capture.identity.operationId), audio.mediaRef)
+            ) {
                 return failed(entry, "its recording could not be sent")
             }
             if (isCurrent(peer) && outbox.isCurrentOperation(EntityType.NOTE, capture.pending)) {

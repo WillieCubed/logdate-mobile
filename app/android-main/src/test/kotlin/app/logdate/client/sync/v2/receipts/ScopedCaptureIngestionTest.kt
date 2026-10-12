@@ -46,7 +46,7 @@ class ScopedCaptureIngestionTest {
         )
     private val path = WearPaths.watchRecord(RecordKind.NOTE, note.uid)
     private val ingestion =
-        ScopedCaptureIngestion(peers) { context ->
+        ScopedCaptureIngestion(peers) { context, _ ->
             created++
             afterCreate()
             WatchRecordIngestorV2(

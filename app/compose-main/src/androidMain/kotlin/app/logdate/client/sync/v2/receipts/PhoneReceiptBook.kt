@@ -11,6 +11,7 @@ import app.logdate.client.sync.datalayer.v2.ReceiptState
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import app.logdate.client.sync.peer.delivery.PeerScopes
@@ -33,9 +34,10 @@ class PhoneReceiptBook(
 
     /** Null when the phone has no copy of that version yet, so the watch sends it again. */
     suspend fun receiptFor(query: ReceiptQuery): Receipt? {
+        if (query.operationId != null) return null
         val session = sessions.getOriginBoundSession()
         val id = Uuid.parseOrNull(query.id)
-        if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id)
+        if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id, query.operationId)
         val note = notes.getNoteById(id)
         if (note == null) {
             val received = ledger.get(PeerScopes.WATCHES, DeliveryDirection.FROM_WATCH, EntityType.NOTE, query.id)
@@ -66,10 +68,11 @@ class PhoneReceiptBook(
         if (!isCurrent(context)) return null
         val session = sessions.getOriginBoundSession()
         val id = Uuid.parseOrNull(query.id)
-        if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id)
+        if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id, query.operationId)
+        val key = query.operationId?.let { CaptureIdentity.of(query.id, it)?.ledgerKey ?: return null } ?: query.id
         val received =
             ledger
-                .get(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, query.id)
+                .get(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, key)
                 ?.takeIf { it.contentVersion >= query.contentVersion } ?: return null
         val note = notes.getNoteById(id)
         val receipt =
@@ -90,7 +93,7 @@ class PhoneReceiptBook(
                     serverVersion = note.syncVersion.takeIf { backedUp },
                 )
             }
-        return receipt.takeIf { sessions.getOriginBoundSession() == session && isCurrent(context) }
+        return receipt.copy(operationId = query.operationId).takeIf { sessions.getOriginBoundSession() == session && isCurrent(context) }
     }
 
     companion object {
@@ -100,6 +103,7 @@ class PhoneReceiptBook(
         fun rejected(
             kind: RecordKind,
             id: String,
-        ): Receipt = Receipt(kind, id, ANY_VERSION, ReceiptState.REJECTED_UNSUPPORTED)
+            operationId: String? = null,
+        ): Receipt = Receipt(kind, id, ANY_VERSION, ReceiptState.REJECTED_UNSUPPORTED, operationId = operationId)
     }
 }

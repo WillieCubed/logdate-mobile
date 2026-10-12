@@ -257,6 +257,22 @@ class ScopedWatchReceiptPushTest {
             assertEquals(DeliveryState.NEW, entry()?.state)
         }
 
+    @Test
+    fun `backup notifications retain operation identity and the public note ID`() =
+        runTest {
+            val entry = ledger.track(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, "$id@operation", 5)
+            ledger.moveTo(entry, DeliveryState.ON_PHONE)
+            assertEquals(1, notifier.pushBackedUp())
+            val receipt =
+                sent
+                    .single()
+                    .second.receipts
+                    .single()
+            assertEquals(id.toString(), receipt.id)
+            assertEquals("operation", receipt.operationId)
+            assertEquals(ReceiptState.BACKED_UP, receipt.state)
+        }
+
     private suspend fun received() {
         val entry = ledger.track(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, id.toString(), 5)
         ledger.moveTo(entry, DeliveryState.ON_PHONE)

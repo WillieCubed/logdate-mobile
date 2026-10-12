@@ -62,6 +62,22 @@ class ScopedCaptureWireTest {
     }
 
     @Test
+    fun `operation channels use an explicit namespace and preserve their identity`() {
+        val expected = "/logdate/v2/w2p/media/note/$id/${context.linkPathSegment}/op/operation"
+        assertEquals(expected, WearPaths.recordMedia(RecordKind.NOTE, id, context, "operation"))
+        assertEquals(RecordPath(RecordKind.NOTE, id, context.linkId, "operation"), WearPaths.parseRecordMedia(expected))
+    }
+
+    @Test
+    fun `invalid operation suffixes cannot become scoped recording channels`() {
+        val prefix = "/logdate/v2/w2p/media/note/$id/${context.linkPathSegment}/op/"
+        for (operation in listOf("", "../escape", "%2Fescape", "a".repeat(129), "operation/extra")) {
+            assertNull(WearPaths.parseRecordMedia(prefix + operation), operation)
+            assertFailsWith<IllegalArgumentException> { WearPaths.recordMedia(RecordKind.NOTE, id, context, operation) }
+        }
+    }
+
+    @Test
     fun `old media channels stay unbound and keep their existing path`() {
         val path = WearPaths.recordMedia(RecordKind.NOTE, id)
         assertEquals("/logdate/v2/w2p/media/note/$id", path)

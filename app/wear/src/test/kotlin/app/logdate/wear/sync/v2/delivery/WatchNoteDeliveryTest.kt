@@ -169,7 +169,7 @@ class WatchNoteDeliveryTest {
                     lastUpdated = note.lastUpdated,
                 )
             delivery.deliverIfActive()
-            assertEquals(listOf(WearPaths.recordMedia(RecordKind.NOTE, note.uid, peer) to "/recording.m4a"), transport.files)
+            assertEquals(listOf(WearPaths.recordMedia(RecordKind.NOTE, note.uid, peer, "operation") to "/recording.m4a"), transport.files)
             val envelope = (EnvelopeDataMap.fromDataMap(transport.puts.single().second) as Decoded.Supported).value
             assertEquals(42L, envelope.media.single().sizeBytes)
         }

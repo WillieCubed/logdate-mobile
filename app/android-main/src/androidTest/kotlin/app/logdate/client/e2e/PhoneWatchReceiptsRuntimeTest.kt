@@ -43,6 +43,7 @@ class PhoneWatchReceiptsRuntimeTest {
         assertListener("CHANNEL_EVENT", "/logdate/v2/w2p/media/note/${Uuid.random()}")
         val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32) { -1 }), "phone", "watch", LinkMode.PAIR)
         assertListener("CHANNEL_EVENT", WearPaths.recordMedia(RecordKind.NOTE, Uuid.random(), peer))
+        assertListener("CHANNEL_EVENT", WearPaths.recordMedia(RecordKind.NOTE, Uuid.random(), peer, "operation"))
     }
 
     @Test

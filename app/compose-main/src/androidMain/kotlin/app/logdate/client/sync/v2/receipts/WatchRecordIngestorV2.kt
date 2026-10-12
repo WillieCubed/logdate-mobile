@@ -2,6 +2,7 @@ package app.logdate.client.sync.v2.receipts
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.sync.WatchCaptureReceipt
 import app.logdate.client.sync.WatchNoteAcknowledger
 import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.NoteDataMapper
@@ -32,6 +33,7 @@ class WatchRecordIngestorV2(
     private val mapper: NoteDataMapper = NoteDataMapper(),
     private val receivedVersion: suspend (Uuid) -> Long? = { null },
     private val scoped: ScopedCaptureIngestion? = null,
+    private val operationId: String? = null,
 ) {
     suspend fun onRecord(
         sourceNodeId: String?,
@@ -64,7 +66,7 @@ class WatchRecordIngestorV2(
                 is Decoded.Unsupported -> return refuse(recordPath, "it was written by a newer version")
                 is Decoded.Malformed -> return refuse(recordPath, decoded.reason)
             }
-        if (envelope.context != null) {
+        if (envelope.context != null || envelope.operationId != operationId) {
             Napier.w("A scoped capture requires a source-validated ingestion path")
             return
         }
@@ -89,6 +91,9 @@ class WatchRecordIngestorV2(
             )
         ) {
             return refuse(recordPath, "its audio has no single integrity reference")
+        }
+        if (operationId != null && note !is JournalNote.Text && note !is JournalNote.Audio) {
+            return refuse(recordPath, "this capture transport supports text and recordings")
         }
         val received = receivedVersion(note.uid)
         if (received != null && received >= envelope.contentVersion && notes.getNoteById(note.uid) == null) {
@@ -132,6 +137,7 @@ class WatchRecordIngestorV2(
 
     private suspend fun acknowledgeIfStored(note: JournalNote) {
         val stored = notes.getNoteById(note.uid) ?: return
+        if (operationId != null && !WatchCaptureReceipt.sameContent(stored, note)) return
         acknowledger.acknowledge(note.uid, stored.lastUpdated)
     }
 

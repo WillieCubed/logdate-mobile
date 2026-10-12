@@ -1,5 +1,6 @@
 package app.logdate.client.sync.datalayer.v2
 
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.link.LinkWire
 import kotlin.uuid.Uuid
 
@@ -82,16 +83,29 @@ object WearPaths {
         context: PeerDeliveryContext,
     ): String = "${recordMedia(kind, id)}/${context.linkPathSegment}"
 
+    fun recordMedia(
+        kind: RecordKind,
+        id: Uuid,
+        context: PeerDeliveryContext,
+        operationId: String,
+    ): String {
+        require(CaptureIdentity.of(id.toString(), operationId) != null) { "A recording needs a valid operation identity" }
+        return "${recordMedia(kind, id, context)}/op/$operationId"
+    }
+
     fun parseRecordMedia(path: String): RecordPath? {
         if (!path.startsWith(MEDIA_PREFIX)) return null
         val parts = path.removePrefix(MEDIA_PREFIX).split('/')
         if (parts.size == 2) return parse(path, MEDIA_PREFIX)
-        if (parts.size != 3 || !LINK_PATH_SEGMENT.matches(parts[2])) return null
+        if (parts.size !in listOf(3, 5) || !LINK_PATH_SEGMENT.matches(parts[2])) return null
+        if (parts.size == 5 && parts[3] != "op") return null
         val linkId = parts[2].replace('-', '+').replace('_', '/') + "="
         val hash = LinkWire.decodeKey(linkId) ?: return null
         if (hash.size != 32 || LinkWire.encodeKey(hash) != linkId) return null
         val record = parse("$MEDIA_PREFIX${parts[0]}/${parts[1]}", MEDIA_PREFIX) ?: return null
-        return record.copy(linkId = linkId)
+        val operation = parts.getOrNull(4)
+        if (operation != null && CaptureIdentity.of(record.id.toString(), operation) == null) return null
+        return record.copy(linkId = linkId, operationId = operation)
     }
 
     private fun parse(
@@ -112,4 +126,5 @@ data class RecordPath(
     val kind: RecordKind,
     val id: Uuid,
     val linkId: String? = null,
+    val operationId: String? = null,
 )

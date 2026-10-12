@@ -12,6 +12,7 @@ import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
@@ -48,9 +49,10 @@ class WatchReceiptNotifier(
         context: PeerDeliveryContext,
         noteId: String,
         contentVersion: Long,
+        operationId: String? = null,
     ): Boolean {
         if (!isCurrent(context)) return false
-        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, noteId, contentVersion)) ?: return false
+        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, noteId, contentVersion, operationId)) ?: return false
         return send(context, listOf(receipt))
     }
 
@@ -58,7 +60,8 @@ class WatchReceiptNotifier(
         context: PeerDeliveryContext,
         kind: RecordKind,
         id: String,
-    ): Boolean = send(context, listOf(PhoneReceiptBook.rejected(kind, id)))
+        operationId: String? = null,
+    ): Boolean = send(context, listOf(PhoneReceiptBook.rejected(kind, id, operationId)))
 
     override suspend fun reject(
         kind: RecordKind,
@@ -78,7 +81,10 @@ class WatchReceiptNotifier(
                     .inState(context.ledgerScope, DeliveryDirection.FROM_WATCH, DeliveryState.ON_PHONE)
                     .filter { it.entityType == EntityType.NOTE }
                     .mapNotNull { entry ->
-                        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, entry.entityId, entry.contentVersion))
+                        val identity = CaptureIdentity.fromLedgerKey(entry.entityId)
+                        val query =
+                            ReceiptQuery(RecordKind.NOTE, identity?.recordId ?: entry.entityId, entry.contentVersion, identity?.operationId)
+                        val receipt = book.receiptFor(context, query)
                         if (receipt?.state == ReceiptState.BACKED_UP) entry to receipt else null
                     }
             if (backedUp.isEmpty() || !send(context, backedUp.map { it.second }) || !isCurrent(context)) continue
@@ -133,6 +139,7 @@ class ReceiptAcknowledger(
     private val ledger: PeerDeliveryLedger,
     private val receipts: WatchReceiptNotifier,
     private val context: PeerDeliveryContext? = null,
+    private val operationId: String? = null,
 ) : WatchNoteAcknowledger {
     override suspend fun acknowledge(
         noteId: Uuid,
@@ -141,9 +148,11 @@ class ReceiptAcknowledger(
         val peer = context ?: return
         if (!receipts.isCurrent(peer)) return
         val version = lastUpdated.toEpochMilliseconds()
-        val entry = ledger.track(peer.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, noteId.toString(), version)
+        val id = noteId.toString()
+        val key = operationId?.let { CaptureIdentity.of(id, it)?.ledgerKey ?: return } ?: id
+        val entry = ledger.track(peer.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, key, version)
         if (entry.contentVersion != version || !receipts.isCurrent(peer)) return
         if (entry.state == DeliveryState.NEW) ledger.moveTo(entry, DeliveryState.ON_PHONE)
-        receipts.push(peer, noteId.toString(), version)
+        receipts.push(peer, id, version, operationId)
     }
 }
