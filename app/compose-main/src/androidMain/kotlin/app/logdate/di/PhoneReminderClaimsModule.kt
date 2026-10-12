@@ -26,6 +26,7 @@ import org.koin.dsl.module
 
 val phoneReminderClaimsModule =
     module {
+        includes(phoneReminderSignalsModule)
         single { ReminderPostedHistory(get()) }
         single { DeviceReminderBudget(get()) }
         single { PhoneMomentReminderNotifier(androidContext()) }
@@ -64,7 +65,8 @@ val phoneReminderClaimsModule =
                 dayStartHour = { preferences.getPreferences().dayStartHour ?: DEFAULT_STREAK_DAY_START_HOUR },
             )
         }
-        factory { (source: PhoneReminderSnapshotSource) ->
+        factory { parameters ->
+            val source = parameters.getOrNull<PhoneReminderSnapshotSource>() ?: get<PhoneReminderSnapshotSource>()
             val peers = get<PhoneDeliveryPeers>()
             val notifier = get<PhoneMomentReminderNotifier>()
             PhoneReminderDelivery(

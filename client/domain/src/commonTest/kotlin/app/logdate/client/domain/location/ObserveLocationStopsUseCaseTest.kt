@@ -28,6 +28,39 @@ import kotlin.time.Instant
  */
 class ObserveLocationStopsUseCaseTest {
     @Test
+    fun `current device snapshot excludes imported locations and retains its newest movement`() =
+        runTest {
+            val start = Instant.parse("2026-10-12T12:00:00Z")
+            val local = listOf(0, 5, 10).map { minute -> historyItem(start + minute.minutes, 37.0, -122.0) }
+            val moved = historyItem(start + 11.minutes, 38.0, -122.0)
+            val foreign = historyItem(start + 12.minutes, 39.0, -122.0).copy(deviceId = "foreign")
+            val repository = FakeLocationHistoryRepository(local + moved + foreign)
+            val useCase = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(repository))
+            val snapshot = useCase.currentDevice("device").first()
+            assertEquals(moved, snapshot.latest)
+            assertTrue(snapshot.stops.all { it.location.latitude < 39.0 })
+            assertTrue(snapshot.stops.any { it.startTime == start && it.hasReliableDuration })
+        }
+
+    @Test
+    fun `manual journal and reviewed locations cannot be a current arrival fix`() =
+        runTest {
+            val now = Instant.parse("2026-10-12T12:00:00Z")
+            val samples =
+                listOf(
+                    app.logdate.client.repository.location.LocationCaptureSource.MANUAL,
+                    app.logdate.client.repository.location.LocationCaptureSource.JOURNAL_ENTRY,
+                    app.logdate.client.repository.location.LocationCaptureSource.TIMELINE_REVIEW,
+                ).map { source -> historyItem(now, 37.0, -122.0, source) }
+            val snapshot =
+                ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(FakeLocationHistoryRepository(samples)))
+                    .currentDevice("device")
+                    .first()
+            assertEquals(null, snapshot.latest)
+            assertTrue(snapshot.stops.isEmpty())
+        }
+
+    @Test
     fun `invoke groups nearby consecutive points into one stop`() =
         runTest {
             val baseTime = Instant.fromEpochMilliseconds(1_000)

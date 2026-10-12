@@ -57,11 +57,13 @@ class DefaultPlaceFamiliarityRepository(
 
     private suspend fun loadRecords(): Map<String, PlaceFamiliarityRecord> {
         val stored = keyValueStorage.getString(KEY_PLACE_FAMILIARITY) ?: return emptyMap()
-        return runCatching {
-            json
-                .decodeFromString<List<PlaceFamiliarityRecord>>(stored)
-                .associateBy(PlaceFamiliarityRecord::placeKey)
-        }.getOrDefault(emptyMap())
+        return try {
+            val records = json.decodeFromString<List<PlaceFamiliarityRecord>>(stored)
+            check(records.all { it.placeKey.isNotBlank() && it.visitCount > 0 }) { "Invalid place familiarity" }
+            records.associateBy(PlaceFamiliarityRecord::placeKey)
+        } catch (e: Exception) {
+            throw IllegalStateException("Unreadable place familiarity", e)
+        }
     }
 
     companion object {

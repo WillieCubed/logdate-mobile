@@ -7,6 +7,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.reminders.DeviceReminderBudget
 import app.logdate.client.domain.reminders.PhoneReminderDelivery
 import app.logdate.client.domain.reminders.PhoneReminderOutcome
@@ -15,6 +17,10 @@ import app.logdate.client.domain.reminders.PhoneReminderSnapshotSource
 import app.logdate.client.domain.reminders.ReminderClock
 import app.logdate.client.domain.reminders.ReminderPostedHistory
 import app.logdate.client.domain.reminders.ReminderSignals
+import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.client.domain.watch.WatchPreferencesRepository
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -35,6 +41,57 @@ import kotlin.time.Clock
 
 @RunWith(AndroidJUnit4::class)
 class PhoneReminderDeliveryRuntimeTest {
+    @Test
+    fun installedLiveSnapshotReadsSavedJournalActivityWithExplicitConsent(): Unit =
+        runBlocking {
+            val koin = KoinJavaComponent.getKoin()
+            val flags = koin.get<FeatureFlagStore>()
+            val shared = koin.get<WatchPreferencesRepository>()
+            val notes = koin.get<JournalNotesRepository>()
+            val previousFlag = flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)
+            val previousReminders = shared.get(SharedPreferenceKey.RemindersEnabled)
+            val previousPlaces = shared.get(SharedPreferenceKey.CapturePlaces)
+            val now = Clock.System.now()
+            val fixture = JournalNote.Text(creationTimestamp = now, lastUpdated = now, content = "Reminder runtime fixture")
+            try {
+                shared.set(SharedPreferenceKey.CapturePlaces, false)
+                shared.set(SharedPreferenceKey.RemindersEnabled, true)
+                flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, true)
+                notes.create(fixture)
+                val snapshot = koin.get<PhoneReminderSnapshotSource>().read()
+                assertTrue(snapshot.signals.enabled)
+                assertTrue(snapshot.signals.writtenToday)
+                assertTrue(snapshot.audience.isNotBlank())
+                assertEquals(null, snapshot.signals.newPlaceArrivedAt)
+                assertEquals(null, snapshot.signals.workoutEndedAt)
+                assertNotNull(notes.getNoteById(fixture.uid))
+            } finally {
+                notes.removeById(fixture.uid)
+                flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, previousFlag)
+                shared.set(SharedPreferenceKey.RemindersEnabled, previousReminders)
+                shared.set(SharedPreferenceKey.CapturePlaces, previousPlaces)
+            }
+        }
+
+    @Test
+    fun installedLiveSnapshotReadsTheRolloutHoldWithoutCollectingPrivateSignals() =
+        runBlocking {
+            val koin = KoinJavaComponent.getKoin()
+            val flags = koin.get<FeatureFlagStore>()
+            val previous = flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)
+            try {
+                flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, false)
+                val snapshot = koin.get<PhoneReminderSnapshotSource>().read()
+                assertFalse(snapshot.signals.enabled)
+                assertEquals(0, snapshot.signals.openMarks)
+                assertEquals(null, snapshot.signals.newPlaceArrivedAt)
+                assertEquals(null, snapshot.signals.workoutEndedAt)
+                assertEquals(PhoneReminderOutcome.SKIPPED, koin.get<PhoneReminderDelivery>().run())
+            } finally {
+                flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, previous)
+            }
+        }
+
     @Test
     fun installedStandaloneDeliveryPostsAndDurablySuppressesAnotherRun() =
         runBlocking {

@@ -26,6 +26,19 @@ class ObserveLocationStopsUseCase(
     private val reconstruct: ReconstructLocationDay = ReconstructLocationDay(),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
+    fun currentDevice(deviceId: String): Flow<LocationStopSnapshot> =
+        observeLocationHistoryUseCase()
+            .map { history ->
+                val local =
+                    history.filter {
+                        deviceId.isNotBlank() &&
+                            it.deviceId == deviceId &&
+                            it.countsTowardActivityStops() &&
+                            it.captureSource != LocationCaptureSource.MANUAL
+                    }
+                LocationStopSnapshot(aggregateStops(local), local.maxByOrNull { it.timestamp })
+            }.flowOn(dispatcher)
+
     /** Reconstruction is heavy over long history, so it never runs on the collector's (often main) thread. */
     operator fun invoke(): Flow<List<LocationStop>> = observeLocationHistoryUseCase().map(::aggregateStops).flowOn(dispatcher)
 
@@ -87,3 +100,9 @@ class ObserveLocationStopsUseCase(
         const val LEGACY_OWNER = "default_user"
     }
 }
+
+/** Stops and latest fix read from the same device-scoped history snapshot. */
+data class LocationStopSnapshot(
+    val stops: List<LocationStop>,
+    val latest: LocationHistoryItem?,
+)
