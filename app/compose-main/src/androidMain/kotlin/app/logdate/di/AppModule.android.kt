@@ -150,8 +150,8 @@ actual val appModule: Module =
             val quickReply = FeatureFlagState(get(), FeatureFlag.NOTIFICATION_QUICK_REPLY, get())
             AmbientPromptNotificationCoordinator(androidContext(), quickReplyEnabled = quickReply::enabled)
         }
-        single { AmbientPromptScheduler(androidContext(), get()) }
-        single { AmbientPromptSchedulingObserver(get(), get(), get()) }
+        single { AmbientPromptScheduler(androidContext(), get(), get(), get()) }
+        single { AmbientPromptSchedulingObserver(get(), get(), get(), get(), get()) }
         workerOf(::AmbientPromptWorker)
 
         single { RewindNotificationCoordinator(androidContext()) }

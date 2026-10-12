@@ -11,10 +11,14 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.client.domain.watch.WatchPreferencesRepository
 import io.github.aakira.napier.Napier
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -22,6 +26,8 @@ import java.util.concurrent.TimeUnit
 class AmbientPromptScheduler(
     private val context: Context,
     private val memoriesSettingsRepository: MemoriesSettingsRepository,
+    private val flags: FeatureFlagStore,
+    private val shared: WatchPreferencesRepository,
 ) {
     private val alarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -31,7 +37,16 @@ class AmbientPromptScheduler(
         refreshSchedules(memoriesSettingsRepository.getSettings())
     }
 
-    fun refreshSchedules(settings: MemoriesSettings) {
+    suspend fun refreshSchedules(settings: MemoriesSettings) {
+        if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) {
+            cancelFixedAlarms()
+            if (shared.get(SharedPreferenceKey.RemindersEnabled)) {
+                enqueuePeriodicEvaluation(15, TimeUnit.MINUTES)
+            } else {
+                cancelAll()
+            }
+            return
+        }
         if (!settings.contextualRecommendationsEnabled || !settings.ambientPromptsEnabled || !hasAnyAmbientPromptFamily(settings)) {
             cancelAll()
             return
@@ -57,19 +72,18 @@ class AmbientPromptScheduler(
             alarmManager.cancel(pendingIntent(REQUEST_EVENING, ACTION_EVENING_PROMPT))
         }
 
-        val periodicRequest =
-            PeriodicWorkRequestBuilder<AmbientPromptWorker>(
-                6,
-                TimeUnit.HOURS,
-            ).setInputData(
-                workDataOf(AmbientPromptWorker.KEY_TRIGGER_CONTEXT to AmbientPromptTriggerContext.PERIODIC.name),
-            ).build()
+        enqueuePeriodicEvaluation(6, TimeUnit.HOURS)
+    }
 
-        workManager.enqueueUniquePeriodicWork(
-            PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            periodicRequest,
-        )
+    private fun enqueuePeriodicEvaluation(
+        interval: Long,
+        unit: TimeUnit,
+    ) {
+        val request =
+            PeriodicWorkRequestBuilder<AmbientPromptWorker>(interval, unit)
+                .setInputData(workDataOf(AmbientPromptWorker.KEY_TRIGGER_CONTEXT to AmbientPromptTriggerContext.PERIODIC.name))
+                .build()
+        workManager.enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     fun enqueueImmediateEvaluation(triggerContext: AmbientPromptTriggerContext) {
@@ -86,10 +100,17 @@ class AmbientPromptScheduler(
         )
     }
 
-    private fun cancelAll() {
+    private fun cancelFixedAlarms() {
         alarmManager.cancel(pendingIntent(REQUEST_MORNING, ACTION_MORNING_PROMPT))
         alarmManager.cancel(pendingIntent(REQUEST_EVENING, ACTION_EVENING_PROMPT))
+    }
+
+    private fun cancelAll() {
+        cancelFixedAlarms()
         workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
+        AmbientPromptTriggerContext.entries.forEach { trigger ->
+            workManager.cancelUniqueWork("${IMMEDIATE_WORK_NAME}:${trigger.name.lowercase()}")
+        }
     }
 
     private fun hasAnyAmbientPromptFamily(settings: MemoriesSettings): Boolean =

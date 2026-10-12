@@ -3,23 +3,36 @@ package app.logdate.client.ambient
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.recommendation.AmbientPromptHistoryRepository
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.recommendation.GenerateAmbientPromptCandidatesUseCase
+import app.logdate.client.domain.reminders.PhoneReminderDelivery
 import io.github.aakira.napier.Napier
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
+import kotlinx.coroutines.CancellationException
 
 class AmbientPromptWorker(
     context: Context,
     params: WorkerParameters,
-) : CoroutineWorker(context, params),
-    KoinComponent {
-    private val generateAmbientPromptCandidates: GenerateAmbientPromptCandidatesUseCase by inject()
-    private val ambientPromptHistoryRepository: AmbientPromptHistoryRepository by inject()
-    private val notificationCoordinator: AmbientPromptNotificationCoordinator by inject()
-
+    private val flags: FeatureFlagStore,
+    private val reminders: PhoneReminderDelivery,
+    private val generateAmbientPromptCandidates: GenerateAmbientPromptCandidatesUseCase,
+    private val ambientPromptHistoryRepository: AmbientPromptHistoryRepository,
+    private val notificationCoordinator: AmbientPromptNotificationCoordinator,
+) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) {
+            try {
+                reminders.run()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Napier.w("Moment reminder evaluation unavailable; waiting for the next evaluation", e)
+            }
+            return Result.success()
+        }
+
         val triggerContext =
             runCatching {
                 AmbientPromptTriggerContext.valueOf(
@@ -32,6 +45,7 @@ class AmbientPromptWorker(
             candidates.firstOrNull { ambientPromptHistoryRepository.canShow(it) }
                 ?: return Result.success()
 
+        if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) return Result.success()
         val posted = notificationCoordinator.post(candidate)
         if (!posted) {
             Napier.w("Ambient prompt notification could not be posted")

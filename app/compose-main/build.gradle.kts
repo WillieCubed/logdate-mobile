@@ -152,6 +152,7 @@ kotlin {
         val androidHostTest by getting
         androidHostTest.dependencies {
             implementation(libs.robolectric)
+            implementation(libs.androidx.work.testing)
             implementation(libs.kotlinx.coroutines.test)
         }
         desktopMain.dependencies {
