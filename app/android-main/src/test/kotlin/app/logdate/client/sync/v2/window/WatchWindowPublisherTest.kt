@@ -7,9 +7,11 @@ import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.RecordOrigin
+import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.datalayer.v2.WindowMemberRef
 import app.logdate.client.sync.datalayer.v2.WindowReason
+import app.logdate.client.sync.datalayer.v2.WindowTombstoneDataMap
 import app.logdate.client.sync.peer.delivery.EnvelopeDataMap
 import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.client.sync.v2.MemoryKeyValueStorage
@@ -24,11 +26,13 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -105,7 +109,7 @@ class WatchWindowPublisherTest {
             assertEquals(setOf(WindowReason.RECENT), envelope.reasons)
             assertEquals(RecordOrigin.PHONE, envelope.origin)
             assertEquals(peer, envelope.context)
-            val expected = WindowMemberRef(RecordKind.NOTE, recent.uid.toString(), recent.lastUpdated.toEpochMilliseconds())
+            val expected = WindowMemberRef(RecordKind.NOTE, recent.uid.toString(), recent.lastUpdated.toEpochMilliseconds(), revision = 1)
             assertEquals(listOf(expected), result.members)
         }
 
@@ -331,6 +335,85 @@ class WatchWindowPublisherTest {
             items.undeletable = null
             publisher.publishIfActive("watch")
             assertTrue(WindowManifestStore(storage).read(peer).tombstones.isEmpty())
+        }
+
+    @Test
+    fun `a returning note is newer than its delayed removal even when the clock moves back`() =
+        runTest {
+            notesFlow.value = listOf(recent)
+            publisher.publishIfActive("watch")
+            val first =
+                items.puts
+                    .last()
+                    .second[WindowTombstoneDataMap.KEY_REVISION]
+                    ?.toLongOrNull()
+            notesFlow.value = emptyList()
+            publisher.publishIfActive("watch")
+            val removal =
+                items.puts
+                    .last()
+                    .second[WindowTombstoneDataMap.KEY_REVISION]
+                    ?.toLongOrNull()
+            now = start - 1.hours
+            notesFlow.value = listOf(recent)
+            publisher.publishIfActive("watch")
+            val returned =
+                items.puts
+                    .last()
+                    .second[WindowTombstoneDataMap.KEY_REVISION]
+                    ?.toLongOrNull()
+            assertEquals(listOf(1L, 2L, 3L), listOf(first, removal, returned))
+        }
+
+    @Test
+    fun `publication revisions survive losing the manifest and restarting the store`() =
+        runTest {
+            val store = WindowManifestStore(storage)
+            assertEquals(1L, store.reserveRevision(peer))
+            storage.putString(
+                WindowManifestStore.KEY + "." +
+                    WearJson.encode(PeerDeliveryContext.serializer(), peer),
+                "nope",
+            )
+            assertEquals(2L, WindowManifestStore(storage).reserveRevision(peer))
+            assertEquals(2L, WindowManifestStore(storage).revision(peer))
+        }
+
+    @Test
+    fun `a failed write consumes its revision before another attempt`() =
+        runTest {
+            notesFlow.value = listOf(recent)
+            items.putOk = false
+            val failed = assertNotNull(publisher.publishIfActive("watch"))
+            assertEquals(1L, failed.revision)
+            items.putOk = true
+            val succeeded = assertNotNull(publisher.publishIfActive("watch"))
+            assertEquals(2L, succeeded.revision)
+            assertEquals(2L, succeeded.members.single().revision)
+            assertEquals("2", items.puts.single().second[WindowTombstoneDataMap.KEY_REVISION])
+        }
+
+    @Test
+    fun `revision allocation belongs to the exact link exchange`() =
+        runTest {
+            val store = WindowManifestStore(storage)
+            val replacement = peer.copy(linkId = LinkWire.encodeKey(ByteArray(32) { 2 }))
+            assertEquals(1L, store.reserveRevision(peer))
+            assertEquals(1L, store.reserveRevision(replacement))
+            assertEquals(2L, store.reserveRevision(peer))
+            assertEquals(1L, store.revision(replacement))
+        }
+
+    @Test
+    fun `an unreadable revision counter prevents publication`() =
+        runTest {
+            notesFlow.value = listOf(recent)
+            storage.putString(
+                WindowManifestStore.KEY + "." + WearJson.encode(PeerDeliveryContext.serializer(), peer) + ".revision",
+                "broken",
+            )
+            assertFailsWith<IllegalStateException> { publisher.publishIfActive("watch") }
+            assertTrue(items.puts.isEmpty())
         }
 
     private fun text(

@@ -18,11 +18,19 @@ class WindowMessagesTest {
             WindowResyncResponse(context = peer, members = listOf(WindowMemberRef(RecordKind.NOTE, id.toString(), 5)), publishedAt = 9)
         assertEquals(
             Decoded.Supported(request),
-            WearJson.decode(WearJson.encode(WindowResyncRequest.serializer(), request), 1, WindowResyncRequest.serializer()),
+            WearJson.decode(
+                WearJson.encode(WindowResyncRequest.serializer(), request),
+                WearProtocol.WINDOW_SCHEMA,
+                WindowResyncRequest.serializer(),
+            ),
         )
         assertEquals(
             Decoded.Supported(response),
-            WearJson.decode(WearJson.encode(WindowResyncResponse.serializer(), response), 1, WindowResyncResponse.serializer()),
+            WearJson.decode(
+                WearJson.encode(WindowResyncResponse.serializer(), response),
+                WearProtocol.WINDOW_SCHEMA,
+                WindowResyncResponse.serializer(),
+            ),
         )
     }
 
@@ -34,7 +42,7 @@ class WindowMessagesTest {
     @Test
     fun `a resync answer from a newer phone is unsupported`() {
         assertIs<Decoded.Unsupported>(
-            WearJson.decode("""{"schema":2,"members":[],"publishedAt":1}""", 1, WindowResyncResponse.serializer()),
+            WearJson.decode("""{"schema":3,"members":[],"publishedAt":1}""", WearProtocol.WINDOW_SCHEMA, WindowResyncResponse.serializer()),
         )
     }
 
@@ -54,8 +62,13 @@ class WindowMessagesTest {
     @Test
     fun `a removal carries both its timestamp and exact audience`() {
         assertEquals(
-            mapOf("removedAt" to "7", "context" to WearJson.encode(PeerDeliveryContext.serializer(), peer)),
-            WindowTombstoneDataMap.toDataMap(7, peer),
+            mapOf("removedAt" to "7", "context" to WearJson.encode(PeerDeliveryContext.serializer(), peer), "windowRevision" to "1"),
+            WindowTombstoneDataMap.toDataMap(7, peer, 1),
         )
+    }
+
+    @Test
+    fun `ordered window messages use schema two`() {
+        assertEquals(2, WearProtocol.WINDOW_SCHEMA)
     }
 }

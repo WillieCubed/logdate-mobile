@@ -20,7 +20,7 @@ object WearProtocol {
     const val RECEIPTS_SCHEMA = 1
     const val LINK_SCHEMA = 1
     const val LIVE_SCHEMA = 1
-    const val WINDOW_SCHEMA = 1
+    const val WINDOW_SCHEMA = 2
 
     /** A state document is one small data item; anything larger belongs in its own path. */
     const val MAX_STATE_BYTES = 8 * 1024

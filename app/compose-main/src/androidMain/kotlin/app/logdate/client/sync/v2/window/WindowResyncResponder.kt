@@ -25,7 +25,12 @@ class WindowResyncResponder(
         if (published.context != peer || !peers.isCurrent(peer)) return null
         return WearJson.encodeToBytes(
             WindowResyncResponse.serializer(),
-            WindowResyncResponse(context = peer, members = published.members, publishedAt = published.publishedAt),
+            WindowResyncResponse(
+                context = peer,
+                members = published.members,
+                publishedAt = published.publishedAt,
+                revision = published.revision,
+            ),
         )
     }
 }

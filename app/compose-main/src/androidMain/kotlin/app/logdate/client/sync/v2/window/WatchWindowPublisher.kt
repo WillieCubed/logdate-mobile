@@ -49,6 +49,7 @@ data class WindowPublishResult(
     val failed: Int,
     val tooLarge: Int,
     val publishedAt: Long,
+    val revision: Long = 0,
 )
 
 /**
@@ -160,9 +161,25 @@ class WatchWindowPublisher(
         requireCurrent(peer)
         val members =
             plan.members.mapNotNull { member ->
-                published[member.id.toString()]?.let { WindowMemberRef(RecordKind.NOTE, member.id.toString(), it.contentVersion) }
+                published[member.id.toString()]?.let {
+                    WindowMemberRef(
+                        RecordKind.NOTE,
+                        member.id.toString(),
+                        it.contentVersion,
+                        it.revision,
+                    )
+                }
             }
-        return WindowPublishResult(peer, members, counts.written, counts.removed, counts.failed, counts.tooLarge, now.toEpochMilliseconds())
+        return WindowPublishResult(
+            peer,
+            members,
+            counts.written,
+            counts.removed,
+            counts.failed,
+            counts.tooLarge,
+            now.toEpochMilliseconds(),
+            manifest.revision(peer),
+        )
     }
 
     private suspend fun write(
@@ -177,7 +194,8 @@ class WatchWindowPublisher(
         val id = member.id.toString()
         val version = note.lastUpdated.toEpochMilliseconds()
         val wanted = PublishedItem(version, member.reasons)
-        if (published[id] == wanted) return
+        val existing = published[id]
+        if (existing != null && existing.contentVersion == version && existing.reasons == member.reasons && existing.revision > 0) return
         val envelope =
             RecordEnvelope(
                 kind = RecordKind.NOTE,
@@ -200,6 +218,8 @@ class WatchWindowPublisher(
                 return
             }
         requireCurrent(peer)
+        val revision = manifest.reserveRevision(peer)
+        requireCurrent(peer)
         if (id in tombstones) {
             if (!items.deleteOwn(WearPaths.windowTombstone(RecordKind.NOTE, member.id, peer))) {
                 counts.failed++
@@ -208,13 +228,18 @@ class WatchWindowPublisher(
             requireCurrent(peer)
             tombstones.remove(id)
         }
-        if (!items.put(WearPaths.windowItem(RecordKind.NOTE, member.id, peer), data, urgent = false)) {
+        if (!items.put(
+                WearPaths.windowItem(RecordKind.NOTE, member.id, peer),
+                data + (WindowTombstoneDataMap.KEY_REVISION to revision.toString()),
+                urgent = false,
+            )
+        ) {
             counts.failed++
             Napier.w("Could not write a note to the watch's library window; it is written again on the next publish")
             return
         }
         requireCurrent(peer)
-        published[id] = wanted
+        published[id] = wanted.copy(revision = revision)
         counts.written++
     }
 
@@ -232,8 +257,15 @@ class WatchWindowPublisher(
             return
         }
         requireCurrent(peer)
+        val revision = manifest.reserveRevision(peer)
+        requireCurrent(peer)
         val at = now.toEpochMilliseconds()
-        if (!items.put(WearPaths.windowTombstone(RecordKind.NOTE, uuid, peer), WindowTombstoneDataMap.toDataMap(at, peer), urgent = true)) {
+        if (!items.put(
+                WearPaths.windowTombstone(RecordKind.NOTE, uuid, peer),
+                WindowTombstoneDataMap.toDataMap(at, peer, revision),
+                urgent = true,
+            )
+        ) {
             counts.failed++
             Napier.w("Could not tell the watch a note left its library window; it is told on the next publish")
             return

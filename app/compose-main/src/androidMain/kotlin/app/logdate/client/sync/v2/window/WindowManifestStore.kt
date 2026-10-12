@@ -5,12 +5,15 @@ import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WindowReason
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class PublishedItem(
     val contentVersion: Long,
     val reasons: Set<WindowReason>,
+    val revision: Long = 0,
 )
 
 /** What the phone last published to the watch's window, by note id, and when each tombstone was written. */
@@ -23,6 +26,8 @@ data class PublishedWindow(
 class WindowManifestStore(
     private val storage: KeyValueStorage,
 ) {
+    private val allocating = Mutex()
+
     suspend fun read(peer: PeerDeliveryContext): PublishedWindow {
         val text = storage.getString(key(peer)) ?: return PublishedWindow()
         return try {
@@ -38,6 +43,20 @@ class WindowManifestStore(
         window: PublishedWindow,
     ) {
         storage.putString(key(peer), WearJson.encode(PublishedWindow.serializer(), window))
+    }
+
+    suspend fun reserveRevision(peer: PeerDeliveryContext): Long =
+        allocating.withLock {
+            val previous = revision(peer)
+            check(previous < Long.MAX_VALUE) { "The watch library revision is exhausted" }
+            val next = previous + 1
+            storage.putString(key(peer) + ".revision", next.toString())
+            next
+        }
+
+    suspend fun revision(peer: PeerDeliveryContext): Long {
+        val saved = storage.getString(key(peer) + ".revision") ?: return 0
+        return checkNotNull(saved.toLongOrNull()?.takeIf { it >= 0 }) { "The watch library revision is unreadable" }
     }
 
     private fun key(peer: PeerDeliveryContext): String = "$KEY.${WearJson.encode(PeerDeliveryContext.serializer(), peer)}"

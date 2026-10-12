@@ -37,12 +37,21 @@ class WindowResyncResponderTest {
         runTest {
             val members = listOf(WindowMemberRef(RecordKind.NOTE, "a", 5))
             coEvery { publisher.publishIfActive("watch") } returns
-                WindowPublishResult(context = peer, members = members, written = 0, removed = 0, failed = 0, tooLarge = 0, publishedAt = 9)
+                WindowPublishResult(
+                    context = peer,
+                    members = members,
+                    written = 0,
+                    removed = 0,
+                    failed = 0,
+                    tooLarge = 0,
+                    publishedAt = 9,
+                    revision = 7,
+                )
 
             val answer = assertNotNull(responder.answer("watch", request))
 
             assertEquals(
-                Decoded.Supported(WindowResyncResponse(context = peer, members = members, publishedAt = 9)),
+                Decoded.Supported(WindowResyncResponse(context = peer, members = members, publishedAt = 9, revision = 7)),
                 WearJson.decode(answer, WearProtocol.WINDOW_SCHEMA, WindowResyncResponse.serializer()),
             )
         }
@@ -50,7 +59,7 @@ class WindowResyncResponderTest {
     @Test
     fun `a request from a newer watch gets no answer`() =
         runTest {
-            assertNull(responder.answer("watch", """{"schema":2}""".encodeToByteArray()))
+            assertNull(responder.answer("watch", """{"schema":3}""".encodeToByteArray()))
         }
 
     @Test
