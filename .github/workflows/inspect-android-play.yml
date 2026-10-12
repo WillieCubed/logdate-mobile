@@ -1,0 +1,47 @@
+name: Inspect Android Play tracks
+run-name: Inspect Play tracks by ${{ github.actor }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-play-publish
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect configured Play tracks
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Authenticate as the Play publishing service account
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.LOGDATE_PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Read tracks without publishing
+        shell: bash
+        env:
+          GOOGLE_API_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          source scripts/lib/common.sh
+          source scripts/lib/google-api.sh
+          application="$PLAY_API/applications/studio.hypertext.logdate"
+          edit="$(google_api POST "$application/edits" '{}' | jq -er '.id')"
+          trap 'google_api DELETE "$application/edits/$edit" >/dev/null' EXIT
+          google_api GET "$application/edits/$edit/tracks" | jq '{tracks: [.tracks[] | {track, releases: [.releases[]? | {name, status, versionCodes}]}]}'
