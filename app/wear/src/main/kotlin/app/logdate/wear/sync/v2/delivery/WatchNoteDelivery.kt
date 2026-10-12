@@ -67,6 +67,7 @@ class WatchNoteDelivery(
     private val cloud: CloudRelease,
     private val digester: AudioFileDigester = FileAudioDigester(),
     private val clock: Clock = Clock.System,
+    private val mediaFilePath: (String) -> String? = { it },
 ) : WatchNotesV2 {
     private data class Capture(
         val pending: PendingUpload,
@@ -252,11 +253,12 @@ class WatchNoteDelivery(
     ): Step {
         return try {
             val audio = capture.note as? JournalNote.Audio
+            val audioPath = audio?.let { mediaFilePath(it.mediaRef) ?: return failed(entry, "its recording could not be read") }
             val media =
                 if (audio == null) {
                     emptyList()
                 } else {
-                    val digest = digester.digest(audio.mediaRef) ?: return failed(entry, "its recording could not be read")
+                    val digest = digester.digest(checkNotNull(audioPath)) ?: return failed(entry, "its recording could not be read")
                     listOf(MediaRef(sha256 = digest.sha256Hex, sizeBytes = digest.sizeBytes, mimeType = "audio/mp4"))
                 }
             if (!isCurrent(peer) || !outbox.isCurrentOperation(EntityType.NOTE, capture.pending)) return Step()
@@ -278,7 +280,10 @@ class WatchNoteDelivery(
             }
             if (!isCurrent(peer) || !outbox.isCurrentOperation(EntityType.NOTE, capture.pending)) return Step()
             if (audio != null &&
-                !transport.sendFile(WearPaths.recordMedia(RecordKind.NOTE, audio.uid, peer, capture.identity.operationId), audio.mediaRef)
+                !transport.sendFile(
+                    WearPaths.recordMedia(RecordKind.NOTE, audio.uid, peer, capture.identity.operationId),
+                    checkNotNull(audioPath),
+                )
             ) {
                 return failed(entry, "its recording could not be sent")
             }

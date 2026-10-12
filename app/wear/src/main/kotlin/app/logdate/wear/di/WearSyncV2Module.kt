@@ -5,6 +5,7 @@ import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.datalayer.v2.LinkNonceLedger
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
@@ -103,6 +104,7 @@ val wearSyncV2Module =
                 receipts = receipts,
                 released = get(),
                 cloud = CloudRelease { koin.get<DefaultSyncManager>(WatchCloud).uploadPendingChanges() },
+                mediaFilePath = get<MediaFileResolver>()::filePath,
             )
         } bind WatchNotesV2::class
         single {
