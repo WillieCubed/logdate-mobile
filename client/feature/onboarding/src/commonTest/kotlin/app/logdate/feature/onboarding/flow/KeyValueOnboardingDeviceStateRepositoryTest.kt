@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -44,6 +45,19 @@ class KeyValueOnboardingDeviceStateRepositoryTest {
             assertTrue(repository.deviceState.value.notificationsHandledOnThisDevice)
             assertFalse(repository.deviceState.value.recommendationsHandledOnThisDevice)
             assertFalse(repository.deviceState.value.dayBoundariesHandledOnThisDevice)
+        }
+
+    @Test fun droppedNotificationProgressIsReportedAsAFailedSave() =
+        runTest {
+            val dropping =
+                object : KeyValueStorage by fakeStorage {
+                    override suspend fun putBoolean(
+                        key: String,
+                        value: Boolean,
+                    ) = Unit
+                }
+            val repository = KeyValueOnboardingDeviceStateRepository(dropping, backgroundScope)
+            assertFailsWith<IllegalStateException> { repository.markNotificationsHandled() }
         }
 
     @Test

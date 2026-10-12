@@ -20,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.domain.reminders.ReminderPreferences
+import app.logdate.client.domain.reminders.ReminderPreferencesState
 import app.logdate.client.permissions.rememberNotificationPermissionState
 import app.logdate.ui.step.StepBusyButton
 import app.logdate.ui.step.StepHeroIcon
@@ -31,6 +33,7 @@ import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -44,6 +47,18 @@ fun OnboardingNotificationsScreen(
     onNext: () -> Unit,
     viewModel: OnboardingViewModel = koinViewModel(),
 ) {
+    val reminders = koinInject<ReminderPreferences>()
+    val reminderState by remember(reminders) { reminders.observe() }.collectAsState(ReminderPreferencesState())
+    if (reminderState.ready && reminderState.rolloutEnabled) {
+        ReminderOnboardingNotificationsStep(
+            onBack = onBack,
+            onNext = onNext,
+            preferences = reminders,
+            state = reminderState,
+            markHandled = viewModel::markNotificationsHandled,
+        )
+        return
+    }
     val recommendationsEnabled by viewModel.recommendationsEnabled.collectAsState()
     val permissionState = rememberNotificationPermissionState()
     val coroutineScope = rememberCoroutineScope()
@@ -89,7 +104,7 @@ fun OnboardingNotificationsScreen(
         },
         recommendationsEnabled = recommendationsEnabled,
         hasDecision = hasDecision,
-        isSaving = isSaving || permissionState.isRequestInFlight,
+        isSaving = isSaving || permissionState.isRequestInFlight || !reminderState.ready,
         errorMessage = errorMessage,
     )
 }
@@ -103,11 +118,16 @@ fun OnboardingNotificationsContent(
     hasDecision: Boolean,
     isSaving: Boolean = false,
     errorMessage: String? = null,
+    remindersEnabled: Boolean? = null,
 ) {
     val bodyText: String
     val previewTitle: String
     val previewBody: String
-    if (recommendationsEnabled) {
+    if (remindersEnabled != null) {
+        bodyText = stringResource(Res.string.onboarding_reminders_body)
+        previewTitle = stringResource(Res.string.onboarding_reminders_preview_title)
+        previewBody = stringResource(Res.string.onboarding_reminders_preview_body)
+    } else if (recommendationsEnabled) {
         bodyText = stringResource(Res.string.onboarding_notifications_body_with_recommendations)
         previewTitle = stringResource(Res.string.onboarding_notifications_preview_prompt_title)
         previewBody = stringResource(Res.string.onboarding_notifications_preview_prompt_body)
@@ -117,14 +137,25 @@ fun OnboardingNotificationsContent(
         previewBody = stringResource(Res.string.onboarding_notifications_preview_update_body)
     }
     val primaryActionLabel =
-        if (hasDecision) {
+        if (remindersEnabled == false || (remindersEnabled == true && !hasDecision)) {
+            stringResource(Res.string.onboarding_reminders_enable)
+        } else if (hasDecision) {
             stringResource(UiRes.string.common_continue)
         } else {
             stringResource(Res.string.onboarding_notifications_enable)
         }
 
     StepScaffold(
-        title = stringResource(Res.string.onboarding_notifications_title),
+        title =
+            stringResource(
+                if (remindersEnabled ==
+                    null
+                ) {
+                    Res.string.onboarding_notifications_title
+                } else {
+                    Res.string.onboarding_reminders_title
+                },
+            ),
         onBack = onBack,
         modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG),
         supportingText = bodyText,
@@ -142,7 +173,17 @@ fun OnboardingNotificationsContent(
                 enabled = !isSaving,
                 modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_SKIP_TAG),
             ) {
-                Text(stringResource(Res.string.onboarding_notifications_not_now))
+                Text(
+                    stringResource(
+                        if (remindersEnabled ==
+                            null
+                        ) {
+                            Res.string.onboarding_notifications_not_now
+                        } else {
+                            Res.string.onboarding_reminders_not_now
+                        },
+                    ),
+                )
             }
             OnboardingActionError(errorMessage)
         },

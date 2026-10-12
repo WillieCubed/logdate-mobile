@@ -65,6 +65,7 @@ class KeyValueOnboardingDeviceStateRepository(
 
     override suspend fun markNotificationsHandled() {
         storage.putBoolean(KEY_NOTIFICATIONS_HANDLED, true)
+        check(storage.getBoolean(KEY_NOTIFICATIONS_HANDLED)) { "Notification setup progress could not be saved" }
     }
 
     override suspend fun markAccountHandled() {

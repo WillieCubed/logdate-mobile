@@ -1,0 +1,8 @@
+<resources>
+    <string name="onboarding_reminders_title">Reminders</string>
+    <string name="onboarding_reminders_body">At most one reminder a day, on your phone or watch. You can change this anytime in Settings.</string>
+    <string name="onboarding_reminders_enable">Turn on reminders</string>
+    <string name="onboarding_reminders_preview_title">Before the day ends</string>
+    <string name="onboarding_reminders_preview_body">Take a moment to capture today.</string>
+    <string name="onboarding_reminders_not_now">Not now</string>
+</resources>

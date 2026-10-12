@@ -28,13 +28,11 @@ class ReminderPreferences(
 
     suspend fun setPlacesEnabled(enabled: Boolean): Boolean {
         if (!flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) return false
-        shared.set(SharedPreferenceKey.CapturePlaces, enabled)
-        return shared.get(SharedPreferenceKey.CapturePlaces) == enabled
+        return shared.setAndVerify(SharedPreferenceKey.CapturePlaces, enabled)
     }
 
     suspend fun setEnabled(enabled: Boolean): Boolean {
         if (!flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) return false
-        shared.set(SharedPreferenceKey.RemindersEnabled, enabled)
-        return shared.get(SharedPreferenceKey.RemindersEnabled) == enabled
+        return shared.setAndVerify(SharedPreferenceKey.RemindersEnabled, enabled)
     }
 }

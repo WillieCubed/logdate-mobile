@@ -111,7 +111,9 @@ class ReminderPreferencesTest {
                 }
             val preference = ReminderPreferences(DefaultWatchPreferencesRepository(StampedPreferenceStore(dropping, PeerRole.PHONE)), flags)
             assertFalse(preference.setEnabled(true))
+            assertFalse(preference.setEnabled(false))
             assertFalse(preference.setPlacesEnabled(true))
+            assertFalse(preference.setPlacesEnabled(false))
             assertFalse(preference.observe().first().enabled)
             assertFalse(preference.observe().first().capturePlaces)
         }

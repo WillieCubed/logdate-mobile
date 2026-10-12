@@ -15,6 +15,15 @@ interface WatchPreferencesRepository {
         key: SharedPreferenceKey<T>,
         value: T,
     )
+
+    /** Confirms that a choice was persisted, including an explicit choice of the default value. */
+    suspend fun <T> setAndVerify(
+        key: SharedPreferenceKey<T>,
+        value: T,
+    ): Boolean {
+        set(key, value)
+        return get(key) == value
+    }
 }
 
 class DefaultWatchPreferencesRepository(
@@ -34,5 +43,14 @@ class DefaultWatchPreferencesRepository(
     ) {
         require(key.isAllowed(value)) { "${key.name} does not accept $value" }
         store.write(key.name, key.encode(value))
+    }
+
+    override suspend fun <T> setAndVerify(
+        key: SharedPreferenceKey<T>,
+        value: T,
+    ): Boolean {
+        require(key.isAllowed(value)) { "${key.name} does not accept $value" }
+        val written = store.write(key.name, key.encode(value))
+        return store.snapshot()[key.name] == written
     }
 }
