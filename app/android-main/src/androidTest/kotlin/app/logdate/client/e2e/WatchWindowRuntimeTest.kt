@@ -10,6 +10,8 @@ import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.sync.v2.media.PhoneMediaEndpoint
+import app.logdate.client.sync.v2.media.PhoneMediaServer
 import app.logdate.client.sync.v2.window.WatchWindowPublisher
 import app.logdate.client.sync.v2.window.WindowResyncResponder
 import app.logdate.client.sync.v2.window.WindowRollWorker
@@ -39,6 +41,26 @@ class WatchWindowRuntimeTest {
                 .setPackage(context.packageName)
         val matches = context.packageManager.queryIntentServices(request, PackageManager.GET_RESOLVED_FILTER)
         assertTrue(matches.any { it.serviceInfo.name.endsWith("PhoneDataLayerListenerService") })
+    }
+
+    @Test
+    fun the_installed_phone_resolves_and_receives_scoped_media_requests() {
+        val koin = KoinJavaComponent.getKoin()
+        assertNotNull(koin.get<PhoneMediaServer>())
+        assertNotNull(koin.get<PhoneMediaEndpoint>())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        for ((action, path) in listOf(
+            "REQUEST_RECEIVED" to "/logdate/v2/media/info",
+            "REQUEST_RECEIVED" to "/logdate/v2/media/range",
+            "CHANNEL_EVENT" to "/logdate/v2/p2w/media/test-ticket",
+        )) {
+            val request =
+                Intent("com.google.android.gms.wearable.$action")
+                    .setData("wear://watch$path".toUri())
+                    .setPackage(context.packageName)
+            val matches = context.packageManager.queryIntentServices(request, PackageManager.GET_RESOLVED_FILTER)
+            assertTrue(matches.any { it.serviceInfo.name.endsWith("PhoneDataLayerListenerService") }, path)
+        }
     }
 
     @Test

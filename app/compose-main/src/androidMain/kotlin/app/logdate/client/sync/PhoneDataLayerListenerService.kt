@@ -9,6 +9,7 @@ import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.client.sync.datalayer.v2.WearFeatures
+import app.logdate.client.sync.datalayer.v2.WearMediaPaths
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
@@ -16,6 +17,7 @@ import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.client.sync.v2.link.PhoneLinkInitiator
+import app.logdate.client.sync.v2.media.PhoneMediaEndpoint
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.answerPhoneRequest
 import app.logdate.client.sync.v2.window.WatchWindowPublisher
@@ -44,10 +46,8 @@ import kotlinx.coroutines.withContext
 import java.io.InputStream
 
 /**
- * Receives watch captures, journals, shared state, media, and library requests.
- * Ingestors preserve cloud-backup queues and post entry handoff notifications.
- * Library resync uses the requesting watch's verified link; older watches retain their pull path.
- * Koin resolution retries when the service wakes before dependency injection is ready.
+ * Receives watch captures, shared state, media, and library requests with verified link routing.
+ * Ingestors preserve cloud-backup queues; Koin resolution retries when the service wakes early.
  */
 open class PhoneDataLayerListenerService : WearableListenerService() {
     protected open val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -163,6 +163,10 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
+        if (channel.path.startsWith(WearMediaPaths.CHANNEL_PREFIX)) {
+            serviceScope.launch { resolveKoin()?.get<PhoneMediaEndpoint>()?.serve(channel) ?: closeChannel(channel) }
+            return
+        }
         if (WearPaths.parseRecordMedia(channel.path) != null) {
             serviceScope.launch { receiveRecordMedia(channel) }
             return
@@ -236,19 +240,18 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         nodeId: String,
         path: String,
         request: ByteArray,
-    ): ByteArray? {
-        if (path != WearPaths.RECEIPTS && path != WearPaths.WINDOW_RESYNC) return null
-        if (path == WearPaths.RECEIPTS && !receiptsActive()) return null
-        val koin = resolveKoin()
-        if (koin == null) {
-            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the watch's $path request fails and is asked again")
-            return null
+    ): ByteArray? =
+        when {
+            path == WearPaths.RECEIPTS && receiptsActive() -> resolveKoin()?.get<WatchReceiptResponder>()?.answer(nodeId, request)
+            path == WearPaths.WINDOW_RESYNC -> resolveKoin()?.get<WindowResyncResponder>()?.answer(nodeId, request)
+            path == WearMediaPaths.INFO || path == WearMediaPaths.RANGE ->
+                resolveKoin()?.get<PhoneMediaEndpoint>()?.answer(
+                    nodeId,
+                    path,
+                    request,
+                )
+            else -> null
         }
-        return when (path) {
-            WearPaths.WINDOW_RESYNC -> koin.get<WindowResyncResponder>().answer(nodeId, request)
-            else -> koin.get<WatchReceiptResponder>().answer(nodeId, request)
-        }
-    }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         // Snapshot events before they are recycled by the system

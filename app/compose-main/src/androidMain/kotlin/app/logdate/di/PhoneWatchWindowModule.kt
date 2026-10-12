@@ -6,11 +6,14 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.v2.link.PhoneWatchLinkStore
 import app.logdate.client.sync.v2.localNodeIdOrNull
+import app.logdate.client.sync.v2.media.PhoneMediaEndpoint
+import app.logdate.client.sync.v2.media.PhoneMediaServer
 import app.logdate.client.sync.v2.window.GoogleWindowDataItems
 import app.logdate.client.sync.v2.window.WatchWindowPublisher
 import app.logdate.client.sync.v2.window.WindowDataItems
@@ -29,6 +32,8 @@ import org.koin.dsl.module
 
 val phoneWatchWindowModule =
     module {
+        single { PhoneMediaServer(get(), get(), get<MediaFileResolver>()::filePath) }
+        single { PhoneMediaEndpoint(get(), Wearable.getChannelClient(androidContext())) }
         single { WindowManifestStore(get()) }
         single<WindowDataItems> {
             val node = Wearable.getNodeClient(androidContext())

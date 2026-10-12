@@ -27,6 +27,7 @@ import app.logdate.wear.sync.v2.delivery.WatchRouteConditions
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.sync.v2.localNodeIdOrNull
+import app.logdate.wear.sync.v2.media.GoogleMediaRangeSource
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import org.koin.core.parameter.parametersOf
@@ -64,6 +65,10 @@ val wearSyncV2Module =
                 localNodeId = { nodeClient.localNodeIdOrNull() },
                 active = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
             )
+        }
+        factory { parameters ->
+            val peer = parameters.get<PeerDeliveryContext>()
+            GoogleMediaRangeSource(get(), get<LinkedDataLayerTransportV2> { parametersOf(peer) }, Wearable.getChannelClient(get<Context>()))
         }
         single { PeerDeliveryLedger(get()) }
         single { WatchReceiptApplier(ledger = get(), peers = get()) }
