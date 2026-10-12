@@ -1,5 +1,6 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.streak.toStreakDay
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
@@ -23,6 +24,7 @@ class LivePhoneReminderSnapshotSource(
     private val openMarks: suspend () -> Int,
     private val workoutEndedAt: suspend () -> Instant? = { null },
     private val clock: Clock = Clock.System,
+    private val supplemental: suspend (Instant) -> AmbientPromptCandidate? = { null },
 ) : PhoneReminderSnapshotSource {
     override suspend fun read(): PhoneReminderSnapshot {
         val initial = environment()
@@ -37,6 +39,22 @@ class LivePhoneReminderSnapshotSource(
         val marks = openMarks().coerceAtLeast(0)
         val arrival = if (initial.capturePlaces) arrivals.read(clock.now(), initial.audience) else null
         val workout = workoutEndedAt()
+        val signals =
+            ReminderSignals(
+                enabled = true,
+                writtenToday = activity.writtenToday,
+                openMarks = marks,
+                campfire = activity.campfire,
+                newPlaceArrivedAt = arrival,
+                workoutEndedAt = workout,
+            )
+        if (environment() != initial ||
+            started.toStreakDay(initial.zone, initial.dayStartHour) != clock.now().toStreakDay(initial.zone, initial.dayStartHour)
+        ) {
+            return PhoneReminderSnapshot(decisionClock.copy(now = clock.now()), ReminderSignals(false, false), "")
+        }
+        val decision = ReminderOrchestrator.decide(decisionClock.copy(now = clock.now()), signals)
+        val candidate = if (decision == ReminderDecision.Skip(SkipReason.NOTHING_TO_REMIND)) supplemental(clock.now()) else null
         val current = environment()
         val finalClock = decisionClock.copy(now = clock.now())
         if (current != initial ||
@@ -46,15 +64,8 @@ class LivePhoneReminderSnapshotSource(
         }
         return PhoneReminderSnapshot(
             clock = finalClock,
-            signals =
-                ReminderSignals(
-                    enabled = true,
-                    writtenToday = activity.writtenToday,
-                    openMarks = marks,
-                    campfire = activity.campfire,
-                    newPlaceArrivedAt = arrival,
-                    workoutEndedAt = workout,
-                ),
+            signals = signals,
+            supplemental = candidate,
             audience = initial.audience,
             watch = initial.watch,
         )

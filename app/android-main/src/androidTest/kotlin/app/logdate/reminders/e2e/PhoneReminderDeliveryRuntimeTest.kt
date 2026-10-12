@@ -1,6 +1,7 @@
 package app.logdate.reminders.e2e
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -9,6 +10,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
+import app.logdate.client.domain.recommendation.AmbientPromptFamily
+import app.logdate.client.domain.recommendation.AmbientPromptHistoryRepository
+import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.domain.reminders.DeviceReminderBudget
 import app.logdate.client.domain.reminders.PhoneReminderDelivery
 import app.logdate.client.domain.reminders.PhoneReminderOutcome
@@ -38,6 +43,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 @RunWith(AndroidJUnit4::class)
 class PhoneReminderDeliveryRuntimeTest {
@@ -135,6 +141,77 @@ class PhoneReminderDeliveryRuntimeTest {
                     notification.postTime,
                     manager.activeNotifications.single { it.tag == "logdate.reminder" && it.id == 4005 }.postTime,
                 )
+            } finally {
+                manager.cancel("logdate.reminder", 4005)
+                before.forEach { (key, value) -> if (value == null) storage.remove(key) else storage.putString(key, value) }
+            }
+        }
+
+    @Test fun installedFactoryPostsDraftAndMemoryWithTheSharedDailyAllowance() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            InstrumentationRegistry
+                .getInstrumentation()
+                .uiAutomation
+                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+            val koin = KoinJavaComponent.getKoin()
+            val storage = koin.get<KeyValueStorage>()
+            val keys = listOf(DeviceReminderBudget.STORAGE_KEY, ReminderPostedHistory.STORAGE_KEY, "ambient_prompt_history")
+            val before = keys.associateWith { storage.getString(it) }
+            val manager = context.getSystemService(NotificationManager::class.java)
+            val day =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.UTC)
+                    .date
+            val noon = LocalDateTime(day, LocalTime(12, 0)).toInstant(TimeZone.UTC)
+            val candidates =
+                listOf(
+                    AmbientPromptCandidate(
+                        AmbientPromptFamily.DRAFT_RESCUE,
+                        100,
+                        "native-draft",
+                        AmbientPromptPayload.DraftRescue(Uuid.random()),
+                    ) to
+                        "Finish your draft",
+                    AmbientPromptCandidate(
+                        AmbientPromptFamily.MEMORY_RECALL,
+                        80,
+                        "native-recall",
+                        AmbientPromptPayload.MemoryRecall(day, "Memory fixture"),
+                    ) to
+                        "Revisit a memory",
+                )
+            try {
+                for ((candidate, title) in candidates) {
+                    keys.forEach { storage.remove(it) }
+                    manager.cancel("logdate.reminder", 4005)
+                    val source =
+                        PhoneReminderSnapshotSource {
+                            PhoneReminderSnapshot(
+                                ReminderClock(noon, TimeZone.UTC),
+                                ReminderSignals(true, true),
+                                "native-fixture",
+                                supplemental = candidate,
+                            )
+                        }
+                    assertEquals(PhoneReminderOutcome.PHONE_POSTED, koin.get<PhoneReminderDelivery> { parametersOf(source) }.run())
+                    withTimeout(5_000) {
+                        while (manager.activeNotifications.none {
+                                it.tag == "logdate.reminder" &&
+                                    it.notification.extras
+                                        .getCharSequence(Notification.EXTRA_TITLE)
+                                        .toString() == title
+                            }
+                        ) {
+                            delay(25)
+                        }
+                    }
+                    assertFalse(koin.get<AmbientPromptHistoryRepository>().canShow(candidate))
+                    assertFalse(DeviceReminderBudget(storage).available(day))
+                    val repeated = koin.get<PhoneReminderDelivery> { parametersOf(source) }.run()
+                    assertTrue(repeated == PhoneReminderOutcome.SKIPPED || repeated == PhoneReminderOutcome.HELD)
+                }
             } finally {
                 manager.cancel("logdate.reminder", 4005)
                 before.forEach { (key, value) -> if (value == null) storage.remove(key) else storage.putString(key, value) }

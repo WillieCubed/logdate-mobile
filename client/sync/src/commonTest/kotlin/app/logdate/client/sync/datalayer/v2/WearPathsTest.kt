@@ -114,6 +114,7 @@ class WearPathsTest {
                 "moments.v1",
                 "live.v1",
                 "reminders.v1",
+                "reminders.supplements.v1",
                 "link.cloud.v1",
                 "phone.camera.v1",
                 "phone.playback.v1",

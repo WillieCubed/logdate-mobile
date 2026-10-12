@@ -100,6 +100,7 @@ class PhoneReminderEnvironmentReaderTest {
             assertEquals(peer, result.watch?.context)
             assertEquals(true, result.watch?.reachable)
             assertEquals(true, result.watch?.supportsReminders)
+            assertEquals(false, result.watch?.supportsSupplementalReminders)
         }
 
     @Test
@@ -168,5 +169,11 @@ class PhoneReminderEnvironmentReaderTest {
             coEvery { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) } returns true
             coEvery { shared.get(SharedPreferenceKey.RemindersEnabled) } returns false
             assertFalse(reader.read().enabled)
+        }
+
+    @Test fun supplementalDeliveryRequiresItsOwnVerifiedAdvertisement() =
+        runTest {
+            document(features = setOf(WearFeatures.REMINDERS, WearFeatures.REMINDER_SUPPLEMENTS))
+            assertEquals(true, reader.read().watch?.supportsSupplementalReminders)
         }
 }

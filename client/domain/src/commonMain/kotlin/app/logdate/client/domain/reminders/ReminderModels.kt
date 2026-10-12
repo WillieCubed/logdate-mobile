@@ -62,6 +62,8 @@ data class ReminderSignals(
     val campfire: FirePhase? = null,
     val newPlaceArrivedAt: Instant? = null,
     val workoutEndedAt: Instant? = null,
+    val draftWaiting: Boolean = false,
+    val memoryAvailable: Boolean = false,
 )
 
 /** What a reminder rings for, in the order [ReminderOrchestrator] prefers them. */
@@ -71,6 +73,8 @@ enum class ReminderTrigger {
     ARRIVED_SOMEWHERE_NEW,
     CAMPFIRE_EMBERS,
     WIND_DOWN,
+    DRAFT_RESCUE,
+    MEMORY_RECALL,
 }
 
 enum class SkipReason {

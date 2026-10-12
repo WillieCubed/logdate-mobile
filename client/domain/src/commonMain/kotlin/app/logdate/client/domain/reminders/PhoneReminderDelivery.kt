@@ -1,5 +1,6 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.streak.toStreakDay
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.peer.state.Presence
@@ -12,12 +13,14 @@ data class PhoneReminderSnapshot(
     val signals: ReminderSignals,
     val audience: String,
     val watch: ReminderWatch? = null,
+    val supplemental: AmbientPromptCandidate? = null,
 )
 
 data class ReminderWatch(
     val context: PeerDeliveryContext,
     val reachable: Boolean,
     val supportsReminders: Boolean,
+    val supportsSupplementalReminders: Boolean = false,
 )
 
 enum class PhoneReminderOutcome { SKIPPED, HELD, PHONE_POSTED, WATCH_POSTED, UNCERTAIN }
@@ -36,8 +39,12 @@ class PhoneReminderDelivery(
     private val isCurrent: suspend (PeerDeliveryContext) -> Boolean,
     private val postPhone: (ReminderTrigger, Int, LocalDate) -> Boolean,
     private val clock: Clock = Clock.System,
+    private val postSupplemental: (AmbientPromptCandidate, Int, LocalDate) -> Boolean = { _, _, _ -> false },
+    private val supplementalPosted: suspend (AmbientPromptCandidate) -> Unit = {},
+    private val preflight: suspend () -> PhoneReminderOutcome? = { null },
 ) {
     suspend fun run(): PhoneReminderOutcome {
+        preflight()?.let { return it }
         val initial = snapshot.read()
         if (initial.audience.isBlank()) return PhoneReminderOutcome.HELD
         if (decision(initial) !is ReminderDecision.Deliver) return PhoneReminderOutcome.SKIPPED
@@ -55,7 +62,11 @@ class PhoneReminderDelivery(
         val target =
             NudgeTargetPolicy.choose(
                 confirmed.watch?.reachable == true && final.watch?.reachable == true,
-                watch != null,
+                watch != null &&
+                    (
+                        final.supplemental?.reminderTrigger() != trigger.trigger ||
+                            (confirmed.watch?.supportsSupplementalReminders == true && final.watch?.supportsSupplementalReminders == true)
+                    ),
                 reading,
                 final.clock.now.toEpochMilliseconds(),
             )
@@ -66,7 +77,7 @@ class PhoneReminderDelivery(
                 )
             ) {
                 ReminderDeliveryStatus.POSTED -> {
-                    history.recordPostedAt(clock.now())
+                    recordPosted(final, trigger.trigger)
                     PhoneReminderOutcome.WATCH_POSTED
                 }
                 ReminderDeliveryStatus.NOT_POSTED -> {
@@ -85,9 +96,24 @@ class PhoneReminderDelivery(
         day: LocalDate,
     ): PhoneReminderOutcome {
         val delivery = decision(state) as? ReminderDecision.Deliver ?: return PhoneReminderOutcome.HELD
-        if (!postPhone(delivery.trigger, delivery.openMarks, day)) return PhoneReminderOutcome.HELD
-        history.recordPostedAt(clock.now())
+        val candidate = state.supplemental?.takeIf { it.reminderTrigger() == delivery.trigger }
+        val posted =
+            if (candidate != null) {
+                postSupplemental(candidate, delivery.openMarks, day)
+            } else {
+                postPhone(delivery.trigger, delivery.openMarks, day)
+            }
+        if (!posted) return PhoneReminderOutcome.HELD
+        recordPosted(state, delivery.trigger)
         return PhoneReminderOutcome.PHONE_POSTED
+    }
+
+    private suspend fun recordPosted(
+        state: PhoneReminderSnapshot,
+        trigger: ReminderTrigger,
+    ) {
+        history.recordPostedAt(clock.now())
+        state.supplemental?.takeIf { it.reminderTrigger() == trigger }?.let { supplementalPosted(it) }
     }
 
     private suspend fun fresh(initial: PhoneReminderSnapshot): PhoneReminderSnapshot? {
@@ -102,7 +128,10 @@ class PhoneReminderDelivery(
     private suspend fun decision(state: PhoneReminderSnapshot): ReminderDecision =
         ReminderOrchestrator.decide(
             state.clock.copy(lastReminderAt = listOfNotNull(state.clock.lastReminderAt, history.latest()).maxOrNull()),
-            state.signals,
+            state.signals.copy(
+                draftWaiting = state.supplemental?.reminderTrigger() == ReminderTrigger.DRAFT_RESCUE,
+                memoryAvailable = state.supplemental?.reminderTrigger() == ReminderTrigger.MEMORY_RECALL,
+            ),
         )
 
     private fun PhoneReminderSnapshot.day() = clock.now.toStreakDay(clock.zone, clock.dayStartHour)

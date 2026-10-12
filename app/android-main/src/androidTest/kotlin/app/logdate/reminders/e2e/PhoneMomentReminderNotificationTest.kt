@@ -10,11 +10,17 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.MainActivity
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
+import app.logdate.client.domain.recommendation.AmbientPromptFamily
+import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.domain.reminders.ReminderTrigger
 import app.logdate.client.reminders.PhoneMomentReminderNotifier
 import app.logdate.client.resolveMainActivityNavKey
 import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.navigation.EntryEditorRoute
+import app.logdate.navigation.TimelineDetailRoute
 import kotlinx.datetime.LocalDate
 import org.junit.After
 import org.junit.Before
@@ -25,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 @RunWith(AndroidJUnit4::class)
 class PhoneMomentReminderNotificationTest {
@@ -100,6 +107,61 @@ class PhoneMomentReminderNotificationTest {
             try {
                 val route = assertIs<EntryEditorRoute>(resolveMainActivityNavKey(activity.intent))
                 assertEquals(EditorLaunchMode.Voice, route.launchMode)
+            } finally {
+                activity.finish()
+            }
+        } finally {
+            instrumentation.removeMonitor(monitor)
+        }
+    }
+
+    @Test fun draftReminderRetainsItsDraftTargetAndSharedNotificationIdentity() {
+        val id = Uuid.random()
+        val candidate = AmbientPromptCandidate(AmbientPromptFamily.DRAFT_RESCUE, 100, "draft", AmbientPromptPayload.DraftRescue(id))
+        assertTrue(notifier.post(ReminderTrigger.DRAFT_RESCUE, 2, day, candidate))
+        assertEquals("Finish your draft", posted().extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        val wearable = NotificationCompat.WearableExtender(posted())
+        assertEquals("logdate.reminder", wearable.bridgeTag)
+        assertEquals("logdate.reminder:$day", wearable.dismissalId)
+        assertTrue(
+            posted()
+                .extras
+                .getCharSequence(Notification.EXTRA_TEXT)
+                .toString()
+                .contains("2 marked moments to finish"),
+        )
+        withOpenedContent { intent ->
+            assertEquals(id.toString(), intent.getStringExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID))
+            assertEquals(id.toString(), assertIs<EntryEditorRoute>(resolveMainActivityNavKey(intent)).draftId)
+        }
+    }
+
+    @Test fun memoryReminderRetainsItsRecallDateAndSharedNotificationIdentity() {
+        val date = LocalDate(2025, 10, 12)
+        val candidate =
+            AmbientPromptCandidate(
+                AmbientPromptFamily.MEMORY_RECALL,
+                80,
+                "recall",
+                AmbientPromptPayload.MemoryRecall(date, "A day to revisit"),
+            )
+        assertTrue(notifier.post(ReminderTrigger.MEMORY_RECALL, 0, day, candidate))
+        assertEquals("Revisit a memory", posted().extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("logdate.reminder:$day", NotificationCompat.WearableExtender(posted()).dismissalId)
+        withOpenedContent { intent ->
+            assertEquals(date.toString(), intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE))
+            assertEquals(date.toString(), assertIs<TimelineDetailRoute>(resolveMainActivityNavKey(intent)).dateIso)
+        }
+    }
+
+    private fun withOpenedContent(check: (android.content.Intent) -> Unit) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
+        try {
+            posted().contentIntent.send()
+            val activity = assertNotNull(instrumentation.waitForMonitorWithTimeout(monitor, 10_000))
+            try {
+                check(activity.intent)
             } finally {
                 activity.finish()
             }

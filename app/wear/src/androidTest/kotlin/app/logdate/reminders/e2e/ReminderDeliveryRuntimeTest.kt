@@ -45,103 +45,111 @@ import kotlin.uuid.Uuid
 
 @RunWith(AndroidJUnit4::class)
 class ReminderDeliveryRuntimeTest {
-    @Test
-    fun delegatedWireRequestPostsOnceUsingNativeClaimsAndPreferences() =
-        runBlocking {
-            val context = ApplicationProvider.getApplicationContext<Context>()
-            InstrumentationRegistry
-                .getInstrumentation()
-                .uiAutomation
-                .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
-            val fixture = "delivery-test-${Uuid.random()}"
-            val base = KoinJavaComponent.getKoin().get<KeyValueStorage>()
-            val written = mutableSetOf<String>()
-            val storage =
-                object : KeyValueStorage by base {
-                    override suspend fun getString(key: String) = base.getString("$fixture:$key")
+    @Test fun delegatedWireRequestPostsOnceUsingNativeClaimsAndPreferences() =
+        delegated(ReminderTrigger.CAMPFIRE_EMBERS, "Keep your campfire going")
 
-                    override suspend fun putString(
-                        key: String,
-                        value: String,
-                    ) {
-                        written += "$fixture:$key"
-                        base.putString("$fixture:$key", value)
-                    }
+    @Test fun delegatedDraftRescueUsesTheSameNativeClaimAndBudget() = delegated(ReminderTrigger.DRAFT_RESCUE, "Finish your draft")
+
+    @Test fun delegatedMemoryRecallUsesTheSameNativeClaimAndBudget() = delegated(ReminderTrigger.MEMORY_RECALL, "Revisit a memory")
+
+    private fun delegated(
+        trigger: ReminderTrigger,
+        title: String,
+    ) = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        InstrumentationRegistry
+            .getInstrumentation()
+            .uiAutomation
+            .grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        val fixture = "delivery-test-${Uuid.random()}"
+        val base = KoinJavaComponent.getKoin().get<KeyValueStorage>()
+        val written = mutableSetOf<String>()
+        val storage =
+            object : KeyValueStorage by base {
+                override suspend fun getString(key: String) = base.getString("$fixture:$key")
+
+                override suspend fun putString(
+                    key: String,
+                    value: String,
+                ) {
+                    written += "$fixture:$key"
+                    base.putString("$fixture:$key", value)
                 }
-            val preferences = SharedPreferencesWatchReminderPreferences(context.getSharedPreferences(fixture, Context.MODE_PRIVATE))
-            val manager = context.getSystemService(NotificationManager::class.java)
-            val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32) { 1 }), "fixture-phone", "fixture-watch", LinkMode.PAIR)
-            val clock =
-                object : Clock {
-                    override fun now() = Instant.parse("2026-10-12T12:00:00Z")
-                }
-            val claim = ReminderDayClaim(peer, LocalDate(2026, 10, 12), "00000000-0000-4000-8000-000000000001", PeerRole.PHONE)
-
-            fun coordinator() =
-                CoordinatedReminderClaims(
-                    ReminderDayClaims(storage, PeerRole.WATCH),
-                    PeerRole.WATCH,
-                    ReminderClaimPeer { true },
-                    isCurrent = { it == peer },
-                    enabled = { true },
-                    clock = clock,
-                    timeZone = { TimeZone.UTC },
-                )
-
-            fun responder() =
-                ReminderDeliveryResponder(
-                    coordinator(),
-                    DeviceReminderBudget(storage),
-                    { preferences.enabled.value },
-                    post = { trigger, marks -> WatchNudgeNotifier(context).post(trigger, marks) },
-                    recordPostedAt = { preferences.setLastReminderAt(it) },
-                    clock = clock,
-                )
-            val request =
-                WearJson.encodeToBytes(
-                    ReminderDeliveryRequest.serializer(),
-                    ReminderDeliveryRequest(
-                        claim = claim,
-                        trigger = ReminderTrigger.CAMPFIRE_EMBERS,
-                        openMarks = 3,
-                    ),
-                )
-
-            suspend fun status() =
-                assertIs<Decoded.Supported<ReminderDeliveryResponse>>(
-                    WearJson.decode(requireNotNull(responder().answer("fixture-phone", request)), 1, ReminderDeliveryResponse.serializer()),
-                ).value.status
-            try {
-                preferences.setEnabled(true)
-                assertTrue(coordinator().grant(claim))
-                assertEquals(ReminderDeliveryStatus.POSTED, status())
-                assertEquals(ReminderDeliveryStatus.ALREADY_HANDLED, status())
-                assertEquals(
-                    clock.now().toEpochMilliseconds(),
-                    SharedPreferencesWatchReminderPreferences(
-                        context.getSharedPreferences(fixture, Context.MODE_PRIVATE),
-                    ).lastReminderAt()?.toEpochMilliseconds(),
-                )
-                withTimeout(5_000) {
-                    while (manager.activeNotifications.none { it.tag == WatchNudgeNotifier.TAG }) delay(25)
-                }
-                val notification = manager.activeNotifications.single { it.tag == WatchNudgeNotifier.TAG }.notification
-                assertEquals(
-                    "Keep your campfire going",
-                    notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString(),
-                )
-                assertTrue(
-                    notification.extras
-                        .getCharSequence(android.app.Notification.EXTRA_TEXT)
-                        .toString()
-                        .contains("3 marked moments to finish"),
-                )
-            } finally {
-                manager.cancel(WatchNudgeNotifier.TAG, WatchNudgeNotifier.NOTIFICATION_ID)
-                written.forEach { base.remove(it) }
-                context.deleteSharedPreferences(fixture)
             }
+        val preferences = SharedPreferencesWatchReminderPreferences(context.getSharedPreferences(fixture, Context.MODE_PRIVATE))
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32) { 1 }), "fixture-phone", "fixture-watch", LinkMode.PAIR)
+        val clock =
+            object : Clock {
+                override fun now() = Instant.parse("2026-10-12T12:00:00Z")
+            }
+        val claim = ReminderDayClaim(peer, LocalDate(2026, 10, 12), "00000000-0000-4000-8000-000000000001", PeerRole.PHONE)
+
+        fun coordinator() =
+            CoordinatedReminderClaims(
+                ReminderDayClaims(storage, PeerRole.WATCH),
+                PeerRole.WATCH,
+                ReminderClaimPeer { true },
+                isCurrent = { it == peer },
+                enabled = { true },
+                clock = clock,
+                timeZone = { TimeZone.UTC },
+            )
+
+        fun responder() =
+            ReminderDeliveryResponder(
+                coordinator(),
+                DeviceReminderBudget(storage),
+                { preferences.enabled.value },
+                post = { trigger, marks -> WatchNudgeNotifier(context).post(trigger, marks) },
+                recordPostedAt = { preferences.setLastReminderAt(it) },
+                clock = clock,
+            )
+        val request =
+            WearJson.encodeToBytes(
+                ReminderDeliveryRequest.serializer(),
+                ReminderDeliveryRequest(
+                    claim = claim,
+                    trigger = trigger,
+                    openMarks = 3,
+                ),
+            )
+
+        suspend fun status() =
+            assertIs<Decoded.Supported<ReminderDeliveryResponse>>(
+                WearJson.decode(requireNotNull(responder().answer("fixture-phone", request)), 1, ReminderDeliveryResponse.serializer()),
+            ).value.status
+        try {
+            preferences.setEnabled(true)
+            assertTrue(coordinator().grant(claim))
+            assertEquals(ReminderDeliveryStatus.POSTED, status())
+            assertEquals(ReminderDeliveryStatus.ALREADY_HANDLED, status())
+            assertEquals(
+                clock.now().toEpochMilliseconds(),
+                SharedPreferencesWatchReminderPreferences(
+                    context.getSharedPreferences(fixture, Context.MODE_PRIVATE),
+                ).lastReminderAt()?.toEpochMilliseconds(),
+            )
+            withTimeout(5_000) {
+                while (manager.activeNotifications.none { it.tag == WatchNudgeNotifier.TAG }) delay(25)
+            }
+            val notification = manager.activeNotifications.single { it.tag == WatchNudgeNotifier.TAG }.notification
+            assertEquals(
+                title,
+                notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE).toString(),
+            )
+            assertTrue(
+                notification.extras
+                    .getCharSequence(android.app.Notification.EXTRA_TEXT)
+                    .toString()
+                    .contains("3 marked moments to finish"),
+            )
+        } finally {
+            manager.cancel(WatchNudgeNotifier.TAG, WatchNudgeNotifier.NOTIFICATION_ID)
+            written.forEach { base.remove(it) }
+            context.deleteSharedPreferences(fixture)
         }
+    }
 
     @Test
     fun installedManifestRoutesDelegatedReminderToListener() {

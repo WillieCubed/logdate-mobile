@@ -63,6 +63,8 @@ object ReminderOrchestrator {
         if (signals.newPlaceArrivedAt.lastedAtLeast(now, ARRIVAL_DWELL)) return ReminderTrigger.ARRIVED_SOMEWHERE_NEW
         if (campfireFading(clock, signals, window)) return ReminderTrigger.CAMPFIRE_EMBERS
         if (windingDown(now, signals, window)) return ReminderTrigger.WIND_DOWN
+        if (signals.draftWaiting) return ReminderTrigger.DRAFT_RESCUE
+        if (signals.memoryAvailable) return ReminderTrigger.MEMORY_RECALL
         return null
     }
 

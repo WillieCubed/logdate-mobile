@@ -9,6 +9,8 @@ enum class WatchReminder(
     @param:StringRes val titleRes: Int,
     @param:StringRes val bodyRes: Int,
 ) {
+    DRAFT_RESCUE(R.string.wear_reminder_draft_title, R.string.wear_reminder_draft_body),
+    MEMORY_RECALL(R.string.wear_reminder_memory_title, R.string.wear_reminder_memory_body),
     EVENING(R.string.wear_reminder_evening_title, R.string.wear_reminder_evening_body),
     ARRIVED_SOMEWHERE_NEW(R.string.wear_reminder_arrival_title, R.string.wear_reminder_arrival_body),
     CAMPFIRE_EMBERS(R.string.wear_reminder_campfire_title, R.string.wear_reminder_campfire_body),
@@ -22,4 +24,6 @@ fun reminderForTrigger(trigger: ReminderTrigger): WatchReminder =
         ReminderTrigger.ARRIVED_SOMEWHERE_NEW -> WatchReminder.ARRIVED_SOMEWHERE_NEW
         ReminderTrigger.CAMPFIRE_EMBERS -> WatchReminder.CAMPFIRE_EMBERS
         ReminderTrigger.WIND_DOWN -> WatchReminder.WIND_DOWN
+        ReminderTrigger.DRAFT_RESCUE -> WatchReminder.DRAFT_RESCUE
+        ReminderTrigger.MEMORY_RECALL -> WatchReminder.MEMORY_RECALL
     }

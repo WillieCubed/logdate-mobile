@@ -12,9 +12,17 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import app.logdate.client.MainActivity
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_DRAFT
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
 import app.logdate.client.capture.ACTION_CAPTURE
 import app.logdate.client.capture.EXTRA_CAPTURE_MODE
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
+import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.domain.reminders.ReminderTrigger
+import app.logdate.client.domain.reminders.reminderTrigger
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import io.github.aakira.napier.Napier
@@ -30,8 +38,14 @@ class PhoneMomentReminderNotifier(
         trigger: ReminderTrigger,
         openMarks: Int,
         day: LocalDate,
+        supplemental: AmbientPromptCandidate? = null,
     ): Boolean {
         if (openMarks < 0) return false
+        if (trigger == ReminderTrigger.DRAFT_RESCUE || trigger == ReminderTrigger.MEMORY_RECALL) {
+            if (supplemental?.reminderTrigger() != trigger) return false
+        } else if (supplemental != null) {
+            return false
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -59,7 +73,7 @@ class PhoneMomentReminderNotifier(
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(true)
-                .setContentIntent(capture(day, "text"))
+                .setContentIntent(supplemental?.let { openSupplemental(it, day) } ?: capture(day, "text"))
                 .addAction(
                     NotificationResources.drawable.ic_notification_capture,
                     context.getString(R.string.moment_reminder_record),
@@ -90,12 +104,46 @@ class PhoneMomentReminderNotifier(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+    private fun openSupplemental(
+        candidate: AmbientPromptCandidate,
+        day: LocalDate,
+    ): PendingIntent {
+        val intent =
+            Intent(context, MainActivity::class.java)
+                .setData(Uri.parse("logdate://reminder/$day/${candidate.reminderTrigger()}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        when (val payload = candidate.payload) {
+            is AmbientPromptPayload.DraftRescue ->
+                intent
+                    .putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_DRAFT)
+                    .putExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID, payload.draftId.toString())
+            is AmbientPromptPayload.MemoryRecall ->
+                intent
+                    .putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_MEMORY_RECALL)
+                    .putExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE, payload.date.toString())
+            else -> error("Unsupported supplemental reminder")
+        }
+        return PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
     private fun content(trigger: ReminderTrigger): Pair<Int, Int> =
         when (trigger) {
             ReminderTrigger.WORKOUT_ENDED -> R.string.moment_reminder_workout_title to R.string.moment_reminder_workout_body
             ReminderTrigger.ARRIVED_SOMEWHERE_NEW -> R.string.moment_reminder_arrival_title to R.string.moment_reminder_arrival_body
             ReminderTrigger.CAMPFIRE_EMBERS -> R.string.moment_reminder_campfire_title to R.string.moment_reminder_campfire_body
-            ReminderTrigger.WIND_DOWN -> R.string.moment_reminder_wind_down_title to R.string.moment_reminder_wind_down_body
+            ReminderTrigger.WIND_DOWN ->
+                R.string.moment_reminder_wind_down_title to R.string.moment_reminder_wind_down_body
+            ReminderTrigger.DRAFT_RESCUE ->
+                NotificationResources.string.ambient_prompt_draft_rescue_title to
+                    NotificationResources.string.ambient_prompt_draft_rescue_body
+            ReminderTrigger.MEMORY_RECALL ->
+                NotificationResources.string.ambient_prompt_memory_recall_title to
+                    NotificationResources.string.ambient_prompt_memory_recall_body
         }
 
     companion object {

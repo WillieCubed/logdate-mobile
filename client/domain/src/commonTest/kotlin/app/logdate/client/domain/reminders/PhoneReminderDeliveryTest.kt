@@ -1,5 +1,8 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
+import app.logdate.client.domain.recommendation.AmbientPromptFamily
+import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.domain.recommendation.FakeKeyValueStorage
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.datalayer.v2.LinkMode
@@ -23,6 +26,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class PhoneReminderDeliveryTest {
     private val storage = FakeKeyValueStorage()
@@ -47,9 +51,12 @@ class PhoneReminderDeliveryTest {
     private var afterPresence: () -> Unit = {}
     private var afterDelivery: () -> Unit = {}
     private var phoneSucceeds = true
+    private var snapshotReads = 0
     private var claimCalls = 0
     private var presenceCalls = 0
     private var deliveryCalls = 0
+    private val supplementalPosts = mutableListOf<AmbientPromptCandidate>()
+    private val postedHistory = mutableListOf<AmbientPromptCandidate>()
     private val phonePosts = mutableListOf<Pair<ReminderTrigger, Int>>()
 
     private fun delivery() =
@@ -95,7 +102,10 @@ class PhoneReminderDeliveryTest {
                     )
                 }
             },
-            snapshot = { state },
+            snapshot = {
+                snapshotReads++
+                state
+            },
             isCurrent = { current && it == context },
             postPhone = { trigger, marks, day ->
                 assertEquals(LocalDate(2026, 10, 12), day)
@@ -103,10 +113,35 @@ class PhoneReminderDeliveryTest {
                 phoneSucceeds
             },
             clock = clock,
+            postSupplemental = { candidate, _, _ ->
+                supplementalPosts.add(candidate)
+                phoneSucceeds
+            },
+            supplementalPosted = { postedHistory.add(it) },
+            preflight = {
+                PhoneReminderPreflight(
+                    { PhoneReminderEnvironment(state.audience, state.signals.enabled, false, TimeZone.UTC, state.clock.dayStartHour) },
+                    budget,
+                    history,
+                    clock,
+                ).check()
+            },
         )
 
-    private fun linked(supported: Boolean = true) {
-        state = state.copy(watch = ReminderWatch(context, reachable = true, supportsReminders = supported))
+    private fun linked(
+        supported: Boolean = true,
+        supplements: Boolean = false,
+    ) {
+        state =
+            state.copy(
+                watch =
+                    ReminderWatch(
+                        context,
+                        reachable = true,
+                        supportsReminders = supported,
+                        supportsSupplementalReminders = supplements,
+                    ),
+            )
     }
 
     @Test
@@ -273,5 +308,92 @@ class PhoneReminderDeliveryTest {
             assertEquals(PhoneReminderOutcome.HELD, delivery().run())
             assertEquals(0, presenceCalls)
             assertEquals(emptyList(), phonePosts)
+        }
+
+    private fun withDraft() {
+        state =
+            state.copy(
+                signals = ReminderSignals(enabled = true, writtenToday = true),
+                supplemental =
+                    AmbientPromptCandidate(
+                        AmbientPromptFamily.DRAFT_RESCUE,
+                        100,
+                        "draft",
+                        AmbientPromptPayload.DraftRescue(Uuid.random()),
+                    ),
+            )
+    }
+
+    @Test fun draftAndMomentDeliveryShareTheSameDailyBudget() =
+        runTest {
+            withDraft()
+            val candidate = state.supplemental!!
+            assertEquals(PhoneReminderOutcome.PHONE_POSTED, delivery().run())
+            assertEquals(listOf(candidate), supplementalPosts)
+            assertEquals(listOf(candidate), postedHistory)
+            assertEquals(now, history.latest())
+            state = state.copy(signals = ReminderSignals(true, false, workoutEndedAt = now), supplemental = null)
+            assertEquals(PhoneReminderOutcome.SKIPPED, delivery().run())
+            assertTrue(phonePosts.isEmpty())
+        }
+
+    @Test fun draftUsesWatchDeliveryWhenWornAndStillRecordsItsDedupeHistory() =
+        runTest {
+            withDraft()
+            linked(supplements = true)
+            assertEquals(PhoneReminderOutcome.WATCH_POSTED, delivery().run())
+            assertEquals(1, deliveryCalls)
+            assertEquals(listOf(state.supplemental!!), postedHistory)
+            assertTrue(supplementalPosts.isEmpty())
+        }
+
+    @Test fun resolvedDraftDuringPresenceCheckDoesNotPostOrConsumeBudget() =
+        runTest {
+            withDraft()
+            linked()
+            afterPresence = { state = state.copy(supplemental = null) }
+            assertEquals(PhoneReminderOutcome.HELD, delivery().run())
+            assertTrue(supplementalPosts.isEmpty())
+            assertTrue(budget.available(LocalDate(2026, 10, 12)))
+        }
+
+    @Test fun sharedOptOutSuppressesDraftsEvenWhenACandidateExists() =
+        runTest {
+            withDraft()
+            state = state.copy(signals = state.signals.copy(enabled = false))
+            assertEquals(PhoneReminderOutcome.SKIPPED, delivery().run())
+            assertTrue(supplementalPosts.isEmpty())
+            assertTrue(budget.available(LocalDate(2026, 10, 12)))
+        }
+
+    @Test fun olderWatchCoordinatesTheBudgetButReceivesNoUnsupportedDraftTrigger() =
+        runTest {
+            withDraft()
+            linked()
+            assertEquals(PhoneReminderOutcome.PHONE_POSTED, delivery().run())
+            assertEquals(1, claimCalls)
+            assertEquals(0, deliveryCalls)
+            assertEquals(listOf(state.supplemental!!), supplementalPosts)
+        }
+
+    @Test fun exhaustedBudgetPreventsPrivateSnapshotReads() =
+        runTest {
+            budget.consume(LocalDate(2026, 10, 12))
+            assertEquals(PhoneReminderOutcome.HELD, delivery().run())
+            assertEquals(0, snapshotReads)
+        }
+
+    @Test fun peerPostedHistoryPreventsPrivateSnapshotReads() =
+        runTest {
+            history.adoptPeer("watch", now.toEpochMilliseconds())
+            assertEquals(PhoneReminderOutcome.SKIPPED, delivery().run())
+            assertEquals(0, snapshotReads)
+        }
+
+    @Test fun sharedOptOutPreventsPrivateSnapshotReads() =
+        runTest {
+            state = state.copy(signals = state.signals.copy(enabled = false))
+            assertEquals(PhoneReminderOutcome.SKIPPED, delivery().run())
+            assertEquals(0, snapshotReads)
         }
 }

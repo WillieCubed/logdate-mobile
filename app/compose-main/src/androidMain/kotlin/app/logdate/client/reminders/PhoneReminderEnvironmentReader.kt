@@ -76,7 +76,12 @@ class PhoneReminderEnvironmentReader(
         return contexts
             .mapNotNull { context ->
                 val watch = documents[context.watchNode]?.watch?.takeIf { it.linkId == context.linkId } ?: return@mapNotNull null
-                ReminderWatch(context, context.watchNode in reachable, WearFeatures.REMINDERS in watch.features)
+                ReminderWatch(
+                    context,
+                    context.watchNode in reachable,
+                    WearFeatures.REMINDERS in watch.features,
+                    WearFeatures.REMINDER_SUPPLEMENTS in watch.features,
+                )
             }.sortedWith(
                 compareByDescending<ReminderWatch> { it.reachable && it.supportsReminders }.thenBy { it.context.watchNode },
             ).firstOrNull()

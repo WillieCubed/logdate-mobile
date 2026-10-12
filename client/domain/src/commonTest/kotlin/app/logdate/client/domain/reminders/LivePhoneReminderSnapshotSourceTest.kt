@@ -1,5 +1,8 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
+import app.logdate.client.domain.recommendation.AmbientPromptFamily
+import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.domain.recommendation.DefaultPlaceFamiliarityRepository
 import app.logdate.client.domain.recommendation.FakeKeyValueStorage
 import app.logdate.client.domain.streak.FakeNotesRepository
@@ -15,9 +18,11 @@ import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class LivePhoneReminderSnapshotSourceTest {
     private var now = Instant.parse("2026-10-12T21:30:00Z")
@@ -27,6 +32,10 @@ class LivePhoneReminderSnapshotSourceTest {
     private var afterMarks: () -> Unit = {}
     private var workout: Instant? = null
     private var healthReads = 0
+    private var supplementalReads = 0
+    private var afterSupplemental: () -> Unit = {}
+    private val draft =
+        AmbientPromptCandidate(AmbientPromptFamily.DRAFT_RESCUE, 100, "draft", AmbientPromptPayload.DraftRescue(Uuid.random()))
     private val notes =
         object : JournalNotesRepository by FakeNotesRepository() {
             override fun observeEntryTimestamps() = flowOf(times)
@@ -82,6 +91,11 @@ class LivePhoneReminderSnapshotSourceTest {
                 }, { error("Places are off") }),
             openMarks = { marks.also { afterMarks() } },
             workoutEndedAt = { workout },
+            supplemental = {
+                supplementalReads++
+                afterSupplemental()
+                draft
+            },
             clock =
                 object : Clock {
                     override fun now() = this@LivePhoneReminderSnapshotSourceTest.now
@@ -156,5 +170,55 @@ class LivePhoneReminderSnapshotSourceTest {
                 ReminderDecision.Deliver(ReminderTrigger.WORKOUT_ENDED, 2),
                 ReminderOrchestrator.decide(snapshot.clock, snapshot.signals),
             )
+        }
+
+    @Test fun supplementsAreReadInsideTheSharedGateWhenNoMomentIsReady() =
+        runTest {
+            now = Instant.parse("2026-10-12T12:00:00Z")
+            assertEquals(draft, source().read().supplemental)
+            assertEquals(1, supplementalReads)
+        }
+
+    @Test fun disabledRemindersDoNotReadDraftsOrMemories() =
+        runTest {
+            current = current.copy(enabled = false)
+            assertNull(source().read().supplemental)
+            assertEquals(0, supplementalReads)
+        }
+
+    @Test fun sleepingDoesNotReadDraftsOrMemories() =
+        runTest {
+            now = Instant.parse("2026-10-12T03:00:00Z")
+            assertNull(source().read().supplemental)
+            assertEquals(0, supplementalReads)
+        }
+
+    @Test fun primaryMomentSignalsDoNotReadUnneededRecallData() =
+        runTest {
+            workout = now
+            assertNull(source().read().supplemental)
+            assertEquals(0, supplementalReads)
+        }
+
+    @Test fun optingOutDuringSupplementalReadDiscardsTheCandidate() =
+        runTest {
+            now = Instant.parse("2026-10-12T12:00:00Z")
+            afterSupplemental = { current = current.copy(enabled = false) }
+            val snapshot = source().read()
+            assertFalse(snapshot.signals.enabled)
+            assertNull(snapshot.supplemental)
+        }
+
+    @Test fun consentOrAccountChangesBeforeRecallPreventThePrivateRead() =
+        runTest {
+            now = Instant.parse("2026-10-12T12:00:00Z")
+            val initial = current
+            for (changed in listOf(initial.copy(enabled = false), initial.copy(audience = "other"))) {
+                current = initial
+                afterMarks = { current = changed }
+                val snapshot = source().read()
+                assertFalse(snapshot.signals.enabled)
+                assertEquals(0, supplementalReads)
+            }
         }
 }

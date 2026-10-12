@@ -200,4 +200,8 @@
         <item quantity="one">%d-day fire</item>
         <item quantity="other">%d-day fire</item>
     </plurals>
+    <string name="wear_reminder_draft_title">Finish your draft</string>
+    <string name="wear_reminder_draft_body">You started a story. Pick it back up on your phone.</string>
+    <string name="wear_reminder_memory_title">Revisit a memory</string>
+    <string name="wear_reminder_memory_body">An older entry is waiting to be rediscovered on your phone.</string>
 </resources>
