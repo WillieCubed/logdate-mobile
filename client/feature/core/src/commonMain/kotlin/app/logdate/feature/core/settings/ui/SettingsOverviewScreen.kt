@@ -10,9 +10,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.feature.core.settings.ui.watch.WatchDeviceCard
+import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
@@ -21,6 +26,7 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.screen_title_settings
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
 
@@ -58,6 +64,18 @@ fun SettingsOverviewScreen(
     viewModel: SettingsOverviewViewModel = koinViewModel(),
     campfireViewModel: CampfireViewModel = koinViewModel(),
 ) {
+    val flags = koinInject<FeatureFlagStore>()
+    val watchRedesign by remember(flags) { flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) }.collectAsState(false)
+    val deviceCards: (@Composable () -> Unit)? =
+        if (watchRedesign && onNavigateToWatch != null) {
+            {
+                val watchViewModel = koinViewModel<WatchSettingsViewModel>()
+                val watchStatus by watchViewModel.status.collectAsState()
+                WatchDeviceCard(watchStatus, onClick = onNavigateToWatch, modifier = Modifier.padding(Spacing.lg))
+            }
+        } else {
+            null
+        }
     val identity by viewModel.resolvedIdentity.collectAsState()
     val streakData by viewModel.streakData.collectAsState()
     val campfire by campfireViewModel.presentation.collectAsState()
@@ -97,6 +115,7 @@ fun SettingsOverviewScreen(
         streakCount = if (isCampfireEnabled == false && streakData.isEnabled) streakData.currentStreak else null,
         campfire = campfire,
         modifier = modifier,
+        deviceCards = deviceCards,
     )
 }
 
@@ -129,6 +148,7 @@ fun SettingsOverviewContent(
     streakCount: Int? = null,
     campfire: CampfirePresentation? = null,
     modifier: Modifier = Modifier,
+    deviceCards: (@Composable () -> Unit)? = null,
 ) {
     FoldableBookLayout(
         modifier = modifier,
@@ -143,6 +163,8 @@ fun SettingsOverviewContent(
                     onEditProfile = onNavigateToProfile,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
+
+                deviceCards?.invoke()
 
                 SettingsPersonalSection(
                     onNavigateToProfile = onNavigateToProfile,
@@ -165,7 +187,7 @@ fun SettingsOverviewContent(
                     onNavigateToAccount = onNavigateToAccount,
                     onNavigateToDevices = onNavigateToDevices,
                     onNavigateToLocation = onNavigateToLocation,
-                    onNavigateToWatch = onNavigateToWatch,
+                    onNavigateToWatch = onNavigateToWatch.takeIf { deviceCards == null },
                     onNavigateToNotifications = onNavigateToNotifications,
                 )
 
@@ -197,6 +219,8 @@ fun SettingsOverviewContent(
                     )
                 }
 
+                deviceCards?.let { cards -> item { cards() } }
+
                 // Personal group
                 item {
                     SettingsPersonalSection(
@@ -220,7 +244,7 @@ fun SettingsOverviewContent(
                         onNavigateToAccount = onNavigateToAccount,
                         onNavigateToDevices = onNavigateToDevices,
                         onNavigateToLocation = onNavigateToLocation,
-                        onNavigateToWatch = onNavigateToWatch,
+                        onNavigateToWatch = onNavigateToWatch.takeIf { deviceCards == null },
                         onNavigateToNotifications = onNavigateToNotifications,
                     )
                 }

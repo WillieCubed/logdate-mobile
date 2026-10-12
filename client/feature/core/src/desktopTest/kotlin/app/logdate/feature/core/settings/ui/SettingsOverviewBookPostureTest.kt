@@ -2,6 +2,7 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -52,6 +53,43 @@ private val bookPosture =
 @OptIn(ExperimentalTestApi::class)
 class SettingsOverviewBookPostureTest {
     @Test
+    fun `compact overview places device cards before personal settings without a duplicate row`() =
+        runDesktopComposeUiTest(width = 411, height = 1600) {
+            setContent { SettingsOverviewInBookPosture(book = false) }
+
+            val card = onNodeWithText("Test watch device").fetchSemanticsNode().boundsInRoot
+            val library = onNodeWithText("Your library").fetchSemanticsNode().boundsInRoot
+            kotlin.test.assertTrue(card.top < library.top)
+            onNodeWithText("Watch").assertDoesNotExist()
+        }
+
+    @Test
+    fun `device card replaces the watch row`() =
+        runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
+            setContent { SettingsOverviewInBookPosture() }
+
+            onNodeWithText("Test watch device").assertExists()
+            onNodeWithText("Watch").assertDoesNotExist()
+        }
+
+    @Test
+    fun `without device cards the existing watch row remains`() =
+        runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
+            setContent { SettingsOverviewInBookPosture(withCards = false) }
+
+            onNodeWithText("Watch").performScrollTo().assertIsDisplayed()
+            onNodeWithText("Test watch device").assertDoesNotExist()
+        }
+
+    @Test
+    fun `device cards are reachable in the identity pane`() =
+        runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
+            setContent { SettingsOverviewInBookPosture() }
+
+            onNodeWithText("Test watch device").performScrollTo().assertIsDisplayed()
+        }
+
+    @Test
     fun `the last row of the start pane scrolls into view`() =
         runDesktopComposeUiTest(width = WINDOW_WIDTH, height = WINDOW_HEIGHT) {
             setContent { SettingsOverviewInBookPosture() }
@@ -69,14 +107,18 @@ class SettingsOverviewBookPostureTest {
 }
 
 @Composable
-private fun SettingsOverviewInBookPosture() {
-    provideFoldableLayoutInfo(bookPosture) {
+private fun SettingsOverviewInBookPosture(
+    withCards: Boolean = true,
+    book: Boolean = true,
+) {
+    provideFoldableLayoutInfo(if (book) bookPosture else FoldableLayoutInfo()) {
         LogDateTheme(dynamicColor = false, darkTheme = false) {
             SettingsOverviewContent(
                 onBack = {},
                 onNavigateToProfile = {},
                 onNavigateToAccount = {},
                 onNavigateToDevices = {},
+                onNavigateToWatch = {},
                 onNavigateToReset = {},
                 onNavigateToLocation = {},
                 onNavigateToPrivacy = {},
@@ -84,6 +126,12 @@ private fun SettingsOverviewInBookPosture() {
                 onNavigateToSync = {},
                 onNavigateToExport = {},
                 userProfile = UserProfile(name = "Alex Rivera", username = "alex", isAuthenticated = true),
+                deviceCards =
+                    if (withCards) {
+                        { Text("Test watch device") }
+                    } else {
+                        null
+                    },
             )
         }
     }
