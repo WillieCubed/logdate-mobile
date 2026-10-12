@@ -14,6 +14,7 @@ data class PublishedItem(
     val contentVersion: Long,
     val reasons: Set<WindowReason>,
     val revision: Long = 0,
+    val bodySha256: String? = null,
 )
 
 /** What the phone last published to the watch's window, by note id, and when each tombstone was written. */

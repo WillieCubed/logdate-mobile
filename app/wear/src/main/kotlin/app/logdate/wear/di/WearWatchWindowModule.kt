@@ -16,10 +16,13 @@ import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.wear.sync.SyncedAudioCache
 import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
+import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.sync.v2.window.DataClientWindowItemSource
+import app.logdate.wear.sync.v2.window.GoogleWindowBodyRangeSource
 import app.logdate.wear.sync.v2.window.WatchTranscriptRepository
 import app.logdate.wear.sync.v2.window.WindowApplier
+import app.logdate.wear.sync.v2.window.WindowBodyHydrator
 import app.logdate.wear.sync.v2.window.WindowDataEvents
 import app.logdate.wear.sync.v2.window.WindowItemSource
 import app.logdate.wear.sync.v2.window.WindowMembershipStore
@@ -31,6 +34,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
+import java.io.File
 
 val wearWatchWindowModule =
     module {
@@ -50,7 +54,23 @@ val wearWatchWindowModule =
             val flags = get<FeatureFlagStore>()
             WindowProtocol({ flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) }, get(), get(), get())
         }
-        single<WindowItemSource> { DataClientWindowItemSource(Wearable.getDataClient(get<Context>())) }
+        single<WindowItemSource> {
+            val context = get<Context>()
+            val peers = get<WatchDeliveryPeer>()
+            val koin = getKoin()
+            WindowBodyHydrator(
+                DataClientWindowItemSource(Wearable.getDataClient(context)),
+                peers,
+                File(context.cacheDir, "watch-window-bodies"),
+            ) { body ->
+                GoogleWindowBodyRangeSource(
+                    peers,
+                    koin.get<LinkedDataLayerTransportV2> { parametersOf(body.context) },
+                    Wearable.getChannelClient(context),
+                    body,
+                )
+            }
+        }
         single {
             val cache = get<SyncedAudioCache>()
             WindowApplier(

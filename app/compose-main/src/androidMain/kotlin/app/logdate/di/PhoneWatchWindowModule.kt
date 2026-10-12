@@ -15,6 +15,8 @@ import app.logdate.client.sync.v2.localNodeIdOrNull
 import app.logdate.client.sync.v2.media.PhoneMediaEndpoint
 import app.logdate.client.sync.v2.media.PhoneMediaServer
 import app.logdate.client.sync.v2.window.GoogleWindowDataItems
+import app.logdate.client.sync.v2.window.PhoneWindowBodyEndpoint
+import app.logdate.client.sync.v2.window.PhoneWindowBodyServer
 import app.logdate.client.sync.v2.window.WatchWindowPublisher
 import app.logdate.client.sync.v2.window.WindowDataItems
 import app.logdate.client.sync.v2.window.WindowExtras
@@ -29,12 +31,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
+import java.io.File
 
 val phoneWatchWindowModule =
     module {
         single { PhoneMediaServer(get(), get(), get<MediaFileResolver>()::filePath) }
         single { PhoneMediaEndpoint(get(), Wearable.getChannelClient(androidContext())) }
         single { WindowManifestStore(get()) }
+        single { PhoneWindowBodyServer(get(), get(), get(), File(androidContext().cacheDir, "watch-window-bodies")) }
+        single { PhoneWindowBodyEndpoint(get(), Wearable.getChannelClient(androidContext())) }
         single<WindowDataItems> {
             val node = Wearable.getNodeClient(androidContext())
             GoogleWindowDataItems(Wearable.getDataClient(androidContext())) { node.localNodeIdOrNull() }

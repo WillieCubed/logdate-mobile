@@ -72,7 +72,9 @@ class WearKoinGraphTest {
         runBlocking {
             koin.get<app.logdate.wear.sync.v2.window.WindowMembershipStore>()
             koin.get<app.logdate.wear.sync.v2.window.WindowApplier>()
-            koin.get<app.logdate.wear.sync.v2.window.WindowItemSource>()
+            kotlin.test.assertTrue(
+                koin.get<app.logdate.wear.sync.v2.window.WindowItemSource>() is app.logdate.wear.sync.v2.window.WindowBodyHydrator,
+            )
             assertFalse(koin.get<app.logdate.wear.sync.v2.window.WindowProtocol>().active())
             kotlin.test.assertNull(koin.get<app.logdate.wear.sync.v2.window.WindowReconciler>().resync())
         }

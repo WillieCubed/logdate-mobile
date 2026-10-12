@@ -7,9 +7,11 @@ import app.logdate.client.domain.watch.WindowMember
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.NoteDataMapper
+import app.logdate.client.sync.datalayer.v2.BodyRef
 import app.logdate.client.sync.datalayer.v2.DeliveryPriority
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.RecordEnvelope
+import app.logdate.client.sync.datalayer.v2.RecordEnvelopeCodec
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.RecordOrigin
 import app.logdate.client.sync.datalayer.v2.WearPaths
@@ -197,16 +199,24 @@ class WatchWindowPublisher(
     ) {
         val id = member.id.toString()
         val version = note.lastUpdated.toEpochMilliseconds()
-        val wanted = PublishedItem(version, member.reasons)
+        val bodyBytes = body.toString().encodeToByteArray()
+        val bodyHash =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(bodyBytes)
+                .joinToString("") { "%02x".format(it) }
+        val wanted = PublishedItem(version, member.reasons, bodySha256 = bodyHash)
         val existing = published[id]
         if (!interrupted &&
             existing != null &&
             existing.contentVersion == version &&
             existing.reasons == member.reasons &&
+            existing.bodySha256 == bodyHash &&
             existing.revision > 0
         ) {
             return
         }
+        val bodyRef = if (RecordEnvelopeCodec.needsChannel(body)) BodyRef(bodyHash, bodyBytes.size.toLong()) else null
         val envelope =
             RecordEnvelope(
                 kind = RecordKind.NOTE,
@@ -217,7 +227,8 @@ class WatchWindowPublisher(
                 context = peer,
                 reasons = member.reasons,
                 priority = DeliveryPriority.NORMAL,
-                body = body,
+                body = body.takeIf { bodyRef == null },
+                bodyRef = bodyRef,
             )
         val data =
             try {
@@ -225,7 +236,7 @@ class WatchWindowPublisher(
                 EnvelopeDataMap.toDataMap(envelope, sentAt = version)
             } catch (e: IllegalArgumentException) {
                 counts.tooLarge++
-                Napier.w("A note is too large for one data item; it stays out of the watch's window until large bodies travel on a channel")
+                Napier.w("Could not encode a note for the watch library window")
                 return
             }
         requireCurrent(peer)

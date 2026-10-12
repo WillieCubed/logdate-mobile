@@ -167,4 +167,84 @@ class WatchWindowRuntimeTest {
                 notes.deleteFromSync(note.uid)
             }
         }
+
+    @Test fun largeVerifiedBodySurvivesActualRoomAndMissingReplacementDoesNotPrune() =
+        runBlocking {
+            links.savePairing("isolated-test-phone", ByteArray(32), LinkWire.encodeKey(ByteArray(32) { 3 }))
+            val peer = assertNotNull(peers.current())
+            val note =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = Instant.fromEpochMilliseconds(1),
+                    lastUpdated = Instant.fromEpochMilliseconds(5),
+                    content = "A long journal entry 🌊".repeat(10000),
+                )
+            val bytes = NoteEnvelopeBody.encode(note).toString().encodeToByteArray()
+            val ref =
+                app.logdate.client.sync.datalayer.v2.BodyRef(
+                    java.security.MessageDigest
+                        .getInstance("SHA-256")
+                        .digest(bytes)
+                        .joinToString("") { "%02x".format(it) },
+                    bytes.size.toLong(),
+                )
+            val envelope =
+                NoteEnvelopeBody
+                    .envelope(note, RecordOrigin.PHONE, DeliveryPriority.BULK)
+                    .copy(context = peer, body = null, bodyRef = ref)
+            val item =
+                WindowItem(
+                    peer.phoneNode,
+                    WearPaths.windowItem(RecordKind.NOTE, note.uid, peer),
+                    EnvelopeDataMap.toDataMap(envelope, 1) + (WindowTombstoneDataMap.KEY_REVISION to "1"),
+                )
+            val response =
+                WindowResyncResponse(
+                    context = peer,
+                    members = listOf(WindowMemberRef(RecordKind.NOTE, note.uid.toString(), 5, 1)),
+                    publishedAt = 9,
+                    revision = 1,
+                )
+            val directory = java.io.File(koin.get<android.content.Context>().cacheDir, "window-body-test-" + Uuid.random())
+            var bodyBytes = bytes
+            var opens = 0
+            var closes = 0
+            val hydrator =
+                app.logdate.wear.sync.v2.window.WindowBodyHydrator(
+                    app.logdate.wear.sync.v2.window
+                        .WindowItemSource { listOf(item) },
+                    peers,
+                    directory,
+                ) {
+                    app.logdate.wear.sync.v2.media.MediaRangeSource { request ->
+                        opens++
+                        val input = bodyBytes.inputStream().also { it.skip(request.offset) }
+                        object : app.logdate.wear.sync.v2.media.MediaRangeConnection {
+                            override val identity = request.identity
+                            override val offset = request.offset
+                            override val sourceNodeId = peer.phoneNode
+
+                            override suspend fun read(buffer: ByteArray): Int = input.read(buffer)
+
+                            override suspend fun close() {
+                                closes++
+                                input.close()
+                            }
+                        }
+                    }
+                }
+            try {
+                assertEquals(WindowApplied(1, 0), applier.reconcile(peer, response, hydrator.items(peer)))
+                assertEquals(note, notes.getNoteById(note.uid))
+                bodyBytes = bytes.copyOf(100)
+                val replacement = response.copy(revision = 2, members = response.members.map { it.copy(revision = 2) })
+                assertNull(applier.reconcile(peer, replacement, hydrator.items(peer)))
+                assertEquals(note, notes.getNoteById(note.uid))
+                assertEquals(opens, closes)
+                kotlin.test.assertTrue(directory.listFiles().orEmpty().isEmpty())
+            } finally {
+                notes.deleteFromSync(note.uid)
+                directory.deleteRecursively()
+            }
+        }
 }

@@ -86,6 +86,51 @@ class WatchWindowPublisherTest {
     private val recent = text("written yesterday", start - 1.days)
     private val old = text("written long ago", start - 400.days)
 
+    @Test fun `oversized notes publish a bounded body reference instead of being omitted`() =
+        runTest {
+            val large = recent.copy(content = "large note".repeat(15000))
+            notesFlow.value = listOf(large)
+            val result = assertNotNull(publisher.publishIfActive("watch"))
+            assertEquals(1, result.written)
+            assertEquals(0, result.tooLarge)
+            val envelope = (EnvelopeDataMap.fromDataMap(items.puts.single().second) as Decoded.Supported).value
+            assertNull(envelope.body)
+            val reference = assertNotNull(envelope.bodyRef)
+            val bytes =
+                app.logdate.client.sync.peer.delivery.NoteEnvelopeBody
+                    .encode(large)
+                    .toString()
+                    .encodeToByteArray()
+            assertEquals(bytes.size.toLong(), reference.sizeBytes)
+            assertEquals(
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(bytes)
+                    .joinToString("") { "%02x".format(it) },
+                reference.sha256,
+            )
+            assertEquals(1, result.members.size)
+        }
+
+    @Test
+    fun `a large body edited within the same timestamp publishes a new revision`() =
+        runTest {
+            val large = recent.copy(content = "old large note".repeat(15000))
+            notesFlow.value = listOf(large)
+            publisher.publishIfActive("watch")
+            val first = items.puts.single().second
+            items.puts.clear()
+            notesFlow.value = listOf(large.copy(content = "new large note".repeat(15000)))
+            assertEquals(1, assertNotNull(publisher.publishIfActive("watch")).written)
+            val next = items.puts.single().second
+            val before = (EnvelopeDataMap.fromDataMap(first) as Decoded.Supported).value
+            val after = (EnvelopeDataMap.fromDataMap(next) as Decoded.Supported).value
+            assertTrue(before.bodyRef != after.bodyRef)
+            assertTrue(
+                next.getValue(WindowTombstoneDataMap.KEY_REVISION).toLong() > first.getValue(WindowTombstoneDataMap.KEY_REVISION).toLong(),
+            )
+        }
+
     @Test
     fun `while the watch does not take the window nothing is published`() =
         runTest {
@@ -156,11 +201,13 @@ class WatchWindowPublisherTest {
         }
 
     @Test
-    fun `a note too large for one data item is left out and counted`() =
+    fun `a large referenced note is not rewritten when its publication is unchanged`() =
         runTest {
             notesFlow.value = listOf(text("x".repeat(100 * 1024), start - 1.days))
 
-            assertEquals(1, assertNotNull(publisher.publishIfActive("watch")).tooLarge)
+            assertEquals(1, assertNotNull(publisher.publishIfActive("watch")).written)
+            items.puts.clear()
+            assertEquals(0, assertNotNull(publisher.publishIfActive("watch")).written)
             assertTrue(items.puts.isEmpty())
         }
 

@@ -9,7 +9,6 @@ import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.client.sync.datalayer.v2.WearFeatures
-import app.logdate.client.sync.datalayer.v2.WearMediaPaths
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
@@ -20,6 +19,7 @@ import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.client.sync.v2.media.PhoneMediaEndpoint
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.answerPhoneRequest
+import app.logdate.client.sync.v2.window.PhoneWindowBodyEndpoint
 import app.logdate.client.sync.v2.window.WatchWindowPublisher
 import app.logdate.client.sync.v2.window.WindowResyncResponder
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
@@ -55,6 +55,8 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     private val journalDataMapper = JournalDataMapper()
     private val associationDataMapper = AssociationDataMapper()
     private val healthSnapshotDataMapper = HealthSnapshotDataMapper()
+    private val readChannels =
+        PhoneReadChannels({ resolveKoin()?.get<PhoneMediaEndpoint>() }, { resolveKoin()?.get<PhoneWindowBodyEndpoint>() })
 
     @Volatile
     private var cachedLocalNodeId: String? = null
@@ -163,8 +165,8 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
-        if (channel.path.startsWith(WearMediaPaths.CHANNEL_PREFIX)) {
-            serviceScope.launch { resolveKoin()?.get<PhoneMediaEndpoint>()?.serve(channel) ?: closeChannel(channel) }
+        if (readChannels.recognizes(channel.path)) {
+            serviceScope.launch { if (!readChannels.serve(channel)) closeChannel(channel) }
             return
         }
         if (WearPaths.parseRecordMedia(channel.path) != null) {
@@ -244,13 +246,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         when {
             path == WearPaths.RECEIPTS && receiptsActive() -> resolveKoin()?.get<WatchReceiptResponder>()?.answer(nodeId, request)
             path == WearPaths.WINDOW_RESYNC -> resolveKoin()?.get<WindowResyncResponder>()?.answer(nodeId, request)
-            path == WearMediaPaths.INFO || path == WearMediaPaths.RANGE ->
-                resolveKoin()?.get<PhoneMediaEndpoint>()?.answer(
-                    nodeId,
-                    path,
-                    request,
-                )
-            else -> null
+            else -> readChannels.answer(nodeId, path, request)
         }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {

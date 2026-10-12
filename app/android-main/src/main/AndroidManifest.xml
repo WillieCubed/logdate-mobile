@@ -291,6 +291,7 @@
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/w2p/media" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/p2w/media/" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/p2w/window-body/" />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
@@ -307,6 +308,7 @@
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/window/resync" />
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/media/info" />
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/media/range" />
+                <data android:scheme="wear" android:host="*" android:path="/logdate/v2/window/body" />
             </intent-filter>
         </service>
 
