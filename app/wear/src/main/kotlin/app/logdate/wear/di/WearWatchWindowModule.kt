@@ -60,10 +60,8 @@ val wearWatchWindowModule =
                 members = get(),
                 transactions = get<SyncTransactionManager>(WatchCloud),
                 forgetMedia = { id ->
-                    if (cache.cachedFile(id) != null) {
-                        cache.delete(id)
-                        check(cache.cachedFile(id) == null) { "The downloaded audio could not be removed" }
-                    }
+                    cache.delete(id)
+                    check(cache.cachedFile(id) == null) { "The downloaded audio could not be removed" }
                 },
                 media = get(),
                 prepareNote = get<WindowPlaces>()::ensure,

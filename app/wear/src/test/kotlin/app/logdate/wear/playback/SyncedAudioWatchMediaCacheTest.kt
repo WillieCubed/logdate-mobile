@@ -143,5 +143,75 @@ class SyncedAudioWatchMediaCacheTest {
             assertTrue(directory.listFiles().orEmpty().isEmpty())
         }
 
+    @Test
+    fun `eviction invalidates a download waiting for the disk budget`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val cache = cache(Long.MAX_VALUE)
+            val first =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    cache.store(Uuid.random(), "m4a") { path, _ ->
+                        gate.await()
+                        File(path).writeText("first")
+                        true
+                    }
+                }
+            var fetched = false
+            val queued =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    cache.store(noteId, "m4a") { path, _ ->
+                        fetched = true
+                        File(path).writeText("evicted")
+                        true
+                    }
+                }
+            cache.evict(noteId)
+            gate.complete(Unit)
+            first.await()
+            assertNull(queued.await())
+            assertFalse(fetched)
+            assertNull(cache.cachedFile(noteId))
+        }
+
+    @Test
+    fun `eviction after the last chunk prevents publication and allows a fresh download`() =
+        runTest {
+            val cache = cache(Long.MAX_VALUE)
+            val stored =
+                cache.store(noteId, "m4a") { path, beforeWrite ->
+                    beforeWrite(5)
+                    File(path).writeText("stale")
+                    cache.evict(noteId)
+                    true
+                }
+            assertNull(stored)
+            assertNull(cache.cachedFile(noteId))
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+            val fresh =
+                cache.store(noteId, "m4a") { path, beforeWrite ->
+                    beforeWrite(5)
+                    File(path).writeText("fresh")
+                    true
+                }
+            assertEquals("fresh", fresh?.readText())
+        }
+
+    @Test
+    fun `an evicted transfer cannot write another chunk`() =
+        runTest {
+            val cache = cache(Long.MAX_VALUE)
+            assertFailsWith<java.io.IOException> {
+                cache.store(noteId, "m4a") { path, beforeWrite ->
+                    File(path).writeText("first")
+                    cache.evict(noteId)
+                    beforeWrite(4)
+                    File(path).appendText("late")
+                    true
+                }
+            }
+            assertNull(cache.cachedFile(noteId))
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+        }
+
     private fun cache(freeBytes: Long) = SyncedAudioWatchMediaCache(SyncedAudioCache(directory), freeBytes = { freeBytes })
 }

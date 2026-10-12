@@ -64,12 +64,20 @@ class SyncedAudioWatchMediaCache(
         extension: String,
         download: suspend (partPath: String, beforeWrite: suspend (Int) -> Unit) -> Boolean,
     ): File? =
-        downloads.withLock {
-            val free = freeBytes()
-            if (free <= reserveBytes) throw NoRoomForAudioException(free, reserveBytes)
-            val budget = free - reserveBytes
-            cache.pull(noteId, extension) { path ->
-                downloadWithinBudget(path, budget, download)
+        cache.withDownloadLease(noteId) { lease ->
+            downloads.withLock {
+                if (!cache.isValid(lease)) return@withLock null
+                val free = freeBytes()
+                if (free <= reserveBytes) throw NoRoomForAudioException(free, reserveBytes)
+                val budget = free - reserveBytes
+                cache.pull(noteId, extension, lease) { path ->
+                    downloadWithinBudget(path, budget) { partPath, beforeWrite ->
+                        download(partPath) { bytes ->
+                            cache.checkValid(lease)
+                            beforeWrite(bytes)
+                        }
+                    }
+                }
             }
         }
 

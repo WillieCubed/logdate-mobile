@@ -2,6 +2,7 @@ package app.logdate.wear.sync
 
 import io.github.aakira.napier.Napier
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlin.uuid.Uuid
@@ -18,6 +19,40 @@ import kotlin.uuid.Uuid
 class SyncedAudioCache(
     private val directory: File,
 ) {
+    private val lock = Any()
+    private val leases = mutableMapOf<Uuid, MutableSet<DownloadLease>>()
+
+    internal class DownloadLease {
+        var valid = true
+            internal set
+    }
+
+    internal suspend fun withDownloadLease(
+        noteId: Uuid,
+        block: suspend (DownloadLease) -> File?,
+    ): File? {
+        val lease =
+            synchronized(lock) {
+                DownloadLease().also { leases.getOrPut(noteId) { mutableSetOf() }.add(it) }
+            }
+        return try {
+            block(lease)
+        } finally {
+            synchronized(lock) {
+                leases[noteId]?.let {
+                    it.remove(lease)
+                    if (it.isEmpty()) leases.remove(noteId)
+                }
+            }
+        }
+    }
+
+    internal fun isValid(lease: DownloadLease): Boolean = synchronized(lock) { lease.valid }
+
+    internal fun checkValid(lease: DownloadLease) {
+        if (!isValid(lease)) throw IOException("The downloaded note was evicted")
+    }
+
     /** The complete audio already pulled for [noteId], or null when there is none. */
     fun cachedFile(noteId: Uuid): File? =
         directory
@@ -35,22 +70,41 @@ class SyncedAudioCache(
         noteId: Uuid,
         extension: String,
         download: suspend (partPath: String) -> Boolean,
+    ): File? = withDownloadLease(noteId) { lease -> pull(noteId, extension, lease, download) }
+
+    internal suspend fun pull(
+        noteId: Uuid,
+        extension: String,
+        lease: DownloadLease,
+        download: suspend (partPath: String) -> Boolean,
     ): File? {
+        if (!isValid(lease)) return null
         directory.mkdirs()
         clearAbandonedParts()
-        val part = File(directory, "$noteId.$extension.$PART_EXTENSION")
+        val part = Files.createTempFile(directory.toPath(), "$noteId.$extension.", ".$PART_EXTENSION").toFile()
         return try {
             if (!download(part.absolutePath) || part.length() <= 0L) return null
-            val target = File(directory, "$noteId.$extension")
-            Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
-            target
+            synchronized(lock) {
+                if (!lease.valid) return@synchronized null
+                val target = File(directory, "$noteId.$extension")
+                Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                target
+            }
         } finally {
             part.delete()
         }
     }
 
-    /** Removes the audio pulled for [noteId]. @return true when a file was deleted. */
-    fun delete(noteId: Uuid): Boolean = cachedFile(noteId)?.delete() ?: false
+    /** Invalidates queued and active pulls, then removes the complete audio if present. */
+    fun delete(noteId: Uuid): Boolean =
+        synchronized(lock) {
+            leases[noteId]?.forEach { it.valid = false }
+            directory
+                .listFiles()
+                .orEmpty()
+                .filter { it.isFile && it.nameWithoutExtension == noteId.toString() }
+                .fold(false) { deleted, file -> file.delete() || deleted }
+        }
 
     private fun clearAbandonedParts() {
         val cutoff = System.currentTimeMillis() - ABANDONED_PART_AGE_MS

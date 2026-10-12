@@ -1,5 +1,6 @@
 package app.logdate.wear.sync
 
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Test
@@ -112,6 +113,58 @@ class SyncedAudioCacheTest {
 
             assertFalse(abandoned.exists())
             assertTrue(inProgress.exists())
+        }
+
+    @Test
+    fun `deleting during a legacy pull prevents resurrecting the evicted audio`() =
+        runTest {
+            val result =
+                cache.pull(noteId, "m4a") { path ->
+                    File(path).writeText("stale")
+                    cache.delete(noteId)
+                    true
+                }
+            assertNull(result)
+            assertNull(cache.cachedFile(noteId))
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+        }
+
+    @Test
+    fun `overlapping pulls cannot share a partial file`() =
+        runTest {
+            val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val resume = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val first =
+                async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                    cache.pull(noteId, "m4a") { path ->
+                        File(path).writeText("first")
+                        started.complete(Unit)
+                        resume.await()
+                        assertEquals("first", File(path).readText())
+                        true
+                    }
+                }
+            started.await()
+            val second =
+                cache.pull(noteId, "m4a") { path ->
+                    File(path).writeText("second")
+                    true
+                }
+            assertEquals("second", second?.readText())
+            resume.complete(Unit)
+            assertEquals("first", first.await()?.readText())
+            assertEquals(listOf("$noteId.m4a"), directory.list().orEmpty().toList())
+        }
+
+    @Test
+    fun `eviction removes every completed format for a note and preserves other notes`() =
+        runTest {
+            File(directory, "$noteId.m4a").writeText("old format")
+            File(directory, "$noteId.aac").writeText("new format")
+            val other = File(directory, "${Uuid.random()}.m4a").apply { writeText("other") }
+            assertTrue(cache.delete(noteId))
+            assertNull(cache.cachedFile(noteId))
+            assertEquals(listOf(other.name), directory.list().orEmpty().toList())
         }
 
     private companion object {
