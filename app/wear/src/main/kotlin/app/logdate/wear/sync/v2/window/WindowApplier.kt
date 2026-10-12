@@ -24,7 +24,6 @@ import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.security.MessageDigest
 import kotlin.uuid.Uuid
 
 data class WindowItem(
@@ -310,15 +309,5 @@ class WindowApplier(
 
     private suspend fun pending(id: String) = outbox.hasPending(EntityType.NOTE, id)
 
-    private fun fingerprint(note: JournalNote): String {
-        val content =
-            when (note) {
-                is JournalNote.Text -> note.copy(syncVersion = 0)
-                is JournalNote.Audio -> note.copy(syncVersion = 0, mediaRef = media.storedReference(note.mediaRef))
-                is JournalNote.Image -> note.copy(syncVersion = 0, mediaRef = media.storedReference(note.mediaRef))
-                is JournalNote.Video -> note.copy(syncVersion = 0, mediaRef = media.storedReference(note.mediaRef))
-            }
-        val json = mapper.toDataMap(content).getValue(NoteDataMapper.KEY_JSON_PAYLOAD)
-        return MessageDigest.getInstance("SHA-256").digest(json.encodeToByteArray()).joinToString("") { "%02x".format(it) }
-    }
+    private fun fingerprint(note: JournalNote): String = windowNoteFingerprint(note, media)
 }

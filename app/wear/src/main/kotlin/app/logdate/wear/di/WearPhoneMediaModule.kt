@@ -2,11 +2,14 @@
 
 package app.logdate.wear.di
 
+import android.content.Context
+import androidx.work.WorkManager
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.media.audio.AudioPlaybackSourceFactory
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
@@ -17,6 +20,8 @@ import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.media.GoogleMediaRangeSource
 import app.logdate.wear.sync.v2.media.WatchAudioDataSources
+import app.logdate.wear.sync.v2.media.WatchMediaPrefetchScheduler
+import app.logdate.wear.sync.v2.media.WatchMediaPrefetcher
 import app.logdate.wear.sync.v2.media.WatchPhoneMedia
 import app.logdate.wear.sync.v2.window.WindowMembershipStore
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +54,39 @@ val wearPhoneMediaModule =
                             ?.features
                             .orEmpty()
                 },
+            )
+        }
+        single {
+            val peers = get<WatchDeliveryPeer>()
+            val states = get<PeerStateStore>()
+            val flags = get<FeatureFlagStore>()
+            val media = get<WatchPhoneMedia>()
+            WatchMediaPrefetcher(
+                peers = peers,
+                members = get(),
+                notes = get(),
+                outbox = get(),
+                enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+                supported = { peer ->
+                    WearFeatures.MEDIA_RANGE in
+                        states
+                            .documents(PeerRole.PHONE)
+                            .first()[peer.phoneNode]
+                            ?.phone
+                            ?.features
+                            .orEmpty()
+                },
+                download = { note, peer, allowed ->
+                    media.download(note, peer, allowed)
+                    Unit
+                },
+                media = get<StoredMediaReferences>(),
+            )
+        }
+        single {
+            WatchMediaPrefetchScheduler(
+                WorkManager.getInstance(get<Context>()),
+                get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
             )
         }
         single<AudioPlaybackSourceFactory> { WatchAudioDataSources(get()) }

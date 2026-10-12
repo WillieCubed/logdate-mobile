@@ -16,6 +16,7 @@ import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import java.io.File
@@ -32,6 +33,7 @@ import kotlin.uuid.Uuid
 class WatchPhoneMediaTest {
     private val directory = Files.createTempDirectory("phone-media-watch").toFile()
     private val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32) { 1 }), "phone", "watch", LinkMode.PAIR)
+    private var currentPeer = peer
     private var active = true
     private var supported = true
     private var reachable = true
@@ -48,11 +50,12 @@ class WatchPhoneMediaTest {
     private var stored: JournalNote? = note
     private val peers =
         mockk<WatchDeliveryPeer> {
-            coEvery { current() } answers { peer.takeIf { active } }
-            coEvery { isCurrent(any()) } answers { active && firstArg<PeerDeliveryContext>() == peer }
+            coEvery { current() } answers { currentPeer.takeIf { active } }
+            coEvery { isCurrent(any()) } answers { active && firstArg<PeerDeliveryContext>() == currentPeer }
         }
     private val notes = mockk<JournalNotesRepository> { coEvery { getNoteById(note.uid) } answers { stored } }
-    private val cache = SyncedAudioWatchMediaCache(SyncedAudioCache(directory), { Long.MAX_VALUE })
+    private var available = Long.MAX_VALUE
+    private val cache = SyncedAudioWatchMediaCache(SyncedAudioCache(directory), { available })
     private val storage = MemoryKeyValueStorage()
     private var descriptor =
         PhoneMediaDescriptor(
@@ -66,7 +69,8 @@ class WatchPhoneMediaTest {
                 },
             mediaRef = note.mediaRef,
         )
-    private var duringRead: () -> Unit = {}
+    private var duringRead: suspend () -> Unit = {}
+    private var duringEnd: suspend () -> Unit = {}
     private val rangeSource =
         MediaRangeSource { request ->
             if (!reachable) throw IOException("Phone away")
@@ -77,7 +81,10 @@ class WatchPhoneMediaTest {
                 private var read = false
 
                 override suspend fun read(buffer: ByteArray): Int {
-                    if (read) return -1
+                    if (read) {
+                        duringEnd()
+                        return -1
+                    }
                     read = true
                     bytes.copyInto(buffer)
                     duringRead()
@@ -101,6 +108,112 @@ class WatchPhoneMediaTest {
                 Result.success(WearJson.encodeToBytes(PhoneMediaDescriptor.serializer(), descriptor))
             }
         }, { rangeSource }, { supported })
+
+    @Test fun `prefetch cannot download for a stale exchange or an ineligible note`() =
+        runTest {
+            val repo = repository()
+            assertFailsWith<IOException> { repo.download(note, peer.copy(linkId = LinkWire.encodeKey(ByteArray(32) { 2 }))) }
+            assertFailsWith<IOException> { repo.download(note, peer) { false } }
+            assertEquals(0, requested)
+        }
+
+    @Test fun `prefetch eligibility loss during transfer cannot publish bytes`() =
+        runTest {
+            var eligible = true
+            duringRead = { eligible = false }
+            assertFailsWith<IOException> { repository().download(note, peer) { eligible } }
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+        }
+
+    @Test fun `queued downloads cannot switch to a replacement phone exchange`() =
+        runTest {
+            val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val proceed = kotlinx.coroutines.CompletableDeferred<Unit>()
+            duringRead = {
+                started.complete(Unit)
+                proceed.await()
+            }
+            val repo = repository()
+            val first = async { runCatching { repo.download(note) } }
+            started.await()
+            val queued =
+                async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                    runCatching { repo.download(note) }
+                }
+            currentPeer = peer.copy(linkId = LinkWire.encodeKey(ByteArray(32) { 2 }))
+            proceed.complete(Unit)
+            assertTrue(first.await().isFailure)
+            assertTrue(queued.await().isFailure)
+            assertEquals(1, requested)
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+        }
+
+    private suspend fun prefetcher(): WatchMediaPrefetcher {
+        val members =
+            app.logdate.wear.sync.v2.window
+                .WindowMembershipStore(storage)
+        val id = note.uid.toString()
+        val hash =
+            app.logdate.wear.sync.v2.window
+                .windowNoteFingerprint(note)
+        members.write(
+            peer,
+            app.logdate.wear.sync.v2.window.WindowMembership(
+                entries =
+                    mapOf(
+                        id to
+                            app.logdate.wear.sync.v2.window
+                                .WindowProjection(1, 2, setOf(hash), hash),
+                    ),
+                snapshotRevision = 1,
+                expected =
+                    mapOf(
+                        id to
+                            app.logdate.client.sync.datalayer.v2
+                                .WindowMemberRef(app.logdate.client.sync.datalayer.v2.RecordKind.NOTE, id, 2, 1),
+                    ),
+            ),
+        )
+        val outbox = mockk<app.logdate.client.sync.metadata.SyncMetadataService> { coEvery { hasPending(any(), any()) } returns false }
+        val repo = repository()
+        return WatchMediaPrefetcher(peers, members, notes, outbox, { active }, { supported }, { audio, captured, allowed ->
+            repo.download(audio, captured, allowed)
+        })
+    }
+
+    @Test fun `prefetch fills the shared verified cache and preserves the logical note`() =
+        runTest {
+            assertEquals(1, prefetcher().run())
+            reachable = false
+            val repo = repository()
+            val identity = repo.identity(repo.prepare(note))
+            val range = repo.source(identity).open(MediaRangeRequest(identity, 0))
+            try {
+                val output = ByteArray(bytes.size)
+                assertEquals(bytes.size, range.read(output))
+                assertEquals("phone audio", output.decodeToString())
+            } finally {
+                range.close()
+            }
+            assertEquals(note, stored)
+            assertEquals(1, requested)
+        }
+
+    @Test fun `prefetch preserves the recording reserve and removes incomplete cache files`() =
+        runTest {
+            available = app.logdate.wear.playback.SyncedAudioWatchMediaCache.DEFAULT_RESERVE_BYTES
+            assertFailsWith<app.logdate.wear.playback.NoRoomForAudioException> { prefetcher().run() }
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+            assertEquals(note, stored)
+        }
+
+    @Test fun `eligibility loss at stream completion cannot publish an unowned cache file`() =
+        runTest {
+            var eligible = true
+            duringEnd = { eligible = false }
+            assertFailsWith<IOException> { repository().download(note, peer) { eligible } }
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+        }
 
     @After fun cleanUp() {
         directory.deleteRecursively()

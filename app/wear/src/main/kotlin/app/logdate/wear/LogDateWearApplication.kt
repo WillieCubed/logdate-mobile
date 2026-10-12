@@ -25,6 +25,7 @@ import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.v2.WatchStateMirror
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
+import app.logdate.wear.sync.v2.media.WatchMediaPrefetchScheduler
 import app.logdate.wear.sync.v2.window.WindowReconciler
 import app.logdate.wear.v2.surfaces.SurfaceCoordinator
 import io.github.aakira.napier.DebugAntilog
@@ -147,6 +148,7 @@ class LogDateWearApplication :
         val scope = koin.get<CoroutineScope>()
         koin.get<WatchStateMirror>().start(scope)
         koin.get<WindowReconciler>().start(scope)
+        koin.get<WatchMediaPrefetchScheduler>().start(scope)
         scope.launch { resumeAccountLink(koin) }
         scope.launch {
             newWatchApp.state.collect { restoreReminders(koin.get()) }

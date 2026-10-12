@@ -61,27 +61,41 @@ class WatchPhoneMedia(
         }
     }
 
-    suspend fun download(note: JournalNote.Audio): File =
-        downloads.withLock {
-            val peer = peers.current() ?: throw IOException("No verified phone is linked")
+    suspend fun download(
+        note: JournalNote.Audio,
+        expectedPeer: PeerDeliveryContext? = null,
+        allowed: suspend () -> Boolean = { true },
+    ): File {
+        val peer = expectedPeer ?: peers.current() ?: throw IOException("No verified phone is linked")
+
+        suspend fun checkAllowed() {
             ensureCurrent(note, peer)
+            if (!allowed()) throw IOException("The phone audio is no longer eligible for download")
+        }
+        checkAllowed()
+        return downloads.withLock {
+            checkAllowed()
             cached(note, peer)?.let { return@withLock it.file }
             val media = describe(note, peer)
-            ensureCurrent(note, peer)
+            checkAllowed()
             cache.evict(note.uid)
             val file =
                 cache.store(note.uid, "m4a") { path, beforeWrite ->
-                    MediaStreamClient(source(peer), ::isCurrent).copyTo(media, File(path)) { count ->
-                        ensureCurrent(note, peer)
-                        beforeWrite(count)
-                    }
+                    val copied =
+                        MediaStreamClient(source(peer), ::isCurrent).copyTo(media, File(path)) { count ->
+                            checkAllowed()
+                            beforeWrite(count)
+                        }
+                    checkAllowed()
+                    copied
                 } ?: throw IOException("The phone audio download was invalidated")
-            ensureCurrent(note, peer)
+            checkAllowed()
             storage.putString(cacheKey(note.uid), WearJson.encode(PhoneMediaDescriptor.serializer(), media.asDescriptor()))
-            ensureCurrent(note, peer)
+            checkAllowed()
             if (cache.cachedFile(note.uid) != file) throw IOException("The phone audio was evicted before playback")
             file
         }
+    }
 
     suspend fun identity(uri: String): WatchMediaIdentity {
         val token = uri.removePrefix(SCHEME)
