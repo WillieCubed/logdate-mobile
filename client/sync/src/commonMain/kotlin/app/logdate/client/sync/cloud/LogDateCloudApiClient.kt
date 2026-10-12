@@ -130,6 +130,38 @@ class LogDateCloudApiClient(
         contentId: String,
     ): Result<Unit> = requestDeleteContent(accessToken, contentId)
 
+    override suspend fun createMomentIfAbsent(
+        accessToken: String,
+        moment: app.logdate.shared.model.sync.MomentUploadRequest,
+    ): Result<ConditionalCreateResult> = requestCreateMomentIfAbsent(accessToken, moment)
+
+    override suspend fun updateMoment(
+        accessToken: String,
+        momentId: String,
+        moment: app.logdate.shared.model.sync.MomentUpdateRequest,
+    ): Result<app.logdate.shared.model.sync.MomentUpdateResponse> = requestUpdateMoment(accessToken, momentId, moment)
+
+    override suspend fun getMoment(
+        accessToken: String,
+        momentId: String,
+    ): Result<app.logdate.shared.model.sync.MomentChange> = requestGetMoment(accessToken, momentId)
+
+    override suspend fun getMomentChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<app.logdate.shared.model.sync.MomentChangesResponse> = requestGetMomentChanges(accessToken, since, limit)
+
+    override suspend fun deleteMoment(
+        accessToken: String,
+        momentId: String,
+    ): Result<Unit> = requestDeleteMoment(accessToken, momentId)
+
+    internal fun supportsMomentRequests(baseUrl: String): Boolean {
+        val descriptor = configRepository.getCurrentServerDescriptor() ?: return false
+        return descriptor.apiBaseUrl == baseUrl && descriptor.hasProtocolFeature(ServerProtocolFeature.MOMENTS_V1)
+    }
+
     override suspend fun uploadJournal(
         accessToken: String,
         journal: JournalUploadRequest,

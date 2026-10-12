@@ -16,6 +16,7 @@ internal enum class ConditionalRecord(
 ) {
     CONTENT("CONTENT_EXISTS", "CONTENT_DELETED"),
     JOURNAL("JOURNAL_EXISTS", "JOURNAL_DELETED"),
+    MOMENT("MOMENT_EXISTS", "MOMENT_DELETED"),
 }
 
 private val wireJson = Json { ignoreUnknownKeys = true }

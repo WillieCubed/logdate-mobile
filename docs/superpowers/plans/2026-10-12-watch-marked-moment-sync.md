@@ -54,10 +54,11 @@ Files: extend client/repository/.../moments/MarkedMoment.kt, client/data/.../mom
 
 Files: create client/sync/.../cloud/CloudMomentDataSource.kt and moment payload codec; extend CloudApiClient and its HTTP implementation with existing shared/model/.../sync/SyncModels.kt moment contracts. Extend sync upload/download runners and platform DI for EntityType.MOMENT.
 
-- [ ] Add red codec/API tests for encrypted payload, unsupported schema, conditional create, version conflicts, pagination, deletions, unreadable records and session rotation.
-- [ ] Implement server-capability-aware moment transport using existing cipher/error/cursor contracts, preserving lastUpdated precision inside payload.
+- [x] Add red codec/API tests for encrypted payload, unsupported schema, conditional create, version conflicts, pagination, deletions, unreadable records and session rotation.
+- [x] Implement server-capability-aware moment transport using existing cipher/error/page contracts, preserving lastUpdated precision inside payload. Durable inbox and engine cursor settlement remain part of routing below.
 - [ ] Route MOMENT creates/deletes on linked watches and merged edits through phone; do not drop unsupported outbox entries.
-- [ ] Run server/client integration with actual moment routes and persisted rows; save focused local commits.
+- [x] Verify encrypted payload transport through actual server moment routes, linked session, conflicts and tombstones; save focused local commit. Full sync-engine and Room end-to-end acceptance remains below.
+- [ ] Verify engine routing with persisted Room rows and durable cursor recovery, beyond the transport integration.
 
 ## Task 4: Authenticated peer ingestion and return window
 

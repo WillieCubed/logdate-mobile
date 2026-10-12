@@ -13,6 +13,35 @@ import app.logdate.shared.model.LogDateAccount
  * account management, authentication, and data synchronization.
  */
 interface CloudApiClient {
+    suspend fun createMomentIfAbsent(
+        accessToken: String,
+        moment: app.logdate.shared.model.sync.MomentUploadRequest,
+    ): Result<ConditionalCreateResult> = Result.failure(UnsupportedOperationException("Moments are not supported"))
+
+    suspend fun updateMoment(
+        accessToken: String,
+        momentId: String,
+        moment: app.logdate.shared.model.sync.MomentUpdateRequest,
+    ): Result<app.logdate.shared.model.sync.MomentUpdateResponse> =
+        Result.failure(UnsupportedOperationException("Moments are not supported"))
+
+    suspend fun getMoment(
+        accessToken: String,
+        momentId: String,
+    ): Result<app.logdate.shared.model.sync.MomentChange> = Result.failure(UnsupportedOperationException("Moments are not supported"))
+
+    suspend fun getMomentChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int? = null,
+    ): Result<app.logdate.shared.model.sync.MomentChangesResponse> =
+        Result.failure(UnsupportedOperationException("Moments are not supported"))
+
+    suspend fun deleteMoment(
+        accessToken: String,
+        momentId: String,
+    ): Result<Unit> = Result.failure(UnsupportedOperationException("Moments are not supported"))
+
     suspend fun mergeJournals(
         accessToken: String,
         sourceId: String,
