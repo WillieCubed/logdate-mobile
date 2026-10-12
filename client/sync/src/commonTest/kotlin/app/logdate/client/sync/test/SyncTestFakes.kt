@@ -174,6 +174,7 @@ fun testDefaultSyncManager(
     deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
     profile: SyncProfile = SyncProfile.Standard,
     createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
+    momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -212,6 +213,7 @@ fun testDefaultSyncManager(
             deviceSessionRevocationListener = deviceSessionRevocationListener,
             profile = profile,
             createCollisionPolicy = createCollisionPolicy,
+            momentSyncConfig = momentSyncConfig,
         )
     } else {
         DefaultSyncManager(
@@ -250,6 +252,7 @@ fun testDefaultSyncManager(
             deviceSessionRevocationListener = deviceSessionRevocationListener,
             profile = profile,
             createCollisionPolicy = createCollisionPolicy,
+            momentSyncConfig = momentSyncConfig,
             syncScope = syncScope,
         )
     }

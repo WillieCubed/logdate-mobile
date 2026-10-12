@@ -130,7 +130,7 @@ class MarkedMomentCloudClientServerE2ETest {
         }
 }
 
-private class MomentTestSecrets : SecureStorage {
+internal class MomentTestSecrets : SecureStorage {
     private val state = MutableStateFlow<Map<String, String>>(emptyMap())
 
     override suspend fun getString(key: String): String? = state.value[key]

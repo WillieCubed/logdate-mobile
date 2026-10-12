@@ -80,6 +80,14 @@ class WearKoinGraphTest {
         }
 
     @Test
+    fun markedMomentCloudConfigResolvesAndRemainsHeldBeforeRollout() =
+        runBlocking {
+            val config = koin.get<app.logdate.client.sync.moments.MomentSyncConfig>(named("watchCloud"))
+            assertSame(koin.get<app.logdate.client.repository.moments.SyncableMarkedMomentRepository>(), config.repository)
+            assertFalse(config.enabled())
+        }
+
+    @Test
     fun linkBindingsResolveWithoutMintingAnIdentity() {
         koin.get<WatchLinkCoordinator>()
         koin.get<LinkInstaller>()

@@ -6,6 +6,8 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.PrefixedKeyValueStorage
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.ContentEncryptionService
 import app.logdate.client.media.AndroidMediaManager
 import app.logdate.client.media.MediaManager
@@ -28,9 +30,11 @@ import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.cloud.DefaultCloudMomentDataSource
 import app.logdate.client.sync.cloud.DeviceSessionRevocationListener
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
+import app.logdate.client.sync.crypto.MarkedMomentPayloadCodec
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
 import app.logdate.client.sync.crypto.SyncPayloadCipher
@@ -44,12 +48,14 @@ import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
 import app.logdate.client.sync.metadata.KeyValueSyncRetryScheduleStore
 import app.logdate.client.sync.metadata.KeyValueUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.RoutedSyncMetadataService
+import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.peer.link.LinkProblem
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.wear.sync.v2.cloud.WatchCloudAccountRepository
 import app.logdate.wear.sync.v2.delivery.ReleasedToCloud
 import app.logdate.wear.sync.v2.link.WatchLinkStore
@@ -96,6 +102,17 @@ val wearCloudSyncModule =
         }
         single(WatchCloud) { DurableCloudApiClient(get<CloudApiClient>(WatchCloud), get<DownloadInbox>(WatchCloud)) }
         single(WatchCloud) { SyncPayloadCipher(get(), get(), get()) }
+        single(WatchCloud) {
+            val flags = get<FeatureFlagStore>()
+            val config = get<LogDateConfigRepository>()
+            MomentSyncConfig(
+                DefaultCloudMomentDataSource(get<DurableCloudApiClient>(WatchCloud), MarkedMomentPayloadCodec(get(WatchCloud))),
+                get(),
+            ) {
+                flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) &&
+                    config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.MOMENTS_V1) == true
+            }
+        }
         single<CloudAccountRepository>(WatchCloud) {
             WatchCloudAccountRepository(api = get(WatchCloud), config = get())
         }
@@ -149,6 +166,7 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
         identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(storage),
         unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(storage),
         downloadInbox = get(WatchCloud),
+        momentSyncConfig = get(WatchCloud),
         deviceSessionRevocationListener = DeviceSessionRevocationListener { links.recordProblem(null, LinkProblem.SESSION_REVOKED) },
         profile = SyncProfile.LinkedWatch(RecentCaptureFilter(RECENT_CAPTURES)),
     )

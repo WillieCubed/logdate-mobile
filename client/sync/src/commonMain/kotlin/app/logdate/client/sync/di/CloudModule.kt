@@ -16,19 +16,23 @@ import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.CloudMomentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
 import app.logdate.client.sync.cloud.DefaultCloudBackupDataSource
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.cloud.DefaultCloudMomentDataSource
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
+import app.logdate.client.sync.crypto.MarkedMomentPayloadCodec
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.location.LocationHistoryStager
 import app.logdate.client.sync.location.LocationHistorySyncEngine
+import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
@@ -108,6 +112,16 @@ val cloudModule =
                     stager.stage(owner, origin)
                 },
             )
+        }
+        single { MarkedMomentPayloadCodec(get()) }
+        single<CloudMomentDataSource> { DefaultCloudMomentDataSource(get<DurableCloudApiClient>(), get()) }
+        single {
+            val flags = get<FeatureFlagStore>()
+            val config = get<LogDateConfigRepository>()
+            MomentSyncConfig(get(), get()) {
+                flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) &&
+                    config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.MOMENTS_V1) == true
+            }
         }
         single<CloudContentDataSource> { DefaultCloudContentDataSource(get<DurableCloudApiClient>(), get()) }
         single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get<DurableCloudApiClient>(), get()) }

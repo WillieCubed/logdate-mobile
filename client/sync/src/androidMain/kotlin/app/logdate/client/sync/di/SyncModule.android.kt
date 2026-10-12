@@ -84,6 +84,7 @@ actual val syncModule: Module =
                 cloudQuotaManager = get(),
                 cloudApiClient = get(),
                 downloadInbox = get(),
+                momentSyncConfig = get(),
                 diagnostics = get(),
                 diagnosticSource = get<app.logdate.client.sync.diagnostics.DiagnosticSourceProvider>()::current,
                 supportsRichDrafts = {

@@ -36,6 +36,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
+import app.logdate.client.sync.moments.createMomentDownloader
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.CloudQuotaManager
@@ -79,7 +80,7 @@ class DefaultSyncManager(
     private val deadLetterStore: SyncDeadLetterStore,
     private val retryScheduleStore: SyncRetryScheduleStore,
     internal val syncMetadataService: SyncMetadataService,
-    private val transactionManager: SyncTransactionManager,
+    internal val transactionManager: SyncTransactionManager,
     private val dataUsagePolicy: DataUsagePolicy,
     private val deviceIdProvider: DeviceIdProvider? = null,
     /** Wired on every platform; optional only so tests that never encrypt can omit it. */
@@ -104,7 +105,7 @@ class DefaultSyncManager(
      */
     private val cloudApiClient: CloudApiClient? = null,
     internal val identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
-    private val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+    internal val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
     private val locationHistorySyncEngine: LocationHistorySyncEngine? = null,
     internal val downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
     private val supportsRichDrafts: () -> Boolean = { false },
@@ -116,6 +117,7 @@ class DefaultSyncManager(
     /** How this device syncs; a linked watch uses [SyncProfile.LinkedWatch]. */
     internal val profile: SyncProfile = SyncProfile.Standard,
     private val createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
+    private val momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -123,6 +125,8 @@ class DefaultSyncManager(
     internal val syncMutex = Mutex()
 
     internal var isEnabled = true
+
+    internal val momentDownloader by lazy { momentSyncConfig?.let(::createMomentDownloader) }
 
     internal val historyEngine = locationHistorySyncEngine.takeIf { profile.syncsLocationHistory }
 
@@ -372,6 +376,7 @@ class DefaultSyncManager(
                 syncMetadataService.getLastSyncTime(EntityType.ASSOCIATION),
                 syncMetadataService.getLastSyncTime(EntityType.MEDIA),
                 syncMetadataService.getLastSyncTime(EntityType.DRAFT),
+                syncMetadataService.getLastSyncTime(EntityType.MOMENT),
             ).filterNotNull()
 
         return times.maxOrNull()

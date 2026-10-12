@@ -222,6 +222,12 @@ class DownloadInbox(
             dao.pending(it.owner, it.origin, type, now())
         }
 
+    /** All unapplied records, including those held by retry backoff or an unsupported format. */
+    suspend fun retained(
+        type: String,
+        selected: DownloadScope = scope(),
+    ): List<DownloadInboxEntity> = dao.pending(selected.owner, selected.origin, type, Long.MAX_VALUE)
+
     suspend fun serverVersion(
         type: String,
         id: String,

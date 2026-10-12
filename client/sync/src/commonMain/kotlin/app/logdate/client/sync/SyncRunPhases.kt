@@ -138,12 +138,13 @@ internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
         val associationResult = downloader.downloadAssociations(accessToken, associationSince)
         if (associationResult.success) legacyBackfill?.enqueueMembershipsIfNeeded()
         val historyResult = historyEngine?.download(accessToken) ?: SyncResult(success = true)
+        val momentResult = momentDownloader?.download() ?: SyncResult(success = true)
         recoverMedia(accessToken, EntityType.NOTE)
         val totalDownloaded =
             journalResult.downloadedItems +
                 contentResult.downloadedItems +
                 associationResult.downloadedItems +
-                historyResult.downloadedItems
+                historyResult.downloadedItems + momentResult.downloadedItems
         val conflictsResolved =
             journalResult.conflictsResolved +
                 contentResult.conflictsResolved +
@@ -152,7 +153,7 @@ internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
             journalResult.errors +
                 contentResult.errors +
                 associationResult.errors +
-                historyResult.errors
+                historyResult.errors + momentResult.errors
 
         val success = errors.isEmpty()
         if (success) {
@@ -168,7 +169,7 @@ internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
             conflictsResolved = conflictsResolved,
             errors = errors,
             lastSyncTime = latestSyncTime(),
-            hasMorePending = historyResult.hasMorePending,
+            hasMorePending = historyResult.hasMorePending || momentResult.hasMorePending,
         )
     }
 
