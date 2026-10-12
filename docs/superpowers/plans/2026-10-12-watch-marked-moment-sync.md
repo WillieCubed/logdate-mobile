@@ -35,7 +35,7 @@ Ruling: scalar payload follows the latest lastUpdated; ties use a stable tuple o
 
 - [x] Write compiling stub and tests for every state pair, union, stale payload, equal timestamps, algebraic laws and mismatched capture identity.
 - [x] Observe assertion failures, implement the merge, then run the complete shared sync host suites and lint.
-- [ ] Save a focused local commit and record evidence.
+- [x] Save a focused local commit and record evidence (ec3c1144b; merge and remote apply).
 
 ## Task 2: Transactional repository writes and deletion
 
@@ -49,6 +49,8 @@ Files: extend client/repository/.../moments/MarkedMoment.kt, client/data/.../mom
 - [ ] Verify Room and affected repository suites; save focused local commit.
 
 ## Task 3: Encrypted cloud transport and sync-engine routing
+
+- [x] Add encrypted moment codec with precise clocks, payload identity binding, account-key separation and fail-closed schema/state tests. Transport and routing remain below.
 
 Files: create client/sync/.../cloud/CloudMomentDataSource.kt and moment payload codec; extend CloudApiClient and its HTTP implementation with existing shared/model/.../sync/SyncModels.kt moment contracts. Extend sync upload/download runners and platform DI for EntityType.MOMENT.
 
