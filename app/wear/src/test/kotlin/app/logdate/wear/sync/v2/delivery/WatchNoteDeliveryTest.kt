@@ -142,6 +142,15 @@ class WatchNoteDeliveryTest {
             assertTrue(assertNotNull(delivery.deliverIfActive()).success)
             val envelope = assertNotNull((EnvelopeDataMap.fromDataMap(transport.puts.single().second) as? Decoded.Supported)?.value)
             assertEquals(peer, envelope.context)
+            assertEquals("operation", envelope.operationId)
+            assertEquals(
+                "operation",
+                transport.requests
+                    .single()
+                    .items
+                    .single()
+                    .operationId,
+            )
             assertEquals(note.uid.toString(), envelope.id)
             assertEquals(DeliveryState.SENT, row()?.state)
             assertEquals(now + 30_000, row()?.nextAttemptAt)
@@ -369,6 +378,44 @@ class WatchNoteDeliveryTest {
             assertTrue(transport.deleted.isEmpty())
         }
 
+    @Test
+    fun `an earlier receipt cannot settle a new operation with the same timestamp`() =
+        runTest {
+            queue = listOf(original.copy(operationId = "new", operation = PendingOperation.UPDATE))
+            response = proof(ReceiptState.BACKED_UP)
+            delivery.deliverIfActive()
+            assertEquals(listOf("new"), queue.map { it.operationId })
+            assertEquals(1, transport.puts.size)
+            assertTrue(transport.deleted.isEmpty())
+        }
+
+    @Test
+    fun `terminal history from an earlier operation cannot settle a restarted edit`() =
+        runTest {
+            val previous = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, original.entityId + "@operation", 5)
+            ledger.moveTo(previous, DeliveryState.BACKED_UP)
+            queue = listOf(original.copy(operationId = "new", operation = PendingOperation.UPDATE))
+            route = route.copy(phone = PhoneReach.UNREACHABLE)
+            delivery.deliverIfActive()
+            assertEquals(listOf("new"), queue.map { it.operationId })
+            assertTrue(transport.deleted.isEmpty())
+            assertEquals(0, cloudCalls)
+        }
+
+    @Test
+    fun `an operationless receipt cannot impersonate a scoped ledger key`() =
+        runTest {
+            for (id in listOf(original.entityId, original.entityId + "@operation")) {
+                response =
+                    proof(ReceiptState.BACKED_UP).let {
+                        it.copy(receipts = it.receipts.map { receipt -> receipt.copy(id = id, operationId = null) })
+                    }
+                delivery.deliverIfActive()
+                assertEquals(listOf(original), queue)
+                assertTrue(transport.deleted.isEmpty())
+            }
+        }
+
     private fun pairOnly() {
         peer = peer.copy(mode = LinkMode.PAIR, accountId = null, serverOrigin = null)
         currentPeer = peer
@@ -378,13 +425,13 @@ class WatchNoteDeliveryTest {
     private fun proof(
         state: ReceiptState,
         cloud: CloudPresence = CloudPresence.SIGNED_IN,
-    ) = ReceiptsResponse(
-        cloud = cloud,
-        context = peer,
-        receipts = listOf(Receipt(RecordKind.NOTE, original.entityId, 5, state, if (state == ReceiptState.BACKED_UP) 7 else null)),
-    )
+    ): ReceiptsResponse {
+        val serverVersion = if (state == ReceiptState.BACKED_UP) 7L else null
+        val receipt = Receipt(RecordKind.NOTE, original.entityId, 5, state, serverVersion, operationId = "operation")
+        return ReceiptsResponse(cloud = cloud, context = peer, receipts = listOf(receipt))
+    }
 
-    private suspend fun row() = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, original.entityId)
+    private suspend fun row() = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, original.entityId + "@operation")
 
     private inner class Transport : DataLayerTransportV2 {
         val puts = mutableListOf<Pair<String, Map<String, String>>>()

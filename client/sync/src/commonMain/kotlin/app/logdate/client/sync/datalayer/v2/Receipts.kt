@@ -26,6 +26,7 @@ data class ReceiptQuery(
     val kind: RecordKind,
     val id: String,
     val contentVersion: Long,
+    val operationId: String? = null,
 )
 
 /** Sent with `MessageClient.sendRequest` to [WearPaths.RECEIPTS]. */
@@ -43,6 +44,7 @@ data class Receipt(
     val contentVersion: Long,
     val state: ReceiptState,
     val serverVersion: Long? = null,
+    val operationId: String? = null,
 ) {
     /** Whether this receipt is about [localContentVersion] or a later version of it. */
     fun covers(localContentVersion: Long): Boolean = contentVersion >= localContentVersion

@@ -24,6 +24,7 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.EnvelopeDataMap
@@ -69,6 +70,7 @@ class WatchNoteDelivery(
     private data class Capture(
         val pending: PendingUpload,
         val note: JournalNote,
+        val identity: CaptureIdentity,
     )
 
     private data class Step(
@@ -117,6 +119,7 @@ class WatchNoteDelivery(
         for (operation in pending) {
             if (!isCurrent(peer)) break
             if (operation.operation == PendingOperation.DELETE || operation.scope == null || operation.operationId.isNullOrBlank()) continue
+            val identity = CaptureIdentity.of(operation.entityId, operation.operationId) ?: continue
             val id = Uuid.parseOrNull(operation.entityId) ?: continue
             val note = notes.getNoteById(id) ?: continue
             if (!isCurrent(peer) || !outbox.isCurrentOperation(EntityType.NOTE, operation)) continue
@@ -124,10 +127,10 @@ class WatchNoteDelivery(
                 peer.ledgerScope,
                 DeliveryDirection.TO_PHONE,
                 EntityType.NOTE,
-                operation.entityId,
+                identity.ledgerKey,
                 note.lastUpdated.toEpochMilliseconds(),
             )
-            captures += Capture(operation, note)
+            captures += Capture(operation, note, identity)
         }
         return captures
     }
@@ -139,12 +142,13 @@ class WatchNoteDelivery(
         conditions: RouteConditions,
         proof: ReceiptsResponse?,
     ): Step {
-        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, capture.pending.entityId) ?: return Step()
+        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, capture.identity.ledgerKey) ?: return Step()
         if (entry.holdReason == HoldReason.SEND_FAILED && (entry.nextAttemptAt ?: 0L) > now()) return Step()
         val freshLocalProof =
             proof?.receipts?.any {
                 it.kind == RecordKind.NOTE &&
-                    it.id == entry.entityId &&
+                    it.id == capture.pending.entityId &&
+                    it.operationId == capture.identity.operationId &&
                     it.covers(entry.contentVersion) &&
                     it.state == ReceiptState.ON_PHONE
             } == true
@@ -218,7 +222,7 @@ class WatchNoteDelivery(
                         RecordOrigin.WATCH,
                         DeliveryPriority.URGENT,
                         media = media,
-                    ).copy(context = peer)
+                    ).copy(context = peer, operationId = capture.identity.operationId)
             val data =
                 try {
                     EnvelopeDataMap.toDataMap(envelope, sentAt = now())
@@ -268,7 +272,15 @@ class WatchNoteDelivery(
         return try {
             val request =
                 ReceiptsRequest(
-                    items = captures.map { ReceiptQuery(RecordKind.NOTE, it.pending.entityId, it.note.lastUpdated.toEpochMilliseconds()) },
+                    items =
+                        captures.map {
+                            ReceiptQuery(
+                                RecordKind.NOTE,
+                                it.pending.entityId,
+                                it.note.lastUpdated.toEpochMilliseconds(),
+                                it.identity.operationId,
+                            )
+                        },
                     context = peer,
                 )
             val answer = transport.request(WearPaths.RECEIPTS, WearJson.encodeToBytes(ReceiptsRequest.serializer(), request)).getOrNull()

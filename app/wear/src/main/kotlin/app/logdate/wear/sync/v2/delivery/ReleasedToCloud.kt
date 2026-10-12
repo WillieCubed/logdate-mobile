@@ -7,6 +7,7 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
@@ -59,7 +60,8 @@ class ReleasedToCloud(
         val scope = pending.scope ?: return false
         if (scope.ownerId != peer.accountId || scope.serverOrigin != peer.serverOrigin || pending.operationId.isNullOrBlank()) return false
         val capture = run.captures.firstOrNull { sameOperation(it.pending, pending) } ?: return false
-        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, pending.entityId) ?: return false
+        val identity = CaptureIdentity.of(pending.entityId, pending.operationId) ?: return false
+        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, identity.ledgerKey) ?: return false
         if (entry.state != DeliveryState.CLOUD_PENDING ||
             entry.holdReason != null ||
             entry.contentVersion != capture.contentVersion

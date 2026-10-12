@@ -105,7 +105,14 @@ class ReleasedToCloudTest {
         runTest {
             markReleased()
             released.withCaptures(peer, listOf(CloudCapture(pending, 5))) {
-                ledger.applyReceipt(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, "note", 5, DeliveryState.BACKED_UP)
+                ledger.applyReceipt(
+                    peer.ledgerScope,
+                    DeliveryDirection.TO_PHONE,
+                    EntityType.NOTE,
+                    "note@operation",
+                    5,
+                    DeliveryState.BACKED_UP,
+                )
                 assertFalse(released.isEligible(EntityType.NOTE, pending))
             }
         }
@@ -115,7 +122,7 @@ class ReleasedToCloudTest {
         runTest {
             markReleased()
             released.withCaptures(peer, listOf(CloudCapture(pending, 5))) {
-                val newer = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, "note", 6)
+                val newer = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, "note@operation", 6)
                 ledger.moveTo(newer, DeliveryState.CLOUD_PENDING)
                 assertFalse(released.isEligible(EntityType.NOTE, pending))
             }
@@ -168,7 +175,7 @@ class ReleasedToCloudTest {
         }
 
     private suspend fun markReleased() {
-        val row = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, "note", 5)
+        val row = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, "note@operation", 5)
         ledger.moveTo(row, DeliveryState.CLOUD_PENDING)
     }
 }

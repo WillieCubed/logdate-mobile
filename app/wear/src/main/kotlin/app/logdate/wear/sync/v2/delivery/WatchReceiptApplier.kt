@@ -11,11 +11,13 @@ import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import io.github.aakira.napier.Napier
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.uuid.Uuid
 
 /** Applies the phone's receipts, pushed or answered, to the watch's ledger. A receipt only ever moves a note forward. */
 class WatchReceiptApplier(
@@ -92,12 +94,15 @@ class WatchReceiptApplier(
             Napier.w("Ignoring a backup receipt with no positive server version")
             return false
         }
+        if (Uuid.parseOrNull(receipt.id)?.toString() != receipt.id) return false
+        val operation = receipt.operationId
+        val key = if (operation == null) receipt.id else CaptureIdentity.of(receipt.id, operation)?.ledgerKey ?: return false
         val moved =
             ledger.applyReceipt(
                 scope = peer.ledgerScope,
                 direction = DeliveryDirection.TO_PHONE,
                 entityType = EntityType.NOTE,
-                entityId = receipt.id,
+                entityId = key,
                 receiptVersion = receipt.contentVersion,
                 state = DeliveryState.of(receipt.state),
             )
