@@ -226,7 +226,7 @@ actual val dataModule: Module =
         // Places
         single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }
         single<MarkedMomentRepository> {
-            OfflineFirstMarkedMomentRepository(get(), RoomSyncTransactionManager(get<app.logdate.client.database.LogDateDatabase>()))
+            OfflineFirstMarkedMomentRepository(get(), RoomSyncTransactionManager(get<app.logdate.client.database.LogDateDatabase>()), get())
         }
         single<app.logdate.client.repository.moments.SyncableMarkedMomentRepository> {
             get<MarkedMomentRepository>() as app.logdate.client.repository.moments.SyncableMarkedMomentRepository

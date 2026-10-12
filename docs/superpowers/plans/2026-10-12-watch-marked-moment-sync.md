@@ -43,10 +43,10 @@ Ruling: scalar payload follows the latest lastUpdated; ties use a stable tuple o
 
 Files: extend client/repository/.../moments/MarkedMoment.kt, client/data/.../moments/OfflineFirstMarkedMomentRepository.kt, client/database/.../moments/MarkedMomentDao.kt; tests in existing data/database test source sets.
 
-- [ ] Define local dismiss/fill/delete and remote apply contracts; write failing real-row tests before implementation.
-- [ ] Apply merge and tombstone rules inside SyncTransactionManager; enqueue local MOMENT changes without requeueing accepted remote projections.
-- [ ] Preserve mark capture identity and local pending changes, including concurrent location enrichment and attachments.
-- [ ] Verify Room and affected repository suites; save focused local commit.
+- [x] Define local dismiss/fill/delete and remote deletion contracts; observe failing repository and real Room clock tests before their fixes.
+- [x] Apply merge and tombstone rules inside SyncTransactionManager; enqueue repository MOMENT changes without requeueing accepted remote projections.
+- [x] Preserve capture identity and pending work during repository edits, location enrichment and attachment union. Watch capture-store creation and sensor replay are tracked below.
+- [x] Verify real Room rollback, installed graph and affected repository suites; save focused local commit.
 
 ## Task 3: Encrypted cloud transport and sync-engine routing
 
@@ -58,9 +58,11 @@ Files: create client/sync/.../cloud/CloudMomentDataSource.kt and moment payload 
 - [x] Implement server-capability-aware moment transport using existing cipher/error/page contracts, preserving lastUpdated precision inside payload. Durable inbox and engine cursor settlement remain part of routing below.
 - [ ] Route MOMENT creates/deletes on linked watches and merged edits through phone; do not drop unsupported outbox entries.
 - [x] Verify encrypted payload transport through actual server moment routes, linked session, conflicts and tombstones; save focused local commit. Full sync-engine and Room end-to-end acceptance remains below.
-- [ ] Verify engine routing with persisted Room rows and durable cursor recovery, beyond the transport integration.
+- [ ] Verify engine routing with persisted Room rows and durable cursor recovery, beyond the transport integration. Explicitly verify the precision boundary between encrypted Instant payloads and Room millisecond timestamps.
 
 ## Task 4: Authenticated peer ingestion and return window
+
+- [ ] Make watch capture-store creation and late sensor updates transactional and merge against current resolution/tombstones.
 
 Files: create WatchMomentIngestor alongside app/compose-main/.../sync/v2/receipts/WatchRecordIngestorV2.kt; extend watch capture delivery, receipt ledger, listener dispatch, WatchWindowPublisher and WindowApplier with separate MOMENT envelopes.
 

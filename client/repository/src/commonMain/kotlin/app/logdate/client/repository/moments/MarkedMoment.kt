@@ -48,6 +48,26 @@ interface MarkedMomentRepository {
     /** The mark with [id], or null when there is none or it was deleted. */
     suspend fun getMark(id: Uuid): MarkedMoment?
 
+    /** Dismisses an open mark; a filled or deleted mark is never reopened. */
+    suspend fun dismiss(
+        id: Uuid,
+        updatedAt: Instant,
+    ): Boolean
+
+    /** Resolves a mark with a caption or notes; note associations only grow. */
+    suspend fun fill(
+        id: Uuid,
+        caption: String,
+        noteIds: Set<Uuid>,
+        updatedAt: Instant,
+    ): Boolean
+
+    /** Retains a tombstone and queues deletion, including when a creation is still pending. */
+    suspend fun delete(
+        id: Uuid,
+        deletedAt: Instant,
+    ): Boolean
+
     /**
      * Records [location] for a mark captured without one. False when the mark already has a place or
      * no longer exists, so a place set elsewhere is never overwritten.

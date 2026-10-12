@@ -178,6 +178,23 @@ class EnrichMarkLocationUseCaseTest {
     )
 
     private class FakeMarks : MarkedMomentRepository {
+        override suspend fun dismiss(
+            id: Uuid,
+            updatedAt: Instant,
+        ): Boolean = error("Not used")
+
+        override suspend fun fill(
+            id: Uuid,
+            caption: String,
+            noteIds: Set<Uuid>,
+            updatedAt: Instant,
+        ): Boolean = error("Not used")
+
+        override suspend fun delete(
+            id: Uuid,
+            deletedAt: Instant,
+        ): Boolean = error("Not used")
+
         private val marks = mutableMapOf<Uuid, MarkedMoment>()
         val fills = mutableListOf<Triple<Uuid, MarkLocation, Instant>>()
         var fillSucceeds = true

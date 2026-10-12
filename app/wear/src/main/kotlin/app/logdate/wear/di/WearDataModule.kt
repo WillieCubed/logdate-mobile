@@ -98,7 +98,7 @@ val wearDataModule =
         includes(permissionsModule)
         includes(locationModule)
         single {
-            OfflineFirstMarkedMomentRepository(get(), get<SyncTransactionManager>(WatchCloud))
+            OfflineFirstMarkedMomentRepository(get(), get<SyncTransactionManager>(WatchCloud), get())
         } binds arrayOf(MarkedMomentRepository::class, SyncableMarkedMomentRepository::class)
 
         // JSON serialization
