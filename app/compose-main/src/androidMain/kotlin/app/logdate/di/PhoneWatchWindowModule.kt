@@ -6,6 +6,8 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
+import app.logdate.client.domain.watch.StampedPreferenceStore
+import app.logdate.client.domain.watch.WatchWindowPreferences
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.peer.state.PeerRole
@@ -28,6 +30,7 @@ import app.logdate.client.sync.v2.window.WindowRollWork
 import app.logdate.client.sync.v2.window.WorkManagerWindowRollWork
 import app.logdate.shared.config.LogDateConfigRepository
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -67,6 +70,7 @@ val phoneWatchWindowModule =
             val links = get<PhoneWatchLinkStore>()
             val sessions = get<SessionStorage>()
             val config = get<LogDateConfigRepository>()
+            val shared = get<StampedPreferenceStore>()
             WatchWindowPublisher(
                 moments = moments.changes,
                 momentDeletions = moments.deletions,
@@ -89,11 +93,17 @@ val phoneWatchWindowModule =
                         states.documents(PeerRole.WATCH).map { },
                         sessions.getSessionFlow().map { },
                         config.backendUrl.map { },
+                        shared
+                            .observe()
+                            .map(WatchWindowPreferences::from)
+                            .distinctUntilChanged()
+                            .map { },
                     ),
                 work = get(),
                 notes = get(),
                 dayStartHour = { preferences.getPreferences().dayStartHour ?: DEFAULT_STREAK_DAY_START_HOUR },
                 extras = get(),
+                preferences = { WatchWindowPreferences.from(shared.snapshot()) },
                 manifest = get(),
                 items = get(),
             )

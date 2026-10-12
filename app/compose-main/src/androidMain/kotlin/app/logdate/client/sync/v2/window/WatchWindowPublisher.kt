@@ -2,6 +2,7 @@ package app.logdate.client.sync.v2.window
 
 import app.logdate.client.domain.streak.nextStreakDayStart
 import app.logdate.client.domain.watch.WatchWindowPolicy
+import app.logdate.client.domain.watch.WatchWindowPreferences
 import app.logdate.client.domain.watch.WindowCandidate
 import app.logdate.client.domain.watch.WindowMember
 import app.logdate.client.repository.journals.JournalNote
@@ -77,6 +78,7 @@ class WatchWindowPublisher(
     private val moments: Flow<List<app.logdate.client.repository.moments.MarkedMoment>> = kotlinx.coroutines.flow.flowOf(emptyList()),
     private val momentDeletions: Flow<Map<Uuid, Instant>> = kotlinx.coroutines.flow.flowOf(emptyMap()),
     private val acceptsMoments: suspend (PeerDeliveryContext) -> Boolean = { false },
+    private val preferences: suspend () -> WatchWindowPreferences = { WatchWindowPreferences() },
 ) {
     private val publishing = Mutex()
 
@@ -145,10 +147,11 @@ class WatchWindowPublisher(
 
     private suspend fun publish(peer: PeerDeliveryContext): WindowPublishResult {
         val now = clock.now()
+        val selection = preferences()
         val all = notes.allNotesObserved.first().associateBy { it.uid }
         val bodies = all.mapValues { (_, note) -> NoteEnvelopeBody.encode(note, mapper) }
         val candidates = all.values.map { WindowCandidate(it.uid, it.creationTimestamp, bodies.getValue(it.uid).sizeBytes()) }
-        val plan = policy.choose(candidates, extras.ids(), now, zone(), dayStartHour())
+        val plan = policy.choose(candidates, extras.ids(), now, zone(), dayStartHour(), selection)
         if (plan.dropped > 0) Napier.w("${plan.dropped} note(s) do not fit the watch's library window; the most recent are chosen")
         requireCurrent(peer)
         val previous = manifest.read(peer)
@@ -165,7 +168,7 @@ class WatchWindowPublisher(
         clearOldTombstones(peer, tombstones, inWindow, now, counts)
         requireCurrent(peer)
         manifest.write(peer, previous.copy(items = published, tombstones = tombstones))
-        val momentResult = publishMoments(peer, plan.members, bodies, now, interrupted)
+        val momentResult = publishMoments(peer, plan.members, bodies, now, interrupted, selection)
         if (counts.failed == 0 && momentResult.failed == 0) manifest.finishPublication(peer)
         requireCurrent(peer)
         val members =
@@ -197,6 +200,7 @@ class WatchWindowPublisher(
         bodies: Map<Uuid, JsonElement>,
         now: Instant,
         interrupted: Boolean,
+        selection: WatchWindowPreferences,
     ): MomentWindowPublished {
         if (!acceptsMoments(peer)) return MomentWindowPublished()
         val used = notes.sumOf { bodies.getValue(it.id).sizeBytes() }
@@ -210,6 +214,7 @@ class WatchWindowPublisher(
             (8L * 1024 * 1024 - used).coerceAtLeast(0),
             interrupted,
             momentDeletions.first(),
+            preferences = selection,
         ) {
             requireCurrent(peer)
             if (!acceptsMoments(peer)) throw AudienceChanged()

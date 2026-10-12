@@ -18,6 +18,35 @@ class WatchWindowPolicyTest {
     private val policy = WatchWindowPolicy()
 
     @Test
+    fun `selected seven and thirty day windows use logical day boundaries`() {
+        val older = note(at(2026, 9, 20, 12, 0))
+        val now = at(2026, 10, 10, 10, 0)
+        val seven = policy.choose(listOf(older), WindowExtraIds(), now, zone, 4, WatchWindowPreferences(days = 7))
+        val thirty = policy.choose(listOf(older), WindowExtraIds(), now, zone, 4, WatchWindowPreferences(days = 30))
+        assertTrue(seven.members.isEmpty())
+        assertEquals(listOf(older.id), thirty.members.map { it.id })
+    }
+
+    @Test
+    fun `disabled recall reasons do not remove starred content`() {
+        val anniversary = note(at(2025, 10, 10, 12, 0))
+        val rewind = note(at(2025, 10, 11, 12, 0))
+        val starred = note(at(2025, 10, 12, 12, 0))
+        val extras = WindowExtraIds(rewind = setOf(rewind.id), starred = setOf(starred.id))
+        val plan =
+            policy.choose(
+                listOf(anniversary, rewind, starred),
+                extras,
+                at(2026, 10, 10, 10, 0),
+                zone,
+                4,
+                WatchWindowPreferences(onThisDay = false, rewind = false),
+            )
+        assertEquals(listOf(starred.id), plan.members.map { it.id })
+        assertEquals(setOf(WindowReason.STARRED), plan.members.single().reasons)
+    }
+
+    @Test
     fun `the fourteen logical days up to today are recent`() {
         val firstDay = note(at(2026, 9, 27, 5, 0))
         val dayBefore = note(at(2026, 9, 27, 3, 0))

@@ -70,18 +70,19 @@ class WatchWindowPolicy(
         now: Instant,
         zone: TimeZone,
         dayStartHour: Int,
+        preferences: WatchWindowPreferences = WatchWindowPreferences(days = recentDays),
     ): WindowPlan {
         val today = now.toStreakDay(zone, dayStartHour)
-        val firstRecentDay = today.minus(recentDays - 1, DateTimeUnit.DAY)
+        val firstRecentDay = today.minus(preferences.days - 1, DateTimeUnit.DAY)
         val qualified =
             candidates.mapNotNull { candidate ->
                 val day = candidate.createdAt.toStreakDay(zone, dayStartHour)
                 val reasons =
                     buildSet {
                         if (day in firstRecentDay..today) add(WindowReason.RECENT)
-                        if (isOnThisDay(day, today)) add(WindowReason.ON_THIS_DAY)
+                        if (preferences.onThisDay && isOnThisDay(day, today)) add(WindowReason.ON_THIS_DAY)
                         if (candidate.id in extras.starred) add(WindowReason.STARRED)
-                        if (candidate.id in extras.rewind) add(WindowReason.REWIND)
+                        if (preferences.rewind && candidate.id in extras.rewind) add(WindowReason.REWIND)
                     }
                 if (reasons.isEmpty()) null else candidate to reasons
             }

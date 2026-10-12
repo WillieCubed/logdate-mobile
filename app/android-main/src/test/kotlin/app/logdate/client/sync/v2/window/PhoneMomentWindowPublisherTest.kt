@@ -1,5 +1,6 @@
 package app.logdate.client.sync.v2.window
 
+import app.logdate.client.domain.watch.WatchWindowPreferences
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.client.sync.datalayer.v2.Decoded
@@ -18,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -46,6 +48,7 @@ class PhoneMomentWindowPublisherTest {
             }
         }
     private val publisher = PhoneMomentWindowPublisher(manifest, items)
+    private var selection = WatchWindowPreferences()
 
     private suspend fun publish(
         marks: List<MarkedMoment>,
@@ -53,7 +56,27 @@ class PhoneMomentWindowPublisherTest {
         maxBytes: Long = 8L * 1024 * 1024,
         interrupted: Boolean = false,
         deletions: Map<Uuid, Instant> = emptyMap(),
-    ) = publisher.publish(peer, marks, now, TimeZone.UTC, 4, maxItems, maxBytes, interrupted, deletions) {}
+    ) = publisher.publish(peer, marks, now, TimeZone.UTC, 4, maxItems, maxBytes, interrupted, deletions, preferences = selection) {}
+
+    @Test
+    fun `selected days also govern marks and shrinking evicts without deleting the mark`() =
+        runTest {
+            val older = mark.copy(capturedAt = now - 20.days)
+            selection = WatchWindowPreferences(days = 30)
+            assertEquals(1, publish(listOf(older)).written)
+            selection = WatchWindowPreferences(days = 7)
+            assertEquals(1, publish(listOf(older)).removed)
+            assertTrue("deletedAt" !in puts.last().second)
+        }
+
+    @Test
+    fun `turning off on this day evicts an anniversary mark`() =
+        runTest {
+            val anniversary = mark.copy(capturedAt = Instant.parse("2025-10-12T15:00:00Z"))
+            assertEquals(1, publish(listOf(anniversary)).written)
+            selection = WatchWindowPreferences(onThisDay = false)
+            assertEquals(1, publish(listOf(anniversary)).removed)
+        }
 
     @Test fun phoneDeletionIsExplicitEvenWhenTheWatchNeverReceivedTheLiveWindowMember() =
         runTest {

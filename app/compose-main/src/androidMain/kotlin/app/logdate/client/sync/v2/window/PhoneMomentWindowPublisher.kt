@@ -1,6 +1,7 @@
 package app.logdate.client.sync.v2.window
 
 import app.logdate.client.domain.watch.WatchWindowPolicy
+import app.logdate.client.domain.watch.WatchWindowPreferences
 import app.logdate.client.domain.watch.WindowBudget
 import app.logdate.client.domain.watch.WindowCandidate
 import app.logdate.client.domain.watch.WindowExtraIds
@@ -50,6 +51,7 @@ class PhoneMomentWindowPublisher(
         maxBytes: Long,
         interrupted: Boolean,
         deletions: Map<Uuid, Instant> = emptyMap(),
+        preferences: WatchWindowPreferences = WatchWindowPreferences(),
         current: suspend () -> Unit,
     ): MomentWindowPublished {
         current()
@@ -60,7 +62,7 @@ class PhoneMomentWindowPublisher(
         val chosen =
             WatchWindowPolicy(
                 budget = WindowBudget(maxItems, maxBytes),
-            ).choose(candidates, WindowExtraIds(), now, zone, dayStartHour)
+            ).choose(candidates, WindowExtraIds(), now, zone, dayStartHour, preferences)
         val published = previous.moments.toMutableMap()
         val tombstones = previous.momentTombstones.toMutableMap()
         val counts = Counts()
