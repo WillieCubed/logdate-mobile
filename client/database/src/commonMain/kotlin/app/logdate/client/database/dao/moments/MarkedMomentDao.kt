@@ -20,6 +20,9 @@ interface MarkedMomentDao {
     @Query("SELECT * FROM marked_moments WHERE state = :state AND deletedAt IS NULL ORDER BY capturedAt DESC")
     fun observeByState(state: String): Flow<List<MarkedMomentEntity>>
 
+    @Query("SELECT * FROM marked_moments WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC")
+    fun observeDeleted(): Flow<List<MarkedMomentEntity>>
+
     /** Records a place for a mark captured without one; 1 when it did, 0 when the mark has a place or was deleted. */
     @Query(
         "UPDATE marked_moments SET latitude = :latitude, longitude = :longitude, locationAccuracy = :accuracy, " +

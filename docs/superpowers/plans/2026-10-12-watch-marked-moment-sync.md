@@ -77,7 +77,8 @@ Files: create WatchMomentIngestor alongside app/compose-main/.../sync/v2/receipt
 - [ ] Reuse operation receipts and the shared merge; never clear local work on legacy or mismatched acknowledgments.
 - [x] Publish separate, capability-gated MOMENT window members on the phone, observing filled/dismissed Room marks and retaining typed manifests, shared count/byte budgets, revisions and tombstones. Transfer oversized bodies through kind-bound request/ticket guards; verify actual Room publication/streaming on phone and tablet emulators.
 - [x] Merge returned MOMENT members on the watch with typed ownership, pending-operation preservation and complete-snapshot guards. Verify real Room merge/outbox rollback, stale-receipt protection and installed graph. Window retirement retains durable capture rows and pending work.
-- [ ] Verify semantic phone deletion returning to pair-only watches separately from window eviction, plus the full paired return journey. Keep both peers from advertising MOMENTS until this passes.
+- [x] Distinguish explicit phone deletion from window eviction: observe durable deleted Room rows, retain scoped semantic markers beyond window expiry, replay them through live events and resync, and replace pending live watch work with DELETE without inventing cloud confirmation. Verify phone/watch Room and real emulator DataClient persistence/query behavior.
+- [ ] Verify the full paired return journey, including semantic deletion on a pair-only watch. Local Room and single-node DataClient evidence do not prove paired transport. Keep both peers from advertising MOMENTS until this passes.
 - [ ] Verify actual installed graphs, manifest routing, Room and paired emulator transport.
 
 ## Task 5: Acceptance and later rollout

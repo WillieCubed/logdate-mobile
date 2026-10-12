@@ -91,6 +91,59 @@ class WatchMomentTransactionTest {
         context.deleteDatabase(databaseName)
     }
 
+    @Test fun deletedRoomMarkPublishesAnExplicitDeletionEvenWithoutPreviousWindowOwnership() =
+        runBlocking {
+            repository.applyFromSync(mark)
+            repository.delete(mark.id, at)
+            val source =
+                app.logdate.client.sync.v2.window
+                    .PhoneWindowMoments(db.markedMomentDao(), repository)
+            assertTrue(source.changes.first().isEmpty())
+            val deletions = source.deletions.first()
+            assertEquals(mapOf(mark.id to Instant.fromEpochMilliseconds(101)), deletions)
+            val backing =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<app.logdate.client.datastore.KeyValueStorage>()
+            val storage =
+                app.logdate.client.datastore
+                    .PrefixedKeyValueStorage(backing, "deleted_window_test.${mark.id}.")
+            val manifest =
+                app.logdate.client.sync.v2.window
+                    .WindowManifestStore(storage)
+            val records = mutableListOf<Pair<String, Map<String, String>>>()
+            val items =
+                object : app.logdate.client.sync.v2.window.WindowDataItems {
+                    override suspend fun put(
+                        path: String,
+                        data: Map<String, String>,
+                        urgent: Boolean,
+                    ): Boolean {
+                        records += path to data
+                        return true
+                    }
+
+                    override suspend fun deleteOwn(path: String) = true
+                }
+            val published =
+                app.logdate.client.sync.v2.window.PhoneMomentWindowPublisher(manifest, items).publish(
+                    peer,
+                    source.changes.first(),
+                    at,
+                    kotlinx.datetime.TimeZone.UTC,
+                    4,
+                    10,
+                    8L * 1024 * 1024,
+                    false,
+                    deletions,
+                ) {}
+            assertEquals(1, published.removed)
+            assertTrue(published.members.isEmpty())
+            assertEquals(WearPaths.windowTombstone(RecordKind.MOMENT, mark.id, peer), records.single().first)
+            assertEquals("101", records.single().second["deletedAt"])
+            assertEquals(PendingOperation.DELETE, outbox.getPendingUploads(EntityType.MOMENT).single().operation)
+        }
+
     @Test fun resolvedRoomMarkPublishesAndStreamsAfterLeavingTheOpenList() =
         runBlocking {
             repository.applyFromSync(mark)

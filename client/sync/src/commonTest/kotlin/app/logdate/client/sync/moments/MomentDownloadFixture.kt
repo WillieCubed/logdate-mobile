@@ -160,6 +160,11 @@ internal class MomentDownloadFixture {
             return rows[moment.id]
         }
 
+        override suspend fun applyDeletionFromPeer(
+            id: Uuid,
+            deletedAt: Instant,
+        ): Unit = error("Unused")
+
         override suspend fun applyDeletionFromSync(
             id: Uuid,
             deletedAt: Instant,

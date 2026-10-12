@@ -91,6 +91,35 @@ class OfflineFirstMarkedMomentRepository(
         }
     }
 
+    override suspend fun applyDeletionFromPeer(
+        id: Uuid,
+        deletedAt: Instant,
+    ) {
+        val at = Instant.fromEpochMilliseconds(deletedAt.toEpochMilliseconds())
+        transactions.withTransaction {
+            val existing = dao.getById(id)
+            val tombstone =
+                existing ?: MarkedMomentEntity(
+                    id = id,
+                    capturedAt = at,
+                    timeZoneId = "",
+                    state = MarkedMomentState.OPEN,
+                    originDeviceId = "",
+                    lastUpdated = at,
+                )
+            val deleted =
+                tombstone.copy(
+                    deletedAt = maxOf(tombstone.deletedAt ?: at, at),
+                    lastUpdated = maxOf(tombstone.lastUpdated, at),
+                )
+            if (deleted != existing) dao.upsert(deleted)
+            val pending = metadata.getPendingUploads(EntityType.MOMENT).singleOrNull { it.entityId == id.toString() }
+            if (pending != null && pending.operation != PendingOperation.DELETE) {
+                metadata.enqueuePending(id.toString(), EntityType.MOMENT, PendingOperation.DELETE)
+            }
+        }
+    }
+
     private suspend fun mutate(
         id: Uuid,
         updatedAt: Instant,

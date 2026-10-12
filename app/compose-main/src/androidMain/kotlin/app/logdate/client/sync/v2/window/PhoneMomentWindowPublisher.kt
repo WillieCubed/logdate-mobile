@@ -47,19 +47,48 @@ class PhoneMomentWindowPublisher(
         maxItems: Int,
         maxBytes: Long,
         interrupted: Boolean,
+        deletions: Map<Uuid, Instant> = emptyMap(),
         current: suspend () -> Unit,
     ): MomentWindowPublished {
         current()
-        val all = marks.associateBy { it.id }
+        val previous = manifest.read(peer)
+        val deletedIds = previous.momentDeletions.keys + deletions.keys.map { it.toString() }
+        val all = marks.filter { it.id.toString() !in deletedIds }.associateBy { it.id }
         val candidates = all.values.map { WindowCandidate(it.id, it.capturedAt, bodyBytes(it).size.toLong()) }
         val chosen =
             WatchWindowPolicy(
                 budget = WindowBudget(maxItems, maxBytes),
             ).choose(candidates, WindowExtraIds(), now, zone, dayStartHour)
-        val previous = manifest.read(peer)
         val published = previous.moments.toMutableMap()
         val tombstones = previous.momentTombstones.toMutableMap()
         val counts = Counts()
+        val deletionProofs = previous.momentDeletions.toMutableMap()
+        val requestedDeletions =
+            previous.momentDeletions.mapValues { Instant.fromEpochMilliseconds(it.value.deletedAt) } +
+                deletions.mapKeys { it.key.toString() }
+        for ((id, at) in requestedDeletions) {
+            current()
+            val old = deletionProofs[id]
+            val deletedAt = maxOf(old?.deletedAt ?: 0, at.toEpochMilliseconds())
+            if (interrupted || old == null || old.deletedAt < deletedAt) {
+                val revision = manifest.reserveRevision(peer)
+                current()
+                val data =
+                    WindowTombstoneDataMap.toDataMap(now.toEpochMilliseconds(), peer, revision) +
+                        (WindowTombstoneDataMap.KEY_DELETED_AT to deletedAt.toString())
+                if (!items.put(WearPaths.windowTombstone(RecordKind.MOMENT, Uuid.parse(id), peer), data, true)) {
+                    counts.failed++
+                    continue
+                }
+                current()
+                deletionProofs[id] = PublishedMomentDeletion(deletedAt, revision)
+                counts.removed++
+            }
+            published.remove(id)
+            tombstones.remove(id)
+            current()
+            if (!items.deleteOwn(WearPaths.windowItem(RecordKind.MOMENT, Uuid.parse(id), peer))) counts.failed++
+        }
         for (member in chosen.members) {
             current()
             val mark = all.getValue(member.id)
@@ -111,7 +140,7 @@ class PhoneMomentWindowPublisher(
             counts.written++
         }
         val desired = chosen.members.mapTo(mutableSetOf()) { it.id.toString() }
-        for (id in published.keys.toSet() - desired) {
+        for (id in published.keys.toSet() - desired - deletedIds) {
             current()
             val uuid = Uuid.parse(id)
             val revision = manifest.reserveRevision(peer)
@@ -131,7 +160,7 @@ class PhoneMomentWindowPublisher(
             counts.removed++
         }
         for ((id, at) in tombstones.toMap()) {
-            if (id in desired) continue
+            if (id in desired || id in deletedIds) continue
             current()
             val uuid = Uuid.parse(id)
             if (!items.deleteOwn(WearPaths.windowItem(RecordKind.MOMENT, uuid, peer))) {
@@ -149,7 +178,7 @@ class PhoneMomentWindowPublisher(
             }
         }
         current()
-        manifest.write(peer, previous.copy(moments = published, momentTombstones = tombstones))
+        manifest.write(peer, previous.copy(moments = published, momentTombstones = tombstones, momentDeletions = deletionProofs))
         current()
         return MomentWindowPublished(
             chosen.members.mapNotNull { member ->

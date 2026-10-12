@@ -138,6 +138,127 @@ class MomentWindowRoomTest {
             assertNull(f.members.read(f.peer).snapshotRevision)
         }
 
+    @Test fun explicitPhoneDeletionReplacesPendingCaptureAndRejectsLateResolution() =
+        runBlocking {
+            val f = fixture()
+            val original = pending(f.mark.id)
+            val deletedAt = f.mark.lastUpdated.toEpochMilliseconds() + 10
+            // Deletion is authoritative without requiring a prior live-window snapshot.
+            val deletion =
+                WindowItem(
+                    f.peer.phoneNode,
+                    WearPaths.windowTombstone(RecordKind.MOMENT, f.mark.id, f.peer),
+                    WindowTombstoneDataMap.toDataMap(deletedAt, f.peer, 2) + ("deletedAt" to deletedAt.toString()),
+                )
+            assertTrue(f.applier.onTombstone(deletion))
+            assertNull(repository.getMark(f.mark.id))
+            val current = pending(f.mark.id)
+            assertEquals(PendingOperation.DELETE, current.operation)
+            assertNotEquals(original.operationId, current.operationId)
+            assertFalse(metadata.settleIfCurrent(EntityType.MOMENT, original, Instant.fromEpochMilliseconds(deletedAt), 7))
+            assertFalse(f.applier.onItem(f.item))
+            assertNull(repository.getMark(f.mark.id))
+            assertTrue(f.applier.onTombstone(deletion))
+            assertEquals(current, pending(f.mark.id))
+        }
+
+    @Test fun resyncFindsPersistedPhoneDeletionWithoutANewDataEvent() =
+        runBlocking {
+            val f = fixture()
+            val at = f.mark.lastUpdated.toEpochMilliseconds() + 10
+            val deletion =
+                WindowItem(
+                    f.peer.phoneNode,
+                    WearPaths.windowTombstone(RecordKind.MOMENT, f.mark.id, f.peer),
+                    WindowTombstoneDataMap.toDataMap(at, f.peer, 2) + ("deletedAt" to at.toString()),
+                )
+            assertNotNull(f.applier.reconcile(f.peer, f.response.copy(members = emptyList(), revision = 2), listOf(deletion)))
+            assertNull(repository.getMark(f.mark.id))
+            assertEquals(PendingOperation.DELETE, pending(f.mark.id).operation)
+        }
+
+    @Test fun anIncompleteUnrelatedNoteCannotPreventAnExplicitPhoneDeletion() =
+        runBlocking {
+            val f = fixture()
+            val at = f.mark.lastUpdated.toEpochMilliseconds() + 10
+            val deletion =
+                WindowItem(
+                    f.peer.phoneNode,
+                    WearPaths.windowTombstone(RecordKind.MOMENT, f.mark.id, f.peer),
+                    WindowTombstoneDataMap.toDataMap(at, f.peer, 2) + ("deletedAt" to at.toString()),
+                )
+            val incomplete =
+                f.response.copy(
+                    members = listOf(WindowMemberRef(RecordKind.NOTE, Uuid.random().toString(), 1, 2)),
+                    revision = 2,
+                )
+            assertNull(f.applier.reconcile(f.peer, incomplete, listOf(deletion)))
+            assertNull(repository.getMark(f.mark.id))
+            assertEquals(PendingOperation.DELETE, pending(f.mark.id).operation)
+        }
+
+    @Test fun malformedAndForeignDeletionMarkersPreserveRoomAndPendingCapture() =
+        runBlocking {
+            val f = fixture()
+            val before = repository.getMark(f.mark.id)
+            val original = pending(f.mark.id)
+            val at = f.mark.lastUpdated.toEpochMilliseconds() + 10
+            val valid =
+                WindowItem(
+                    f.peer.phoneNode,
+                    WearPaths.windowTombstone(RecordKind.MOMENT, f.mark.id, f.peer),
+                    WindowTombstoneDataMap.toDataMap(at, f.peer, 2) + ("deletedAt" to at.toString()),
+                )
+            val invalid =
+                listOf(
+                    valid.copy(sourceNodeId = "foreign-phone"),
+                    valid.copy(data = valid.data + ("deletedAt" to "invalid")),
+                    valid.copy(data = valid.data + ("deletedAt" to "-1")),
+                    valid.copy(data = valid.data + (WindowTombstoneDataMap.KEY_REVISION to "0")),
+                    valid.copy(data = valid.data - WindowTombstoneDataMap.KEY_CONTEXT),
+                    valid.copy(path = WearPaths.windowTombstone(RecordKind.NOTE, f.mark.id, f.peer)),
+                )
+            for (item in invalid) {
+                assertFalse(f.applier.onTombstone(item))
+                assertEquals(before, repository.getMark(f.mark.id))
+                assertEquals(original, pending(f.mark.id))
+            }
+        }
+
+    @Test fun capabilityWithdrawalDuringPhoneDeletionRollsBackRoomAndOutbox() =
+        runBlocking {
+            var supported = true
+            val revoked =
+                object : SyncableMarkedMomentRepository by repository {
+                    override suspend fun applyDeletionFromPeer(
+                        id: Uuid,
+                        deletedAt: Instant,
+                    ) {
+                        repository.applyDeletionFromPeer(id, deletedAt)
+                        supported = false
+                    }
+                }
+            val f = fixture(moments = revoked, accepts = { supported })
+            val before = repository.getMark(f.mark.id)
+            val original = pending(f.mark.id)
+            val at = f.mark.lastUpdated.toEpochMilliseconds() + 10
+            val deletion =
+                WindowItem(
+                    f.peer.phoneNode,
+                    WearPaths.windowTombstone(RecordKind.MOMENT, f.mark.id, f.peer),
+                    WindowTombstoneDataMap.toDataMap(at, f.peer, 2) + ("deletedAt" to at.toString()),
+                )
+            assertFalse(f.applier.onTombstone(deletion))
+            assertEquals(before, repository.getMark(f.mark.id))
+            assertEquals(original, pending(f.mark.id))
+            assertTrue(
+                f.members
+                    .read(f.peer)
+                    .retired
+                    .isEmpty(),
+            )
+        }
+
     private suspend fun fixture(
         outbox: SyncMetadataService = metadata,
         moments: SyncableMarkedMomentRepository = repository,

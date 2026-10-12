@@ -23,6 +23,7 @@ import app.logdate.client.sync.peer.delivery.MomentEnvelopeBody
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import io.github.aakira.napier.Napier
 import java.security.MessageDigest
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /** Called under WindowApplier's serialization lock; moment ownership never aliases note ownership. */
@@ -63,6 +64,22 @@ class MomentWindowApplier(
             }
         }
         return peers.isCurrent(peer)
+    }
+
+    /** Explicit deletions are independent of live-window completeness and must replay after restart. */
+    suspend fun applyDeletions(
+        peer: PeerDeliveryContext,
+        items: List<WindowItem>,
+    ): Set<String>? {
+        val deleted = mutableSetOf<String>()
+        for (item in items) {
+            val path = WearPaths.parseWindowTombstone(item.path) ?: continue
+            if (path.kind != RecordKind.MOMENT || WindowTombstoneDataMap.KEY_DELETED_AT !in item.data) continue
+            if (!allowed(peer)) return null
+            if (onTombstone(item)) deleted += path.id.toString()
+            if (!allowed(peer)) return null
+        }
+        return deleted.takeIf { peers.isCurrent(peer) }
     }
 
     suspend fun reconcile(
@@ -122,6 +139,10 @@ class MomentWindowApplier(
         }
         if (item.data[WindowTombstoneDataMap.KEY_REMOVED_AT]?.toLongOrNull()?.takeIf { it >= 0 } == null) return false
         val revision = item.data[WindowTombstoneDataMap.KEY_REVISION]?.toLongOrNull()?.takeIf { it > 0 } ?: return false
+        if (WindowTombstoneDataMap.KEY_DELETED_AT in item.data) {
+            val deletedAt = item.data[WindowTombstoneDataMap.KEY_DELETED_AT]?.toLongOrNull()?.takeIf { it >= 0 } ?: return false
+            return delete(peer, path.id, Instant.fromEpochMilliseconds(deletedAt), revision)
+        }
         val state = members.read(peer)
         val snapshot = state.snapshotRevision ?: return false
         val id = path.id.toString()
@@ -202,6 +223,26 @@ class MomentWindowApplier(
         val projection = WindowProjection(copy.ref.revision, copy.ref.contentVersion, setOf(fingerprint(merged)), wanted)
         members.write(peer, current.copy(entries = current.entries + (id to projection), retired = current.retired - id))
         return true
+    }
+
+    private suspend fun delete(
+        peer: PeerDeliveryContext,
+        id: Uuid,
+        deletedAt: Instant,
+        revision: Long,
+    ): Boolean {
+        try {
+            transactions.withTransaction {
+                guard(peer)
+                moments.applyDeletionFromPeer(id, deletedAt)
+                guard(peer)
+            }
+        } catch (_: GuardChanged) {
+            return false
+        }
+        if (!allowed(peer)) return false
+        retire(peer, id.toString(), revision)
+        return allowed(peer)
     }
 
     private suspend fun retire(

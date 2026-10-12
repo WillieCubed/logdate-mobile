@@ -52,7 +52,43 @@ class PhoneMomentWindowPublisherTest {
         maxItems: Int = 10,
         maxBytes: Long = 8L * 1024 * 1024,
         interrupted: Boolean = false,
-    ) = publisher.publish(peer, marks, now, TimeZone.UTC, 4, maxItems, maxBytes, interrupted) {}
+        deletions: Map<Uuid, Instant> = emptyMap(),
+    ) = publisher.publish(peer, marks, now, TimeZone.UTC, 4, maxItems, maxBytes, interrupted, deletions) {}
+
+    @Test fun phoneDeletionIsExplicitEvenWhenTheWatchNeverReceivedTheLiveWindowMember() =
+        runTest {
+            val result = publish(listOf(mark), deletions = mapOf(mark.id to now))
+            assertTrue(result.members.isEmpty())
+            assertEquals(1, result.removed)
+            assertEquals(WearPaths.windowTombstone(RecordKind.MOMENT, mark.id, peer), puts.single().first)
+            assertEquals(now.toEpochMilliseconds().toString(), puts.single().second["deletedAt"])
+            assertEquals(0, publish(emptyList(), deletions = mapOf(mark.id to now)).removed)
+            assertEquals(1, puts.size)
+        }
+
+    @Test fun semanticDeletionReplacesEvictionAndRetriesFailedPublication() =
+        runTest {
+            publish(listOf(mark))
+            publish(emptyList())
+            assertTrue("deletedAt" !in puts.last().second)
+            succeeds = false
+            assertEquals(1, publish(emptyList(), deletions = mapOf(mark.id to now)).failed)
+            succeeds = true
+            assertEquals(1, publish(emptyList(), deletions = mapOf(mark.id to now)).removed)
+            assertEquals(now.toEpochMilliseconds().toString(), puts.last().second["deletedAt"])
+            assertTrue(manifest.read(peer).momentTombstones.isEmpty())
+        }
+
+    @Test fun deletionProofSurvivesWindowRetentionAndBlocksAnOldLiveProjection() =
+        runTest {
+            publish(emptyList(), deletions = mapOf(mark.id to now))
+            assertEquals(1, puts.size)
+            val later = Instant.parse("2026-10-30T15:00:00Z")
+            val result = publisher.publish(peer, listOf(mark), later, TimeZone.UTC, 4, 10, 8L * 1024 * 1024, false) {}
+            assertTrue(result.members.isEmpty())
+            assertTrue(WearPaths.windowTombstone(RecordKind.MOMENT, mark.id, peer) !in deletes)
+            assertTrue(puts.all { "deletedAt" in it.second })
+        }
 
     @Test fun separateMomentProjectionReturnsResolutionAndPreservesSameIdNote() =
         runTest {

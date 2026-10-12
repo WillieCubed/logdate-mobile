@@ -18,6 +18,12 @@ data class PublishedItem(
     val syncVersion: Long = 0,
 )
 
+@Serializable
+data class PublishedMomentDeletion(
+    val deletedAt: Long,
+    val revision: Long,
+)
+
 /** What the phone last published to the watch's window, by note id, and when each tombstone was written. */
 @Serializable
 data class PublishedWindow(
@@ -25,6 +31,7 @@ data class PublishedWindow(
     val tombstones: Map<String, Long> = emptyMap(),
     val moments: Map<String, PublishedItem> = emptyMap(),
     val momentTombstones: Map<String, Long> = emptyMap(),
+    val momentDeletions: Map<String, PublishedMomentDeletion> = emptyMap(),
 )
 
 class WindowManifestStore(

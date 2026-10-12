@@ -289,6 +289,59 @@ class OfflineFirstMarkedMomentRepositoryTest {
             assertTrue(metadata.getPendingUploads(EntityType.MOMENT).isEmpty())
         }
 
+    @Test fun `peer deletion before capture prevents revival without claiming cloud backup`() =
+        runTest {
+            val id = Uuid.random()
+            repository.applyDeletionFromPeer(id, at)
+            assertNull(repository.applyFromSync(row(id).toModel()!!))
+            assertEquals(at, dao.getById(id)?.deletedAt)
+            assertEquals(0, dao.getById(id)?.syncVersion)
+            assertTrue(metadata.getPendingUploads(EntityType.MOMENT).isEmpty())
+        }
+
+    @Test fun `peer deletion replaces live queued work but preserves confirmed cloud version`() =
+        runTest {
+            val id = Uuid.random()
+            dao.rows += row(id).copy(syncVersion = 7)
+            metadata.enqueuePending(id.toString(), EntityType.MOMENT, PendingOperation.UPDATE)
+            dao.beforeUpsert = { assertTrue(inTransaction) }
+            repository.applyDeletionFromPeer(id, at)
+            assertNull(repository.getMark(id))
+            assertEquals(7, dao.getById(id)?.syncVersion)
+            assertEquals(PendingOperation.DELETE, metadata.getPendingUploads(EntityType.MOMENT).single().operation)
+            val deletion = metadata.getPendingUploads(EntityType.MOMENT).single()
+            val writes = dao.upserts
+            repository.applyDeletionFromPeer(id, at)
+            assertEquals(writes, dao.upserts)
+            assertEquals(deletion, metadata.getPendingUploads(EntityType.MOMENT).single())
+            assertFalse(repository.fill(id, "late edit", emptySet(), at))
+        }
+
+    @Test fun `cancelled peer deletion restores both live capture and queued operation`() =
+        runTest {
+            val id = Uuid.random()
+            val original = row(id)
+            dao.rows += original
+            metadata.enqueuePending(id.toString(), EntityType.MOMENT, PendingOperation.CREATE)
+            val pending = metadata.getPendingUploads(EntityType.MOMENT).single()
+            failTransaction = true
+            assertFailsWith<CancellationException> { repository.applyDeletionFromPeer(id, at) }
+            assertEquals(original, dao.getById(id))
+            assertEquals(pending, metadata.getPendingUploads(EntityType.MOMENT).single())
+        }
+
+    @Test fun `older peer deletion never moves an existing tombstone clock backwards`() =
+        runTest {
+            val id = Uuid.random()
+            val newer = Instant.fromEpochMilliseconds(at.toEpochMilliseconds() + 20)
+            dao.rows += row(id).copy(deletedAt = newer, lastUpdated = newer, syncVersion = 9)
+            repository.applyDeletionFromPeer(id, at)
+            assertEquals(newer, dao.getById(id)?.deletedAt)
+            assertEquals(newer, dao.getById(id)?.lastUpdated)
+            assertEquals(9, dao.getById(id)?.syncVersion)
+            assertTrue(metadata.getPendingUploads(EntityType.MOMENT).isEmpty())
+        }
+
     private fun row(id: Uuid) =
         MarkedMomentEntity(
             id = id,
@@ -315,6 +368,8 @@ class OfflineFirstMarkedMomentRepositoryTest {
         }
 
         override suspend fun getById(id: Uuid): MarkedMomentEntity? = rows.firstOrNull { it.id == id }
+
+        override fun observeDeleted() = flowOf(rows.filter { it.deletedAt != null })
 
         override fun observeByState(state: String): Flow<List<MarkedMomentEntity>> =
             flowOf(rows.filter { it.state == state && it.deletedAt == null }.sortedByDescending { it.capturedAt })

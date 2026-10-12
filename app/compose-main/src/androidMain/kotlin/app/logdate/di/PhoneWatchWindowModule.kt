@@ -69,6 +69,7 @@ val phoneWatchWindowModule =
             val config = get<LogDateConfigRepository>()
             WatchWindowPublisher(
                 moments = moments.changes,
+                momentDeletions = moments.deletions,
                 acceptsMoments = momentSupport::accepts,
                 active = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                 peers = get(),

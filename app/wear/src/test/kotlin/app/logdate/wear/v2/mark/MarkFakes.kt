@@ -24,6 +24,8 @@ class FakeMarkedMomentDao : MarkedMomentDao {
 
     override suspend fun getById(id: Uuid): MarkedMomentEntity? = stored.value[id]
 
+    override fun observeDeleted() = stored.map { rows -> rows.values.filter { it.deletedAt != null } }
+
     override fun observeByState(state: String): Flow<List<MarkedMomentEntity>> =
         stored.map { rows -> rows.values.filter { it.state == state && it.deletedAt == null }.sortedByDescending { it.capturedAt } }
 

@@ -200,6 +200,11 @@ class MomentRemoteApplierTest {
             return current
         }
 
+        override suspend fun applyDeletionFromPeer(
+            id: Uuid,
+            deletedAt: Instant,
+        ): Unit = error("Unused")
+
         override suspend fun applyDeletionFromSync(
             id: Uuid,
             deletedAt: Instant,

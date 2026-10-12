@@ -30,6 +30,8 @@ data class WindowResyncResponse(
 
 /** Link provenance and time accompany every window removal. */
 object WindowTombstoneDataMap {
+    /** Present only for a domain deletion; absence means window eviction. */
+    const val KEY_DELETED_AT = "deletedAt"
     const val KEY_REMOVED_AT = "removedAt"
     const val KEY_CONTEXT = "context"
     const val KEY_REVISION = "windowRevision"

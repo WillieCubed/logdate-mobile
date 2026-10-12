@@ -75,6 +75,7 @@ class WatchWindowPublisher(
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
     private val clock: Clock = Clock.System,
     private val moments: Flow<List<app.logdate.client.repository.moments.MarkedMoment>> = kotlinx.coroutines.flow.flowOf(emptyList()),
+    private val momentDeletions: Flow<Map<Uuid, Instant>> = kotlinx.coroutines.flow.flowOf(emptyMap()),
     private val acceptsMoments: suspend (PeerDeliveryContext) -> Boolean = { false },
 ) {
     private val publishing = Mutex()
@@ -137,7 +138,7 @@ class WatchWindowPublisher(
     @OptIn(FlowPreview::class)
     fun start(scope: CoroutineScope): Job =
         scope.launch {
-            merge(notes.allNotesObserved.map { }, moments.map { }, active.map { }, changes, dayStarts())
+            merge(notes.allNotesObserved.map { }, moments.map { }, momentDeletions.map { }, active.map { }, changes, dayStarts())
                 .debounce(SETTLE_MS)
                 .collect { publishLogged() }
         }
@@ -208,6 +209,7 @@ class WatchWindowPublisher(
             (400 - notes.size).coerceAtLeast(0),
             (8L * 1024 * 1024 - used).coerceAtLeast(0),
             interrupted,
+            momentDeletions.first(),
         ) {
             requireCurrent(peer)
             if (!acceptsMoments(peer)) throw AudienceChanged()

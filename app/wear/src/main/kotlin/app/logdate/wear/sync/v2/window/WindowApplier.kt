@@ -98,6 +98,10 @@ class WindowApplier(
     ): WindowApplied? =
         applying.withLock {
             val previous = previousSnapshot(peer, response) ?: return@withLock null
+            if (momentWindow != null) {
+                val deleted = momentWindow.applyDeletions(peer, items) ?: return@withLock null
+                if (response.members.any { it.kind == RecordKind.MOMENT && it.id in deleted }) return@withLock null
+            }
             val expected = response.members.filter { it.kind == RecordKind.NOTE }.associateBy { it.id }
             if (momentWindow == null && expected.size != response.members.size) return@withLock null
             if (momentWindow != null && !momentWindow.complete(peer, response, items)) return@withLock null
