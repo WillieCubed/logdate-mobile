@@ -64,6 +64,7 @@ class WatchRemovalDeliveryTest {
     private var query: ReceiptsRequest? = null
     private var cleanup = 0
     private var cloudEligible = false
+    private var cloudCompletes = false
     private val transport =
         object : DataLayerTransportV2 {
             override suspend fun reach() = route.phone
@@ -112,9 +113,20 @@ class WatchRemovalDeliveryTest {
             released,
             CloudRelease {
                 cloudEligible = released.isEligible(EntityType.NOTE, pending)
+                if (cloudCompletes) queue = emptyList()
                 SyncResult(success = true)
             },
         )
+
+    @Test
+    fun `direct cloud completion removes the operation data item`() =
+        runTest {
+            route = route.copy(phone = PhoneReach.UNREACHABLE)
+            cloudCompletes = true
+            delivery.deliverIfActive()
+            assertTrue(cloudEligible)
+            assertEquals(1, cleanup)
+        }
 
     init {
         coEvery { peers.current() } returns peer

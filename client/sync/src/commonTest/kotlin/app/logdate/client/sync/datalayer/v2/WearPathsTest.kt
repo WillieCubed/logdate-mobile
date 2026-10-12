@@ -108,6 +108,7 @@ class WearPathsTest {
         assertEquals(
             setOf(
                 "receipts.v1",
+                "receipts.operations.v1",
                 "window.v1",
                 "moments.v1",
                 "live.v1",

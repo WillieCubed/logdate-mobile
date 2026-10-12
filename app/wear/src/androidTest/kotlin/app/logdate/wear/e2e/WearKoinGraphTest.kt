@@ -6,7 +6,12 @@ import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.metadata.CloudEligibility
 import app.logdate.client.sync.peer.link.LinkInstaller
+import app.logdate.wear.sync.WatchSyncScheduler
+import app.logdate.wear.sync.WearDataLayerSyncManager
 import app.logdate.wear.sync.v2.delivery.ReleasedToCloud
+import app.logdate.wear.sync.v2.delivery.WatchCaptureProtocol
+import app.logdate.wear.sync.v2.delivery.WatchNoteDelivery
+import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -30,6 +35,14 @@ class WearKoinGraphTest {
         val engine = koin.get<DefaultSyncManager>(named("watchCloud"))
 
         assertEquals(SyncPausedReason.NEEDS_DEVICE_LINK, runBlocking { engine.getSyncStatus() }.pausedReason)
+    }
+
+    @Test
+    fun captureDeliveryAndSchedulingResolveThroughTheInstalledGraph() {
+        assertSame(koin.get<WatchNoteDelivery>(), koin.get<WatchNotesV2>())
+        koin.get<WearDataLayerSyncManager>()
+        koin.get<WatchSyncScheduler>()
+        assertFalse(runBlocking { koin.get<WatchCaptureProtocol>().active() })
     }
 
     @Test

@@ -86,6 +86,7 @@ class WatchNoteDelivery(
     )
 
     private val router = WatchSyncRouter()
+    private val cleanup = WatchCaptureCleanup(peers, outbox, ledger)
 
     suspend fun schedule(): NoteSchedule {
         if (!active()) return NoteSchedule.Outbox
@@ -111,6 +112,7 @@ class WatchNoteDelivery(
         if (!active()) return null
         val peer = peers.current() ?: return SyncResult(success = true)
         val transport = transportFor(peer)
+        cleanup.prune(peer, transport)
         val pending = outbox.getPendingUploads(EntityType.NOTE)
         val captures = captures(peer, pending)
         if (!isCurrent(peer)) return SyncResult(success = true)
@@ -132,6 +134,7 @@ class WatchNoteDelivery(
             settled += result.uploadedItems
             errors += result.errors
         }
+        if (isCurrent(peer)) cleanup.prune(peer, transport)
         val finishedAt = clock.now()
         if (isCurrent(peer)) outbox.updateLastSyncTime(EntityType.NOTE, finishedAt)
         return SyncResult(success = errors.isEmpty(), uploadedItems = settled, errors = errors, lastSyncTime = finishedAt)

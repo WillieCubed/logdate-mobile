@@ -36,6 +36,7 @@ object WearProtocol {
 /** The names a device lists in its state document for each version 2 feature it supports. */
 object WearFeatures {
     const val RECEIPTS = "receipts.v1"
+    const val OPERATION_RECEIPTS = "receipts.operations.v1"
     const val WINDOW = "window.v1"
     const val MOMENTS = "moments.v1"
     const val LIVE = "live.v1"
@@ -49,6 +50,7 @@ object WearFeatures {
     val ALL: Set<String> =
         setOf(
             RECEIPTS,
+            OPERATION_RECEIPTS,
             WINDOW,
             MOMENTS,
             LIVE,

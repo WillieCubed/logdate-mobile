@@ -94,7 +94,7 @@ val phoneWatchSyncV2Module =
                 peerStates = get(),
                 sharedPreferences = watchPreferences.observe(),
                 adoptWatchPreferences = { shared -> watchPreferences.adopt(shared) },
-                features = setOf(WearFeatures.PREFS, WearFeatures.LINK_CLOUD, WearFeatures.RECEIPTS),
+                features = setOf(WearFeatures.PREFS, WearFeatures.LINK_CLOUD, WearFeatures.RECEIPTS, WearFeatures.OPERATION_RECEIPTS),
                 parts = sessions.getSessionFlow().map { PhoneStateParts(cloud = cloudPresence(it)) },
             )
         }

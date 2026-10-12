@@ -230,7 +230,7 @@ class WatchNoteDeliveryTest {
             transport.beforeAnswer = { queue = listOf(original.copy(operationId = "new", operation = PendingOperation.UPDATE)) }
             delivery.deliverIfActive()
             assertEquals("new", queue.single().operationId)
-            assertTrue(transport.deleted.isEmpty())
+            assertEquals(listOf(WearPaths.watchRecord(RecordKind.NOTE, note.uid, peer, "operation")), transport.deleted)
         }
 
     @Test
@@ -398,7 +398,7 @@ class WatchNoteDeliveryTest {
             route = route.copy(phone = PhoneReach.UNREACHABLE)
             delivery.deliverIfActive()
             assertEquals(listOf("new"), queue.map { it.operationId })
-            assertTrue(transport.deleted.isEmpty())
+            assertEquals(listOf(WearPaths.watchRecord(RecordKind.NOTE, note.uid, peer, "operation")), transport.deleted)
             assertEquals(0, cloudCalls)
         }
 
