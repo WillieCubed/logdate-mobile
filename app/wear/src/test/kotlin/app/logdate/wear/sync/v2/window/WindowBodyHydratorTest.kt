@@ -71,6 +71,72 @@ class WindowBodyHydratorTest {
             }
         }
 
+    @Test fun largeMomentHydrationPreservesKindAndNeverAcceptsANotePath() =
+        runTest {
+            val mark =
+                app.logdate.client.repository.moments.MarkedMoment(
+                    large.uid,
+                    large.creationTimestamp,
+                    "UTC",
+                    null,
+                    72,
+                    app.logdate.client.repository.moments.MarkState.FILLED,
+                    "resolved caption".repeat(15000),
+                    emptySet(),
+                    "watch",
+                    large.lastUpdated,
+                    7,
+                )
+            val original =
+                app.logdate.client.sync.peer.delivery.MomentEnvelopeBody
+                    .envelope(mark, RecordOrigin.PHONE)
+                    .copy(context = f.peer)
+            val momentBytes = original.body!!.toString().encodeToByteArray()
+            val bodyRef =
+                BodyRef(
+                    MessageDigest.getInstance("SHA-256").digest(momentBytes).joinToString("") { "%02x".format(it) },
+                    momentBytes.size.toLong(),
+                )
+            val momentItem =
+                item.copy(
+                    path = WearPaths.windowItem(RecordKind.MOMENT, mark.id, f.peer),
+                    data =
+                        EnvelopeDataMap.toDataMap(original.copy(body = null, bodyRef = bodyRef), 1) +
+                            (WindowTombstoneDataMap.KEY_REVISION to "2"),
+                )
+            var calls = 0
+            val typed =
+                WindowBodyHydrator(WindowItemSource { records }, f.peers, directory) { request ->
+                    assertEquals(RecordKind.MOMENT, request.kind)
+                    calls++
+                    MediaRangeSource { range ->
+                        val input = momentBytes.inputStream()
+                        object : MediaRangeConnection {
+                            override val identity = range.identity
+                            override val offset = range.offset
+                            override val sourceNodeId = "phone"
+
+                            override suspend fun read(buffer: ByteArray) = input.read(buffer)
+
+                            override suspend fun close() = input.close()
+                        }
+                    }
+                }
+            records = listOf(momentItem.copy(path = item.path))
+            assertEquals(records, typed.items(f.peer))
+            assertEquals(0, calls)
+            records = listOf(momentItem)
+            val hydrated = typed.items(f.peer).single()
+            assertEquals(
+                mark,
+                app.logdate.client.sync.peer.delivery.MomentEnvelopeBody.decode(
+                    (EnvelopeDataMap.fromDataMap(hydrated.data) as Decoded.Supported).value,
+                ),
+            )
+            assertEquals(1, calls)
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+        }
+
     @AfterTest fun cleanUp() {
         directory.deleteRecursively()
     }

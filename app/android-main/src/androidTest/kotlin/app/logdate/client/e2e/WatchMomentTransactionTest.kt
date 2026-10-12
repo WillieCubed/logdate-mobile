@@ -39,6 +39,7 @@ import app.logdate.shared.config.DefaultLogDateConfigRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -89,6 +90,109 @@ class WatchMomentTransactionTest {
         db.close()
         context.deleteDatabase(databaseName)
     }
+
+    @Test fun resolvedRoomMarkPublishesAndStreamsAfterLeavingTheOpenList() =
+        runBlocking {
+            repository.applyFromSync(mark)
+            repository.fill(mark.id, "resolved mark".repeat(15000), setOf(Uuid.random()), at)
+            assertTrue(repository.observeOpenMarks().first().isEmpty())
+            val snapshot =
+                app.logdate.client.sync.v2.window
+                    .PhoneWindowMoments(db.markedMomentDao(), repository)
+                    .changes
+                    .first()
+            val resolved = snapshot.single()
+            assertEquals(MarkState.FILLED, resolved.state)
+            val values = mutableMapOf<String, String>()
+            val backing =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<app.logdate.client.datastore.KeyValueStorage>()
+            val storage =
+                object : app.logdate.client.datastore.KeyValueStorage by backing {
+                    override suspend fun getString(key: String) = values[key]
+
+                    override suspend fun putString(
+                        key: String,
+                        value: String,
+                    ) {
+                        values[key] = value
+                    }
+
+                    override suspend fun remove(key: String) {
+                        values.remove(key)
+                    }
+                }
+            val manifest =
+                app.logdate.client.sync.v2.window
+                    .WindowManifestStore(storage)
+            val records = mutableListOf<Map<String, String>>()
+            val items =
+                object : app.logdate.client.sync.v2.window.WindowDataItems {
+                    override suspend fun put(
+                        path: String,
+                        data: Map<String, String>,
+                        urgent: Boolean,
+                    ): Boolean {
+                        records += data
+                        return true
+                    }
+
+                    override suspend fun deleteOwn(path: String) = true
+                }
+            val published =
+                app.logdate.client.sync.v2.window.PhoneMomentWindowPublisher(manifest, items).publish(
+                    peer,
+                    snapshot,
+                    at,
+                    kotlinx.datetime.TimeZone.UTC,
+                    4,
+                    10,
+                    8L * 1024 * 1024,
+                    false,
+                ) {}
+            val envelope = (EnvelopeDataMap.fromDataMap(records.single()) as app.logdate.client.sync.datalayer.v2.Decoded.Supported).value
+            val body = assertNotNull(envelope.bodyRef)
+            val peers =
+                mockk<PhoneDeliveryPeers> {
+                    coEvery { current("watch") } returns peer
+                    coEvery { isCurrent(peer) } returns true
+                }
+            val server =
+                app.logdate.client.sync.v2.window.PhoneWindowBodyServer(
+                    peers,
+                    mockk(),
+                    manifest,
+                    context.cacheDir,
+                    moments = repository,
+                    acceptsMoments = { true },
+                )
+            val request =
+                app.logdate.client.sync.datalayer.v2.WindowBodyRequest(
+                    context = peer,
+                    kind = RecordKind.MOMENT,
+                    noteId = mark.id.toString(),
+                    contentVersion = envelope.contentVersion,
+                    revision = published.members.single().revision,
+                    body = body,
+                )
+            val ticket = assertNotNull(server.prepare("watch", request))
+            assertTrue(
+                server.serve("watch", ticket.channelPath) { file, _, _, allowed ->
+                    assertTrue(allowed())
+                    val received =
+                        MomentEnvelopeBody.decode(
+                            envelope.copy(
+                                bodyRef = null,
+                                body =
+                                    app.logdate.client.sync.datalayer.v2.WearJson.json
+                                        .parseToJsonElement(file.readText()),
+                            ),
+                        )
+                    assertEquals(resolved, received)
+                },
+            )
+        }
 
     @Test fun captureRowOutboxAndOperationProofCommitTogether() =
         runBlocking {

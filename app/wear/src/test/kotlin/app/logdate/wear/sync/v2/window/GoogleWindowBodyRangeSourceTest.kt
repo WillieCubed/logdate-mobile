@@ -94,6 +94,7 @@ class GoogleWindowBodyRangeSourceTest {
             for (bad in listOf(
                 response.copy(request = descriptor.copy(context = peer.copy(phoneNode = "other"))),
                 response.copy(request = descriptor.copy(contentVersion = 3)),
+                response.copy(request = descriptor.copy(kind = app.logdate.client.sync.datalayer.v2.RecordKind.MOMENT)),
                 response.copy(request = descriptor.copy(offset = 6)),
                 response.copy(request = descriptor.copy(revision = 8)),
                 response.copy(request = descriptor.copy(body = descriptor.body.copy(sha256 = "b".repeat(64)))),

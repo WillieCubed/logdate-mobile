@@ -38,8 +38,8 @@ class WindowBodyHydrator(
         val revision = item.data[WindowTombstoneDataMap.KEY_REVISION]?.toLongOrNull() ?: return item
         if (item.sourceNodeId != peer.phoneNode ||
             path.linkId != peer.linkId ||
-            path.kind != RecordKind.NOTE ||
-            envelope.kind != RecordKind.NOTE ||
+            path.kind !in setOf(RecordKind.NOTE, RecordKind.MOMENT) ||
+            envelope.kind != path.kind ||
             envelope.origin != RecordOrigin.PHONE ||
             envelope.context != peer ||
             envelope.id != path.id.toString() ||
@@ -60,6 +60,7 @@ class WindowBodyHydrator(
             val request =
                 WindowBodyRequest(
                     context = peer,
+                    kind = envelope.kind,
                     noteId = envelope.id,
                     contentVersion = envelope.contentVersion,
                     revision = revision,

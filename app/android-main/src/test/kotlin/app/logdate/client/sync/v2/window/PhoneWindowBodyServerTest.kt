@@ -62,6 +62,67 @@ class PhoneWindowBodyServerTest {
         manifest.write(peer, PublishedWindow(items = mapOf(note.uid.toString() to PublishedItem(2, emptySet(), 1))))
     }
 
+    @Test fun momentsUseTheirOwnManifestAndBodyEvenWhenANoteSharesTheId() =
+        runTest {
+            val mark =
+                app.logdate.client.repository.moments.MarkedMoment(
+                    note.uid,
+                    note.creationTimestamp,
+                    "UTC",
+                    null,
+                    72,
+                    app.logdate.client.repository.moments.MarkState.FILLED,
+                    "resolved caption".repeat(15000),
+                    setOf(Uuid.random()),
+                    "watch",
+                    note.lastUpdated,
+                    7,
+                )
+            var storedMark = mark
+            var negotiated = true
+            val repository =
+                mockk<app.logdate.client.repository.moments.MarkedMomentRepository> {
+                    coEvery { getMark(note.uid) } answers { storedMark }
+                }
+            val typedServer = PhoneWindowBodyServer(peers, notes, manifest, directory, repository, { negotiated }) { now }
+            val momentBytes =
+                app.logdate.client.sync.peer.delivery.MomentEnvelopeBody
+                    .envelope(
+                        mark,
+                        app.logdate.client.sync.datalayer.v2.RecordOrigin.PHONE,
+                    ).body!!
+                    .toString()
+                    .encodeToByteArray()
+            val momentRequest =
+                request.copy(
+                    kind = app.logdate.client.sync.datalayer.v2.RecordKind.MOMENT,
+                    body =
+                        BodyRef(
+                            MessageDigest.getInstance("SHA-256").digest(momentBytes).joinToString("") { "%02x".format(it) },
+                            momentBytes.size.toLong(),
+                        ),
+                )
+            seed()
+            assertNull(typedServer.prepare("watch", momentRequest))
+            manifest.write(peer, manifest.read(peer).copy(moments = mapOf(mark.id.toString() to PublishedItem(2, emptySet(), 1))))
+            val ticket = assertNotNull(typedServer.prepare("watch", momentRequest))
+            assertTrue(
+                typedServer.serve("watch", ticket.channelPath) { file, _, _, current ->
+                    assertTrue(current())
+                    assertEquals(momentBytes.toList(), file.readBytes().toList())
+                },
+            )
+            assertNull(typedServer.prepare("watch", momentRequest.copy(kind = app.logdate.client.sync.datalayer.v2.RecordKind.NOTE)))
+            val changed = assertNotNull(typedServer.prepare("watch", momentRequest))
+            storedMark = mark.copy(caption = "replaced at same clock")
+            assertFalse(typedServer.serve("watch", changed.channelPath) { _, _, _, _ -> error("Changed mark served") })
+            storedMark = mark
+            val revoked = assertNotNull(typedServer.prepare("watch", momentRequest))
+            negotiated = false
+            assertFalse(typedServer.serve("watch", revoked.channelPath) { _, _, _, _ -> error("Withdrawn capability served") })
+            assertTrue(directory.listFiles().orEmpty().isEmpty())
+        }
+
     @After fun cleanUp() {
         directory.deleteRecursively()
     }

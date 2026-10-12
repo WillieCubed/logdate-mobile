@@ -15,6 +15,7 @@ data class PublishedItem(
     val reasons: Set<WindowReason>,
     val revision: Long = 0,
     val bodySha256: String? = null,
+    val syncVersion: Long = 0,
 )
 
 /** What the phone last published to the watch's window, by note id, and when each tombstone was written. */
@@ -22,6 +23,8 @@ data class PublishedItem(
 data class PublishedWindow(
     val items: Map<String, PublishedItem> = emptyMap(),
     val tombstones: Map<String, Long> = emptyMap(),
+    val moments: Map<String, PublishedItem> = emptyMap(),
+    val momentTombstones: Map<String, Long> = emptyMap(),
 )
 
 class WindowManifestStore(

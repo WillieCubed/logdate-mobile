@@ -17,6 +17,7 @@ data class WindowBodyRequest(
     val revision: Long,
     val body: BodyRef,
     val offset: Long = 0,
+    val kind: RecordKind = RecordKind.NOTE,
 )
 
 @Serializable

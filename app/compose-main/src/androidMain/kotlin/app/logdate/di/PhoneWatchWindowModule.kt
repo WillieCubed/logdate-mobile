@@ -14,9 +14,11 @@ import app.logdate.client.sync.v2.link.PhoneWatchLinkStore
 import app.logdate.client.sync.v2.localNodeIdOrNull
 import app.logdate.client.sync.v2.media.PhoneMediaEndpoint
 import app.logdate.client.sync.v2.media.PhoneMediaServer
+import app.logdate.client.sync.v2.receipts.PhoneMomentSupport
 import app.logdate.client.sync.v2.window.GoogleWindowDataItems
 import app.logdate.client.sync.v2.window.PhoneWindowBodyEndpoint
 import app.logdate.client.sync.v2.window.PhoneWindowBodyServer
+import app.logdate.client.sync.v2.window.PhoneWindowMoments
 import app.logdate.client.sync.v2.window.WatchWindowPublisher
 import app.logdate.client.sync.v2.window.WindowDataItems
 import app.logdate.client.sync.v2.window.WindowExtras
@@ -38,7 +40,18 @@ val phoneWatchWindowModule =
         single { PhoneMediaServer(get(), get(), get<MediaFileResolver>()::filePath) }
         single { PhoneMediaEndpoint(get(), Wearable.getChannelClient(androidContext())) }
         single { WindowManifestStore(get()) }
-        single { PhoneWindowBodyServer(get(), get(), get(), File(androidContext().cacheDir, "watch-window-bodies")) }
+        single { PhoneWindowMoments(get(), get()) }
+        single {
+            val support = get<PhoneMomentSupport>()
+            PhoneWindowBodyServer(
+                get(),
+                get(),
+                get(),
+                File(androidContext().cacheDir, "watch-window-bodies"),
+                moments = get(),
+                acceptsMoments = support::accepts,
+            )
+        }
         single { PhoneWindowBodyEndpoint(get(), Wearable.getChannelClient(androidContext())) }
         single<WindowDataItems> {
             val node = Wearable.getNodeClient(androidContext())
@@ -47,12 +60,16 @@ val phoneWatchWindowModule =
         single<WindowExtras> { WindowExtras.None }
         single<WindowRollWork> { WorkManagerWindowRollWork(WorkManager.getInstance(androidContext())) }
         single {
+            val moments = get<PhoneWindowMoments>()
+            val momentSupport = get<PhoneMomentSupport>()
             val preferences = get<LogdatePreferencesDataSource>()
             val states = get<PeerStateStore>()
             val links = get<PhoneWatchLinkStore>()
             val sessions = get<SessionStorage>()
             val config = get<LogDateConfigRepository>()
             WatchWindowPublisher(
+                moments = moments.changes,
+                acceptsMoments = momentSupport::accepts,
                 active = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                 peers = get(),
                 supports = { node ->

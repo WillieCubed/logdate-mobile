@@ -30,6 +30,8 @@ class WatchWindowRuntimeTest {
         val koin = KoinJavaComponent.getKoin()
         assertNotNull(koin.get<WatchWindowPublisher>())
         assertNotNull(koin.get<WindowResyncResponder>())
+        assertNotNull(koin.get<app.logdate.client.sync.v2.window.PhoneWindowMoments>())
+        assertNotNull(koin.get<app.logdate.client.sync.v2.window.PhoneWindowBodyServer>())
     }
 
     @Test

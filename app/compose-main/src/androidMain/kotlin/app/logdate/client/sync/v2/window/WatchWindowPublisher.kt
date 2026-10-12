@@ -74,6 +74,8 @@ class WatchWindowPublisher(
     private val mapper: NoteDataMapper = NoteDataMapper(),
     private val zone: () -> TimeZone = { TimeZone.currentSystemDefault() },
     private val clock: Clock = Clock.System,
+    private val moments: Flow<List<app.logdate.client.repository.moments.MarkedMoment>> = kotlinx.coroutines.flow.flowOf(emptyList()),
+    private val acceptsMoments: suspend (PeerDeliveryContext) -> Boolean = { false },
 ) {
     private val publishing = Mutex()
 
@@ -135,7 +137,7 @@ class WatchWindowPublisher(
     @OptIn(FlowPreview::class)
     fun start(scope: CoroutineScope): Job =
         scope.launch {
-            merge(notes.allNotesObserved.map { }, active.map { }, changes, dayStarts())
+            merge(notes.allNotesObserved.map { }, moments.map { }, active.map { }, changes, dayStarts())
                 .debounce(SETTLE_MS)
                 .collect { publishLogged() }
         }
@@ -161,8 +163,9 @@ class WatchWindowPublisher(
         (published.keys - inWindow).forEach { id -> remove(peer, id, published, tombstones, now, counts) }
         clearOldTombstones(peer, tombstones, inWindow, now, counts)
         requireCurrent(peer)
-        manifest.write(peer, PublishedWindow(published, tombstones))
-        if (counts.failed == 0) manifest.finishPublication(peer)
+        manifest.write(peer, previous.copy(items = published, tombstones = tombstones))
+        val momentResult = publishMoments(peer, plan.members, bodies, now, interrupted)
+        if (counts.failed == 0 && momentResult.failed == 0) manifest.finishPublication(peer)
         requireCurrent(peer)
         val members =
             plan.members.mapNotNull { member ->
@@ -177,14 +180,38 @@ class WatchWindowPublisher(
             }
         return WindowPublishResult(
             peer,
-            members,
-            counts.written,
-            counts.removed,
-            counts.failed,
+            members + momentResult.members,
+            counts.written + momentResult.written,
+            counts.removed + momentResult.removed,
+            counts.failed + momentResult.failed,
             counts.tooLarge,
             now.toEpochMilliseconds(),
             manifest.revision(peer),
         )
+    }
+
+    private suspend fun publishMoments(
+        peer: PeerDeliveryContext,
+        notes: List<WindowMember>,
+        bodies: Map<Uuid, JsonElement>,
+        now: Instant,
+        interrupted: Boolean,
+    ): MomentWindowPublished {
+        if (!acceptsMoments(peer)) return MomentWindowPublished()
+        val used = notes.sumOf { bodies.getValue(it.id).sizeBytes() }
+        return PhoneMomentWindowPublisher(manifest, items).publish(
+            peer,
+            moments.first(),
+            now,
+            zone(),
+            dayStartHour(),
+            (400 - notes.size).coerceAtLeast(0),
+            (8L * 1024 * 1024 - used).coerceAtLeast(0),
+            interrupted,
+        ) {
+            requireCurrent(peer)
+            if (!acceptsMoments(peer)) throw AudienceChanged()
+        }
     }
 
     private suspend fun write(

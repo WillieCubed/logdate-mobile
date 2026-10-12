@@ -2,9 +2,13 @@ package app.logdate.client.sync.v2.window
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.moments.MarkedMoment
+import app.logdate.client.sync.datalayer.v2.RecordKind
+import app.logdate.client.sync.datalayer.v2.RecordOrigin
 import app.logdate.client.sync.datalayer.v2.WindowBodyPaths
 import app.logdate.client.sync.datalayer.v2.WindowBodyRequest
 import app.logdate.client.sync.datalayer.v2.WindowBodyTicket
+import app.logdate.client.sync.peer.delivery.MomentEnvelopeBody
 import app.logdate.client.sync.peer.delivery.NoteEnvelopeBody
 import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import kotlinx.coroutines.sync.Mutex
@@ -19,6 +23,8 @@ class PhoneWindowBodyServer(
     private val notes: JournalNotesRepository,
     private val manifest: WindowManifestStore,
     private val temporaryDirectory: File,
+    private val moments: app.logdate.client.repository.moments.MarkedMomentRepository? = null,
+    private val acceptsMoments: suspend (app.logdate.client.sync.datalayer.v2.PeerDeliveryContext) -> Boolean = { false },
     private val nowMs: () -> Long = { System.nanoTime() / 1_000_000 },
 ) {
     private data class Ticket(
@@ -57,13 +63,13 @@ class PhoneWindowBodyServer(
             } ?: return false
         if (nowMs() - ticket.issuedAt > TICKET_LIFETIME_MS) return false
         val request = ticket.request
-        val note = snapshot(node, request) ?: return false
+        val record = snapshot(node, request) ?: return false
         if (!temporaryDirectory.isDirectory && !temporaryDirectory.mkdirs()) return false
         val file = File.createTempFile("window-body-", ".json", temporaryDirectory)
         try {
-            file.writeBytes(bodyBytes(note))
+            file.writeBytes(bodyBytes(record))
 
-            suspend fun allowed(): Boolean = current(request) && notes.getNoteById(note.uid) == note && current(request)
+            suspend fun allowed(): Boolean = current(request) && readRecord(request) == record && current(request)
             if (!allowed()) return false
             send(file, request.offset, request.body.sizeBytes - request.offset) { allowed() }
             return allowed()
@@ -75,8 +81,9 @@ class PhoneWindowBodyServer(
     private suspend fun snapshot(
         node: String,
         request: WindowBodyRequest,
-    ): JournalNote? {
-        if (request.schema != 1 ||
+    ): Any? {
+        if (request.kind !in setOf(RecordKind.NOTE, RecordKind.MOMENT) ||
+            request.schema != 1 ||
             request.contentVersion < 0 ||
             request.revision <= 0 ||
             request.body.sizeBytes !in 1..WindowBodyPaths.MAX_BODY_BYTES ||
@@ -85,23 +92,49 @@ class PhoneWindowBodyServer(
         ) {
             return null
         }
-        val id = Uuid.parseOrNull(request.noteId)?.takeIf { it.toString() == request.noteId } ?: return null
         if (peers.current(node) != request.context || !request.context.isValid() || !current(request)) return null
-        val note =
-            notes.getNoteById(id)?.takeIf { it.uid == id && it.lastUpdated.toEpochMilliseconds() == request.contentVersion }
-                ?: return null
-        val bytes = bodyBytes(note)
+        val record = readRecord(request) ?: return null
+        val bytes = bodyBytes(record)
         if (bytes.size.toLong() != request.body.sizeBytes || digest(bytes) != request.body.sha256) return null
-        return note.takeIf { current(request) && notes.getNoteById(id) == note }
+        return record.takeIf { current(request) && readRecord(request) == record }
+    }
+
+    private suspend fun readRecord(request: WindowBodyRequest): Any? {
+        val id = Uuid.parseOrNull(request.noteId)?.takeIf { it.toString() == request.noteId } ?: return null
+        return when (request.kind) {
+            RecordKind.NOTE ->
+                notes.getNoteById(id)?.takeIf {
+                    it.uid == id &&
+                        it.lastUpdated.toEpochMilliseconds() == request.contentVersion
+                }
+            RecordKind.MOMENT ->
+                if (acceptsMoments(request.context)) {
+                    moments?.getMark(id)?.takeIf { it.id == id && it.lastUpdated.toEpochMilliseconds() == request.contentVersion }
+                } else {
+                    null
+                }
+            else -> null
+        }
     }
 
     private suspend fun current(request: WindowBodyRequest): Boolean {
         if (!peers.isCurrent(request.context)) return false
-        val item = manifest.read(request.context).items[request.noteId] ?: return false
+        val published = manifest.read(request.context)
+        val item =
+            when (request.kind) {
+                RecordKind.NOTE -> published.items[request.noteId]
+                RecordKind.MOMENT -> published.moments[request.noteId].takeIf { acceptsMoments(request.context) }
+                else -> null
+            } ?: return false
         return item.contentVersion == request.contentVersion && item.revision == request.revision && peers.isCurrent(request.context)
     }
 
-    private fun bodyBytes(note: JournalNote): ByteArray = NoteEnvelopeBody.encode(note).toString().encodeToByteArray()
+    private fun bodyBytes(record: Any): ByteArray =
+        when (record) {
+            is JournalNote -> NoteEnvelopeBody.encode(record)
+            is MarkedMoment -> checkNotNull(MomentEnvelopeBody.envelope(record, RecordOrigin.PHONE).body)
+            else -> error("Unsupported window body record")
+        }.toString().encodeToByteArray()
 
     private fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
