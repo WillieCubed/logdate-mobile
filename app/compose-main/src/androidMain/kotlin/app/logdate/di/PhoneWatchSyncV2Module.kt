@@ -98,6 +98,7 @@ val phoneWatchSyncV2Module =
             val watchPreferences = get<StampedPreferenceStore>()
             val preferences = get<LogdatePreferencesDataSource>()
             val campfire = get<ObserveCampfireUseCase>()
+            val peers = get<PhoneDeliveryPeers>()
             PhoneStatePublisher(
                 v2Enabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                 channel = get(),
@@ -105,6 +106,9 @@ val phoneWatchSyncV2Module =
                 peerStates = get(),
                 sharedPreferences = watchPreferences.observe(),
                 adoptWatchPreferences = { shared -> watchPreferences.adopt(shared) },
+                acceptsWatchPreferences = { node, document ->
+                    peers.current(node)?.let { it.linkId == document.watch?.linkId } == true
+                },
                 features =
                     setOf(
                         WearFeatures.PREFS,

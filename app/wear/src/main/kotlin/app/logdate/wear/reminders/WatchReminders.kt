@@ -14,6 +14,7 @@ class WatchReminders(
     private val evening: EveningReminderScheduler,
     private val experienceEnabled: () -> Boolean = { true },
     private val awaitExperience: suspend () -> Unit = {},
+    private val writeSharedChoice: suspend (Boolean) -> Unit = {},
 ) {
     private val registration = Mutex()
     private val currentWorkouts = MutableStateFlow(false)
@@ -29,6 +30,7 @@ class WatchReminders(
     }
 
     suspend fun setEnabled(enabled: Boolean) {
+        writeSharedChoice(enabled)
         preferences.setEnabled(enabled)
         restore()
     }

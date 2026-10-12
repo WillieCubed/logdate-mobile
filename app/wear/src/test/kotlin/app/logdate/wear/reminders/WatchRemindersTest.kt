@@ -13,6 +13,26 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WatchRemindersTest {
+    @Test
+    fun `watch switch persists shared choice before changing local registration`() =
+        runTest {
+            var sharedChoice: Boolean? = null
+            val reminders =
+                WatchReminders(
+                    preferences,
+                    activity,
+                    permissions,
+                    evening,
+                    writeSharedChoice = { enabled ->
+                        assertFalse(preferences.enabled.value)
+                        sharedChoice = enabled
+                    },
+                )
+            reminders.setEnabled(true)
+            assertEquals(true, sharedChoice)
+            assertTrue(preferences.enabled.value)
+        }
+
     private val preferences = FakeReminderPreferences(enabled = false)
     private val activity = FakeActivityRegistration()
     private val permissions = FakeReminderPermissions()

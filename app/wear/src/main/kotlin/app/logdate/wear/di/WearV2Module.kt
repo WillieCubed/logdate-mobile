@@ -37,6 +37,7 @@ import app.logdate.wear.reminders.ReminderPermissions
 import app.logdate.wear.reminders.SensorManagerOffBodyReadings
 import app.logdate.wear.reminders.SharedPreferencesActivityTransitionStore
 import app.logdate.wear.reminders.SharedPreferencesWatchReminderPreferences
+import app.logdate.wear.reminders.SharedWatchReminderSettings
 import app.logdate.wear.reminders.WatchNudgeNotifier
 import app.logdate.wear.reminders.WatchReminderDispatcher
 import app.logdate.wear.reminders.WatchReminderPreferences
@@ -319,6 +320,7 @@ val wearV2Module =
         }
         single {
             val experience = get<FeatureSwitch>()
+            val shared = get<SharedWatchReminderSettings>()
             WatchReminders(
                 preferences = get(),
                 activity = get(),
@@ -326,6 +328,7 @@ val wearV2Module =
                 evening = get(),
                 experienceEnabled = { experience.isOn },
                 awaitExperience = experience::awaitReady,
+                writeSharedChoice = shared::persistChoice,
             )
         }
         single<EveningReminderWork> { WorkManagerEveningReminderWork(WorkManager.getInstance(get<Context>())) }

@@ -9,6 +9,7 @@ import app.logdate.client.sync.peer.state.PeerLinkState
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.PhoneState
+import app.logdate.client.sync.peer.state.Stamped
 import app.logdate.client.sync.peer.state.StateDocument
 import app.logdate.client.sync.peer.state.StateDocumentChannel
 import app.logdate.client.sync.peer.state.StateMerger
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -30,6 +32,115 @@ import kotlin.time.Instant
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WatchStateMirrorTest {
+    @Test
+    fun `failed capability update retries when shared state changes`() =
+        runTest {
+            val shared = MutableStateFlow<Map<String, Stamped>>(emptyMap())
+            val mirror =
+                WatchStateMirror(
+                    flags,
+                    channel,
+                    capabilities,
+                    PeerStateStore(),
+                    StateMerger(FixedClock(1_000)),
+                    sharedPreferences = shared,
+                )
+            capabilities.succeeds = false
+            mirror.start(backgroundScope)
+            runCurrent()
+            capabilities.succeeds = true
+            shared.value = mapOf("reminders.enabled" to Stamped(JsonPrimitive(true), 900))
+            runCurrent()
+            assertEquals(listOf("remove $WATCH_V2", "remove $WATCH_V2"), capabilities.calls)
+        }
+
+    @Test
+    fun `posting a reminder publishes its time without changing capability`() =
+        runTest {
+            val posted = MutableStateFlow<Long?>(null)
+            val mirror =
+                WatchStateMirror(
+                    flags,
+                    channel,
+                    capabilities,
+                    PeerStateStore(),
+                    StateMerger(FixedClock(1_000)),
+                    lastReminderAt = posted,
+                )
+            mirror.start(backgroundScope)
+            runCurrent()
+            posted.value = 900
+            runCurrent()
+            assertEquals(900L, channel.published.last().lastReminderAt)
+            assertEquals(listOf("remove $WATCH_V2"), capabilities.calls)
+        }
+
+    @Test
+    fun `shared choices publish without changing the Labs switch`() =
+        runTest {
+            val shared = MutableStateFlow<Map<String, Stamped>>(emptyMap())
+            val mirror =
+                WatchStateMirror(
+                    flags,
+                    channel,
+                    capabilities,
+                    PeerStateStore(),
+                    StateMerger(FixedClock(1_000)),
+                    sharedPreferences = shared,
+                )
+            mirror.start(backgroundScope)
+            runCurrent()
+            shared.value = mapOf("reminders.enabled" to Stamped(JsonPrimitive(true), 900))
+            runCurrent()
+            assertEquals(shared.value, channel.published.last().shared)
+            assertEquals(listOf("remove $WATCH_V2"), capabilities.calls)
+        }
+
+    @Test
+    fun `phone preferences are adopted even when the Labs switch is unchanged`() =
+        runTest {
+            flags.value.value = true
+            val adopted = mutableListOf<Pair<String, StateDocument>>()
+            val mirror =
+                WatchStateMirror(
+                    flags,
+                    channel,
+                    capabilities,
+                    PeerStateStore(),
+                    StateMerger(FixedClock(1_000)),
+                    adoptPhonePreferences = { node, document -> adopted += node to document },
+                )
+            val document = phoneDocument(switchOn = true)
+            mirror.onPhoneDocument(PHONE_NODE, WATCH_NODE, Decoded.Supported(document))
+            assertEquals(listOf(PHONE_NODE to document), adopted)
+            assertTrue(flags.writes.isEmpty())
+        }
+
+    @Test
+    fun `saved reminder migration runs before first publication`() =
+        runTest {
+            val shared = MutableStateFlow<Map<String, Stamped>>(emptyMap())
+            val mirror =
+                WatchStateMirror(
+                    flags,
+                    channel,
+                    capabilities,
+                    PeerStateStore(),
+                    StateMerger(FixedClock(1_000)),
+                    sharedPreferences = shared,
+                    initializeShared = { shared.value = mapOf("reminders.enabled" to Stamped(JsonPrimitive(true), 900)) },
+                )
+            mirror.start(backgroundScope)
+            runCurrent()
+            assertEquals(
+                JsonPrimitive(true),
+                channel.published
+                    .first()
+                    .shared["reminders.enabled"]
+                    ?.value,
+            )
+        }
+
     private val flags = InMemoryFlags()
     private val channel = FakeChannel()
     private val capabilities = FakeCapabilities()
@@ -190,15 +301,16 @@ class WatchStateMirrorTest {
 
     private class FakeCapabilities : LocalCapabilities {
         val calls = mutableListOf<String>()
+        var succeeds = true
 
         override suspend fun add(capability: String): Boolean {
             calls += "add $capability"
-            return true
+            return succeeds
         }
 
         override suspend fun remove(capability: String): Boolean {
             calls += "remove $capability"
-            return true
+            return succeeds
         }
     }
 

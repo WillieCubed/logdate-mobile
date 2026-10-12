@@ -33,6 +33,62 @@ import kotlin.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneStatePublisherTest {
     @Test
+    fun `unlinked watch preferences cannot shadow the verified watch`() =
+        runTest {
+            val publisher =
+                PhoneStatePublisher(
+                    enabled,
+                    channel,
+                    capabilities,
+                    peerStates,
+                    adoptWatchPreferences = { adopted += it },
+                    acceptsWatchPreferences = { node, _ -> node == "verified" },
+                )
+            publisher.start(backgroundScope)
+            runCurrent()
+            val good = mapOf("reminders.enabled" to Stamped(JsonPrimitive(true), 900))
+            val bad = mapOf("reminders.enabled" to Stamped(JsonPrimitive(false), 950))
+            peerStates.accept(
+                "verified",
+                Decoded.Supported(StateDocument(role = PeerRole.WATCH, writtenAt = 900, shared = good)),
+                PeerRole.WATCH,
+            )
+            peerStates.accept(
+                "unlinked",
+                Decoded.Supported(StateDocument(role = PeerRole.WATCH, writtenAt = 950, shared = bad)),
+                PeerRole.WATCH,
+            )
+            runCurrent()
+            assertEquals(listOf(good), adopted)
+        }
+
+    @Test
+    fun `withdrawn watch cannot change shared reminder choice`() =
+        runTest {
+            var current = true
+            val publisher =
+                PhoneStatePublisher(
+                    enabled,
+                    channel,
+                    capabilities,
+                    peerStates,
+                    adoptWatchPreferences = { adopted += it },
+                    acceptsWatchPreferences = { _, _ -> current },
+                )
+            publisher.start(backgroundScope)
+            runCurrent()
+            current = false
+            val shared = mapOf("reminders.enabled" to Stamped(JsonPrimitive(true), 950))
+            peerStates.accept(
+                "watch-node",
+                Decoded.Supported(StateDocument(role = PeerRole.WATCH, writtenAt = 950, shared = shared)),
+                PeerRole.WATCH,
+            )
+            runCurrent()
+            assertEquals(emptyList(), adopted)
+        }
+
+    @Test
     fun `the phone lists the features it supports`() =
         runTest {
             val withFeatures =

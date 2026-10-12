@@ -18,6 +18,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.domain.watch.StampedPreferenceStore
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.permissions.di.permissionsModule
@@ -54,6 +55,9 @@ import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.health.UnavailableWearHealthSensorManager
 import app.logdate.wear.health.WearHealthSensorManager
 import app.logdate.wear.location.WearLocationCaptureCoordinator
+import app.logdate.wear.reminders.SharedWatchReminderSettings
+import app.logdate.wear.reminders.WatchReminderPreferences
+import app.logdate.wear.reminders.WatchReminders
 import app.logdate.wear.sync.CapabilityPhoneReachability
 import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
@@ -72,11 +76,13 @@ import app.logdate.wear.sync.v2.WatchPeerLink
 import app.logdate.wear.sync.v2.WatchStateMirror
 import app.logdate.wear.sync.v2.delivery.WatchCaptureDelivery
 import app.logdate.wear.sync.v2.delivery.WatchCaptureProtocol
+import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
 import app.logdate.wear.sync.v2.window.WindowReconciler
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import org.koin.dsl.binds
 import org.koin.dsl.module
@@ -164,6 +170,11 @@ val wearDataModule =
         }
         single { PeerStateStore() }
         single { StateMerger() }
+        single { StampedPreferenceStore(storage = get(), localRole = PeerRole.WATCH) }
+        single {
+            val peers = get<WatchDeliveryPeer>()
+            SharedWatchReminderSettings(get(), get(), acceptsPhone = { peers.current()?.phoneNode == it })
+        }
         single {
             WatchPeerLink(
                 dataLayerClient = get(),
@@ -173,6 +184,9 @@ val wearDataModule =
             )
         } binds arrayOf(StateDocumentChannel::class, LocalCapabilities::class, PeerCapabilityPresence::class)
         single {
+            val shared = get<StampedPreferenceStore>()
+            val reminders = get<SharedWatchReminderSettings>()
+            val controller = get<WatchReminders>()
             WatchStateMirror(
                 featureFlags = get(),
                 channel = get(),
@@ -180,6 +194,10 @@ val wearDataModule =
                 peerStates = get(),
                 merger = get(),
                 ownState = get<WatchOwnState>().observe(),
+                sharedPreferences = shared.observe(),
+                initializeShared = reminders::initialize,
+                adoptPhonePreferences = { node, document -> if (reminders.adopt(node, document)) controller.restore() },
+                lastReminderAt = get<WatchReminderPreferences>().observeLastReminderAt().map { it?.toEpochMilliseconds() },
             )
         }
         single {

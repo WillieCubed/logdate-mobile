@@ -37,6 +37,19 @@ internal class FakeReminderPreferences(
     enabled: Boolean = true,
     private var last: Instant? = null,
 ) : WatchReminderPreferences {
+    private val peerTimes = mutableMapOf<String, Long>()
+
+    override fun mergePhoneReminderAt(
+        nodeId: String,
+        at: Long,
+        observedAt: Instant,
+    ) {
+        if (at <= 0 || at <= (peerTimes[nodeId] ?: 0)) return
+        peerTimes[nodeId] = at
+        val observed = Instant.fromEpochMilliseconds(minOf(at, observedAt.toEpochMilliseconds()))
+        last = last?.let { maxOf(it, observed) } ?: observed
+    }
+
     override val enabled = MutableStateFlow(enabled)
 
     override fun setEnabled(enabled: Boolean) {

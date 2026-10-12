@@ -19,9 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
@@ -56,6 +54,7 @@ class PhoneStatePublisher(
     private val features: Set<String> = setOf(WearFeatures.PREFS),
     private val parts: Flow<PhoneStateParts> = flowOf(PhoneStateParts()),
     private val adoptWatchPreferences: suspend (Map<String, Stamped>) -> Unit = {},
+    private val acceptsWatchPreferences: suspend (String, StateDocument) -> Boolean = { _, _ -> true },
 ) {
     fun start(scope: CoroutineScope): Job =
         scope.launch {
@@ -123,11 +122,16 @@ class PhoneStatePublisher(
     }
 
     private suspend fun adoptPreferencesFromWatches() {
+        val adopted = mutableMapOf<String, Map<String, Stamped>>()
         peerStates
-            .latest(PeerRole.WATCH)
-            .filterNotNull()
-            .map { document -> document.shared }
-            .distinctUntilChanged()
-            .collect { shared -> adoptWatchPreferences(shared) }
+            .documents(PeerRole.WATCH)
+            .collect { documents ->
+                documents.forEach { (node, document) ->
+                    if (adopted[node] != document.shared && acceptsWatchPreferences(node, document)) {
+                        adoptWatchPreferences(document.shared)
+                        adopted[node] = document.shared
+                    }
+                }
+            }
     }
 }
