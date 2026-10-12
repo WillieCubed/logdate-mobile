@@ -144,6 +144,102 @@ class PhoneStatePublisherTest {
             assertEquals(listOf("remove $PHONE_V2"), capabilities.calls)
         }
 
+    @Test
+    fun `posted history republishes without advertising again`() =
+        runTest {
+            val history = MutableStateFlow<Long?>(null)
+            PhoneStatePublisher(enabled, channel, capabilities, peerStates, lastReminderAt = history).start(backgroundScope)
+            runCurrent()
+            history.value = 900
+            runCurrent()
+            assertEquals(900L, channel.published.last().lastReminderAt)
+            assertEquals(listOf("remove $PHONE_V2"), capabilities.calls)
+        }
+
+    @Test
+    fun `new watch post is adopted even when its preferences are unchanged`() =
+        runTest {
+            val posts = mutableListOf<Pair<String, Long>>()
+            PhoneStatePublisher(
+                enabled,
+                channel,
+                capabilities,
+                peerStates,
+                adoptWatchReminderAt = { node, at -> posts += node to at },
+            ).start(backgroundScope)
+            runCurrent()
+            for (at in listOf(900L, 950L)) {
+                peerStates.accept(
+                    "watch",
+                    Decoded.Supported(
+                        StateDocument(
+                            role = PeerRole.WATCH,
+                            writtenAt = at,
+                            lastReminderAt = at,
+                        ),
+                    ),
+                    PeerRole.WATCH,
+                )
+                runCurrent()
+            }
+            assertEquals(listOf("watch" to 900L, "watch" to 950L), posts)
+        }
+
+    @Test
+    fun `foreign and withdrawn watches cannot alter posted history`() =
+        runTest {
+            var current = true
+            val posts = mutableListOf<Pair<String, Long>>()
+            PhoneStatePublisher(
+                enabled,
+                channel,
+                capabilities,
+                peerStates,
+                adoptWatchReminderAt = { node, at -> posts += node to at },
+                acceptsWatchPreferences = { node, _ -> current && node == "verified" },
+            ).start(backgroundScope)
+            runCurrent()
+            peerStates.accept(
+                "foreign",
+                Decoded.Supported(
+                    StateDocument(
+                        role = PeerRole.WATCH,
+                        writtenAt = 900,
+                        lastReminderAt = 900,
+                    ),
+                ),
+                PeerRole.WATCH,
+            )
+            runCurrent()
+            current = false
+            peerStates.accept(
+                "verified",
+                Decoded.Supported(
+                    StateDocument(
+                        role = PeerRole.WATCH,
+                        writtenAt = 950,
+                        lastReminderAt = 950,
+                    ),
+                ),
+                PeerRole.WATCH,
+            )
+            runCurrent()
+            assertEquals(emptyList(), posts)
+        }
+
+    @Test
+    fun `failed capability change retries on the next history change`() =
+        runTest {
+            val history = MutableStateFlow<Long?>(null)
+            capabilities.succeeds = false
+            PhoneStatePublisher(enabled, channel, capabilities, peerStates, lastReminderAt = history).start(backgroundScope)
+            runCurrent()
+            capabilities.succeeds = true
+            history.value = 900
+            runCurrent()
+            assertEquals(listOf("remove $PHONE_V2", "remove $PHONE_V2"), capabilities.calls)
+        }
+
     private val enabled = MutableStateFlow(false)
     private val preferences = MutableStateFlow<Map<String, Stamped>>(emptyMap())
     private val adopted = mutableListOf<Map<String, Stamped>>()
@@ -270,15 +366,16 @@ class PhoneStatePublisherTest {
 
     private class FakeCapabilities : LocalCapabilities {
         val calls = mutableListOf<String>()
+        var succeeds = true
 
         override suspend fun add(capability: String): Boolean {
             calls += "add $capability"
-            return true
+            return succeeds
         }
 
         override suspend fun remove(capability: String): Boolean {
             calls += "remove $capability"
-            return true
+            return succeeds
         }
     }
 

@@ -7,6 +7,7 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
+import app.logdate.client.domain.reminders.ReminderPostedHistory
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.domain.watch.StampedPreferenceStore
@@ -73,6 +74,7 @@ import app.logdate.client.sync.v2.toSnapshot
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 import java.io.File
@@ -99,12 +101,15 @@ val phoneWatchSyncV2Module =
             val preferences = get<LogdatePreferencesDataSource>()
             val campfire = get<ObserveCampfireUseCase>()
             val peers = get<PhoneDeliveryPeers>()
+            val history = get<ReminderPostedHistory>()
             PhoneStatePublisher(
                 v2Enabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                 channel = get(),
                 capabilities = get(),
                 peerStates = get(),
                 sharedPreferences = watchPreferences.observe(),
+                lastReminderAt = history.observe().map { it?.toEpochMilliseconds() },
+                adoptWatchReminderAt = { node, at -> history.adoptPeer(node, at) },
                 adoptWatchPreferences = { shared -> watchPreferences.adopt(shared) },
                 acceptsWatchPreferences = { node, document ->
                     peers.current(node)?.let { it.linkId == document.watch?.linkId } == true

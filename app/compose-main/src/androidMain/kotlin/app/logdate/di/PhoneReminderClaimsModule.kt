@@ -6,6 +6,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.reminders.CoordinatedReminderClaims
 import app.logdate.client.domain.reminders.ReminderClaimResponder
 import app.logdate.client.domain.reminders.ReminderDayClaims
+import app.logdate.client.domain.reminders.ReminderPostedHistory
 import app.logdate.client.domain.reminders.WireReminderClaimPeer
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.sync.peer.state.PeerRole
@@ -17,6 +18,7 @@ import org.koin.dsl.module
 
 val phoneReminderClaimsModule =
     module {
+        single { ReminderPostedHistory(get()) }
         single { ReminderDayClaims(get(), PeerRole.PHONE) }
         single {
             val messages = Wearable.getMessageClient(androidContext())

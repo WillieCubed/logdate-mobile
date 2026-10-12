@@ -51,6 +51,8 @@ class PhoneStatePublisher(
     private val clock: Clock = Clock.System,
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
     private val sharedPreferences: Flow<Map<String, Stamped>> = flowOf(emptyMap()),
+    private val lastReminderAt: Flow<Long?> = flowOf(null),
+    private val adoptWatchReminderAt: suspend (String, Long) -> Unit = { _, _ -> },
     private val features: Set<String> = setOf(WearFeatures.PREFS),
     private val parts: Flow<PhoneStateParts> = flowOf(PhoneStateParts()),
     private val adoptWatchPreferences: suspend (Map<String, Stamped>) -> Unit = {},
@@ -65,13 +67,13 @@ class PhoneStatePublisher(
                 v2Enabled.distinctUntilChanged(),
                 sharedPreferences.distinctUntilChanged(),
                 parts.distinctUntilChanged(),
-            ) { enabled, shared, current ->
-                Triple(enabled, shared, current)
-            }.collect { (enabled, shared, current) ->
-                publish(enabled, shared, current)
+                lastReminderAt.distinctUntilChanged(),
+            ) { enabled, shared, current, postedAt ->
+                Publication(enabled, shared, current, postedAt)
+            }.collect { (enabled, shared, current, postedAt) ->
+                publish(enabled, shared, current, postedAt)
                 if (enabled == advertised) return@collect
-                updateCapability(enabled)
-                advertised = enabled
+                if (updateCapability(enabled)) advertised = enabled
             }
         }
 
@@ -84,6 +86,7 @@ class PhoneStatePublisher(
         v2Enabled: Boolean,
         shared: Map<String, Stamped> = emptyMap(),
         current: PhoneStateParts = PhoneStateParts(),
+        postedAt: Long? = null,
     ) {
         val document =
             StateDocument(
@@ -99,6 +102,7 @@ class PhoneStatePublisher(
                         campfire = current.campfire,
                     ),
                 shared = shared,
+                lastReminderAt = postedAt,
             )
         if (!channel.publish(document)) {
             Napier.e(
@@ -107,7 +111,7 @@ class PhoneStatePublisher(
         }
     }
 
-    private suspend fun updateCapability(v2Enabled: Boolean) {
+    private suspend fun updateCapability(v2Enabled: Boolean): Boolean {
         val capabilityUpdated =
             if (v2Enabled) {
                 capabilities.add(WearProtocol.PHONE_CAPABILITY_V2)
@@ -119,7 +123,15 @@ class PhoneStatePublisher(
                 "Could not update ${WearProtocol.PHONE_CAPABILITY_V2}; watches use the old protocol until the next change or restart",
             )
         }
+        return capabilityUpdated
     }
+
+    private data class Publication(
+        val enabled: Boolean,
+        val shared: Map<String, Stamped>,
+        val parts: PhoneStateParts,
+        val postedAt: Long?,
+    )
 
     private suspend fun adoptPreferencesFromWatches() {
         val adopted = mutableMapOf<String, Map<String, Stamped>>()
@@ -127,9 +139,13 @@ class PhoneStatePublisher(
             .documents(PeerRole.WATCH)
             .collect { documents ->
                 documents.forEach { (node, document) ->
-                    if (adopted[node] != document.shared && acceptsWatchPreferences(node, document)) {
+                    if (!acceptsWatchPreferences(node, document)) return@forEach
+                    if (adopted[node] != document.shared) {
                         adoptWatchPreferences(document.shared)
                         adopted[node] = document.shared
+                    }
+                    if (acceptsWatchPreferences(node, document)) {
+                        document.lastReminderAt?.let { adoptWatchReminderAt(node, it) }
                     }
                 }
             }

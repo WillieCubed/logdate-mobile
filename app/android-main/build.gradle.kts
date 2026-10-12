@@ -574,6 +574,7 @@ dependencies {
     androidTestImplementation(projects.shared.model)
     androidTestImplementation(libs.nav3.runtime)
     androidTestImplementation(libs.kotlin.test.junit)
+    androidTestImplementation(libs.play.services.wearable)
     androidTestImplementation(libs.play.services.location)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.kotlinx.datetime)
