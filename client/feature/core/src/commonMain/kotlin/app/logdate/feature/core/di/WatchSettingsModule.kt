@@ -7,6 +7,7 @@ import app.logdate.client.domain.watch.WatchSettingsRepository
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.ui.watch.WatchPeerSnapshotSource
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
+import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPreferencesViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -20,6 +21,7 @@ import org.koin.dsl.module
 val watchSettingsModule: Module =
     module {
         single<WatchSettingsRepository> { DefaultWatchSettingsRepository(get()) }
+        viewModel { WatchCompanionPreferencesViewModel(get()) }
         viewModel {
             WatchSettingsViewModel(
                 connectionManager = get(),

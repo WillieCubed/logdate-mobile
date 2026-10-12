@@ -58,4 +58,19 @@
     <!-- Watch privacy -->
     <string name="watch_privacy_title">Your data stays on your devices</string>
     <string name="watch_privacy_description">Entries captured on your watch sync directly to this phone over Bluetooth. Nothing is sent to the cloud unless you enable cloud sync separately.</string>
+    <string name="watch_library_section">On your watch</string>
+    <string name="watch_library_days">Days on your watch</string>
+    <string name="watch_library_days_value">%1$d days</string>
+    <string name="watch_library_on_this_day">On this day</string>
+    <string name="watch_library_on_this_day_description">Include moments from this date in past years.</string>
+    <string name="watch_library_rewind">Rewind</string>
+    <string name="watch_library_rewind_description">Include this week&apos;s Rewind.</string>
+    <string name="watch_capture_section">Capture</string>
+    <string name="watch_capture_places">Places</string>
+    <string name="watch_capture_places_description">Save places with watch captures when location access is allowed on your watch.</string>
+    <string name="watch_capture_mood">Mood after recording</string>
+    <string name="watch_capture_mood_description">Offer a mood check-in after saving a recording.</string>
+    <string name="watch_preferences_save_failed">Couldn&apos;t save your watch settings. Try again.</string>
+    <string name="watch_preferences_loading">Loading your watch settings…</string>
+    <string name="watch_library_days_cancel">Cancel</string>
 </resources>

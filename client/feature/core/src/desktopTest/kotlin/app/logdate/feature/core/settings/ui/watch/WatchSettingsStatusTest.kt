@@ -2,6 +2,7 @@
 
 package app.logdate.feature.core.settings.ui.watch
 
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onNodeWithText
@@ -15,6 +16,20 @@ import kotlin.test.Test
  */
 @OptIn(ExperimentalTestApi::class)
 class WatchSettingsStatusTest {
+    @Test
+    fun `installed watch displays companion controls when supplied`() =
+        runDesktopComposeUiTest(width = 411, height = 1600) {
+            setContent { WatchPage(WatchStatus.Ready("Pixel Watch", true), companionSettings = { Text("Companion controls") }) }
+            onNodeWithText("Companion controls").assertExists()
+        }
+
+    @Test
+    fun `uninstalled watch does not offer companion controls`() =
+        runDesktopComposeUiTest(width = 411, height = 1600) {
+            setContent { WatchPage(WatchStatus.NotInstalled("Pixel Watch"), companionSettings = { Text("Companion controls") }) }
+            onNodeWithText("Companion controls").assertDoesNotExist()
+        }
+
     @Test
     fun `a connected watch that reports nothing shows no sync status`() =
         runDesktopComposeUiTest(width = 411, height = 1600) {
@@ -86,10 +101,14 @@ class WatchSettingsStatusTest {
 }
 
 @Composable
-private fun WatchPage(status: WatchStatus) {
+private fun WatchPage(
+    status: WatchStatus,
+    companionSettings: (@Composable () -> Unit)? = null,
+) {
     LogDateTheme(dynamicColor = false, darkTheme = false) {
         WatchSettingsContent(
             status = status,
+            companionSettings = companionSettings,
             requestFailure = null,
             onBack = {},
             onBeginAssociation = {},

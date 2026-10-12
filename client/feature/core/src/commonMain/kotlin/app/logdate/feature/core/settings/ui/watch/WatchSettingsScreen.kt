@@ -27,9 +27,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPreferencesViewModel
+import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionSections
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
@@ -49,6 +55,7 @@ import logdate.client.feature.core.generated.resources.watch_sync_up_to_date
 import logdate.client.feature.core.generated.resources.watch_troubleshooting
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_description
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -59,6 +66,8 @@ fun WatchSettingsScreen(
     viewModel: WatchSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
+    val flags = koinInject<FeatureFlagStore>()
+    val redesign by remember(flags) { flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) }.collectAsState(false)
     val status by viewModel.status.collectAsState()
     val requestFailure by viewModel.requestFailure.collectAsState()
 
@@ -72,6 +81,30 @@ fun WatchSettingsScreen(
         onNavigateToNotifications = onNavigateToNotifications,
         onNavigateToTroubleshooting = onNavigateToTroubleshooting,
         modifier = modifier,
+        companionSettings =
+            if (redesign) {
+                { WatchCompanionSettings() }
+            } else {
+                null
+            },
+    )
+}
+
+@Composable
+private fun WatchCompanionSettings(viewModel: WatchCompanionPreferencesViewModel = koinViewModel()) {
+    val state by viewModel.state.collectAsState()
+    val saving by viewModel.saving.collectAsState()
+    val saveFailed by viewModel.saveFailed.collectAsState()
+    WatchCompanionSections(
+        state = state,
+        saving = saving,
+        saveFailed = saveFailed,
+        onDays = { viewModel.set(SharedPreferenceKey.WindowDays, it) },
+        onThisDay = { viewModel.set(SharedPreferenceKey.WindowOnThisDay, it) },
+        onRewind = { viewModel.set(SharedPreferenceKey.WindowRewind, it) },
+        onPlaces = { viewModel.set(SharedPreferenceKey.CapturePlaces, it) },
+        onMood = { viewModel.set(SharedPreferenceKey.MoodAfterRecording, it) },
+        modifier = Modifier.padding(horizontal = Spacing.lg),
     )
 }
 
@@ -86,6 +119,7 @@ fun WatchSettingsContent(
     onNavigateToNotifications: () -> Unit,
     onNavigateToTroubleshooting: () -> Unit,
     modifier: Modifier = Modifier,
+    companionSettings: (@Composable () -> Unit)? = null,
 ) {
     FoldableBookLayout(
         modifier = modifier.fillMaxSize(),
@@ -118,6 +152,7 @@ fun WatchSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
+                if (status.hasLogDate()) companionSettings?.invoke()
                 WatchConnectedSections(
                     status = status,
                     onRequestSync = onRequestSync,
@@ -142,6 +177,7 @@ fun WatchSettingsContent(
                     )
                 }
                 if (status.hasLogDate()) {
+                    companionSettings?.let { settings -> item { settings() } }
                     item {
                         WatchConnectedSections(
                             status = status,
