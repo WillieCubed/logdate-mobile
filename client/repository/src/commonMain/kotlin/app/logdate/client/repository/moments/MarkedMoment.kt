@@ -41,6 +41,13 @@ data class MarkedMoment(
     val syncVersion: Long,
 )
 
+/** Room and peer delivery identify mark clocks at millisecond precision. Normalize wire snapshots before merging stored projections. */
+fun MarkedMoment.atMillisecondPrecision(): MarkedMoment =
+    copy(
+        capturedAt = Instant.fromEpochMilliseconds(capturedAt.toEpochMilliseconds()),
+        lastUpdated = Instant.fromEpochMilliseconds(lastUpdated.toEpochMilliseconds()),
+    )
+
 interface MarkedMomentRepository {
     /** Marks waiting to be filled in, newest first; deleted marks are left out. */
     fun observeOpenMarks(): Flow<List<MarkedMoment>>

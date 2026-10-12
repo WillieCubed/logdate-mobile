@@ -271,6 +271,24 @@ class OfflineFirstMarkedMomentRepositoryTest {
             assertTrue(metadata.hasPending(EntityType.MOMENT, other.toString()))
         }
 
+    @Test fun `precise remote clocks become stable Room projections before identity checks`() =
+        runTest {
+            val remote =
+                row(Uuid.random()).toModel()!!.copy(
+                    capturedAt = Instant.parse("2026-10-12T12:00:00.123456789Z"),
+                    lastUpdated = Instant.parse("2026-10-12T12:01:00.987654321Z"),
+                )
+            val expected =
+                remote.copy(
+                    capturedAt = Instant.fromEpochMilliseconds(remote.capturedAt.toEpochMilliseconds()),
+                    lastUpdated = Instant.fromEpochMilliseconds(remote.lastUpdated.toEpochMilliseconds()),
+                )
+            assertEquals(expected, repository.applyFromSync(remote))
+            assertEquals(expected, repository.getMark(remote.id))
+            assertEquals(expected, repository.applyFromSync(remote))
+            assertTrue(metadata.getPendingUploads(EntityType.MOMENT).isEmpty())
+        }
+
     private fun row(id: Uuid) =
         MarkedMomentEntity(
             id = id,

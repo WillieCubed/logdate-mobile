@@ -7,6 +7,7 @@ import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.client.repository.moments.SyncableMarkedMomentRepository
+import app.logdate.client.repository.moments.atMillisecondPrecision
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.conflict.MarkedMomentConflictResolver
 import app.logdate.client.sync.metadata.EntityType
@@ -108,13 +109,14 @@ class OfflineFirstMarkedMomentRepository(
 
     override suspend fun applyFromSync(moment: MarkedMoment): MarkedMoment? =
         transactions.withTransaction {
+            val projection = moment.atMillisecondPrecision()
             val existing = dao.getById(moment.id)
             if (existing?.deletedAt != null) return@withTransaction null
             val local = existing?.toModel()
             if (existing != null && local == null) return@withTransaction null
             val merged =
                 try {
-                    if (local == null) moment else MarkedMomentConflictResolver().merge(local, moment)
+                    if (local == null) projection else MarkedMomentConflictResolver().merge(local, projection)
                 } catch (e: IllegalArgumentException) {
                     Napier.w("A remote marked moment disagrees with its stored capture identity", e)
                     return@withTransaction null
@@ -155,7 +157,7 @@ internal fun MarkedMomentEntity.toModel(): MarkedMoment? {
         originDeviceId = originDeviceId,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
-    )
+    ).atMillisecondPrecision()
 }
 
 private fun MarkedMomentEntity.locationOrNull(): MarkLocation? {

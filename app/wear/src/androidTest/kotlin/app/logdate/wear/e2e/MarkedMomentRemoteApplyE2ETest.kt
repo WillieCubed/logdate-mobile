@@ -193,4 +193,23 @@ class MarkedMomentRemoteApplyE2ETest {
             assertEquals(at, row.deletedAt)
             assertFalse(koin.get<SyncMetadataService>().hasPending(EntityType.MOMENT, incoming.id.toString()))
         }
+
+    @Test fun preciseRemoteCaptureReplaysAgainstRoomMillisecondIdentity() =
+        runBlocking {
+            val incoming =
+                remote().copy(
+                    capturedAt = Instant.parse("2026-10-12T12:00:00.123456789Z"),
+                    lastUpdated = Instant.parse("2026-10-12T12:01:00.987654321Z"),
+                )
+            val expected =
+                incoming.copy(
+                    capturedAt = Instant.fromEpochMilliseconds(incoming.capturedAt.toEpochMilliseconds()),
+                    lastUpdated = Instant.fromEpochMilliseconds(incoming.lastUpdated.toEpochMilliseconds()),
+                )
+            val repository = koin.get<SyncableMarkedMomentRepository>()
+            assertEquals(expected, repository.applyFromSync(incoming))
+            assertEquals(expected, repository.getMark(incoming.id))
+            assertEquals(expected, repository.applyFromSync(incoming))
+            assertEquals(expected, repository.getMark(incoming.id))
+        }
 }

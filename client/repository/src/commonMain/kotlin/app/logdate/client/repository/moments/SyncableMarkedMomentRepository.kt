@@ -12,6 +12,6 @@ interface SyncableMarkedMomentRepository : MarkedMomentRepository {
         serverVersion: Long,
     )
 
-    /** Returns the merged stored mark, or null when a tombstone or incompatible capture prevents applying it. */
+    /** Returns the merged millisecond-precision stored projection, or null when a tombstone or incompatible capture prevents applying it. */
     suspend fun applyFromSync(moment: MarkedMoment): MarkedMoment?
 }

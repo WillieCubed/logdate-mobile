@@ -50,6 +50,8 @@ Files: extend client/repository/.../moments/MarkedMoment.kt, client/data/.../mom
 
 ## Task 3: Encrypted cloud transport and sync-engine routing
 
+- [x] Verify precise encrypted clocks against actual Room storage: the codec remains lossless, while repository snapshots normalize to the existing millisecond storage/peer contract before capture-identity merge and return. Repeated delivery must match the persisted projection.
+
 - [x] Add encrypted moment codec with precise clocks, payload identity binding, account-key separation and fail-closed schema/state tests. Transport and routing remain below.
 
 Files: create client/sync/.../cloud/CloudMomentDataSource.kt and moment payload codec; extend CloudApiClient and its HTTP implementation with existing shared/model/.../sync/SyncModels.kt moment contracts. Extend sync upload/download runners and platform DI for EntityType.MOMENT.
@@ -59,7 +61,7 @@ Files: create client/sync/.../cloud/CloudMomentDataSource.kt and moment payload 
 - [x] Stage encrypted MOMENT pages and checkpoints before conversion; verify disk restart, exact-version acknowledgment, tombstone replacement, corrupt-wire retention, scope changes and authentication refusal propagation.
 - [ ] Route MOMENT creates/deletes on linked watches and merged edits through phone; do not drop unsupported outbox entries.
 - [x] Verify encrypted payload transport through actual server moment routes, linked session, conflicts and tombstones; save focused local commit. Full sync-engine and Room end-to-end acceptance remains below.
-- [ ] Verify engine routing with persisted Room rows and durable cursor recovery, beyond the transport integration. Explicitly verify the precision boundary between encrypted Instant payloads and Room millisecond timestamps.
+- [ ] Verify engine routing with persisted Room rows and durable cursor recovery, beyond the transport integration. The repository precision boundary is verified below; engine comparison and acknowledgment must use canonical stored projections.
 
 ## Task 4: Authenticated peer ingestion and return window
 
