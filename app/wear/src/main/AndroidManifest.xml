@@ -144,6 +144,7 @@
                     android:host="*"
                     android:pathPrefix="/logdate/link" />
                 <data android:path="/logdate/presence" />
+                <data android:path="/logdate/reminders/claim" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.NODE_MIGRATED" />

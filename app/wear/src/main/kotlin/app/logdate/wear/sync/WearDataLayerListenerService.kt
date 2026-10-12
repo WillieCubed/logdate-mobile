@@ -2,6 +2,7 @@ package app.logdate.wear.sync
 
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.domain.reminders.ReminderClaimResponder
 import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -98,7 +99,7 @@ class WearDataLayerListenerService : WearableListenerService() {
         path: String,
         request: ByteArray,
     ): ByteArray? {
-        if (!WatchLinkCoordinator.handles(path) && path != WearPaths.PRESENCE) {
+        if (!WatchLinkCoordinator.handles(path) && path != WearPaths.PRESENCE && path != WearPaths.REMINDERS_CLAIM) {
             Napier.w("The phone sent a request this watch does not answer: $path")
             return null
         }
@@ -107,7 +108,9 @@ class WearDataLayerListenerService : WearableListenerService() {
             Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the phone's link request fails and is tried again")
             return null
         }
-        return if (path == WearPaths.PRESENCE) {
+        return if (path == WearPaths.REMINDERS_CLAIM) {
+            koin.get<ReminderClaimResponder>().answer(nodeId, request)
+        } else if (path == WearPaths.PRESENCE) {
             koin.get<WearPresenceResponder>().answer(nodeId, request)
         } else {
             koin.get<WatchLinkCoordinator>().answer(nodeId, path, request)

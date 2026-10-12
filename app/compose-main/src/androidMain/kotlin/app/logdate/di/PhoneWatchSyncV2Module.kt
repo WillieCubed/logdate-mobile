@@ -83,6 +83,7 @@ val phoneWatchSyncV2Module =
     module {
         includes(phoneMomentSyncModule)
         includes(phoneWatchWindowModule)
+        includes(phoneReminderClaimsModule)
         single {
             val clients = PhoneLinkClientFactory(get(), get())
             LinkCodeMinter(sessions = get(), clientsFor = clients::capture)

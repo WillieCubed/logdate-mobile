@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.domain.reminders.ReminderClaimResponder
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.remote.RemoteCameraActivity
 import app.logdate.client.remote.RemoteCameraSessionController
@@ -246,6 +247,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         when {
             path == WearPaths.RECEIPTS && receiptsActive() -> resolveKoin()?.get<WatchReceiptResponder>()?.answer(nodeId, request)
             path == WearPaths.WINDOW_RESYNC -> resolveKoin()?.get<WindowResyncResponder>()?.answer(nodeId, request)
+            path == WearPaths.REMINDERS_CLAIM -> resolveKoin()?.get<ReminderClaimResponder>()?.answer(nodeId, request)
             else -> readChannels.answer(nodeId, path, request)
         }
 

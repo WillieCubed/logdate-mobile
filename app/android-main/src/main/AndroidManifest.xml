@@ -309,6 +309,7 @@
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/media/info" />
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/media/range" />
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/window/body" />
+                <data android:scheme="wear" android:host="*" android:path="/logdate/reminders/claim" />
             </intent-filter>
         </service>
 

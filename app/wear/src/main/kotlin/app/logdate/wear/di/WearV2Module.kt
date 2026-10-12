@@ -105,6 +105,7 @@ import kotlin.uuid.Uuid
 /** Koin module for the redesigned watch app. Only the new app's screens resolve anything from it. */
 val wearV2Module =
     module {
+        includes(wearReminderClaimsModule)
         single<HapticsPreferenceStore> {
             SharedPreferencesHapticsPreferenceStore(
                 get<Context>().getSharedPreferences(SharedPreferencesHapticsPreferenceStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
