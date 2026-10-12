@@ -1,7 +1,6 @@
 package app.logdate.integration.e2e.harness
 
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
-import app.logdate.server.di.initializeDatabase
 import app.logdate.server.module
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import io.ktor.client.HttpClient
@@ -26,61 +25,65 @@ data class ServerClientE2EHarness(
     private val engine: EmbeddedServer<*, *>,
 ) : AutoCloseable {
     override fun close() {
-        httpClient.close()
-        engine.stop(gracePeriodMillis = 500, timeoutMillis = 5_000)
+        try {
+            httpClient.close()
+        } finally {
+            engine.stop(gracePeriodMillis = 500, timeoutMillis = 5_000)
+        }
     }
 }
 
 suspend fun <T> withServerClientHarness(
     serverPort: Int? = null,
     block: suspend ServerClientE2EHarness.() -> T,
-): T {
-    val json =
-        Json {
-            prettyPrint = false
-            isLenient = true
-            ignoreUnknownKeys = true
-        }
+): T =
+    withHarnessDatabase { databaseAvailable ->
+        val json =
+            Json {
+                prettyPrint = false
+                isLenient = true
+                ignoreUnknownKeys = true
+            }
 
-    require(serverPort == null || serverPort in 1..65535) { "serverPort must be between 1 and 65535" }
-    val port = serverPort ?: ServerSocket(0).use { it.localPort }
-    val host = "127.0.0.1"
-    val databaseConfigured = !System.getenv("DATABASE_URL").isNullOrBlank()
-    val databaseAvailable = databaseConfigured && initializeDatabase()
-    check(!databaseConfigured || databaseAvailable) {
-        "DATABASE_URL is set but the database could not be initialized."
-    }
-    val engine =
-        embeddedServer(Netty, host = host, port = port) {
-            module(isDatabaseAvailable = databaseAvailable)
-        }
+        require(serverPort == null || serverPort in 1..65535) { "serverPort must be between 1 and 65535" }
+        val port = serverPort ?: ServerSocket(0).use { it.localPort }
+        val host = "127.0.0.1"
+        val engine =
+            embeddedServer(Netty, host = host, port = port) {
+                module(isDatabaseAvailable = databaseAvailable)
+            }
 
-    engine.start(wait = false)
-    waitForServerStartup(host, port)
+        var harness: ServerClientE2EHarness? = null
+        try {
+            engine.start(wait = false)
+            waitForServerStartup(host, port)
 
-    val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "http://$host:$port")
-    val baseUrl = configRepository.getCurrentApiBaseUrl()
-    val httpClient =
-        HttpClient(OkHttp) {
-            install(ContentNegotiation) {
-                ktorJson(json)
+            val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "http://$host:$port")
+            val baseUrl = configRepository.getCurrentApiBaseUrl()
+            val httpClient =
+                HttpClient(OkHttp) {
+                    install(ContentNegotiation) {
+                        ktorJson(json)
+                    }
+                }
+            val apiClient = LogDateCloudApiClient(configRepository = configRepository, httpClient = httpClient)
+            harness =
+                ServerClientE2EHarness(
+                    baseUrl = baseUrl,
+                    apiClient = apiClient,
+                    httpClient = httpClient,
+                    engine = engine,
+                )
+
+            harness.block()
+        } finally {
+            if (harness != null) {
+                harness.close()
+            } else {
+                engine.stop(gracePeriodMillis = 500, timeoutMillis = 5_000)
             }
         }
-    val apiClient = LogDateCloudApiClient(configRepository = configRepository, httpClient = httpClient)
-    val harness =
-        ServerClientE2EHarness(
-            baseUrl = baseUrl,
-            apiClient = apiClient,
-            httpClient = httpClient,
-            engine = engine,
-        )
-
-    return try {
-        harness.block()
-    } finally {
-        harness.close()
     }
-}
 
 private fun waitForServerStartup(
     host: String,

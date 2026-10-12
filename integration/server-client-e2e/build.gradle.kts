@@ -24,6 +24,7 @@ dependencies {
     testImplementation(projects.client.repository)
     testImplementation(projects.client.logdateDatastore)
     testImplementation(libs.sqlite.bundled)
+    testImplementation(libs.exposed.jdbc)
     testImplementation(projects.shared.config)
     testImplementation(projects.shared.model)
 
