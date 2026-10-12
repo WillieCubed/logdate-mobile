@@ -6,6 +6,7 @@ import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.metadata.CloudEligibility
 import app.logdate.client.sync.peer.link.LinkInstaller
+import app.logdate.wear.sync.v2.delivery.ReleasedToCloud
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -14,6 +15,7 @@ import org.koin.core.qualifier.named
 import org.koin.java.KoinJavaComponent
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 
 /**
  * Resolves the watch's version 2 sync graph the way the installed app builds it, so a missing binding
@@ -34,7 +36,7 @@ class WearKoinGraphTest {
     fun linkBindingsResolveWithoutMintingAnIdentity() {
         koin.get<WatchLinkCoordinator>()
         koin.get<LinkInstaller>()
-        koin.get<CloudEligibility>(named("watchCloud"))
+        assertSame(koin.get<ReleasedToCloud>(), koin.get<CloudEligibility>(named("watchCloud")))
 
         assertFalse(runBlocking { koin.get<IdentityKeyManager>().hasIdentityKey() })
     }

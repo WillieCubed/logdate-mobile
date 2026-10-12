@@ -9,10 +9,13 @@ import app.logdate.client.networking.saver.NetworkSaverState
 import app.logdate.client.sensor.battery.BatteryInfoProvider
 import app.logdate.client.sensor.battery.BatteryState
 import app.logdate.client.sync.datalayer.v2.CloudPresence
+import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.peer.delivery.PhoneReach
 import app.logdate.client.sync.peer.delivery.RouteConditions
 import app.logdate.client.sync.peer.delivery.WatchNetwork
 import app.logdate.client.sync.peer.link.LinkProblem
+import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.ServerDescriptor
@@ -39,10 +42,24 @@ class WatchRouteConditionsTest {
     private val transport = mockk<DataLayerTransportV2>()
     private var bound: OriginBoundSession? = OriginBoundSession("https://logdate.test", UserSession("access", "refresh", "account"))
     private val sessions = mockk<SessionStorage>()
-    private val conditions = WatchRouteConditions(transport, { CloudPresence.SIGNED_IN }, links, config, network, battery, sessions)
+    private val linkId = LinkWire.encodeKey(ByteArray(32) { 1 })
+    private var enabled = true
+    private var captured = PeerDeliveryContext(linkId, "phone-node", "watch-node", LinkMode.CLOUD, "account", "https://logdate.test")
+    private val peers = WatchDeliveryPeer(links, sessions, config, { "watch-node" }, { enabled })
+    private val conditions get() =
+        WatchRouteConditions(
+            transport,
+            { CloudPresence.SIGNED_IN },
+            config,
+            network,
+            battery,
+            captured,
+            peers,
+        )
 
     init {
         every { sessions.getOriginBoundSession() } answers { bound }
+        every { sessions.getSession() } answers { bound?.session }
         every { config.getCurrentBackendUrl() } returns "https://logdate.test"
         coEvery { transport.reach() } returns PhoneReach.RELAY_ONLY
         every { config.getCurrentServerDescriptor() } returns
@@ -54,7 +71,7 @@ class WatchRouteConditionsTest {
     @Test
     fun `a watch linked to the account on a ready server over wifi may upload`() =
         runTest {
-            links.saveCloudLink("phone-node", "account", "https://logdate.test")
+            links.saveCloudLink("phone-node", "account", "https://logdate.test", linkId = linkId)
 
             assertEquals(
                 RouteConditions(
@@ -80,7 +97,7 @@ class WatchRouteConditionsTest {
     @Test
     fun `a link with a problem is not linked`() =
         runTest {
-            links.saveCloudLink("phone-node", "account", "https://logdate.test")
+            links.saveCloudLink("phone-node", "account", "https://logdate.test", linkId = linkId)
             links.recordProblem("phone-node", LinkProblem.SESSION_REVOKED)
 
             assertFalse(conditions.current().linked)
@@ -204,7 +221,8 @@ class WatchRouteConditionsTest {
     fun `pair only routing still reaches the phone without cloud credentials`() =
         runTest {
             bound = null
-            links.savePairing("phone-node", ByteArray(32))
+            captured = captured.copy(mode = LinkMode.PAIR, accountId = null, serverOrigin = null)
+            links.savePairing("phone-node", ByteArray(32), linkId = linkId)
             val current = conditions.current()
             assertEquals(PhoneReach.RELAY_ONLY, current.phone)
             assertFalse(current.linked)
@@ -221,7 +239,48 @@ class WatchRouteConditionsTest {
             assertClosed()
         }
 
-    private suspend fun link() = links.saveCloudLink("phone-node", "account", "https://logdate.test")
+    @Test
+    fun `a link without a verified exchange cannot authorize routing`() =
+        runTest {
+            links.saveCloudLink("phone-node", "account", "https://logdate.test")
+            assertClosed()
+        }
+
+    @Test
+    fun `a renewed exchange cannot inherit an earlier run's routing conditions`() =
+        runTest {
+            links.saveCloudLink("phone-node", "account", "https://logdate.test", LinkWire.encodeKey(ByteArray(32) { 2 }))
+            assertClosed()
+        }
+
+    @Test
+    fun `disabling the experience closes the captured route`() =
+        runTest {
+            link()
+            enabled = false
+            assertClosed()
+        }
+
+    @Test
+    fun `a raw session different from the installed session closes routing`() =
+        runTest {
+            link()
+            every { sessions.getSession() } returns UserSession("other-access", "other-refresh", "account")
+            assertClosed()
+        }
+
+    @Test
+    fun `renewing the exchange during network lookup closes the captured route`() =
+        runTest {
+            link()
+            coEvery { network.getCurrentDataSaverState() } coAnswers {
+                links.saveCloudLink("phone-node", "account", "https://logdate.test", LinkWire.encodeKey(ByteArray(32) { 2 }))
+                NetworkSaverState(false, NetworkConnectionType.WIFI)
+            }
+            assertClosed()
+        }
+
+    private suspend fun link() = links.saveCloudLink("phone-node", "account", "https://logdate.test", linkId = linkId)
 
     private suspend fun assertClosed() {
         val current = conditions.current()

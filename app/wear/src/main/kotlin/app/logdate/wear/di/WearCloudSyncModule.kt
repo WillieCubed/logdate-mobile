@@ -51,6 +51,7 @@ import app.logdate.client.sync.recovery.DurableCloudApiClient
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.wear.sync.v2.cloud.WatchCloudAccountRepository
+import app.logdate.wear.sync.v2.delivery.ReleasedToCloud
 import app.logdate.wear.sync.v2.link.WatchLinkStore
 import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
@@ -98,7 +99,8 @@ val wearCloudSyncModule =
         single<CloudAccountRepository>(WatchCloud) {
             WatchCloudAccountRepository(api = get(WatchCloud), config = get())
         }
-        single<CloudEligibility>(WatchCloud) { CloudEligibility { _, _ -> false } }
+        single { ReleasedToCloud(ledger = get(), peers = get(), outbox = get()) }
+        single<CloudEligibility>(WatchCloud) { get<ReleasedToCloud>() }
         single<JournalContentRepository>(WatchCloud) {
             OfflineFirstJournalContentRepository(get(), get(), get(), syncMetadataService = get())
         }
