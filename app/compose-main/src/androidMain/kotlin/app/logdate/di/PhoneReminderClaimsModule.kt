@@ -6,6 +6,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.recommendation.AmbientPromptHistoryRepository
 import app.logdate.client.domain.reminders.CoordinatedReminderClaims
 import app.logdate.client.domain.reminders.DeviceReminderBudget
+import app.logdate.client.domain.reminders.LearnedReminderHours
 import app.logdate.client.domain.reminders.PhoneReminderDelivery
 import app.logdate.client.domain.reminders.PhoneReminderPreflight
 import app.logdate.client.domain.reminders.PhoneReminderSnapshotSource
@@ -78,6 +79,7 @@ val phoneReminderClaimsModule =
             val ambientHistory = get<AmbientPromptHistoryRepository>()
             val peers = get<PhoneDeliveryPeers>()
             val notifier = get<PhoneMomentReminderNotifier>()
+            val hours = get<LearnedReminderHours>()
             PhoneReminderDelivery(
                 budget = get(),
                 history = get(),
@@ -92,6 +94,7 @@ val phoneReminderClaimsModule =
                 },
                 supplementalPosted = { ambientHistory.recordShown(it) },
                 preflight = { if (sourceOverride == null) preflight.check() else null },
+                refreshWakingHours = hours::refresh,
             )
         }
         single { ReminderClaimResponder(get(), PeerRole.PHONE) }

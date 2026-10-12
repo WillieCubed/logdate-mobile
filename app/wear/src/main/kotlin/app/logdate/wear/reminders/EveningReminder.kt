@@ -6,6 +6,8 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import app.logdate.client.domain.reminders.WakingHours
+import app.logdate.client.domain.reminders.WakingWindow
 import app.logdate.client.domain.today.TodaySummaryCalculator
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.sync.PhoneReachability
@@ -18,10 +20,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
-import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -34,11 +34,15 @@ import kotlin.time.Instant
 fun nextEveningCheck(
     now: Instant,
     timeZone: TimeZone,
+    hours: WakingHours = WakingHours.Fallback,
 ): Instant {
     val today = now.toLocalDateTime(timeZone).date
-    val tonight = LocalDateTime(today, WatchReminderRules.EVENING_CHECK).toInstant(timeZone)
-    if (now < tonight) return tonight
-    return LocalDateTime(today.plus(1, DateTimeUnit.DAY), WatchReminderRules.EVENING_CHECK).toInstant(timeZone)
+    return (-1..2)
+        .map { offset ->
+            val window = WakingWindow.startingOn(today.plus(offset, DateTimeUnit.DAY), timeZone, hours)
+            maxOf(window.start, window.end - WatchReminderRules.EVENING_LEAD)
+        }.filter { it > now }
+        .min()
 }
 
 interface EveningReminderWork {
@@ -86,15 +90,16 @@ class EveningReminderScheduler(
     private val work: EveningReminderWork,
     private val clock: Clock = Clock.System,
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    private val hours: () -> WakingHours = { WakingHours.Fallback },
 ) {
     fun scheduleNext(replace: Boolean = true) {
         val now = clock.now()
-        work.runAfter((nextEveningCheck(now, timeZone()) - now).inWholeMilliseconds, replace)
+        work.runAfter((nextEveningCheck(now, timeZone(), hours()) - now).inWholeMilliseconds, replace)
     }
 
     fun ensureScheduled() {
         val now = clock.now()
-        work.ensureAfter((nextEveningCheck(now, timeZone()) - now).inWholeMilliseconds)
+        work.ensureAfter((nextEveningCheck(now, timeZone(), hours()) - now).inWholeMilliseconds)
     }
 
     fun cancel() = work.cancel()

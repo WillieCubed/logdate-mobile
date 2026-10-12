@@ -33,6 +33,49 @@ import kotlin.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneStatePublisherTest {
     @Test
+    fun `learned waking hours are published as phone owned state`() =
+        runTest {
+            val hours =
+                app.logdate.client.sync.peer.state
+                    .ReminderHours(32_400, 7_200)
+            val publisher = PhoneStatePublisher(enabled, channel, capabilities, peerStates)
+            publisher.publish(
+                true,
+                shared = mapOf("reminders.enabled" to Stamped(JsonPrimitive(true), 900)),
+                current = PhoneStateParts(reminderHours = hours),
+            )
+            assertEquals(
+                hours,
+                channel.published
+                    .last()
+                    .phone
+                    ?.reminderHours,
+            )
+        }
+
+    @Test fun `stale learned hours cannot be published after rollout or consent is off`() =
+        runTest {
+            val hours =
+                app.logdate.client.sync.peer.state
+                    .ReminderHours(32_400, 7_200)
+            val publisher = PhoneStatePublisher(enabled, channel, capabilities, peerStates)
+            for ((rollout, consent) in listOf(false to true, true to false)) {
+                publisher.publish(
+                    rollout,
+                    shared = mapOf("reminders.enabled" to Stamped(JsonPrimitive(consent), 900)),
+                    current = PhoneStateParts(reminderHours = hours),
+                )
+                assertEquals(
+                    null,
+                    channel.published
+                        .last()
+                        .phone
+                        ?.reminderHours,
+                )
+            }
+        }
+
+    @Test
     fun `unlinked watch preferences cannot shadow the verified watch`() =
         runTest {
             val publisher =

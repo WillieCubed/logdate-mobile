@@ -7,6 +7,22 @@ import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.minutes
 
 class EveningReminderTest {
+    @Test fun `night owl evening check crosses midnight`() {
+        val learned =
+            app.logdate.client.domain.reminders
+                .WakingHours(kotlinx.datetime.LocalTime(9, 0), kotlinx.datetime.LocalTime(2, 0))
+        assertEquals(berlin(11, 0), nextEveningCheck(berlin(10, 21), REMINDER_ZONE, learned))
+    }
+
+    @Test fun `learned evening preserves elapsed lead across daylight saving transition`() {
+        val learned =
+            app.logdate.client.domain.reminders
+                .WakingHours(kotlinx.datetime.LocalTime(9, 0), kotlinx.datetime.LocalTime(4, 0))
+        val now = LocalDateTime(2026, 10, 24, 21, 0).toInstant(REMINDER_ZONE)
+        val sleep = LocalDateTime(2026, 10, 25, 4, 0).toInstant(REMINDER_ZONE)
+        assertEquals(sleep - 120.minutes, nextEveningCheck(now, REMINDER_ZONE, learned))
+    }
+
     @Test
     fun `before 20 30 the check runs tonight`() {
         assertEquals(berlin(10, 20, 30), nextEveningCheck(berlin(10, 18), REMINDER_ZONE))

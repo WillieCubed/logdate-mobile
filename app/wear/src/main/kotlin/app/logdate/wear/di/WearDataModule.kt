@@ -56,6 +56,7 @@ import app.logdate.wear.health.UnavailableWearHealthSensorManager
 import app.logdate.wear.health.WearHealthSensorManager
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.reminders.SharedWatchReminderSettings
+import app.logdate.wear.reminders.WatchReminderHours
 import app.logdate.wear.reminders.WatchReminderPreferences
 import app.logdate.wear.reminders.WatchReminders
 import app.logdate.wear.sync.CapabilityPhoneReachability
@@ -176,6 +177,10 @@ val wearDataModule =
             SharedWatchReminderSettings(get(), get(), acceptsPhone = { peers.current()?.phoneNode == it })
         }
         single {
+            val peers = get<WatchDeliveryPeer>()
+            WatchReminderHours(get(), acceptsPhone = { peers.current()?.phoneNode == it })
+        }
+        single {
             WatchPeerLink(
                 dataLayerClient = get(),
                 dataClient = Wearable.getDataClient(get<Context>()),
@@ -187,6 +192,7 @@ val wearDataModule =
             val shared = get<StampedPreferenceStore>()
             val reminders = get<SharedWatchReminderSettings>()
             val controller = get<WatchReminders>()
+            val hours = get<WatchReminderHours>()
             WatchStateMirror(
                 featureFlags = get(),
                 channel = get(),
@@ -195,8 +201,15 @@ val wearDataModule =
                 merger = get(),
                 ownState = get<WatchOwnState>().observe(),
                 sharedPreferences = shared.observe(),
-                initializeShared = reminders::initialize,
-                adoptPhonePreferences = { node, document -> if (reminders.adopt(node, document)) controller.restore() },
+                initializeShared = {
+                    reminders.initialize()
+                    hours.initialize()
+                },
+                adoptPhonePreferences = { node, document ->
+                    val changed = reminders.adopt(node, document)
+                    val hoursChanged = hours.adopt(node, document)
+                    if (changed || hoursChanged) controller.restore(rescheduleEvening = hoursChanged)
+                },
                 lastReminderAt = get<WatchReminderPreferences>().observeLastReminderAt().map { it?.toEpochMilliseconds() },
             )
         }

@@ -59,7 +59,7 @@ class PhoneReminderDeliveryTest {
     private val postedHistory = mutableListOf<AmbientPromptCandidate>()
     private val phonePosts = mutableListOf<Pair<ReminderTrigger, Int>>()
 
-    private fun delivery() =
+    private fun delivery(refresh: () -> Unit = {}) =
         PhoneReminderDelivery(
             budget,
             history,
@@ -118,6 +118,7 @@ class PhoneReminderDeliveryTest {
                 phoneSucceeds
             },
             supplementalPosted = { postedHistory.add(it) },
+            refreshWakingHours = refresh,
             preflight = {
                 PhoneReminderPreflight(
                     { PhoneReminderEnvironment(state.audience, state.signals.enabled, false, TimeZone.UTC, state.clock.dayStartHour) },
@@ -127,6 +128,15 @@ class PhoneReminderDeliveryTest {
                 ).check()
             },
         )
+
+    @Test fun `evaluations refresh waking hours even when delivery is skipped`() =
+        runTest {
+            state = state.copy(signals = state.signals.copy(enabled = false))
+            var refreshed = false
+            assertEquals(PhoneReminderOutcome.SKIPPED, delivery { refreshed = true }.run())
+            assertTrue(refreshed)
+            assertEquals(0, snapshotReads)
+        }
 
     private fun linked(
         supported: Boolean = true,

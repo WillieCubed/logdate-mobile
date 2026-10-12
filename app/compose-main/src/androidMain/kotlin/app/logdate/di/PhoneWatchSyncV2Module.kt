@@ -7,6 +7,7 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
+import app.logdate.client.domain.reminders.LearnedReminderHours
 import app.logdate.client.domain.reminders.ReminderPostedHistory
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
@@ -38,6 +39,7 @@ import app.logdate.client.sync.peer.link.SecureStoragePairKeyVault
 import app.logdate.client.sync.peer.state.PeerCapabilityPresence
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
+import app.logdate.client.sync.peer.state.ReminderHours
 import app.logdate.client.sync.v2.PhoneStateParts
 import app.logdate.client.sync.v2.PhoneStatePublisher
 import app.logdate.client.sync.v2.link.AccountKeySource
@@ -102,6 +104,7 @@ val phoneWatchSyncV2Module =
             val campfire = get<ObserveCampfireUseCase>()
             val peers = get<PhoneDeliveryPeers>()
             val history = get<ReminderPostedHistory>()
+            val hours = get<LearnedReminderHours>()
             PhoneStatePublisher(
                 v2Enabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                 channel = get(),
@@ -124,11 +127,12 @@ val phoneWatchSyncV2Module =
                         WearFeatures.MEDIA_RANGE,
                     ),
                 parts =
-                    combine(sessions.getSessionFlow(), campfire()) { session, fire ->
+                    combine(sessions.getSessionFlow(), campfire(), hours.observe()) { session, fire, waking ->
                         PhoneStateParts(
                             cloud = cloudPresence(session),
                             dayStartHour = preferences.getPreferences().dayStartHour ?: DEFAULT_STREAK_DAY_START_HOUR,
                             campfire = fire?.toSnapshot(Clock.System.now()),
+                            reminderHours = waking?.let { ReminderHours(it.wake.toSecondOfDay(), it.sleep.toSecondOfDay()) },
                         )
                     },
             )

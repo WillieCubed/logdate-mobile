@@ -44,6 +44,7 @@ data class PhoneState(
     val zone: String? = null,
     val openMarks: Int = 0,
     val features: Set<String> = emptySet(),
+    val reminderHours: ReminderHours? = null,
 )
 
 @Serializable

@@ -107,7 +107,7 @@ object ReminderOrchestrator {
 }
 
 /** The waking hours that contain an instant, as instants, so a bedtime after midnight and DST both work. */
-internal data class WakingWindow(
+data class WakingWindow(
     val start: Instant,
     val end: Instant,
 ) {
@@ -124,7 +124,7 @@ internal data class WakingWindow(
                 .firstOrNull { window -> now >= window.start && now < window.end }
         }
 
-        private fun startingOn(
+        fun startingOn(
             date: LocalDate,
             zone: TimeZone,
             hours: WakingHours,

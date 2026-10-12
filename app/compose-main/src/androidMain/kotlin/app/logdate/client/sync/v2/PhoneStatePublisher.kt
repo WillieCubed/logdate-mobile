@@ -2,6 +2,7 @@ package app.logdate.client.sync.v2
 
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.streak.CampfireState
+import app.logdate.client.domain.watch.SharedPreferenceKey
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocol
@@ -29,6 +30,7 @@ data class PhoneStateParts(
     val cloud: CloudPresence = CloudPresence.UNKNOWN,
     val dayStartHour: Int = 0,
     val campfire: CampfireSnapshot? = null,
+    val reminderHours: app.logdate.client.sync.peer.state.ReminderHours? = null,
 )
 
 /** The campfire as the phone computed it; the watch's window is too short to compute a long run itself. */
@@ -100,6 +102,10 @@ class PhoneStatePublisher(
                         cloud = current.cloud,
                         dayStartHour = current.dayStartHour,
                         campfire = current.campfire,
+                        reminderHours =
+                            current.reminderHours.takeIf {
+                                v2Enabled && SharedPreferenceKey.RemindersEnabled.read(shared[SharedPreferenceKey.RemindersEnabled.name])
+                            },
                     ),
                 shared = shared,
                 lastReminderAt = postedAt,

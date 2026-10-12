@@ -1,5 +1,6 @@
 package app.logdate.wear.reminders
 
+import app.logdate.client.domain.reminders.WakingHours
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -15,12 +16,14 @@ class WatchReminderDispatcher(
     private val clock: Clock = Clock.System,
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
     private val authorize: suspend () -> Boolean = { true },
+    private val hours: () -> WakingHours = { WakingHours.Fallback },
+    private val initializeHours: suspend () -> Unit = {},
 ) {
     private val mutex = Mutex()
 
     suspend fun onWorkoutEnded(endedAt: Instant): Boolean =
         deliverIfDue(WatchReminder.WORKOUT_ENDED) { now ->
-            WatchReminderRules.workoutReminderDue(now, endedAt, preferences.lastReminderAt(), timeZone())
+            WatchReminderRules.workoutReminderDue(now, endedAt, preferences.lastReminderAt(), timeZone(), hours())
         }
 
     suspend fun onEveningCheck(
@@ -28,7 +31,7 @@ class WatchReminderDispatcher(
         momentsToday: Int,
     ): Boolean =
         deliverIfDue(WatchReminder.EVENING) { now ->
-            WatchReminderRules.eveningReminderDue(now, preferences.lastReminderAt(), momentsToday, phoneReachable, timeZone())
+            WatchReminderRules.eveningReminderDue(now, preferences.lastReminderAt(), momentsToday, phoneReachable, timeZone(), hours())
         }
 
     private suspend fun authorized(): Boolean =
@@ -46,6 +49,7 @@ class WatchReminderDispatcher(
         due: (Instant) -> Boolean,
     ): Boolean =
         mutex.withLock {
+            initializeHours()
             if (!preferences.enabled.value || !due(clock.now()) || !authorized()) return@withLock false
             val now = clock.now()
             if (!preferences.enabled.value || !due(now) || !notifier.post(reminder)) return@withLock false

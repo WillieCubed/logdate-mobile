@@ -42,8 +42,10 @@ class PhoneReminderDelivery(
     private val postSupplemental: (AmbientPromptCandidate, Int, LocalDate) -> Boolean = { _, _, _ -> false },
     private val supplementalPosted: suspend (AmbientPromptCandidate) -> Unit = {},
     private val preflight: suspend () -> PhoneReminderOutcome? = { null },
+    private val refreshWakingHours: () -> Unit = {},
 ) {
     suspend fun run(): PhoneReminderOutcome {
+        refreshWakingHours()
         preflight()?.let { return it }
         val initial = snapshot.read()
         if (initial.audience.isBlank()) return PhoneReminderOutcome.HELD

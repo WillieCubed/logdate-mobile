@@ -1,5 +1,7 @@
 package app.logdate.di
 
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
@@ -7,11 +9,14 @@ import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.reminders.CampfireFadeDetector
+import app.logdate.client.domain.reminders.LearnedReminderHours
 import app.logdate.client.domain.reminders.LivePhoneReminderSnapshotSource
 import app.logdate.client.domain.reminders.NovelPlaceArrivalDetector
 import app.logdate.client.domain.reminders.PhoneReminderSnapshotSource
 import app.logdate.client.domain.reminders.SupplementalReminderSource
 import app.logdate.client.domain.reminders.WindDownTimeResolver
+import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.client.domain.watch.WatchPreferencesRepository
 import app.logdate.client.health.AndroidSleepRepository
 import app.logdate.client.health.SleepRepository
 import app.logdate.client.permissions.PermissionManager
@@ -20,6 +25,7 @@ import app.logdate.client.reminders.PhoneReminderEnvironmentReader
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.moments.MarkedMomentRepository
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
@@ -30,6 +36,20 @@ val phoneReminderSignalsModule =
     module {
         single<SleepRepository> { AndroidSleepRepository(androidContext()) }
         factory { WindDownTimeResolver(get()) }
+        single {
+            val flags = get<FeatureFlagStore>()
+            val shared = get<WatchPreferencesRepository>()
+            LearnedReminderHours(
+                enabled =
+                    combine(flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2), shared.observe(SharedPreferenceKey.RemindersEnabled)) {
+                        rollout,
+                        reminders,
+                        ->
+                        rollout && reminders
+                    },
+                resolver = get(),
+            )
+        }
         factory { CampfireFadeDetector(get(), get()) }
         single {
             val stops = get<ObserveLocationStopsUseCase>()

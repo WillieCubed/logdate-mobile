@@ -47,6 +47,7 @@ import app.logdate.wear.reminders.SharedPreferencesWatchReminderPreferences
 import app.logdate.wear.reminders.SharedWatchReminderSettings
 import app.logdate.wear.reminders.WatchNudgeNotifier
 import app.logdate.wear.reminders.WatchReminderDispatcher
+import app.logdate.wear.reminders.WatchReminderHours
 import app.logdate.wear.reminders.WatchReminderPreferences
 import app.logdate.wear.reminders.WatchReminders
 import app.logdate.wear.reminders.WearPresenceResponder
@@ -312,9 +313,12 @@ val wearV2Module =
             val budget = get<DeviceReminderBudget>()
             val peers = get<WatchDeliveryPeer>()
             val states = get<PeerStateStore>()
+            val hours = get<WatchReminderHours>()
             WatchReminderDispatcher(
                 preferences = get(),
                 notifier = get(),
+                hours = { hours.current },
+                initializeHours = hours::initialize,
                 authorize = authorize@{
                     val peer = peers.current()
                     val phone = states.documents(PeerRole.PHONE).first()[peer?.phoneNode]?.phone
@@ -352,6 +356,7 @@ val wearV2Module =
         single {
             val experience = get<FeatureSwitch>()
             val shared = get<SharedWatchReminderSettings>()
+            val hours = get<WatchReminderHours>()
             WatchReminders(
                 preferences = get(),
                 activity = get(),
@@ -360,10 +365,14 @@ val wearV2Module =
                 experienceEnabled = { experience.isOn },
                 awaitExperience = experience::awaitReady,
                 writeSharedChoice = shared::persistChoice,
+                initializeHours = hours::initialize,
             )
         }
         single<EveningReminderWork> { WorkManagerEveningReminderWork(WorkManager.getInstance(get<Context>())) }
-        single { EveningReminderScheduler(work = get()) }
+        single {
+            val hours = get<WatchReminderHours>()
+            EveningReminderScheduler(work = get(), hours = { hours.current })
+        }
 
         single { SurfaceUpdater(refresher = AndroidSurfaceRefresher(get()), scope = get()) }
         single { SurfaceComponents(PackageManagerComponentSwitch(get())) }

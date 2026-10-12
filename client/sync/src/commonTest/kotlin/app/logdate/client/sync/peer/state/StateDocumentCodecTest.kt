@@ -12,6 +12,11 @@ import kotlin.test.assertIs
  * Tests [StateDocumentCodec], the per-device document at `/logdate/state`.
  */
 class StateDocumentCodecTest {
+    @Test fun `optional learned waking hours survive the state protocol`() {
+        val document = phoneDocument.copy(phone = phoneDocument.phone?.copy(reminderHours = ReminderHours(32_400, 7_200)))
+        assertEquals(Decoded.Supported(document), StateDocumentCodec.decode(StateDocumentCodec.encode(document)))
+    }
+
     @Test
     fun `a watch's link problem reads back and is left out when there is none`() {
         val failed =

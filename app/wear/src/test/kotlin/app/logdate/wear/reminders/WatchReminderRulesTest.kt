@@ -5,6 +5,24 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WatchReminderRulesTest {
+    private val learned =
+        app.logdate.client.domain.reminders.WakingHours(
+            kotlinx.datetime.LocalTime(9, 0),
+            kotlinx.datetime.LocalTime(2, 0),
+        )
+
+    @Test fun `learned night owl hours include after midnight and exclude late morning sleep`() {
+        assertTrue(WatchReminderRules.isWaking(berlin(11, 1), REMINDER_ZONE, learned))
+        assertFalse(WatchReminderRules.isWaking(berlin(11, 8), REMINDER_ZONE, learned))
+        assertFalse(WatchReminderRules.isWaking(berlin(11, 2), REMINDER_ZONE, learned))
+    }
+
+    @Test fun `learned evening is before learned sleep rather than fixed twenty thirty`() {
+        assertFalse(WatchReminderRules.eveningReminderDue(berlin(10, 21), null, 0, false, REMINDER_ZONE, learned))
+        assertTrue(WatchReminderRules.eveningReminderDue(berlin(11, 0), null, 0, false, REMINDER_ZONE, learned))
+        assertTrue(WatchReminderRules.workoutReminderDue(berlin(11, 1), berlin(11, 0, 45), null, REMINDER_ZONE, learned))
+    }
+
     @Test
     fun `a workout that ended within 30 minutes is due`() {
         assertTrue(

@@ -15,6 +15,7 @@ class WatchReminders(
     private val experienceEnabled: () -> Boolean = { true },
     private val awaitExperience: suspend () -> Unit = {},
     private val writeSharedChoice: suspend (Boolean) -> Unit = {},
+    private val initializeHours: suspend () -> Unit = {},
 ) {
     private val registration = Mutex()
     private val currentWorkouts = MutableStateFlow(false)
@@ -26,6 +27,7 @@ class WatchReminders(
 
     suspend fun awaitActive(): Boolean {
         awaitExperience()
+        initializeHours()
         return isActive
     }
 
@@ -36,11 +38,12 @@ class WatchReminders(
     }
 
     /** Reconciles boot, permission and rollout changes with the latest saved choice. */
-    suspend fun restore() {
+    suspend fun restore(rescheduleEvening: Boolean = false) {
         awaitExperience()
+        initializeHours()
         registration.withLock {
             if (isActive) {
-                evening.ensureScheduled()
+                if (rescheduleEvening) evening.scheduleNext() else evening.ensureScheduled()
             } else {
                 evening.cancel()
             }
