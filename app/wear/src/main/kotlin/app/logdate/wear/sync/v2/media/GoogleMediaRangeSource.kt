@@ -155,4 +155,5 @@ internal fun WatchMediaIdentity.asDescriptor() =
         contentVersion = contentVersion,
         sizeBytes = sizeBytes,
         sha256 = sha256,
+        mediaRef = mediaRef,
     )

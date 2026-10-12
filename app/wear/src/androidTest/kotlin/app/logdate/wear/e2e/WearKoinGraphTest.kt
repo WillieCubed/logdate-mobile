@@ -42,6 +42,17 @@ class WearKoinGraphTest {
     }
 
     @Test
+    fun playbackUsesTheVerifiedPhoneResolverAndServiceSource() {
+        kotlin.test.assertTrue(
+            koin.get<app.logdate.wear.playback.WearSyncedAudioResolver>() is app.logdate.wear.playback.WindowPhoneAudioResolver,
+        )
+        kotlin.test.assertTrue(
+            koin.get<app.logdate.client.media.audio.AudioPlaybackSourceFactory>() is app.logdate.wear.sync.v2.media.WatchAudioDataSources,
+        )
+        koin.get<app.logdate.wear.sync.v2.media.WatchPhoneMedia>()
+    }
+
+    @Test
     fun cloudEngineResolvesAndWaitsForAccountLink() {
         val engine = koin.get<DefaultSyncManager>(named("watchCloud"))
 

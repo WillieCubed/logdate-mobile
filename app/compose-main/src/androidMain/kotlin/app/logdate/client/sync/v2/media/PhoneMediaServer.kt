@@ -119,6 +119,7 @@ class PhoneMediaServer(
                     contentVersion = request.contentVersion,
                     sizeBytes = size,
                     sha256 = digest.digest().joinToString("") { "%02x".format(it) },
+                    mediaRef = note.mediaRef,
                 ),
                 note,
                 file,

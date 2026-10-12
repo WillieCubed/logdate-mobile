@@ -21,6 +21,7 @@ data class WatchMediaIdentity(
     val contentVersion: Long,
     val sizeBytes: Long,
     val sha256: String,
+    val mediaRef: String? = null,
 )
 
 data class MediaRangeRequest(

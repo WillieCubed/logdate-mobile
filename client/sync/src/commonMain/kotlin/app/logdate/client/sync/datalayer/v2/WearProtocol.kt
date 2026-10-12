@@ -39,6 +39,7 @@ object WearFeatures {
     const val RECEIPTS = "receipts.v1"
     const val OPERATION_RECEIPTS = "receipts.operations.v1"
     const val WINDOW = "window.v1"
+    const val MEDIA_RANGE = "media.range.v1"
     const val MOMENTS = "moments.v1"
     const val LIVE = "live.v1"
     const val REMINDERS = "reminders.v1"
@@ -53,6 +54,7 @@ object WearFeatures {
             RECEIPTS,
             OPERATION_RECEIPTS,
             WINDOW,
+            MEDIA_RANGE,
             MOMENTS,
             LIVE,
             REMINDERS,

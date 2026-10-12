@@ -16,6 +16,7 @@ data class PhoneMediaDescriptor(
     val contentVersion: Long,
     val sizeBytes: Long,
     val sha256: String,
+    val mediaRef: String? = null,
 )
 
 @Serializable

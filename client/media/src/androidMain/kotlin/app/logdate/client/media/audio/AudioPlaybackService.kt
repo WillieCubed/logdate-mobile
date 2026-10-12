@@ -12,13 +12,16 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import app.logdate.client.media.device.AndroidAudioRouteDevices
 import app.logdate.client.notifications.AndroidLogDateNotificationCatalog
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import org.koin.mp.KoinPlatform
 
 class AudioPlaybackService : MediaSessionService() {
     companion object {
@@ -53,7 +56,12 @@ class AudioPlaybackService : MediaSessionService() {
         val player =
             ExoPlayer
                 .Builder(this)
-                .setAudioAttributes(
+                .setMediaSourceFactory(
+                    DefaultMediaSourceFactory(
+                        KoinPlatform.getKoinOrNull()?.getOrNull<AudioPlaybackSourceFactory>()?.create(this)
+                            ?: DefaultDataSource.Factory(this),
+                    ),
+                ).setAudioAttributes(
                     AudioAttributes
                         .Builder()
                         .setUsage(C.USAGE_MEDIA)

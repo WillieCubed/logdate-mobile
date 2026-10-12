@@ -110,6 +110,7 @@ class WearPathsTest {
                 "receipts.v1",
                 "receipts.operations.v1",
                 "window.v1",
+                "media.range.v1",
                 "moments.v1",
                 "live.v1",
                 "reminders.v1",

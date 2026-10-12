@@ -37,7 +37,7 @@ import org.koin.dsl.module
 /** Koin module for the watch's version 2 sync: linking, delivery and the library window. */
 val wearSyncV2Module =
     module {
-        includes(wearWatchWindowModule)
+        includes(wearWatchWindowModule, wearPhoneMediaModule)
         single<PairKeyVault> { SecureStoragePairKeyVault(get(), prefix = "watch.link.pair_key.") }
         single { WatchLinkStore(storage = get(), pairKeys = get()) }
         single { WatchLinkExchange(handshake = BouncyCastleLinkHandshake(), nonces = LinkNonceLedger()) }
@@ -116,7 +116,14 @@ val wearSyncV2Module =
         single {
             WatchOwnState(
                 links = get<WatchLinkStore>().observe(),
-                features = setOf(WearFeatures.LINK_CLOUD, WearFeatures.RECEIPTS, WearFeatures.OPERATION_RECEIPTS, WearFeatures.WINDOW),
+                features =
+                    setOf(
+                        WearFeatures.LINK_CLOUD,
+                        WearFeatures.RECEIPTS,
+                        WearFeatures.OPERATION_RECEIPTS,
+                        WearFeatures.WINDOW,
+                        WearFeatures.MEDIA_RANGE,
+                    ),
             )
         }
     }

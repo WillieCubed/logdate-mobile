@@ -109,6 +109,7 @@ val phoneWatchSyncV2Module =
                         WearFeatures.RECEIPTS,
                         WearFeatures.OPERATION_RECEIPTS,
                         WearFeatures.WINDOW,
+                        WearFeatures.MEDIA_RANGE,
                     ),
                 parts =
                     combine(sessions.getSessionFlow(), campfire()) { session, fire ->

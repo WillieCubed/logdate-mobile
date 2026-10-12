@@ -227,6 +227,17 @@ class WindowApplier(
                 guard(peer, id)
                 val current = notes.getNoteById(copy.note.uid)
                 if (current?.let(::fingerprint) != before?.let(::fingerprint)) throw GuardChanged()
+                if (current is JournalNote.Audio &&
+                    (
+                        copy.note !is JournalNote.Audio ||
+                            current.mediaRef != copy.note.mediaRef ||
+                            current.lastUpdated != copy.note.lastUpdated
+                    )
+                ) {
+                    forgetMedia(current.uid)
+                    guard(peer, id)
+                    if (notes.getNoteById(current.uid)?.let(::fingerprint) != before?.let(::fingerprint)) throw GuardChanged()
+                }
                 prepareNote(copy.note)
                 guard(peer, id)
                 notes.createFromSync(copy.note)

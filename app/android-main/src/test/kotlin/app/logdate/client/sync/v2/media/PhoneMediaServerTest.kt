@@ -70,6 +70,13 @@ class PhoneMediaServerTest {
             assertFalse(server.serve("watch", ticket.channelPath) { _, _, _, _ -> error("Replayed ticket") })
         }
 
+    @Test fun `descriptors retain the logical media reference for same timestamp replacements`() =
+        runTest {
+            val media = assertNotNull(server.describe("watch", info))
+            assertEquals((note as JournalNote.Audio).mediaRef, media.mediaRef)
+            assertNull(server.prepare("watch", PhoneMediaRangeRequest(media = media.copy(mediaRef = "other"), offset = 0)))
+        }
+
     @Test fun `foreign node schema context and note version cannot obtain descriptors`() =
         runTest {
             assertNull(server.describe("other", info))

@@ -32,7 +32,6 @@ import app.logdate.wear.playback.WatchMediaCache
 import app.logdate.wear.playback.WearAudioOutputMonitor
 import app.logdate.wear.playback.WearAudioOutputs
 import app.logdate.wear.playback.WearPlaybackEngine
-import app.logdate.wear.playback.WearSyncedAudioResolver
 import app.logdate.wear.playback.WearVoiceNotePlayer
 import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
 import app.logdate.wear.presentation.home.WearHomeViewModel
@@ -140,7 +139,7 @@ val wearAudioModule =
             val storage = get<StorageSpaceChecker>()
             SyncedAudioWatchMediaCache(cache = get(), freeBytes = storage::getAvailableStorageSpace)
         }
-        single<WearSyncedAudioResolver> {
+        single {
             PhoneSyncedAudioResolver(
                 context = get(),
                 mediaCache = get(),
