@@ -8,12 +8,16 @@ import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.shared.model.sync.DeviceId
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -36,8 +40,16 @@ class RepoBackedLogDateMomentsRepositoryTest {
     private val metadataStore = InMemoryLogDateCollectionsMetadataStore()
     private val collections =
         RepoBackedLogDateCollectionsRepository(accountRepository, identityService, signingKeyService, blockStore, metadataStore)
+    private val mutations = InMemoryJournalMergeStore()
     private val moments =
-        RepoBackedLogDateMomentsRepository(accountRepository, signingKeyService, blockStore, metadataStore, collections::canonicalRepoDid)
+        RepoBackedLogDateMomentsRepository(
+            accountRepository,
+            signingKeyService,
+            blockStore,
+            metadataStore,
+            collections::canonicalRepoDid,
+            mutations,
+        )
     private var users = 0
 
     @Test
@@ -112,6 +124,61 @@ class RepoBackedLogDateMomentsRepositoryTest {
 
             assertTrue(moments.momentChanges(user, since = 0L, limit = 10).deletions.isEmpty())
             assertEquals(LogDateRecordState.Absent, moments.momentState(user, "m4"))
+        }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun `two repository instances cannot accept the same known version`() =
+        runTest {
+            val (user, _) = newUser()
+            val initial = moments.upsertMoment(user, moment("race"))
+            val other =
+                RepoBackedLogDateMomentsRepository(
+                    accountRepository,
+                    signingKeyService,
+                    blockStore,
+                    metadataStore,
+                    collections::canonicalRepoDid,
+                    mutations,
+                )
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val first =
+                async {
+                    moments.updateMomentIfVersion(user, "race", initial.version) {
+                        entered.complete(Unit)
+                        release.await()
+                        it.copy(payload = "LDSE2:first")
+                    }
+                }
+            try {
+                runCurrent()
+                assertTrue(entered.isCompleted, "The first patch must read its real stored moment")
+                val second =
+                    async {
+                        other.updateMomentIfVersion(user, "race", initial.version) { it.copy(payload = "LDSE2:second") }
+                    }
+                runCurrent()
+                assertFalse(second.isCompleted, "The second instance must wait for the first mutation boundary")
+                release.complete(Unit)
+                val updated = assertIs<MomentUpdateResult.Updated>(first.await()).moment
+                assertEquals(MomentUpdateResult.Conflict, second.await())
+                assertTrue(updated.version > initial.version)
+                assertEquals("LDSE2:first", moments.getMoment(user, "race")?.payload)
+            } finally {
+                release.complete(Unit)
+            }
+        }
+
+    @Test fun `conditional patch never revives a deleted moment`() =
+        runTest {
+            val (user, _) = newUser()
+            val initial = moments.upsertMoment(user, moment("deleted"))
+            moments.deleteMoment(user, "deleted", 99)
+            val result = moments.updateMomentIfVersion(user, "deleted", initial.version) { it.copy(payload = "LDSE2:late") }
+            assertEquals(MomentUpdateResult.Missing, result)
+            assertNull(moments.getMoment(user, "deleted"))
+            assertEquals(1, moments.momentChanges(user, 0, 10).deletions.size)
         }
 
     private suspend fun newUser(): Pair<UUID, AtprotoDid> {

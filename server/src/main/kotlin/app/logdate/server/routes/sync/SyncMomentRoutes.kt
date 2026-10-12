@@ -4,6 +4,7 @@ import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.logdate.LogDateMoment
 import app.logdate.server.logdate.LogDateMomentsRepository
 import app.logdate.server.logdate.LogDateRecordState
+import app.logdate.server.logdate.MomentUpdateResult
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.SyncMomentDocs
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -156,25 +157,26 @@ private fun Route.patchMomentRoute(
             val momentId = call.requiredPathParam("momentId")
             val req = call.receive<MomentUpdateRequest>()
             if (call.rejectInvalidMoment(momentId, req.payload, req.schema)) return@patch
-            val existing =
-                repository.getMoment(userId, momentId)
-                    ?: return@patch call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Moment not found"))
             val expected = (req.versionConstraint as? VersionConstraint.Known)?.serverVersion
-            if (expected != null && expected != existing.version) {
-                metrics.recordConflict()
-                return@patch call.respond(HttpStatusCode.Conflict, error("CONFLICT", "Server has a newer version"))
-            }
-            val updated =
-                repository.upsertMoment(
-                    userId,
+            val result =
+                repository.updateMomentIfVersion(userId, momentId, expected) { existing ->
                     existing.copy(
                         capturedAt = req.capturedAt ?: existing.capturedAt,
                         lastUpdated = req.lastUpdated,
                         deviceId = req.deviceId,
                         payload = req.payload,
                         schema = req.schema,
-                    ),
-                )
+                    )
+                }
+            val updated =
+                when (result) {
+                    is MomentUpdateResult.Updated -> result.moment
+                    MomentUpdateResult.Missing -> return@patch call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Moment not found"))
+                    MomentUpdateResult.Conflict -> {
+                        metrics.recordConflict()
+                        return@patch call.respond(HttpStatusCode.Conflict, error("CONFLICT", "Server has a newer version"))
+                    }
+                }
             call.respond(MomentUpdateResponse(momentId, updated.version, updated.lastUpdated))
             success = true
         } finally {

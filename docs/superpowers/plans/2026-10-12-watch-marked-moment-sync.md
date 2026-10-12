@@ -64,7 +64,8 @@ Files: create client/sync/.../cloud/CloudMomentDataSource.kt and moment payload 
 - [x] Route MOMENT conditional creates/deletes with linked-watch update holds and merged phone edits; retain unsupported/missing-body work. Save server versions and operation-CAS settlement atomically; recover unversioned deletion collisions only after an account-scoped tombstone applies.
 - [x] Verify encrypted payload transport through actual server moment routes, linked session, conflicts and tombstones; save focused local commit. Full sync-engine and Room end-to-end acceptance remains below.
 - [x] Verify phone engine upload/download routing with real server and persisted Room: encrypted restart recovery, attachment union, in-flight receipt rollback, bounded version-conflict retry, conditional creation, deletion and deletion-collision recovery.
-- [ ] Verify linked-watch cloud-engine journeys with installed session/provider routing, remaining session/capability edge cases, and concurrent server version-check/write atomicity; retain the paired peer and full companion acceptance gates below.
+- [x] Verify and fix concurrent server version-check/write atomicity for MOMENT patches: reproduce two accepted writes from one known version, move the check and mutation into the shared account boundary, and verify independent PostgreSQL advisory-lock/repository instances preserve one winner and return a conflict for the stale patch.
+- [ ] Verify linked-watch cloud-engine journeys with installed session/provider routing and remaining session/capability edge cases; retain paired peer, repository/index crash-recovery and full companion acceptance gates below.
 
 ## Task 4: Authenticated peer ingestion and return window
 

@@ -21,16 +21,61 @@ internal class RepoBackedLogDateMomentsRepository(
     blockStore: RepoBlockStore,
     private val metadataStore: LogDateCollectionsMetadataStore,
     private val repoDidFor: suspend (UUID) -> AtprotoDid,
+    private val mutations: JournalMergeStore,
 ) : LogDateMomentsRepository {
     private val repoEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
     private val conditionalWriter = RepoConditionalWriter(repoEngine, metadataStore)
 
+    override suspend fun updateMomentIfVersion(
+        userId: UUID,
+        id: String,
+        expectedVersion: Long?,
+        transform: suspend (LogDateMoment) -> LogDateMoment,
+    ): MomentUpdateResult =
+        mutations.withAccountLock(userId) {
+            val existing = readMoment(userId, id) ?: return@withAccountLock MomentUpdateResult.Missing
+            if (expectedVersion != null && existing.version != expectedVersion) return@withAccountLock MomentUpdateResult.Conflict
+            val changed = transform(existing)
+            require(changed.id == id) { "A moment patch cannot change its identity" }
+            MomentUpdateResult.Updated(writeMoment(userId, changed))
+        }
+
     override suspend fun momentState(
         userId: UUID,
         id: String,
-    ): LogDateRecordState = conditionalWriter.state(userId, LogDateCollectionKind.MOMENT, id)
+    ): LogDateRecordState = mutations.withAccountLock(userId) { conditionalWriter.state(userId, LogDateCollectionKind.MOMENT, id) }
 
     override suspend fun upsertMoment(
+        userId: UUID,
+        moment: LogDateMoment,
+    ): LogDateMoment = mutations.withAccountLock(userId) { writeMoment(userId, moment) }
+
+    override suspend fun createMomentIfAbsent(
+        userId: UUID,
+        moment: LogDateMoment,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateMoment> = mutations.withAccountLock(userId) { createMoment(userId, moment, respectTombstones) }
+
+    override suspend fun getMoment(
+        userId: UUID,
+        id: String,
+    ): LogDateMoment? = mutations.withAccountLock(userId) { readMoment(userId, id) }
+
+    override suspend fun deleteMoment(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    ) {
+        mutations.withAccountLock(userId) { removeMoment(userId, id, deletedAt) }
+    }
+
+    override suspend fun momentChanges(
+        userId: UUID,
+        since: Long,
+        limit: Int,
+    ): LogDateChangeSet<LogDateMoment, LogDateMomentDeletion> = mutations.withAccountLock(userId) { readChanges(userId, since, limit) }
+
+    private suspend fun writeMoment(
         userId: UUID,
         moment: LogDateMoment,
     ): LogDateMoment {
@@ -40,7 +85,7 @@ internal class RepoBackedLogDateMomentsRepository(
         return moment.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
     }
 
-    override suspend fun createMomentIfAbsent(
+    private suspend fun createMoment(
         userId: UUID,
         moment: LogDateMoment,
         respectTombstones: Boolean,
@@ -57,7 +102,7 @@ internal class RepoBackedLogDateMomentsRepository(
             ).mapCreated { version -> moment.copy(version = version, lastUpdated = System.currentTimeMillis()) }
     }
 
-    override suspend fun getMoment(
+    private suspend fun readMoment(
         userId: UUID,
         id: String,
     ): LogDateMoment? {
@@ -69,7 +114,7 @@ internal class RepoBackedLogDateMomentsRepository(
             ?.toLogDateMoment(RecordKey.require(id), metadata.version)
     }
 
-    override suspend fun deleteMoment(
+    private suspend fun removeMoment(
         userId: UUID,
         id: String,
         deletedAt: Long,
@@ -82,7 +127,7 @@ internal class RepoBackedLogDateMomentsRepository(
         metadataStore.delete(userId, repoDid, LogDateCollectionKind.MOMENT, existing.recordKey, deletedAt)
     }
 
-    override suspend fun momentChanges(
+    private suspend fun readChanges(
         userId: UUID,
         since: Long,
         limit: Int,

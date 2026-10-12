@@ -424,6 +424,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 blockStore = get(),
                 metadataStore = get(),
                 repoDidFor = collections::canonicalRepoDid,
+                mutations = get(),
             )
         }
         single {

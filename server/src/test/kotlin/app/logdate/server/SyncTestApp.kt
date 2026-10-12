@@ -52,6 +52,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
     mediaStorage: GcsMediaStorage? = null,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
     accessTokenVerifier: AccessTokenVerifier? = null,
+    momentDecorator: (LogDateMomentsRepository) -> LogDateMomentsRepository = { it },
 ): SyncTestEnvironment {
     val accountRepository = InMemoryAccountRepository()
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "sync-test-kek")
@@ -71,6 +72,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
             blockStore = blockStore,
             metadataStore = metadataStore,
         )
+    val momentMutations = InMemoryJournalMergeStore()
     val momentsRepository =
         RepoBackedLogDateMomentsRepository(
             accountRepository = accountRepository,
@@ -78,6 +80,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
             blockStore = blockStore,
             metadataStore = metadataStore,
             repoDidFor = collectionsRepository::canonicalRepoDid,
+            mutations = momentMutations,
         )
     val mediaRepository = InMemoryLogDateMediaRepository()
     val backupRepository = InMemoryLogDateBackupRepository()
@@ -103,11 +106,11 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     mediaStorage = mediaStorage,
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
-                    collectionsRepository = MergeAwareLogDateCollectionsRepository(collectionsRepository, InMemoryJournalMergeStore()),
+                    collectionsRepository = MergeAwareLogDateCollectionsRepository(collectionsRepository, momentMutations),
                     mediaBlobRepository = mediaRepository.asLogDateMediaBlobRepository(),
                     backupRepository = backupRepository,
                     accessTokenVerifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
-                    momentsRepository = momentsRepository,
+                    momentsRepository = momentDecorator(momentsRepository),
                 )
             }
         }
@@ -135,5 +138,6 @@ internal fun inMemoryMomentsRepository(accountRepository: AccountRepository): Lo
         blockStore,
         metadataStore,
         collections::canonicalRepoDid,
+        InMemoryJournalMergeStore(),
     )
 }
