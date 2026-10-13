@@ -71,13 +71,24 @@ class WatchWindowPolicyTest {
     }
 
     @Test
-    fun `notes from this date in earlier years are on this day`() {
+    fun `nearby memories from last year are retained for offline recall`() {
         val lastYear = note(at(2025, 10, 10, 12, 0))
-        val otherDay = note(at(2025, 10, 11, 12, 0))
+        val nearby = note(at(2025, 10, 11, 12, 0))
+        val tooFar = note(at(2025, 10, 14, 12, 0))
 
-        val plan = policy.choose(listOf(lastYear, otherDay), WindowExtraIds(), at(2026, 10, 10, 10, 0), zone, dayStartHour = 4)
+        val plan = policy.choose(listOf(lastYear, nearby, tooFar), WindowExtraIds(), at(2026, 10, 10, 10, 0), zone, dayStartHour = 4)
 
-        assertEquals(listOf(WindowMember(lastYear.id, setOf(WindowReason.ON_THIS_DAY))), plan.members)
+        assertEquals(setOf(lastYear.id, nearby.id), plan.members.map { it.id }.toSet())
+        assertTrue(plan.members.all { it.reasons == setOf(WindowReason.ON_THIS_DAY) })
+    }
+
+    @Test
+    fun `anniversary fallback crosses a year boundary`() {
+        val near = note(at(2024, 12, 29, 12, 0))
+        val far = note(at(2024, 12, 28, 12, 0))
+        val plan = policy.choose(listOf(near, far), WindowExtraIds(), at(2026, 1, 1, 10, 0), zone, dayStartHour = 4)
+
+        assertEquals(listOf(near.id), plan.members.map { it.id })
     }
 
     @Test
@@ -132,7 +143,7 @@ class WatchWindowPolicyTest {
         val recent = note(at(2026, 10, 9, 12, 0))
         val starred = note(at(2020, 1, 5, 12, 0))
         val anniversary = note(at(2025, 10, 10, 12, 0))
-        val rewind = note(at(2025, 10, 11, 12, 0))
+        val rewind = note(at(2025, 10, 20, 12, 0))
         val extras = WindowExtraIds(starred = setOf(starred.id), rewind = setOf(rewind.id))
         val small = WatchWindowPolicy(budget = WindowBudget(maxItems = 3))
 

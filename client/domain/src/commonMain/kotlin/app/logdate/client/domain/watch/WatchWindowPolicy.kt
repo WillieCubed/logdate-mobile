@@ -8,6 +8,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -22,7 +23,7 @@ data class WindowCandidate(
     val sizeBytes: Long,
 )
 
-/** Notes other features pick for the watch; empty until Rewind and starred notes supply them. */
+/** Additional note IDs selected by the current weekly Rewind and starred library. */
 data class WindowExtraIds(
     val rewind: Set<Uuid> = emptySet(),
     val starred: Set<Uuid> = emptySet(),
@@ -80,7 +81,9 @@ class WatchWindowPolicy(
                 val reasons =
                     buildSet {
                         if (day in firstRecentDay..today) add(WindowReason.RECENT)
-                        if (preferences.onThisDay && isOnThisDay(day, today)) add(WindowReason.ON_THIS_DAY)
+                        if (preferences.onThisDay && (isOnThisDay(day, today) || isNearLastYear(day, today))) {
+                            add(WindowReason.ON_THIS_DAY)
+                        }
                         if (candidate.id in extras.starred) add(WindowReason.STARRED)
                         if (preferences.rewind && candidate.id in extras.rewind) add(WindowReason.REWIND)
                     }
@@ -122,6 +125,15 @@ class WatchWindowPolicy(
             if (day.month == today.month && day.day == today.day) return true
             val leapDayMissing = today.month == Month.FEBRUARY && today.day == 28 && !isLeapYear(today.year)
             return leapDayMissing && day.month == Month.FEBRUARY && day.day == 29
+        }
+
+        /** The shared recall picker widens to three days either side when last year's exact day is empty. */
+        private fun isNearLastYear(
+            day: LocalDate,
+            today: LocalDate,
+        ): Boolean {
+            val anniversary = today.minus(1, DateTimeUnit.YEAR)
+            return day in anniversary.minus(3, DateTimeUnit.DAY)..anniversary.plus(3, DateTimeUnit.DAY)
         }
 
         private fun isLeapYear(year: Int): Boolean = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
