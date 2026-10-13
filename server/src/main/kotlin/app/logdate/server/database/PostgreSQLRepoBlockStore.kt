@@ -10,10 +10,12 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import org.jetbrains.exposed.v1.jdbc.upsert
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.RepoBlock
@@ -106,24 +108,14 @@ class PostgreSQLRepoBlockStore :
                 transaction {
                     val repoDid = head.repo.toString()
                     if (expectedRevision == null) {
-                        // No head yet. The insert itself is the guard: a unique repoDid means a
-                        // racing writer that also thought the repo was empty loses here.
-                        val alreadyPresent =
-                            AtprotoRepoHeadsTable
-                                .selectAll()
-                                .where { AtprotoRepoHeadsTable.repoDid eq repoDid }
-                                .any()
-                        if (alreadyPresent) {
-                            return@transaction false
-                        }
-                        AtprotoRepoHeadsTable.insert {
-                            it[AtprotoRepoHeadsTable.repoDid] = repoDid
-                            it[rootCid] = head.root.toString()
-                            it[commitCid] = head.commitCid.toString()
-                            it[revision] = head.revision
-                            it[updatedAt] = Clock.System.now()
-                        }
-                        true
+                        AtprotoRepoHeadsTable
+                            .insertIgnore {
+                                it[AtprotoRepoHeadsTable.repoDid] = repoDid
+                                it[rootCid] = head.root.toString()
+                                it[commitCid] = head.commitCid.toString()
+                                it[revision] = head.revision
+                                it[updatedAt] = Clock.System.now()
+                            }.insertedCount == 1
                     } else {
                         val updated =
                             AtprotoRepoHeadsTable.update({
@@ -180,35 +172,15 @@ class PostgreSQLRepoBlockStore :
             withContext(Dispatchers.IO) {
                 transaction {
                     val cidValue = block.cid.toString()
-                    val existingBlock =
-                        AtprotoRepoBlocksTable
-                            .selectAll()
-                            .where { AtprotoRepoBlocksTable.cid eq cidValue }
-                            .singleOrNull()
-                    if (existingBlock == null) {
-                        AtprotoRepoBlocksTable.insert {
-                            it[cid] = cidValue
-                            it[bytes] = block.bytes
-                        }
-                    } else {
-                        AtprotoRepoBlocksTable.update({ AtprotoRepoBlocksTable.cid eq cidValue }) {
-                            it[bytes] = block.bytes
-                        }
+                    AtprotoRepoBlocksTable.insertIgnore {
+                        it[cid] = cidValue
+                        it[bytes] = block.bytes
                     }
-
-                    val existingLink =
-                        AtprotoRepoBlockLinksTable
-                            .selectAll()
-                            .where {
-                                (AtprotoRepoBlockLinksTable.repoDid eq repo.toString()) and
-                                    (AtprotoRepoBlockLinksTable.cid eq cidValue)
-                            }.singleOrNull()
-                    if (existingLink == null) {
-                        AtprotoRepoBlockLinksTable.insert {
-                            it[repoDid] = repo.toString()
-                            it[cid] = cidValue
-                        }
+                    AtprotoRepoBlockLinksTable.insertIgnore {
+                        it[repoDid] = repo.toString()
+                        it[cid] = cidValue
                     }
+                    Unit
                 }
             }
         }.onSuccess { blockCache.remember(block, generation) }
@@ -253,37 +225,17 @@ class PostgreSQLRepoBlockStore :
         runCatching {
             withContext(Dispatchers.IO) {
                 transaction {
-                    val existing =
-                        AtprotoRepoCommitsTable
-                            .selectAll()
-                            .where {
-                                (AtprotoRepoCommitsTable.repoDid eq repo.toString()) and
-                                    (AtprotoRepoCommitsTable.revision eq commit.commit.revision)
-                            }.singleOrNull()
-                    if (existing == null) {
-                        AtprotoRepoCommitsTable.insert {
-                            it[repoDid] = repo.toString()
-                            it[revision] = commit.commit.revision
-                            it[cid] = commit.cid.toString()
-                            it[rootCid] = commit.commit.root.toString()
-                            it[prevCid] = commit.commit.prev?.toString()
-                            it[createdAtEpochMillis] = commit.commit.createdAtEpochMillis
-                            it[recordCount] = commit.commit.recordCount
-                            it[signature] = commit.signature
-                        }
-                    } else {
-                        AtprotoRepoCommitsTable.update({
-                            (AtprotoRepoCommitsTable.repoDid eq repo.toString()) and
-                                (AtprotoRepoCommitsTable.revision eq commit.commit.revision)
-                        }) {
-                            it[cid] = commit.cid.toString()
-                            it[rootCid] = commit.commit.root.toString()
-                            it[prevCid] = commit.commit.prev?.toString()
-                            it[createdAtEpochMillis] = commit.commit.createdAtEpochMillis
-                            it[recordCount] = commit.commit.recordCount
-                            it[signature] = commit.signature
-                        }
+                    AtprotoRepoCommitsTable.upsert(AtprotoRepoCommitsTable.repoDid, AtprotoRepoCommitsTable.revision) {
+                        it[repoDid] = repo.toString()
+                        it[revision] = commit.commit.revision
+                        it[cid] = commit.cid.toString()
+                        it[rootCid] = commit.commit.root.toString()
+                        it[prevCid] = commit.commit.prev?.toString()
+                        it[createdAtEpochMillis] = commit.commit.createdAtEpochMillis
+                        it[recordCount] = commit.commit.recordCount
+                        it[signature] = commit.signature
                     }
+                    Unit
                 }
             }
         }

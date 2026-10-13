@@ -243,6 +243,9 @@ class ConditionalCreatePostgresTest {
 
                 assertEquals(1, outcomes.count { it.getOrNull() is ConditionalCreate.Created }, outcomes.toString())
                 assertTrue(outcomes.all { it.isSuccess || it.exceptionOrNull() is RepoHeadConflictException }, outcomes.toString())
+                outcomes.filter { it.isFailure }.forEach {
+                    assertIs<ConditionalCreate.Exists>(create().getOrThrow())
+                }
                 assertIs<LogDateRecordState.Live>(repository.entryState(ownerId, "race-entry"))
                 assertEquals(1, repository.entryChanges(ownerId, since = 0L, limit = 10).changes.size)
             } finally {
