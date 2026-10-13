@@ -9,6 +9,7 @@ on:
       - 'client/ui/**/workspace/**'
       - 'client/feature/location-timeline/**'
       - 'app/android-main/src/androidTest/**/HomeWorkspaceE2ETest.kt'
+      - 'app/android-main/src/main/AndroidManifest.xml'
       - 'scripts/materialize-ci-debug-keystore.py'
       - '.github/workflows/home-workspace-acceptance.yml'
 
@@ -79,5 +80,7 @@ jobs:
             app/android-main/build/outputs/androidTest-results/managedDevice/debug/**/TEST-*.xml
             app/android-main/build/outputs/managed_device_android_test_additional_output/**/*.png
             app/android-main/build/outputs/managed_device_android_test_additional_output/**/*.txt
+            app/android-main/build/intermediates/managed_device_android_test_additional_output/**/*.png
+            app/android-main/build/intermediates/managed_device_android_test_additional_output/**/*.txt
           if-no-files-found: warn
           retention-days: 14

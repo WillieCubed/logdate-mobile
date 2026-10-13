@@ -33,6 +33,11 @@
         android:theme="@style/Theme.LogDate"
         tools:targetApi="34">
 
+        <!-- Maps SDK 20 can load a legacy renderer on older Google Play services. -->
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false" />
+
         <!-- Koin installs the worker factory after loading the application's dependencies. -->
         <provider
             android:name="androidx.startup.InitializationProvider"

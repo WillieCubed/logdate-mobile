@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
@@ -394,7 +395,7 @@ class HomeWorkspaceE2ETest {
                     SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Map loaded"),
                 ).fetchSemanticsNodes().isNotEmpty()
             }
-        } catch (failure: Exception) {
+        } catch (failure: ComposeTimeoutException) {
             val directory = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
                 ?: throw failure
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())

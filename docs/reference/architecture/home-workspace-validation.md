@@ -93,3 +93,19 @@ The user reprioritized immediate access to the new UI after the delayed deployme
 The [standard-instrumentation run](https://github.com/WillieCubed/logdate-mobile/actions/runs/37059421218) completes both targets without skips: Rewind interaction passes, but native map loading times out after 30 seconds on both. This is an unresolved map/configuration/runtime issue, not a passing native acceptance result. Historical browsing and the map-unavailable recovery path have earlier Managed Device acceptance. Native maps, unobscured captures for both targets, and the broad inherited screenshot failures remain release evidence limitations; no production promotion or physical-device acceptance is claimed.
 
 The [enabled internal publication](https://github.com/WillieCubed/logdate-mobile/actions/runs/37060787909) completed successfully for `117264f`, version `0.1.0-main.173+117264f`, Play version code **43**. Play reports the release as completed on the internal track. Installation on a user's device has not been verified.
+
+## Maps SDK 20 compatibility repair
+
+A local API 35 Managed Device reproduction exposed `NoClassDefFoundError` for
+`org.apache.http.ProtocolVersion` while Google Play services loaded the legacy
+Maps renderer. The application now declares the optional `org.apache.http.legacy`
+library, as required by the [Maps SDK 20 release notes](https://developers.google.com/maps/documentation/android-sdk/release-notes#january_31_2026).
+The native acceptance workflow uses a dedicated CI certificate and a Maps-only
+key restricted to that certificate and the debug package. Timeout diagnostics
+catch Compose's `Throwable`-derived timeout without relaxing map-loaded or no-skip
+assertions. These changes do not authorize a broader release.
+
+After the manifest repair, the local renderer no longer crashes. Full map loading
+still timed out on the local emulator, whose runtime log reports DNS resolution
+failures and `ERR_INTERNET_DISCONNECTED`. Hosted map-loading acceptance remains
+pending; the crash repair alone is not a passing map-loading claim.
