@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
         with:
           lfs: true
       - name: Materialize debug configuration
@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: test -n "$LOGDATE_GOOGLE_MAPS_API_KEY"
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
           java-version: '17'
@@ -44,7 +44,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Set up Gradle cache
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v6.4.0
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Run workspace acceptance on managed emulators
@@ -66,7 +66,7 @@ jobs:
           assert all(not list(test) for test in native), 'Native map acceptance must pass without skips'
       - name: Upload acceptance results and rendered maps
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: home-workspace-acceptance-${{ github.sha }}
           path: |

@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out production tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
 
       - name: Confirm this commit deployed to staging
         env:
@@ -60,7 +60,7 @@ jobs:
           echo "$response" | jq -e '.db_connected == true' >/dev/null
 
       - name: Set up Python with pip cache
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.13'
           cache: pip
