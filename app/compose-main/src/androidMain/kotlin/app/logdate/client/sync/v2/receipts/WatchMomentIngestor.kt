@@ -5,11 +5,13 @@ import app.logdate.client.database.dao.sync.PeerDeliveryDao
 import app.logdate.client.database.entities.moments.MarkedMomentEntity
 import app.logdate.client.database.entities.moments.MarkedMomentState
 import app.logdate.client.database.entities.sync.PeerDeliveryEntity
+import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.client.repository.moments.SyncableMarkedMomentRepository
 import app.logdate.client.repository.moments.atMillisecondPrecision
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
+import app.logdate.client.sync.datalayer.v2.RecordEnvelope
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.RecordOrigin
 import app.logdate.client.sync.datalayer.v2.WearPaths
@@ -21,6 +23,7 @@ import app.logdate.client.sync.peer.delivery.EnvelopeDataMap
 import app.logdate.client.sync.peer.delivery.MomentEnvelopeBody
 import io.github.aakira.napier.Napier
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 class WatchMomentIngestor(
     private val moments: SyncableMarkedMomentRepository,
@@ -67,82 +70,88 @@ class WatchMomentIngestor(
                     return
                 }
             }
-        if (envelope.removed &&
-            (
-                envelope.schema != 1 ||
-                    envelope.enc != null ||
-                    envelope.contentVersion != 0L ||
-                    envelope.syncVersion < 0 ||
-                    envelope.body != null ||
-                    envelope.bodyRef != null ||
-                    envelope.media.isNotEmpty()
-            )
-        ) {
-            return
-        }
-        var queued = false
-        val accepted =
-            transactions.withTransaction {
-                requireCurrent(peer)
-                val id = record.id
-                val row = marks.getById(id)
-                if (row != null && row.state !in knownStates) return@withTransaction false
-                if (envelope.removed) {
-                    if (row?.deletedAt == null) {
-                        if (row == null) {
-                            val now = clock.now()
-                            marks.upsert(
-                                MarkedMomentEntity(
-                                    id = id,
-                                    capturedAt = now,
-                                    timeZoneId = "",
-                                    state = MarkedMomentState.OPEN,
-                                    originDeviceId = "",
-                                    lastUpdated = now,
-                                    deletedAt = now,
-                                ),
-                            )
-                            outbox.enqueuePending(envelope.id, EntityType.MOMENT, PendingOperation.DELETE)
-                        } else if (!moments.delete(id, clock.now())) {
-                            return@withTransaction false
-                        }
-                        queued = true
-                    }
-                } else if (row?.deletedAt == null) {
-                    val existing = moments.getMark(id)
-                    val merged =
-                        moments.applyFromSync(requireNotNull(incoming).copy(syncVersion = existing?.syncVersion ?: 0))
-                            ?: return@withTransaction false
-                    if (merged != existing) {
-                        outbox.enqueuePending(
-                            envelope.id,
-                            EntityType.MOMENT,
-                            if (existing == null) PendingOperation.CREATE else PendingOperation.UPDATE,
-                        )
-                        queued = true
-                    }
-                }
-                requireCurrent(peer)
-                deliveries.retainNewest(
-                    PeerDeliveryEntity(
-                        peerScope = peer.ledgerScope,
-                        direction = "FROM_WATCH",
-                        entityType = EntityType.MOMENT.name,
-                        entityId = if (envelope.removed) identity.removalLedgerKey else identity.ledgerKey,
-                        contentVersion = envelope.contentVersion,
-                        state = if (envelope.removed || row?.deletedAt != null) "DELETED_ON_PHONE" else "ON_PHONE",
-                        stateChangedAt = clock.now().toEpochMilliseconds(),
-                    ),
-                )
-                requireCurrent(peer)
-                true
-            }
-        if (!accepted) {
+        if (envelope.removed && !isValidRemoval(envelope)) return
+        val queued = applyCapture(peer, record.id, envelope, identity, incoming)
+        if (queued == null) {
             receipts.reject(peer, RecordKind.MOMENT, envelope.id, identity.operationId)
             return
         }
         if (queued) onUpdated()
         receipts.push(peer, envelope.id, envelope.contentVersion, identity.operationId, envelope.removed, RecordKind.MOMENT)
+    }
+
+    private fun isValidRemoval(envelope: RecordEnvelope): Boolean =
+        envelope.schema == 1 &&
+            envelope.enc == null &&
+            envelope.contentVersion == 0L &&
+            envelope.syncVersion >= 0 &&
+            envelope.body == null &&
+            envelope.bodyRef == null &&
+            envelope.media.isEmpty()
+
+    private suspend fun applyCapture(
+        peer: PeerDeliveryContext,
+        id: Uuid,
+        envelope: RecordEnvelope,
+        identity: CaptureIdentity,
+        incoming: MarkedMoment?,
+    ): Boolean? =
+        transactions.withTransaction {
+            var queued = false
+            requireCurrent(peer)
+            val row = marks.getById(id)
+            if (row != null && row.state !in knownStates) return@withTransaction null
+            if (envelope.removed) {
+                if (row?.deletedAt == null) {
+                    if (!deleteMoment(id, row)) return@withTransaction null
+                    queued = true
+                }
+            } else if (row?.deletedAt == null) {
+                val existing = moments.getMark(id)
+                val merged =
+                    moments.applyFromSync(requireNotNull(incoming).copy(syncVersion = existing?.syncVersion ?: 0))
+                        ?: return@withTransaction null
+                if (merged != existing) {
+                    outbox.enqueuePending(
+                        envelope.id,
+                        EntityType.MOMENT,
+                        if (existing == null) PendingOperation.CREATE else PendingOperation.UPDATE,
+                    )
+                    queued = true
+                }
+            }
+            requireCurrent(peer)
+            deliveries.retainNewest(
+                PeerDeliveryEntity(
+                    peerScope = peer.ledgerScope,
+                    direction = "FROM_WATCH",
+                    entityType = EntityType.MOMENT.name,
+                    entityId = if (envelope.removed) identity.removalLedgerKey else identity.ledgerKey,
+                    contentVersion = envelope.contentVersion,
+                    state = if (envelope.removed || row?.deletedAt != null) "DELETED_ON_PHONE" else "ON_PHONE",
+                    stateChangedAt = clock.now().toEpochMilliseconds(),
+                ),
+            )
+            requireCurrent(peer)
+            queued
+        }
+
+    private suspend fun deleteMoment(id: Uuid, row: MarkedMomentEntity?): Boolean {
+        if (row != null) return moments.delete(id, clock.now())
+        val now = clock.now()
+        marks.upsert(
+            MarkedMomentEntity(
+                id = id,
+                capturedAt = now,
+                timeZoneId = "",
+                state = MarkedMomentState.OPEN,
+                originDeviceId = "",
+                lastUpdated = now,
+                deletedAt = now,
+            ),
+        )
+        outbox.enqueuePending(id.toString(), EntityType.MOMENT, PendingOperation.DELETE)
+        return true
     }
 
     private suspend fun requireCurrent(peer: PeerDeliveryContext) {

@@ -245,29 +245,7 @@ class WatchWindowPublisher(
         ) {
             return
         }
-        val bodyRef = if (RecordEnvelopeCodec.needsChannel(body)) BodyRef(bodyHash, bodyBytes.size.toLong()) else null
-        val envelope =
-            RecordEnvelope(
-                kind = RecordKind.NOTE,
-                id = id,
-                contentVersion = version,
-                syncVersion = note.syncVersion,
-                origin = RecordOrigin.PHONE,
-                context = peer,
-                reasons = member.reasons,
-                priority = DeliveryPriority.NORMAL,
-                body = body.takeIf { bodyRef == null },
-                bodyRef = bodyRef,
-            )
-        val data =
-            try {
-                // The send time is the version, so a repeat of the same version is identical and the Data Layer sends nothing.
-                EnvelopeDataMap.toDataMap(envelope, sentAt = version)
-            } catch (e: IllegalArgumentException) {
-                counts.tooLarge++
-                Napier.w("Could not encode a note for the watch library window")
-                return
-            }
+        val data = encodeNote(peer, note, member, body, bodyHash, bodyBytes, counts) ?: return
         requireCurrent(peer)
         val revision = manifest.reserveRevision(peer)
         requireCurrent(peer)
@@ -292,6 +270,41 @@ class WatchWindowPublisher(
         requireCurrent(peer)
         published[id] = wanted.copy(revision = revision)
         counts.written++
+    }
+
+    private fun encodeNote(
+        peer: PeerDeliveryContext,
+        note: JournalNote,
+        member: WindowMember,
+        body: JsonElement,
+        bodyHash: String,
+        bodyBytes: ByteArray,
+        counts: Counts,
+    ): Map<String, String>? {
+        val id = member.id.toString()
+        val version = note.lastUpdated.toEpochMilliseconds()
+        val bodyRef = if (RecordEnvelopeCodec.needsChannel(body)) BodyRef(bodyHash, bodyBytes.size.toLong()) else null
+        val envelope =
+            RecordEnvelope(
+                kind = RecordKind.NOTE,
+                id = id,
+                contentVersion = version,
+                syncVersion = note.syncVersion,
+                origin = RecordOrigin.PHONE,
+                context = peer,
+                reasons = member.reasons,
+                priority = DeliveryPriority.NORMAL,
+                body = body.takeIf { bodyRef == null },
+                bodyRef = bodyRef,
+            )
+        return try {
+            // The send time is the version, so a repeat of the same version is identical and the Data Layer sends nothing.
+            EnvelopeDataMap.toDataMap(envelope, sentAt = version)
+        } catch (e: IllegalArgumentException) {
+            counts.tooLarge++
+            Napier.w("Could not encode a note for the watch library window")
+            null
+        }
     }
 
     private suspend fun remove(

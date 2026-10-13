@@ -4,6 +4,7 @@ import app.logdate.client.domain.watch.WatchWindowPolicy
 import app.logdate.client.domain.watch.WindowBudget
 import app.logdate.client.domain.watch.WindowCandidate
 import app.logdate.client.domain.watch.WindowExtraIds
+import app.logdate.client.domain.watch.WindowMember
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.client.sync.datalayer.v2.BodyRef
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
@@ -16,6 +17,7 @@ import app.logdate.client.sync.datalayer.v2.WindowTombstoneDataMap
 import app.logdate.client.sync.peer.delivery.EnvelopeDataMap
 import app.logdate.client.sync.peer.delivery.MomentEnvelopeBody
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonElement
 import java.security.MessageDigest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -66,6 +68,37 @@ class PhoneMomentWindowPublisher(
         val requestedDeletions =
             previous.momentDeletions.mapValues { Instant.fromEpochMilliseconds(it.value.deletedAt) } +
                 deletions.mapKeys { it.key.toString() }
+        publishDeletions(peer, now, interrupted, requestedDeletions, deletionProofs, published, tombstones, counts, current)
+        publishMembers(peer, chosen.members, all, interrupted, published, tombstones, counts, current)
+        val desired = chosen.members.mapTo(mutableSetOf()) { it.id.toString() }
+        evictMembers(peer, now, desired, deletedIds, published, tombstones, counts, current)
+        clearOldTombstones(peer, now, desired, deletedIds, tombstones, counts, current)
+        current()
+        manifest.write(peer, previous.copy(moments = published, momentTombstones = tombstones, momentDeletions = deletionProofs))
+        current()
+        return MomentWindowPublished(
+            chosen.members.mapNotNull { member ->
+                published[member.id.toString()]?.let {
+                    WindowMemberRef(RecordKind.MOMENT, member.id.toString(), it.contentVersion, it.revision)
+                }
+            },
+            counts.written,
+            counts.removed,
+            counts.failed,
+        )
+    }
+
+    private suspend fun publishDeletions(
+        peer: PeerDeliveryContext,
+        now: Instant,
+        interrupted: Boolean,
+        requestedDeletions: Map<String, Instant>,
+        deletionProofs: MutableMap<String, PublishedMomentDeletion>,
+        published: MutableMap<String, PublishedItem>,
+        tombstones: MutableMap<String, Long>,
+        counts: Counts,
+        current: suspend () -> Unit,
+    ) {
         for ((id, at) in requestedDeletions) {
             current()
             val old = deletionProofs[id]
@@ -89,7 +122,19 @@ class PhoneMomentWindowPublisher(
             current()
             if (!items.deleteOwn(WearPaths.windowItem(RecordKind.MOMENT, Uuid.parse(id), peer))) counts.failed++
         }
-        for (member in chosen.members) {
+    }
+
+    private suspend fun publishMembers(
+        peer: PeerDeliveryContext,
+        members: List<WindowMember>,
+        all: Map<Uuid, MarkedMoment>,
+        interrupted: Boolean,
+        published: MutableMap<String, PublishedItem>,
+        tombstones: MutableMap<String, Long>,
+        counts: Counts,
+        current: suspend () -> Unit,
+    ) {
+        for (member in members) {
             current()
             val mark = all.getValue(member.id)
             val body = checkNotNull(MomentEnvelopeBody.envelope(mark, RecordOrigin.PHONE).body)
@@ -107,15 +152,7 @@ class PhoneMomentWindowPublisher(
             ) {
                 continue
             }
-            val reference = if (RecordEnvelopeCodec.needsChannel(body)) BodyRef(hash, bytes.size.toLong()) else null
-            val envelope =
-                MomentEnvelopeBody.envelope(mark, RecordOrigin.PHONE).copy(
-                    context = peer,
-                    reasons = member.reasons,
-                    body = body.takeIf { reference == null },
-                    bodyRef = reference,
-                )
-            val data = EnvelopeDataMap.toDataMap(envelope, wanted.contentVersion)
+            val data = encodeMoment(peer, mark, member, body, hash, bytes)
             val revision = manifest.reserveRevision(peer)
             current()
             if (mark.id.toString() in tombstones || interrupted) {
@@ -139,7 +176,37 @@ class PhoneMomentWindowPublisher(
             published[mark.id.toString()] = wanted.copy(revision = revision)
             counts.written++
         }
-        val desired = chosen.members.mapTo(mutableSetOf()) { it.id.toString() }
+    }
+
+    private fun encodeMoment(
+        peer: PeerDeliveryContext,
+        mark: MarkedMoment,
+        member: WindowMember,
+        body: JsonElement,
+        hash: String,
+        bytes: ByteArray,
+    ): Map<String, String> {
+        val reference = if (RecordEnvelopeCodec.needsChannel(body)) BodyRef(hash, bytes.size.toLong()) else null
+        val envelope =
+            MomentEnvelopeBody.envelope(mark, RecordOrigin.PHONE).copy(
+                context = peer,
+                reasons = member.reasons,
+                body = body.takeIf { reference == null },
+                bodyRef = reference,
+            )
+        return EnvelopeDataMap.toDataMap(envelope, mark.lastUpdated.toEpochMilliseconds())
+    }
+
+    private suspend fun evictMembers(
+        peer: PeerDeliveryContext,
+        now: Instant,
+        desired: Set<String>,
+        deletedIds: Set<String>,
+        published: MutableMap<String, PublishedItem>,
+        tombstones: MutableMap<String, Long>,
+        counts: Counts,
+        current: suspend () -> Unit,
+    ) {
         for (id in published.keys.toSet() - desired - deletedIds) {
             current()
             val uuid = Uuid.parse(id)
@@ -159,6 +226,17 @@ class PhoneMomentWindowPublisher(
             tombstones[id] = now.toEpochMilliseconds()
             counts.removed++
         }
+    }
+
+    private suspend fun clearOldTombstones(
+        peer: PeerDeliveryContext,
+        now: Instant,
+        desired: Set<String>,
+        deletedIds: Set<String>,
+        tombstones: MutableMap<String, Long>,
+        counts: Counts,
+        current: suspend () -> Unit,
+    ) {
         for ((id, at) in tombstones.toMap()) {
             if (id in desired || id in deletedIds) continue
             current()
@@ -177,19 +255,6 @@ class PhoneMomentWindowPublisher(
                 }
             }
         }
-        current()
-        manifest.write(peer, previous.copy(moments = published, momentTombstones = tombstones, momentDeletions = deletionProofs))
-        current()
-        return MomentWindowPublished(
-            chosen.members.mapNotNull { member ->
-                published[member.id.toString()]?.let {
-                    WindowMemberRef(RecordKind.MOMENT, member.id.toString(), it.contentVersion, it.revision)
-                }
-            },
-            counts.written,
-            counts.removed,
-            counts.failed,
-        )
     }
 
     private fun bodyBytes(mark: MarkedMoment) =
