@@ -80,18 +80,7 @@ internal class MomentUploader(
 
     private suspend fun send(pending: PendingUpload): Boolean {
         val id = Uuid.parse(pending.entityId)
-        if (pending.operation == PendingOperation.DELETE) {
-            request(pending) { config.cloud.delete(it, id) }
-            val settled =
-                transactions.withTransaction {
-                    ensureScope(pending)
-                    val result = metadata.settleIfCurrent(TYPE, pending, Clock.System.now(), 0)
-                    ensureScope(pending)
-                    result
-                }
-            retries.finishPersistedSettlement(TYPE, pending, settled)
-            return true
-        }
+        if (pending.operation == PendingOperation.DELETE) return sendDeletion(pending, id)
         var mark = config.repository.getMark(id) ?: error("Queued marked moment has no local body")
         if (pending.expectedServerVersion != null) mark = mark.copy(syncVersion = pending.expectedServerVersion)
         if (pending.operation == PendingOperation.CREATE || mark.syncVersion <= 0) {
@@ -142,6 +131,22 @@ internal class MomentUploader(
             }
         }
         error("Moment retry limit reached")
+    }
+
+    private suspend fun sendDeletion(
+        pending: PendingUpload,
+        id: Uuid,
+    ): Boolean {
+        request(pending) { config.cloud.delete(it, id) }
+        val settled =
+            transactions.withTransaction {
+                ensureScope(pending)
+                val result = metadata.settleIfCurrent(TYPE, pending, Clock.System.now(), 0)
+                ensureScope(pending)
+                result
+            }
+        retries.finishPersistedSettlement(TYPE, pending, settled)
+        return true
     }
 
     private suspend fun mergeRemote(
