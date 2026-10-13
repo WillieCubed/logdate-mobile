@@ -1,284 +1,120 @@
 # `:app:wear` — Wear OS App
 
-LogDate on your wrist. Tap to record a thought, or press and hold to talk; log your mood with an
-emoji; and listen back to your voice memories, all without pulling out your phone.
+LogDate captures thoughts, voice recordings, moods, and marked moments on your wrist. The phone
+companion manages setup, the shared library, reminders, and device access.
 
 **Min SDK**: 34 (Wear OS 5+) | **Target SDK**: 37 | **Compile SDK**: 37
 
-## The watch and the phone are one app
+## Release and compatibility
 
-The watch app uses the **phone's package name** (`studio.hypertext.logdate`, and
-`studio.hypertext.logdate.debug` for debug builds) and is signed with the same key. It ships on the same
-Play listing as a Wear OS form factor. This looks odd, but the Wear Data Layer requires it: notes and
-audio only travel between a phone app and a watch app that match on both package name and signing key.
+The phone and watch use the same application ID (`studio.hypertext.logdate`, or
+`studio.hypertext.logdate.debug` for debug) and must have matching signing certificates for the Wear
+Data Layer. Matching identity is necessary, but does not establish pairing or a verified LogDate link.
+A Play phone build and a locally upload-key-signed watch build do not have matching app-signing keys.
+Install both from the corresponding Play internal test tracks for hardware dogfood.
 
-Two things follow from that:
+The redesign is gated by `FeatureFlag.WATCH_EXPERIENCE_V2`, default OFF. Protocol negotiation also
+requires the peer's version and advertised feature; an incompatible or older peer retains the legacy
+path. The flag is not evidence of runtime readiness. Enablement waits for the paired scenarios and
+user-operated hardware pass in the [dogfood checklist](../../docs/testing/wear-dogfood-checklist.md).
+The full design is [Wear OS and Phone Companion Redesign](../../docs/superpowers/specs/2026-10-02-wear-companion-experience-design.md).
 
-- A debug phone build and a debug watch build made on the same machine share a package name and debug
-  key, so they can talk to each other without any setup.
-- A phone build signed with a different key (the local `dogfood` build type uses the upload key, Play
-  uses the app signing key) will not exchange data with a watch build signed with another. Install
-  both from Play, or both from the same machine.
+Mobile distribution is **internal only**: phone `internal`, watch `wear:internal`. Release identity,
+versioning, and signing come from `app.logdate.android-release` in `build-logic`. See
+[Google Play Publishing](../../docs/reference/google-play-publishing.md#wear-os). Batch a verified
+implementation into one publication rather than creating a new Play version for each local commit.
 
-The watch does not talk to the LogDate server. It hands notes and audio to the phone, and the phone
-backs them up. Release identity, versioning and signing come from the `app.logdate.android-release`
-plugin in `build-logic`; publishing is covered in
-[Google Play Publishing](../../docs/reference/google-play-publishing.md#wear-os).
+## Companion behavior
 
-## Getting started
+With the redesign enabled, Today leads into Flow, retained memories, Archive, and moment details.
+Capture supports tap-to-record, hold-to-talk, pause/resume, explicit discard, and Undo. Shared
+preferences govern capture places, post-recording mood, reminders, and library sources. Permission
+and preference checks still apply when a background operation executes.
 
-### Prerequisites
+The phone's Watch page uses shared settings components and includes a populated Today preview,
+library/capture controls, Tiles and complications instructions, connection diagnostics, and removal.
+Optional watch onboarding persists a per-device handled marker. Installation and repair actions
+remain bound to the selected watch rather than silently targeting another node.
 
-- Android Studio with Wear OS system images (API 34+ round)
-- `adb` available on PATH ([setup](../../docs/environment/setup.md))
-- A Wear OS emulator **or** a physical watch with developer options enabled
+A linked watch can create encrypted captures through the phone or directly through its restricted
+cloud session. The phone remains the editor: it resolves marked moments, captions, photo suggestions,
+and attachments. Accepted captures survive offline retries; sync receipts distinguish local storage
+from delivery and cloud backup. The watch's cloud profile cannot enroll another device.
 
-### Build and install
+Recording continuity exposes the live watch recording on the phone with Stop and Open actions.
+Playback handoffs use acknowledged requests: an attempted command must not appear completed merely
+because a button was tapped or the transport accepted bytes.
 
-```bash
-# Build debug APK
-./gradlew :app:wear:assembleDebug
+Removal drains pending captures first, revokes the linked cloud session, and clears watch data.
+An offline watch retains a deferred erase request; a failed step remains actionable and must not be
+shown as complete. Sign-out follows the same protection before clearing phone credentials.
 
-# Install on a connected Wear OS device or emulator
-./gradlew :app:wear:installDebug
-```
+These are implemented paths under acceptance, not a claim that the current published flag-off build
+exposes them. See the checklist for the exact release candidate and unresolved runtime gates.
 
-### Installing on a physical watch
+## Reminders
 
-1. **Enable developer options** on the watch:
-   Settings > System > About > tap "Build number" 7 times.
+Reminders are explicitly optional. Notification permission alone does not enable them. Established
+users with effective legacy nudges retain their choice through migration; a new installation stays
+OFF until chosen. The phone publishes learned waking hours for offline watch scheduling, with safe
+fallback when sleep access is unavailable. Device arbitration and the shared daily budget still apply.
 
-2. **Enable ADB debugging**:
-   Settings > Developer options > ADB debugging > ON.
-
-3. **Connect over Wi-Fi** (watches rarely have USB ports):
-   - On the watch: Settings > Developer options > Wireless debugging > ON.
-     Note the IP address and port shown (e.g., `192.168.1.42:5555`).
-   - On your machine:
-     ```bash
-     adb connect 192.168.1.42:5555
-     ```
-   - Accept the debugging prompt on the watch.
-
-4. **Install**:
-   ```bash
-   ./gradlew :app:wear:installDebug
-   ```
-   Or install the APK directly:
-   ```bash
-   adb -s 192.168.1.42:5555 install app/wear/build/outputs/apk/debug/wear-debug.apk
-   ```
-
-5. **View logs**:
-   ```bash
-   adb -s 192.168.1.42:5555 logcat -s LogDate
-   ```
-
-> **Bluetooth debugging** (alternative): On watches without Wi-Fi debugging, pair through
-> the Wear OS companion app on your phone, then enable Debug over Bluetooth in Developer
-> options. See the [official guide][wear-debug-docs].
-
-### Using the emulator
-
-```bash
-# Create a Wear OS AVD (round, API 34)
-# Android Studio > Device Manager > Create Device > Wear OS > Small Round > API 34
-
-# Or via command line
-avdmanager create avd -n WearOS_Round -k "system-images;android-34;google_apis;x86_64" -d "wearos_small_round"
-emulator -avd WearOS_Round
-```
-
-After the emulator boots:
-```bash
-./gradlew :app:wear:installDebug
-```
-
-> **Limitations**: Microphone input and Health Services require a physical watch. The
-> emulator works for UI development, navigation, and screenshot tests.
-
-## Features
-
-### Implemented
-
-| Feature | Description | Entry point |
-|---------|-------------|-------------|
-| **Voice recorder** | Tap to record until you tap again, or press and hold to talk and release to save. Pause, discard, and a five second Undo after saving | Home |
-| **Voice memories** | Every recording newest first, with a player that has play and pause, 10 second skips and a progress bar | Home > headphones |
-| **Mood Check-in** | Tap an emoji | Home > mood button |
-| **Quick Text** | System speech-to-text, saved as a text note | Home > More > Quick text |
-| **Timeline** | Entries by day, with inline audio playback | Home > More > Timeline |
-| **Haptic Feedback** | Distinct vibration patterns for every interaction | Automatic |
-
-### Implemented Platform Capabilities
-
-- Timeline browser with day-by-day entry viewing
-- Phone sync via the Wear Data Layer API
-- Health Services integration with graceful fallback when unavailable
-- Tiles and complications for quick capture and daily summaries
-- Watch-owned location capture for standalone geotagged journal entries
+Phone Health Connect workout collection is deliberately omitted from this internal release; no
+exercise permission or Play health declaration is added. Compatible watches retain the separate
+passive workout trigger subject to capability, consent, and permissions. See the
+[recorded release decision](../../docs/testing/wear-workout-reminder-release-decision.md).
 
 ## Architecture
 
-```
-app/wear/src/main/kotlin/app/logdate/wear/
-├── LogDateWearApplication.kt        Koin setup (wearDataModule + wearAudioModule)
-├── di/
-│   ├── WearDataModule.kt            Room DB, repositories, DataStore
-│   └── AudioModule.kt               ViewModels, recording infrastructure
-├── haptic/
-│   └── WearHapticEngine.kt          Centralized haptic patterns
-├── recording/
-│   ├── WearRecorder.kt              The recorder as screens see it
-│   └── WearAudioRecordingManager.kt Session logic over the shared recording service
-├── playback/
-│   ├── WearVoiceNotePlayer.kt       Play, pause, skip, output checks
-│   ├── WearPlaybackEngine.kt        Media3 playback behind a small interface
-│   └── WearSyncedAudioResolver.kt   Fetches audio from the phone when the watch lacks it
-├── location/
-│   └── WearLocationCaptureCoordinator.kt  Journal-entry geotagging policy
-├── data/storage/
-│   └── StorageSpaceChecker.kt       Pre-recording space validation
-├── presentation/
-│   ├── MainActivity.kt              Single activity, hosts NavDisplay
-│   ├── theme/Theme.kt               Material 3 for Wear OS
-│   ├── navigation/WearNavRoutes.kt  NavKey route definitions
-│   ├── home/                        The recorder screen + ViewModel
-│   ├── recording/                   Recorder ViewModel and its state
-│   ├── memories/                    Voice memories list and player
-│   ├── more/                        Quick text, Timeline and Settings
-│   ├── timeline/                    Day list and day detail
-│   ├── mood/                        Emoji picker + ViewModel
-│   └── quicktext/                   System STT handler
-├── complication/
-│   ├── EntryCountComplicationService.kt  Today's journal entry count
-│   ├── MoodComplicationService.kt        Today's mood shortcut
-│   ├── QuickCaptureComplicationService.kt Voice-note shortcut
-│   └── StreakComplicationService.kt      Journaling streak
-└── tile/
-    ├── QuickCaptureTileService.kt   Voice, mood, and text capture shortcuts
-    └── TodaySummaryTileService.kt   Daily summary and timeline shortcut
-```
+- `di/`: platform dependencies, protocol, window publication, reminders, continuity, and removal.
+- `recording/`: shared recording-service controller, audio persistence/recovery, and Undo.
+- `capture/`: shared preference checks and the capture/write guard used during secure erasure.
+- `sync/v2/`: verified linking, receipts, library membership, media delivery, shared state, and removal.
+- `v2/`: responsive watch destinations, moment actions, recorder, playback, and live continuity.
+- `presentation/`, `playback/`: retained legacy presentation and playback compatibility.
+- `tile/`, `complication/`: system entry points and compact summaries.
 
-### Data layer
+The watch uses the shared Room schema, migrations, SQLCipher storage, and note repositories. Cloud
+credentials and identity/media keys stay in protected device storage. The bounded library window is
+phone-owned; watch-owned captures are distinct from evictable phone library copies. Persisted window
+reasons supply On this day, the previous completed week's Rewind, and actual starred sources without
+requiring the watch to generate Rewinds.
 
-The watch runs the **same Room schema** as the phone (all entities, all migrations, SqlCipher
-encryption). Most tables are simply empty on the watch. This eliminates sync impedance.
-
-Key shared modules wired into the Wear app:
-- `client/database` — Room DB + SqlCipher + DAOs
-- `client/data` — `OfflineFirstJournalNotesRepository`
-- `client/datastore` — User preferences
-- `client/device` — `DatabasePassphraseProvider` (Android KeyStore)
-
-### Dependency injection
-
-Two Koin modules loaded in `LogDateWearApplication`:
-
-- **`wearDataModule`** — Database, repositories, DataStore, passphrase provider
-- **`wearAudioModule`** — ViewModels, `WearAudioRecordingManager`, the shared recording service controller, playback, `StorageSpaceChecker`, `WearHapticEngine`
-
-### Navigation
-
-Flat, single-level navigation from the home hub. All routes are defined as `NavKey` objects
-in `WearNavRoutes.kt`. Back always returns home or exits. The app uses Navigation 3's
-`NavDisplay` with `SwipeDismissableEntry` for swipe-to-dismiss.
-
-## Permissions
-
-Declared in `AndroidManifest.xml`:
-
-| Permission | Purpose |
-|------------|---------|
-| `RECORD_AUDIO` | Microphone access for voice notes |
-| `FOREGROUND_SERVICE` | Background recording |
-| `FOREGROUND_SERVICE_MICROPHONE` | Foreground service type |
-| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Playback that continues with the screen off |
-| `POST_NOTIFICATIONS` | The recording and playback notifications |
-| `WAKE_LOCK` | Keep recording when screen is off |
-| `VIBRATE` | Haptic feedback |
-
-## Testing
-
-Three test layers cover every screen:
-
-### Unit tests (`src/test/`)
+## Build and emulator validation
 
 ```bash
-./gradlew :app:wear:testDebugUnitTest
-```
-
-They cover the recorder session (`WearAudioRecordingManagerTest`), the recording ViewModel including
-the tap and hold gesture, undo and interruptions (`WearRecordingViewModelTest`), the voice note player
-and the memories screens' ViewModels, watch to phone sync and its acknowledgement handling, the mood and
-settings ViewModels, and the haptic engine.
-
-### Screenshot tests (`src/screenshotTest/`)
-
-Render every screen state on small round and large round watch displays, on the watch's black
-background. No device needed.
-
-```bash
-# Generate or update baseline images
-./gradlew :app:wear:updateDebugScreenshotTest
-
-# Validate current screenshots match baselines
-./gradlew :app:wear:validateDebugScreenshotTest
-```
-
-Baselines live in `src/screenshotTestDebug/reference/` and are committed to git. Each preview
-produces two images, one per display size. Home has a preview for every recorder state, and the
-voice memories screens have previews for the list, the player, and its failure states.
-
-The `@WearScreenshotPreviewMatrix` annotation applies both device specs automatically:
-```kotlin
-@Preview(name = "Small Round", device = "id:wearos_small_round")
-@Preview(name = "Large Round", device = "id:wearos_large_round")
-annotation class WearScreenshotPreviewMatrix
-```
-
-### Instrumented E2E tests (`src/androidTest/`)
-
-Require a Wear OS emulator or a managed device.
-
-```bash
-./gradlew :app:wear:wearSmallRoundApi34DebugAndroidTest
-```
-
-`WearHomeScreenTest` checks the controls each recorder state shows, and the day detail, mood and sync
-suites cover the rest. These tests render stateless content composables (such as `WearHomeContent`)
-with controlled state, so they need neither a bound service nor a ViewModel.
-
-## Quick reference
-
-```bash
-# Build
+# Build only; no connected-device selection
 ./gradlew :app:wear:assembleDebug
 
-# Install on connected device
-./gradlew :app:wear:installDebug
+# Host behavior checks
+./gradlew :app:wear:testDebugUnitTest :app:wear:ktlintCheck :app:wear:detekt
 
-# Run unit tests
-./gradlew :app:wear:testDebugUnitTest
+# Emulator-only instrumentation
+./gradlew :app:wear:wearSmallRoundApi34DebugAndroidTest
 
-# Generate screenshot baselines
-./gradlew :app:wear:updateDebugScreenshotTest
-
-# Validate screenshots
+# Compare existing visual references
 ./gradlew :app:wear:validateDebugScreenshotTest
-
-# Build the release bundle (see the Play publishing doc)
-./gradlew :app:wear:bundleRelease
-
-# Lint
-./gradlew :app:wear:ktlintCheck
 ```
+
+For manual paired acceptance, first verify both explicit `adb` serials begin with `emulator-`.
+Use Android Studio Device Manager's Pair Wearable flow and verify the actual peer in LogDate's
+connection diagnostics. An AVD named “Paired Watch” or a saved Android Studio association does not
+prove that the running phone and watch are paired. Preserve retained AVD data and credentials.
+
+Repository policy forbids agent installs, instrumentation, and other device commands against
+physical hardware. Hardware acceptance is performed by the user using Play internal builds. Do not
+uninstall or clear LogDate data to troubleshoot setup. Controlled fixture instrumentation can replace
+link/session state; run it on managed devices, not the retained pair used for end-to-end acceptance.
+
+Visual tests cover small/large round screens; the consolidated phone/watch matrix also covers
+populated states, large text, RTL, dark/dynamic colors, and reduced motion. Static rendering does not
+prove rotary/gesture input, real audio, background behavior, Bluetooth, battery, or paired delivery.
+See [Screenshot tests](../../docs/testing/screenshot-tests.md) and the
+[cloud acceptance record](../../docs/testing/wear-cloud-companion-acceptance.md).
 
 ## Further reading
 
-- [Audio recording feature](../../docs/feature-design/wear-audio-recording.md) — recording service, storage, battery
-- [Testing strategy](../../docs/testing/introduction.md) — project-wide testing approach
-- [Screenshot tests](../../docs/testing/screenshot-tests.md) — visual regression guide
-- [Wear OS debugging][wear-debug-docs] — official setup docs
-
-[wear-debug-docs]: https://developer.android.com/training/wearables/get-started/debugging
+- [Audio recording feature](../../docs/feature-design/wear-audio-recording.md)
+- [Testing strategy](../../docs/testing/introduction.md)
+- [Wear OS and phone companion design](../../docs/superpowers/specs/2026-10-02-wear-companion-experience-design.md)
+- [Internal hardware dogfood and rollout](../../docs/testing/wear-dogfood-checklist.md)

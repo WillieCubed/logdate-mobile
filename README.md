@@ -42,7 +42,7 @@ Each module contains detailed documentation in its respective `README.md` file:
 ### App Modules
 - [`:app:android-main`](app/android-main/) - Android application wrapper/entry point
 - [`:app:compose-main`](app/compose-main/README.md) - Shared Compose Multiplatform app module (Android/iOS/Desktop)
-- [`:app:wear`](app/wear/README.md) - Wear OS companion app with Material 3 UI
+- [`:app:wear`](app/wear/README.md) - Wear OS companion, verified phone linking, and gated redesign; [internal acceptance checklist](docs/testing/wear-dogfood-checklist.md)
 
 ### Client Infrastructure
 - [`:client:database`](client/database/README.md) - Local data persistence with Room
@@ -210,8 +210,8 @@ docker-compose --profile full-stack up
 # Build a release app bundle
 ./gradlew :app:android-main:bundleRelease
 
-# Build and install Wear OS app
-./gradlew :app:wear:installDebug
+# Build Wear OS app (use emulator-only validation or Play internal hardware dogfood)
+./gradlew :app:wear:assembleDebug
 
 # Run Desktop app
 ./gradlew :app:compose-main:run
