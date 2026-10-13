@@ -1,6 +1,7 @@
 package app.logdate.feature.journals.ui.detail
 
 import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
+import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.audio.AudioContextProcessor
 import kotlinx.coroutines.Dispatchers
@@ -164,6 +165,61 @@ class AudioNoteViewerViewModelTest {
             advanceUntilIdle()
 
             assertEquals(1f, audioPlaybackManager.lastSeek)
+        }
+
+    @Test
+    fun `another recording does not appear to play in the opened note`() =
+        runTest(dispatcher) {
+            val noteId = Uuid.random()
+            val now = Instant.parse("2025-01-01T00:00:00Z")
+            val note =
+                JournalNote.Audio(
+                    mediaRef = "audio://opened",
+                    durationMs = 1000L,
+                    uid = noteId,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                )
+            val audioPlaybackManager = FakeAudioPlaybackManager()
+            val viewModel =
+                AudioNoteViewerViewModel(
+                    noteId = noteId,
+                    notesRepository = FakeJournalNotesRepository(listOf(note)),
+                    audioContextProcessor =
+                        AudioContextProcessor(
+                            amplitudeExtractor = FakeAmplitudeExtractor(),
+                            waveformStorage = FakeWaveformStorage(),
+                            coroutineContext = dispatcher,
+                        ),
+                    durationResolver = FakeAudioDurationResolver(durationMs = 1000L),
+                    audioPlaybackManager = audioPlaybackManager,
+                    getJournalMembership = GetJournalMembershipUseCase(FakeDetailJournalContentRepository()),
+                    audioTagRepository = FakeAudioTagRepository(),
+                )
+            advanceUntilIdle()
+
+            audioPlaybackManager.updateStatus(
+                audioPlaybackManager.playbackStatus.value.copy(
+                    isPlaying = true,
+                    progress = 0.25f,
+                    metadata = AudioPlaybackMetadata(noteId = noteId),
+                ),
+            )
+            advanceUntilIdle()
+            assertTrue(assertIs<AudioNoteViewerUiState.Ready>(viewModel.uiState.value).playbackState.isPlaying)
+
+            audioPlaybackManager.updateStatus(
+                audioPlaybackManager.playbackStatus.value.copy(
+                    isPlaying = true,
+                    progress = 0.5f,
+                    metadata = AudioPlaybackMetadata(noteId = Uuid.random()),
+                ),
+            )
+            advanceUntilIdle()
+
+            val ready = assertIs<AudioNoteViewerUiState.Ready>(viewModel.uiState.value)
+            assertFalse(ready.playbackState.isPlaying)
+            assertEquals(0f, ready.playbackState.progress)
         }
 
     @Test

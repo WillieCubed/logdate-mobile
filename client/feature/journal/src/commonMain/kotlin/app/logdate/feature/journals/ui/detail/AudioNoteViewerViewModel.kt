@@ -211,6 +211,21 @@ class AudioNoteViewerViewModel(
         statusProvider ?: return
         viewModelScope.launch {
             statusProvider.playbackStatus.collect { status ->
+                val currentNoteId = status.metadata?.noteId
+                val playingAnotherNote =
+                    when {
+                        currentNoteId != null -> currentNoteId != noteId
+                        status.currentUri != null -> status.currentUri != cachedAudioMediaRef
+                        else -> false
+                    }
+                if (playingAnotherNote) {
+                    cachedPlaybackState = AudioPlaybackUiState()
+                    _uiState.update { state ->
+                        val ready = state as? AudioNoteViewerUiState.Ready ?: return@update state
+                        ready.copy(playbackState = cachedPlaybackState)
+                    }
+                    return@collect
+                }
                 val durationMs =
                     if (status.duration > Duration.ZERO) {
                         status.duration.inWholeMilliseconds
