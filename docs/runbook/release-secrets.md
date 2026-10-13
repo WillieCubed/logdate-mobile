@@ -28,6 +28,8 @@ run one command.
 | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | `app/android-main/src/release/google-services.json` (release Firebase project) | When Firebase release project config changes. |
 | `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | `iosApp/iosApp/Firebase/GoogleService-Info-Release.plist` (single iOS Firebase project) | When Firebase iOS project config changes. |
 | `LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG` | Dedicated debug-project Android key restricted to `studio.hypertext.logdate.debug`, its matching debug signing certificate, Places API, and Maps SDK for Android. | When the debug signing key or API restriction changes. |
+| `LOGDATE_CI_DEBUG_KEYSTORE_BASE64` | Dedicated CI-only debug keystore, alias `androiddebugkey`, with the standard Android debug password. Used only by native-map acceptance. | Rotate together with the CI Maps key restriction and `LOGDATE_CI_DEBUG_CERT_SHA1` repository variable. |
+| `LOGDATE_CI_GOOGLE_MAPS_API_KEY` | `logdate-dev` Maps SDK for Android key restricted to `studio.hypertext.logdate.debug` and the exact dedicated CI debug certificate. | When the CI signing identity changes. |
 | `LOGDATE_GOOGLE_MAPS_API_KEY_RELEASE` | Dedicated release-project Android key restricted to `studio.hypertext.logdate` and the applicable release signing certificates, Places API, and Maps SDK for Android. | When the upload or Play signing key changes. |
 
 ### Google ID-token audiences and Android OAuth clients

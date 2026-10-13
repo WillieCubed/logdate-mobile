@@ -9,6 +9,7 @@ on:
       - 'client/ui/**/workspace/**'
       - 'client/feature/location-timeline/**'
       - 'app/android-main/src/androidTest/**/HomeWorkspaceE2ETest.kt'
+      - 'scripts/materialize-ci-debug-keystore.py'
       - '.github/workflows/home-workspace-acceptance.yml'
 
 permissions:
@@ -28,7 +29,7 @@ jobs:
         uses: ./.github/actions/setup-firebase-configs
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
-          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          android-maps-api-key: ${{ secrets.LOGDATE_CI_GOOGLE_MAPS_API_KEY }}
           google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
       - name: Require native map configuration
         shell: bash
@@ -38,6 +39,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Install the dedicated CI debug signer
+        env:
+          LOGDATE_CI_DEBUG_KEYSTORE_BASE64: ${{ secrets.LOGDATE_CI_DEBUG_KEYSTORE_BASE64 }}
+          LOGDATE_CI_DEBUG_CERT_SHA1: ${{ vars.LOGDATE_CI_DEBUG_CERT_SHA1 }}
+        run: python3 scripts/materialize-ci-debug-keystore.py "$HOME/.android/debug.keystore"
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
