@@ -72,5 +72,6 @@ jobs:
           path: |
             app/android-main/build/outputs/androidTest-results/managedDevice/debug/**/TEST-*.xml
             app/android-main/build/outputs/managed_device_android_test_additional_output/**/*.png
+            app/android-main/build/outputs/managed_device_android_test_additional_output/**/*.txt
           if-no-files-found: warn
           retention-days: 14

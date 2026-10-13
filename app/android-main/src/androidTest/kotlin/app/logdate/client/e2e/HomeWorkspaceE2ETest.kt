@@ -23,9 +23,11 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -318,13 +320,7 @@ class HomeWorkspaceE2ETest {
                 }
             }
         }
-        compose.waitUntil(timeoutMillis = 30_000) {
-            compose
-                .onAllNodes(
-                    SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Map loaded"),
-                ).fetchSemanticsNodes()
-                .isNotEmpty()
-        }
+        awaitNativeMap(context.getString(keyId))
         compose.onNodeWithTag("history-native-map").assertIsDisplayed()
         capture("workspace-native-map-peek")
         // On wider managed devices the supporting panel is already expanded.
@@ -389,5 +385,30 @@ class HomeWorkspaceE2ETest {
         val file = File(directory, "$name-${device.displayWidth}x${device.displayHeight}.png")
         file.parentFile?.mkdirs()
         assertTrue(device.takeScreenshot(file))
+    }
+
+    private fun awaitNativeMap(apiKey: String) {
+        try {
+            compose.waitUntil(timeoutMillis = 30_000) {
+                compose.onAllNodes(
+                    SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Map loaded"),
+                ).fetchSemanticsNodes().isNotEmpty()
+            }
+        } catch (failure: Exception) {
+            val directory = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+                ?: throw failure
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            val prefix = "workspace-native-map-failure-${device.displayWidth}x${device.displayHeight}"
+            runCatching {
+                File(directory).mkdirs()
+                device.takeScreenshot(File(directory, "$prefix.png"))
+                File(directory, "$prefix-semantics.txt").writeText(compose.onRoot(useUnmergedTree = true).printToString())
+                val logs = device.executeShellCommand(
+                    "logcat -d -s 'Google Maps Android API' 'MapsInitializer' 'DynamiteModule' 'GooglePlayServicesUtil' '*:S'",
+                ).replace(apiKey, "[REDACTED]").replace(Regex("AIza[0-9A-Za-z_-]+"), "[REDACTED]")
+                File(directory, "$prefix-maps.txt").writeText(logs)
+            }.onFailure { failure.addSuppressed(it) }
+            throw failure
+        }
     }
 }
