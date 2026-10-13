@@ -44,9 +44,10 @@ jobs:
         include:
           - platform: Android
             module: android-main
-            runner: ubuntu-latest
-            distribution: temurin
-            java-version: '17'
+            # Match the rendering host used for the committed pixel-exact references.
+            runner: macos-latest
+            distribution: jetbrains
+            java-version: '21'
           - platform: Wear
             module: wear
             runner: macos-latest

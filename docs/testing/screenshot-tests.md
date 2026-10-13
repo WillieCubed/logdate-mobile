@@ -573,7 +573,7 @@ that touch app, feature, UI, theme, or build code. It runs three jobs:
 
 | Job | Runner | Command |
 | --- | --- | --- |
-| `android-wear-screenshots` | Ubuntu (phone), macOS (Wear, whose references match the Mac renderer) | `./gradlew :app:<module>:validateDebugScreenshotTest --continue` |
+| `android-wear-screenshots` | macOS with JetBrains JDK 21 (phone and Wear, matching the committed references' rendering host) | `./gradlew :app:<module>:validateDebugScreenshotTest --continue` |
 | `desktop-screenshots` | macOS | `./gradlew validateDesktopScreenshots --continue` |
 | `ios-screenshot-validation` | macOS | `./gradlew validateIosScreenshots --continue` |
 
