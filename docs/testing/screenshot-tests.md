@@ -580,6 +580,12 @@ that touch app, feature, UI, theme, or build code. It runs three jobs:
 Each job uploads its results (rendered images and diffs) as a build artifact. When a job fails,
 download the artifact and compare the `diffs/` images with the references.
 
+Android and Wear validation use `TZ=America/Los_Angeles` and
+`JAVA_TOOL_OPTIONS=-Duser.timezone=America/Los_Angeles`, matching the committed references' local
+date/time labels. Use the same environment when validating or recording their references locally.
+The validation step has a 40-minute timeout inside a 45-minute job, leaving time to upload rendered
+images, diffs, and XML/HTML reports even when validation times out.
+
 ## Troubleshooting
 
 ### "Expected images not found"

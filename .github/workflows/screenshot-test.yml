@@ -37,7 +37,7 @@ jobs:
   android-wear-screenshots:
     name: ${{ matrix.platform }} screenshots
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -80,14 +80,22 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Validate ${{ matrix.platform }} screenshots
+        timeout-minutes: 40
+        env:
+          # Fixture instants were recorded in this zone; keep date/time labels reproducible.
+          TZ: America/Los_Angeles
+          JAVA_TOOL_OPTIONS: -Duser.timezone=America/Los_Angeles
         run: ./gradlew :app:${{ matrix.module }}:validateDebugScreenshotTest --continue
 
       - name: Upload ${{ matrix.platform }} screenshot reports
-        if: ${{ !cancelled() }}
+        if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ matrix.module }}-screenshot-report
-          path: app/${{ matrix.module }}/build/outputs/screenshotTest-results/
+          path: |
+            app/${{ matrix.module }}/build/outputs/screenshotTest-results/
+            app/${{ matrix.module }}/build/test-results/validateDebugScreenshotTest/
+            app/${{ matrix.module }}/build/reports/screenshotTest/
           retention-days: 14
 
   desktop-screenshots:
