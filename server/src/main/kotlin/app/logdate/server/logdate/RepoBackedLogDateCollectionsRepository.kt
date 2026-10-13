@@ -31,7 +31,13 @@ internal class RepoBackedLogDateCollectionsRepository(
     internal val metadataStore: LogDateCollectionsMetadataStore,
 ) : LogDateCollectionsRepository {
     internal val repoEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
-    private val conditionalWriter = RepoConditionalWriter(repoEngine, metadataStore)
+    private val transaction = blockStore as? RepoWriteTransaction ?: RepoWriteTransaction.Direct
+    private val conditionalWriter =
+        RepoConditionalWriter(
+            repoEngine,
+            metadataStore,
+            transaction,
+        )
 
     override suspend fun status(userId: UUID): LogDateCollectionsStatus = metadataStore.status(userId)
 
@@ -47,26 +53,27 @@ internal class RepoBackedLogDateCollectionsRepository(
     override suspend fun upsertEntry(
         userId: UUID,
         entry: LogDateEntry,
-    ): LogDateEntry {
-        val repoDid = canonicalRepoDid(userId)
-        val preserved =
-            entry.copy(
-                transcript =
-                    entry.transcript ?: getEntry(userId, entry.id)
-                        ?.takeIf {
-                            it.type == entry.type && it.mediaUri == entry.mediaUri && it.durationMs == entry.durationMs
-                        }?.transcript,
-            )
-        repoEngine.putRecord(entryRecordId(repoDid, entry.id), preserved.toRepoJson()).getOrThrow()
-        val metadata =
-            metadataStore.upsert(
-                userId = userId,
-                repoDid = repoDid,
-                collection = LogDateCollectionKind.ENTRY,
-                recordKey = entry.id,
-            )
-        return preserved.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
-    }
+    ): LogDateEntry =
+        transaction.write {
+            val repoDid = canonicalRepoDid(userId)
+            val preserved =
+                entry.copy(
+                    transcript =
+                        entry.transcript ?: getEntry(userId, entry.id)
+                            ?.takeIf {
+                                it.type == entry.type && it.mediaUri == entry.mediaUri && it.durationMs == entry.durationMs
+                            }?.transcript,
+                )
+            repoEngine.putRecord(entryRecordId(repoDid, entry.id), preserved.toRepoJson()).getOrThrow()
+            val metadata =
+                metadataStore.upsert(
+                    userId = userId,
+                    repoDid = repoDid,
+                    collection = LogDateCollectionKind.ENTRY,
+                    recordKey = entry.id,
+                )
+            return@write preserved.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
+        }
 
     override suspend fun entryExists(
         userId: UUID,
@@ -172,21 +179,23 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
         deletedAt: Long,
-    ) {
-        val existing = metadataStore.metadata(userId, LogDateCollectionKind.ENTRY, id) ?: return
-        val repoDid = canonicalRepoDid(userId)
-        val deleted = repoEngine.deleteRecord(entryRecordId(repoDid, id)).getOrThrow()
-        if (!deleted) {
-            Napier.w("Expected canonical repo entry $id for user $userId before tombstoning it")
+    ): Unit =
+        transaction.write {
+            val existing = metadataStore.metadata(userId, LogDateCollectionKind.ENTRY, id) ?: return@write
+            val repoDid = canonicalRepoDid(userId)
+            val deleted = repoEngine.deleteRecord(entryRecordId(repoDid, id)).getOrThrow()
+            if (!deleted) {
+                Napier.w("Expected canonical repo entry $id for user $userId before tombstoning it")
+            }
+            metadataStore.delete(
+                userId = userId,
+                repoDid = repoDid,
+                collection = LogDateCollectionKind.ENTRY,
+                recordKey = existing.recordKey,
+                deletedAt = deletedAt,
+            )
+            Unit
         }
-        metadataStore.delete(
-            userId = userId,
-            repoDid = repoDid,
-            collection = LogDateCollectionKind.ENTRY,
-            recordKey = existing.recordKey,
-            deletedAt = deletedAt,
-        )
-    }
 
     override suspend fun entryChanges(
         userId: UUID,
@@ -232,18 +241,19 @@ internal class RepoBackedLogDateCollectionsRepository(
     override suspend fun upsertJournal(
         userId: UUID,
         journal: LogDateJournal,
-    ): LogDateJournal {
-        val repoDid = canonicalRepoDid(userId)
-        repoEngine.putRecord(journalRecordId(repoDid, journal.id), journal.toRepoJson()).getOrThrow()
-        val metadata =
-            metadataStore.upsert(
-                userId = userId,
-                repoDid = repoDid,
-                collection = LogDateCollectionKind.JOURNAL,
-                recordKey = journal.id,
-            )
-        return journal.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
-    }
+    ): LogDateJournal =
+        transaction.write {
+            val repoDid = canonicalRepoDid(userId)
+            repoEngine.putRecord(journalRecordId(repoDid, journal.id), journal.toRepoJson()).getOrThrow()
+            val metadata =
+                metadataStore.upsert(
+                    userId = userId,
+                    repoDid = repoDid,
+                    collection = LogDateCollectionKind.JOURNAL,
+                    recordKey = journal.id,
+                )
+            return@write journal.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
+        }
 
     override suspend fun getJournal(
         userId: UUID,
@@ -267,21 +277,23 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
         deletedAt: Long,
-    ) {
-        val existing = metadataStore.metadata(userId, LogDateCollectionKind.JOURNAL, id) ?: return
-        val repoDid = canonicalRepoDid(userId)
-        val deleted = repoEngine.deleteRecord(journalRecordId(repoDid, id)).getOrThrow()
-        if (!deleted) {
-            Napier.w("Expected canonical repo journal $id for user $userId before tombstoning it")
+    ): Unit =
+        transaction.write {
+            val existing = metadataStore.metadata(userId, LogDateCollectionKind.JOURNAL, id) ?: return@write
+            val repoDid = canonicalRepoDid(userId)
+            val deleted = repoEngine.deleteRecord(journalRecordId(repoDid, id)).getOrThrow()
+            if (!deleted) {
+                Napier.w("Expected canonical repo journal $id for user $userId before tombstoning it")
+            }
+            metadataStore.delete(
+                userId = userId,
+                repoDid = repoDid,
+                collection = LogDateCollectionKind.JOURNAL,
+                recordKey = existing.recordKey,
+                deletedAt = deletedAt,
+            )
+            Unit
         }
-        metadataStore.delete(
-            userId = userId,
-            repoDid = repoDid,
-            collection = LogDateCollectionKind.JOURNAL,
-            recordKey = existing.recordKey,
-            deletedAt = deletedAt,
-        )
-    }
 
     override suspend fun recordJournalMergeDeletion(
         userId: UUID,
@@ -338,13 +350,13 @@ internal class RepoBackedLogDateCollectionsRepository(
     override suspend fun upsertAssociations(
         userId: UUID,
         associations: List<LogDateAssociation>,
-    ): List<LogDateAssociation> = repoUpsertAssociations(userId, associations)
+    ): List<LogDateAssociation> = transaction.write { repoUpsertAssociations(userId, associations) }
 
     override suspend fun deleteAssociations(
         userId: UUID,
         associations: List<LogDateAssociationRef>,
         deletedAt: Long,
-    ) = repoDeleteAssociations(userId, associations, deletedAt)
+    ) = transaction.write { repoDeleteAssociations(userId, associations, deletedAt) }
 
     override suspend fun associationChanges(
         userId: UUID,
@@ -355,7 +367,7 @@ internal class RepoBackedLogDateCollectionsRepository(
     override suspend fun upsertDraft(
         userId: UUID,
         draft: LogDateDraft,
-    ): LogDateDraft = repoUpsertDraft(userId, draft)
+    ): LogDateDraft = transaction.write { repoUpsertDraft(userId, draft) }
 
     override suspend fun getDraft(
         userId: UUID,
@@ -366,7 +378,7 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
         deletedAt: Long,
-    ) = repoDeleteDraft(userId, id, deletedAt)
+    ) = transaction.write { repoDeleteDraft(userId, id, deletedAt) }
 
     override suspend fun draftChanges(
         userId: UUID,

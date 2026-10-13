@@ -24,7 +24,8 @@ internal class RepoBackedLogDateMomentsRepository(
     private val mutations: JournalMergeStore,
 ) : LogDateMomentsRepository {
     private val repoEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
-    private val conditionalWriter = RepoConditionalWriter(repoEngine, metadataStore)
+    private val transaction = blockStore as? RepoWriteTransaction ?: RepoWriteTransaction.Direct
+    private val conditionalWriter = RepoConditionalWriter(repoEngine, metadataStore, transaction)
 
     override suspend fun updateMomentIfVersion(
         userId: UUID,
@@ -37,7 +38,7 @@ internal class RepoBackedLogDateMomentsRepository(
             if (expectedVersion != null && existing.version != expectedVersion) return@withAccountLock MomentUpdateResult.Conflict
             val changed = transform(existing)
             require(changed.id == id) { "A moment patch cannot change its identity" }
-            MomentUpdateResult.Updated(writeMoment(userId, changed))
+            MomentUpdateResult.Updated(transaction.write { writeMoment(userId, changed) })
         }
 
     override suspend fun momentState(
@@ -48,7 +49,7 @@ internal class RepoBackedLogDateMomentsRepository(
     override suspend fun upsertMoment(
         userId: UUID,
         moment: LogDateMoment,
-    ): LogDateMoment = mutations.withAccountLock(userId) { writeMoment(userId, moment) }
+    ): LogDateMoment = mutations.withAccountLock(userId) { transaction.write { writeMoment(userId, moment) } }
 
     override suspend fun createMomentIfAbsent(
         userId: UUID,
@@ -66,7 +67,7 @@ internal class RepoBackedLogDateMomentsRepository(
         id: String,
         deletedAt: Long,
     ) {
-        mutations.withAccountLock(userId) { removeMoment(userId, id, deletedAt) }
+        mutations.withAccountLock(userId) { transaction.write { removeMoment(userId, id, deletedAt) } }
     }
 
     override suspend fun momentChanges(

@@ -19,6 +19,7 @@ import java.util.UUID
 internal class RepoConditionalWriter(
     private val repoEngine: DefaultRepoEngine,
     private val metadataStore: LogDateCollectionsMetadataStore,
+    private val transaction: RepoWriteTransaction = RepoWriteTransaction.Direct,
 ) {
     suspend fun state(
         userId: UUID,
@@ -32,6 +33,18 @@ internal class RepoConditionalWriter(
 
     /** Writes [value] at [recordId] only if no live record holds it; [ConditionalCreate.Created] carries the new version. */
     suspend fun createIfAbsent(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordId: RepoRecordId,
+        value: JsonObject,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<Long> =
+        transaction.write {
+            create(userId, repoDid, collection, recordId, value, respectTombstones)
+        }
+
+    private suspend fun create(
         userId: UUID,
         repoDid: AtprotoDid,
         collection: LogDateCollectionKind,

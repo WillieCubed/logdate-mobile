@@ -9,6 +9,9 @@ import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.ConditionalCreate
+import app.logdate.server.logdate.LogDateCollectionKind
+import app.logdate.server.logdate.LogDateCollectionMetadata
+import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateRecordState
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
@@ -26,13 +29,181 @@ import org.junit.Assume.assumeTrue
 import studio.hypertext.atproto.repo.RepoHeadConflictException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /** Explicit disposable PostgreSQL only; races real repo-head swaps on one entry ID. */
 class ConditionalCreatePostgresTest {
+    @Test
+    fun `failed moment updates and deletions preserve the previously committed record`() =
+        runBlocking {
+            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
+            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
+            require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+            val previous = TransactionManager.defaultDatabase
+            val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+            try {
+                TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)
+                val accounts = InMemoryAccountRepository()
+                val signing = SigningKeyService(InMemorySigningKeyRepository(), "moment-rollback-kek")
+                val identity =
+                    AtprotoIdentityService(
+                        accounts,
+                        signing,
+                        AtprotoIdentityConfig(handleDomain = "logdate.test", pdsServiceEndpoint = "https://logdate.test"),
+                    )
+                val account =
+                    identity.ensureIdentity(
+                        accounts.save(
+                            Account(
+                                id = Uuid.random(),
+                                username = "rollback_${Uuid.random().toHexString().take(8)}",
+                                displayName = "Rollback",
+                                createdAt = Clock.System.now(),
+                            ),
+                        ),
+                    )
+                val owner = account.id.toJavaUUID()
+                val backing = PostgreSQLLogDateCollectionsMetadataStore()
+                val blocks = PostgreSQLRepoBlockStore()
+                val canonical = RepoBackedLogDateCollectionsRepository(accounts, identity, signing, blocks, backing)
+                val mutations = PostgreSQLJournalMergeStore(source)
+
+                fun moments(metadata: LogDateCollectionsMetadataStore) =
+                    app.logdate.server.logdate.RepoBackedLogDateMomentsRepository(
+                        accounts,
+                        signing,
+                        PostgreSQLRepoBlockStore(),
+                        metadata,
+                        canonical::canonicalRepoDid,
+                        mutations,
+                    )
+                val initial =
+                    moments(backing).upsertMoment(
+                        owner,
+                        app.logdate.server.logdate
+                            .LogDateMoment("rollback-mark", 100, 100, 0, DeviceId("watch"), "LDSE2:initial", 1),
+                    )
+                val persisted = moments(backing).getMoment(owner, initial.id)
+                val failing =
+                    object : LogDateCollectionsMetadataStore by backing {
+                        override suspend fun upsert(
+                            userId: java.util.UUID,
+                            repoDid: studio.hypertext.atproto.identity.AtprotoDid,
+                            collection: LogDateCollectionKind,
+                            recordKey: String,
+                        ): LogDateCollectionMetadata {
+                            backing.upsert(userId, repoDid, collection, recordKey)
+                            error("Stop after index write")
+                        }
+
+                        override suspend fun delete(
+                            userId: java.util.UUID,
+                            repoDid: studio.hypertext.atproto.identity.AtprotoDid,
+                            collection: LogDateCollectionKind,
+                            recordKey: String,
+                            deletedAt: Long,
+                            allowMissing: Boolean,
+                        ): LogDateCollectionMetadata? {
+                            backing.delete(userId, repoDid, collection, recordKey, deletedAt, allowMissing)
+                            error("Stop after tombstone write")
+                        }
+                    }
+                val repoDid =
+                    studio.hypertext.atproto.identity.AtprotoDid
+                        .require(requireNotNull(account.did))
+                val before = blocks.readHead(repoDid).getOrThrow()
+                assertFailsWith<IllegalStateException> {
+                    moments(failing).updateMomentIfVersion(owner, initial.id, initial.version) { it.copy(payload = "LDSE2:changed") }
+                }
+                assertEquals(persisted, moments(backing).getMoment(owner, initial.id))
+                assertEquals(before, PostgreSQLRepoBlockStore().readHead(repoDid).getOrThrow())
+                assertFailsWith<IllegalStateException> { moments(failing).deleteMoment(owner, initial.id, 500) }
+                assertEquals(persisted, moments(backing).getMoment(owner, initial.id))
+                assertEquals(before, PostgreSQLRepoBlockStore().readHead(repoDid).getOrThrow())
+            } finally {
+                source.close()
+                TransactionManager.defaultDatabase = previous
+            }
+        }
+
+    @Test
+    fun `failure after indexing rolls back body and index together`() =
+        runBlocking {
+            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
+            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
+            require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+            val previous = TransactionManager.defaultDatabase
+            val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+            try {
+                TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)
+                val accounts = InMemoryAccountRepository()
+                val signing = SigningKeyService(InMemorySigningKeyRepository(), "rollback-kek")
+                val identity =
+                    AtprotoIdentityService(
+                        accounts,
+                        signing,
+                        AtprotoIdentityConfig(handleDomain = "logdate.test", pdsServiceEndpoint = "https://logdate.test"),
+                    )
+                val account =
+                    identity.ensureIdentity(
+                        accounts.save(
+                            Account(
+                                id = Uuid.random(),
+                                username = "rollback_${Uuid.random().toHexString().take(8)}",
+                                displayName = "Rollback",
+                                createdAt = Clock.System.now(),
+                            ),
+                        ),
+                    )
+                val backing = PostgreSQLLogDateCollectionsMetadataStore()
+                val failing =
+                    object : LogDateCollectionsMetadataStore by backing {
+                        override suspend fun upsert(
+                            userId: java.util.UUID,
+                            repoDid: studio.hypertext.atproto.identity.AtprotoDid,
+                            collection: LogDateCollectionKind,
+                            recordKey: String,
+                        ): LogDateCollectionMetadata {
+                            backing.upsert(userId, repoDid, collection, recordKey)
+                            error("Stop after index write")
+                        }
+                    }
+                val blocks = PostgreSQLRepoBlockStore()
+                val repository = RepoBackedLogDateCollectionsRepository(accounts, identity, signing, blocks, failing)
+                val repoDid =
+                    studio.hypertext.atproto.identity.AtprotoDid
+                        .require(requireNotNull(account.did))
+                val before = blocks.readHead(repoDid).getOrThrow()
+                assertFailsWith<IllegalStateException> {
+                    repository.createEntryIfAbsent(
+                        account.id.toJavaUUID(),
+                        LogDateEntry("rollback-entry", "TEXT", "LDSE2:opaque", null, 0, 10, 10, 0, DeviceId("watch")),
+                        true,
+                    )
+                }
+                val restartedBlocks = PostgreSQLRepoBlockStore()
+                assertEquals(before, restartedBlocks.readHead(repoDid).getOrThrow())
+                assertNull(backing.metadata(account.id.toJavaUUID(), LogDateCollectionKind.ENTRY, "rollback-entry"))
+                val restarted = RepoBackedLogDateCollectionsRepository(accounts, identity, signing, restartedBlocks, backing)
+                assertIs<ConditionalCreate.Created<LogDateEntry>>(
+                    restarted.createEntryIfAbsent(
+                        account.id.toJavaUUID(),
+                        LogDateEntry("rollback-entry", "TEXT", "LDSE2:retry", null, 0, 10, 10, 0, DeviceId("watch")),
+                        true,
+                    ),
+                )
+                Unit
+            } finally {
+                source.close()
+                TransactionManager.defaultDatabase = previous
+            }
+        }
+
     @Test
     fun `concurrent strict creates of one entry produce exactly one record`() =
         runBlocking {

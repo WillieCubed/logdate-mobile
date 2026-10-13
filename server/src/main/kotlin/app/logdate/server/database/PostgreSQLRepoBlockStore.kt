@@ -1,5 +1,6 @@
 package app.logdate.server.database
 
+import app.logdate.server.logdate.RepoWriteTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -10,6 +11,7 @@ import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import studio.hypertext.atproto.identity.AtprotoDid
@@ -27,8 +29,23 @@ import kotlin.time.Clock
  * Repo ownership is keyed by DID string rather than a foreign-key account id so the shared repo
  * library can keep speaking pure AT Protocol identifiers.
  */
-class PostgreSQLRepoBlockStore : RepoBlockStore {
+class PostgreSQLRepoBlockStore :
+    RepoBlockStore,
+    RepoWriteTransaction {
     private val blockCache = RepoBlockReadCache()
+
+    override suspend fun <T> write(action: suspend () -> T): T =
+        try {
+            withContext(Dispatchers.IO) {
+                suspendTransaction {
+                    maxAttempts = 1
+                    action()
+                }
+            }
+        } catch (failure: Throwable) {
+            blockCache.clear()
+            throw failure
+        }
 
     // Every method here is blocking JDBC. Run on the caller's thread it held a Ktor request
     // worker for the whole query, and a one-CPU instance sizes that pool at one - so a few
