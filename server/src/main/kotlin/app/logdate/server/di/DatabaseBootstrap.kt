@@ -1,5 +1,6 @@
 package app.logdate.server.di
 
+import app.logdate.server.auth.requireAccountBlobCleanupSchema
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.config.profileAwareBoolEnv
 import app.logdate.server.database.DatabaseConfig
@@ -41,6 +42,9 @@ fun initializeDatabase(
         val dataSource = DatabaseConfig.createDataSource()
         val runFlyway = DatabaseConfig.shouldRunMigrations()
         val database = DatabaseConfig.initializeDatabase(dataSource, autoMigrate = runFlyway)
+        if (RuntimeProfile.fromEnvironment(readEnv).isProduction) {
+            requireAccountBlobCleanupSchema(dataSource)
+        }
         // Register the application database before Koin creates entitlement services. Exposed's
         // default handle is not guaranteed when Database.connect is performed during bootstrap.
         TransactionManager.defaultDatabase = database

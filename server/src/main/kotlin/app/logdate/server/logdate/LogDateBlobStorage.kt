@@ -49,6 +49,14 @@ interface LogDateBlobStorage {
 
     fun deleteBlob(storagePath: String): Boolean
 
+    /** Delete or confirm absence; throw on a provider failure. Never infer absence from a read. */
+    fun deleteBlobIfExists(storagePath: String) {
+        check(deleteBlob(storagePath)) { "Blob deletion was not confirmed" }
+    }
+
+    /** Exact owner namespace only; enumeration failures must propagate to the cleanup queue. */
+    fun listOwnerBlobPaths(ownerId: UUID): List<String> = error("Owner enumeration is unavailable")
+
     fun getSignedDownloadUrl(
         storagePath: String,
         expirationHours: Long = 1,

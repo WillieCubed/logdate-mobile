@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.SERVER_PORT
+import app.logdate.server.auth.handleAccountBlobCleanupCommand
 import app.logdate.server.config.ProductionConfigValidator
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.di.initializeDatabase
@@ -25,11 +26,12 @@ import org.koin.ktor.ext.inject
 
 private const val HEALTH_TOKEN_ENV = "HEALTH_INTERNAL_TOKEN"
 
-fun main() {
+fun main(args: Array<String> = emptyArray()) {
     // First: until an antilog is registered Napier discards everything, so anything logged
     // before this line is lost — including why startup validation refused to continue.
     installServerLogging()
 
+    if (handleAccountBlobCleanupCommand(args)) return
     val profile = RuntimeProfile.fromEnvironment()
     ProductionConfigValidator.validate(profile)
 

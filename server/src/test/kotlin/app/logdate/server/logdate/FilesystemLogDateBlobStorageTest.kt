@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -19,6 +20,25 @@ import kotlin.test.assertTrue
  * retrieval, and deletion—as well as environment-based initialization logic.
  */
 class FilesystemLogDateBlobStorageTest {
+    @Test
+    fun `owner cleanup enumerates only its namespace and missing deletion is idempotent`() {
+        val root = Files.createTempDirectory("logdate-owner-cleanup-")
+        try {
+            val storage = FilesystemLogDateBlobStorage(root)
+            val owner = UUID.randomUUID()
+            val other = UUID.randomUUID()
+            val owned = storage.uploadBackup(owner, UUID.randomUUID(), byteArrayOf(1))
+            val retained = storage.uploadBackup(other, UUID.randomUUID(), byteArrayOf(2))
+            assertEquals(listOf(owned), storage.listOwnerBlobPaths(owner))
+            storage.deleteBlobIfExists(owned)
+            storage.deleteBlobIfExists(owned)
+            assertEquals(emptyList(), storage.listOwnerBlobPaths(owner))
+            assertNotNull(storage.getBlob(retained))
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+    }
+
     @Test
     fun `backup file streams through storage without a byte array request`() {
         val root = Files.createTempDirectory("logdate-blob-file-test")

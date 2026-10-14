@@ -37,6 +37,9 @@ private val approvedNotices =
             "LOGDATE_ALLOW_INMEMORY_FALLBACK is set: running on in-memory repositories. Nothing is " +
                 "persisted and every record is lost when the process exits."
         ) to "SERVER_DATABASE_IN_MEMORY",
+        "Account blob cleanup queue overdue" to "SERVER_ACCOUNT_BLOB_CLEANUP_OVERDUE",
+        "Account blob cleanup failed" to "SERVER_ACCOUNT_BLOB_CLEANUP_FAILED",
+        "Account blob cleanup batch complete" to "SERVER_ACCOUNT_BLOB_CLEANUP_COMPLETE",
         "Database repositories initialized successfully" to "SERVER_DATABASE_READY",
         "Production database unavailable; refusing to start with in-memory fallback" to "SERVER_DATABASE_REQUIRED",
         "Database unavailable; refusing to start somewhere nothing would persist" to "SERVER_DATABASE_REQUIRED",

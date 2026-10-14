@@ -63,6 +63,9 @@ locals {
     "iamcredentials.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "secretmanager.googleapis.com",
+    "cloudscheduler.googleapis.com",
+    "monitoring.googleapis.com",
+    "logging.googleapis.com",
   ]
 
   conditional_services = concat(
@@ -393,5 +396,132 @@ resource "google_cloud_run_domain_mapping" "default" {
 
   spec {
     route_name = google_cloud_run_v2_service.server[0].name
+  }
+}
+
+# Jobs run independently of request CPU allocation and reuse the server's secret references.
+resource "google_cloud_run_v2_job" "account_blob_cleanup" {
+  count    = var.enable_cloud_run_service ? 1 : 0
+  name     = "${var.service_name}-account-blob-cleanup"
+  location = var.region
+  template {
+    parallelism = 1
+    task_count  = 1
+    template {
+      service_account = google_service_account.runtime.email
+      timeout         = "3600s"
+      max_retries     = 0
+      containers {
+        image = var.cloud_run_image
+        args  = ["--cleanup-account-blobs"]
+        resources {
+          limits = { cpu = var.cpu, memory = var.memory }
+        }
+        dynamic "env" {
+          for_each = local.env_vars
+          content {
+            name  = env.key
+            value = env.value
+          }
+        }
+        dynamic "env" {
+          for_each = var.cloud_run_secret_env
+          content {
+            name = env.key
+            value_source {
+              secret_key_ref {
+                secret  = env.value.secret_id
+                version = env.value.version
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  lifecycle {
+    ignore_changes = [template[0].template[0].containers[0].image]
+  }
+  depends_on = [google_project_service.required, google_secret_manager_secret_iam_member.runtime_access]
+}
+
+resource "google_service_account" "cleanup_scheduler" {
+  count        = var.enable_cloud_run_service ? 1 : 0
+  account_id   = "${var.service_name}-cleanup"
+  display_name = "Invoke account blob cleanup job"
+}
+
+resource "google_cloud_run_v2_job_iam_member" "cleanup_invoker" {
+  count    = var.enable_cloud_run_service ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_job.account_blob_cleanup[0].name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.cleanup_scheduler[0].email}"
+}
+
+resource "google_cloud_scheduler_job" "account_blob_cleanup" {
+  count            = var.enable_cloud_run_service ? 1 : 0
+  name             = "${var.service_name}-account-blob-cleanup"
+  region           = var.region
+  schedule         = "0 * * * *"
+  time_zone        = "Etc/UTC"
+  attempt_deadline = "180s"
+  retry_config {
+    retry_count = 3
+  }
+  http_target {
+    http_method = "POST"
+    uri         = "https://run.googleapis.com/v2/projects/${var.project_id}/locations/${var.region}/jobs/${google_cloud_run_v2_job.account_blob_cleanup[0].name}:run"
+    body        = base64encode("{}")
+    headers     = { "Content-Type" = "application/json" }
+    oauth_token {
+      service_account_email = google_service_account.cleanup_scheduler[0].email
+    }
+  }
+  depends_on = [google_project_service.required, google_cloud_run_v2_job_iam_member.cleanup_invoker]
+}
+
+resource "google_monitoring_alert_policy" "account_blob_cleanup_failure" {
+  count                 = var.enable_cloud_run_service ? 1 : 0
+  display_name          = "${var.service_name} account cleanup job failed"
+  combiner              = "OR"
+  notification_channels = var.cleanup_notification_channels
+  conditions {
+    display_name = "Cleanup execution failed"
+    condition_threshold {
+      filter          = "resource.type = \"cloud_run_job\" AND resource.labels.job_name = \"${var.service_name}-account-blob-cleanup\" AND metric.type = \"run.googleapis.com/job/completed_execution_count\" AND metric.labels.result = \"failed\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+      duration        = "0s"
+      aggregations {
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+  documentation {
+    content   = "P1: inspect the cleanup job configuration and storage/database availability within one business day. Pending work remains durable. See docs/reference/operations/account-blob-cleanup.md."
+    mime_type = "text/markdown"
+  }
+}
+
+resource "google_monitoring_alert_policy" "account_blob_cleanup_overdue" {
+  count                 = var.enable_cloud_run_service ? 1 : 0
+  display_name          = "${var.service_name} account cleanup older than 24 hours"
+  combiner              = "OR"
+  notification_channels = var.cleanup_notification_channels
+  conditions {
+    display_name = "Pending cleanup older than 24 hours"
+    condition_matched_log {
+      filter = "resource.type=\"cloud_run_job\" resource.labels.job_name=\"${var.service_name}-account-blob-cleanup\" textPayload:\"SERVER_ACCOUNT_BLOB_CLEANUP_OVERDUE\""
+    }
+  }
+  alert_strategy {
+    notification_rate_limit { period = "3600s" }
+  }
+  documentation {
+    content   = "P1: resolve the account deletion cleanup backlog within one business day. Inspect failed job attempts and rerun the job after restoring access. See docs/reference/operations/account-blob-cleanup.md."
+    mime_type = "text/markdown"
   }
 }

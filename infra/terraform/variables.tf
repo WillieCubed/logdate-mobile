@@ -288,3 +288,9 @@ variable "enable_services" {
   description = "Whether to enable required GCP APIs in the project."
   default     = true
 }
+
+variable "cleanup_notification_channels" {
+  description = "Cloud Monitoring channel resource names for account cleanup failure and backlog alerts."
+  type        = list(string)
+  default     = []
+}

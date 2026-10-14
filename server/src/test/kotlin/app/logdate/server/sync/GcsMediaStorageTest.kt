@@ -29,6 +29,24 @@ import kotlin.test.assertTrue
  */
 class GcsMediaStorageTest {
     @Test
+    fun `cleanup confirms missing objects but propagates provider failure`() {
+        val storage = mockk<Storage>()
+        val sut = GcsMediaStorage(bucketName = "bucket-a", storage = storage)
+        every { storage.delete(any<BlobId>()) } returns false
+        sut.deleteBlobIfExists("users/owner/media/missing")
+        every { storage.delete(any<BlobId>()) } throws
+            com.google.cloud.storage
+                .StorageException(404, "missing")
+        sut.deleteBlobIfExists("users/owner/media/missing")
+        every { storage.delete(any<BlobId>()) } throws
+            com.google.cloud.storage
+                .StorageException(503, "private-path")
+        val error = kotlin.test.assertFails { sut.deleteBlobIfExists("users/owner/media/failed") }
+        assertEquals("Blob cleanup failed", error.message)
+        assertNull(error.cause)
+    }
+
+    @Test
     fun `upload media returns storage path and sanitizes filename`() {
         val storage = mockk<Storage>()
         every { storage.create(any<BlobInfo>(), any<ByteArray>(), *anyVararg()) } returns mockk<Blob>()

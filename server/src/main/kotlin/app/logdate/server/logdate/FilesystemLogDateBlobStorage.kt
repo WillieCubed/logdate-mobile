@@ -97,6 +97,22 @@ class FilesystemLogDateBlobStorage(
             false
         }
 
+    override fun deleteBlobIfExists(storagePath: String) {
+        rootPath.resolve(storagePath).deleteIfExists()
+    }
+
+    override fun listOwnerBlobPaths(ownerId: java.util.UUID): List<String> =
+        LogDateBlobNamespace.entries.flatMap { namespace ->
+            val directory = rootPath.resolve("${namespace.name.lowercase()}/$ownerId")
+            try {
+                Files.walk(directory).use { paths ->
+                    paths.filter { Files.isRegularFile(it) }.map { rootPath.relativize(it).toString() }.toList()
+                }
+            } catch (_: NoSuchFileException) {
+                emptyList()
+            }
+        }
+
     override fun getSignedDownloadUrl(
         storagePath: String,
         expirationHours: Long,

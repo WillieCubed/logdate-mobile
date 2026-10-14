@@ -83,6 +83,13 @@ class InMemoryLogDateBlobStorage : LogDateBlobStorage {
         return blobs.remove(storagePath) != null || file != null
     }
 
+    override fun deleteBlobIfExists(storagePath: String) {
+        deleteBlob(storagePath)
+    }
+
+    override fun listOwnerBlobPaths(ownerId: java.util.UUID): List<String> =
+        (blobs.keys + fileBlobs.keys).filter { it.startsWith("users/$ownerId/") }
+
     override fun getSignedDownloadUrl(
         storagePath: String,
         expirationHours: Long,

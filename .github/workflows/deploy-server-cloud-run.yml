@@ -409,6 +409,9 @@ jobs:
             --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
             --to-tags "$CANDIDATE_TAG=100"
 
+      - name: Deploy and execute durable account blob cleanup job
+        run: python3 scripts/account-blob-cleanup-job.py --contract-file "$CONTRACT_FILE"
+
       - name: Verify public durability and clean smoke data
         run: |
           HEALTH_INTERNAL_TOKEN="$(

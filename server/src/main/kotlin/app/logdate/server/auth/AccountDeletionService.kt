@@ -8,35 +8,19 @@ import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import java.util.UUID
+import kotlinx.coroutines.withContext
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 
-/**
- * Orchestrates the destructive-but-legitimate path a user takes when they ask the server to
- * forget them.
- *
- * The DB side is handled by V17 and V16's `ON DELETE CASCADE` foreign keys — removing the row in
- * `accounts` wipes every dependent row (passkeys, sessions, sync data, media records, backup
- * rows, entitlements). But the cascade doesn't reach the object store: media payloads and backup
- * blobs live in GCS or on-disk storage outside PostgreSQL's scope. This service lists and deletes
- * those blobs *before* the DB cascade runs, so an operator with access to both systems is left
- * with neither the metadata nor the bytes.
- *
- * A failed blob delete is logged but does not abort the account deletion. Users asking to be
- * forgotten expect the answer to be "yes" even if a handful of blobs are unreachable — we'd
- * rather orphan bytes in storage than block the delete and preserve their metadata.
- */
+/** Account removal commits durable external cleanup before returning success. */
 @OptIn(ExperimentalUuidApi::class)
 class AccountDeletionService(
     private val accountRepository: AccountRepository,
     private val mediaBlobRepository: LogDateMediaBlobRepository,
     private val backupRepository: LogDateBackupRepository,
     private val blobStorage: LogDateBlobStorage?,
+    private val blobCleanup: AccountBlobCleanup? = null,
 ) {
     data class Summary(
         val mediaBlobsDeleted: Int,
@@ -45,72 +29,39 @@ class AccountDeletionService(
     )
 
     suspend fun deleteAccount(accountId: Uuid): Summary {
-        val legacyId: UUID = accountId.toJavaUuid()
-
-        val mediaBlobsDeleted = deleteMediaBlobs(legacyId)
-        val backupBlobsDeleted = deleteBackupBlobs(legacyId)
-        val accountDeleted = accountRepository.deleteAccount(accountId)
-
-        Napier.i(
-            "Account deletion complete: account=$accountId, " +
-                "mediaBlobsDeleted=$mediaBlobsDeleted, backupBlobsDeleted=$backupBlobsDeleted, " +
-                "accountRowDeleted=$accountDeleted",
-        )
+        val owner = accountId.toJavaUuid()
+        // PostgreSQL's BEFORE DELETE trigger captures all references, including soft deletes.
+        // Non-database development runs have no durable queue and must enumerate successfully.
+        val mediaPaths = if (blobCleanup == null) mediaBlobRepository.listMedia(owner).mapNotNull { it.storagePath } else emptyList()
+        val backupPaths = if (blobCleanup == null) backupRepository.listBackups(owner).map { it.storagePath } else emptyList()
+        val deleted = accountRepository.deleteAccount(accountId)
+        var mediaDeleted = 0
+        var backupDeleted = 0
+        withContext(Dispatchers.IO) {
+            if (blobCleanup != null) {
+                try {
+                    blobCleanup.runOnce(owner)
+                } catch (_: Exception) {
+                    Napier.w("Account removed; external cleanup remains in the durable queue")
+                }
+            } else {
+                blobStorage?.let { storage ->
+                    mediaPaths.forEach {
+                        storage.deleteBlobIfExists(it)
+                        mediaDeleted++
+                    }
+                    backupPaths.forEach {
+                        storage.deleteBlobIfExists(it)
+                        backupDeleted++
+                    }
+                }
+            }
+        }
         AuditLogger.emit(
             AuditCategory.ACCOUNT_DELETED,
-            mapOf(
-                AuditKey.ACCOUNT_ID to accountId.toString(),
-                "mediaBlobsDeleted" to mediaBlobsDeleted.toString(),
-                "backupBlobsDeleted" to backupBlobsDeleted.toString(),
-                "accountRowDeleted" to accountDeleted.toString(),
-            ),
+            mapOf(AuditKey.ACCOUNT_ID to accountId.toString(), "accountRowDeleted" to deleted.toString()),
         )
-        return Summary(
-            mediaBlobsDeleted = mediaBlobsDeleted,
-            backupBlobsDeleted = backupBlobsDeleted,
-            accountRowDeleted = accountDeleted,
-        )
+        Napier.i("Account deletion accepted: accountRowDeleted=$deleted")
+        return Summary(mediaDeleted, backupDeleted, deleted)
     }
-
-    private suspend fun deleteMediaBlobs(userId: UUID): Int {
-        val storage = blobStorage ?: return 0
-        val paths =
-            runCatching { mediaBlobRepository.listMedia(userId) }
-                .onFailure { Napier.w("Failed to list media for account $userId during delete", it) }
-                .getOrElse { return 0 }
-                .mapNotNull { it.storagePath }
-        return deleteInParallel(storage, paths, userId)
-    }
-
-    private suspend fun deleteBackupBlobs(userId: UUID): Int {
-        val storage = blobStorage ?: return 0
-        val paths =
-            runCatching { backupRepository.listBackups(userId) }
-                .onFailure { Napier.w("Failed to list backups for account $userId during delete", it) }
-                .getOrElse { return 0 }
-                .map { it.storagePath }
-        return deleteInParallel(storage, paths, userId)
-    }
-
-    /**
-     * Fan out [paths] deletes across the IO dispatcher so a user with hundreds of blobs doesn't
-     * block the delete on serial round-trips against GCS. Each failure is logged but non-fatal —
-     * orphaned bytes are a smaller problem than refusing the delete.
-     */
-    private suspend fun deleteInParallel(
-        storage: LogDateBlobStorage,
-        paths: List<String>,
-        userId: UUID,
-    ): Int =
-        coroutineScope {
-            paths
-                .map { path ->
-                    async(Dispatchers.IO) {
-                        runCatching { storage.deleteBlob(path) }
-                            .onFailure { Napier.w("Failed to delete blob $path for $userId", it) }
-                            .getOrDefault(false)
-                    }
-                }.awaitAll()
-                .count { it }
-        }
 }

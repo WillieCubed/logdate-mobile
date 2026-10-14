@@ -13,6 +13,7 @@ import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountBlobCleanup
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
@@ -381,6 +382,12 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 mediaBlobRepository = get(),
                 backupRepository = get(),
                 blobStorage = getOrNull<LogDateBlobStorage>(),
+                blobCleanup =
+                    if (isDatabaseAvailable) {
+                        AccountBlobCleanup(storage = get())
+                    } else {
+                        null
+                    },
             )
         }
 

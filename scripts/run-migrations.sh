@@ -322,6 +322,24 @@ docker run --rm \
     info migrate info
 log "Flyway migrate complete."
 
+# AUTO_MIGRATE=false containers depend on this trigger to preserve storage pointers.
+# Refuse deployment if it is missing or disabled, even when Flyway reports no pending work.
+docker run --rm \
+    --network host \
+    --env-file "$PSQL_ENV_FILE" \
+    "$POSTGRES_IMAGE" \
+    psql --no-psqlrc --set ON_ERROR_STOP=1 \
+    --command "DO \$\$ BEGIN
+      IF to_regclass('account_blob_cleanup_paths') IS NULL OR NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgrelid='accounts'::regclass
+          AND tgname='accounts_enqueue_blob_cleanup' AND tgenabled IN ('O', 'A')
+      ) OR NOT EXISTS (
+        SELECT 1 FROM pg_trigger WHERE tgrelid='accounts'::regclass
+          AND tgname='accounts_prevent_deleted_id_reuse' AND tgenabled IN ('O', 'A')
+      ) THEN RAISE EXCEPTION 'Required account cleanup schema is unavailable'; END IF;
+    END \$\$;"
+log "Account cleanup schema validated."
+
 if [[ "$VALIDATE_PASSKEY_FK" == "true" ]]; then
     log "Validating passkeys.account_id_fkey..."
     docker run --rm \

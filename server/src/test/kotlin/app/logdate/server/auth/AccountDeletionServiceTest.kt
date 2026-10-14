@@ -4,13 +4,17 @@ import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.LogDateBackup
+import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateMedia
+import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.shared.model.sync.DeviceId
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
@@ -21,7 +25,7 @@ import kotlin.uuid.toJavaUuid
 @OptIn(ExperimentalUuidApi::class)
 class AccountDeletionServiceTest {
     @Test
-    fun `deletes external media and backup bytes before removing the account`() =
+    fun `deletes external media and backup bytes after removing the account`() =
         runTest {
             val accountId = Uuid.random()
             val legacyAccountId = accountId.toJavaUuid()
@@ -80,7 +84,13 @@ class AccountDeletionServiceTest {
                     accountRepository = accountRepository,
                     mediaBlobRepository = mediaRepository.asLogDateMediaBlobRepository(),
                     backupRepository = backupRepository,
-                    blobStorage = blobStorage,
+                    blobStorage =
+                        object : LogDateBlobStorage by blobStorage {
+                            override fun deleteBlobIfExists(storagePath: String) {
+                                assertNull(runBlocking { accountRepository.findById(accountId) })
+                                blobStorage.deleteBlobIfExists(storagePath)
+                            }
+                        },
                 ).deleteAccount(accountId)
 
             assertEquals(AccountDeletionService.Summary(1, 1, true), summary)
@@ -106,6 +116,21 @@ class AccountDeletionServiceTest {
 
             assertEquals(AccountDeletionService.Summary(0, 0, true), summary)
             assertNull(accountRepository.findById(accountId))
+        }
+
+    @Test
+    fun `metadata enumeration failure does not delete the account`() =
+        runTest {
+            val owner = Uuid.random()
+            val accounts = InMemoryAccountRepository()
+            accounts.create(testAccount(owner))
+            val media =
+                object : LogDateMediaBlobRepository by InMemoryLogDateMediaRepository().asLogDateMediaBlobRepository() {
+                    override fun listMedia(userId: UUID): List<LogDateMedia> = throw IllegalStateException("database unavailable")
+                }
+            val service = AccountDeletionService(accounts, media, InMemoryLogDateBackupRepository(), InMemoryLogDateBlobStorage())
+            assertFailsWith<IllegalStateException> { service.deleteAccount(owner) }
+            assertNotNull(accounts.findById(owner))
         }
 
     private fun testAccount(id: Uuid): Account =

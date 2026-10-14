@@ -178,6 +178,21 @@ class GcsMediaStorage(
         }
     }
 
+    override fun deleteBlobIfExists(storagePath: String) {
+        try {
+            storage.delete(BlobId.of(bucketName, storagePath))
+        } catch (error: com.google.cloud.storage.StorageException) {
+            if (error.code != 404) throw MediaStorageException("Blob cleanup failed")
+        }
+    }
+
+    override fun listOwnerBlobPaths(ownerId: java.util.UUID): List<String> =
+        storage
+            .list(bucketName, Storage.BlobListOption.prefix("users/$ownerId/"))
+            .iterateAll()
+            .map { it.name }
+            .toList()
+
     /**
      * Check if media exists in GCS.
      * @param storagePath The GCS storage path
