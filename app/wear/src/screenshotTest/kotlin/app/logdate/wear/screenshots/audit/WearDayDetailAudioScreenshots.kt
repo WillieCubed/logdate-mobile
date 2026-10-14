@@ -2,6 +2,8 @@ package app.logdate.wear.screenshots.audit
 
 import androidx.compose.runtime.Composable
 import androidx.wear.compose.material3.AppScaffold
+import androidx.wear.compose.material3.TimeSource
+import androidx.wear.compose.material3.TimeText
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.wear.playback.AudioOutputState
 import app.logdate.wear.presentation.theme.LogDateTheme
@@ -39,13 +41,14 @@ class WearDayDetailAudioScreenshots {
     @Composable
     fun OutputRoutePickerClosed() {
         LogDateTheme {
-            AppScaffold {
+            AppScaffold(timeText = { TimeText(timeSource = PreviewTimeSource) }) {
                 WearDayDetailContent(
                     detail = wearDayDetail,
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
                     onChooseOutput = {},
+                    timeSource = PreviewTimeSource,
                 )
             }
         }
@@ -56,15 +59,21 @@ class WearDayDetailAudioScreenshots {
     @Composable
     fun OutputRoutePickerSystemControlled() {
         LogDateTheme {
-            AppScaffold {
+            AppScaffold(timeText = { TimeText(timeSource = PreviewTimeSource) }) {
                 WearDayDetailContent(
                     detail = wearDayDetail,
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.Unavailable,
                     onToggleNote = {},
                     onChooseOutput = {},
+                    timeSource = PreviewTimeSource,
                 )
             }
         }
     }
+}
+
+private object PreviewTimeSource : TimeSource {
+    @Composable
+    override fun currentTime(): String = "10:09"
 }

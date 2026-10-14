@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,7 +29,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.ButtonGroup
 import androidx.wear.compose.material3.CircularProgressIndicator
-import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.IconButtonDefaults
@@ -127,7 +127,12 @@ private fun PlayerBody(
             maxLines = 1,
         )
     }
-    ButtonGroup(modifier = Modifier.fillMaxWidth(CONTROLS_WIDTH_FRACTION).padding(vertical = 6.dp)) {
+    ButtonGroup(
+        modifier =
+            Modifier
+                .fillMaxWidth(if (canChooseOutput) OUTPUT_CONTROLS_WIDTH_FRACTION else CONTROLS_WIDTH_FRACTION)
+                .padding(vertical = 6.dp),
+    ) {
         val backSource = remember { MutableInteractionSource() }
         val playSource = remember { MutableInteractionSource() }
         val forwardSource = remember { MutableInteractionSource() }
@@ -154,16 +159,20 @@ private fun PlayerBody(
             interactionSource = forwardSource,
             modifier = Modifier.weight(SIDE_WEIGHT).animateWidth(forwardSource),
         )
+        if (canChooseOutput) {
+            val outputSource = remember { MutableInteractionSource() }
+            PlayerSideButton(
+                icon = Icons.Default.VolumeUp,
+                description = R.string.wear_audio_output,
+                enabled = true,
+                onClick = onChooseOutput,
+                interactionSource = outputSource,
+                modifier = Modifier.weight(SIDE_WEIGHT).animateWidth(outputSource),
+            )
+        }
     }
     Box(modifier = Modifier.height(STATUS_SLOT_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         PlayerStatus(playback = playback, blocked = blocked, memory = memory)
-    }
-    if (canChooseOutput) {
-        CompactButton(
-            onClick = onChooseOutput,
-            label = { Text(stringResource(R.string.wear_audio_output)) },
-            modifier = Modifier.padding(top = 4.dp),
-        )
     }
 }
 
@@ -267,5 +276,6 @@ private val PLAY_BUTTON_SIZE = 64.dp
 private val SIDE_BUTTON_SIZE = 36.dp
 private val PROGRESS_RING_INSET = 2.dp
 private const val CONTROLS_WIDTH_FRACTION = 0.86f
+private const val OUTPUT_CONTROLS_WIDTH_FRACTION = 0.96f
 private const val SIDE_WEIGHT = 0.75f
 private const val PLAY_WEIGHT = 1.5f

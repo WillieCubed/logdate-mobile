@@ -38,7 +38,9 @@ import androidx.wear.compose.material3.LinearProgressIndicator
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.TimeSource
 import androidx.wear.compose.material3.TimeText
+import androidx.wear.compose.material3.TimeTextDefaults
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.wear.R
 import app.logdate.wear.playback.AudioOutputState
@@ -90,11 +92,12 @@ internal fun WearDayDetailContent(
     onOpenTextEntry: (kotlin.uuid.Uuid) -> Unit = {},
     onChooseOutput: () -> Unit = {},
     canChooseOutput: Boolean = true,
+    timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
 ) {
     val listState = rememberScalingLazyListState()
 
     ScreenScaffold(
-        timeText = { TimeText() },
+        timeText = { TimeText(timeSource = timeSource) },
         scrollState = listState,
     ) { contentPadding ->
         ScalingLazyColumn(
