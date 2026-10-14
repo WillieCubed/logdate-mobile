@@ -129,6 +129,18 @@ class WatchCompanionVisualAcceptanceTest {
                     onNodeWithText("Pixel Watch").assertIsDisplayed()
                     // TileRenderer is Android-only; desktop must not substitute a fabricated watch face.
                     onNodeWithTag("watch_today_preview").assertDoesNotExist()
+                    if (variant == "compact-large-text" || variant == "phone") {
+                        val icon =
+                            onNodeWithTag("watch_identity_icon", useUnmergedTree = true)
+                                .fetchSemanticsNode()
+                                .boundsInRoot
+                        val status = onNodeWithText("Connected").fetchSemanticsNode().boundsInRoot
+                        if (variant == "compact-large-text") {
+                            assertTrue(status.top >= icon.bottom, "Large watch status needs its own row")
+                        } else {
+                            assertTrue(status.left >= icon.right, "Phone watch status should share the icon row")
+                        }
+                    }
                 }
                 saveImage("${scene.name.lowercase()}-$variant-top", onRoot().captureToImage())
                 val terminal =

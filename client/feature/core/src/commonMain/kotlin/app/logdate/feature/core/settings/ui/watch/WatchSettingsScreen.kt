@@ -76,6 +76,7 @@ fun WatchSettingsScreen(
     val redesign by remember(flags) { flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) }.collectAsState(false)
     val status by viewModel.status.collectAsState()
     val requestFailure by viewModel.requestFailure.collectAsState()
+    val installRequestSent by viewModel.installRequestSent.collectAsState()
 
     if (redesign) {
         WatchCompanionPage(
@@ -91,6 +92,7 @@ fun WatchSettingsScreen(
             onNavigateToConnectionCheck,
             onNavigateToRemove,
             modifier,
+            installRequestSent,
         ) { captureActions -> WatchCompanionSettings(captureActions = captureActions) }
         return
     }

@@ -14,6 +14,16 @@
     <string name="watch_app_not_installed">Install LogDate on your watch</string>
     <string name="watch_app_not_installed_description">Your %1$s is connected but doesn&apos;t have LogDate yet.</string>
     <string name="watch_install_on_watch">Install on Watch</string>
+    <string name="watch_setup_pair_title">Add a watch</string>
+    <string name="watch_setup_pair_description">Pair a Wear OS watch with this phone.</string>
+    <string name="watch_setup_associate_title">Connect %1$s</string>
+    <string name="watch_setup_associate_description">Let LogDate connect to your watch.</string>
+    <string name="watch_setup_associate_action">Continue on phone</string>
+    <string name="watch_setup_install_title">LogDate on %1$s</string>
+    <string name="watch_setup_install_description">Install LogDate from Play on your watch, then open it.</string>
+    <string name="watch_setup_install_action">Open Play</string>
+    <string name="watch_setup_sent">Check your watch for Play.</string>
+    <string name="watch_setup_installed_help">Already installed? Open LogDate on your watch.</string>
     <string name="watch_connected">Connected</string>
     <string name="watch_out_of_range">Out of range</string>
     <string name="watch_unsupported">This device can&apos;t connect to a watch</string>

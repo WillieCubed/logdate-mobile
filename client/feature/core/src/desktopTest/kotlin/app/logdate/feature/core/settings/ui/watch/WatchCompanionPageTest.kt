@@ -1,8 +1,10 @@
 package app.logdate.feature.core.settings.ui.watch
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Density
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPage
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPreferences
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionSections
@@ -26,6 +29,90 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class WatchCompanionPageTest {
+    @Test fun `setup action stays reachable at compact width and large text`() =
+        runDesktopComposeUiTest(width = 320, height = 568) {
+            setContent {
+                LogDateTheme(dynamicColor = false) {
+                    CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                        WatchCompanionPage(
+                            status = WatchStatus.NotInstalled("Pixel Watch"),
+                            requestFailure = null,
+                            onBack = {},
+                            onAssociate = {},
+                            onInstall = {},
+                            onReminders = {},
+                            onTiles = {},
+                            onMicrophone = {},
+                            onNotifications = {},
+                            onDiagnostics = {},
+                            onRemove = {},
+                        )
+                    }
+                }
+            }
+            onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Open Play"))
+            val action = onNodeWithText("Open Play").fetchSemanticsNode().boundsInRoot
+            assertTrue(action.left >= 0f && action.right <= 320f, "Setup action overflows compact width: $action")
+            saveScreenshot(onRoot().captureToImage(), "watch-setup-compact-large-text.png")
+        }
+
+    @Test fun `without a paired watch the page offers setup and no watch settings`() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            setContent {
+                LogDateTheme(dynamicColor = false) {
+                    WatchCompanionPage(
+                        status = WatchStatus.NoWatch,
+                        requestFailure = null,
+                        onBack = {},
+                        onAssociate = {},
+                        onInstall = {},
+                        onReminders = {},
+                        onTiles = {},
+                        onMicrophone = {},
+                        onNotifications = {},
+                        onDiagnostics = {},
+                        onRemove = {},
+                    )
+                }
+            }
+            onNodeWithText("Add a watch").assertExists()
+            onNodeWithText("Set up your watch").assertExists()
+            onNodeWithText("Check connection").assertDoesNotExist()
+            onNodeWithText("Timeline history").assertDoesNotExist()
+            onNodeWithText("Reminders").assertDoesNotExist()
+            saveScreenshot(onRoot().captureToImage(), "watch-setup-no-watch.png")
+        }
+
+    @Test fun `watch install explains both paths and confirms a sent Play request`() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            var installRequests = 0
+            setContent {
+                LogDateTheme(dynamicColor = false) {
+                    WatchCompanionPage(
+                        status = WatchStatus.NotInstalled("Pixel Watch"),
+                        requestFailure = null,
+                        onBack = {},
+                        onAssociate = {},
+                        onInstall = { installRequests++ },
+                        onReminders = {},
+                        onTiles = {},
+                        onMicrophone = {},
+                        onNotifications = {},
+                        onDiagnostics = {},
+                        onRemove = {},
+                        installRequestSent = true,
+                    )
+                }
+            }
+            onNodeWithText("Open Play").performClick()
+            assertEquals(1, installRequests)
+            onNodeWithText("Check your watch", substring = true).assertExists()
+            onNodeWithText("Already installed", substring = true).assertExists()
+            onNodeWithText("Check connection").assertDoesNotExist()
+            onNodeWithText("Timeline history").assertDoesNotExist()
+            saveScreenshot(onRoot().captureToImage(), "watch-setup-install.png")
+        }
+
     @Test fun `wide companion keeps watch identity beside settings`() =
         runDesktopComposeUiTest(width = 1100, height = 900) {
             setContent {

@@ -156,6 +156,26 @@ class WatchSettingsViewModelTest {
             viewModel.installAppOnWatch()
             advanceUntilIdle()
             assertNull(viewModel.requestFailure.value)
+            assertEquals(true, viewModel.installRequestSent.value)
+        }
+
+    @Test
+    fun `failed install request never claims Play opened on the watch`() =
+        runTest {
+            val viewModel =
+                WatchSettingsViewModel(
+                    connectionManager =
+                        FakeWatchConnectionManager(
+                            installResult = WatchRequestResult.Failed(WatchRequestFailure.WATCH_DID_NOT_RESPOND),
+                        ),
+                    settingsRepository = FakeWatchSettingsRepository(),
+                )
+
+            viewModel.installAppOnWatch()
+            advanceUntilIdle()
+
+            assertEquals(false, viewModel.installRequestSent.value)
+            assertEquals(WatchRequestFailure.WATCH_DID_NOT_RESPOND, viewModel.requestFailure.value)
         }
 
     private class FakeWatchConnectionManager(

@@ -59,6 +59,9 @@ class WatchSettingsViewModel(
     /** Why the last Install or Open request didn't go through; cleared when the next one starts. */
     val requestFailure: StateFlow<WatchRequestFailure?> = _requestFailure.asStateFlow()
 
+    private val _installRequestSent = MutableStateFlow(false)
+    val installRequestSent: StateFlow<Boolean> = _installRequestSent.asStateFlow()
+
     fun beginAssociation() {
         viewModelScope.launch {
             try {
@@ -80,11 +83,12 @@ class WatchSettingsViewModel(
     }
 
     fun installAppOnWatch() {
-        sendToWatch { connectionManager.installAppOnWatch() }
+        _installRequestSent.value = false
+        sendToWatch({ connectionManager.installAppOnWatch() }) { _installRequestSent.value = true }
     }
 
     fun openAppOnWatch() {
-        sendToWatch { connectionManager.openAppOnWatch() }
+        sendToWatch(request = { connectionManager.openAppOnWatch() })
     }
 
     // Notification settings mutations
@@ -99,12 +103,18 @@ class WatchSettingsViewModel(
         }
     }
 
-    private fun sendToWatch(request: suspend () -> WatchRequestResult) {
+    private fun sendToWatch(
+        request: suspend () -> WatchRequestResult,
+        onSent: () -> Unit = {},
+    ) {
         viewModelScope.launch {
             _requestFailure.value = null
             _requestFailure.value =
                 when (val result = request()) {
-                    WatchRequestResult.Sent -> null
+                    WatchRequestResult.Sent -> {
+                        onSent()
+                        null
+                    }
                     is WatchRequestResult.Failed -> result.reason
                 }
         }

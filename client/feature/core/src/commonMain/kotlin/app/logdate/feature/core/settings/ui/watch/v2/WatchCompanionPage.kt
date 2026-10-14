@@ -24,6 +24,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.ui.watch.WatchLinkLine
@@ -71,9 +73,30 @@ fun WatchCompanionPage(
     onDiagnostics: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    installRequestSent: Boolean = false,
     preferences: @Composable (captureActions: @Composable () -> Unit) -> Unit = {},
 ) {
     val installed = status is WatchStatus.Ready || status is WatchStatus.NeedsAttention
+    if (!installed) {
+        SettingsScaffold(
+            title = stringResource(Res.string.watch_settings),
+            onBack = onBack,
+            modifier = modifier,
+            maxContentWidth = 1040.dp,
+        ) {
+            item {
+                WatchSetupContent(
+                    status = status,
+                    requestFailure = requestFailure,
+                    installRequestSent = installRequestSent,
+                    onAssociate = onAssociate,
+                    onInstall = onInstall,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+                )
+            }
+        }
+        return
+    }
     val identity: @Composable () -> Unit = {
         if (status is WatchStatus.Ready) {
             WatchReadyIdentity(status)
@@ -171,6 +194,7 @@ fun WatchCompanionPage(
 
 @Composable
 private fun WatchReadyIdentity(status: WatchStatus.Ready) {
+    val largeText = LocalDensity.current.fontScale >= 1.6f
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -180,43 +204,65 @@ private fun WatchReadyIdentity(status: WatchStatus.Ready) {
             modifier = Modifier.padding(Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer) {
-                    Icon(
-                        Icons.Default.Watch,
-                        contentDescription = null,
-                        modifier = Modifier.padding(Spacing.md),
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    )
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(
-                        stringResource(if (status.nearby) Res.string.watch_connected else Res.string.watch_out_of_range),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                    Text(
-                        status.watchName.replace('_', ' '),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    status.link?.let { link ->
-                        Text(
-                            stringResource(
-                                if (link == WatchLinkLine.THROUGH_PHONE) {
-                                    Res.string.watch_link_through_phone
-                                } else {
-                                    Res.string.watch_link_on_its_own
-                                },
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
+            if (largeText) {
+                WatchIdentityIcon()
+                WatchIdentityCopy(status)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    WatchIdentityIcon()
+                    WatchIdentityCopy(status, Modifier.weight(1f))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun WatchIdentityIcon() {
+    Surface(
+        modifier = Modifier.testTag("watch_identity_icon"),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+    ) {
+        Icon(
+            Icons.Default.Watch,
+            contentDescription = null,
+            modifier = Modifier.padding(Spacing.md),
+            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+    }
+}
+
+@Composable
+private fun WatchIdentityCopy(
+    status: WatchStatus.Ready,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(
+            stringResource(if (status.nearby) Res.string.watch_connected else Res.string.watch_out_of_range),
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+        Text(
+            status.watchName.replace('_', ' '),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        status.link?.let { link ->
+            Text(
+                stringResource(
+                    if (link == WatchLinkLine.THROUGH_PHONE) {
+                        Res.string.watch_link_through_phone
+                    } else {
+                        Res.string.watch_link_on_its_own
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
         }
     }
 }
