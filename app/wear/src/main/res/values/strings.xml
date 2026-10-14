@@ -70,6 +70,9 @@
     <string name="wear_day_detail_voice_note">Voice note %1$s</string>
     <string name="wear_day_detail_photo">Photo</string>
     <string name="wear_day_detail_video">Video</string>
+    <string name="wear_text_entry_title">Text entry</string>
+    <string name="wear_text_entry_missing">This entry is no longer on your watch</string>
+    <string name="wear_text_entry_back">Back to day</string>
 
     <!-- Voice memories -->
     <string name="wear_memories_title">Voice memories</string>
@@ -89,6 +92,9 @@
     <string name="wear_playback_connect_headphones">Connect headphones to listen</string>
     <string name="wear_playback_preparing_audio">Preparing audio…</string>
     <string name="wear_playback_retry_download">Couldn’t load audio. Tap to retry</string>
+    <string name="wear_audio_output">Audio output</string>
+    <string name="wear_audio_output_action">Choose where to listen</string>
+    <string name="wear_playback_choose_output">Choose an output to listen</string>
 
     <!-- Settings -->
     <string name="wear_settings_title">Settings</string>
@@ -163,10 +169,21 @@
     <string name="wear_onboarding_permissions_skip">Maybe later</string>
     <string name="wear_onboarding_permissions_granted">Granted</string>
     <string name="wear_onboarding_phone_checking">Looking for your phone\u2026</string>
+    <string name="wear_onboarding_phone_checking_detail">Phone setup is optional. Your entries save on this watch.</string>
     <string name="wear_onboarding_phone_connected">LogDate found on your phone</string>
-    <string name="wear_onboarding_phone_connected_detail">Your entries sync automatically</string>
+    <string name="wear_onboarding_phone_connected_detail">Open Watch settings on your phone to finish linking and sync your entries.</string>
+    <string name="wear_onboarding_phone_app_missing">Set up LogDate on your phone</string>
+    <string name="wear_onboarding_phone_app_missing_detail">Install LogDate on your paired Android phone, then open it and finish setup.</string>
     <string name="wear_onboarding_phone_not_connected">Phone not detected</string>
-    <string name="wear_onboarding_phone_not_connected_detail">Entries save locally and sync when your phone is nearby</string>
+    <string name="wear_onboarding_phone_not_connected_detail">Keep your paired Android phone nearby and open LogDate there. Then check again.</string>
+    <string name="wear_onboarding_phone_unsupported">Phone sync needs Android</string>
+    <string name="wear_onboarding_phone_unsupported_detail">You can capture on this watch, but LogDate phone sync requires an Android phone.</string>
+    <string name="wear_onboarding_phone_open_setup">Open setup on phone</string>
+    <string name="wear_onboarding_phone_install">Install on phone</string>
+    <string name="wear_onboarding_phone_sent">Check your phone, then come back and check again.</string>
+    <string name="wear_onboarding_phone_open_failed">Couldn\'t open your phone. Open LogDate → Settings → Watch there.</string>
+    <string name="wear_onboarding_phone_check_again">Check again</string>
+    <string name="wear_onboarding_phone_continue_watch">Continue on watch</string>
     <string name="wear_onboarding_continue">Continue</string>
     <string name="wear_onboarding_done_title">You\'re ready</string>
     <string name="wear_onboarding_done_subtitle">Start with a voice note or mood check-in</string>

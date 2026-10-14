@@ -26,6 +26,7 @@ import app.logdate.wear.presentation.navigation.WearOnboardingRoute
 import app.logdate.wear.presentation.navigation.WearQuickTextRoute
 import app.logdate.wear.presentation.navigation.WearRemoteCameraRoute
 import app.logdate.wear.presentation.navigation.WearSettingsRoute
+import app.logdate.wear.presentation.navigation.WearTextEntryRoute
 import app.logdate.wear.presentation.navigation.WearTimelineDayDetailRoute
 import app.logdate.wear.presentation.navigation.WearTimelineRoute
 import app.logdate.wear.presentation.navigation.WearVoiceMemoriesRoute
@@ -36,6 +37,7 @@ import app.logdate.wear.presentation.quicktext.QuickTextLauncher
 import app.logdate.wear.presentation.settings.WearSettingsScreen
 import app.logdate.wear.presentation.theme.LogDateTheme
 import app.logdate.wear.presentation.timeline.WearDayDetailScreen
+import app.logdate.wear.presentation.timeline.WearTextEntryScreen
 import app.logdate.wear.presentation.timeline.WearTimelineScreen
 import app.logdate.wear.presentation.timeline.WearTimelineViewModel
 import kotlinx.coroutines.flow.Flow
@@ -151,7 +153,11 @@ fun WearApp(
                         WearDayDetailScreen(
                             date = route.date,
                             viewModel = timelineViewModel,
+                            onOpenTextEntry = { noteId -> backStack.add(WearTextEntryRoute(noteId)) },
                         )
+                    }
+                    entry<WearTextEntryRoute> { route ->
+                        WearTextEntryScreen(noteId = route.noteId, onNavigateBack = navigateBack)
                     }
                     entry<WearRemoteCameraRoute> {
                         WearRemoteCameraScreen(

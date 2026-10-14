@@ -1,26 +1,27 @@
 package app.logdate.wear.presentation.timeline
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -38,15 +39,11 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
-import app.logdate.client.media.device.AudioRouteRepository
-import app.logdate.client.media.device.MediaDeviceCategory
-import app.logdate.client.media.device.MediaDeviceKind
-import app.logdate.client.media.device.MediaDeviceSelectionUiState
-import app.logdate.client.media.device.MediaDeviceUiState
-import app.logdate.client.media.device.systemControlledSelection
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.wear.R
 import app.logdate.wear.playback.AudioOutputState
+import app.logdate.wear.v2.playon.OutputPicker
+import app.logdate.wear.v2.playon.OutputPickerRoute
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -54,10 +51,6 @@ import org.koin.compose.koinInject
 
 internal object WearDayDetailTags {
     const val OUTPUT_SUMMARY = "wear_day_detail_output_summary"
-    const val OUTPUT_PICKER = "wear_day_detail_output_picker"
-    const val BLUETOOTH_SETTINGS = "wear_day_detail_bluetooth_settings"
-
-    fun outputDevice(deviceId: String): String = "wear_day_detail_output_device_$deviceId"
 
     fun audioNote(noteId: kotlin.uuid.Uuid): String = "wear_day_detail_audio_note_$noteId"
 }
@@ -66,33 +59,25 @@ internal object WearDayDetailTags {
 fun WearDayDetailScreen(
     date: LocalDate,
     viewModel: WearTimelineViewModel,
+    onOpenTextEntry: (kotlin.uuid.Uuid) -> Unit,
 ) {
-    val audioRouteRepository: AudioRouteRepository = koinInject()
+    val outputPicker: OutputPicker = koinInject()
     LaunchedEffect(date) {
         viewModel.selectDay(date)
     }
     val detail by viewModel.selectedDayState.collectAsState()
     val playbackState by viewModel.playbackState.collectAsState()
     val outputState by viewModel.audioOutputState.collectAsState()
-    val outputSelection by audioRouteRepository.outputDevices.collectAsState()
-    var isOutputPickerVisible by remember { mutableStateOf(false) }
     val dayDetail = detail ?: return
 
     WearDayDetailContent(
         detail = dayDetail,
         playbackState = playbackState,
         audioOutputState = outputState,
-        outputSelection = outputSelection,
-        isOutputPickerVisible = isOutputPickerVisible,
-        onToggleOutputPicker = {
-            isOutputPickerVisible = !isOutputPickerVisible
-        },
-        onSelectOutputDevice = { deviceId ->
-            audioRouteRepository.selectOutputDevice(deviceId)
-            isOutputPickerVisible = false
-        },
         onToggleNote = viewModel::toggleNote,
-        onOpenBluetoothSettings = viewModel::openBluetoothSettings,
+        onOpenTextEntry = onOpenTextEntry,
+        onChooseOutput = { outputPicker.open() },
+        canChooseOutput = outputPicker.route != OutputPickerRoute.NONE,
     )
 }
 
@@ -101,12 +86,10 @@ internal fun WearDayDetailContent(
     detail: WearDayDetailUiState,
     playbackState: WearPlaybackUiState,
     audioOutputState: AudioOutputState,
-    outputSelection: MediaDeviceSelectionUiState = defaultWearOutputSelection(),
-    isOutputPickerVisible: Boolean = false,
-    onToggleOutputPicker: () -> Unit = {},
-    onSelectOutputDevice: (String) -> Unit = {},
     onToggleNote: (JournalNote.Audio) -> Unit,
-    onOpenBluetoothSettings: () -> Unit,
+    onOpenTextEntry: (kotlin.uuid.Uuid) -> Unit = {},
+    onChooseOutput: () -> Unit = {},
+    canChooseOutput: Boolean = true,
 ) {
     val listState = rememberScalingLazyListState()
 
@@ -129,29 +112,9 @@ internal fun WearDayDetailContent(
                                 .fillMaxWidth()
                                 .padding(bottom = 4.dp),
                     )
-                    Text(
-                        text = formatOutputHeaderText(outputSelection, audioOutputState),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutputRouteSummaryCard(
-                        outputSelection = outputSelection,
-                        audioOutputState = audioOutputState,
-                        onClick = onToggleOutputPicker,
-                    )
-                }
-            }
-
-            if (isOutputPickerVisible) {
-                item(key = "output-picker") {
-                    WearAudioOutputPicker(
-                        outputSelection = outputSelection,
-                        audioOutputState = audioOutputState,
-                        onSelectDevice = onSelectOutputDevice,
-                        onOpenBluetoothSettings = onOpenBluetoothSettings,
-                    )
+                    if (detail.entries.any { it is JournalNote.Audio } && canChooseOutput) {
+                        OutputRouteSummaryCard(onClick = onChooseOutput)
+                    }
                 }
             }
 
@@ -175,7 +138,8 @@ internal fun WearDayDetailContent(
                         playbackState = playbackState,
                         audioOutputState = audioOutputState,
                         onToggleNote = onToggleNote,
-                        onOpenBluetoothSettings = onOpenBluetoothSettings,
+                        onOpenTextEntry = onOpenTextEntry,
+                        onChooseOutput = onChooseOutput,
                     )
                 }
             }
@@ -184,191 +148,28 @@ internal fun WearDayDetailContent(
 }
 
 @Composable
-private fun OutputRouteSummaryCard(
-    outputSelection: MediaDeviceSelectionUiState,
-    audioOutputState: AudioOutputState,
-    onClick: () -> Unit,
-) {
-    val selectedDevice = outputSelection.selectedDevice
-    val summary =
-        when {
-            audioOutputState is AudioOutputState.Unavailable -> {
-                stringResource(R.string.wear_playback_connect_headphones)
-            }
-            outputSelection.isSelectionControllable -> "Tap to choose output"
-            else -> "Tap for output options"
-        }
-
+private fun OutputRouteSummaryCard(onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .testTag(WearDayDetailTags.OUTPUT_SUMMARY)
-                .padding(top = 4.dp),
+        modifier = Modifier.fillMaxWidth().testTag(WearDayDetailTags.OUTPUT_SUMMARY).padding(top = 8.dp),
     ) {
-        Text(
-            text = selectedDevice?.label ?: "System output",
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = summary,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun WearAudioOutputPicker(
-    outputSelection: MediaDeviceSelectionUiState,
-    audioOutputState: AudioOutputState,
-    onSelectDevice: (String) -> Unit,
-    onOpenBluetoothSettings: () -> Unit,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .testTag(WearDayDetailTags.OUTPUT_PICKER),
-    ) {
-        Text(
-            text = "Audio output",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
-        )
-
-        outputSelection.devices.forEach { device ->
-            OutputRouteDeviceCard(
-                device = device,
-                isSelected = device.id == outputSelection.selectedDeviceId,
-                isSelectionControllable = outputSelection.isSelectionControllable,
-                onSelectDevice = onSelectDevice,
-                onOpenBluetoothSettings = onOpenBluetoothSettings,
-            )
-        }
-
-        if (outputSelection.devices.isEmpty() || audioOutputState is AudioOutputState.Unavailable) {
-            Text(
-                text = stringResource(R.string.wear_playback_connect_headphones),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-
-        outputSelection.routeControlMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-
-        Card(
-            onClick = onOpenBluetoothSettings,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .testTag(WearDayDetailTags.BLUETOOTH_SETTINGS),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.BluetoothSearching,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
+            Icon(Icons.Default.VolumeUp, contentDescription = null, modifier = Modifier.size(18.dp))
+            Column {
+                Text(text = stringResource(R.string.wear_audio_output), style = MaterialTheme.typography.bodySmall)
                 Text(
-                    text = "Bluetooth settings",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.weight(1f),
+                    text = stringResource(R.string.wear_audio_output_action),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
     }
 }
-
-@Composable
-private fun OutputRouteDeviceCard(
-    device: MediaDeviceUiState,
-    isSelected: Boolean,
-    isSelectionControllable: Boolean,
-    onSelectDevice: (String) -> Unit,
-    onOpenBluetoothSettings: () -> Unit,
-) {
-    Card(
-        onClick = {
-            if (isSelectionControllable && device.isAvailable) {
-                onSelectDevice(device.id)
-            } else {
-                onOpenBluetoothSettings()
-            }
-        },
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .testTag(WearDayDetailTags.outputDevice(device.id)),
-    ) {
-        Text(
-            text = device.label,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = outputRouteStatusText(device, isSelected, isSelectionControllable),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-private fun formatOutputHeaderText(
-    outputSelection: MediaDeviceSelectionUiState,
-    audioOutputState: AudioOutputState,
-): String {
-    val selectedLabel = outputSelection.selectedDevice?.label ?: "System output"
-    return if (audioOutputState is AudioOutputState.Unavailable) {
-        "Output unavailable"
-    } else {
-        "Output: $selectedLabel"
-    }
-}
-
-private fun outputRouteStatusText(
-    device: MediaDeviceUiState,
-    isSelected: Boolean,
-    isSelectionControllable: Boolean,
-): String {
-    if (!device.isAvailable) return "Unavailable"
-    return when {
-        isSelected -> "Current"
-        !isSelectionControllable -> "Managed by Wear OS"
-        device.category == MediaDeviceCategory.BLUETOOTH -> "Bluetooth"
-        device.category == MediaDeviceCategory.WIRED -> "Wired"
-        device.isExternal -> "External"
-        else -> "Available"
-    }
-}
-
-private fun defaultWearOutputSelection(): MediaDeviceSelectionUiState = systemControlledSelection(MediaDeviceKind.AUDIO_OUTPUT)
 
 @Composable
 private fun NoteEntryCard(
@@ -376,7 +177,8 @@ private fun NoteEntryCard(
     playbackState: WearPlaybackUiState,
     audioOutputState: AudioOutputState,
     onToggleNote: (JournalNote.Audio) -> Unit,
-    onOpenBluetoothSettings: () -> Unit,
+    onOpenTextEntry: (kotlin.uuid.Uuid) -> Unit,
+    onChooseOutput: () -> Unit,
 ) {
     val timezone = TimeZone.currentSystemDefault()
     val time = note.creationTimestamp.toLocalDateTime(timezone)
@@ -395,13 +197,13 @@ private fun NoteEntryCard(
                 playbackState = playbackState,
                 audioOutputState = audioOutputState,
                 onToggle = { onToggleNote(note) },
-                onOpenBluetoothSettings = onOpenBluetoothSettings,
+                onChooseOutput = onChooseOutput,
             )
         }
 
         is JournalNote.Text -> {
             Card(
-                onClick = { },
+                onClick = { onOpenTextEntry(note.uid) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(
@@ -424,14 +226,21 @@ private fun NoteEntryCard(
         }
 
         is JournalNote.Image -> {
-            Card(
-                onClick = { },
-                modifier = Modifier.fillMaxWidth(),
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(12.dp),
             ) {
                 Text(
                     text = stringResource(R.string.wear_day_detail_photo),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                if (note.caption.isNotBlank()) {
+                    Text(text = note.caption, style = MaterialTheme.typography.bodySmall, maxLines = 3)
+                }
                 Text(
                     text = timeLabel,
                     style = MaterialTheme.typography.labelSmall,
@@ -441,14 +250,21 @@ private fun NoteEntryCard(
         }
 
         is JournalNote.Video -> {
-            Card(
-                onClick = { },
-                modifier = Modifier.fillMaxWidth(),
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(12.dp),
             ) {
                 Text(
                     text = stringResource(R.string.wear_day_detail_video),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                if (note.caption.isNotBlank()) {
+                    Text(text = note.caption, style = MaterialTheme.typography.bodySmall, maxLines = 3)
+                }
                 Text(
                     text = timeLabel,
                     style = MaterialTheme.typography.labelSmall,
@@ -514,14 +330,14 @@ private fun AudioNoteCard(
     playbackState: WearPlaybackUiState,
     audioOutputState: AudioOutputState,
     onToggle: () -> Unit,
-    onOpenBluetoothSettings: () -> Unit,
+    onChooseOutput: () -> Unit,
 ) {
     val cardState = resolveAudioCardState(note.uid, playbackState, audioOutputState)
 
     Card(
         onClick = {
             when (cardState) {
-                is AudioCardState.NoOutput -> onOpenBluetoothSettings()
+                is AudioCardState.NoOutput -> onChooseOutput()
                 is AudioCardState.Preparing -> onToggle()
                 is AudioCardState.Playing -> onToggle()
                 is AudioCardState.Error -> onToggle()
@@ -547,7 +363,7 @@ private fun AudioNoteCard(
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        text = stringResource(R.string.wear_playback_connect_headphones),
+                        text = stringResource(R.string.wear_playback_choose_output),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -648,7 +464,7 @@ private fun AudioNoteCard(
 }
 
 @Composable
-private fun formatDetailHeader(date: LocalDate): String {
+internal fun formatDetailHeader(date: LocalDate): String {
     val monthName =
         date.month.name
             .lowercase()

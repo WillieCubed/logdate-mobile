@@ -314,6 +314,7 @@ private fun PhoneConnectionPage(
     onNext: () -> Unit,
 ) {
     val phoneCheckState by viewModel.phoneCheckState.collectAsState()
+    val phoneActionState by viewModel.phoneActionState.collectAsState()
     val listState = rememberScalingLazyListState()
 
     ScreenScaffold(scrollState = listState) {
@@ -323,106 +324,107 @@ private fun PhoneConnectionPage(
             horizontalAlignment = Alignment.CenterHorizontally,
             contentPadding = screenAwareContentPadding,
         ) {
-            when (phoneCheckState) {
-                PhoneCheckState.Checking -> {
-                    item(key = "spinner") {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                        )
-                    }
-                    item(key = "checking_text") {
-                        Text(
-                            text = stringResource(R.string.wear_onboarding_phone_checking),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp),
-                        )
-                    }
+            item(key = "phone-icon") {
+                if (phoneCheckState is PhoneCheckState.Checking) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                } else {
+                    Icon(
+                        imageVector =
+                            if (phoneCheckState is PhoneCheckState.Connected) Icons.Default.PhoneAndroid else Icons.Default.PhonelinkOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
                 }
-                PhoneCheckState.Connected -> {
-                    item(key = "icon") {
-                        Icon(
-                            imageVector = Icons.Default.PhoneAndroid,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    item(key = "title") {
-                        Text(
-                            text = stringResource(R.string.wear_onboarding_phone_connected),
-                            style = MaterialTheme.typography.titleSmall,
-                            textAlign = TextAlign.Center,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp),
-                        )
-                    }
-                    item(key = "detail") {
-                        Text(
-                            text = stringResource(R.string.wear_onboarding_phone_connected_detail),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    item(key = "continue") {
-                        Button(
-                            onClick = onNext,
-                            label = { Text(stringResource(R.string.wear_onboarding_continue)) },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                        )
-                    }
+            }
+            item(key = "phone-title") {
+                Text(
+                    text =
+                        stringResource(
+                            when (phoneCheckState) {
+                                PhoneCheckState.Checking -> R.string.wear_onboarding_phone_checking
+                                is PhoneCheckState.Connected -> R.string.wear_onboarding_phone_connected
+                                is PhoneCheckState.AppMissing -> R.string.wear_onboarding_phone_app_missing
+                                PhoneCheckState.NotConnected -> R.string.wear_onboarding_phone_not_connected
+                                PhoneCheckState.Unsupported -> R.string.wear_onboarding_phone_unsupported
+                            },
+                        ),
+                    style = MaterialTheme.typography.titleSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
+            }
+            item(key = "phone-guidance") {
+                Text(
+                    text =
+                        stringResource(
+                            when (phoneCheckState) {
+                                PhoneCheckState.Checking -> R.string.wear_onboarding_phone_checking_detail
+                                is PhoneCheckState.Connected -> R.string.wear_onboarding_phone_connected_detail
+                                is PhoneCheckState.AppMissing -> R.string.wear_onboarding_phone_app_missing_detail
+                                PhoneCheckState.NotConnected -> R.string.wear_onboarding_phone_not_connected_detail
+                                PhoneCheckState.Unsupported -> R.string.wear_onboarding_phone_unsupported_detail
+                            },
+                        ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            if (phoneCheckState is PhoneCheckState.Connected || phoneCheckState is PhoneCheckState.AppMissing) {
+                item(key = "phone-setup") {
+                    Button(
+                        onClick = viewModel::openPhoneSetup,
+                        enabled = phoneActionState != PhoneActionState.SENDING,
+                        label = {
+                            Text(
+                                stringResource(
+                                    if (phoneCheckState is PhoneCheckState.Connected) {
+                                        R.string.wear_onboarding_phone_open_setup
+                                    } else {
+                                        R.string.wear_onboarding_phone_install
+                                    },
+                                ),
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
                 }
-                PhoneCheckState.NotConnected -> {
-                    item(key = "icon") {
-                        Icon(
-                            imageVector = Icons.Default.PhonelinkOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    item(key = "title") {
-                        Text(
-                            text = stringResource(R.string.wear_onboarding_phone_not_connected),
-                            style = MaterialTheme.typography.titleSmall,
-                            textAlign = TextAlign.Center,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp),
-                        )
-                    }
-                    item(key = "detail") {
-                        Text(
-                            text = stringResource(R.string.wear_onboarding_phone_not_connected_detail),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    item(key = "continue") {
-                        Button(
-                            onClick = onNext,
-                            label = { Text(stringResource(R.string.wear_onboarding_continue)) },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                        )
-                    }
+            }
+            if (phoneActionState == PhoneActionState.SENT || phoneActionState == PhoneActionState.FAILED) {
+                item(key = "phone-action-result") {
+                    Text(
+                        text =
+                            stringResource(
+                                if (phoneActionState == PhoneActionState.SENT) {
+                                    R.string.wear_onboarding_phone_sent
+                                } else {
+                                    R.string.wear_onboarding_phone_open_failed
+                                },
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
+            }
+            if (phoneCheckState !is PhoneCheckState.Checking && phoneCheckState !is PhoneCheckState.Unsupported) {
+                item(key = "phone-recheck") {
+                    FilledTonalButton(
+                        onClick = viewModel::checkPhoneConnection,
+                        label = { Text(stringResource(R.string.wear_onboarding_phone_check_again)) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
+                }
+            }
+            item(key = "phone-continue") {
+                FilledTonalButton(
+                    onClick = onNext,
+                    label = { Text(stringResource(R.string.wear_onboarding_phone_continue_watch)) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
             }
         }
     }

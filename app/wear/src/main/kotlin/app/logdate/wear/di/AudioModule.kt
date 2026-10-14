@@ -208,7 +208,8 @@ val wearAudioModule =
         }
         viewModel {
             WearOnboardingViewModel(
-                get<WearDataLayerClient>(),
+                get(),
+                get(),
             )
         }
         viewModel {

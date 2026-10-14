@@ -9,10 +9,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.wear.compose.material3.MaterialTheme
-import app.logdate.client.media.device.MediaDeviceCategory
-import app.logdate.client.media.device.MediaDeviceKind
-import app.logdate.client.media.device.MediaDeviceSelectionUiState
-import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.wear.playback.AudioOutputState
 import app.logdate.wear.presentation.timeline.WearDayDetailContent
@@ -69,35 +65,6 @@ class WearDayDetailPlaybackTest {
             entries = entries,
         )
 
-    private fun outputSelection(isSelectionControllable: Boolean = true) =
-        MediaDeviceSelectionUiState(
-            kind = MediaDeviceKind.AUDIO_OUTPUT,
-            devices =
-                listOf(
-                    MediaDeviceUiState(
-                        id = "watch-speaker",
-                        label = "Watch speaker",
-                        kind = MediaDeviceKind.AUDIO_OUTPUT,
-                        category = MediaDeviceCategory.BUILT_IN,
-                    ),
-                    MediaDeviceUiState(
-                        id = "bluetooth-headphones",
-                        label = "Bluetooth headphones",
-                        kind = MediaDeviceKind.AUDIO_OUTPUT,
-                        category = MediaDeviceCategory.BLUETOOTH,
-                        isExternal = true,
-                    ),
-                ),
-            selectedDeviceId = "watch-speaker",
-            isSelectionControllable = isSelectionControllable,
-            routeControlMessage =
-                if (isSelectionControllable) {
-                    null
-                } else {
-                    "Use Wear OS Bluetooth settings to route playback."
-                },
-        )
-
     // -----------------------------------------------------------------------
     // Idle state — play button + duration
     // -----------------------------------------------------------------------
@@ -111,7 +78,7 @@ class WearDayDetailPlaybackTest {
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
@@ -128,7 +95,7 @@ class WearDayDetailPlaybackTest {
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
@@ -146,7 +113,7 @@ class WearDayDetailPlaybackTest {
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = { toggled = true },
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
@@ -173,7 +140,7 @@ class WearDayDetailPlaybackTest {
                         ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
@@ -195,7 +162,7 @@ class WearDayDetailPlaybackTest {
                         ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
@@ -219,7 +186,7 @@ class WearDayDetailPlaybackTest {
                         ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = { toggled = true },
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
@@ -241,7 +208,7 @@ class WearDayDetailPlaybackTest {
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.Unavailable,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
@@ -249,11 +216,11 @@ class WearDayDetailPlaybackTest {
         composeRule
             .onNodeWithTag(WearDayDetailTags.audioNote(testNoteId))
             .assertIsDisplayed()
-            .assertTextContains("Connect headphones to listen")
+            .assertTextContains("Choose an output to listen")
     }
 
     @Test
-    fun `no output tap opens bluetooth settings`() {
+    fun `no output tap opens output picker`() {
         var opened = false
         composeRule.setContent {
             MaterialTheme {
@@ -262,89 +229,17 @@ class WearDayDetailPlaybackTest {
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.Unavailable,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = { opened = true },
+                    onChooseOutput = { opened = true },
                 )
             }
         }
 
         composeRule.onNodeWithTag(WearDayDetailTags.audioNote(testNoteId)).performClick()
-        assertTrue("Tapping no-output card should open Bluetooth settings", opened)
+        assertTrue("Tapping no-output card should open output picker", opened)
     }
 
     @Test
-    fun `output summary tap shows output picker`() {
-        var toggledPicker = false
-        composeRule.setContent {
-            MaterialTheme {
-                WearDayDetailContent(
-                    detail = dayDetail(),
-                    playbackState = WearPlaybackUiState.Idle,
-                    audioOutputState = AudioOutputState.SpeakerAndBluetooth,
-                    outputSelection = outputSelection(),
-                    onToggleOutputPicker = { toggledPicker = true },
-                    onToggleNote = {},
-                    onOpenBluetoothSettings = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_SUMMARY).assertIsDisplayed()
-        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_SUMMARY).performClick()
-        assertTrue("Tapping the Wear output summary should open output options", toggledPicker)
-    }
-
-    @Test
-    fun `output picker displays bluetooth output route`() {
-        composeRule.setContent {
-            MaterialTheme {
-                WearDayDetailContent(
-                    detail = dayDetail(),
-                    playbackState = WearPlaybackUiState.Idle,
-                    audioOutputState = AudioOutputState.SpeakerAndBluetooth,
-                    outputSelection = outputSelection(),
-                    isOutputPickerVisible = true,
-                    onToggleNote = {},
-                    onOpenBluetoothSettings = {},
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_PICKER).assertIsDisplayed()
-        composeRule.onNodeWithTag(WearDayDetailTags.outputDevice("bluetooth-headphones")).assertIsDisplayed()
-    }
-
-    @Test
-    fun `output picker controllable route selects bluetooth output`() {
-        var selectedDeviceId: String? = null
-        composeRule.setContent {
-            MaterialTheme {
-                WearDayDetailContent(
-                    detail = dayDetail(),
-                    playbackState = WearPlaybackUiState.Idle,
-                    audioOutputState = AudioOutputState.SpeakerAndBluetooth,
-                    outputSelection = outputSelection(isSelectionControllable = true),
-                    isOutputPickerVisible = true,
-                    onSelectOutputDevice = { selectedDeviceId = it },
-                    onToggleNote = {},
-                    onOpenBluetoothSettings = {},
-                )
-            }
-        }
-
-        composeRule.waitForIdle()
-        composeRule
-            .onNodeWithTag(WearDayDetailTags.outputDevice("bluetooth-headphones"))
-            .assertIsDisplayed()
-            .performClick()
-
-        assertTrue(
-            "Tapping an available controllable Wear output should select that device",
-            selectedDeviceId == "bluetooth-headphones",
-        )
-    }
-
-    @Test
-    fun `output picker system controlled route opens bluetooth settings`() {
+    fun `audio output action opens the system picker`() {
         var opened = false
         composeRule.setContent {
             MaterialTheme {
@@ -352,24 +247,30 @@ class WearDayDetailPlaybackTest {
                     detail = dayDetail(),
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.SpeakerAndBluetooth,
-                    outputSelection = outputSelection(isSelectionControllable = false),
-                    isOutputPickerVisible = true,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = { opened = true },
+                    onChooseOutput = { opened = true },
                 )
             }
         }
 
-        composeRule.waitForIdle()
-        composeRule
-            .onNodeWithTag(WearDayDetailTags.outputDevice("bluetooth-headphones"))
-            .assertIsDisplayed()
-            .performClick()
+        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_SUMMARY).assertIsDisplayed().performClick()
+        assertTrue("Audio output action should open the system picker", opened)
+    }
 
-        assertTrue(
-            "System-controlled Wear output routes should open Bluetooth settings",
-            opened,
-        )
+    @Test
+    fun `day without audio does not advertise an output picker`() {
+        composeRule.setContent {
+            MaterialTheme {
+                WearDayDetailContent(
+                    detail = dayDetail(entries = listOf(textNote())),
+                    playbackState = WearPlaybackUiState.Idle,
+                    audioOutputState = AudioOutputState.SpeakerOnly,
+                    onToggleNote = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(WearDayDetailTags.OUTPUT_SUMMARY).assertDoesNotExist()
     }
 
     // -----------------------------------------------------------------------
@@ -385,13 +286,33 @@ class WearDayDetailPlaybackTest {
                     playbackState = WearPlaybackUiState.Idle,
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }
 
         composeRule.onNodeWithText("Hello world").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Play voice note").assertIsDisplayed()
+    }
+
+    @Test
+    fun `text entry opens its full reader`() {
+        val note = textNote()
+        var opened: Uuid? = null
+        composeRule.setContent {
+            MaterialTheme {
+                WearDayDetailContent(
+                    detail = dayDetail(entries = listOf(note)),
+                    playbackState = WearPlaybackUiState.Idle,
+                    audioOutputState = AudioOutputState.SpeakerOnly,
+                    onToggleNote = {},
+                    onOpenTextEntry = { opened = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Hello world").performClick()
+        assertTrue("Tapping text should open the entry", opened == note.uid)
     }
 
     @Test
@@ -409,7 +330,7 @@ class WearDayDetailPlaybackTest {
                         ),
                     audioOutputState = AudioOutputState.SpeakerOnly,
                     onToggleNote = {},
-                    onOpenBluetoothSettings = {},
+                    onChooseOutput = {},
                 )
             }
         }

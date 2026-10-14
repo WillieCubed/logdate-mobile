@@ -16,6 +16,10 @@ data class WearTimelineDayDetailRoute(
     val date: LocalDate,
 ) : NavKey
 
+data class WearTextEntryRoute(
+    val noteId: Uuid,
+) : NavKey
+
 data object WearRemoteCameraRoute : NavKey
 
 data object WearSettingsRoute : NavKey

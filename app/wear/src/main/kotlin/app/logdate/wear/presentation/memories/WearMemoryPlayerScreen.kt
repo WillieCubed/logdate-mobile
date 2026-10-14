@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -29,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.ButtonGroup
 import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.IconButtonDefaults
@@ -41,8 +41,11 @@ import app.logdate.wear.playback.AudioOutputState
 import app.logdate.wear.presentation.recording.formatDuration
 import app.logdate.wear.presentation.timeline.WearPlaybackUiState
 import app.logdate.wear.presentation.timeline.formatDayLabel
+import app.logdate.wear.v2.playon.OutputPicker
+import app.logdate.wear.v2.playon.OutputPickerRoute
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -52,6 +55,7 @@ fun WearMemoryPlayerScreen(
     viewModel: WearMemoryPlayerViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
+    val outputPicker: OutputPicker = koinInject()
     LaunchedEffect(noteId) { viewModel.open(noteId) }
     DisposableEffect(viewModel) { onDispose { viewModel.close() } }
 
@@ -60,7 +64,8 @@ fun WearMemoryPlayerScreen(
         onPlayPause = viewModel::onPlayPause,
         onSkipBack = viewModel::onSkipBack,
         onSkipForward = viewModel::onSkipForward,
-        onOpenBluetoothSettings = viewModel::onOpenBluetoothSettings,
+        onChooseOutput = { outputPicker.open() },
+        canChooseOutput = outputPicker.route != OutputPickerRoute.NONE,
     )
 }
 
@@ -70,7 +75,8 @@ internal fun WearMemoryPlayerContent(
     onPlayPause: () -> Unit = {},
     onSkipBack: () -> Unit = {},
     onSkipForward: () -> Unit = {},
-    onOpenBluetoothSettings: () -> Unit = {},
+    onChooseOutput: () -> Unit = {},
+    canChooseOutput: Boolean = true,
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
     ScreenScaffold(timeText = { TimeText() }) {
@@ -90,7 +96,7 @@ internal fun WearMemoryPlayerContent(
             when {
                 !state.isLoaded -> Unit
                 memory == null -> PlayerMessage(stringResource(R.string.wear_memory_not_found))
-                else -> PlayerBody(state, memory, timeZone, onPlayPause, onSkipBack, onSkipForward, onOpenBluetoothSettings)
+                else -> PlayerBody(state, memory, timeZone, onPlayPause, onSkipBack, onSkipForward, onChooseOutput, canChooseOutput)
             }
         }
     }
@@ -104,7 +110,8 @@ private fun PlayerBody(
     onPlayPause: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
-    onOpenBluetoothSettings: () -> Unit,
+    onChooseOutput: () -> Unit,
+    canChooseOutput: Boolean,
 ) {
     val playback = state.playback
     val active = playback as? WearPlaybackUiState.Active
@@ -136,7 +143,6 @@ private fun PlayerBody(
             playback = playback,
             blocked = blocked,
             onPlayPause = onPlayPause,
-            onOpenBluetoothSettings = onOpenBluetoothSettings,
             interactionSource = playSource,
             modifier = Modifier.weight(PLAY_WEIGHT).animateWidth(playSource),
         )
@@ -152,6 +158,13 @@ private fun PlayerBody(
     Box(modifier = Modifier.height(STATUS_SLOT_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         PlayerStatus(playback = playback, blocked = blocked, memory = memory)
     }
+    if (canChooseOutput) {
+        CompactButton(
+            onClick = onChooseOutput,
+            label = { Text(stringResource(R.string.wear_audio_output)) },
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
 
 @Composable
@@ -159,20 +172,18 @@ private fun PlayButton(
     playback: WearPlaybackUiState,
     blocked: Boolean,
     onPlayPause: () -> Unit,
-    onOpenBluetoothSettings: () -> Unit,
     interactionSource: MutableInteractionSource,
     modifier: Modifier = Modifier,
 ) {
     val active = playback as? WearPlaybackUiState.Active
     val (icon, description) =
         when {
-            blocked -> Icons.AutoMirrored.Filled.BluetoothSearching to R.string.wear_playback_connect_headphones
             active != null && !active.isPaused -> Icons.Default.Pause to R.string.wear_player_pause
             else -> Icons.Default.PlayArrow to R.string.wear_player_play
         }
     IconButton(
-        onClick = if (blocked) onOpenBluetoothSettings else onPlayPause,
-        enabled = blocked || playback !is WearPlaybackUiState.Preparing,
+        onClick = onPlayPause,
+        enabled = !blocked && playback !is WearPlaybackUiState.Preparing,
         modifier = modifier.height(PLAY_BUTTON_SIZE),
         interactionSource = interactionSource,
         shapes = IconButtonDefaults.animatedShapes(),
@@ -214,7 +225,7 @@ private fun PlayerStatus(
     memory: VoiceMemoryItem,
 ) {
     when {
-        blocked -> PlayerMessage(stringResource(R.string.wear_playback_connect_headphones))
+        blocked -> PlayerMessage(stringResource(R.string.wear_playback_choose_output))
         playback is WearPlaybackUiState.Preparing -> PlayerMessage(stringResource(R.string.wear_playback_preparing_audio))
         playback is WearPlaybackUiState.Error -> PlayerMessage(stringResource(R.string.wear_playback_retry_download))
         playback is WearPlaybackUiState.Active -> {
