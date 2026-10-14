@@ -884,6 +884,21 @@ assert_equals "first_party" "$(jq -r '.env_vars.LOGDATE_DEPLOYMENT_KIND' "$CURRE
 # prevent.
 assert_contains 'android:apk-key-hash:' "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$CURRENT_PRODUCTION_OUT")"
 
+# CI's provider-free variables must accept the same committed operator settings
+# while leaving the runtime contract identical to a normal Terraform render.
+CURRENT_PRODUCTION_CI_OUT="$TMP_DIR/current-production-ci.out"
+CURRENT_PRODUCTION_CI_ERR="$TMP_DIR/current-production-ci.err"
+(
+    cd "$CURRENT_INPUTS_REPO"
+    CI=true PATH="$(dirname "$REAL_TERRAFORM"):$(dirname "$REAL_JQ"):$PATH" \
+        "$SCRIPT" --environment production --release-sha "$CURRENT_RELEASE_SHA" \
+        >"$CURRENT_PRODUCTION_CI_OUT" 2>"$CURRENT_PRODUCTION_CI_ERR"
+) || fail "current committed production inputs did not render in CI"
+cmp -s "$CURRENT_PRODUCTION_OUT" "$CURRENT_PRODUCTION_CI_OUT" || \
+    fail "CI production contract differed from the normal Terraform render"
+pass
+assert_zero_bytes "$CURRENT_PRODUCTION_CI_ERR"
+
 expect_failure() {
     local label="$1" environment="$2" release_sha="$3" fixture="$4" expected_error="$5"
     local output_file="$TMP_DIR/$label.out" error_file="$TMP_DIR/$label.err" status

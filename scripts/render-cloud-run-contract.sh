@@ -267,6 +267,14 @@ variable "secret_ids" {
   type = list(string)
   default = []
 }
+variable "cleanup_operator_email" {
+  type = string
+  default = ""
+}
+variable "cleanup_notification_channels" {
+  type = list(string)
+  default = []
+}
 variable "webauthn_origin" {
   type = string
   default = ""
