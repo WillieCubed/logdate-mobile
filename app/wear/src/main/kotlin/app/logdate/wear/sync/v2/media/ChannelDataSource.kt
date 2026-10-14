@@ -39,7 +39,7 @@ class ChannelDataSource(
             openedUri = dataSpec.uri
             started = true
             transferStarted(dataSpec)
-            if (dataSpec.length == C.LENGTH_UNSET.toLong()) available else dataSpec.length
+            available
         }
     }
 
