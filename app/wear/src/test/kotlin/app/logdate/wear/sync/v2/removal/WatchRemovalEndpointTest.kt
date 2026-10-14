@@ -47,6 +47,7 @@ class WatchRemovalEndpointTest {
             },
             pending = { pending },
             wipe = { wipes++ },
+            forcedWipe = { wipes++ },
         )
 
     @Test
@@ -105,6 +106,24 @@ class WatchRemovalEndpointTest {
         runTest {
             pending = 0
             assertFalse(reply(RemovalAction.WIPE).completed)
+            assertEquals(0, wipes)
+        }
+
+    @Test
+    fun `approved offline wipe erases pending captures for the current link`() =
+        runTest {
+            recording = true
+            assertTrue(reply(RemovalAction.REVOKED_WIPE).completed)
+            assertEquals(1, wipes)
+            assertEquals(0, drains)
+            assertEquals("wiping-revoked:${peer.linkId}", lock.state())
+        }
+
+    @Test
+    fun `approved offline wipe cannot erase a newly linked watch`() =
+        runTest {
+            current = peer.copy(linkId = LinkWire.encodeKey(ByteArray(32) { 4 }))
+            assertNull(subject.answer("phone", request(RemovalAction.REVOKED_WIPE)))
             assertEquals(0, wipes)
         }
 

@@ -31,6 +31,7 @@ import logdate.client.feature.core.generated.resources.watch_remove_busy
 import logdate.client.feature.core.generated.resources.watch_remove_confirm
 import logdate.client.feature.core.generated.resources.watch_remove_consequence
 import logdate.client.feature.core.generated.resources.watch_remove_count_unknown
+import logdate.client.feature.core.generated.resources.watch_remove_deferred
 import logdate.client.feature.core.generated.resources.watch_remove_done
 import logdate.client.feature.core.generated.resources.watch_remove_failed
 import logdate.client.feature.core.generated.resources.watch_remove_loading
@@ -138,6 +139,7 @@ fun WatchRemovalContent(
                         is WatchRemovalState.Finished ->
                             when (val result = value.result) {
                                 WatchRemovalResult.Removed -> Text(stringResource(Res.string.watch_remove_done))
+                                WatchRemovalResult.RemovedWillWipeOnNextConnect -> Text(stringResource(Res.string.watch_remove_deferred))
                                 is WatchRemovalResult.Failed -> {
                                     Text(stringResource(Res.string.watch_remove_failed))
                                     Button(onClick = onRetry) { Text(stringResource(Res.string.watch_remove_retry)) }

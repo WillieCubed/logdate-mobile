@@ -14,6 +14,7 @@ class WatchRemovalCoordinatorTest {
     private var pending = 0
     private var reachable = true
     private var revoked = true
+    private var queued = true
     private var pendingAfterDrain = 0
     private var wipeReachable = true
     private val subject =
@@ -32,6 +33,10 @@ class WatchRemovalCoordinatorTest {
                 } else {
                     null
                 }
+            },
+            deferWipe = {
+                calls += "queue wipe"
+                queued
             },
             revoke = {
                 calls += "revoke"
@@ -66,16 +71,25 @@ class WatchRemovalCoordinatorTest {
     fun `offline watch has durable wipe queued before local link is forgotten`() =
         runTest {
             reachable = false
-            assertEquals(WatchRemovalResult.Failed("sync"), subject.remove(target))
-            assertEquals(listOf("DRAIN"), calls)
+            assertEquals(WatchRemovalResult.RemovedWillWipeOnNextConnect, subject.remove(target))
+            assertEquals(listOf("DRAIN", "revoke", "queue wipe", "forget"), calls)
         }
 
     @Test
-    fun `lost wipe reply retains link for an authenticated retry`() =
+    fun `lost wipe reply queues erasure after revocation`() =
         runTest {
             wipeReachable = false
-            assertEquals(WatchRemovalResult.Failed("wipe"), subject.remove(target))
-            assertEquals(listOf("DRAIN", "revoke", "WIPE"), calls)
+            assertEquals(WatchRemovalResult.RemovedWillWipeOnNextConnect, subject.remove(target))
+            assertEquals(listOf("DRAIN", "revoke", "WIPE", "queue wipe", "forget"), calls)
+        }
+
+    @Test
+    fun `failed deferred queue retains the link for a retry after revocation`() =
+        runTest {
+            reachable = false
+            queued = false
+            assertEquals(WatchRemovalResult.Failed("queue wipe"), subject.remove(target))
+            assertEquals(listOf("DRAIN", "revoke", "queue wipe"), calls)
         }
 
     @Test

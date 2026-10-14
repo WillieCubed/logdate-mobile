@@ -126,13 +126,14 @@
     <string name="watch_v2_mark">Mark</string>
     <string name="watch_remove_loading">Checking the linked watch…</string>
     <string name="watch_remove_review">Remove %1$s?</string>
-    <string name="watch_remove_pending">Last reported unsent moments: %1$s. Removal will sync and check that none remain.</string>
+    <string name="watch_remove_pending">Last reported unsent moments: %1$s. If the watch is offline, these and any newer unsent moments may be lost.</string>
     <string name="watch_remove_count_unknown">unavailable</string>
-    <string name="watch_remove_consequence">Keep your watch nearby and connected. After its unsent moments are synced, LogDate removes its access and erases its local data and account keys. Your phone journal and backed-up moments stay safe. If sync or erasure cannot be confirmed, removal stops so you can try again.</string>
+    <string name="watch_remove_consequence">When the watch is nearby, LogDate syncs its moments before removing it. If it is offline, LogDate revokes its access now and queues erasure for its next connection. Unsent moments on the watch may be lost. Your phone journal and backed-up moments stay safe.</string>
     <string name="watch_remove_confirm">Remove watch</string>
-    <string name="watch_remove_busy">Syncing and removing the watch…</string>
+    <string name="watch_remove_busy">Removing the watch…</string>
     <string name="watch_remove_unavailable">No verified watch link is available. Set up the watch again before removing it securely.</string>
     <string name="watch_remove_done">Watch removed. Its retained LogDate data has been erased.</string>
+    <string name="watch_remove_deferred">Watch access revoked. LogDate will erase its local data when it reconnects. Unsent moments on that watch may be lost.</string>
     <string name="watch_remove_failed">Removal isn’t complete. Keep the watch nearby and try again. Recording on the watch may pause until this finishes.</string>
     <string name="watch_remove_retry">Check again</string>
     <string name="watch_audio_wifi_or_charging">Wi-Fi or while charging</string>

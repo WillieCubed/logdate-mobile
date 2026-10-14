@@ -89,7 +89,7 @@ class LinkedDeviceInstallerTest {
         runTest {
             val outcome = installer.install(bundle())
 
-            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, leftBehind = 0), outcome)
+            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, leftBehind = 0, sessionId = "session"), outcome)
             assertContentEquals(identityKey, identity.getIdentityKey())
             assertContentEquals(mediaKey, mediaKeys.getOrCreateKey())
             assertEquals(UserSession("access", "refresh", ACCOUNT), vault.sessions[LINKED_ORIGIN])
@@ -171,7 +171,7 @@ class LinkedDeviceInstallerTest {
             assertTrue(journal.values.isNotEmpty())
             moveFails = false
 
-            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, leftBehind = 0), installer.resume())
+            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, leftBehind = 0, sessionId = "session"), installer.resume())
             assertEquals(ACCOUNT, owner.id)
             assertTrue(journal.values.isEmpty())
         }
@@ -290,7 +290,7 @@ class LinkedDeviceInstallerTest {
             moveFails = true
             installer.install(bundle())
             moveFails = false
-            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, 0), installer.install(bundle()))
+            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, 0, sessionId = "session"), installer.install(bundle()))
             assertEquals(1, redeemCalls)
             assertEquals(1, moves.size)
         }
@@ -333,7 +333,7 @@ class LinkedDeviceInstallerTest {
             assertFailsWith<IllegalStateException> { installer.install(bundle()) }
             assertTrue(journal.values.isNotEmpty())
             persistenceFails = false
-            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, 0), installer.resume())
+            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, 0, sessionId = "session"), installer.resume())
             assertEquals(2, persistenceCalls)
             assertEquals(1, moves.size)
             assertTrue(journal.values.isEmpty())

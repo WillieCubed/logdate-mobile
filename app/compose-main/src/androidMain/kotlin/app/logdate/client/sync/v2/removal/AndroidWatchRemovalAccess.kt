@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.networking.DeviceLinkApiClient
+import app.logdate.client.networking.DeviceLinkApiException
 import app.logdate.client.networking.httpClient
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.datalayer.v2.LinkMode
@@ -23,6 +24,7 @@ import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import app.logdate.shared.config.PinnedLogDateConfigRepository
+import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -43,6 +45,7 @@ class AndroidWatchRemovalAccess(
         WatchRemovalCoordinator(
             current = peers::isCurrentRemoval,
             request = ::request,
+            deferWipe = ::deferWipe,
             revoke = ::revoke,
             disassociate = ::disassociate,
             forget = {
@@ -112,6 +115,20 @@ class AndroidWatchRemovalAccess(
             null
         }
 
+    private suspend fun deferWipe(request: WatchRemovalRequest): Boolean =
+        try {
+            val path = "${WatchRemovalProtocol.PATH}/${request.context.watchNode}/${request.context.linkPathSegment}"
+            val item = PutDataMapRequest.create(path)
+            item.dataMap.putString("request", WearJson.encode(WatchRemovalRequest.serializer(), request))
+            Wearable.getDataClient(context).putDataItem(item.asPutDataRequest().setUrgent()).await()
+            true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.e("Could not queue watch erasure after revocation; retaining link for retry", error)
+            false
+        }
+
     private suspend fun revoke(target: WatchRemovalTarget): Boolean {
         if (target.context.mode == LinkMode.PAIR) return true
         val id = target.sessionId ?: return false
@@ -120,7 +137,11 @@ class AndroidWatchRemovalAccess(
         val client = DeviceLinkApiClient(httpClient, PinnedLogDateConfigRepository(bound.origin, null))
         val result = client.revoke(id, bound.session.accessToken)
         if (sessions.getOriginBoundSession() != bound) return false
-        return result.isSuccess
+        if (result.isSuccess) return true
+        val error = result.exceptionOrNull() as? DeviceLinkApiException ?: return false
+        if (error.status != 404) return false
+        val remaining = client.listDevices(bound.session.accessToken).getOrNull() ?: return false
+        return sessions.getOriginBoundSession() == bound && remaining.none { it.id == id }
     }
 
     @Suppress("DEPRECATION")

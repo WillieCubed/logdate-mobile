@@ -75,6 +75,7 @@ val wearRemovalModule =
                 },
                 pending = { database.syncMetadataDao().getAllPending().size },
                 wipe = wiper::wipe,
+                forcedWipe = wiper::wipe,
             )
         }
     }

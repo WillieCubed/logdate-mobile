@@ -65,4 +65,14 @@ class WatchRemovalRecoveryTest {
             assertTrue(subject.finish())
             coVerify(exactly = 1) { wiper.wipe() }
         }
+
+    @Test
+    fun `approved offline removal resumes erasure despite unsent captures`() =
+        runTest {
+            marker = "wiping-revoked:old-link"
+            pending = 2
+            every { recorder.isRecording } returns MutableStateFlow(true)
+            assertTrue(subject.finish())
+            coVerify(exactly = 1) { wiper.wipe() }
+        }
 }

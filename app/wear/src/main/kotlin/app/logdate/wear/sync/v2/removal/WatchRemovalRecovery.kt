@@ -21,13 +21,13 @@ class WatchRemovalRecovery(
 ) {
     suspend fun restore() {
         val state = lock.state()
-        if (state == "wiping" || state?.startsWith("wiping:") == true) schedule()
+        if (state == "wiping" || state?.startsWith("wiping:") == true || state?.startsWith("wiping-revoked:") == true) schedule()
     }
 
     suspend fun finish(): Boolean {
         val state = lock.state() ?: return true
-        if (state != "wiping" && !state.startsWith("wiping:")) return true
-        if (recorder.isRecording.value || (state.startsWith("wiping:") && pending() != 0)) return false
+        if (state != "wiping" && !state.startsWith("wiping:") && !state.startsWith("wiping-revoked:")) return true
+        if (state.startsWith("wiping:") && (recorder.isRecording.value || pending() != 0)) return false
         wiper.wipe()
         return true
     }

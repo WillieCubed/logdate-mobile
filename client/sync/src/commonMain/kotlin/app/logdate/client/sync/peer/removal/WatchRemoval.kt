@@ -8,7 +8,7 @@ object WatchRemovalProtocol {
 }
 
 @Serializable
-enum class RemovalAction { DRAIN, WIPE }
+enum class RemovalAction { DRAIN, WIPE, REVOKED_WIPE }
 
 @Serializable
 data class WatchRemovalRequest(
@@ -28,6 +28,8 @@ data class WatchRemovalReply(
 
 sealed interface WatchRemovalResult {
     data object Removed : WatchRemovalResult
+
+    data object RemovedWillWipeOnNextConnect : WatchRemovalResult
 
     data class Failed(
         val step: String,

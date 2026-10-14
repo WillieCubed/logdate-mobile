@@ -135,6 +135,20 @@ class LogDateWearApplication :
     }
 
     private fun startReadyObservers() {
+        observers.start("pending-watch-removal") {
+            startupScope.launch {
+                try {
+                    org.koin.java.KoinJavaComponent
+                        .getKoin()
+                        .get<app.logdate.wear.sync.v2.removal.WatchRemovalEvents>()
+                        .replayPending(this@LogDateWearApplication)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Napier.w("Pending watch removal will be retried on the next connection", error)
+                }
+            }
+        }
         observers.start(
             "media-migration",
         ) {

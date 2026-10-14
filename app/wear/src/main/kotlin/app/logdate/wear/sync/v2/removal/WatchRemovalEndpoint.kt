@@ -64,10 +64,23 @@ class WatchRemovalLock(
             count
         }
 
+    suspend fun beginRevokedWipe(linkId: String): Boolean =
+        mutations.withLock {
+            val state = state()
+            if (state != null && state != "prepared:$linkId" && state != "wiping:$linkId" && state != "wiping-revoked:$linkId") {
+                return@withLock false
+            }
+            storage.putString(KEY, "wiping-revoked:$linkId")
+            check(state() == "wiping-revoked:$linkId")
+            true
+        }
+
     suspend fun mark() {
         val state = state()
         val next =
-            if (state?.startsWith("prepared:") == true) {
+            if (state?.startsWith("wiping-revoked:") == true) {
+                state
+            } else if (state?.startsWith("prepared:") == true) {
                 "wiping:${state.removePrefix("prepared:")}"
             } else {
                 state?.takeIf { it.startsWith("wiping:") } ?: "wiping"
@@ -77,7 +90,13 @@ class WatchRemovalLock(
 
     suspend fun finish() {
         val state = state()
-        storage.putString(KEY, if (state?.startsWith("wiping:") == true) "removed:${state.removePrefix("wiping:")}" else "removed")
+        val linkId =
+            when {
+                state?.startsWith("wiping-revoked:") == true -> state.removePrefix("wiping-revoked:")
+                state?.startsWith("wiping:") == true -> state.removePrefix("wiping:")
+                else -> null
+            }
+        storage.putString(KEY, linkId?.let { "removed:$it" } ?: "removed")
     }
 
     suspend fun removedFor(linkId: String): Boolean = state() == "removed:$linkId"
@@ -101,6 +120,7 @@ class WatchRemovalEndpoint(
     private val drain: suspend () -> Unit,
     private val pending: suspend () -> Int,
     private val wipe: suspend () -> Unit,
+    private val forcedWipe: suspend () -> Unit,
 ) {
     private val mutex = Mutex()
 
@@ -116,7 +136,7 @@ class WatchRemovalEndpoint(
             val peer =
                 current() ?: return@withLock if (lock.removedFor(request.context.linkId)) reply(request, 0, true) else null
             if (request.context != peer) return@withLock null
-            if (recording()) {
+            if (recording() && request.action != RemovalAction.REVOKED_WIPE) {
                 return@withLock reply(request, pending(), false)
             }
             when (request.action) {
@@ -130,6 +150,11 @@ class WatchRemovalEndpoint(
                     val count = lock.beginWipe(peer.linkId) { pending() } ?: return@withLock reply(request, pending(), false)
                     if (count != 0) return@withLock reply(request, count, false)
                     wipe()
+                    reply(request, 0, true)
+                }
+                RemovalAction.REVOKED_WIPE -> {
+                    if (current() != peer || !lock.beginRevokedWipe(peer.linkId)) return@withLock null
+                    forcedWipe()
                     reply(request, 0, true)
                 }
             }
