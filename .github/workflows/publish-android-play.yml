@@ -2,8 +2,6 @@ name: Publish Android to Play
 run-name: Android Play ${{ inputs.stage || 'internal' }} ${{ inputs.candidate_tag || github.ref_name }} by ${{ github.actor }}
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       stage:
@@ -41,7 +39,7 @@ concurrency:
 jobs:
   publish-internal:
     name: Publish Android internal release
-    if: ${{ vars.LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED == 'true' && (github.event_name == 'push' || inputs.stage == 'internal') }}
+    if: ${{ vars.LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED == 'true' && inputs.stage == 'internal' }}
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 45

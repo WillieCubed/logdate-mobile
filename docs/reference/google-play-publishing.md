@@ -9,9 +9,8 @@ and the helper scripts used to prepare the required secrets.
 The automated path is intentionally narrow:
 
 - publish the Android app bundle (`.aab`) only
-- publish **internal** track builds on every push to `main`
-- allow **manual** internal publishes via `workflow_dispatch`
-- promote **production** releases only from `android-v*` tag pushes
+- publish **internal** track builds only when manually dispatched from `main`
+- promote **production** releases only by manual dispatch for a tested `android-v*` tag
 - read the publishing secrets from the `production` GitHub Environment, which
   only `main` and release tags may use
 - stay disabled until maintainers explicitly enable each path
@@ -21,14 +20,14 @@ The automated path is intentionally narrow:
 
 ### Dogfood and production
 
-"Dogfood" is the Play **internal testing** track. Every push to `main`
-publishes a real, non-debuggable `release` bundle there, built against the
-production backend `https://cloud.logdate.app`. The local `dogfood` Gradle
+"Dogfood" is the Play **internal testing** track. An explicit `workflow_dispatch`
+from `main` publishes a real, non-debuggable `release` bundle there, built against
+the production backend `https://cloud.logdate.app`. The local `dogfood` Gradle
 build type is something else: a debuggable build for sideloading, which Play
 would reject.
 
-Production is the same bundle, promoted from internal testing by an
-`android-v*` tag. Nothing is rebuilt for production.
+Production is the same bundle, promoted from internal testing by an explicit
+workflow dispatch that names its tested `android-v*` tag. Nothing is rebuilt for production.
 
 The workflow lives in [`publish-android-play.yml`](../../.github/workflows/publish-android-play.yml).
 
@@ -167,8 +166,7 @@ The workflow has two publish paths:
 
 ### Internal track
 
-- Triggers on every push to `main`
-- Also supports manual `workflow_dispatch`
+- Runs only for a manual `workflow_dispatch` with stage `internal` from `main`
 - Requires `LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED=true`
 - Materializes the **release** Firebase config because Gradle Play Publisher
   builds the signed `release` bundle even when publishing to the internal
@@ -192,7 +190,8 @@ The workflow has two publish paths:
 
 ### Production track
 
-- Triggers only on `android-v<major>.<minor>.<patch>` tag pushes
+- Runs only for a manual production-stage dispatch naming a tested
+  `android-v<major>.<minor>.<patch>` tag
 - Requires `LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true`
 - Runs in the `production` Environment, which only release tags and `main` may use
 - Materializes the **release** Firebase config
@@ -274,7 +273,8 @@ track. Use the registered API alias rather than guessing from the Console's disp
 
 writes `app/wear/build/outputs/bundle/release/wear-release.aab`. Pass
 `-Plogdate.allowDebugReleaseSigning=true` on a machine with no signing material. CI builds the same
-bundle on every push so a broken watch release cannot reach `main`.
+bundle when an internal release is dispatched. Run the local Wear build before committing
+watch changes so a broken watch release cannot reach `main`.
 
 ## Local Verification
 
