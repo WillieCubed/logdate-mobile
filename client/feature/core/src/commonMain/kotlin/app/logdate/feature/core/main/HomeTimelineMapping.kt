@@ -88,6 +88,10 @@ private fun Moment.toMomentUiState(
         label = label,
         timeOfDay = timeOfDay,
         textSnippet = textFragments.firstOrNull()?.text,
+        textNoteId =
+            textFragments.firstOrNull()?.sourceNoteId?.takeIf { sourceId ->
+                sourceNotes.any { note -> note.uid == sourceId && note is JournalNote.Text }
+            },
         media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
         audio =
             audio.firstOrNull()?.let {

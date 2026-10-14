@@ -2,6 +2,7 @@ package app.logdate.feature.core.main
 
 import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.MomentInferenceSource
+import app.logdate.client.domain.timeline.MomentTextFragment
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
@@ -79,7 +80,20 @@ class HomeTimelineCapturedOnTest {
         val moments = day.toHomeTimelineUiState().moments
         assertEquals(2, moments.size)
         assertTrue(moments.any { it.textSnippet == fromPhone.content })
+        assertTrue(moments.any { it.textNoteId == fromPhone.uid })
         assertTrue(moments.any { it.pendingMark?.id == mark.id })
+    }
+
+    @Test
+    fun `only text note snippets open a text entry directly`() {
+        val textMoment = moment(listOf(fromPhone)).copy(textFragments = listOf(MomentTextFragment(fromPhone.content, fromPhone.uid)))
+        val audioMoment = moment(listOf(fromWatch)).copy(textFragments = listOf(MomentTextFragment("Transcript", fromWatch.uid)))
+        val day = TimelineDay(start = at, end = at, tldr = "", date = LocalDate(2026, 10, 10), moments = listOf(textMoment, audioMoment))
+
+        val moments = day.toHomeTimelineUiState().moments
+
+        assertEquals(fromPhone.uid, moments.single { it.id == textMoment.id.toString() }.textNoteId)
+        assertEquals(null, moments.single { it.id == audioMoment.id.toString() }.textNoteId)
     }
 
     private fun moment(notes: List<JournalNote>) =

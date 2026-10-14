@@ -119,6 +119,7 @@ private fun synthesizeMoment(
                 .firstOrNull()
                 ?.text
                 ?.toSnippet(),
+        textNoteId = sortedNotes.filterIsInstance<TextNoteUiState>().firstOrNull()?.noteId,
         media =
             sortedNotes.visualNotes().map { visual ->
                 MomentMediaUiState(uri = visual.uri, isVideo = visual.isVideo)

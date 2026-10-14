@@ -108,6 +108,7 @@ fun TimelineList(
     onImportBackup: () -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
     pendingMomentContent: @Composable (app.logdate.client.repository.moments.MarkedMoment) -> Unit = {},
+    onOpenTextNote: (Uuid) -> Unit = {},
 ) {
     val isPostCloudRestore = LocalIsPostCloudRestore.current
     val workspaceEnabled = LocalWorkspaceEnabled.current
@@ -275,6 +276,7 @@ fun TimelineList(
                             item = item,
                             layoutMode = layoutMode,
                             onOpenDay = onOpenDay,
+                            onOpenTextNote = onOpenTextNote,
                             pendingMomentContent = pendingMomentContent,
                             modifier =
                                 Modifier

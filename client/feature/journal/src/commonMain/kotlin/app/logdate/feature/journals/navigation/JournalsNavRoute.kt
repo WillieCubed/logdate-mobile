@@ -53,6 +53,7 @@ fun EntryProviderScope<NavKey>.journalEntries(
     onJournalMerged: (JournalMergeOperation) -> Unit = {},
     onJournalRedirected: (sourceId: Uuid, destinationId: Uuid) -> Unit = { _, _ -> },
     onNavigateToNote: (noteId: Uuid, journalId: Uuid?) -> Unit = { _, _ -> },
+    onEditNote: ((Uuid) -> Unit)? = null,
 ) {
     journalsOverviewEntry(
         onOpenJournal = onOpenJournal,
@@ -80,5 +81,5 @@ fun EntryProviderScope<NavKey>.journalEntries(
     journalContentPickerEntry(onBack = onBack)
     journalMergeEntry(onBack = onBack, onJournalMerged = onJournalMerged)
     shareJournalEntry(onBack = onBack)
-    noteDetailEntry(onBack = onBack, onNavigateToNote = onNavigateToNote)
+    noteDetailEntry(onBack = onBack, onNavigateToNote = onNavigateToNote, onEditNote = onEditNote)
 }

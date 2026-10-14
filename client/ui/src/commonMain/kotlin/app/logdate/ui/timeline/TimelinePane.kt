@@ -80,6 +80,7 @@ fun TimelinePane(
     banner: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
     pendingMomentContent: @Composable (app.logdate.client.repository.moments.MarkedMoment) -> Unit = {},
+    onOpenTextNote: (Uuid) -> Unit = {},
 ) {
     val scrollBehavior =
         if (currentPlatform.isApple) {
@@ -122,6 +123,7 @@ fun TimelinePane(
                         onImportBackup,
                         listState,
                         pendingMomentContent,
+                        onOpenTextNote,
                     )
                     ScrollToTopButton(listState, Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.lg))
                 }
@@ -175,6 +177,7 @@ fun TimelinePane(
                     onImportBackup,
                     listState,
                     pendingMomentContent,
+                    onOpenTextNote,
                 )
 
                 ScrollToTopButton(

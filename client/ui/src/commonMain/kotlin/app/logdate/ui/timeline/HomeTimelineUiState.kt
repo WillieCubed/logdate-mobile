@@ -106,6 +106,7 @@ data class MomentUiState(
      * Best text snippet for this moment, truncated.
      */
     val textSnippet: String? = null,
+    val textNoteId: Uuid? = null,
     /**
      * Photos and videos in this moment.
      */

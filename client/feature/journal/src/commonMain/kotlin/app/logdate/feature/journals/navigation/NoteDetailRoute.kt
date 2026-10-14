@@ -29,6 +29,7 @@ fun NavBackStack<NavKey>.navigateToNoteDetail(noteId: Uuid) {
 fun EntryProviderScope<NavKey>.noteDetailEntry(
     onBack: () -> Unit,
     onNavigateToNote: (noteId: Uuid, journalId: Uuid?) -> Unit = { _, _ -> },
+    onEditNote: ((Uuid) -> Unit)? = null,
 ) {
     taggedEntry<NoteDetailRoute>(metadata = { route ->
         (route.journalId?.let { ActivityPresentation.Detail("journal:$it") } ?: ActivityPresentation.Replacement).asMetadata() +
@@ -40,6 +41,7 @@ fun EntryProviderScope<NavKey>.noteDetailEntry(
                 noteId = Uuid.parse(route.noteId),
                 journalId = journalId,
                 onGoBack = onBack,
+                onEdit = onEditNote,
                 onNavigateToNote = { onNavigateToNote(it, journalId) },
             )
         }

@@ -58,6 +58,7 @@ import logdate.client.ui.generated.resources.happy_birthday
 import logdate.client.ui.generated.resources.journey_days_count
 import logdate.client.ui.generated.resources.youve_reached_the_end
 import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
 
 internal val placeholderLayouts =
     listOf(
@@ -157,6 +158,7 @@ internal fun TimelineDayListItem(
     layoutMode: TimelineDayLayoutMode,
     pendingMomentContent: @Composable (app.logdate.client.repository.moments.MarkedMoment) -> Unit,
     onOpenDay: (LocalDate) -> Unit,
+    onOpenTextNote: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -182,6 +184,7 @@ internal fun TimelineDayListItem(
             style = item.layout.style(),
             layoutMode = layoutMode,
             pendingMomentContent = pendingMomentContent,
+            onOpenTextNote = onOpenTextNote,
         )
     }
 }

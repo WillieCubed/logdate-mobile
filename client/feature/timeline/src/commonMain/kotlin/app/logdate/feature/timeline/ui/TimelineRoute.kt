@@ -64,6 +64,7 @@ fun TimelineRoute(
             birthday = viewModel.birthday.collectAsState().value,
             modifier = modifier,
             onWriteMark = onWriteMark,
+            onOpenTextNote = onOpenTimelineItem,
         )
     }
 }
@@ -79,6 +80,7 @@ internal fun TimelineScreen(
     birthday: Instant?,
     modifier: Modifier = Modifier,
     onWriteMark: (Uuid) -> Unit = {},
+    onOpenTextNote: (Uuid) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -106,6 +108,7 @@ internal fun TimelineScreen(
             onNewEntry = onNewEntry,
             onShareMemory = onShareMemory,
             onOpenDay = { date -> onSetSelectedDay(date) },
+            onOpenTextNote = onOpenTextNote,
             onVisibleAudioNoteIdsChanged = onVisibleAudioNoteIdsChanged,
             birthday = birthday,
             modifier = modifier.padding(paddingValues),

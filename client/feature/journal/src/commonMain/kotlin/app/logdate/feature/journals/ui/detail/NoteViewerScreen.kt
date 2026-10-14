@@ -74,6 +74,7 @@ import app.logdate.ui.common.BannerContent
 import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.common.MessageBanner
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.WorkspacePanel
@@ -108,6 +109,7 @@ import logdate.client.ui.generated.resources.Res as UiRes
 fun NoteViewerScreen(
     noteId: Uuid,
     onGoBack: () -> Unit,
+    onEdit: ((Uuid) -> Unit)? = null,
     journalId: Uuid? = null,
     enableSharedBounds: Boolean = journalId != null,
     onOpenLocationTimeline: () -> Unit = {},
@@ -149,6 +151,7 @@ fun NoteViewerScreen(
             NoteViewerScaffoldContent(
                 shared = state.shared,
                 onGoBack = onGoBack,
+                onEdit = onEdit?.let { edit -> { edit(state.shared.noteId) } },
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
@@ -407,6 +410,7 @@ private fun rememberNoteViewerSharedBoundsModifier(
 fun NoteViewerScaffoldContent(
     shared: NoteViewerShared,
     onGoBack: () -> Unit,
+    onEdit: (() -> Unit)? = null,
     onOpenLocationTimeline: () -> Unit = {},
     onNavigateToNote: (Uuid) -> Unit = {},
     onShowAddToJournal: () -> Unit = {},
@@ -423,7 +427,7 @@ fun NoteViewerScaffoldContent(
     if (LocalWorkspaceEnabled.current) {
         WorkspacePanel(modifier) {
             Column(Modifier.fillMaxSize()) {
-                NoteViewerToolbar(onGoBack, journalContext, accentColor, onNavigateToNote, onShowAddToJournal, onShare)
+                NoteViewerToolbar(onGoBack, journalContext, accentColor, onNavigateToNote, onShowAddToJournal, onShare, onEdit)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     NoteViewerContent(shared, onOpenLocationTimeline, noteContent = noteContent)
                 }
@@ -465,6 +469,7 @@ fun NoteViewerScaffoldContent(
                     onNavigateToNote = onNavigateToNote,
                     onShowAddToJournal = onShowAddToJournal,
                     onShare = onShare,
+                    onEdit = onEdit,
                 )
             }
         },
@@ -503,6 +508,7 @@ fun NoteViewerScaffoldContent(
                             onNavigateToNote = onNavigateToNote,
                             onShowAddToJournal = onShowAddToJournal,
                             onShare = onShare,
+                            onEdit = onEdit,
                         )
                     }
                 },
@@ -516,6 +522,7 @@ fun NoteViewerScaffoldContent(
                                 onNavigateToNote = onNavigateToNote,
                                 onShowAddToJournal = onShowAddToJournal,
                                 onShare = onShare,
+                                onEdit = onEdit,
                             )
                         },
                         editorContent = {
@@ -547,6 +554,7 @@ private fun NoteViewerToolbar(
     onNavigateToNote: (Uuid) -> Unit = {},
     onShowAddToJournal: () -> Unit = {},
     onShare: () -> Unit = {},
+    onEdit: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
@@ -574,6 +582,16 @@ private fun NoteViewerToolbar(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        if (onEdit != null) {
+            IconButton(onClick = onEdit) {
+                Icon(
+                    painter = PlatformIcons.edit(),
+                    contentDescription = "Edit entry",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
 
         IconButton(onClick = onShowAddToJournal) {
             Icon(

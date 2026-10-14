@@ -269,6 +269,7 @@ fun LogDateNavDisplay(
                                             onOpenSyncSettings = { backStack.add(SyncSettingsRoute) },
                                             onOpenWatch = { backStack.add(WatchSettingsRoute) },
                                             onOpenDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
+                                            onOpenTextNote = { backStack.add(NoteDetailRoute(it)) },
                                             onOpenStreak = { backStack.add(StreakSettingsRoute) },
                                             libraryContent = { modifier ->
                                                 LibraryScreen(
@@ -308,6 +309,7 @@ fun LogDateNavDisplay(
                                         },
                                         onOpenNote = { noteId, journalId -> backStack.selectJournalNote(noteId, journalId) },
                                         onNavigateToNote = { noteId, journalId -> backStack.replaceNoteDetail(noteId, journalId) },
+                                        onEditNote = { backStack.add(EntryEditorRoute(entryId = it.toString())) },
                                         onOpenEditorForJournal = { journalId ->
                                             backStack.add(EntryEditorRoute(journalIds = listOf(journalId.toString())))
                                         },

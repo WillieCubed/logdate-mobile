@@ -6,6 +6,7 @@ package app.logdate.ui.timeline.newstuff
 import androidx.compose.animation.animateBounds
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
 import coil3.compose.AsyncImage
+import kotlin.uuid.Uuid
 
 @Composable
 internal fun SemanticTimelineDayContent(
@@ -51,6 +53,7 @@ internal fun SemanticTimelineDayContent(
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
     pendingMomentContent: @Composable (MarkedMoment) -> Unit,
+    onOpenTextNote: (Uuid) -> Unit = {},
 ) {
     val isCompact = layoutMode == TimelineDayLayoutMode.COMPACT
     val gap =
@@ -94,6 +97,7 @@ internal fun SemanticTimelineDayContent(
                                 layoutMode = layoutMode,
                                 modifier = itemModifier,
                                 pendingMomentContent = pendingMomentContent,
+                                onOpenTextNote = onOpenTextNote,
                             )
                         DayPresentation.STACKED ->
                             StackedMomentCard(
@@ -102,6 +106,7 @@ internal fun SemanticTimelineDayContent(
                                 layoutMode = layoutMode,
                                 modifier = itemModifier,
                                 pendingMomentContent = pendingMomentContent,
+                                onOpenTextNote = onOpenTextNote,
                             )
                     }
                 }
@@ -117,9 +122,10 @@ private fun FlowingMomentItem(
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
     pendingMomentContent: @Composable (MarkedMoment) -> Unit,
+    onOpenTextNote: (Uuid) -> Unit,
 ) {
     if (moment.isHero) {
-        HeroMomentContainer(moment = moment, style = style, layoutMode = layoutMode, modifier = modifier)
+        HeroMomentContainer(moment = moment, style = style, layoutMode = layoutMode, modifier = modifier, onOpenTextNote = onOpenTextNote)
     } else {
         SupportingMomentContainer(
             moment = moment,
@@ -127,6 +133,7 @@ private fun FlowingMomentItem(
             layoutMode = layoutMode,
             modifier = modifier,
             pendingMomentContent = pendingMomentContent,
+            onOpenTextNote = onOpenTextNote,
         )
     }
 }
@@ -137,6 +144,7 @@ private fun HeroMomentContainer(
     style: TimelineDayStyle,
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
+    onOpenTextNote: (Uuid) -> Unit,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -174,7 +182,10 @@ private fun HeroMomentContainer(
                 Surface(
                     color = style.softAccentColor,
                     shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .openTextEntryOnClick(moment.openTextEntryAction(onOpenTextNote)),
                 ) {
                     Text(
                         text = snippet,
@@ -185,7 +196,7 @@ private fun HeroMomentContainer(
                     )
                 }
             } else {
-                TextQuoteContainer(text = snippet)
+                TextQuoteContainer(text = snippet, onClick = moment.openTextEntryAction(onOpenTextNote))
             }
         }
 
@@ -201,6 +212,7 @@ private fun SupportingMomentContainer(
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
     pendingMomentContent: @Composable (MarkedMoment) -> Unit,
+    onOpenTextNote: (Uuid) -> Unit,
 ) {
     val hasSingleMedia = moment.media.size == 1
     val hasText = moment.textSnippet != null
@@ -236,7 +248,11 @@ private fun SupportingMomentContainer(
                         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
                         modifier = Modifier.weight(1f - imageWeight),
                     ) {
-                        TextQuoteContainer(text = moment.textSnippet.orEmpty(), maxLines = 5)
+                        TextQuoteContainer(
+                            text = moment.textSnippet.orEmpty(),
+                            maxLines = 5,
+                            onClick = moment.openTextEntryAction(onOpenTextNote),
+                        )
                         PersonAvatarRow(people = moment.people)
                     }
                 }
@@ -245,7 +261,9 @@ private fun SupportingMomentContainer(
                     MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = false)
                 }
                 moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
-                moment.textSnippet?.let { snippet -> TextQuoteContainer(text = snippet, maxLines = 6) }
+                moment.textSnippet?.let { snippet ->
+                    TextQuoteContainer(text = snippet, maxLines = 6, onClick = moment.openTextEntryAction(onOpenTextNote))
+                }
                 PersonAvatarRow(people = moment.people)
             }
         }
@@ -259,6 +277,7 @@ private fun StackedMomentCard(
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
     pendingMomentContent: @Composable (MarkedMoment) -> Unit,
+    onOpenTextNote: (Uuid) -> Unit,
 ) {
     moment.pendingMark?.let { mark ->
         Box(modifier = modifier) { pendingMomentContent(mark) }
@@ -290,6 +309,8 @@ private fun StackedMomentCard(
                     style = if (moment.isHero) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                     maxLines = if (layoutMode == TimelineDayLayoutMode.COMPACT) 4 else 6,
                     overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        Modifier.openTextEntryOnClick(moment.openTextEntryAction(onOpenTextNote)),
                 )
             }
             PersonAvatarRow(people = moment.people)
@@ -304,11 +325,13 @@ private fun TextQuoteContainer(
     text: String,
     modifier: Modifier = Modifier,
     maxLines: Int = 4,
+    onClick: (() -> Unit)? = null,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         shape = RoundedCornerShape(16.dp),
-        modifier = modifier.fillMaxWidth(),
+        modifier =
+            modifier.fillMaxWidth().openTextEntryOnClick(onClick),
     ) {
         Text(
             text = text,
@@ -319,6 +342,12 @@ private fun TextQuoteContainer(
         )
     }
 }
+
+private fun MomentUiState.openTextEntryAction(onOpenTextNote: (Uuid) -> Unit): (() -> Unit)? =
+    textNoteId?.let { id -> { onOpenTextNote(id) } }
+
+private fun Modifier.openTextEntryOnClick(onClick: (() -> Unit)?): Modifier =
+    if (onClick == null) this else clickable(onClickLabel = "Open full entry", onClick = onClick)
 
 @Composable
 private fun PersonAvatarRow(
