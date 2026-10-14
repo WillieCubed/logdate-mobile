@@ -58,20 +58,10 @@ fun EntryProviderScope<NavKey>.watchHandoffEntries(
         val shareTitle = stringResource(Res.string.watch_handoff_share_title)
         LaunchedEffect(route.noteId, route.target, retry) {
             state = WatchHandoffUiState.Waiting
-            val id = Uuid.parseOrNull(route.noteId)
-            val arrived =
-                if (id == null || !flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) {
-                    false
-                } else {
-                    withTimeoutOrNull(20_000) {
-                        notes.allNotesObserved.first { items -> items.any { it.uid == id } }
-                        true
-                    } ?: false
-                }
-            if (!arrived) {
+            if (!handoffArrived(route.noteId, notes, flags)) {
                 state = WatchHandoffUiState.Missing
             } else {
-                val note = id?.let { notes.getNoteById(it) }
+                val note = Uuid.parseOrNull(route.noteId)?.let { notes.getNoteById(it) }
                 when (route.target) {
                     "edit" -> onOpenEditor(route.noteId)
                     "play" -> onOpenPlayback(route.noteId)
@@ -87,24 +77,7 @@ fun EntryProviderScope<NavKey>.watchHandoffEntries(
                         }
                     "share" ->
                         if (note != null) {
-                            val text =
-                                when (note) {
-                                    is JournalNote.Text -> note.content
-                                    is JournalNote.Audio -> note.caption
-                                    is JournalNote.Image -> note.caption
-                                    is JournalNote.Video -> note.caption
-                                }
-                            try {
-                                sharing.shareContent(
-                                    text = text,
-                                    mediaUris = listOfNotNull(note.mediaRefOrNull()),
-                                    chooserTitle = shareTitle,
-                                )
-                                onBack()
-                            } catch (e: Exception) {
-                                Napier.w("Couldn't open sharing for the watch moment", e)
-                                state = WatchHandoffUiState.ShareFailed
-                            }
+                            if (shareHandoffNote(note, sharing, shareTitle)) onBack() else state = WatchHandoffUiState.ShareFailed
                         } else {
                             state = WatchHandoffUiState.Missing
                         }
@@ -131,3 +104,36 @@ fun EntryProviderScope<NavKey>.watchHandoffEntries(
         }
     }
 }
+
+private suspend fun handoffArrived(
+    noteId: String,
+    notes: JournalNotesRepository,
+    flags: FeatureFlagStore,
+): Boolean {
+    val id = Uuid.parseOrNull(noteId) ?: return false
+    if (!flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) return false
+    return withTimeoutOrNull(20_000) {
+        notes.allNotesObserved.first { items -> items.any { it.uid == id } }
+        true
+    } ?: false
+}
+
+private fun shareHandoffNote(
+    note: JournalNote,
+    sharing: SharingLauncher,
+    title: String,
+): Boolean =
+    try {
+        val text =
+            when (note) {
+                is JournalNote.Text -> note.content
+                is JournalNote.Audio -> note.caption
+                is JournalNote.Image -> note.caption
+                is JournalNote.Video -> note.caption
+            }
+        sharing.shareContent(text = text, mediaUris = listOfNotNull(note.mediaRefOrNull()), chooserTitle = title)
+        true
+    } catch (e: Exception) {
+        Napier.w("Couldn't open sharing for the watch moment", e)
+        false
+    }

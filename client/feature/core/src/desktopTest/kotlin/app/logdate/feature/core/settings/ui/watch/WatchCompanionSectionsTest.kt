@@ -39,7 +39,7 @@ class WatchCompanionSectionsTest {
                     )
                 }
             }
-            onNodeWithText("Days on your watch").performClick()
+            onNodeWithText("Timeline history").performClick()
             onNodeWithText("30 days").performClick()
             onNodeWithText("Places").performClick()
             onNodeWithText("Mood after recording").performClick()
