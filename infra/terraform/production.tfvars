@@ -62,6 +62,8 @@ request_concurrency = 16
 cpu_idle            = true
 startup_cpu_boost   = true
 
+cleanup_operator_email = "willie@hypertext.studio"
+
 # Must match scripts/render-cloud-run-contract.sh exactly: the renderer requires every key
 # below and rejects any it does not know, so an extra entry fails the deploy just as a missing
 # one does. HOST, GCS_*, and WEBAUTHN_* are derived by the renderer from the fields above.
