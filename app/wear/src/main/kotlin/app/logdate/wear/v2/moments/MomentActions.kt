@@ -14,6 +14,8 @@ object MomentTags {
     const val MISSING = "moment_missing"
     const val PLAY_ON = "moment_play_on"
     const val CHOOSE_OUTPUT = "moment_choose_output"
+    const val PLAY_ON_WATCH = "moment_play_on_watch"
+    const val PLAY_ON_PHONE = "moment_play_on_phone"
 }
 
 /** What the person can do on a moment's screen. Delete and Play on appear only with their handlers. */

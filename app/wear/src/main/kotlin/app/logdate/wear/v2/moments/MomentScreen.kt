@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
@@ -51,6 +52,7 @@ import androidx.wear.compose.material3.AnimatedPage
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
+import androidx.wear.compose.material3.Dialog
 import androidx.wear.compose.material3.FilledIconButton
 import androidx.wear.compose.material3.FilledTonalIconButton
 import androidx.wear.compose.material3.Icon
@@ -109,7 +111,6 @@ fun MomentDetailsPage(
     state: MomentUiState.Ready,
     onDelete: (() -> Unit)?,
     onPlayOn: (() -> Unit)? = null,
-    onPlayOnPhone: (() -> Unit)? = null,
     onOpenOnPhone: (() -> Unit)? = null,
     phoneHandoffMessage: String? = null,
     modifier: Modifier = Modifier,
@@ -132,16 +133,7 @@ fun MomentDetailsPage(
             if (onPlayOn != null && note is JournalNote.Audio) {
                 item { PlayOnButton(onPlayOn, Modifier.transformedHeight(this, spec), SurfaceTransformation(spec)) }
             }
-            if (onPlayOnPhone != null && note is JournalNote.Audio) {
-                item {
-                    Button(
-                        onClick = onPlayOnPhone,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.wear_moment_play_on_phone)) },
-                    )
-                }
-            }
-            if (onOpenOnPhone != null && (note !is JournalNote.Audio || onPlayOnPhone == null)) {
+            if (onOpenOnPhone != null) {
                 item {
                     Button(
                         onClick = onOpenOnPhone,
@@ -177,10 +169,23 @@ private fun ReadyMoment(
     timeSource: TimeSource,
 ) {
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
+    var choosingOutput by rememberSaveable { mutableStateOf(false) }
     val askToDelete: (() -> Unit)? = actions.onDelete?.let { { confirmingDelete = true } }
     val note = state.note
     if (note is JournalNote.Audio) {
-        VoiceMoment(note, state, actions, askToDelete, timeSource)
+        val available = actions.onPlayOn != null || actions.onPlayOnPhone != null
+        val menuActions =
+            actions.copy(
+                onPlayOn = if (available) ({ choosingOutput = true }) else null,
+                onPlayOnPhone = null,
+            )
+        VoiceMoment(note, state, menuActions, askToDelete, timeSource)
+        PlayOnDialog(
+            visible = choosingOutput,
+            onDismiss = { choosingOutput = false },
+            onWatch = actions.onPlayOn,
+            onPhone = actions.onPlayOnPhone,
+        )
     } else {
         MomentDetailsPage(
             state,
@@ -219,7 +224,6 @@ private fun VoiceMoment(
                         state,
                         onDelete,
                         onPlayOn = actions.onPlayOn,
-                        onPlayOnPhone = actions.onPlayOnPhone,
                         onOpenOnPhone = actions.onOpenOnPhone,
                         phoneHandoffMessage = actions.phoneHandoffMessage,
                         timeSource = timeSource,
@@ -293,7 +297,7 @@ private fun MomentPlayerPage(
                     }
                 }
                 PlayerControls(state, actions)
-                PlayerLine(note, state.playback, positionMs)
+                PlayerLine(note, state.playback, positionMs, actions.phoneHandoffMessage)
             }
         }
     }
@@ -360,13 +364,59 @@ private fun AudioOutputButton(onClick: () -> Unit) {
 }
 
 @Composable
+private fun PlayOnDialog(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    onWatch: (() -> Unit)?,
+    onPhone: (() -> Unit)?,
+) {
+    val listState = rememberTransformingLazyColumnState()
+    Dialog(visible = visible, onDismissRequest = onDismiss) {
+        ScreenScaffold(scrollState = listState) { contentPadding ->
+            TransformingLazyColumn(state = listState, contentPadding = contentPadding, modifier = Modifier.fillMaxSize()) {
+                item { ListHeader { Text(stringResource(R.string.wear_moment_play_on)) } }
+                if (onWatch != null) {
+                    item {
+                        Button(
+                            onClick = {
+                                onDismiss()
+                                onWatch()
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag(MomentTags.PLAY_ON_WATCH),
+                            icon = { Icon(Icons.Filled.Headphones, contentDescription = null) },
+                            label = { Text(stringResource(R.string.wear_moment_this_watch)) },
+                            secondaryLabel = { Text(stringResource(R.string.wear_moment_watch_output_detail)) },
+                        )
+                    }
+                }
+                if (onPhone != null) {
+                    item {
+                        Button(
+                            onClick = {
+                                onDismiss()
+                                onPhone()
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag(MomentTags.PLAY_ON_PHONE),
+                            icon = { Icon(Icons.Filled.PhoneAndroid, contentDescription = null) },
+                            label = { Text(stringResource(R.string.wear_moment_phone)) },
+                            secondaryLabel = { Text(stringResource(R.string.wear_moment_phone_output_detail)) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PlayerLine(
     note: JournalNote.Audio,
     playback: PlaybackState,
     positionMs: Long,
+    handoffMessage: String?,
 ) {
-    val failed = playback is PlaybackState.Failed
-    val text = if (playback is PlaybackState.Failed) failureMessage(playback.reason) else captionAt(note, positionMs)
+    val failed = playback is PlaybackState.Failed && handoffMessage == null
+    val text = handoffMessage ?: if (playback is PlaybackState.Failed) failureMessage(playback.reason) else captionAt(note, positionMs)
     if (text == null) return
     Text(
         text = text,

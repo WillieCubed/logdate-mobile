@@ -160,6 +160,10 @@ class MomentDetailTest {
         waitForTag(MomentTags.PLAY_ON)
         composeRule.onNodeWithTag(MomentTags.PLAY_ON).performClick()
 
+        assertEquals(0, picks)
+        waitForTag(MomentTags.PLAY_ON_WATCH)
+        composeRule.onNodeWithTag(MomentTags.PLAY_ON_WATCH).performClick()
+
         assertEquals(1, picks)
     }
 
@@ -182,6 +186,10 @@ class MomentDetailTest {
 
         composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
 
+        assertEquals(0, picks)
+        waitForTag(MomentTags.PLAY_ON_WATCH)
+        composeRule.onNodeWithTag(MomentTags.PLAY_ON_WATCH).performClick()
+
         assertEquals(1, picks)
     }
 
@@ -192,7 +200,33 @@ class MomentDetailTest {
 
         composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
 
+        assertEquals(0, picks)
+        waitForTag(MomentTags.PLAY_ON_WATCH)
+        composeRule.onNodeWithTag(MomentTags.PLAY_ON_WATCH).performClick()
+
         assertEquals(1, picks)
+    }
+
+    @Test
+    fun play_on_keeps_phone_and_watch_in_one_choice() {
+        var watchPicks = 0
+        var phonePicks = 0
+        show(ready(voice), MomentActions(onPlayOn = { watchPicks++ }, onPlayOnPhone = { phonePicks++ }))
+
+        composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
+
+        waitForTag(MomentTags.PLAY_ON_WATCH)
+        composeRule.onNodeWithTag(MomentTags.PLAY_ON_PHONE).assertIsDisplayed().performClick()
+
+        assertEquals(0, watchPicks)
+        assertEquals(1, phonePicks)
+    }
+
+    @Test
+    fun phone_handoff_feedback_appears_on_the_player() {
+        show(ready(voice), MomentActions(phoneHandoffMessage = "Playing on phone"))
+
+        composeRule.onNodeWithText("Playing on phone").assertIsDisplayed()
     }
 
     @Test

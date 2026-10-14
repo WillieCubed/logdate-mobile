@@ -271,8 +271,7 @@ private fun MomentEntry(
     val state by viewModel.uiState.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
     val picker = koinInject<OutputPicker>()
-    val canPick = remember(picker) { picker.route != OutputPickerRoute.NONE }
-    val playOn: (() -> Unit)? = if (canPick) ({ picker.open() }) else null
+    val canPick = picker.route != OutputPickerRoute.NONE
     val handoff = koinInject<WatchPlaybackHandoff>()
     val reachability = koinInject<PhoneReachability>()
     val scope = rememberCoroutineScope()
@@ -285,10 +284,17 @@ private fun MomentEntry(
     val openedMessage = stringResource(R.string.wear_moment_phone_opened)
     val openRetryFailedMessage = stringResource(R.string.wear_moment_phone_playing_open_retry_failed)
     val openFailedMessage = stringResource(R.string.wear_moment_phone_open_failed)
+    val outputFailedMessage = stringResource(R.string.wear_moment_output_open_failed)
     var phoneAvailable by remember { mutableStateOf(false) }
     var handoffBusy by remember { mutableStateOf(false) }
     var handoffMessage by remember { mutableStateOf<String?>(null) }
     var phoneOpenFailed by remember { mutableStateOf(false) }
+    val playOn: (() -> Unit)? =
+        if (canPick) {
+            ({ handoffMessage = if (picker.open()) null else outputFailedMessage })
+        } else {
+            null
+        }
     LaunchedEffect(handoff, reachability) {
         reachability.observe().collect { phoneAvailable = it != null && handoff.available() }
     }
@@ -330,7 +336,10 @@ private fun MomentEntry(
         state = state,
         actions =
             MomentActions(
-                onPlayPause = viewModel::playPause,
+                onPlayPause = {
+                    handoffMessage = null
+                    viewModel.playPause()
+                },
                 onCrown = viewModel::onCrown,
                 onCycleSpeed = viewModel::cycleSpeed,
                 onSkipSilenceChange = viewModel::setSkipSilence,
