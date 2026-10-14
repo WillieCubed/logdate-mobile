@@ -80,6 +80,7 @@ object TodayTags {
     const val SUMMARY = "today_summary"
     const val LATEST = "today_latest"
     const val GET_PHONE_APP = "today_get_phone_app"
+    const val SET_UP_PHONE = "today_set_up_phone"
     const val MARK = "today_mark"
     const val ADD = "today_add"
     const val RECORD = "today_record"
@@ -97,7 +98,7 @@ data class TodayControls(
 
 /**
  * Home's first page: the date in the time text, the campfire, the day's summary line, the latest
- * moment and, when the paired Android phone lacks LogDate, a card that opens its Play listing.
+ * moment and, when phone setup is unfinished, a card that opens the next step on the phone.
  * Record sits at the end as the edge button, with Mark and + above it. While the recorder has
  * something to show, it takes the summary's place: the live recording with Pause, Stop and
  * Discard, then the saved recording with Undo and the five feelings, or what went wrong.
@@ -107,6 +108,7 @@ fun TodayPage(
     state: TodayUiState,
     handoff: HandoffState,
     onGetPhoneApp: () -> Unit,
+    onSetUpPhone: () -> Unit,
     onHandoffDismissed: () -> Unit,
     modifier: Modifier = Modifier,
     controls: TodayControls = TodayControls(),
@@ -127,6 +129,7 @@ fun TodayPage(
             handoff = handoff,
             controls = controls,
             onGetPhoneApp = onGetPhoneApp,
+            onSetUpPhone = onSetUpPhone,
             listState = listState,
             contentPadding = contentPadding,
             modifier = modifier,
@@ -182,6 +185,7 @@ private fun TodayList(
     handoff: HandoffState,
     controls: TodayControls,
     onGetPhoneApp: () -> Unit,
+    onSetUpPhone: () -> Unit,
     listState: TransformingLazyColumnState,
     contentPadding: PaddingValues,
     modifier: Modifier,
@@ -206,6 +210,16 @@ private fun TodayList(
                         GetPhoneAppCard(
                             handoff = handoff,
                             onClick = onGetPhoneApp,
+                            modifier = Modifier.transformedHeight(this, spec),
+                            transformation = SurfaceTransformation(spec),
+                        )
+                    }
+                }
+                if (state.phoneCard is PhoneCard.SetUp) {
+                    item {
+                        SetUpPhoneCard(
+                            handoff = handoff,
+                            onClick = onSetUpPhone,
                             modifier = Modifier.transformedHeight(this, spec),
                             transformation = SurfaceTransformation(spec),
                         )
@@ -291,6 +305,25 @@ private fun GetPhoneAppCard(
         onClick = onClick,
         title = { Text(stringResource(R.string.wear_today_get_phone_app_title)) },
         modifier = modifier.fillMaxWidth().testTag(TodayTags.GET_PHONE_APP),
+        enabled = handoff != HandoffState.SENDING,
+        transformation = transformation,
+    ) {
+        Text(stringResource(body))
+    }
+}
+
+@Composable
+private fun SetUpPhoneCard(
+    handoff: HandoffState,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    val body = if (handoff == HandoffState.FAILED) R.string.wear_today_setup_phone_failed else R.string.wear_today_setup_phone_body
+    TitleCard(
+        onClick = onClick,
+        title = { Text(stringResource(R.string.wear_today_setup_phone_title)) },
+        modifier = modifier.fillMaxWidth().testTag(TodayTags.SET_UP_PHONE),
         enabled = handoff != HandoffState.SENDING,
         transformation = transformation,
     ) {

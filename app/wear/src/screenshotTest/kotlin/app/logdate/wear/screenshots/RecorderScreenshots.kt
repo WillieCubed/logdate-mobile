@@ -150,6 +150,7 @@ private fun RecorderScene(state: RecorderState) {
                 state = today,
                 handoff = HandoffState.IDLE,
                 onGetPhoneApp = {},
+                onSetUpPhone = {},
                 onHandoffDismissed = {},
                 controls = TodayControls(recorder = TodayRecorder(state, PreviewRecorder, PreviewRecorder), onMark = {}, onAdd = {}),
                 timeSource = RecorderTimeSource,

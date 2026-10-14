@@ -7,11 +7,16 @@ import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.domain.today.TodaySummaryCalculator
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.sync.peer.state.PeerLinkState
 import app.logdate.wear.capture.Feeling
+import app.logdate.wear.sync.v2.link.WatchLinkRecord
+import app.logdate.wear.sync.v2.link.WatchLinkStore
+import app.logdate.wear.sync.v2.link.peerLinkState
 import app.logdate.wear.v2.phone.HandoffResult
 import app.logdate.wear.v2.phone.PhoneHandoff
 import app.logdate.wear.v2.phone.PhoneLink
 import app.logdate.wear.v2.phone.PhoneLinkRepository
+import app.logdate.wear.v2.settings.WatchSettingsViewModel
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -28,14 +33,15 @@ import kotlinx.coroutines.launch
 
 /**
  * Today on the watch: the day's moments, places and voice time, the campfire, and an offer to get
- * LogDate on a paired Android phone that lacks it. The day moves at midnight and when the time
- * zone changes.
+ * LogDate on a paired Android phone that lacks it or still needs watch setup. The day moves at
+ * midnight and when the time zone changes.
  */
 class TodayViewModel(
     dayClock: DayClock,
     notesRepository: JournalNotesRepository,
     observeCampfire: ObserveCampfireUseCase,
     phoneLinks: PhoneLinkRepository,
+    watchLinks: WatchLinkStore,
     private val phoneHandoff: PhoneHandoff,
 ) : ViewModel() {
     private val mutableHandoff = MutableStateFlow(HandoffState.IDLE)
@@ -43,8 +49,13 @@ class TodayViewModel(
     val handoff: StateFlow<HandoffState> = mutableHandoff.asStateFlow()
 
     val uiState: StateFlow<TodayUiState> =
-        combine(observeDay(dayClock, notesRepository), observeCampfire(), phoneLinks.observe()) { day, campfire, phone ->
-            readyState(day, campfire, phone)
+        combine(
+            observeDay(dayClock, notesRepository),
+            observeCampfire(),
+            phoneLinks.observe(),
+            watchLinks.observe(),
+        ) { day, campfire, phone, link ->
+            readyState(day, campfire, phone, link)
         }.catch { error ->
             Napier.e("Couldn't load today on the watch", error)
             emit(TodayUiState.Failed)
@@ -58,6 +69,20 @@ class TodayViewModel(
         viewModelScope.launch {
             mutableHandoff.value =
                 when (phoneHandoff.openAppListing(card.nodeId)) {
+                    HandoffResult.SENT -> HandoffState.SENT
+                    HandoffResult.FAILED -> HandoffState.FAILED
+                }
+        }
+    }
+
+    /** Opens the Watch setup destination on the paired phone while this watch is not linked. */
+    fun setUpPhone() {
+        val card = (uiState.value as? TodayUiState.Ready)?.phoneCard as? PhoneCard.SetUp ?: return
+        if (mutableHandoff.value == HandoffState.SENDING) return
+        mutableHandoff.value = HandoffState.SENDING
+        viewModelScope.launch {
+            mutableHandoff.value =
+                when (phoneHandoff.open(WatchSettingsViewModel.PHONE_WATCH_SETTINGS_LINK, card.nodeId)) {
                     HandoffResult.SENT -> HandoffState.SENT
                     HandoffResult.FAILED -> HandoffState.FAILED
                 }
@@ -88,6 +113,7 @@ class TodayViewModel(
         day: Day,
         campfire: CampfireState?,
         phone: PhoneLink,
+        link: WatchLinkRecord?,
     ): TodayUiState {
         val summary = TodaySummaryCalculator.calculate(day.notes) { tag -> Feeling.fromTag(tag) != null }
         return TodayUiState.Ready(
@@ -96,7 +122,17 @@ class TodayViewModel(
             summary = summary,
             feeling = summary.feelingTag?.let(Feeling::fromTag),
             campfire = campfire?.toPresentation(),
-            phoneCard = if (phone is PhoneLink.AppMissing) PhoneCard.GetApp(phone.nodeId) else PhoneCard.None,
+            phoneCard =
+                when (phone) {
+                    is PhoneLink.AppMissing -> PhoneCard.GetApp(phone.nodeId)
+                    is PhoneLink.Connected ->
+                        if (link?.phoneNode == phone.nodeId && link.peerLinkState() == PeerLinkState.LINKED) {
+                            PhoneCard.None
+                        } else {
+                            PhoneCard.SetUp(phone.nodeId)
+                        }
+                    else -> PhoneCard.None
+                },
         )
     }
 

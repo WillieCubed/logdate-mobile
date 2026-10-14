@@ -35,6 +35,11 @@ sealed interface PhoneCard {
     data class GetApp(
         val nodeId: String,
     ) : PhoneCard
+
+    /** LogDate is on the phone, but this watch still needs account setup. */
+    data class SetUp(
+        val nodeId: String,
+    ) : PhoneCard
 }
 
 /** Where a request to open something on the phone stands. */

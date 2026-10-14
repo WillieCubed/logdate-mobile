@@ -7,10 +7,13 @@ import app.logdate.client.domain.streak.FireSize
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.ui.streak.CampfirePhase
 import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.streak.CampfireSize
 import app.logdate.wear.capture.Feeling
+import app.logdate.wear.sync.v2.link.WatchLinkRecord
+import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.v2.phone.HandoffResult
 import app.logdate.wear.v2.phone.PhoneHandoff
 import app.logdate.wear.v2.phone.PhoneLink
@@ -21,6 +24,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -54,6 +58,7 @@ class TodayViewModelTest {
     private val notesRepository = mockk<JournalNotesRepository>()
     private val observeCampfire = mockk<ObserveCampfireUseCase>()
     private val phoneLinks = mockk<PhoneLinkRepository>()
+    private val watchLinks = mockk<WatchLinkStore>()
     private val phoneHandoff = mockk<PhoneHandoff>()
 
     @Before
@@ -62,6 +67,7 @@ class TodayViewModelTest {
         every { dayClock.observe() } returns flowOf(saturday)
         every { observeCampfire.invoke() } returns flowOf(null)
         every { phoneLinks.observe() } returns flowOf(PhoneLink.NotConnected)
+        every { watchLinks.observe() } returns flowOf(null)
         notesFor(saturday)
     }
 
@@ -169,12 +175,54 @@ class TodayViewModelTest {
         }
 
     @Test
-    fun `a phone that has LogDate needs no card`() =
+    fun `an unlinked watch offers setup on its connected phone`() =
         runTest {
             every { phoneLinks.observe() } returns flowOf(PhoneLink.Connected(nodeId = "phone-1", phoneName = "Pixel 9"))
 
             viewModel().uiState.test {
+                assertEquals(PhoneCard.SetUp(nodeId = "phone-1"), (expectMostRecentItem() as TodayUiState.Ready).phoneCard)
+            }
+        }
+
+    @Test
+    fun `a linked watch does not ask for setup again`() =
+        runTest {
+            every { phoneLinks.observe() } returns flowOf(PhoneLink.Connected(nodeId = "phone-1", phoneName = "Pixel 9"))
+            every { watchLinks.observe() } returns
+                flowOf(WatchLinkRecord(mode = LinkMode.CLOUD, phoneNode = "phone-1", linkedAt = 1L, accountId = "account-1"))
+
+            viewModel().uiState.test {
                 assertEquals(PhoneCard.None, (expectMostRecentItem() as TodayUiState.Ready).phoneCard)
+            }
+        }
+
+    @Test
+    fun `setup card leaves Today when phone linking finishes`() =
+        runTest {
+            val link = MutableStateFlow<WatchLinkRecord?>(null)
+            every { phoneLinks.observe() } returns flowOf(PhoneLink.Connected(nodeId = "phone-1", phoneName = "Pixel 9"))
+            every { watchLinks.observe() } returns link
+
+            viewModel().uiState.test {
+                assertEquals(PhoneCard.SetUp("phone-1"), (expectMostRecentItem() as TodayUiState.Ready).phoneCard)
+                link.value = WatchLinkRecord(mode = LinkMode.CLOUD, phoneNode = "phone-1", linkedAt = 1L, accountId = "account-1")
+                assertEquals(PhoneCard.None, (awaitItem() as TodayUiState.Ready).phoneCard)
+            }
+        }
+
+    @Test
+    fun `setup opens the Watch settings on the connected phone`() =
+        runTest {
+            every { phoneLinks.observe() } returns flowOf(PhoneLink.Connected(nodeId = "phone-1", phoneName = "Pixel 9"))
+            coEvery { phoneHandoff.open("studio.hypertext.logdate://settings/watch", "phone-1") } returns HandoffResult.SENT
+            val viewModel = viewModel()
+
+            viewModel.uiState.test {
+                expectMostRecentItem()
+                viewModel.setUpPhone()
+
+                assertEquals(HandoffState.SENT, viewModel.handoff.value)
+                coVerify(exactly = 1) { phoneHandoff.open("studio.hypertext.logdate://settings/watch", "phone-1") }
             }
         }
 
@@ -227,6 +275,7 @@ class TodayViewModelTest {
             notesRepository = notesRepository,
             observeCampfire = observeCampfire,
             phoneLinks = phoneLinks,
+            watchLinks = watchLinks,
             phoneHandoff = phoneHandoff,
         )
 

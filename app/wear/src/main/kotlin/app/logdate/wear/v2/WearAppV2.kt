@@ -211,6 +211,7 @@ private fun TodayEntry(
         state = state,
         handoff = handoff,
         onGetPhoneApp = viewModel::getPhoneApp,
+        onSetUpPhone = viewModel::setUpPhone,
         onHandoffDismissed = viewModel::dismissHandoff,
         controls = controls,
         listState = listState,

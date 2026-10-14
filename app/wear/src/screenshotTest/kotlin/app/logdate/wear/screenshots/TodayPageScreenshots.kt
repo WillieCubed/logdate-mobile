@@ -158,6 +158,7 @@ private fun TodayScene(
                 state = state,
                 handoff = handoff,
                 onGetPhoneApp = {},
+                onSetUpPhone = {},
                 onHandoffDismissed = {},
                 controls = controls,
                 listState = listState,

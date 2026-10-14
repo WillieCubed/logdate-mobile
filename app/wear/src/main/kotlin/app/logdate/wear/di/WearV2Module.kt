@@ -237,6 +237,7 @@ val wearV2Module =
                 notesRepository = get(),
                 observeCampfire = get(),
                 phoneLinks = get(),
+                watchLinks = get(),
                 phoneHandoff = get(),
             )
         }

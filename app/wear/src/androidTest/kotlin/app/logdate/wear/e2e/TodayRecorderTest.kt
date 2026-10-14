@@ -160,6 +160,7 @@ class TodayRecorderTest {
                             state = today,
                             handoff = HandoffState.IDLE,
                             onGetPhoneApp = {},
+                            onSetUpPhone = {},
                             onHandoffDismissed = {},
                             controls = TodayControls(recorder = TodayRecorder(recorder.state, recorder, recorder)),
                         )
