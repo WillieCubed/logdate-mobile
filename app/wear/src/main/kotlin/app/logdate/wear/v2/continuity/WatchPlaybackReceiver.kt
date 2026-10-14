@@ -6,6 +6,7 @@ import app.logdate.client.sync.continuity.HandoffFailure
 import app.logdate.client.sync.continuity.PlaybackHandoffResult
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.datalayer.v2.LivePlaybackCommand
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.PlaybackCommandType
 import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearProtocol
@@ -51,15 +52,7 @@ class WatchPlaybackReceiver(
                             !it.isFinite() || it !in 0.5f..3f
                         } == true -> HandoffFailure.NOT_ALLOWED
                     else -> {
-                        val note =
-                            withTimeoutOrNull(8_000) {
-                                var found = notes.getNoteById(id) as? JournalNote.Audio
-                                while (found == null && peer.isCurrent(context)) {
-                                    delay(200)
-                                    found = notes.getNoteById(id) as? JournalNote.Audio
-                                }
-                                found
-                            }
+                        val note = awaitNote(id, context)
                         if (command.command == PlaybackCommandType.PREPARE_ON_WATCH) {
                             val failure =
                                 when {
@@ -94,5 +87,18 @@ class WatchPlaybackReceiver(
                     }
                 }
             WearJson.encodeToBytes(PlaybackHandoffResult.serializer(), PlaybackHandoffResult(accepted = failure == null, failure = failure))
+        }
+
+    private suspend fun awaitNote(
+        id: Uuid,
+        context: PeerDeliveryContext,
+    ): JournalNote.Audio? =
+        withTimeoutOrNull(8_000) {
+            var found = notes.getNoteById(id) as? JournalNote.Audio
+            while (found == null && peer.isCurrent(context)) {
+                delay(200)
+                found = notes.getNoteById(id) as? JournalNote.Audio
+            }
+            found
         }
 }
