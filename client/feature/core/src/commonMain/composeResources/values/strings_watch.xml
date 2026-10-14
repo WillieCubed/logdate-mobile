@@ -14,8 +14,9 @@
     <string name="watch_app_not_installed">Install LogDate on your watch</string>
     <string name="watch_app_not_installed_description">Your %1$s is connected but doesn&apos;t have LogDate yet.</string>
     <string name="watch_install_on_watch">Install on Watch</string>
-    <string name="watch_setup_pair_title">Add a watch</string>
-    <string name="watch_setup_pair_description">Pair a Wear OS watch with this phone.</string>
+    <string name="watch_setup_pair_title">LogDate on your wrist</string>
+    <string name="watch_setup_pair_description">Record voice notes, mark moments, and replay memories on a Wear OS watch. Your moments appear in the timeline on this phone.</string>
+    <string name="watch_setup_start_action">Set up LogDate</string>
     <string name="watch_setup_associate_title">Connect %1$s</string>
     <string name="watch_setup_associate_description">Let LogDate connect to your watch.</string>
     <string name="watch_setup_associate_action">Continue on phone</string>

@@ -60,6 +60,7 @@ import logdate.client.feature.core.generated.resources.watch_setup_install_title
 import logdate.client.feature.core.generated.resources.watch_setup_pair_description
 import logdate.client.feature.core.generated.resources.watch_setup_pair_title
 import logdate.client.feature.core.generated.resources.watch_setup_sent
+import logdate.client.feature.core.generated.resources.watch_setup_start_action
 import logdate.client.feature.core.generated.resources.watch_unsupported
 import org.jetbrains.compose.resources.stringResource
 
@@ -86,7 +87,12 @@ internal fun WatchSetupContent(
                 stringResource(Res.string.watch_setup_pair_description),
                 Icons.Default.Mic,
                 modifier,
-            ) { WatchSystemSetupButton(launcher = setupLauncher ?: rememberWatchSetupLauncher()) }
+            ) {
+                WatchSystemSetupButton(
+                    launcher = setupLauncher ?: rememberWatchSetupLauncher(),
+                    label = stringResource(Res.string.watch_setup_start_action),
+                )
+            }
         is WatchStatus.SettingUp ->
             when (val step = status.step) {
                 is WatchSetupStep.PairWithPhone ->

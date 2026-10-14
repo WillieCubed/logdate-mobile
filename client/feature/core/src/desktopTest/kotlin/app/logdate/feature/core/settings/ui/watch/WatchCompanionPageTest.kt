@@ -80,11 +80,12 @@ class WatchCompanionPageTest {
                     )
                 }
             }
-            onNodeWithText("Add a watch").assertExists()
-            onNodeWithText("Set up your watch").assertExists()
-            onNodeWithText("Set up your watch").assertIsEnabled()
+            onNodeWithText("LogDate on your wrist").assertExists()
+            onNodeWithText("Record voice notes, mark moments, and replay memories on a Wear OS watch", substring = true).assertExists()
+            onNodeWithText("Set up LogDate").assertExists()
+            onNodeWithText("Set up LogDate").assertIsEnabled()
             val art = onNodeWithTag("watch_setup_art").fetchSemanticsNode().boundsInRoot
-            val title = onNodeWithText("Add a watch").fetchSemanticsNode().boundsInRoot
+            val title = onNodeWithText("LogDate on your wrist").fetchSemanticsNode().boundsInRoot
             assertTrue(art.bottom <= title.top, "Compact setup artwork should lead into the action: $art $title")
             assertTrue(art.height > 300f, "The compact setup should use the available pane: $art")
             assertTrue(title.top > 500f, "The action should anchor the lower part of the compact pane: $title")
@@ -115,7 +116,7 @@ class WatchCompanionPageTest {
                 }
             }
             val art = onNodeWithTag("watch_setup_art").fetchSemanticsNode().boundsInRoot
-            val title = onNodeWithText("Add a watch").fetchSemanticsNode().boundsInRoot
+            val title = onNodeWithText("LogDate on your wrist").fetchSemanticsNode().boundsInRoot
             assertTrue(art.left > title.right, "Wide setup should use its second pane: $art $title")
             assertTrue(art.height > 400f, "Wide setup artwork should fill its pane: $art")
             onNodeWithText("Check connection").assertDoesNotExist()
@@ -146,7 +147,7 @@ class WatchCompanionPageTest {
                     )
                 }
             }
-            onNodeWithText("Set up your watch").performClick()
+            onNodeWithText("Set up LogDate").performClick()
             onNodeWithText("Google Pixel Watch").performClick()
             assertEquals(WatchSetupProvider.PIXEL, selected)
         }

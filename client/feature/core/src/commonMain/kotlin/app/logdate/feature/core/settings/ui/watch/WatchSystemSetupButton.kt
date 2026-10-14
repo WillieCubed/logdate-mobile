@@ -29,11 +29,14 @@ import org.jetbrains.compose.resources.stringResource
 
 /** Manufacturer setup precedes LogDate's separate companion association permission. */
 @Composable
-internal fun WatchSystemSetupButton(launcher: ((WatchSetupProvider) -> Boolean)? = rememberWatchSetupLauncher()) {
+internal fun WatchSystemSetupButton(
+    label: String? = null,
+    launcher: ((WatchSetupProvider) -> Boolean)? = rememberWatchSetupLauncher(),
+) {
     var choosing by remember { mutableStateOf(false) }
     var manufacturerHelp by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
-    Button(onClick = { choosing = true }, enabled = launcher != null) { Text(stringResource(Res.string.watch_system_setup)) }
+    Button(onClick = { choosing = true }, enabled = launcher != null) { Text(label ?: stringResource(Res.string.watch_system_setup)) }
     if (choosing) {
         AlertDialog(
             onDismissRequest = { choosing = false },
