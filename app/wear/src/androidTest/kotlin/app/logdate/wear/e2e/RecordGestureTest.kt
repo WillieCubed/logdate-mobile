@@ -24,12 +24,12 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
+import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.EdgeButtonSize
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
-import app.logdate.wear.v2.home.HomeScreen
 import app.logdate.wear.v2.recorder.gesture.RecordGestureDefaults
 import app.logdate.wear.v2.recorder.gesture.RecordGestureListener
 import app.logdate.wear.v2.recorder.gesture.recordGesture
@@ -44,9 +44,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Drives Record's gesture with real touch input on a Wear OS emulator, inside the real Home pager.
- * The pager is never locked here, so every check that it stays still proves the gesture owns the
- * touch after the long-press timeout.
+ * Drives Record's gesture with real touch input on a Wear OS emulator. A quick drag yields to
+ * scrolling; a hold owns the gesture after the long-press timeout.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -116,7 +115,7 @@ class RecordGestureTest {
     }
 
     @Test
-    fun a_quick_swipe_up_scrolls_the_pager_and_records_nothing() {
+    fun a_quick_swipe_up_yields_to_the_list_and_records_nothing() {
         show()
 
         record {
@@ -125,12 +124,11 @@ class RecordGestureTest {
             up()
         }
 
-        composeRule.waitUntil(TIMEOUT_MS) { isShown(FLOW_TEXT) }
         assertEquals(listOf("pressed", "yielded"), signals.list)
     }
 
     @Test
-    fun after_the_timeout_the_pager_does_not_move() {
+    fun after_the_timeout_the_recording_owns_the_drag() {
         show()
 
         record {
@@ -141,12 +139,11 @@ class RecordGestureTest {
         }
 
         assertTrue(isShown(TODAY_TEXT))
-        assertFalse(isShown(FLOW_TEXT))
         assertEquals("released", signals.list.last())
     }
 
     @Test
-    fun after_the_timeout_a_long_fast_slide_up_does_not_page() {
+    fun after_the_timeout_a_long_fast_slide_locks_recording() {
         show()
 
         record {
@@ -157,7 +154,6 @@ class RecordGestureTest {
         }
 
         assertTrue(isShown(TODAY_TEXT))
-        assertFalse(isShown(FLOW_TEXT))
         assertEquals("locked", signals.list.last())
     }
 
@@ -242,11 +238,7 @@ class RecordGestureTest {
         composeRule.setContent {
             LogDateWearTheme(dynamicColor = false) {
                 AppScaffold {
-                    HomeScreen(
-                        pagingLocked = false,
-                        today = { listState -> RecordPage(listState, armed, signals) { clicks += "click" } },
-                        flow = { listState -> TextPage(listState, FLOW_TEXT) },
-                    )
+                    RecordPage(rememberTransformingLazyColumnState(), armed, signals) { clicks += "click" }
                 }
             }
         }
@@ -294,8 +286,6 @@ class RecordGestureTest {
         const val DESCRIPTION = "Record"
         const val START = "Start recording"
         const val TODAY_TEXT = "Today"
-        const val FLOW_TEXT = "Earlier"
-        const val TIMEOUT_MS = 5_000L
 
         @Composable
         fun RecordPage(
@@ -327,16 +317,6 @@ class RecordGestureTest {
                 },
             ) { contentPadding ->
                 TransformingLazyColumn(state = listState, contentPadding = contentPadding) { item { Text(TODAY_TEXT) } }
-            }
-        }
-
-        @Composable
-        fun TextPage(
-            listState: TransformingLazyColumnState,
-            text: String,
-        ) {
-            ScreenScaffold(scrollState = listState) { contentPadding ->
-                TransformingLazyColumn(state = listState, contentPadding = contentPadding) { item { Text(text) } }
             }
         }
     }

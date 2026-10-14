@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ViewTimeline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -29,6 +31,7 @@ import androidx.wear.compose.foundation.AmbientMode
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
+import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonGroup
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
@@ -84,6 +87,7 @@ object TodayTags {
     const val MARK = "today_mark"
     const val ADD = "today_add"
     const val RECORD = "today_record"
+    const val MOMENTS = "today_moments"
 }
 
 /**
@@ -94,10 +98,11 @@ data class TodayControls(
     val recorder: TodayRecorder? = null,
     val onMark: (() -> Unit)? = null,
     val onAdd: (() -> Unit)? = null,
+    val onOpenMoments: (() -> Unit)? = null,
 )
 
 /**
- * Home's first page: the date in the time text, the campfire, the day's summary line, the latest
+ * Home: the date in the time text, the campfire, the day's summary line, the latest
  * moment and, when phone setup is unfinished, a card that opens the next step on the phone.
  * Record sits at the end as the edge button, with Mark and + above it. While the recorder has
  * something to show, it takes the summary's place: the live recording with Pause, Stop and
@@ -225,9 +230,20 @@ private fun TodayList(
                         )
                     }
                 }
-                if (controls.onMark != null || controls.onAdd != null) item { TodayButtonGroup(controls) }
             }
         }
+        controls.onOpenMoments?.let { open ->
+            item {
+                Button(
+                    onClick = open,
+                    modifier = Modifier.fillMaxWidth().transformedHeight(this, spec).testTag(TodayTags.MOMENTS),
+                    transformation = SurfaceTransformation(spec),
+                    icon = { Icon(Icons.Filled.ViewTimeline, contentDescription = null) },
+                    label = { Text(stringResource(R.string.wear_today_browse_moments)) },
+                )
+            }
+        }
+        if (controls.onMark != null || controls.onAdd != null) item { TodayButtonGroup(controls) }
     }
 }
 

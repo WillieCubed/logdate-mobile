@@ -1,6 +1,9 @@
 package app.logdate.wear.v2.flow
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -12,6 +15,7 @@ import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
@@ -32,6 +36,8 @@ import app.logdate.wear.v2.playback.PlaybackState
 object FlowTags {
     const val LIST = "flow_list"
     const val EARLIER = "flow_earlier"
+    const val MEMORIES = "flow_memories"
+    const val SETTINGS = "flow_settings"
 }
 
 /** What the moment list lets the person do. Each control appears only when its handler is set. */
@@ -39,11 +45,13 @@ data class FlowActions(
     val onOpenMoment: ((JournalNote) -> Unit)? = null,
     val onPlayPause: ((JournalNote.Audio) -> Unit)? = null,
     val onOpenArchive: (() -> Unit)? = null,
+    val onOpenMemories: (() -> Unit)? = null,
+    val onOpenSettings: (() -> Unit)? = null,
 )
 
 /**
- * Home's second page: the voice and text moments of the last 7 days, newest first, each playable
- * from its row, then the memory [cards], then Earlier when the library window has older moments, and [footer] at the very end.
+ * Recent voice and text moments, newest first. Memories and settings open their own screens so
+ * neither depends on the number of moments in this list.
  */
 @Composable
 fun FlowPage(
@@ -53,8 +61,6 @@ fun FlowPage(
     timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
     actions: FlowActions = FlowActions(),
     playback: PlaybackState = PlaybackState.Idle,
-    cards: TransformingLazyColumnScope.(TransformationSpec) -> Unit = {},
-    footer: TransformingLazyColumnScope.(TransformationSpec) -> Unit = {},
 ) {
     val spec = rememberTransformationSpec()
     ScreenScaffold(scrollState = listState, timeText = { TimeText(timeSource = timeSource) }) { contentPadding ->
@@ -64,16 +70,36 @@ fun FlowPage(
                     Text(stringResource(R.string.wear_flow_title))
                 }
             }
+            actions.onOpenMemories?.let { open ->
+                item {
+                    Button(
+                        onClick = open,
+                        modifier = Modifier.fillMaxWidth().transformedHeight(this, spec).testTag(FlowTags.MEMORIES),
+                        transformation = SurfaceTransformation(spec),
+                        icon = { Icon(Icons.Filled.History, contentDescription = null) },
+                        label = { Text(stringResource(R.string.wear_flow_memories)) },
+                    )
+                }
+            }
+            actions.onOpenSettings?.let { open ->
+                item {
+                    Button(
+                        onClick = open,
+                        modifier = Modifier.fillMaxWidth().transformedHeight(this, spec).testTag(FlowTags.SETTINGS),
+                        transformation = SurfaceTransformation(spec),
+                        icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                        label = { Text(stringResource(R.string.wear_flow_settings)) },
+                    )
+                }
+            }
             when (state) {
                 FlowUiState.Loading -> Unit
                 FlowUiState.Failed -> item { FlowMessage(stringResource(R.string.wear_flow_failed)) }
                 is FlowUiState.Ready -> {
                     momentItems(state, actions, playback)
-                    cards(spec)
                     earlierItem(state, actions.onOpenArchive, spec)
                 }
             }
-            footer(spec)
         }
     }
 }

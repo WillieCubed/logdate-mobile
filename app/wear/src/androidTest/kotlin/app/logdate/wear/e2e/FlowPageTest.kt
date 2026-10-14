@@ -22,11 +22,11 @@ import app.logdate.wear.v2.flow.FlowActions
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowTags
 import app.logdate.wear.v2.flow.FlowUiState
+import app.logdate.wear.v2.memories.MemoriesScreen
 import app.logdate.wear.v2.memories.MemoryCardTags
 import app.logdate.wear.v2.memories.MemoryCards
 import app.logdate.wear.v2.memories.OnThisDay
 import app.logdate.wear.v2.memories.WeeklyRewind
-import app.logdate.wear.v2.memories.memoryCardItems
 import app.logdate.wear.v2.moments.MomentRowTags
 import app.logdate.wear.v2.playback.PlaybackFailure
 import app.logdate.wear.v2.playback.PlaybackState
@@ -170,11 +170,7 @@ class FlowPageTest {
     ) {
         composeRule.setContent {
             Scene {
-                FlowPage(
-                    state = FlowUiState.Ready(zone, emptyList(), earlierCount = 0),
-                    timeSource = FlowFixedTime,
-                    cards = { spec -> memoryCardItems(cards, spec, onOpenMoment) },
-                )
+                MemoriesScreen(cards = cards, onOpenMoment = onOpenMoment)
             }
         }
     }

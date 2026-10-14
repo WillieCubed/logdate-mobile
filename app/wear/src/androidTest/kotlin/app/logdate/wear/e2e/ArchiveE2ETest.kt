@@ -3,14 +3,14 @@ package app.logdate.wear.e2e
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performRotaryScrollInput
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.datastore.featureflags.FeatureFlag
@@ -20,7 +20,6 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.presentation.MainActivity
 import app.logdate.wear.v2.archive.ArchiveTags
 import app.logdate.wear.v2.flow.FlowTags
-import app.logdate.wear.v2.home.HomeTags
 import app.logdate.wear.v2.today.TodayTags
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -67,7 +66,8 @@ class ArchiveE2ETest {
             scenario = ActivityScenario.launch(MainActivity::class.java)
             waitFor { composeRule.onAllNodesWithTag(TodayTags.PAGE) }
 
-            composeRule.onNodeWithTag(HomeTags.PAGER).performTouchInput { swipeUp() }
+            composeRule.onNodeWithTag(TodayTags.PAGE).performScrollToNode(hasTestTag(TodayTags.MOMENTS))
+            composeRule.onNodeWithTag(TodayTags.MOMENTS).performClick()
             waitFor { composeRule.onAllNodesWithTag(FlowTags.LIST) }
             assertEquals(0, composeRule.onAllNodesWithText(CONTENT).fetchSemanticsNodes().size)
             composeRule.onNodeWithTag(FlowTags.LIST).performRotaryScrollInput { rotateToScrollVertically(LONG_SCROLL) }

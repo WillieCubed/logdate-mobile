@@ -69,10 +69,6 @@ enum class RecorderFailure {
     RECORDING_LOST,
 }
 
-/** Whether Home has to stay on Today, where Stop is. */
-val RecorderState.locksPaging: Boolean
-    get() = this is RecorderState.Live
-
 /**
  * Whether a touch on Record starts a recording, rather than doing what the button shows. While a
  * failed save waits, Record tries the save again instead of starting over.

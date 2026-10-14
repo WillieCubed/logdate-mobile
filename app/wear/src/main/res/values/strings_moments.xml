@@ -53,4 +53,6 @@
         <item quantity="other">%1$d years ago</item>
     </plurals>
     <string name="wear_memory_rewind">This week’s Rewind</string>
+    <string name="wear_memory_title">Memories</string>
+    <string name="wear_memory_empty">No memories to revisit yet</string>
 </resources>

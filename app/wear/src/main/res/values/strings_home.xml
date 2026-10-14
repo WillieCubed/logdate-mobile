@@ -23,6 +23,7 @@
     <string name="wear_today_mark">Mark</string>
     <string name="wear_today_add">Add</string>
     <string name="wear_today_add_symbol" translatable="false">+</string>
+    <string name="wear_today_browse_moments">Moments</string>
 
     <!-- Moments, in the new watch app -->
     <string name="wear_moment_text">Note</string>
@@ -34,4 +35,6 @@
     <string name="wear_flow_title">Last 7 days</string>
     <string name="wear_flow_empty">No moments in the last 7 days</string>
     <string name="wear_flow_failed">Couldn’t load your recent moments</string>
+    <string name="wear_flow_memories">Memories</string>
+    <string name="wear_flow_settings">Settings</string>
 </resources>

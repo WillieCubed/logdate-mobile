@@ -19,7 +19,6 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
-import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.navigation3.rememberSwipeDismissableSceneStrategy
 import app.logdate.client.repository.journals.JournalNote
@@ -42,11 +41,10 @@ import app.logdate.wear.v2.continuity.WatchPlaybackHandoff
 import app.logdate.wear.v2.flow.FlowActions
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowViewModel
-import app.logdate.wear.v2.home.HomeScreen
 import app.logdate.wear.v2.mark.MarkConfirmation
 import app.logdate.wear.v2.mark.MarkViewModel
+import app.logdate.wear.v2.memories.MemoriesScreen
 import app.logdate.wear.v2.memories.MemoriesViewModel
-import app.logdate.wear.v2.memories.memoryCardItems
 import app.logdate.wear.v2.moments.MomentActions
 import app.logdate.wear.v2.moments.MomentScreen
 import app.logdate.wear.v2.moments.MomentViewModel
@@ -61,11 +59,10 @@ import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.recorder.TodayRecorder
 import app.logdate.wear.v2.recorder.canStartRecording
 import app.logdate.wear.v2.recorder.gesture.startLocked
-import app.logdate.wear.v2.recorder.locksPaging
 import app.logdate.wear.v2.settings.PhoneSettingsHandoffDialog
+import app.logdate.wear.v2.settings.WatchSettingsScreen
 import app.logdate.wear.v2.settings.WatchSettingsViewModel
 import app.logdate.wear.v2.settings.rememberWatchSettingsActions
-import app.logdate.wear.v2.settings.watchSettingsItems
 import app.logdate.wear.v2.theme.LogDateWearTheme
 import app.logdate.wear.v2.today.TodayControls
 import app.logdate.wear.v2.today.TodayPage
@@ -135,6 +132,9 @@ fun WearAppV2(
                                 entry<WearRoute.Home> {
                                     HomeEntry(recorder, marker, onAdd = { open(WearRoute.CaptureSheet) }, navigate = open)
                                 }
+                                entry<WearRoute.Flow> { FlowEntry(navigate = open) }
+                                entry<WearRoute.Memories> { MemoriesEntry(navigate = open) }
+                                entry<WearRoute.Settings> { SettingsEntry() }
                                 entry<WearRoute.Moment> { route -> MomentEntry(route.id, onClose = { backStack.removeLastOrNull() }) }
                                 entry<WearRoute.Archive> { ArchiveEntry(navigate = open) }
                                 entry<WearRoute.CaptureSheet> {
@@ -189,21 +189,15 @@ private fun HomeEntry(
                 recorder = TodayRecorder(recorderState, gesture = recorder, actions = recorder),
                 onMark = marker::mark,
                 onAdd = onAdd,
+                onOpenMoments = { navigate(WearRoute.Flow) },
             )
         }
-    HomeScreen(
-        pagingLocked = recorderState.locksPaging,
-        today = { listState -> TodayEntry(listState, controls) },
-        flow = { listState -> FlowEntry(listState, navigate) },
-    )
+    TodayEntry(controls)
     MarkConfirmation(feedback = markFeedback, onDismiss = marker::dismissFeedback)
 }
 
 @Composable
-private fun TodayEntry(
-    listState: TransformingLazyColumnState,
-    controls: TodayControls,
-) {
+private fun TodayEntry(controls: TodayControls) {
     val viewModel = koinViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsState()
     val handoff by viewModel.handoff.collectAsState()
@@ -214,39 +208,44 @@ private fun TodayEntry(
         onSetUpPhone = viewModel::setUpPhone,
         onHandoffDismissed = viewModel::dismissHandoff,
         controls = controls,
-        listState = listState,
     )
 }
 
 @Composable
-private fun FlowEntry(
-    listState: TransformingLazyColumnState,
-    navigate: (WearRoute) -> Unit,
-) {
+private fun FlowEntry(navigate: (WearRoute) -> Unit) {
     val viewModel = koinViewModel<FlowViewModel>()
-    val memories = koinViewModel<MemoriesViewModel>()
-    val settings = koinViewModel<WatchSettingsViewModel>()
     val player = koinInject<MomentPlayer>()
     val state by viewModel.uiState.collectAsState()
-    val memoryCards by memories.cards.collectAsState()
-    val settingsState by settings.uiState.collectAsState()
     val playback by player.state.collectAsState()
-    val settingsActions = rememberWatchSettingsActions(settings)
     val openMoment: (JournalNote) -> Unit = { note -> navigate(WearRoute.Moment(note.uid.toString())) }
     FlowPage(
         state = state,
-        listState = listState,
         playback = playback,
         actions =
             FlowActions(
                 onOpenMoment = openMoment,
                 onPlayPause = player::playOrPause,
                 onOpenArchive = { navigate(WearRoute.Archive) },
+                onOpenMemories = { navigate(WearRoute.Memories) },
+                onOpenSettings = { navigate(WearRoute.Settings) },
             ),
-        cards = { spec -> memoryCardItems(memoryCards, spec, openMoment) },
-        footer = { spec -> watchSettingsItems(settingsState, settingsActions, spec) },
     )
-    PhoneSettingsHandoffDialog(settingsState.handoff, settings::dismissHandoff)
+}
+
+@Composable
+private fun MemoriesEntry(navigate: (WearRoute) -> Unit) {
+    val viewModel = koinViewModel<MemoriesViewModel>()
+    val cards by viewModel.cards.collectAsState()
+    MemoriesScreen(cards = cards, onOpenMoment = { note -> navigate(WearRoute.Moment(note.uid.toString())) })
+}
+
+@Composable
+private fun SettingsEntry() {
+    val viewModel = koinViewModel<WatchSettingsViewModel>()
+    val state by viewModel.uiState.collectAsState()
+    val actions = rememberWatchSettingsActions(viewModel)
+    WatchSettingsScreen(state = state, actions = actions)
+    PhoneSettingsHandoffDialog(state.handoff, viewModel::dismissHandoff)
 }
 
 @Composable

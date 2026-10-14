@@ -2,9 +2,7 @@ package app.logdate.wear.e2e
 
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -19,17 +17,14 @@ import androidx.compose.ui.test.performRotaryScrollInput
 import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
-import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
-import androidx.wear.compose.material3.ScreenScaffold
-import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import app.logdate.wear.v2.haptics.HapticsPreference
 import app.logdate.wear.v2.settings.WatchSettingsActions
+import app.logdate.wear.v2.settings.WatchSettingsScreen
+import app.logdate.wear.v2.settings.WatchSettingsScreenTags
 import app.logdate.wear.v2.settings.WatchSettingsTags
 import app.logdate.wear.v2.settings.WatchSettingsUiState
 import app.logdate.wear.v2.settings.WatchStatus
-import app.logdate.wear.v2.settings.watchSettingsItems
 import app.logdate.wear.v2.theme.LogDateWearTheme
 import org.junit.Rule
 import org.junit.Test
@@ -38,7 +33,7 @@ import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Taps through the settings section on a Wear OS emulator, scrolling with the crown to reach each control. */
+/** Taps through Watch settings on a Wear OS emulator, scrolling with the crown to reach each control. */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class WatchSettingsTest {
@@ -156,7 +151,7 @@ class WatchSettingsTest {
     }
 }
 
-private const val SETTINGS_LIST = "settings_list"
+private const val SETTINGS_LIST = WatchSettingsScreenTags.LIST
 
 @Composable
 private fun SettingsScene(
@@ -165,13 +160,7 @@ private fun SettingsScene(
 ) {
     LogDateWearTheme(dynamicColor = false) {
         AppScaffold(timeText = {}) {
-            val listState = rememberTransformingLazyColumnState()
-            val spec = rememberTransformationSpec()
-            ScreenScaffold(scrollState = listState, timeText = {}) { contentPadding ->
-                TransformingLazyColumn(state = listState, contentPadding = contentPadding, modifier = Modifier.testTag(SETTINGS_LIST)) {
-                    watchSettingsItems(state, actions, spec)
-                }
-            }
+            WatchSettingsScreen(state, actions)
         }
     }
 }

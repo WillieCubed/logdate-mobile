@@ -13,6 +13,9 @@ class WearRouteTest {
         val routes =
             listOf(
                 WearRoute.Home,
+                WearRoute.Flow,
+                WearRoute.Memories,
+                WearRoute.Settings,
                 WearRoute.Moment(id = Uuid.random().toString()),
                 WearRoute.CaptureSheet,
                 WearRoute.PlayOn,
@@ -27,25 +30,29 @@ class WearRouteTest {
     }
 
     @Test
-    fun `every launch request opens Today until its own screen exists`() {
+    fun `capture launch requests still open Today`() {
         val requests =
             listOf(
                 null,
                 WearLaunchRequest.Home,
                 WearLaunchRequest.Record,
-                WearLaunchRequest.Memories,
                 WearLaunchRequest.MoodCheckIn,
                 WearLaunchRequest.QuickText,
-                WearLaunchRequest.Timeline,
                 WearLaunchRequest.RemoteCamera,
-                WearLaunchRequest.Settings,
                 WearLaunchRequest.Mark,
-                WearLaunchRequest.OnThisDay,
             )
 
         requests.forEach { request ->
             assertEquals(listOf<WearRoute>(WearRoute.Home), request.toV2BackStack(), "for $request")
         }
+    }
+
+    @Test
+    fun `library and settings launch requests open their own screens`() {
+        assertEquals(listOf(WearRoute.Home, WearRoute.Flow), WearLaunchRequest.Timeline.toV2BackStack())
+        assertEquals(listOf(WearRoute.Home, WearRoute.Memories), WearLaunchRequest.Memories.toV2BackStack())
+        assertEquals(listOf(WearRoute.Home, WearRoute.Memories), WearLaunchRequest.OnThisDay.toV2BackStack())
+        assertEquals(listOf(WearRoute.Home, WearRoute.Settings), WearLaunchRequest.Settings.toV2BackStack())
     }
 
     @Test

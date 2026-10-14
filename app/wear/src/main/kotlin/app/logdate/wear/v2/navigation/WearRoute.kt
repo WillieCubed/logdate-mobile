@@ -13,6 +13,15 @@ sealed interface WearRoute : NavKey {
     @Serializable
     data object Home : WearRoute
 
+    @Serializable
+    data object Flow : WearRoute
+
+    @Serializable
+    data object Memories : WearRoute
+
+    @Serializable
+    data object Settings : WearRoute
+
     /** One moment, by the ID of its note. */
     @Serializable
     data class Moment(
