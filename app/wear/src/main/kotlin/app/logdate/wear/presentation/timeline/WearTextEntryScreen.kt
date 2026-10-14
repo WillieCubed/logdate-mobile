@@ -1,6 +1,5 @@
 package app.logdate.wear.presentation.timeline
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -54,11 +53,11 @@ fun WearTextEntryScreen(
 
     val currentNote = note
     val listState = rememberScalingLazyListState()
-    ScreenScaffold(timeText = { TimeText() }, scrollState = listState) {
+    ScreenScaffold(timeText = { TimeText() }, scrollState = listState) { contentPadding ->
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 24.dp),
+            contentPadding = contentPadding,
         ) {
             item {
                 Text(

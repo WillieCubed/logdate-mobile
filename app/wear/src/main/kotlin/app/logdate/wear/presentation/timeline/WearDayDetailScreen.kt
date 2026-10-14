@@ -96,10 +96,11 @@ internal fun WearDayDetailContent(
     ScreenScaffold(
         timeText = { TimeText() },
         scrollState = listState,
-    ) {
+    ) { contentPadding ->
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxWidth(),
+            contentPadding = contentPadding,
         ) {
             item(key = "header") {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
