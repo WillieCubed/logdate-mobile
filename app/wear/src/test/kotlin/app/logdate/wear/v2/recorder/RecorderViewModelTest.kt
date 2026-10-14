@@ -563,10 +563,31 @@ class RecorderViewModelTest {
         }
 
     @Test
-    fun `a recording running when the activity finishes is saved`() =
+    fun `a locked recording continues on the watch face and can be stopped after reopening`() =
         runTest {
             val viewModel = createViewModel()
             tap(viewModel)
+
+            viewModelStore.clear()
+            runCurrent()
+
+            assertTrue(recorder.isRecording.value)
+            assertEquals(0, recorder.stops)
+            val reopened = createViewModel()
+            assertEquals(LiveMode.LOCKED, assertIs<RecorderState.Live>(reopened.state.value).mode)
+
+            reopened.stop()
+            runCurrent()
+
+            assertEquals(1, recorder.stops)
+            coVerify(exactly = 1) { notesRepository.create(any<JournalNote>()) }
+        }
+
+    @Test
+    fun `an interrupted hold is saved when the activity finishes`() =
+        runTest {
+            val viewModel = createViewModel()
+            hold(viewModel)
 
             viewModelStore.clear()
             runCurrent()

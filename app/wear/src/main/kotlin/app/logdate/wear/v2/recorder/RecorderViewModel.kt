@@ -42,7 +42,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * The recorder the new watch app shares. It belongs to the activity, so a recording outlives the
+ * The recorder the new watch app shares. It belongs to the app, so a locked recording outlives the
  * screen that started it, and it follows Record's gesture:
  *
  * - A press starts the recorder at once, so the first word is never lost, but shows nothing.
@@ -54,7 +54,8 @@ import kotlin.time.Duration.Companion.minutes
  * for five seconds and the five feelings show for four. The microphone is asked for when the gesture
  * decides without it, and notifications once, on the first locked recording. Nothing recorded is
  * dropped silently: each failure becomes [RecorderState.Failed] with its reason, and a recording
- * still running when the activity finishes is saved on [applicationScope].
+ * still held when the activity finishes is saved on [applicationScope]. A locked recording remains
+ * active on the watch face and can be reopened from its ongoing notification.
  *
  * A saved note's audio is named by a `logdate-media://` reference; [mediaFiles] resolves it to the
  * file Undo deletes.
@@ -93,10 +94,23 @@ class RecorderViewModel(
             mediaFiles = mediaFiles,
             feelingSaver = feelingSaver,
         )
-    private val mutableState = MutableStateFlow<RecorderState>(RecorderState.Ready)
+    private val mutableState =
+        MutableStateFlow<RecorderState>(
+            if (recorder.isRecording.value) {
+                RecorderState.Live(
+                    mode = LiveMode.LOCKED,
+                    paused = recorder.isPaused.value,
+                    pausedByInterruption = recorder.pausedByInterruption.value,
+                    lockProgress = 1f,
+                    elapsed = recorder.elapsed.value,
+                )
+            } else {
+                RecorderState.Ready
+            },
+        )
     private val permissionRequestChannel = Channel<WatchPermission>(Channel.BUFFERED)
 
-    private var decision = GestureDecision.NONE
+    private var decision = if (recorder.isRecording.value) GestureDecision.LOCK else GestureDecision.NONE
 
     /** Whether the recorder's start succeeded, or null while it is still running. */
     private var started: Boolean? = null
@@ -246,7 +260,8 @@ class RecorderViewModel(
     override fun onCleared() {
         val current = mutableState.value
         when {
-            current is RecorderState.Live -> applicationScope.launch { stopAndSaveDetached() }
+            current is RecorderState.Live && current.mode == LiveMode.HOLDING -> applicationScope.launch { stopAndSaveDetached() }
+            current is RecorderState.Live -> Unit
             current == RecorderState.Arming -> {
                 val decided = decision == GestureDecision.HOLD || decision == GestureDecision.LOCK || decision == GestureDecision.RELEASED
                 applicationScope.launch { if (decided) stopAndSaveDetached() else recorder.discard() }

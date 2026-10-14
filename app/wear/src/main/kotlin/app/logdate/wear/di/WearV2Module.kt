@@ -241,7 +241,7 @@ val wearV2Module =
                 phoneHandoff = get(),
             )
         }
-        viewModel {
+        single {
             RecorderViewModel(
                 recorder = get(),
                 saver = get(),

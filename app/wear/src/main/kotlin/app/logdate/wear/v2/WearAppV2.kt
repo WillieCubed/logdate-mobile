@@ -87,16 +87,16 @@ object WearAppV2Tags {
  * [initialRequest] picks the first back stack; a recreated activity restores the one it saved
  * instead. Each item of [newRequests] replaces the back stack, as a cold launch from a tile does.
  * Swiping right dismisses the top screen. Each screen's view models live as long as its entry; the
- * recorder and Mark are resolved here, outside every entry, so they belong to the activity, and the
- * permissions they ask for are requested here. While recording, the app stays on screen in ambient
- * mode where the watch supports it.
+ * recorder and Mark are resolved here, outside every entry. The recorder belongs to the app so a
+ * locked session continues on the watch face; permissions are requested here. While recording,
+ * the app stays on screen in ambient mode where the watch supports it.
  */
 @Composable
 fun WearAppV2(
     initialRequest: WearLaunchRequest?,
     newRequests: Flow<WearLaunchRequest>,
 ) {
-    val recorder = koinViewModel<RecorderViewModel>()
+    val recorder = koinInject<RecorderViewModel>()
     val marker = koinViewModel<MarkViewModel>()
     val recorderState by recorder.state.collectAsState()
     val backStack = rememberNavBackStack(*initialRequest.toV2BackStack().toTypedArray())
