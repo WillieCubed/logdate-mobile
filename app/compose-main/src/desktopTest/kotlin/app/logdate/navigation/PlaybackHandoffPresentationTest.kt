@@ -3,6 +3,8 @@ package app.logdate.navigation
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -117,7 +119,7 @@ class PlaybackHandoffPresentationTest {
                                 ),
                             LocalPlaybackHandoff provides handoff.value.copy(onContinue = transfer),
                         ) {
-                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
                                 MomentAudioCard(
                                     audio =
                                         MomentAudioUiState(

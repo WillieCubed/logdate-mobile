@@ -134,7 +134,7 @@ class WatchCompanionVisualAcceptanceTest {
                 val terminal =
                     when (scene) {
                         WatchCompanionAcceptanceScene.COMPANION -> "Remove watch"
-                        WatchCompanionAcceptanceScene.DIAGNOSTICS -> "Watch notifications are allowed"
+                        WatchCompanionAcceptanceScene.DIAGNOSTICS -> "Watch notifications"
                         WatchCompanionAcceptanceScene.REMOVE_REVIEW -> "Remove watch"
                         WatchCompanionAcceptanceScene.REMOVE_SYNC_FAILED -> "Check again"
                     }
