@@ -294,3 +294,9 @@ variable "cleanup_notification_channels" {
   type        = list(string)
   default     = []
 }
+
+variable "cleanup_operator_email" {
+  description = "Optional operator email channel managed with account cleanup alert policies."
+  type        = string
+  default     = ""
+}

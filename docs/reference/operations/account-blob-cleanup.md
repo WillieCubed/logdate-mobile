@@ -14,8 +14,8 @@ cleaned. A minimal deleted-account identifier remains to prevent reuse of a name
 object paths are removed from the outbox.
 
 Apply the Terraform job, OAuth Scheduler invocation, and Monitoring policies before relying on
-scheduled recovery. Configure `cleanup_notification_channels` with monitored Cloud Monitoring
-channel resource names. Deployment renders the job from the server's immutable contract so the
+scheduled recovery. Set `cleanup_operator_email` to manage an operator email channel, or configure
+`cleanup_notification_channels` with existing monitored Cloud Monitoring channel resource names. Deployment renders the job from the server's immutable contract so the
 image, database secret versions, storage settings, and runtime identity match. The deployment
 executes the job once and fails if it cannot complete its batch. Apply V40 before the new server;
 production startup and the migration helper reject missing or disabled cleanup triggers.

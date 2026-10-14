@@ -482,11 +482,18 @@ resource "google_cloud_scheduler_job" "account_blob_cleanup" {
   depends_on = [google_project_service.required, google_cloud_run_v2_job_iam_member.cleanup_invoker]
 }
 
+resource "google_monitoring_notification_channel" "cleanup_operator" {
+  count        = var.enable_cloud_run_service && var.cleanup_operator_email != "" ? 1 : 0
+  display_name = "${var.service_name} account cleanup operator"
+  type         = "email"
+  labels       = { email_address = var.cleanup_operator_email }
+}
+
 resource "google_monitoring_alert_policy" "account_blob_cleanup_failure" {
   count                 = var.enable_cloud_run_service ? 1 : 0
   display_name          = "${var.service_name} account cleanup job failed"
   combiner              = "OR"
-  notification_channels = var.cleanup_notification_channels
+  notification_channels = concat(var.cleanup_notification_channels, google_monitoring_notification_channel.cleanup_operator[*].name)
   conditions {
     display_name = "Cleanup execution failed"
     condition_threshold {
@@ -510,7 +517,7 @@ resource "google_monitoring_alert_policy" "account_blob_cleanup_overdue" {
   count                 = var.enable_cloud_run_service ? 1 : 0
   display_name          = "${var.service_name} account cleanup older than 24 hours"
   combiner              = "OR"
-  notification_channels = var.cleanup_notification_channels
+  notification_channels = concat(var.cleanup_notification_channels, google_monitoring_notification_channel.cleanup_operator[*].name)
   conditions {
     display_name = "Pending cleanup older than 24 hours"
     condition_matched_log {

@@ -89,3 +89,5 @@ secret_ids = [
 ]
 
 create_secrets = true
+
+cleanup_operator_email = "willie@hypertext.studio"
