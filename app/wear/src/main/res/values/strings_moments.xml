@@ -19,7 +19,6 @@
     <string name="wear_moment_delete_body">It’s deleted from your phone too.</string>
     <string name="wear_moment_delete_failed">Couldn’t delete this moment</string>
     <string name="wear_moment_play_on">Audio output</string>
-    <string name="wear_moment_choose_output">Choose output</string>
     <string name="wear_moment_play_on_phone">Play on phone</string>
     <string name="wear_moment_open_on_phone">Open on phone</string>
     <string name="wear_moment_phone_opening">Opening on phone…</string>

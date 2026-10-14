@@ -185,6 +185,29 @@ class MomentDetailTest {
         assertEquals(1, picks)
     }
 
+    @Test
+    fun output_picker_is_available_before_playback_fails() {
+        var picks = 0
+        show(ready(voice), MomentActions(onPlayOn = { picks++ }))
+
+        composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
+
+        assertEquals(1, picks)
+    }
+
+    @Test
+    fun no_output_can_retry_after_headphones_connect_when_picker_is_unavailable() {
+        var plays = 0
+        show(
+            ready(voice, PlaybackState.Failed(voice.uid, PlaybackFailure.NO_OUTPUT)),
+            MomentActions(onPlayPause = { plays++ }),
+        )
+
+        composeRule.onNodeWithTag(MomentTags.PLAY_PAUSE).performClick()
+
+        assertEquals(1, plays)
+    }
+
     private fun ready(
         note: JournalNote,
         playback: PlaybackState = PlaybackState.Idle,

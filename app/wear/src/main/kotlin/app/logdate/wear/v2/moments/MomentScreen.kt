@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,7 @@ import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.FilledIconButton
+import androidx.wear.compose.material3.FilledTonalIconButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.wear.compose.material3.IconToggleButton
@@ -270,20 +272,28 @@ private fun MomentPlayerPage(
                 modifier = Modifier.padding(horizontal = PLAYER_SIDE_PADDING),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (state.playback !is PlaybackState.Failed) {
-                    Text(
-                        text =
-                            stringResource(
-                                R.string.wear_moment_position,
-                                formatClockDuration(positionMs.milliseconds),
-                                formatClockDuration(durationMs.milliseconds),
-                            ),
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.testTag(MomentTags.POSITION),
-                    )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(CONTROL_SPACING),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (state.playback !is PlaybackState.Failed) {
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.wear_moment_position,
+                                    formatClockDuration(positionMs.milliseconds),
+                                    formatClockDuration(durationMs.milliseconds),
+                                ),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.testTag(MomentTags.POSITION),
+                        )
+                    }
+                    if (state.playback !is PlaybackState.Failed || state.playback.reason != PlaybackFailure.NO_OUTPUT) {
+                        actions.onPlayOn?.let { AudioOutputButton(it) }
+                    }
                 }
                 PlayerControls(state, actions)
-                PlayerLine(note, state.playback, positionMs, actions.onPlayOn)
+                PlayerLine(note, state.playback, positionMs)
             }
         }
     }
@@ -295,6 +305,7 @@ private fun PlayerControls(
     actions: MomentActions,
 ) {
     val playing = (state.playback as? PlaybackState.Active)?.isPaused == false
+    val noOutput = state.playback is PlaybackState.Failed && state.playback.reason == PlaybackFailure.NO_OUTPUT
     val speedText = speedLabel(state.speed)
     val speedDescription = stringResource(R.string.wear_moment_speed_description, speedText)
     Row(
@@ -302,14 +313,16 @@ private fun PlayerControls(
         horizontalArrangement = Arrangement.spacedBy(CONTROL_SPACING),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CompactButton(
-            onClick = actions.onCycleSpeed,
-            modifier = Modifier.testTag(MomentTags.SPEED).semantics { contentDescription = speedDescription },
-            label = { Text(speedText) },
-        )
+        if (!noOutput) {
+            CompactButton(
+                onClick = actions.onCycleSpeed,
+                modifier = Modifier.testTag(MomentTags.SPEED).semantics { contentDescription = speedDescription },
+                label = { Text(speedText) },
+            )
+        }
         FilledIconButton(
             onClick = actions.onPlayPause,
-            enabled = state.playback !is PlaybackState.Preparing,
+            enabled = (!noOutput || actions.onPlayOn == null) && state.playback !is PlaybackState.Preparing,
             modifier = Modifier.size(IconButtonDefaults.SmallButtonSize).testTag(MomentTags.PLAY_PAUSE),
         ) {
             Icon(
@@ -317,13 +330,32 @@ private fun PlayerControls(
                 contentDescription = stringResource(if (playing) R.string.wear_moment_pause else R.string.wear_moment_play),
             )
         }
-        IconToggleButton(
-            checked = state.skipSilence,
-            onCheckedChange = actions.onSkipSilenceChange,
-            modifier = Modifier.size(IconButtonDefaults.SmallButtonSize).testTag(MomentTags.SKIP_SILENCE),
-        ) {
-            Icon(imageVector = Icons.Filled.FastForward, contentDescription = stringResource(R.string.wear_moment_skip_silence))
+        if (noOutput) {
+            actions.onPlayOn?.let { AudioOutputButton(it) }
+        } else {
+            IconToggleButton(
+                checked = state.skipSilence,
+                onCheckedChange = actions.onSkipSilenceChange,
+                modifier = Modifier.size(IconButtonDefaults.SmallButtonSize).testTag(MomentTags.SKIP_SILENCE),
+            ) {
+                Icon(imageVector = Icons.Filled.FastForward, contentDescription = stringResource(R.string.wear_moment_skip_silence))
+            }
         }
+    }
+}
+
+@Composable
+private fun AudioOutputButton(onClick: () -> Unit) {
+    val outputDescription = stringResource(R.string.wear_moment_play_on)
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .size(36.dp)
+                .testTag(MomentTags.CHOOSE_OUTPUT)
+                .semantics { contentDescription = outputDescription },
+    ) {
+        Icon(Icons.Filled.VolumeUp, contentDescription = null)
     }
 }
 
@@ -332,7 +364,6 @@ private fun PlayerLine(
     note: JournalNote.Audio,
     playback: PlaybackState,
     positionMs: Long,
-    onPlayOn: (() -> Unit)?,
 ) {
     val failed = playback is PlaybackState.Failed
     val text = if (playback is PlaybackState.Failed) failureMessage(playback.reason) else captionAt(note, positionMs)
@@ -345,13 +376,6 @@ private fun PlayerLine(
         maxLines = if (failed) FAILURE_LINES else CAPTION_LINES,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.fillMaxWidth(if (failed) FAILURE_WIDTH_FRACTION else CAPTION_WIDTH_FRACTION).testTag(MomentTags.CAPTION),
-    )
-    val noOutput = playback is PlaybackState.Failed && playback.reason == PlaybackFailure.NO_OUTPUT
-    if (!noOutput || onPlayOn == null) return
-    CompactButton(
-        onClick = onPlayOn,
-        modifier = Modifier.testTag(MomentTags.CHOOSE_OUTPUT),
-        label = { Text(stringResource(R.string.wear_moment_choose_output)) },
     )
 }
 

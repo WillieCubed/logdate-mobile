@@ -212,6 +212,14 @@ class MomentScreenshots {
             actions = MomentActions(onDelete = {}, onPlayOn = {}),
         )
     }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S21_VoiceReadyWithOutput() {
+        MomentScene(ready(voice), actions = MomentActions(onPlayOn = {}))
+    }
 }
 
 private val momentZone = TimeZone.currentSystemDefault()
