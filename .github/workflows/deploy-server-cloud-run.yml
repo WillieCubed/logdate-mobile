@@ -386,7 +386,22 @@ jobs:
             exit 1
           fi
 
+      - name: Record revision serving traffic before promotion
+        id: previous_traffic
+        run: |
+          previous_revision="$(
+            gcloud run services describe "$(jq -r '.service_name' "$CONTRACT_FILE")" \
+              --platform managed \
+              --region "$(jq -r '.region' "$CONTRACT_FILE")" \
+              --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
+              --format=json |
+              jq -r '[.status.traffic[]? | select(.percent == 100) | .revisionName] | first // empty'
+          )"
+          test -n "$previous_revision"
+          echo "revision=$previous_revision" >> "$GITHUB_OUTPUT"
+
       - name: Promote candidate to 100 percent traffic
+        id: promote
         run: |
           gcloud run services update-traffic "$(jq -r '.service_name' "$CONTRACT_FILE")" \
             --platform managed \
@@ -463,3 +478,14 @@ jobs:
               echo "Custom domain not yet responding; SSL may still be provisioning."
             fi
           fi
+
+      - name: Restore prior traffic after failed promotion
+        if: ${{ failure() && (steps.promote.outcome == 'success' || steps.promote.outcome == 'failure') && steps.previous_traffic.outputs.revision != '' }}
+        env:
+          PREVIOUS_REVISION: ${{ steps.previous_traffic.outputs.revision }}
+        run: |
+          gcloud run services update-traffic "$(jq -r '.service_name' "$CONTRACT_FILE")" \
+            --platform managed \
+            --region "$(jq -r '.region' "$CONTRACT_FILE")" \
+            --project "$(jq -r '.project_id' "$CONTRACT_FILE")" \
+            --to-revisions "$PREVIOUS_REVISION=100"
