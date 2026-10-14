@@ -50,6 +50,34 @@ class WearStartupTest {
         }
 
     @Test
+    fun slowRecordingRecoveryDoesNotHoldTheWatchScreenClosed() =
+        runTest {
+            val recovery = CompletableDeferred<Unit>()
+            val calls = mutableListOf<String>()
+            val startup =
+                WearStartup(
+                    backgroundScope,
+                    { calls += "storage" },
+                    { calls += "removal" },
+                    {
+                        calls += "recording"
+                        recovery.await()
+                    },
+                    { calls += "observers" },
+                )
+
+            startup.start()
+            runCurrent()
+
+            assertIs<WearStartupState.Ready>(startup.state.value)
+            assertTrue(startup.awaitReady())
+            assertEquals(listOf("storage", "removal", "recording"), calls)
+            recovery.complete(Unit)
+            runCurrent()
+            assertEquals(listOf("storage", "removal", "recording", "observers"), calls)
+        }
+
+    @Test
     fun loadingDoesNotReleaseColdEntryCallersOrStartObservers() =
         runTest {
             val storage = CompletableDeferred<Unit>()

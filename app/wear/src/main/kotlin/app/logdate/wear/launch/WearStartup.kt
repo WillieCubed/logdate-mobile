@@ -42,9 +42,17 @@ internal class WearStartup(
                     try {
                         openStorage()
                         restoreRemoval()
-                        recoverRecording()
-                        startObservers()
                         mutableState.value = WearStartupState.Ready
+                        scope.launch {
+                            try {
+                                recoverRecording()
+                                startObservers()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                Napier.e("Watch background startup failed; retained data remains available", error)
+                            }
+                        }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {

@@ -181,11 +181,12 @@ val wearV2Module =
         single {
             val location = get<WearLocationCaptureCoordinator>()
             val devices = get<DeviceIdProvider>()
+            val koin = getKoin()
             MarkMomentUseCase(
                 store = get(),
                 deviceId = { devices.getDeviceId().value.toString() },
                 place = { location.captureForJournalEntry() },
-                heartRate = get(),
+                heartRate = HeartRateSampler { koin.get<HeartRateSampler>().sample() },
             )
         }
         single { BackgroundMarker(featureFlags = get(), markMoment = get(), haptics = get()) }
