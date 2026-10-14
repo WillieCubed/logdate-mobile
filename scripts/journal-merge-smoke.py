@@ -74,6 +74,8 @@ def http_request(method, url, headers, body):
         try:
             payload = json.loads(raw) if raw else {}
         except (ValueError, UnicodeError):
+            if response.code == 404:
+                return response.code, {}
             raise SmokeError("Journal merge smoke returned invalid JSON") from None
         return response.code, payload
 

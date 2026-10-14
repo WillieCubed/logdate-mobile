@@ -3,11 +3,14 @@
 
 import copy
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from unittest.mock import patch
+from urllib.error import HTTPError
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -171,6 +174,18 @@ class JournalMergeSmokeTest(unittest.TestCase):
         with self.assertRaisesRegex(smoke.SmokeError, "prepared"):
             self.probe("verify")
         self.assertFalse(any(call[0] != "GET" for call in self.server.calls))
+
+    def test_plain_text_not_found_is_accepted_only_as_an_expected_status(self):
+        url = CANDIDATE + "/api/v1/journals/missing"
+        error = HTTPError(url, 404, "Not Found", {}, io.BytesIO(b"Not Found"))
+        with patch.object(smoke, "build_opener") as opener:
+            opener.return_value.open.side_effect = error
+            self.assertEqual((404, {}), smoke.http_request("GET", url, {}, None))
+
+        with patch.object(self.server, "request", return_value=(404, {})):
+            probe = smoke.Probe(CANDIDATE, self.state, self.server.request, None)
+            with self.assertRaisesRegex(smoke.SmokeError, "HTTP 404"):
+                probe.request("GET", "/journals/missing")
 
     def test_recovery_marks_only_bound_private_state_for_existing_account_cleanup(self):
         smoke.run_probe(CANDIDATE, self.state_file, "recover", transport=self.server.request)
