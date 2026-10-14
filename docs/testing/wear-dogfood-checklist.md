@@ -9,8 +9,8 @@ forbidden; do not uninstall or clear retained LogDate data.
 
 1. The Play Console steps in [Google Play Publishing](../reference/google-play-publishing.md#one-time-play-console-setup)
    are done and `LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` is `true`.
-2. A push to `main` has published both the phone build and the watch build. The watch build shows up
-   under the Wear OS track in Play Console.
+2. One explicit `Publish Android to Play` run from `main` with stage `internal` has published both
+   the phone and watch builds. The watch build shows up under the Wear OS track in Play Console.
 3. LogDate is installed on the phone from Play, and you are signed in.
 4. LogDate is installed on the watch from the Play Store on the watch. Allow the microphone when asked.
 5. The deliberately dispatched internal build defaults **Redesigned watch app** on for both
