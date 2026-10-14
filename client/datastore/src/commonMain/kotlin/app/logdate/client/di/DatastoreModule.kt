@@ -6,6 +6,7 @@ import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createDataStore
 import app.logdate.client.datastore.featureflags.DataStoreFeatureFlagStore
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
@@ -47,7 +48,15 @@ val commonDatastoreModule =
         }
 
         single<FeatureFlagStore> {
-            DataStoreFeatureFlagStore(get(named("mainDataStore")))
+            DataStoreFeatureFlagStore(
+                get(named("mainDataStore")),
+                defaultOverrides =
+                    if (getOrNull<Boolean>(named("watchExperienceDefault")) == true) {
+                        mapOf(FeatureFlag.WATCH_EXPERIENCE_V2 to true)
+                    } else {
+                        emptyMap()
+                    },
+            )
         }
 
         single {

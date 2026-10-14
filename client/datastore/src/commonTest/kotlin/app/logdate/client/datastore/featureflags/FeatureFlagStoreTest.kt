@@ -30,6 +30,39 @@ class FeatureFlagStoreTest {
         }
 
     @Test
+    fun `internal watch default applies only to an unset watch flag`() =
+        runTest {
+            val internalStore =
+                DataStoreFeatureFlagStore(
+                    preferences,
+                    defaultOverrides = mapOf(FeatureFlag.WATCH_EXPERIENCE_V2 to true),
+                )
+
+            assertTrue(internalStore.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2))
+            assertFalse(internalStore.isEnabled(FeatureFlag.EVENTS))
+
+            internalStore.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, false)
+
+            assertFalse(internalStore.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2))
+            assertEquals(false, preferences.data.first()[booleanPreferencesKey(FeatureFlag.WATCH_EXPERIENCE_V2.key)])
+        }
+
+    @Test
+    fun `switching an internal watch flag back to its effective default clears the override`() =
+        runTest {
+            val internalStore =
+                DataStoreFeatureFlagStore(
+                    preferences,
+                    defaultOverrides = mapOf(FeatureFlag.WATCH_EXPERIENCE_V2 to true),
+                )
+            internalStore.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, false)
+            internalStore.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, true)
+
+            assertNull(preferences.data.first()[booleanPreferencesKey(FeatureFlag.WATCH_EXPERIENCE_V2.key)])
+            assertTrue(internalStore.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2))
+        }
+
+    @Test
     fun `Home workspace is enabled unless explicitly disabled`() =
         runTest {
             assertTrue(store.isEnabled(FeatureFlag.HOME_WORKSPACE_V2))

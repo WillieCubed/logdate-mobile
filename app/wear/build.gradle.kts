@@ -32,6 +32,12 @@ extensions.configure<ApplicationExtension> {
 
     defaultConfig {
         applicationId = release.applicationId
+        manifestPlaceholders["watchExperienceDefault"] =
+            providers
+                .gradleProperty("logdate.watchExperienceDefault")
+                .map(String::toBooleanStrict)
+                .getOrElse(false)
+                .toString()
         minSdk = 34
         targetSdk = 37
         versionCode = release.versionCode

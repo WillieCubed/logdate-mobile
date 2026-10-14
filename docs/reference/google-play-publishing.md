@@ -26,6 +26,11 @@ the production backend `https://cloud.logdate.app`. The local `dogfood` Gradle
 build type is something else: a debuggable build for sideloading, which Play
 would reject.
 
+The internal publish command sets `-Plogdate.watchExperienceDefault=true` for both phone
+and watch. Only that built bundle defaults to the redesigned Watch experience; a person who
+turned it off explicitly in Labs keeps their choice. Ordinary builds retain the flag's
+declared default of off. Internal and production tracks remain separate.
+
 Production is the same bundle, promoted from internal testing by an explicit
 workflow dispatch that names its tested `android-v*` tag. Nothing is rebuilt for production.
 
@@ -181,6 +186,8 @@ The workflow has two publish paths:
 
   - `-Plogdate.backendUrl=https://cloud.logdate.app`, explicitly, so a change
     to `gradle.properties` can never retarget Play builds
+  - `-Plogdate.watchExperienceDefault=true`, so the internal phone and watch
+    open the redesigned companion by default
   - `LOGDATE_PLAY_TRACK=internal`
   - `LOGDATE_VERSION_NAME=<derived>` (Play assigns the `versionCode`)
   - `--release-name "<internal release name with short SHA>"`

@@ -13,9 +13,11 @@ Data Layer. Matching identity is necessary, but does not establish pairing or a 
 A Play phone build and a locally upload-key-signed watch build do not have matching app-signing keys.
 Install both from the corresponding Play internal test tracks for hardware dogfood.
 
-The redesign is gated by `FeatureFlag.WATCH_EXPERIENCE_V2`, default OFF. Protocol negotiation also
-requires the peer's version and advertised feature; an incompatible or older peer retains the legacy
-path. The flag is not evidence of runtime readiness. Enablement waits for the paired scenarios and
+The redesign is gated by `FeatureFlag.WATCH_EXPERIENCE_V2`, default OFF in ordinary builds. A
+deliberately dispatched Play internal build defaults it ON on both phone and watch for dogfood;
+an explicit Labs choice still wins. Protocol negotiation also requires the peer's version and
+advertised feature; an incompatible or older peer retains the legacy path. Internal enablement
+is not evidence of runtime readiness. General release waits for the paired scenarios and
 user-operated hardware pass in the [dogfood checklist](../../docs/testing/wear-dogfood-checklist.md).
 The full design is [Wear OS and Phone Companion Redesign](../../docs/superpowers/specs/2026-10-02-wear-companion-experience-design.md).
 

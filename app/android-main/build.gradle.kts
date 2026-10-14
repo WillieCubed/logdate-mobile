@@ -207,6 +207,12 @@ extensions.configure<ApplicationExtension> {
     }
     defaultConfig {
         applicationId = baseApplicationId
+        manifestPlaceholders["watchExperienceDefault"] =
+            providers
+                .gradleProperty("logdate.watchExperienceDefault")
+                .map(String::toBooleanStrict)
+                .getOrElse(false)
+                .toString()
         // Maps and Places use a dedicated Android-restricted credential. Never fall back to the
         // general Firebase API key generated from google-services.json.
         resValue("string", "google_maps_api_key", resolvedGoogleMapsApiKey)

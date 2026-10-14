@@ -99,6 +99,7 @@ jobs:
         run: >
           ./gradlew :app:android-main:publishReleaseBundle
           -Plogdate.backendUrl=https://cloud.logdate.app
+          -Plogdate.watchExperienceDefault=true
           --release-name "${{ steps.version.outputs.internal_release_name }}"
         env:
           LOGDATE_PLAY_TRACK: ${{ env.PLAY_TRACK }}
@@ -109,6 +110,7 @@ jobs:
         run: >
           ./gradlew :app:wear:publishReleaseBundle
           -Plogdate.backendUrl=https://cloud.logdate.app
+          -Plogdate.watchExperienceDefault=true
           --release-name "${{ steps.version.outputs.internal_release_name }}"
         env:
           LOGDATE_PLAY_TRACK: ${{ env.PLAY_TRACK }}

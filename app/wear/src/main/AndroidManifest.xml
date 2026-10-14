@@ -54,6 +54,10 @@
         android:theme="@android:style/Theme.DeviceDefault"
         android:name=".LogDateWearApplication">
 
+        <meta-data
+            android:name="app.logdate.watchExperienceDefault"
+            android:value="${watchExperienceDefault}" />
+
         <!--
             Remove auto-initializers merged from transitive dependencies.
             Google Maps and Emoji2 are not used on Wear OS

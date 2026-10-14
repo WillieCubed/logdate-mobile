@@ -34,6 +34,10 @@
         android:theme="@style/Theme.LogDate"
         tools:targetApi="34">
 
+        <meta-data
+            android:name="app.logdate.watchExperienceDefault"
+            android:value="${watchExperienceDefault}" />
+
         <!-- Maps SDK 20 can load a legacy renderer on older Google Play services. -->
         <uses-library
             android:name="org.apache.http.legacy"

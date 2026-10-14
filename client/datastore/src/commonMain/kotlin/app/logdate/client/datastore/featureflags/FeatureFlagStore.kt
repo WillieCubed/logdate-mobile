@@ -32,9 +32,8 @@ interface FeatureFlagStore {
     /**
      * Turns [flag] on or off for this installation.
      *
-     * Setting a flag to its [FeatureFlag.defaultEnabled] clears the stored value instead of writing
-     * it, so the flag follows its default again. A stored value is read before the default, so one
-     * written for the current default would keep deciding the flag after the default changes.
+     * Setting a flag to its effective default clears the stored value instead of writing it, so
+     * the flag follows the build's default again. A stored value is read before that default.
      */
     suspend fun setEnabled(
         flag: FeatureFlag,
@@ -47,10 +46,11 @@ interface FeatureFlagStore {
  */
 class DataStoreFeatureFlagStore(
     private val userPreferences: DataStore<Preferences>,
+    private val defaultOverrides: Map<FeatureFlag, Boolean> = emptyMap(),
 ) : FeatureFlagStore {
     override fun observe(flag: FeatureFlag): Flow<Boolean> =
         userPreferences.data.map { preferences ->
-            flag.availableForLaunch && (preferences[booleanPreferencesKey(flag.key)] ?: flag.defaultEnabled)
+            flag.availableForLaunch && (preferences[booleanPreferencesKey(flag.key)] ?: effectiveDefault(flag))
         }
 
     override suspend fun setEnabled(
@@ -60,7 +60,7 @@ class DataStoreFeatureFlagStore(
         val key = booleanPreferencesKey(flag.key)
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
-                if (enabled == flag.defaultEnabled) {
+                if (enabled == effectiveDefault(flag)) {
                     remove(key)
                 } else {
                     this[key] = enabled
@@ -68,4 +68,6 @@ class DataStoreFeatureFlagStore(
             }
         }
     }
+
+    private fun effectiveDefault(flag: FeatureFlag): Boolean = defaultOverrides[flag] ?: flag.defaultEnabled
 }
