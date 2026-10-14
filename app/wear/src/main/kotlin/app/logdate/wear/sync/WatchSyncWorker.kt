@@ -7,6 +7,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.logdate.client.sync.SyncManager
+import app.logdate.wear.launch.awaitWearStartup
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -32,6 +33,7 @@ class WatchSyncWorker(
     private val scheduler: WatchSyncScheduler by inject()
 
     override suspend fun doWork(): Result {
+        if (!applicationContext.awaitWearStartup()) return Result.retry()
         val result =
             try {
                 withContext(NonCancellable) { syncManager.fullSync() }

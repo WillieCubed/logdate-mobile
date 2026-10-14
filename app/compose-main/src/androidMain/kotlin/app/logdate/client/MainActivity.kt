@@ -35,6 +35,7 @@ import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.launch.LaunchBootstrapState
 import app.logdate.client.launch.LaunchStage
 import app.logdate.client.launch.LaunchStageTracker
+import app.logdate.client.launch.whenApplicationReady
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.repository.profile.ProfileRepository
@@ -109,6 +110,8 @@ class MainActivity : FragmentActivity() {
 
     private val viewModel by viewModel<AppViewModel>()
 
+    private var bootstrapReady = false
+    private var startupPendingIntent: Intent? = null
     private var appUiState by mutableStateOf<GlobalAppUiState>(GlobalAppUiLoadingState)
     private var pendingNavKey by mutableStateOf<NavKey?>(null)
     private var currentNavKey by mutableStateOf<NavKey?>(null)
@@ -152,6 +155,23 @@ class MainActivity : FragmentActivity() {
         markLaunchStage(LaunchStage.ActivityCreated)
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        startLaunchWatchdog()
+        splashScreen.setKeepOnScreenCondition {
+            launchTracker.bootstrapState is LaunchBootstrapState.BlockingSplash
+        }
+        whenApplicationReady {
+            bootstrapReady = true
+            completeStartup(savedInstanceState)
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) resumeReadyActivity()
+            startupPendingIntent?.let { pending ->
+                startupPendingIntent = null
+                onNewIntent(pending)
+            }
+        }
+    }
+
+    private fun completeStartup(savedInstanceState: Bundle?) {
         // Enqueue only network-constrained work. CloudBackupWorker checks SessionStorage and
         // exits without touching the network when the user is signed out or offline.
         cloudBackupScheduler.schedulePeriodicBackup()
@@ -166,13 +186,7 @@ class MainActivity : FragmentActivity() {
         setupMultiWindowSupport()
         Napier.i("MainActivity onCreate: multi-window support configured", tag = APP_LAUNCH_TAG)
 
-        startLaunchWatchdog()
         observeAppAndDatabaseState()
-        splashScreen.setKeepOnScreenCondition {
-            launchTracker.bootstrapState is LaunchBootstrapState.BlockingSplash
-        }
-
-        enableEdgeToEdge()
         enableHandoffIfSupported()
         // A recreated activity receives the launch intent again; resolving it a second time
         // would overwrite the Navigation 3 back stack restored across rotation.
@@ -294,6 +308,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (!bootstrapReady) {
+            startupPendingIntent = intent
+            return
+        }
         if (handleMultiWindowIntent(intent)) {
             return
         }
@@ -321,6 +339,10 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (bootstrapReady) resumeReadyActivity()
+    }
+
+    private fun resumeReadyActivity() {
         locationTrackingManager.onActivityResumed()
         activityProvider.currentActivity = this
         lifecycleScope.launch {
@@ -330,6 +352,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onPause() {
         super.onPause()
+        if (!bootstrapReady) return
         locationTrackingManager.onActivityPaused()
         if (!isChangingConfigurations) {
             viewModel.onAppBackgrounded()

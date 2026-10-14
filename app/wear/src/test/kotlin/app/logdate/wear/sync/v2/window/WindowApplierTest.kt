@@ -14,6 +14,26 @@ import kotlin.time.Instant
 class WindowApplierTest {
     private val f = WindowFixture()
 
+    @Test fun `verified phone selection reasons survive projection and removal`() =
+        runTest {
+            val reasons = setOf(app.logdate.client.sync.datalayer.v2.WindowReason.REWIND)
+            assertEquals(WindowApplied(1, 0), f.applier.reconcile(f.peer, f.response(), listOf(f.item(reasons = reasons))))
+            assertEquals(
+                reasons,
+                f.members
+                    .read(f.peer)
+                    .entries[f.note.uid.toString()]
+                    ?.reasons,
+            )
+            assertTrue(f.applier.onTombstone(f.tombstone()))
+            assertTrue(
+                f.members
+                    .read(f.peer)
+                    .entries
+                    .isEmpty(),
+            )
+        }
+
     @Test fun `initial verified snapshot creates and tracks an absent phone note`() =
         runTest {
             assertEquals(WindowApplied(1, 0), f.seed())

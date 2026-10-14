@@ -9,6 +9,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.MainActivity
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSettingsRepository
 import app.logdate.client.testing.launch.ActivityLaunchTestOverrides
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -32,6 +35,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import org.koin.core.module.Module
 import org.koin.dsl.module
+import org.koin.java.KoinJavaComponent
 import kotlin.test.assertEquals
 
 /**
@@ -67,6 +71,31 @@ class WatchPairingSettingsE2ETest {
     fun resetFakes() {
         fakeConnectionManager.reset()
         fakeSettingsRepository.reset()
+    }
+
+    @Test(timeout = 60_000)
+    fun `companion page navigates real tile and microphone details with request failure`() {
+        val flags = KoinJavaComponent.getKoin().get<FeatureFlagStore>()
+        val oldFlag = runBlocking { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) }
+        try {
+            runBlocking { flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, true) }
+            fakeConnectionManager.updateState(WatchConnectionState.Connected(watchName = "Pixel Watch"))
+            composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Tiles & complications"))
+            composeRule.onNodeWithText("Tiles & complications").performClick()
+            composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Watch face shortcuts"))
+            composeRule.onNodeWithText("Watch face shortcuts").assertIsDisplayed()
+            composeRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Microphone"))
+            composeRule.onNodeWithText("Microphone").performClick()
+            fakeConnectionManager.openResult = WatchRequestResult.Failed(WatchRequestFailure.WATCH_DID_NOT_RESPOND)
+            composeRule.onNodeWithText("Open on watch").performClick()
+            composeRule
+                .onNodeWithText("Your watch didn't respond. Unlock it, move it close to your phone, and try again.")
+                .assertIsDisplayed()
+            assertEquals(1, fakeConnectionManager.openCalls)
+        } finally {
+            runBlocking { flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, oldFlag) }
+        }
     }
 
     @Test

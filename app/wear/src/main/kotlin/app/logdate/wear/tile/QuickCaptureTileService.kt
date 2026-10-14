@@ -21,6 +21,7 @@ import androidx.wear.tiles.tooling.preview.TilePreviewData
 import androidx.wear.tooling.preview.devices.WearDevices
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
+import app.logdate.wear.launch.isWearStartupReady
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.tiles.SuspendingTileService
 import kotlinx.coroutines.flow.first
@@ -50,6 +51,7 @@ class QuickCaptureTileService : SuspendingTileService() {
             .build()
 
     override suspend fun tileRequest(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
+        if (!isWearStartupReady()) return quickCaptureTile(requestParams, this, null)
         val entryCount = fetchTodayEntryCount()
         return quickCaptureTile(requestParams, this, entryCount)
     }
@@ -74,7 +76,7 @@ class QuickCaptureTileService : SuspendingTileService() {
 internal fun quickCaptureTile(
     requestParams: RequestBuilders.TileRequest,
     context: Context,
-    entryCount: Int,
+    entryCount: Int?,
 ): TileBuilders.Tile {
     val timeline =
         TimelineBuilders.Timeline
@@ -101,14 +103,11 @@ internal fun quickCaptureTile(
 private fun quickCaptureLayout(
     requestParams: RequestBuilders.TileRequest,
     context: Context,
-    entryCount: Int,
+    entryCount: Int?,
 ): LayoutElementBuilders.LayoutElement {
     val entryLabel =
-        context.resources.getQuantityString(
-            R.plurals.wear_tile_entry_count,
-            entryCount,
-            entryCount,
-        )
+        entryCount?.let { context.resources.getQuantityString(R.plurals.wear_tile_entry_count, it, it) }
+            ?: context.getString(R.string.wear_startup_opening)
 
     return PrimaryLayout
         .Builder(requestParams.deviceConfiguration)

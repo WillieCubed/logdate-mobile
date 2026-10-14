@@ -108,6 +108,18 @@ class FakeAudioNoteDao : AudioNoteDao {
         updateFlow()
     }
 
+    override suspend fun updateDurationIfUnknown(
+        noteId: Uuid,
+        contentUri: String,
+        durationMs: Long,
+    ): Int {
+        val existing = notes[noteId] ?: return 0
+        if (existing.contentUri != contentUri || existing.durationMs > 0 || existing.deletedAt != null || durationMs <= 0) return 0
+        notes[noteId] = existing.copy(durationMs = durationMs)
+        updateFlow()
+        return 1
+    }
+
     override suspend fun updateContentUriIfUnchanged(
         noteId: Uuid,
         previous: String,

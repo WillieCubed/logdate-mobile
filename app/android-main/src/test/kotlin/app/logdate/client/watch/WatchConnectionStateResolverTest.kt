@@ -42,7 +42,7 @@ class WatchConnectionStateResolverTest {
             )
 
         assertEquals(
-            WatchConnectionState.Connected(watchName = "Pixel Watch"),
+            WatchConnectionState.Connected(watchName = "Pixel Watch", nodeId = "watch-1"),
             state,
         )
     }
@@ -66,7 +66,7 @@ class WatchConnectionStateResolverTest {
             )
 
         assertEquals(
-            WatchConnectionState.NeedsAssociation("Galaxy Watch"),
+            WatchConnectionState.NeedsAssociation("Galaxy Watch", nodeId = "watch-1"),
             state,
         )
     }
@@ -105,9 +105,33 @@ class WatchConnectionStateResolverTest {
             )
 
         assertEquals(
-            WatchConnectionState.AppNotInstalled("Pixel Watch"),
+            WatchConnectionState.AppNotInstalled("Pixel Watch", nodeId = "watch-1"),
             state,
         )
+    }
+
+    @Test
+    fun `reachable cloud watch keeps its identity with multiple watches`() {
+        val first = WatchNodeSnapshot("watch-a", "Watch A", false)
+        val second = WatchNodeSnapshot("watch-b", "Watch B", true)
+        val state =
+            resolveWatchConnectionState(
+                WatchAssociationSnapshot.Associated(),
+                WatchTransportSnapshot(listOf(first, second), listOf(first, second)),
+            )
+        assertEquals(WatchConnectionState.Connected("Watch A", "watch-a"), state)
+    }
+
+    @Test
+    fun `verified watch reachable through cloud is connected`() {
+        val cloudWatch = WatchNodeSnapshot("watch-cloud", "Pixel Watch", false)
+        val state =
+            resolveWearAppConnection(
+                WatchTransportSnapshot(listOf(cloudWatch), listOf(cloudWatch)),
+                verifiedNodes = setOf(cloudWatch.id),
+            )
+
+        assertEquals(WatchConnectionState.Connected("Pixel Watch", "watch-cloud"), state)
     }
 
     @Test

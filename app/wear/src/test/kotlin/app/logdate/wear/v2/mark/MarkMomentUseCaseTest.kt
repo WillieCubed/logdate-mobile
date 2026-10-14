@@ -32,6 +32,19 @@ class MarkMomentUseCaseTest {
     private var bpm: Int? = null
 
     @Test
+    fun `deferred cold mark preserves its click time zone and stable identity`() =
+        runTest {
+            val clickedAt = clock.start - 30.seconds
+            val id = kotlin.uuid.Uuid.random()
+            val mark = useCase().mark(clickedAt, "America/Los_Angeles", id)
+            assertEquals(clickedAt, mark.capturedAt)
+            assertEquals("America/Los_Angeles", mark.timeZoneId)
+            assertEquals(id, mark.id)
+            useCase().mark(clickedAt, "America/Los_Angeles", id)
+            assertEquals(1, marks.rows.size)
+        }
+
+    @Test
     fun `a mark is saved at once with its time and zone and this watch`() =
         runTest {
             val mark = useCase().mark()

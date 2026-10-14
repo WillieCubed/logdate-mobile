@@ -85,6 +85,7 @@ data class WatchState(
     val features: Set<String> = emptySet(),
     val linkProblem: String? = null,
     val linkId: String? = null,
+    val sessionId: String? = null,
 )
 
 /**

@@ -1,5 +1,6 @@
 package app.logdate.ui.timeline
 
+import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import kotlinx.datetime.LocalDate
@@ -36,6 +37,7 @@ fun createSemanticTimelineDayUiState(
     isBirthday: Boolean = false,
     isLoadingSummary: Boolean = false,
     isLoadingPeople: Boolean = false,
+    pendingMarks: List<MarkedMoment> = emptyList(),
 ): TimelineDayUiState {
     val sortedNotes = notes.sortedByDescending { note -> note.timestamp() }
     val visuals = sortedNotes.visualNotes()
@@ -48,9 +50,10 @@ fun createSemanticTimelineDayUiState(
         }
 
     val resolvedMoments =
-        moments.ifEmpty {
-            listOfNotNull(synthesizeMoment(date, sortedNotes, placesVisited))
-        }
+        integratePendingMoments(
+            moments.ifEmpty { listOfNotNull(synthesizeMoment(date, sortedNotes, placesVisited)) },
+            pendingMarks,
+        )
 
     val dayPresentation =
         when {
@@ -108,6 +111,7 @@ private fun synthesizeMoment(
 
     return MomentUiState(
         id = "synthesized-$date",
+        capturedAt = sortedNotes.minOfOrNull { it.timestamp() },
         label = "",
         textSnippet =
             sortedNotes

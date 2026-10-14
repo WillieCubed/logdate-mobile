@@ -25,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -78,11 +79,18 @@ fun WorkspaceScaffold(
         val navigation = workspaceNavigationMode(maxWidth, posture)
         val rail = navigation != WorkspaceNavigationMode.Bottom
         val largeText = LocalDensity.current.fontScale >= 1.5f
+        val headerCreate = !rail && (largeText || maxWidth <= 440.dp)
         val canvas = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas)
         // In a desktop window the app bar moves into the window's caption bar, between the system's
         // own controls, unless the text is too large to fit its height.
         val captionBar = if (onSearch != null) LocalWorkspaceCaptionBar.current ?: rememberPlatformCaptionBar(canvas) else null
         val appBarInCaption = captionBar?.takeIf { it.height >= MIN_CAPTION_APP_BAR_HEIGHT && !largeText }
+        val headerActions: @Composable RowScope.() -> Unit = {
+            if (headerCreate) {
+                onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition, compact = true) }
+            }
+            actions()
+        }
         Scaffold(
             containerColor = canvas,
             contentWindowInsets =
@@ -107,13 +115,13 @@ fun WorkspaceScaffold(
                 }
             },
             floatingActionButton = {
-                if (!rail && onCreate != null) WorkspaceCreateAction(onCreate, createLabel, createEntryTransition)
+                if (!rail && !headerCreate && onCreate != null) WorkspaceCreateAction(onCreate, createLabel, createEntryTransition)
             },
         ) { insets ->
             WorkspaceSearchHost {
                 Column(Modifier.fillMaxSize().padding(insets)) {
                     if (appBarInCaption != null && onSearch != null) {
-                        WorkspaceCaptionAppBar(selected.title, appBarInCaption, onSearch, actions)
+                        WorkspaceCaptionAppBar(selected.title, appBarInCaption, onSearch, headerActions)
                     }
                     Row(Modifier.fillMaxWidth().weight(1f)) {
                         if (navigation == WorkspaceNavigationMode.Sidebar) {
@@ -164,9 +172,9 @@ fun WorkspaceScaffold(
                         Column(Modifier.weight(1f).fillMaxHeight()) {
                             if (appBarInCaption == null) {
                                 if (onSearch != null) {
-                                    WorkspaceAppBar(selected.title, onSearch, actions = actions)
+                                    WorkspaceAppBar(selected.title, onSearch, actions = headerActions)
                                 } else {
-                                    PanelHeader(selected.title, role = PanelHeaderRole.Destination, actions = actions)
+                                    PanelHeader(selected.title, role = PanelHeaderRole.Destination, actions = headerActions)
                                 }
                             }
                             status()
@@ -191,6 +199,7 @@ private fun WorkspaceCreateAction(
     onClick: () -> Unit,
     label: String,
     createEntryTransition: Boolean,
+    compact: Boolean = false,
 ) {
     val sharedScope = LocalSharedTransitionScope.current
     val visibilityScope = LocalNavAnimatedVisibilityScope.current
@@ -207,12 +216,18 @@ private fun WorkspaceCreateAction(
         } else {
             Modifier
         }
-    FloatingActionButton(
-        onClick,
-        modifier = transitionModifier,
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    ) {
-        Icon(PlatformIcons.newEntry(), label)
+    if (compact) {
+        IconButton(onClick = onClick, modifier = transitionModifier) {
+            Icon(PlatformIcons.newEntry(), label, tint = MaterialTheme.colorScheme.primary)
+        }
+    } else {
+        FloatingActionButton(
+            onClick,
+            modifier = transitionModifier,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Icon(PlatformIcons.newEntry(), label)
+        }
     }
 }

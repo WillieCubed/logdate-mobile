@@ -19,6 +19,7 @@ data class EngineStatus(
     val durationMs: Long,
     val suppressedForUnsuitableOutput: Boolean,
     val playWhenReady: Boolean = true,
+    val isPlaying: Boolean = false,
 ) {
     companion object {
         val Idle =
@@ -95,4 +96,5 @@ internal fun AudioPlaybackStatus.toEngineStatus(): EngineStatus =
         durationMs = duration.inWholeMilliseconds,
         suppressedForUnsuitableOutput = isSuppressedForUnsuitableOutput,
         playWhenReady = playWhenReady,
+        isPlaying = isPlaying,
     )

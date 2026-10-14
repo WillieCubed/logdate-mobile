@@ -56,6 +56,14 @@ class WearLaunchRequestTest {
     }
 
     @Test
+    fun `playback handoff link opens the exact moment`() {
+        val id = Uuid.random()
+        assertEquals(WearLaunchRequest.Moment(id), WearLaunchRequest.parseLink("studio.hypertext.logdate://watch/moment/$id"))
+        assertNull(WearLaunchRequest.parseLink("studio.hypertext.logdate://watch/moment/not-an-id"))
+        assertNull(WearLaunchRequest.parseLink("studio.hypertext.logdate://watch/moment/$id/extra"))
+    }
+
+    @Test
     fun `any other link is no request`() {
         assertNull(WearLaunchRequest.parseLink(null))
         assertNull(WearLaunchRequest.parseLink("studio.hypertext.logdate://watch/other"))

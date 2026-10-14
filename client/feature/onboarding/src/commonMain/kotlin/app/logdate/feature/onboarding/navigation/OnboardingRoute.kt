@@ -2,10 +2,6 @@
 
 package app.logdate.feature.onboarding.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -13,9 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.EntryProviderScope
-import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
@@ -37,6 +31,7 @@ import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
 import app.logdate.feature.onboarding.ui.OnboardingRecommendationsScreen
 import app.logdate.feature.onboarding.ui.OnboardingStartScreen
 import app.logdate.feature.onboarding.ui.OnboardingViewModel
+import app.logdate.feature.onboarding.ui.OnboardingWatchStep
 import app.logdate.feature.onboarding.ui.PersonalIntroScreen
 import app.logdate.feature.onboarding.ui.RecoveryPhraseEntryScreen
 import app.logdate.feature.onboarding.ui.RecoveryPhraseSetupScreen
@@ -45,72 +40,8 @@ import app.logdate.feature.onboarding.ui.WelcomeBackScreen
 import app.logdate.ui.navigation.taggedEntry
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
 import app.logdate.feature.core.account.OnboardingStep as CloudAccountEntryStep
-
-sealed interface OnboardingBaseRoute : NavKey
-
-/** Marker route that resolves to [OnboardingStart] when entered. */
-@Serializable
-data object OnboardingRoute : OnboardingBaseRoute
-
-@Serializable
-data object OnboardingStart : OnboardingBaseRoute
-
-@Serializable
-data object PersonalIntro : OnboardingBaseRoute
-
-@Serializable
-data object AppOverview : OnboardingBaseRoute
-
-@Serializable
-data object MemoryImport : OnboardingBaseRoute
-
-@Serializable
-data object MemorySelection : OnboardingBaseRoute
-
-@Serializable
-data object AccountCreation : OnboardingBaseRoute
-
-@Serializable
-data object SignIn : OnboardingBaseRoute
-
-@Serializable
-data object RecoveryPhrase : OnboardingBaseRoute
-
-@Serializable
-data object BirthdayIntro : OnboardingBaseRoute
-
-@Serializable
-data object FeatureRecommendations : OnboardingBaseRoute
-
-@Serializable
-data object FeatureDayBoundaries : OnboardingBaseRoute
-
-@Serializable
-data object FeatureLocationTimeline : OnboardingBaseRoute
-
-@Serializable
-data object FeatureNotifications : OnboardingBaseRoute
-
-@Serializable
-data object OnboardingComplete : OnboardingBaseRoute
-
-@Serializable
-data object FirstEntryImportOffer : OnboardingBaseRoute
-
-@Serializable
-data object FirstEntryMemorySelection : OnboardingBaseRoute
-
-@Serializable
-data object WelcomeBack : OnboardingBaseRoute
-
-/** Pushes the onboarding flow onto the back stack, starting from [OnboardingStart]. */
-fun NavBackStack<NavKey>.startOnboarding() {
-    clear()
-    add(OnboardingStart)
-}
 
 /**
  * Registers every onboarding entry. Internal step-to-step navigation is computed by this
@@ -490,6 +421,15 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
             },
         )
     }
+    taggedEntry<FeatureWatch> {
+        val flowViewModel = koinViewModel<OnboardingViewModel>()
+        val entryMode by flowViewModel.activeEntryMode.collectAsState()
+        OnboardingWatchStep(
+            onBack = onNavigateBack,
+            onNext = { onGoToItem(routeForStep(terminalStepFor(entryMode))) },
+            viewModel = flowViewModel,
+        )
+    }
     taggedEntry<SignIn> {
         val cloudAccountViewModel = koinViewModel<CloudAccountOnboardingViewModel>()
 
@@ -521,62 +461,5 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
                 onRequirementsIncomplete = { step -> onGoToItem(routeForStep(step)) },
             )
         }
-    }
-}
-
-@Composable
-private fun FirstEntryMemorySelectionEntry(
-    onBack: () -> Unit,
-    onComplete: () -> Unit,
-) {
-    val viewModel = koinViewModel<MemorySelectionViewModel>()
-    val coroutineScope = rememberCoroutineScope()
-    MemorySelectionScreen(
-        uiState = viewModel.uiState.collectAsState().value,
-        onBack = onBack,
-        onContinue = {
-            coroutineScope.launch {
-                viewModel.processSelectedMemories().onSuccess { onComplete() }
-            }
-        },
-        onToggleMemorySelection = viewModel::toggleMemorySelection,
-        onLoadMoreMemories = viewModel::loadMoreMemories,
-        onRefreshMemories = viewModel::refreshMemories,
-    )
-}
-
-private fun routeForStep(step: OnboardingStep): OnboardingBaseRoute =
-    when (step) {
-        OnboardingStep.PERSONAL_INTRO -> PersonalIntro
-        OnboardingStep.APP_OVERVIEW -> AppOverview
-        OnboardingStep.MEMORY_IMPORT -> MemoryImport
-        OnboardingStep.MEMORY_SELECTION -> MemorySelection
-        OnboardingStep.ACCOUNT -> AccountCreation
-        OnboardingStep.RECOVERY_PHRASE -> RecoveryPhrase
-        OnboardingStep.BIRTHDAY -> BirthdayIntro
-        OnboardingStep.RECOMMENDATIONS -> FeatureRecommendations
-        OnboardingStep.DAY_BOUNDARIES -> FeatureDayBoundaries
-        OnboardingStep.LOCATION -> FeatureLocationTimeline
-        OnboardingStep.NOTIFICATIONS -> FeatureNotifications
-        OnboardingStep.COMPLETE -> OnboardingComplete
-        OnboardingStep.WELCOME_BACK -> WelcomeBack
-    }
-
-private fun terminalStepFor(entryMode: OnboardingEntryMode): OnboardingStep =
-    when (entryMode) {
-        OnboardingEntryMode.FRESH -> OnboardingStep.COMPLETE
-        OnboardingEntryMode.CONTINUE_SETUP -> OnboardingStep.WELCOME_BACK
-    }
-
-/**
- * Applies window insets to onboarding screens that lay themselves out edge to edge.
- *
- * Most screens here sit inside a Scaffold that handles this; these four do not, so their
- * headings drew underneath the status bar and their actions under the navigation bar.
- */
-@Composable
-private fun OnboardingInsets(content: @Composable () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
-        content()
     }
 }

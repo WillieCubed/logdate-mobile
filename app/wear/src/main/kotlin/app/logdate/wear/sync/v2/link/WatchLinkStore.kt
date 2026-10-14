@@ -34,6 +34,7 @@ data class WatchLinkRecord(
     val installing: Boolean = false,
     val serverOrigin: String? = null,
     val linkId: String? = null,
+    val sessionId: String? = null,
 )
 
 /** What the watch publishes about its link in its state document. */
@@ -52,6 +53,7 @@ class WatchLinkStore(
     private val storage: KeyValueStorage,
     private val pairKeys: PairKeyVault,
     private val clock: Clock = Clock.System,
+    private val onLinked: suspend () -> Unit = {},
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -108,6 +110,7 @@ class WatchLinkStore(
         accountId: String,
         serverOrigin: String? = null,
         linkId: String? = null,
+        sessionId: String? = null,
     ) {
         write(
             WatchLinkRecord(
@@ -117,6 +120,7 @@ class WatchLinkStore(
                 accountId = accountId,
                 serverOrigin = serverOrigin,
                 linkId = linkId,
+                sessionId = sessionId,
             ),
         )
     }
@@ -144,6 +148,7 @@ class WatchLinkStore(
 
     private suspend fun write(record: WatchLinkRecord) {
         storage.putString(KEY, json.encodeToString(WatchLinkRecord.serializer(), record))
+        if (!record.stale && record.problem == null) onLinked()
     }
 
     private fun decode(text: String?): WatchLinkRecord? {

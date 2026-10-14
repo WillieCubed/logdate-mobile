@@ -3,11 +3,8 @@ package app.logdate.wear.v2.surfaces
 import android.content.Context
 import androidx.wear.protolayout.LayoutElementBuilders
 import androidx.wear.protolayout.material3.MaterialScope
-import androidx.wear.protolayout.material3.primaryLayout
-import androidx.wear.protolayout.material3.text
-import androidx.wear.protolayout.material3.titleCard
 import androidx.wear.protolayout.modifiers.clickable
-import androidx.wear.protolayout.types.layoutString
+import app.logdate.ui.watch.logDateOnThisDayTileLayout
 import app.logdate.wear.R
 import app.logdate.wear.tile.latestEntryPreview
 import app.logdate.wear.v2.memories.OnThisDay
@@ -21,9 +18,6 @@ object OnThisDayTileIds {
     const val MOMENT = "on_this_day_moment"
     const val OPEN = "open_home"
 }
-
-private const val EMPTY_MAX_LINES = 3
-private const val PREVIEW_MAX_LINES = 2
 
 /** The line On this day shows: the recalled day's summary, or its first moment when the summary is blank. */
 internal fun onThisDayPreview(
@@ -47,23 +41,15 @@ internal suspend fun findOnThisDay(): OnThisDay? =
 
 /** The On this day tile: how long ago and the day's first moment, which it opens; or a line saying there is none. */
 fun MaterialScope.onThisDayTileLayout(day: OnThisDay?): LayoutElementBuilders.LayoutElement {
-    val label = context.getString(R.string.wear_memory_on_this_day)
-    if (day == null) {
-        return primaryLayout(
-            titleSlot = { text(label.layoutString) },
-            mainSlot = { text(context.getString(R.string.wear_surface_on_this_day_empty).layoutString, maxLines = EMPTY_MAX_LINES) },
-            onClick = clickable(SurfaceLaunchActions.home(context), OnThisDayTileIds.OPEN),
+    val presentation =
+        app.logdate.ui.watch.OnThisDayTilePresentation(
+            title = context.getString(R.string.wear_memory_on_this_day),
+            yearsAgo = day?.let { context.resources.getQuantityString(R.plurals.wear_memory_years_ago, it.yearsAgo, it.yearsAgo) },
+            summary = day?.let { onThisDayPreview(context, it) } ?: context.getString(R.string.wear_surface_on_this_day_empty),
         )
-    }
-    val yearsAgo = context.resources.getQuantityString(R.plurals.wear_memory_years_ago, day.yearsAgo, day.yearsAgo)
-    return primaryLayout(
-        titleSlot = { text(label.layoutString) },
-        mainSlot = {
-            titleCard(
-                onClick = clickable(SurfaceLaunchActions.moment(context, day.leadMoment.uid), OnThisDayTileIds.MOMENT),
-                title = { text(yearsAgo.layoutString) },
-                content = { text(onThisDayPreview(context, day).layoutString, maxLines = PREVIEW_MAX_LINES) },
-            )
-        },
+    return logDateOnThisDayTileLayout(
+        presentation,
+        day?.let { clickable(SurfaceLaunchActions.moment(context, it.leadMoment.uid), OnThisDayTileIds.MOMENT) }
+            ?: clickable(SurfaceLaunchActions.home(context), OnThisDayTileIds.OPEN),
     )
 }

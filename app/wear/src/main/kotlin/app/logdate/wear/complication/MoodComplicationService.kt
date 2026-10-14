@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Intent
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
+import androidx.wear.watchface.complications.data.NoDataComplicationData
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
@@ -13,6 +14,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
 import app.logdate.wear.capture.Feeling
 import app.logdate.wear.capture.MomentNoteCodec
+import app.logdate.wear.launch.isWearStartupReady
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
@@ -42,6 +44,7 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
     }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
+        if (!isWearStartupReady()) return NoDataComplicationData()
         val feeling = fetchTodayFeeling()
         val description =
             if (feeling != null) {

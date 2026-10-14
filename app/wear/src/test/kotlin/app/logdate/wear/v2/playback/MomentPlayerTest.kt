@@ -10,12 +10,14 @@ import app.logdate.wear.playback.NoRoomForAudioException
 import app.logdate.wear.playback.WearSyncedAudioResolver
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -117,6 +119,29 @@ class MomentPlayerTest {
 
             assertEquals(PlaybackState.Failed(note.uid, PlaybackFailure.NOT_ON_WATCH), player.state.value)
             assertTrue(engine.starts.isEmpty())
+        }
+
+    @Test
+    fun `resolver failure reports its stage and class without its private message`() =
+        runTest(UnconfinedTestDispatcher()) {
+            resolver.failure = java.io.IOException("private media reference")
+            val diagnostics = mutableListOf<Pair<PlaybackFailureStage, String>>()
+
+            player(diagnose = { stage, code -> diagnostics += stage to code }).playOrPause(note)
+
+            assertEquals(listOf(PlaybackFailureStage.RESOLUTION to "IOException"), diagnostics)
+            assertTrue(engine.starts.isEmpty())
+        }
+
+    @Test
+    fun `engine failure reports its own stage after successful resolution`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val diagnostics = mutableListOf<Pair<PlaybackFailureStage, String>>()
+            player(diagnose = { stage, code -> diagnostics += stage to code }).playOrPause(note)
+
+            engine.finish(failed = true)
+
+            assertEquals(listOf(PlaybackFailureStage.ENGINE to "PLAYBACK_FAILED"), diagnostics)
         }
 
     @Test
@@ -258,12 +283,48 @@ class MomentPlayerTest {
             assertEquals(PlaybackState.Preparing(other.uid), player.state.value)
         }
 
-    private fun TestScope.player(resolver: WearSyncedAudioResolver = this@MomentPlayerTest.resolver) =
-        MomentPlayer(
-            scope = backgroundScope,
-            engine = engine,
-            outputs = outputs,
-            resolver = resolver,
-            preferences = preferences,
-        )
+    @Test
+    fun `continuing playback starts at the requested position and waits for audible playback`() =
+        runTest {
+            val player = player()
+            val request = async { player.continuePlayback(note, 12_000, 1.5f) }
+            runCurrent()
+            assertEquals(
+                12_000L,
+                engine.starts
+                    .single()
+                    .second.startPositionMs,
+            )
+            assertEquals(
+                1.5f,
+                engine.starts
+                    .single()
+                    .second.speed,
+            )
+            assertFalse(request.isCompleted)
+            engine.mutableStatus.value = EngineStatus(note.uid, 12_000, 42_000, false, isPlaying = true)
+            runCurrent()
+            assertTrue(request.await())
+        }
+
+    @Test
+    fun `continuing playback which never starts fails and stops the pending player`() =
+        runTest {
+            val player = player()
+            assertFalse(player.continuePlayback(note, 12_000, 1f))
+            assertEquals(PlaybackState.Idle, player.state.value)
+            assertEquals(1, engine.stops)
+        }
+
+    private fun TestScope.player(
+        resolver: WearSyncedAudioResolver = this@MomentPlayerTest.resolver,
+        diagnose: (PlaybackFailureStage, String) -> Unit = { _, _ -> },
+    ) = MomentPlayer(
+        scope = backgroundScope,
+        engine = engine,
+        outputs = outputs,
+        resolver = resolver,
+        preferences = preferences,
+        diagnose = diagnose,
+    )
 }

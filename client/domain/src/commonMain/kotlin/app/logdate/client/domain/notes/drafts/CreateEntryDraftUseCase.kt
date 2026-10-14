@@ -25,14 +25,26 @@ class CreateEntryDraftUseCase(
         pendingMedia: List<PendingMediaRecord> = emptyList(),
         selectedJournalIds: List<Uuid> = emptyList(),
         visitContext: VisitMemoryContext? = null,
+        markId: String? = null,
     ): Uuid =
-        entryDraftRepository.createDraft(
-            uid = draftId,
-            notes = notes,
-            pendingMedia = pendingMedia,
-            selectedJournalIds = selectedJournalIds,
-            visitContext = visitContext,
-        )
+        if (markId == null) {
+            entryDraftRepository.createDraft(
+                uid = draftId,
+                notes = notes,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
+                visitContext = visitContext,
+            )
+        } else {
+            entryDraftRepository.createDraft(
+                uid = draftId,
+                notes = notes,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
+                visitContext = visitContext,
+                markId = markId,
+            )
+        }
 
     /**
      * Creates a new draft with content from a single journal note.

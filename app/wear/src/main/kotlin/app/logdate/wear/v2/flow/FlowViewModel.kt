@@ -23,7 +23,7 @@ sealed interface FlowUiState {
 
     /**
      * The voice and text moments of the last [LibraryWindow.RECENT_DAYS] days, newest first, and how
-     * many more the rest of the library window has.
+     * many older retained moments are available through Earlier.
      */
     data class Ready(
         val timeZone: TimeZone,
@@ -44,12 +44,11 @@ class FlowViewModel(
         dayClock
             .observe()
             .flatMapLatest<TodayWindow, FlowUiState> { today ->
-                val windowStart = LibraryWindow.windowStart(today)
                 val recentStart = LibraryWindow.recentStart(today)
-                notesRepository.observeNotesInRange(windowStart, today.end).map { notes ->
+                notesRepository.allNotesObserved.map { notes ->
                     val library =
                         notes
-                            .filter { it.creationTimestamp >= windowStart && it.creationTimestamp < today.end }
+                            .filter { it.creationTimestamp < today.end }
                             .filter(LibraryWindow::isLibraryMoment)
                     FlowUiState.Ready(
                         timeZone = today.timeZone,

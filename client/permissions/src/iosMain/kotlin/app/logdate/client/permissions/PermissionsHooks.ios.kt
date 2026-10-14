@@ -112,7 +112,7 @@ actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState 
 }
 
 @Composable
-actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
+actual fun rememberMediaLibraryPermissionState(includeVideos: Boolean): MediaLibraryPermissionState {
     var status by remember {
         mutableStateOf(mapPhotosStatus(PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite)))
     }
@@ -127,6 +127,7 @@ actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
         hasPermission = status == PermissionStatus.GRANTED,
         shouldShowRationale = status == PermissionStatus.PERMANENTLY_DENIED,
         permissionRequested = permissionRequested,
+        refreshRevision = refreshNonce,
         requestPermission = {
             PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelReadWrite) { rawStatus ->
                 status = mapPhotosStatus(rawStatus)

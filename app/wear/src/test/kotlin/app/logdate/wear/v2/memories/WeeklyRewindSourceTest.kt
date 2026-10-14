@@ -41,6 +41,28 @@ class WeeklyRewindSourceTest {
     }
 
     @Test
+    fun `verified window sources show a Rewind without copying the phone Rewind database`() =
+        runTest {
+            every { rewinds.getAllRewinds() } returns flowOf(emptyList())
+            every { notesRepository.allNotesObserved } returns flowOf(listOf(walk))
+            WeeklyRewindSource(rewinds, notesRepository, windowRewind = { setOf(walk.uid) }).observe(today).test {
+                assertEquals(walk, awaitItem()?.leadMoment)
+                awaitComplete()
+            }
+        }
+
+    @Test
+    fun `empty verified selection suppresses stale legacy Rewinds`() =
+        runTest {
+            every { rewinds.getAllRewinds() } returns flowOf(listOf(rewind("Old", LocalDate(2026, 10, 4), walk.uid)))
+            every { notesRepository.allNotesObserved } returns flowOf(listOf(walk))
+            WeeklyRewindSource(rewinds, notesRepository, windowRewind = { emptySet() }).observe(today).test {
+                assertNull(awaitItem())
+                awaitComplete()
+            }
+        }
+
+    @Test
     fun `an existing rewind subscription follows edits and deletes of its lead`() =
         runTest {
             val notes = MutableStateFlow<List<JournalNote>>(listOf(walk))

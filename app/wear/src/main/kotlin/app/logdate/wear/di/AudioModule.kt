@@ -100,6 +100,7 @@ val wearAudioModule =
                         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                             PackageManager.PERMISSION_GRANTED
                     },
+                canCapture = { !get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>().removed() },
             )
         }
         single<WearRecorder> { get<WearAudioRecordingManager>() }
@@ -109,6 +110,7 @@ val wearAudioModule =
                 notesRepository = get(),
                 durationResolver = get(),
                 remuxer = AdtsToM4aRemuxer,
+                captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
             )
         }
         single<RecordingHintStore> { SharedPreferencesRecordingHintStore(get()) }
@@ -169,6 +171,7 @@ val wearAudioModule =
                 get<JournalNotesRepository>(),
                 get<WearDataLayerClient>(),
                 get(),
+                captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
             )
         }
         viewModel {

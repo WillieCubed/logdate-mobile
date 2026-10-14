@@ -136,7 +136,10 @@ class WatchMomentIngestor(
             queued
         }
 
-    private suspend fun deleteMoment(id: Uuid, row: MarkedMomentEntity?): Boolean {
+    private suspend fun deleteMoment(
+        id: Uuid,
+        row: MarkedMomentEntity?,
+    ): Boolean {
         if (row != null) return moments.delete(id, clock.now())
         val now = clock.now()
         marks.upsert(

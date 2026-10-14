@@ -11,6 +11,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -27,13 +28,17 @@ class MarkMomentUseCase(
     private val clock: Clock = Clock.System,
     private val timeZoneId: () -> String = { TimeZone.currentSystemDefault().id },
 ) {
-    suspend fun mark(): MarkedMomentEntity {
-        val now = clock.now()
+    suspend fun mark(
+        capturedAt: Instant? = null,
+        capturedTimeZoneId: String? = null,
+        markId: Uuid? = null,
+    ): MarkedMomentEntity {
+        val now = capturedAt ?: clock.now()
         val mark =
             MarkedMomentEntity(
-                id = Uuid.random(),
+                id = markId ?: Uuid.random(),
                 capturedAt = now,
-                timeZoneId = timeZoneId(),
+                timeZoneId = capturedTimeZoneId ?: timeZoneId(),
                 state = MarkedMomentState.OPEN,
                 originDeviceId = deviceId(),
                 lastUpdated = now,

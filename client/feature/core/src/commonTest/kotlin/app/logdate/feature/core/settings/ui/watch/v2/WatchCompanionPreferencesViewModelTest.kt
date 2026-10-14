@@ -38,6 +38,21 @@ class WatchCompanionPreferencesViewModelTest {
     }
 
     @Test
+    fun `audio download choice persists through verified shared preference write`() =
+        runTest {
+            val repository = Preferences()
+            val model = WatchCompanionPreferencesViewModel(repository)
+            backgroundScope.launch { model.state.collect {} }
+            advanceUntilIdle()
+            val policy = app.logdate.client.domain.watch.WatchAudioDownloadPolicy.ON_DEMAND
+            model.set(SharedPreferenceKey.AudioDownloadPolicy, policy.stored)
+            advanceUntilIdle()
+            assertEquals(policy, model.state.value?.audioDownloads)
+            assertEquals(1, repository.verified)
+            assertFalse(model.saveFailed.value)
+        }
+
+    @Test
     fun `library and capture choices follow shared preferences including peer changes`() =
         runTest {
             val repository = Preferences()

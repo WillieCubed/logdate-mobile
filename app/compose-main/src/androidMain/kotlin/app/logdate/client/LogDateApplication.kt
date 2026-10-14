@@ -11,12 +11,15 @@ import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.bubble.RecordingBubbleNotifier
 import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
+import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
+import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.reminders.ReminderSignalObserver
 import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.feature.widgets.publishWidgetPreviews
 import app.logdate.client.image.DataSaverImageInterceptor
+import app.logdate.client.launch.ApplicationStartup
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.notifications.LiveUpdatesSwitch
@@ -33,6 +36,7 @@ import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.window.WatchWindowPublisher
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
+import app.logdate.client.watch.presence.WatchPresenceRegistration
 import app.logdate.di.initializeKoin
 import app.logdate.ui.media.addLocalMedia
 import coil3.ImageLoader
@@ -59,6 +63,20 @@ class LogdateApplication :
     Application(),
     KoinComponent,
     SingletonImageLoader.Factory {
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    internal val startup =
+        ApplicationStartup(startupScope) {
+            try {
+                get<LogDateDatabase>()
+                get<AndroidPlatformSearchIndexManager>()
+                startBackgroundWork()
+                Napier.i("Encrypted storage and startup observers ready", tag = APP_STARTUP_TAG)
+            } catch (error: Exception) {
+                Napier.e("Application storage initialization failed", error, tag = APP_STARTUP_TAG)
+                throw error
+            }
+        }
+
     override fun newImageLoader(context: Context): ImageLoader =
         ImageLoader
             .Builder(context)
@@ -101,7 +119,7 @@ class LogdateApplication :
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
-        startBackgroundWork()
+        startup.start()
     }
 
     /**
@@ -187,6 +205,7 @@ class LogdateApplication :
     private fun startPhoneStatePublishing() {
         runCatching {
             get<PhoneStatePublisher>().start(get())
+            get<WatchPresenceRegistration>().start(get())
         }.onFailure { error ->
             Napier.w("Failed to start publishing this phone's state to its watches", error)
         }

@@ -65,4 +65,26 @@
         <item quantity="one">It&apos;s been a day.</item>
         <item quantity="other">It&apos;s been %1$s days.</item>
     </plurals>
+    <string name="mark_context_label">%1$s · %2$s</string>
+    <string name="mark_watch_label">Marked on your watch</string>
+    <string name="mark_caption_prompt">What was happening?</string>
+    <string name="mark_story_prompt">What caught your attention?</string>
+    <string name="mark_story_hint">Add a note or photo to remember why you marked it.</string>
+    <string name="mark_add_note">Add a note</string>
+    <string name="mark_photo_access">Allow photos to see pictures from this moment</string>
+    <string name="mark_photo_limited">Choose more photos</string>
+    <string name="mark_photo_attach">Attach %1$s to marked moment</string>
+    <string name="mark_save_caption">Save caption</string>
+    <string name="mark_write_more">Write more</string>
+    <string name="mark_leave">Leave as is</string>
+    <string name="mark_delete">Delete mark</string>
+    <string name="mark_delete_title">Delete this mark?</string>
+    <string name="mark_delete_message">The marked moment will be removed from your devices. Your original photos stay in your library.</string>
+    <string name="mark_cancel">Cancel</string>
+    <string name="mark_changed">This mark has changed. Please try again.</string>
+    <string name="mark_save_failed">Could not save this change. Please try again.</string>
+    <string name="mark_attach">Attach</string>
+    <string name="mark_edit_caption">Edit caption</string>
+    <string name="mark_more_actions">Options</string>
+    <string name="mark_photo_suggestions">Photos from this moment</string>
 </resources>

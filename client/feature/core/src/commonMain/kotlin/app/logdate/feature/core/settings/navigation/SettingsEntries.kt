@@ -280,7 +280,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     taggedEntry<DevicesRoute>(metadata = settingsDetailMetadata(SettingsCategory.Devices, categories)) {
-        DevicesScreen(onBackClick = onBack)
+        DevicesScreen(onBackClick = onBack, onNavigateToWatch = onNavigateToWatch)
     }
     taggedEntry<RewindSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Rewind, categories)) {
         RewindSettingsScreen(onBack = onBack)

@@ -51,6 +51,7 @@ kotlin {
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.domain)
             implementation(projects.client.feature.core)
+            implementation(projects.client.feature.timeline)
             implementation(projects.client.feature.events)
             implementation(projects.client.feature.onboarding)
             implementation(projects.client.feature.rewind)

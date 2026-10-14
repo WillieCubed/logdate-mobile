@@ -37,7 +37,7 @@ object ArchiveTags {
     const val LIST = "archive_list"
 }
 
-/** Days 8 to 14 of the library window, a day at a time, each moment playable and openable. */
+/** Earlier moments, with saved favorites first and the remaining days in order. */
 @Composable
 fun ArchiveScreen(
     state: ArchiveUiState,
@@ -72,9 +72,25 @@ private fun TransformingLazyColumnScope.dayItems(
     onOpenMoment: ((JournalNote) -> Unit)?,
     onPlayPause: ((JournalNote.Audio) -> Unit)?,
 ) {
-    if (state.days.isEmpty()) {
+    if (state.days.isEmpty() && state.starredMoments.isEmpty()) {
         item { ArchiveMessage(stringResource(R.string.wear_archive_empty)) }
         return
+    }
+    if (state.starredMoments.isNotEmpty()) {
+        item(key = "starred-header") {
+            ListHeader(modifier = Modifier.transformedHeight(this, spec), transformation = SurfaceTransformation(spec)) {
+                Text(stringResource(R.string.wear_archive_starred), style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        items(state.starredMoments.size, key = { index -> state.starredMoments[index].uid.toString() }) { index ->
+            val note = state.starredMoments[index]
+            MomentRow(
+                note = note,
+                timeZone = state.timeZone,
+                onOpen = onOpenMoment?.let { open -> { open(note) } },
+                playback = rowPlayback(note, playback, onPlayPause),
+            )
+        }
     }
     state.days.forEach { day ->
         item(key = day.date.toString()) {

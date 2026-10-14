@@ -126,6 +126,17 @@ interface AudioNoteDao {
         contentUri: String,
     )
 
+    /** Fills metadata without changing content, capture/edit times, or a newer known duration. */
+    @Query(
+        "UPDATE audio_notes SET durationMs = :durationMs WHERE uid = :noteId AND contentUri = :contentUri " +
+            "AND durationMs <= 0 AND deletedAt IS NULL AND :durationMs > 0",
+    )
+    suspend fun updateDurationIfUnknown(
+        noteId: Uuid,
+        contentUri: String,
+        durationMs: Long,
+    ): Int
+
     /** Rewrites [previous] to [contentUri] only while the note still stores [previous]. */
     @Query("UPDATE audio_notes SET contentUri = :contentUri WHERE uid = :noteId AND contentUri = :previous")
     suspend fun updateContentUriIfUnchanged(

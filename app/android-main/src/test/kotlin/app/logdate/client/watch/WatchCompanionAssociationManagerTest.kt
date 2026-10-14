@@ -82,6 +82,7 @@ class WatchCompanionAssociationManagerTest {
                 ),
             )
 
+            advanceUntilIdle()
             assertEquals(1, launcher.launchCount)
             assertEquals(
                 WatchAssociationSnapshot.Associated(
@@ -135,7 +136,7 @@ class WatchCompanionAssociationManagerTest {
 
     private class FakeCompanionDeviceClient(
         private val isSupported: Boolean = true,
-        private val currentAssociation: WatchAssociationSnapshot =
+        private var currentAssociation: WatchAssociationSnapshot =
             if (isSupported) {
                 WatchAssociationSnapshot.Unassociated
             } else {
@@ -149,6 +150,15 @@ class WatchCompanionAssociationManagerTest {
 
         override suspend fun currentAssociation(): WatchAssociationSnapshot = currentAssociation
 
+        override suspend fun associationTarget() = WatchNodeSnapshot("watch-a", "Pixel Watch", true)
+
+        override suspend fun rememberAssociation(
+            info: AssociationInfo,
+            target: WatchNodeSnapshot,
+        ) {
+            currentAssociation = WatchAssociationSnapshot.Associated(displayName = target.displayName)
+        }
+
         override fun associate(
             request: AssociationRequest,
             callback: CompanionDeviceManager.Callback,
@@ -161,7 +171,7 @@ class WatchCompanionAssociationManagerTest {
     private class FakeWatchAssociationRequestFactory(
         private val request: AssociationRequest,
     ) : WatchAssociationRequestFactory {
-        override fun createRequest(): AssociationRequest = request
+        override fun createRequest(target: WatchNodeSnapshot?): AssociationRequest = request
     }
 
     private fun mockAssociationInfo(displayName: String): AssociationInfo =

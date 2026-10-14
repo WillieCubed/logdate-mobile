@@ -7,6 +7,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.wear.capture.Feeling
 import app.logdate.wear.capture.MomentNoteCodec
+import app.logdate.wear.capture.WatchCaptureWriteGuard
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.sync.WearDataLayerClient
@@ -49,6 +50,7 @@ class MoodCheckInViewModel(
     private val notesRepository: JournalNotesRepository,
     private val dataLayerClient: WearDataLayerClient,
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
+    private val captureGuard: WatchCaptureWriteGuard = WatchCaptureWriteGuard.Unrestricted,
 ) : ViewModel() {
     companion object {
         private const val SAVED_DISPLAY_MS = 800L
@@ -112,16 +114,18 @@ class MoodCheckInViewModel(
         try {
             val now = Clock.System.now()
             val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
-            notesRepository.create(
-                JournalNote.Text(
-                    content = MomentNoteCodec.encode(mood),
-                    uid = Uuid.random(),
-                    creationTimestamp = now,
-                    lastUpdated = now,
-                    location = noteLocation,
-                    timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
-                ),
-            )
+            captureGuard.write {
+                notesRepository.create(
+                    JournalNote.Text(
+                        content = MomentNoteCodec.encode(mood),
+                        uid = Uuid.random(),
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                        location = noteLocation,
+                        timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                    ),
+                )
+            }
             Napier.d("Mood check-in saved: ${mood.tag}")
             if (dataLayerClient.isPhoneConnected()) SaveFeedback.SYNCING_TO_PHONE else SaveFeedback.SAVED_LOCALLY
         } catch (e: CancellationException) {

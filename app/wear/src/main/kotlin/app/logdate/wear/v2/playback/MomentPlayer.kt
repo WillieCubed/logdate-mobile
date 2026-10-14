@@ -8,13 +8,18 @@ import app.logdate.wear.playback.NoRoomForAudioException
 import app.logdate.wear.playback.WearAudioOutputs
 import app.logdate.wear.playback.WearSyncedAudioResolver
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.uuid.Uuid
+
+enum class PlaybackFailureStage { RESOLUTION, ENGINE }
 
 /**
  * Plays one recording at a time for every screen of the new watch app, so a row in a list and a
@@ -31,6 +36,9 @@ class MomentPlayer(
     private val outputs: WearAudioOutputs,
     private val resolver: WearSyncedAudioResolver,
     private val preferences: PlaybackPreferencesStore,
+    private val diagnose: (PlaybackFailureStage, String) -> Unit = { stage, code ->
+        Napier.w("Watch audio failed: stage=${stage.name} code=$code")
+    },
 ) {
     private val mutableState = MutableStateFlow<PlaybackState>(PlaybackState.Idle)
     private var resolveJob: Job? = null
@@ -52,6 +60,41 @@ class MomentPlayer(
         }
         if (current is PlaybackState.Preparing && current.noteId == note.uid) return
         start(note)
+    }
+
+    suspend fun continuePlayback(
+        note: JournalNote.Audio,
+        positionMs: Long,
+        speed: Float,
+    ): Boolean {
+        stop()
+        try {
+            if (outputs.outputState.value is AudioOutputState.Unavailable) return false
+            mutableState.value = PlaybackState.Preparing(note.uid)
+            val uri =
+                resolver.resolvePlayableUri(note).getOrElse { error ->
+                    diagnose(PlaybackFailureStage.RESOLUTION, error.javaClass.simpleName)
+                    mutableState.value = PlaybackState.Failed(note.uid, PlaybackFailure.NOT_ON_WATCH)
+                    return false
+                }
+            if (!isPreparing(note.uid)) return false
+            mutableState.value = PlaybackState.Active(note.uid, positionMs, note.durationMs, false)
+            engine.start(
+                uri,
+                note.uid,
+                AudioPlaybackOptions(
+                    startPositionMs = positionMs,
+                    speed = speed,
+                    skipSilence = skipSilence.value,
+                ),
+            ) { failed -> onFinished(note.uid, failed) }
+            val started = withTimeoutOrNull(3_500) { engine.status.first { it.noteId == note.uid && it.isPlaying } } != null
+            if (!started) stopIfPlaying(note.uid)
+            return started
+        } catch (e: CancellationException) {
+            stopIfPlaying(note.uid)
+            throw e
+        }
     }
 
     fun seekBy(deltaMs: Long) {
@@ -76,6 +119,13 @@ class MomentPlayer(
     fun setSkipSilence(enabled: Boolean) {
         preferences.setSkipSilence(enabled)
         if (mutableState.value is PlaybackState.Active) engine.setSkipSilence(enabled)
+    }
+
+    fun pauseIfPlaying(noteId: Uuid) {
+        val current = mutableState.value as? PlaybackState.Active ?: return
+        if (current.noteId != noteId || current.isPaused) return
+        engine.pause()
+        mutableState.value = current.copy(isPaused = true)
     }
 
     fun stop() {
@@ -105,6 +155,7 @@ class MomentPlayer(
     private suspend fun resolveAndStart(note: JournalNote.Audio) {
         val uri =
             resolver.resolvePlayableUri(note).getOrElse { error ->
+                diagnose(PlaybackFailureStage.RESOLUTION, error.javaClass.simpleName)
                 if (isPreparing(note.uid)) mutableState.value = PlaybackState.Failed(note.uid, error.toPlaybackFailure())
                 return
             }
@@ -126,6 +177,7 @@ class MomentPlayer(
         failed: Boolean,
     ) {
         if (mutableState.value.noteId != noteId) return
+        if (failed) diagnose(PlaybackFailureStage.ENGINE, "PLAYBACK_FAILED")
         mutableState.value = if (failed) PlaybackState.Failed(noteId, PlaybackFailure.UNPLAYABLE) else PlaybackState.Idle
     }
 

@@ -5,6 +5,7 @@ import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
+import app.logdate.wear.capture.WatchCaptureWriteGuard
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import io.github.aakira.napier.Napier
@@ -49,6 +50,7 @@ class AudioMomentSaver(
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
     private val clock: Clock = Clock.System,
     private val deleteFile: (String) -> Unit = { path -> File(path).delete() },
+    private val captureGuard: WatchCaptureWriteGuard = WatchCaptureWriteGuard.Unrestricted,
 ) {
     /**
      * Saves the recording at [path]. [recorderElapsed] is the recorder's own clock. It counts when the
@@ -92,25 +94,26 @@ class AudioMomentSaver(
     private suspend fun persist(
         path: String,
         durationMs: Long,
-    ): JournalNote.Audio {
-        val now = clock.now()
-        val location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationCaptureCoordinator.captureForJournalEntry() }
-        val note =
-            JournalNote.Audio(
-                mediaRef = path,
-                uid = Uuid.random(),
-                creationTimestamp = now,
-                lastUpdated = now,
-                durationMs = durationMs,
-                location = location,
-                timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
-            )
-        notesRepository.create(note)
-        // The raw file marks a recording as unsaved for startup recovery, so it goes once the note exists.
-        deleteRawRecording(path)
-        noteHealthAnnotator.annotate(note.uid)
-        return note
-    }
+    ): JournalNote.Audio =
+        captureGuard.write {
+            val now = clock.now()
+            val location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationCaptureCoordinator.captureForJournalEntry() }
+            val note =
+                JournalNote.Audio(
+                    mediaRef = path,
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    durationMs = durationMs,
+                    location = location,
+                    timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                )
+            notesRepository.create(note)
+            // The raw file marks a recording as unsaved for startup recovery, so it goes once the note exists.
+            deleteRawRecording(path)
+            noteHealthAnnotator.annotate(note.uid)
+            note
+        }
 
     private fun deleteRawRecording(path: String) {
         val raw = CrashSafeRecording.inFlightFile(File(path))

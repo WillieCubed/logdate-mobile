@@ -30,6 +30,10 @@ import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.audio_transcribing
+import logdate.client.ui.generated.resources.search_type_label_voice_note
+import org.jetbrains.compose.resources.stringResource
 
 private val COLLAPSED_WAVEFORM_HEIGHT = 40.dp
 
@@ -61,12 +65,13 @@ fun CollapsedAudioCard(
     transcriptExcerpt: String? = null,
     isTranscribing: Boolean = false,
     onPlayPause: () -> Unit = {},
+    playbackActions: @Composable () -> Unit = {},
 ) {
     val accentColor = remember(palette) { Color(palette.accentColor) }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(28.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(
@@ -81,13 +86,21 @@ fun CollapsedAudioCard(
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
-                isTranscribing ->
+                else ->
                     Text(
-                        text = "…",
+                        text = stringResource(Res.string.search_type_label_voice_note),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
             }
+            if (transcriptExcerpt == null && isTranscribing) {
+                Text(
+                    text = stringResource(Res.string.audio_transcribing),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            playbackActions()
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),

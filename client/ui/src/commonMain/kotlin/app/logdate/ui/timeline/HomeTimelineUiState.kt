@@ -1,6 +1,7 @@
 package app.logdate.ui.timeline
 
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.shared.model.Event
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.location.PlaceUiState
@@ -129,6 +130,9 @@ data class MomentUiState(
      * Whether every note behind this moment was captured on the watch.
      */
     val capturedOnWatch: Boolean = false,
+    val capturedAt: Instant? = null,
+    /** A retained memory anchor awaiting content, presented in the same chronological sequence. */
+    val pendingMark: MarkedMoment? = null,
 )
 
 data class MomentMediaUiState(

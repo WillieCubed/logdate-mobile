@@ -41,6 +41,10 @@ class PeerStateStore {
         return document
     }
 
+    fun clear() {
+        documents.value = emptyMap()
+    }
+
     fun latest(role: PeerRole): Flow<StateDocument?> =
         documents
             .map { all -> all.values.filter { it.role == role }.maxByOrNull { it.writtenAt } }

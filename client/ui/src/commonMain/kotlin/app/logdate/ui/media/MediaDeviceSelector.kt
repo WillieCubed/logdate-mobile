@@ -4,13 +4,17 @@
 package app.logdate.ui.media
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BluetoothAudio
 import androidx.compose.material.icons.rounded.CameraFront
@@ -21,13 +25,17 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.SettingsInputComponent
 import androidx.compose.material.icons.rounded.Speaker
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.ChipColors
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,15 +79,18 @@ fun MediaDeviceSelector(
     modifier: Modifier = Modifier,
     label: String = defaultSelectorLabel(selection.kind),
     enabled: Boolean = true,
+    colors: ChipColors = AssistChipDefaults.assistChipColors(),
     systemSettingsAction: MediaRouteSettingsAction? = rememberMediaRouteSettingsAction(selection.kind),
+    visibilityState: MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
-    var isSheetVisible by remember { mutableStateOf(false) }
+    var isSheetVisible by visibilityState
     val selected = selection.selectedDevice
     val chipLabel = selected?.label ?: label
 
     AssistChip(
         onClick = { isSheetVisible = true },
         enabled = enabled,
+        colors = colors,
         label = {
             Text(
                 text = chipLabel,
@@ -98,17 +109,22 @@ fun MediaDeviceSelector(
     )
 
     if (isSheetVisible) {
-        PlatformSheet(onDismissRequest = { isSheetVisible = false }) {
-            MediaDeviceSelectorSheet(
-                selection = selection,
-                title = label,
-                onDeviceSelected = { deviceId ->
-                    onDeviceSelected(deviceId)
-                    isSheetVisible = false
-                },
-                systemSettingsAction = systemSettingsAction,
-                onDismiss = { isSheetVisible = false },
-            )
+        PlatformSheet(
+            onDismissRequest = { isSheetVisible = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Box(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+                MediaDeviceSelectorSheet(
+                    selection = selection,
+                    title = label,
+                    onDeviceSelected = { deviceId ->
+                        onDeviceSelected(deviceId)
+                        isSheetVisible = false
+                    },
+                    systemSettingsAction = systemSettingsAction,
+                    onDismiss = { isSheetVisible = false },
+                )
+            }
         }
     }
 }

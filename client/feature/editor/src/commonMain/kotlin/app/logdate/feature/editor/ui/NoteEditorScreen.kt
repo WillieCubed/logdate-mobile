@@ -10,10 +10,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import app.logdate.client.repository.moments.MarkedMomentRepository
 import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -64,7 +66,22 @@ fun NoteEditorScreen(
     promptPhotoUri: String? = null,
     viewModel: EntryEditorViewModel = koinViewModel(),
     visitContext: VisitMemoryContext? = null,
+    markId: Uuid? = null,
 ) {
+    val marks: MarkedMomentRepository = koinInject()
+    LaunchedEffect(markId, entryId, draftId) {
+        viewModel.initializeMarkContext(markId?.toString())
+        if (markId != null && entryId == null && draftId == null && initialTextContent.isNullOrBlank()) {
+            try {
+                viewModel.openMarkedMoment(markId.toString(), marks.getMark(markId)?.caption.orEmpty())
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Napier.w("Could not restore marked moment caption", failure)
+            }
+        }
+    }
+
     // Load an existing draft or journal entry when provided
     LaunchedEffect(entryId, draftId, firstEntry, visitContext) {
         if (draftId != null) {

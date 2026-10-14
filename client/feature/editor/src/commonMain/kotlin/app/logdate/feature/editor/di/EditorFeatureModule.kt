@@ -46,6 +46,7 @@ val editorFeatureModule: Module =
                 draftManager = get(),
                 contentLoader = get(),
                 pendingAudioRecoverer = get(),
+                audioDurationResolver = get(),
                 captureUsage = getOrNull<CaptureUsageReporter>() ?: CaptureUsageReporter.None,
             )
         }

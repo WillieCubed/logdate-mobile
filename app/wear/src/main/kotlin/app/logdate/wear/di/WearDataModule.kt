@@ -50,6 +50,7 @@ import app.logdate.client.sync.peer.state.StateDocumentChannel
 import app.logdate.client.sync.peer.state.StateMerger
 import app.logdate.shared.config.configModule
 import app.logdate.shared.model.Journal
+import app.logdate.wear.capture.WatchCapturePreferences
 import app.logdate.wear.health.HealthServicesWearHealthSensorManager
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.health.UnavailableWearHealthSensorManager
@@ -194,6 +195,7 @@ val wearDataModule =
             val controller = get<WatchReminders>()
             val hours = get<WatchReminderHours>()
             WatchStateMirror(
+                acceptsPhone = { !get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>().removed() },
                 featureFlags = get(),
                 channel = get(),
                 capabilities = get(),
@@ -240,7 +242,11 @@ val wearDataModule =
 
         // Location stack required for standalone Wear journaling and activity tracking.
         single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
-        single { WearLocationCaptureCoordinator(get(), get()) }
+        single {
+            val flags = get<FeatureFlagStore>()
+            WatchCapturePreferences(get()) { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) }
+        }
+        single { WearLocationCaptureCoordinator(get(), get(), get<WatchCapturePreferences>()::capturePlaces) }
 
         // Rewinds are cached locally so the watch can browse content synced from phone.
         single<RewindRepository> { OfflineFirstRewindRepository(get()) }

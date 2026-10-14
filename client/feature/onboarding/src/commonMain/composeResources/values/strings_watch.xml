@@ -1,0 +1,14 @@
+<resources>
+    <string name="watch_setup_title">Your watch</string>
+    <string name="watch_setup_description">Capture moments from your wrist. Add LogDate to your Wear OS watch, or do this later in Settings.</string>
+    <string name="watch_setup_ready">LogDate is set up on your watch</string>
+    <string name="watch_setup_add">Add to watch</string>
+    <string name="watch_setup_continue">Continue</string>
+    <string name="watch_setup_skip">Not now</string>
+    <string name="watch_setup_confirm">Confirm the watch on your phone</string>
+    <string name="watch_setup_opening">Opening Play on your watch</string>
+    <string name="watch_setup_waiting">Waiting for LogDate to be installed on your watch</string>
+    <string name="watch_setup_linking">Setting up the connection to your watch</string>
+    <string name="watch_setup_failed">Couldn’t set up your watch. Keep it nearby and try again, or do this later in Settings.</string>
+    <string name="watch_setup_save_failed">Couldn’t save your setup progress. Try again.</string>
+</resources>

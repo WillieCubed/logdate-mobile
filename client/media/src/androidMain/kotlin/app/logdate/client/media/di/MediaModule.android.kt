@@ -3,6 +3,7 @@ package app.logdate.client.media.di
 import android.content.ContentResolver
 import app.logdate.client.media.AndroidMediaCleaner
 import app.logdate.client.media.AndroidMediaManager
+import app.logdate.client.media.AndroidPhotoLibraryMediaManager
 import app.logdate.client.media.MediaCleaner
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
@@ -29,8 +30,20 @@ actual val mediaModule: Module =
         single<ContentResolver> { androidContext().contentResolver }
         single { androidMediaFileResolver(androidContext()) }
         single<StoredMediaReferences> { get<MediaFileResolver>() }
-        single<MediaManager> { AndroidMediaManager(get(), get(), mediaFiles = get()) }
+        single<MediaManager> {
+            AndroidPhotoLibraryMediaManager(AndroidMediaManager(get(), get(), mediaFiles = get()), androidContext())
+        }
         single<MediaCleaner> { AndroidMediaCleaner(get()) }
+        factory {
+            val manager = get<MediaManager>()
+            app.logdate.client.media.ManagedMediaImporter(
+                manager,
+                app.logdate.client.media
+                    .AndroidManagedMediaImportSource(androidContext()),
+                app.logdate.client.media
+                    .AndroidManagedMediaDiscarder(androidContext(), manager)::discard,
+            )
+        }
 
         // Transcription manager
         single<TranscriptionManager> { AndroidTranscriptionManager(androidContext()) }

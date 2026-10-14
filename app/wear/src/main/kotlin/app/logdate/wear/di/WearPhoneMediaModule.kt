@@ -6,6 +6,9 @@ import android.content.Context
 import androidx.work.WorkManager
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.client.domain.watch.StampedPreferenceStore
+import app.logdate.client.domain.watch.WatchAudioDownloadPolicy
 import app.logdate.client.media.audio.AudioPlaybackSourceFactory
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
@@ -23,9 +26,11 @@ import app.logdate.wear.sync.v2.media.WatchAudioDataSources
 import app.logdate.wear.sync.v2.media.WatchMediaPrefetchScheduler
 import app.logdate.wear.sync.v2.media.WatchMediaPrefetcher
 import app.logdate.wear.sync.v2.media.WatchPhoneMedia
+import app.logdate.wear.sync.v2.media.WatchPrefetchConditions
 import app.logdate.wear.sync.v2.window.WindowMembershipStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.koin.core.parameter.parametersOf
 import org.koin.dsl.module
@@ -56,17 +61,29 @@ val wearPhoneMediaModule =
                 },
             )
         }
+        single { WatchPrefetchConditions(get(), get()) }
         single {
             val peers = get<WatchDeliveryPeer>()
             val states = get<PeerStateStore>()
             val flags = get<FeatureFlagStore>()
             val media = get<WatchPhoneMedia>()
+            val shared = get<StampedPreferenceStore>()
+            val conditions = get<WatchPrefetchConditions>()
             WatchMediaPrefetcher(
                 peers = peers,
                 members = get(),
                 notes = get(),
                 outbox = get(),
-                enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+                enabled = {
+                    flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) &&
+                        conditions.permits(
+                            WatchAudioDownloadPolicy.fromStored(
+                                SharedPreferenceKey.AudioDownloadPolicy.read(
+                                    shared.snapshot()[SharedPreferenceKey.AudioDownloadPolicy.name],
+                                ),
+                            ),
+                        )
+                },
                 supported = { peer ->
                     WearFeatures.MEDIA_RANGE in
                         states
@@ -87,6 +104,11 @@ val wearPhoneMediaModule =
             WatchMediaPrefetchScheduler(
                 WorkManager.getInstance(get<Context>()),
                 get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+                get<StampedPreferenceStore>().observe().map { state ->
+                    WatchAudioDownloadPolicy.fromStored(
+                        SharedPreferenceKey.AudioDownloadPolicy.read(state[SharedPreferenceKey.AudioDownloadPolicy.name]),
+                    )
+                },
             )
         }
         single<AudioPlaybackSourceFactory> { WatchAudioDataSources(get()) }

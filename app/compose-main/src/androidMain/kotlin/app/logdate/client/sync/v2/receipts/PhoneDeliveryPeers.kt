@@ -27,6 +27,10 @@ class PhoneDeliveryPeers(
             null
         }
 
+    suspend fun forRemoval(watchNode: String): PeerDeliveryContext? = capture(watchNode, requireActive = false)
+
+    suspend fun isCurrentRemoval(context: PeerDeliveryContext): Boolean = forRemoval(context.watchNode) == context
+
     suspend fun isCurrent(context: PeerDeliveryContext): Boolean = current(context.watchNode) == context
 
     suspend fun all(): List<PeerDeliveryContext> =
@@ -43,8 +47,11 @@ class PhoneDeliveryPeers(
             emptyList()
         }
 
-    private suspend fun capture(watchNode: String): PeerDeliveryContext? {
-        if (!active()) return null
+    private suspend fun capture(
+        watchNode: String,
+        requireActive: Boolean = true,
+    ): PeerDeliveryContext? {
+        if (requireActive && !active()) return null
         val bound = sessions.getOriginBoundSession()
         val session = sessions.getSession()
         val backend = config.getCurrentBackendUrl()
@@ -72,7 +79,7 @@ class PhoneDeliveryPeers(
                         bound.origin == backend
             }
         if (!accountMatches ||
-            !active() ||
+            (requireActive && !active()) ||
             sessions.getOriginBoundSession() != bound ||
             sessions.getSession() != session ||
             config.getCurrentBackendUrl() != backend ||

@@ -67,7 +67,10 @@ val LocalAudioPlaybackState =
  * This ensures only one audio can be played at a time throughout the app.
  */
 @Composable
-fun AudioPlaybackProvider(content: @Composable () -> Unit) {
+fun AudioPlaybackProvider(
+    handoff: PlaybackHandoffState = PlaybackHandoffState(),
+    content: @Composable () -> Unit,
+) {
     val audioPlaybackManager: AudioPlaybackManager = koinInject()
     val audioContextProcessor: AudioContextProcessor = koinInject()
     val audioRouteRepository: AudioRouteRepository = koinInject()
@@ -198,6 +201,7 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
     // Provide the state to all descendants
     CompositionLocalProvider(
         LocalAudioPlaybackState provides playbackState,
+        LocalPlaybackHandoff provides handoff,
         LocalAudioContextProcessor provides audioContextProcessor,
     ) {
         content()

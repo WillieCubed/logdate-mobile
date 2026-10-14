@@ -15,9 +15,12 @@ import app.logdate.client.domain.reminders.DeviceReminderBudget
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.domain.streak.toStreakDay
+import app.logdate.client.domain.watch.StampedPreferenceStore
+import app.logdate.client.domain.watch.WatchWindowPreferences
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.datalayer.v2.WearFeatures
+import app.logdate.client.sync.datalayer.v2.WindowReason
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
@@ -26,6 +29,7 @@ import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
 import app.logdate.wear.LogDateWearApplication
 import app.logdate.wear.capture.QuickNoteWriter
+import app.logdate.wear.capture.WatchCapturePreferences
 import app.logdate.wear.health.HeartRateSampler
 import app.logdate.wear.health.MeasureClientHeartRateReadings
 import app.logdate.wear.health.MeasuredHeartRateSampler
@@ -56,9 +60,13 @@ import app.logdate.wear.reminders.WorkManagerEveningReminderWork
 import app.logdate.wear.reminders.WorkoutWatcher
 import app.logdate.wear.sync.deleteLocalAudio
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
+import app.logdate.wear.sync.v2.window.WindowMembershipStore
 import app.logdate.wear.sync.v2.window.WindowProtocol
 import app.logdate.wear.v2.archive.ArchiveViewModel
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
+import app.logdate.wear.v2.continuity.WatchPlaybackHandoff
+import app.logdate.wear.v2.continuity.WatchPlaybackReceiver
+import app.logdate.wear.v2.continuity.WatchRecordingContinuity
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
@@ -117,6 +125,9 @@ import kotlin.uuid.Uuid
 val wearV2Module =
     module {
         includes(wearReminderClaimsModule)
+        single { WatchRecordingContinuity(get(), Wearable.getMessageClient(get<Context>())) }
+        single { WatchPlaybackHandoff(get(), Wearable.getMessageClient(get<Context>()), get(), get(), get()) }
+        single { WatchPlaybackReceiver(get(), get(), get()) }
         single<HapticsPreferenceStore> {
             SharedPreferencesHapticsPreferenceStore(
                 get<Context>().getSharedPreferences(SharedPreferencesHapticsPreferenceStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
@@ -139,13 +150,20 @@ val wearV2Module =
         }
         single { PermissionPrompts(checker = get(), store = get()) }
 
-        single { QuickNoteWriter(notesRepository = get(), locationCaptureCoordinator = get()) }
+        single {
+            QuickNoteWriter(
+                notesRepository = get(),
+                locationCaptureCoordinator = get(),
+                captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
+            )
+        }
         single {
             MarkedMomentStore(
                 markedMomentDao = get(),
                 peerDeliveryDao = get(),
                 syncMetadataService = get(),
                 transactions = get<SyncTransactionManager>(WatchCloud),
+                captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
             )
         }
         single<HeartRateSampler> {
@@ -181,6 +199,7 @@ val wearV2Module =
                 notesRepository = get(),
                 durationResolver = get(),
                 noteHealthAnnotator = get(),
+                captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
                 locationCaptureCoordinator = get(),
             )
         }
@@ -231,18 +250,71 @@ val wearV2Module =
                 permissions = get(),
                 applicationScope = get(),
                 mediaFiles = get(),
+                continuity = get(),
+                moodAfterRecording = get<WatchCapturePreferences>()::moodAfterRecording,
             )
         }
         viewModel { FlowViewModel(dayClock = get(), notesRepository = get()) }
-        viewModel { ArchiveViewModel(dayClock = get(), notesRepository = get()) }
+        viewModel {
+            val peers = get<WatchDeliveryPeer>()
+            val members = get<WindowMembershipStore>()
+            ArchiveViewModel(
+                dayClock = get(),
+                notesRepository = get(),
+                windowChanges = members.changes,
+                starred = {
+                    val peer = peers.current()
+                    if (peer == null) {
+                        emptySet()
+                    } else {
+                        val ids =
+                            members
+                                .read(peer)
+                                .entries
+                                .filterValues { WindowReason.STARRED in it.reasons }
+                                .keys
+                        if (peers.isCurrent(peer)) ids.mapNotNull(Uuid::parseOrNull).toSet() else emptySet()
+                    }
+                },
+            )
+        }
 
         single { GetMemoryRecallUseCase(notesRepository = get()) }
         single {
             val recall = get<GetMemoryRecallUseCase>()
             OnThisDayFinder(recall = { recall(contentTypes = WATCH_RECALL_TYPES).first() }, notesRepository = get())
         }
-        single { WeeklyRewindSource(rewinds = get(), notesRepository = get()) }
-        viewModel { MemoriesViewModel(dayClock = get(), onThisDay = get(), weeklyRewind = get()) }
+        single {
+            val peers = get<WatchDeliveryPeer>()
+            val members = get<WindowMembershipStore>()
+            WeeklyRewindSource(
+                rewinds = get(),
+                notesRepository = get(),
+                windowChanges = members.changes,
+                windowRewind = {
+                    val peer = peers.current()
+                    if (peer == null) {
+                        emptySet()
+                    } else {
+                        val ids =
+                            members
+                                .read(peer)
+                                .entries
+                                .filterValues { WindowReason.REWIND in it.reasons }
+                                .keys
+                        if (peers.isCurrent(peer)) ids.mapNotNull(Uuid::parseOrNull).toSet() else emptySet()
+                    }
+                },
+            )
+        }
+        viewModel {
+            MemoriesViewModel(
+                dayClock = get(),
+                onThisDay = get(),
+                weeklyRewind = get(),
+                preferences = get<StampedPreferenceStore>().observe().map(WatchWindowPreferences::from),
+            )
+        }
 
         single<PlaybackPreferencesStore> {
             SharedPreferencesPlaybackPreferencesStore(
@@ -365,6 +437,7 @@ val wearV2Module =
                 experienceEnabled = { experience.isOn },
                 awaitExperience = experience::awaitReady,
                 writeSharedChoice = shared::persistChoice,
+                removalPending = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>()::removed,
                 initializeHours = hours::initialize,
             )
         }

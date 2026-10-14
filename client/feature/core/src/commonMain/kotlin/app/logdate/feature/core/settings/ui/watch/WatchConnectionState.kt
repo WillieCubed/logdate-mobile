@@ -4,6 +4,8 @@ package app.logdate.feature.core.settings.ui.watch
  * Describes the current connection state between the phone and a Wear OS watch.
  */
 sealed interface WatchConnectionState {
+    val nodeId: String? get() = null
+
     /**
      * No Wear OS watch is currently available to associate or connect.
      */
@@ -14,6 +16,7 @@ sealed interface WatchConnectionState {
      */
     data class NeedsAssociation(
         val watchName: String,
+        override val nodeId: String? = null,
     ) : WatchConnectionState
 
     /**
@@ -26,6 +29,7 @@ sealed interface WatchConnectionState {
      */
     data class AppNotInstalled(
         val watchName: String,
+        override val nodeId: String? = null,
     ) : WatchConnectionState
 
     /**
@@ -33,6 +37,7 @@ sealed interface WatchConnectionState {
      */
     data class Connected(
         val watchName: String,
+        override val nodeId: String? = null,
     ) : WatchConnectionState
 
     /**
@@ -40,6 +45,7 @@ sealed interface WatchConnectionState {
      */
     data class OutOfRange(
         val watchName: String,
+        override val nodeId: String? = null,
     ) : WatchConnectionState
 
     /**

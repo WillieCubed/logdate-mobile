@@ -4,21 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
-import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.feature.editor.navigation.EditorLaunchMode
-import app.logdate.feature.editor.ui.camera.CaptureMode
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
-import app.logdate.feature.editor.ui.mapper.toJournalNote
 import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,9 +22,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -41,9 +32,9 @@ import kotlin.uuid.Uuid
  */
 class EntryEditorViewModel(
     observeEditorData: ObserveEditorDataUseCase,
-    private val saveEntryUseCase: SaveEntryUseCase,
-    private val draftManager: DraftManager,
-    private val contentLoader: ContentLoader,
+    internal val saveEntryUseCase: SaveEntryUseCase,
+    internal val draftManager: DraftManager,
+    internal val contentLoader: ContentLoader,
     /**
      * The fallback finalizer consulted for a block whose own `AudioBlockEditor` hasn't
      * composed/bound a finalizer yet (see [audioBlockFinalizers]).
@@ -55,7 +46,7 @@ class EntryEditorViewModel(
      * recording's own `AudioBlockEditor` always binds via [bindAudioBlockFinalizer] before
      * Save is reachable, so this default is a safety net, not the common path.
      */
-    private val defaultAudioBlockFinalizer: AudioBlockFinalizer =
+    internal val defaultAudioBlockFinalizer: AudioBlockFinalizer =
         AudioBlockFinalizer { _, currentState ->
             when (currentState) {
                 is AudioCaptureState.Recording, is AudioCaptureState.Stopping ->
@@ -63,8 +54,9 @@ class EntryEditorViewModel(
                 else -> currentState
             }
         },
-    private val pendingAudioRecoverer: PendingAudioRecoverer? = null,
-    private val captureUsage: CaptureUsageReporter = CaptureUsageReporter.None,
+    internal val pendingAudioRecoverer: PendingAudioRecoverer? = null,
+    internal val captureUsage: CaptureUsageReporter = CaptureUsageReporter.None,
+    internal val audioDurationResolver: AudioDurationResolver? = null,
 ) : ViewModel() {
     /**
      * Per-block finalizers bound by each block's own `AudioBlockEditor` composable, keyed by
@@ -77,10 +69,10 @@ class EntryEditorViewModel(
      * reflect the last block to compose, silently disconnecting every other block's finalizer.
      * This map lets [finalizePendingAudio] look up the correct, live finalizer per block.
      */
-    private val audioBlockFinalizers = mutableMapOf<Uuid, AudioBlockFinalizer>()
+    internal val audioBlockFinalizers = mutableMapOf<Uuid, AudioBlockFinalizer>()
 
     // Internal mutable state that can be modified by UI
-    private val mutableEditorState =
+    internal val mutableEditorState =
         MutableStateFlow(
             EditorState(
                 isLoading = true,
@@ -88,14 +80,44 @@ class EntryEditorViewModel(
             ),
         )
 
-    private val draftPersistenceMutex = Mutex()
+    internal val draftPersistenceMutex = Mutex()
 
     // Navigation effects are replayed when an Activity is recreated. Keep the source that has
     // already initialized this ViewModel so a replay cannot overwrite edits that survived the
     // configuration change. A failed load clears the request and remains retryable.
-    private var activeLoadRequest: LoadRequest? = null
-    private var loadGeneration = 0L
-    private var initializedPhotoPromptUri: String? = null
+    internal var activeLoadRequest: LoadRequest? = null
+    internal var loadGeneration = 0L
+
+    private var detachedMarkContext: String? = null
+
+    fun initializeMarkContext(markId: String?) {
+        if (markId != null && markId != detachedMarkContext) {
+            mutateEditorContent { it.copy(markId = markId) }
+        }
+    }
+
+    suspend fun openMarkedMoment(
+        markId: String,
+        caption: String,
+    ) {
+        if (markId == detachedMarkContext) return
+        initializeMarkContext(markId)
+        val loaded = editorState.first { !it.isLoading }
+        val current = mutableEditorState.value
+        if (current.blocks.isNotEmpty() || current.draftState is DraftState.Active) return
+        val draft = loaded.availableDrafts.filter { it.markId == markId }.maxByOrNull { it.updatedAt }
+        if (draft != null) loadDraft(draft.id) else setInitialTextContent(caption)
+    }
+
+    fun continueWithoutMarkedMoment() {
+        val previousMark = mutableEditorState.value.markId ?: return
+        if (mutateEditorContent { it.copy(markId = null, errorMessage = null, isModified = true) }) {
+            detachedMarkContext = previousMark
+            autoSaveLatestEntry()
+        }
+    }
+
+    internal var initializedPhotoPromptUri: String? = null
 
     init {
         viewModelScope.launch {
@@ -171,1256 +193,78 @@ class EntryEditorViewModel(
             ),
         )
 
-    /** Atomically rejects durable editor mutations once an exclusive save or exit begins. */
-    private fun mutateEditorContent(transform: (EditorState) -> EditorState): Boolean {
-        while (true) {
-            val currentState = mutableEditorState.value
-            if (currentState.isEditingLocked || currentState.shouldExit) return false
-            val updatedState = transform(currentState)
-            if (updatedState == currentState) return false
-            if (
-                mutableEditorState.compareAndSet(
-                    currentState,
-                    updatedState.copy(contentRevision = currentState.contentRevision + 1),
-                )
-            ) {
-                return true
-            }
-        }
-    }
+    fun setSelectedJournals(journalIds: List<Uuid>) = setSelectedJournalsImpl(journalIds)
 
-    /**
-     * Sets the journals that this entry is associated with.
-     */
-    fun setSelectedJournals(journalIds: List<Uuid>) {
-        val internalState = mutableEditorState.value
-        val effectiveSelection = authoritativeSelectedJournalIds(internalState, editorState.value)
-        mutateEditorContent { currentState ->
-            if (effectiveSelection == journalIds) {
-                if (currentState.selectedJournalIds == journalIds) {
-                    currentState
-                } else {
-                    currentState.copy(selectedJournalIds = journalIds)
-                }
-            } else {
-                currentState.copy(
-                    selectedJournalIds = journalIds,
-                    hasJournalSelectionChanges = true,
-                    isModified = true,
-                )
-            }
-        }
-    }
+    fun initializeVisitContext(context: VisitMemoryContext?) = initializeVisitContextImpl(context)
 
-    fun initializeVisitContext(context: VisitMemoryContext?) {
-        mutateEditorContent { current ->
-            if (current.visitContext == context) current else current.copy(visitContext = context)
-        }
-    }
+    fun initializeSelectedJournals(journalIds: List<Uuid>) = initializeSelectedJournalsImpl(journalIds)
 
-    /** Applies navigation-provided journal context without treating it as a user edit. */
-    fun initializeSelectedJournals(journalIds: List<Uuid>) {
-        mutateEditorContent { currentState ->
-            if (currentState.selectedJournalIds == journalIds) {
-                currentState
-            } else {
-                currentState.copy(selectedJournalIds = journalIds)
-            }
-        }
-    }
-
-    /**
-     * Adds a new block to the editor.
-     *
-     * Picker tiles pre-generate the block id so the tile can morph into the block. A
-     * second tap on the same tile (while that morph is still animating, or from a picker
-     * that stays on screen) arrives with the same id. Adding it again would give the block
-     * list two entries with one key, which crashes the lazy list, so an id that already
-     * exists focuses the block it created instead.
-     */
     fun createNewBlock(
         type: BlockType,
         id: Uuid = Uuid.random(),
-    ): EntryBlockUiState {
-        val existing = mutableEditorState.value.blocks.find { it.id == id }
-        if (existing != null) {
-            if (type != BlockType.TEXT) setExpandedBlockId(existing.id)
-            return existing
-        }
-        val location = null
-        val timestamp = Clock.System.now()
+    ): EntryBlockUiState = createNewBlockImpl(type, id)
 
-        val newBlock =
-            when (type) {
-                BlockType.TEXT ->
-                    TextBlockUiState(
-                        id = id,
-                        timestamp = timestamp,
-                        location = location,
-                    )
-
-                BlockType.IMAGE ->
-                    ImageBlockUiState(
-                        id = id,
-                        timestamp = timestamp,
-                        location = location,
-                    )
-
-                BlockType.VIDEO ->
-                    VideoBlockUiState(
-                        id = id,
-                        timestamp = timestamp,
-                        location = location,
-                    )
-
-                BlockType.AUDIO ->
-                    AudioBlockUiState(
-                        id = id,
-                        timestamp = timestamp,
-                        location = location,
-                    )
-
-                BlockType.CAMERA ->
-                    CameraBlockUiState(
-                        id = id,
-                        timestamp = timestamp,
-                        location = location,
-                    )
-            }
-
-        mutateEditorContent { currentState ->
-            if (currentState.blocks.any { it.id == id }) {
-                currentState
-            } else {
-                currentState.copy(
-                    blocks = currentState.blocks + newBlock,
-                    expandedBlockId = if (type != BlockType.TEXT) newBlock.id else currentState.expandedBlockId,
-                    isModified = true,
-                )
-            }
-        }
-        return newBlock
-    }
-
-    /**
-     * Updates an existing block in the editor. When [baseBlock] is supplied, only fields
-     * changed from that rendered snapshot are applied to the latest stored block.
-     */
     fun updateBlock(
         updatedBlock: EntryBlockUiState,
         baseBlock: EntryBlockUiState? = null,
-    ) {
-        if (editorState.value.isReadOnly(updatedBlock.id)) {
-            mutableEditorState.update { it.copy(errorMessage = "This memory has already been saved and cannot be changed here.") }
-            return
-        }
-        mutateEditorContent { currentState ->
-            if (currentState.isReadOnly(updatedBlock.id)) {
-                currentState
-            } else {
-                val existingBlock =
-                    currentState.blocks.find { it.id == updatedBlock.id }
-                        ?: return@mutateEditorContent currentState
-                if (existingBlock::class != updatedBlock::class || existingBlock == updatedBlock) {
-                    return@mutateEditorContent currentState
-                }
+    ) = updateBlockImpl(updatedBlock, baseBlock)
 
-                if (baseBlock != null && (baseBlock.id != updatedBlock.id || baseBlock::class != updatedBlock::class)) {
-                    return@mutateEditorContent currentState
-                }
-                val patchedBlock = if (baseBlock == null) updatedBlock else applyBlockChanges(existingBlock, updatedBlock, baseBlock)
-                val effectiveBlock =
-                    mergeCompletedMedia(existingBlock, patchedBlock, baseBlock == null)
-                        ?: return@mutateEditorContent currentState
-                if (effectiveBlock == existingBlock) return@mutateEditorContent currentState
-                currentState.copy(
-                    blocks =
-                        currentState.blocks.map {
-                            if (it.id == updatedBlock.id) effectiveBlock else it
-                        },
-                    isModified = true,
-                )
-            }
-        }
-    }
+    fun appendTextBlock(text: String) = appendTextBlockImpl(text)
 
-    private fun applyBlockChanges(
-        existing: EntryBlockUiState,
-        updated: EntryBlockUiState,
-        base: EntryBlockUiState,
-    ): EntryBlockUiState =
-        when (updated) {
-            is TextBlockUiState -> applyTextChanges(existing as TextBlockUiState, updated, base as TextBlockUiState)
-            is ImageBlockUiState -> {
-                existing as ImageBlockUiState
-                base as ImageBlockUiState
-                existing.copy(
-                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
-                    location = changed(existing.location, updated.location, base.location),
-                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
-                    uri = changed(existing.uri, updated.uri, base.uri),
-                    caption = changed(existing.caption, updated.caption, base.caption),
-                    presentation = changed(existing.presentation, updated.presentation, base.presentation),
-                )
-            }
-            is VideoBlockUiState -> {
-                existing as VideoBlockUiState
-                base as VideoBlockUiState
-                existing.copy(
-                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
-                    location = changed(existing.location, updated.location, base.location),
-                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
-                    uri = changed(existing.uri, updated.uri, base.uri),
-                    caption = changed(existing.caption, updated.caption, base.caption),
-                    durationMs = changed(existing.durationMs, updated.durationMs, base.durationMs),
-                )
-            }
-            is CameraBlockUiState -> {
-                existing as CameraBlockUiState
-                base as CameraBlockUiState
-                existing.copy(
-                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
-                    location = changed(existing.location, updated.location, base.location),
-                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
-                    uri = changed(existing.uri, updated.uri, base.uri),
-                    caption = changed(existing.caption, updated.caption, base.caption),
-                    mediaType = changed(existing.mediaType, updated.mediaType, base.mediaType),
-                    durationMs = changed(existing.durationMs, updated.durationMs, base.durationMs),
-                )
-            }
-            is AudioBlockUiState -> {
-                existing as AudioBlockUiState
-                base as AudioBlockUiState
-                existing.copy(
-                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
-                    location = changed(existing.location, updated.location, base.location),
-                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
-                    captureState = changed(existing.captureState, updated.captureState, base.captureState),
-                    caption = changed(existing.caption, updated.caption, base.caption),
-                    transcription = changed(existing.transcription, updated.transcription, base.transcription),
-                )
-            }
-        }
+    fun removeBlock(blockId: Uuid) = removeBlockImpl(blockId)
 
-    private fun <T> changed(
-        current: T,
-        next: T,
-        original: T,
-    ): T = if (next != original) next else current
+    fun autoSaveEntry(state: EditorState) = autoSaveEntryImpl(state)
 
-    private fun applyTextChanges(
-        existing: TextBlockUiState,
-        updated: TextBlockUiState,
-        base: TextBlockUiState,
-    ): TextBlockUiState =
-        existing.copy(
-            timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
-            location = changed(existing.location, updated.location, base.location),
-            timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
-            content = changed(existing.content, updated.content, base.content),
-        )
+    fun autoSaveLatestEntry() = autoSaveLatestEntryImpl()
 
-    private fun mergeCompletedMedia(
-        existing: EntryBlockUiState,
-        updated: EntryBlockUiState,
-        preserveLegacyMetadata: Boolean,
-    ): EntryBlockUiState? {
-        if (existing is AudioBlockUiState && updated is AudioBlockUiState) {
-            if ((
-                    existing.captureState is AudioCaptureState.Ready &&
-                        (updated.captureState is AudioCaptureState.Recording || updated.captureState is AudioCaptureState.Stopping)
-                ) ||
-                (existing.captureState is AudioCaptureState.Stopping && updated.captureState is AudioCaptureState.Recording)
-            ) {
-                return null
-            }
-            if (preserveLegacyMetadata && existing.captureState != updated.captureState) {
-                return updated.copy(caption = existing.caption, transcription = updated.transcription.ifBlank { existing.transcription })
-            }
-        }
-        if (preserveLegacyMetadata &&
-            existing is MediaBlockUiState &&
-            updated is MediaBlockUiState &&
-            existing.uri == null &&
-            updated.uri != null
-        ) {
-            return when (updated) {
-                is ImageBlockUiState -> updated.copy(caption = existing.caption)
-                is VideoBlockUiState -> updated.copy(caption = existing.caption)
-                is CameraBlockUiState -> updated.copy(caption = existing.caption)
-                is AudioBlockUiState -> updated
-            }
-        }
-        return updated
-    }
+    fun draftIdForHandoff(): Uuid? = draftIdForHandoffImpl()
 
-    /**
-     * Appends a new text block populated with [text] to the current entry.
-     *
-     * Unlike [setInitialTextContent], this works regardless of whether the editor
-     * already has content, making it suitable for drag-and-drop text drops.
-     */
-    fun appendTextBlock(text: String) {
-        if (text.isBlank()) return
-        val newBlock = TextBlockUiState(content = text)
-        mutateEditorContent { state ->
-            state.copy(
-                blocks = state.blocks + newBlock,
-                isModified = true,
-            )
-        }
-    }
+    suspend fun persistDraft(state: EditorState): Uuid? = persistDraftImpl(state)
 
-    /**
-     * Removes a block from the entry.
-     * Also clears the expanded block ID if the deleted block was currently expanded.
-     */
-    fun removeBlock(blockId: Uuid) {
-        if (editorState.value.isReadOnly(blockId)) {
-            mutableEditorState.update { it.copy(errorMessage = "This memory has already been saved and cannot be removed here.") }
-            return
-        }
-        val block = mutableEditorState.value.blocks.find { it.id == blockId } ?: return
-        if (block is AudioBlockUiState &&
-            (block.captureState is AudioCaptureState.Recording || block.captureState is AudioCaptureState.Stopping)
-        ) {
-            mutableEditorState.update { it.copy(errorMessage = "Finish recording before removing this memory.") }
-            return
-        }
-        val removed =
-            mutateEditorContent { currentState ->
-                if (currentState.blocks.none { it.id == blockId }) return@mutateEditorContent currentState
-                val shouldClearExpanded = currentState.expandedBlockId == blockId
-                val filteredBlocks = currentState.blocks.filterNot { it.id == blockId }
+    suspend fun saveAsDraft(state: EditorState): Boolean = saveAsDraftImpl(state)
 
-                currentState.copy(
-                    blocks = filteredBlocks,
-                    expandedBlockId = if (shouldClearExpanded) null else currentState.expandedBlockId,
-                    isModified = true,
-                )
-            }
-        if (removed) audioBlockFinalizers.remove(blockId)
-    }
+    suspend fun discardAndExit(): Boolean = discardAndExitImpl()
 
-    /**
-     * Autosaves the current entry state as a draft.
-     */
-    fun autoSaveEntry(state: EditorState) {
-        val currentState = mutableEditorState.value
-        if (state.isSaving || state.shouldExit || currentState.isSaving || currentState.shouldExit) return
+    fun saveEntry(state: EditorState) = saveEntryImpl(state)
 
-        viewModelScope.launch {
-            try {
-                persistDraft(state)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (e: Exception) {
-                Napier.e("Failed to auto-save draft: ${e.message}", e)
-                mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to save draft: ${e.message}")
-                }
-            }
-        }
-    }
+    fun setExpandedBlockId(blockId: Uuid?) = setExpandedBlockIdImpl(blockId)
 
-    fun autoSaveLatestEntry() = autoSaveEntry(currentDraftPersistenceState(editorState.value))
-
-    /**
-     * The id of the draft Handoff names when it offers this entry to another device, or null for an
-     * empty new entry. Text that has no draft yet gets the id its first draft will be saved under,
-     * and that save starts now, so the id can be handed off at once rather than after autosave.
-     */
-    fun draftIdForHandoff(): Uuid? {
-        val state = mutableEditorState.value
-        (state.draftState as? DraftState.Active)?.let { return it.id }
-        if (!state.hasContent()) return null
-        val draftId = draftManager.reserveDraftId()
-        autoSaveLatestEntry()
-        return draftId
-    }
-
-    /**
-     * Suspends until the local draft repository finishes persisting [state].
-     */
-    suspend fun persistDraft(state: EditorState): Uuid? =
-        persistDraft(
-            state = state,
-            allowWhileExplicitlySaving = false,
-        )
-
-    /**
-     * Persists an explicit exit draft and reports whether it is safe for the UI to navigate.
-     */
-    suspend fun saveAsDraft(state: EditorState): Boolean {
-        if (tryBeginExclusiveOperation(state, lockEditing = false) == null) return false
-
-        return try {
-            val draftId =
-                persistDraft(
-                    state = state,
-                    allowWhileExplicitlySaving = true,
-                ) ?: error("Draft has no content to save")
-            mutableEditorState.update {
-                it.copy(
-                    draftState = DraftState.Active(draftId),
-                    errorMessage = null,
-                )
-            }
-            true
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (e: Exception) {
-            Napier.e("Failed to save exit draft: ${e.message}", e)
-            mutableEditorState.update {
-                it.copy(
-                    errorMessage = "Failed to save draft: ${e.message}",
-                )
-            }
-            false
-        } finally {
-            mutableEditorState.update {
-                it.copy(
-                    isSaving = false,
-                    isEditingLocked = false,
-                )
-            }
-        }
-    }
-
-    /** Deletes every durable draft owned by this editor before allowing navigation. */
-    suspend fun discardAndExit(): Boolean {
-        if (tryBeginExclusiveOperation(mutableEditorState.value, lockEditing = true) == null) {
-            return false
-        }
-
-        return try {
-            draftPersistenceMutex.withLock {
-                val activeDraftId = (mutableEditorState.value.draftState as? DraftState.Active)?.id
-                draftManager.draftIdsForCleanup(activeDraftId).forEach { draftId ->
-                    draftManager.deleteDraft(draftId).getOrThrow()
-                }
-                mutableEditorState.update {
-                    it.copy(
-                        draftState = DraftState.None,
-                        hasJournalSelectionChanges = false,
-                        isModified = false,
-                        errorMessage = null,
-                        shouldExit = true,
-                        exitReason = EditorExitReason.DISCARDED,
-                    )
-                }
-            }
-            true
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (error: Exception) {
-            Napier.e("Failed to discard draft: ${error.message}", error)
-            mutableEditorState.update {
-                it.copy(errorMessage = "Failed to discard draft: ${error.message}")
-            }
-            false
-        } finally {
-            mutableEditorState.update { currentState ->
-                currentState.copy(
-                    isSaving = false,
-                    isEditingLocked = currentState.shouldExit,
-                )
-            }
-        }
-    }
-
-    private suspend fun persistDraft(
-        state: EditorState,
-        allowWhileExplicitlySaving: Boolean,
-    ): Uuid? =
-        draftPersistenceMutex.withLock {
-            val currentState = mutableEditorState.value
-            if (state.shouldExit || currentState.shouldExit) return@withLock null
-            if (!allowWhileExplicitlySaving && (state.isSaving || currentState.isSaving)) {
-                return@withLock null
-            }
-            if (!allowWhileExplicitlySaving && state.isModified && !currentState.isModified) {
-                return@withLock null
-            }
-            if (!allowWhileExplicitlySaving && state.contentRevision != currentState.contentRevision) {
-                return@withLock null
-            }
-
-            if (allowWhileExplicitlySaving) {
-                return@withLock persistLatestDraftUntilStable(state)
-            }
-
-            // A queued snapshot may predate the first durable save. Always reuse the currently
-            // active draft identity so serialized saves cannot create sibling drafts.
-            val stateWithCurrentDraft = state.copy(draftState = currentState.draftState)
-            persistDraftSnapshot(stateWithCurrentDraft)
-        }
-
-    /**
-     * Explicit exit saves fail closed until the durable snapshot catches up with every editor
-     * mutation that arrived while an earlier write was suspended.
-     */
-    private suspend fun persistLatestDraftUntilStable(initialState: EditorState): Uuid? {
-        var snapshot = currentDraftPersistenceState(initialState)
-        while (true) {
-            val draftId = persistDraftSnapshot(snapshot) ?: return null
-            val latest =
-                currentDraftPersistenceState(snapshot).copy(
-                    draftState = DraftState.Active(draftId),
-                )
-            if (getEditorDraftFingerprint(latest) == getEditorDraftFingerprint(snapshot)) {
-                return draftId
-            }
-            snapshot = latest
-        }
-    }
-
-    private suspend fun persistDraftSnapshot(state: EditorState): Uuid? =
-        draftManager.autoSave(state)?.also { draftId ->
-            mutableEditorState.update {
-                it.copy(
-                    draftState = DraftState.Active(draftId),
-                    // The journal shown by default is only derived while there is no draft, so the
-                    // one the draft was saved with becomes the selection.
-                    selectedJournalIds =
-                        if (it.selectedJournalIds.isEmpty() && !it.hasJournalSelectionChanges) {
-                            state.selectedJournalIds
-                        } else {
-                            it.selectedJournalIds
-                        },
-                    hasJournalSelectionChanges =
-                        if (it.selectedJournalIds == state.selectedJournalIds) {
-                            false
-                        } else {
-                            it.hasJournalSelectionChanges
-                        },
-                )
-            }
-        }
-
-    private fun currentDraftPersistenceState(template: EditorState): EditorState {
-        val current = mutableEditorState.value
-        val combined = editorState.value
-        val selectedJournalIds = authoritativeSelectedJournalIds(current, combined)
-        return template.copy(
-            blocks = current.blocks,
-            readOnlyBlocks = combined.readOnlyBlocks,
-            selectedJournalIds = selectedJournalIds,
-            hasJournalSelectionChanges = current.hasJournalSelectionChanges,
-            draftState = current.draftState,
-            shouldExit = current.shouldExit,
-            isModified = current.isModified,
-            isSaving = current.isSaving,
-            contentRevision = current.contentRevision,
-        )
-    }
-
-    private fun authoritativeSelectedJournalIds(
-        current: EditorState,
-        combined: EditorState,
-    ): List<Uuid> =
-        if (
-            current.hasJournalSelectionChanges ||
-            current.draftState is DraftState.Active ||
-            current.selectedJournalIds.isNotEmpty()
-        ) {
-            current.selectedJournalIds
-        } else {
-            combined.selectedJournalIds
-        }
-
-    /**
-     * Saves the current entry.
-     *
-     * Pending audio blocks are finalized first so a recording whose URI hasn't yet
-     * been propagated into the block from the recording side is absorbed into the
-     * save instead of being silently dropped by the mapper.
-     */
-    fun saveEntry(state: EditorState) {
-        val admittedContentRevision = tryBeginEntrySave(state) ?: return
-
-        viewModelScope.launch {
-            try {
-                saveEntryAfterAdmission(admittedContentRevision)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (error: Exception) {
-                Napier.e("Failed to save entry: ${error.message}", error)
-                mutableEditorState.update {
-                    it.copy(errorMessage = "Failed to save: ${error.message}")
-                }
-            } finally {
-                mutableEditorState.update { currentState ->
-                    if (currentState.shouldExit) {
-                        currentState.copy(isSaving = false)
-                    } else {
-                        currentState.copy(
-                            isSaving = false,
-                            isEditingLocked = false,
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    private suspend fun saveEntryAfterAdmission(admittedContentRevision: Long) {
-        val resolvedAudio = finalizePendingAudio() ?: return
-
-        // Wait for any local draft write already in progress. Reading the latest state and
-        // deleting its active draft under the same lock prevents a completed autosave from
-        // recreating a draft after publish.
-        draftPersistenceMutex.withLock {
-            val latestEditableState = mutableEditorState.value
-            if (latestEditableState.shouldExit) return@withLock
-            val publishSnapshot = currentDraftPersistenceState(latestEditableState)
-            if (publishSnapshot.contentRevision != admittedContentRevision) {
-                failPublishInvariant()
-                return@withLock
-            }
-            val publishFingerprint = getEditorDraftFingerprint(publishSnapshot)
-            val notes =
-                publishSnapshot.blocks.mapNotNull { block ->
-                    if (publishSnapshot.isReadOnly(block.id)) return@mapNotNull null
-                    val effective =
-                        if (block is AudioBlockUiState && block.id in resolvedAudio) {
-                            block.copy(captureState = resolvedAudio.getValue(block.id))
-                        } else {
-                            block
-                        }
-                    effective.toJournalNote()
-                }
-            val publishedBlockIds = notes.map { it.uid }.toSet()
-
-            if (notes.isEmpty()) {
-                val activeDraftId = (publishSnapshot.draftState as? DraftState.Active)?.id
-                val cleanupDraftId = draftManager.draftIdForCleanup(activeDraftId)
-                val deletionFailure = cleanupDraftId?.let { draftManager.deleteDraft(it).exceptionOrNull() }
-                if (deletionFailure != null) {
-                    if (deletionFailure is CancellationException) throw deletionFailure
-                    Napier.e("Failed to delete cleared draft: ${deletionFailure.message}", deletionFailure)
-                    applyResolvedAudio(resolvedAudio)
-                    mutableEditorState.update {
-                        it.copy(errorMessage = "Failed to clear draft: ${deletionFailure.message}")
-                    }
-                    return@withLock
-                }
-                if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot, publishedBlockIds)) {
-                    applyResolvedAudio(resolvedAudio)
-                    failPublishInvariant()
-                    return@withLock
-                }
-                applyResolvedAudio(resolvedAudio)
-                mutableEditorState.update {
-                    it.copy(
-                        draftState = DraftState.None,
-                        hasJournalSelectionChanges = false,
-                        isModified = false,
-                        shouldExit = true,
-                        exitReason = EditorExitReason.ENTRY_SAVED,
-                    )
-                }
-                return@withLock
-            }
-
-            val activeDraftId = (publishSnapshot.draftState as? DraftState.Active)?.id
-            val cleanupDraftId = draftManager.draftIdForCleanup(activeDraftId)
-            try {
-                saveEntryUseCase(notes, publishSnapshot.selectedJournalIds, cleanupDraftId, publishSnapshot.visitContext)
-                draftManager.acknowledgeDraftDeletion(cleanupDraftId)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (error: Exception) {
-                applyResolvedAudio(resolvedAudio)
-                throw error
-            }
-            if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot, publishedBlockIds)) {
-                applyResolvedAudio(resolvedAudio)
-                failPublishInvariant()
-                return@withLock
-            }
-            applyResolvedAudio(resolvedAudio)
-            runCatching { captureUsage.entrySaved(captureModesOf(notes), publishSnapshot.selectedJournalIds) }
-                .onFailure { error -> Napier.w("Could not report capture usage", error) }
-            mutableEditorState.update {
-                it.copy(
-                    draftState = DraftState.None,
-                    hasJournalSelectionChanges = false,
-                    isModified = false,
-                    errorMessage = null,
-                    shouldExit = true,
-                    exitReason = EditorExitReason.ENTRY_SAVED,
-                )
-            }
-        }
-    }
-
-    /**
-     * @param publishedBlockIds Block IDs this save just persisted. Their own read-only status
-     *   flipping true is this save's own expected side effect (the reactive "today's notes" flow
-     *   now includes the note it just created), not a conflicting external edit, so it's excluded
-     *   from the comparison below -- every other block's read-only status is still compared live,
-     *   so a genuine concurrent change is still caught.
-     */
-    private fun publishSnapshotChanged(
-        admittedContentRevision: Long,
-        admittedFingerprint: String,
-        template: EditorState,
-        publishedBlockIds: Set<Uuid>,
-    ): Boolean {
-        val liveReadOnlyBlocks = editorState.value.readOnlyBlocks
-        val readOnlyBlocksIgnoringOwnPublish =
-            liveReadOnlyBlocks + template.readOnlyBlocks.filterKeys { it in publishedBlockIds }
-        val currentSnapshot =
-            currentDraftPersistenceState(template).copy(readOnlyBlocks = readOnlyBlocksIgnoringOwnPublish)
-        val currentFingerprint = getEditorDraftFingerprint(currentSnapshot)
-        val revisionChanged = currentSnapshot.contentRevision != admittedContentRevision
-        val fingerprintChanged = currentFingerprint != admittedFingerprint
-        return revisionChanged || fingerprintChanged
-    }
-
-    private fun failPublishInvariant() {
-        mutableEditorState.update {
-            it.copy(
-                errorMessage = "The editor changed while saving. Review your entry before closing.",
-                isSaving = false,
-                isEditingLocked = false,
-            )
-        }
-    }
-
-    private fun tryBeginEntrySave(requestedState: EditorState): Long? = tryBeginExclusiveOperation(requestedState, lockEditing = true)
-
-    private fun tryBeginExclusiveOperation(
-        requestedState: EditorState,
-        lockEditing: Boolean,
-    ): Long? {
-        if (requestedState.shouldExit) return null
-        while (true) {
-            val currentState = mutableEditorState.value
-            if (currentState.shouldExit || currentState.isSaving || currentState.isEditingLocked) return null
-            if (
-                mutableEditorState.compareAndSet(
-                    currentState,
-                    currentState.copy(
-                        isSaving = true,
-                        isEditingLocked = lockEditing,
-                        errorMessage = null,
-                    ),
-                )
-            ) {
-                return currentState.contentRevision
-            }
-        }
-    }
-
-    /**
-     * Drives any in-flight audio recordings to a finalized state.
-     *
-     * Returns a map of blockId → resolved [AudioCaptureState] when every finalize
-     * succeeds (possibly empty if no pending audio existed). Returns null when
-     * any finalize times out or returns [AudioCaptureState.Failed] — in that case
-     * the editor's [EditorState.errorMessage] is set and [EditorState.isSaving]
-     * is cleared so the caller can abort the save without further work.
-     *
-     * The returned map is applied to [mutableEditorState] only after the save
-     * completes, to avoid relying on [editorState] (a combined flow) re-emitting
-     * synchronously within this coroutine.
-     */
-    private suspend fun finalizePendingAudio(): Map<Uuid, AudioCaptureState>? {
-        val initialState = editorState.value
-        val pendingBlocks =
-            initialState.blocks.filterIsInstance<AudioBlockUiState>().filter { block ->
-                !initialState.isReadOnly(block.id) && !block.isPersistable()
-            }
-        if (pendingBlocks.isEmpty()) return emptyMap()
-
-        val finalized: List<Pair<Uuid, AudioCaptureState?>> =
-            coroutineScope {
-                pendingBlocks
-                    .map { block ->
-                        async {
-                            block.id to
-                                withTimeoutOrNull(AUDIO_FINALIZE_TIMEOUT_MS) {
-                                    audioBlockFinalizerFor(block.id).finalize(block.id, block.captureState)
-                                }
-                        }
-                    }.awaitAll()
-            }
-
-        val resolved = mutableMapOf<Uuid, AudioCaptureState>()
-        for ((blockId, state) in finalized) {
-            when (state) {
-                null -> {
-                    Napier.w("Audio finalization timed out for block $blockId")
-                    mutableEditorState.update {
-                        it.copy(
-                            errorMessage = "Recording is still finalizing. Try again in a moment.",
-                            isSaving = false,
-                            isEditingLocked = false,
-                        )
-                    }
-                    return null
-                }
-                is AudioCaptureState.Failed -> {
-                    Napier.w("Audio finalization failed for block $blockId: ${state.reason}")
-                    mutableEditorState.update {
-                        it.copy(
-                            errorMessage = state.reason,
-                            isSaving = false,
-                            isEditingLocked = false,
-                        )
-                    }
-                    return null
-                }
-                else -> resolved[blockId] = state
-            }
-        }
-        return resolved
-    }
-
-    /**
-     * Pushes the resolved capture states from [finalizePendingAudio] back into
-     * [mutableEditorState] so the UI reflects finalized recordings even on the
-     * non-exit paths (e.g., `notes.isEmpty()`, save failure).
-     */
-    private fun applyResolvedAudio(resolved: Map<Uuid, AudioCaptureState>) {
-        if (resolved.isEmpty()) return
-        mutableEditorState.update { state ->
-            state.copy(
-                blocks =
-                    state.blocks.map { existing ->
-                        if (existing is AudioBlockUiState && existing.id in resolved) {
-                            existing.copy(captureState = resolved.getValue(existing.id))
-                        } else {
-                            existing
-                        }
-                    },
-            )
-        }
-    }
-
-    /**
-     * Sets the expanded block ID.
-     */
-    fun setExpandedBlockId(blockId: Uuid?) {
-        mutableEditorState.update { it.copy(expandedBlockId = blockId) }
-    }
-
-    /**
-     * Registers the audio finalizer consulted for [blockId] at save time.
-     *
-     * Call once per block, from that block's own `AudioBlockEditor`, with a finalizer backed by
-     * the live, block-scoped [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel]
-     * instance that composable owns via its own keyed `koinViewModel()` call -- not one Koin
-     * resolves during this ViewModel's own construction, which would be disconnected from any
-     * in-progress recording. See [audioBlockFinalizers] for why this indirection exists at all.
-     */
     fun bindAudioBlockFinalizer(
         blockId: Uuid,
         finalizer: AudioBlockFinalizer,
-    ) {
-        audioBlockFinalizers[blockId] = finalizer
-    }
+    ) = bindAudioBlockFinalizerImpl(blockId, finalizer)
 
-    /**
-     * The finalizer to consult for [blockId]: its own bound finalizer if
-     * [bindAudioBlockFinalizer] has been called for it, otherwise [defaultAudioBlockFinalizer]
-     * for a block whose `AudioBlockEditor` hasn't composed yet.
-     */
-    private fun audioBlockFinalizerFor(blockId: Uuid): AudioBlockFinalizer = audioBlockFinalizers[blockId] ?: defaultAudioBlockFinalizer
+    fun clearSingleEmptyBlock(): Boolean = clearSingleEmptyBlockImpl()
 
-    /**
-     * Removes the lone empty block so the editor can return to the initial content-type picker.
-     *
-     * @return true if the editor was reset to the empty picker, false otherwise
-     */
-    fun clearSingleEmptyBlock(): Boolean {
-        val currentState = mutableEditorState.value
-        if (!currentState.shouldReturnToPickerOnBack()) {
-            return false
-        }
-        return mutateEditorContent {
-            if (it.shouldReturnToPickerOnBack()) {
-                it.copy(
-                    blocks = emptyList(),
-                    expandedBlockId = null,
-                    isModified = it.hasJournalSelectionChanges,
-                )
-            } else {
-                it
-            }
-        }
-    }
+    fun dismissExpandedBlock(): Boolean = dismissExpandedBlockImpl()
 
-    /**
-     * Dismisses the currently expanded block by collapsing it.
-     * This is typically called when the user presses back while a block is focused.
-     *
-     * @return true if a block was dismissed, false if no block was expanded
-     */
-    fun dismissExpandedBlock(): Boolean {
-        val currentExpandedId = mutableEditorState.value.expandedBlockId
-        return if (currentExpandedId != null) {
-            setExpandedBlockId(null)
-            true
-        } else {
-            false
-        }
-    }
+    fun dismissExpandedBlockOrClearSingleEmpty(): Boolean = dismissExpandedBlockOrClearSingleEmptyImpl()
 
-    /**
-     * Handles back from an expanded block, preferring to restore the empty picker when
-     * the editor only contains a single untouched block.
-     */
-    fun dismissExpandedBlockOrClearSingleEmpty(): Boolean {
-        if (clearSingleEmptyBlock()) {
-            return true
-        }
+    fun resumeFirstEntryDraft() = resumeFirstEntryDraftImpl()
 
-        return dismissExpandedBlock()
-    }
+    fun loadDraft(draftId: Uuid) = loadDraftImpl(draftId)
 
-    /**
-     * Loads a draft into the editor.
-     */
-    fun resumeFirstEntryDraft() {
-        viewModelScope.launch {
-            val drafts = editorState.first { !it.isLoading }.availableDrafts
-            val latest =
-                drafts
-                    .withIndex()
-                    .maxWithOrNull(
-                        compareBy<IndexedValue<EntryDraft>> { it.value.updatedAt }.thenBy { it.index },
-                    )?.value
-            if (latest != null) loadDraft(latest.id)
-        }
-    }
+    fun deleteDraft(draftId: Uuid) = deleteDraftImpl(draftId)
 
-    fun loadDraft(draftId: Uuid) {
-        val request = LoadRequest.Draft(draftId)
-        if (activeLoadRequest == request) return
-        if (mutableEditorState.value.isEditingLocked || mutableEditorState.value.shouldExit) return
-        activeLoadRequest = request
-        val generation = ++loadGeneration
-        val requestedContentRevision = mutableEditorState.value.contentRevision
-        viewModelScope.launch {
-            draftPersistenceMutex.withLock {
-                draftManager.loadDraft(draftId).fold(
-                    onSuccess = { loaded ->
-                        val recoveredBlocks = recoverPendingAudio(loaded.blocks)
-                        if (generation != loadGeneration || mutableEditorState.value.contentRevision != requestedContentRevision) {
-                            return@withLock
-                        }
-                        mutateEditorContent { currentState ->
-                            if (generation != loadGeneration || currentState.contentRevision != requestedContentRevision) {
-                                currentState
-                            } else {
-                                currentState.copy(
-                                    blocks = recoveredBlocks,
-                                    selectedJournalIds = loaded.selectedJournalIds,
-                                    visitContext = loaded.visitContext,
-                                    hasJournalSelectionChanges = false,
-                                    draftState = DraftState.Active(loaded.draftId),
-                                    isModified = true,
-                                    errorMessage = null,
-                                )
-                            }
-                        }
-                    },
-                    onFailure = { e ->
-                        if (generation != loadGeneration) return@withLock
-                        if (activeLoadRequest == request) activeLoadRequest = null
-                        Napier.e("Failed to load draft: ${e.message}", e)
-                        mutableEditorState.update {
-                            it.copy(errorMessage = "Failed to load draft: ${e.message}")
-                        }
-                    },
-                )
-            }
-        }
-    }
+    fun deleteAllDrafts() = deleteAllDraftsImpl()
 
-    /**
-     * Resolves any [AudioCaptureState.Stopping] blocks restored from a draft into
-     * either [AudioCaptureState.Ready] (when the file on disk is parseable) or
-     * [AudioCaptureState.Failed] (when the path is missing or the file is unusable).
-     *
-     * No-op when [pendingAudioRecoverer] is not wired — blocks remain Stopping,
-     * which the editor's UI surfaces as a recovery affordance.
-     */
-    private suspend fun recoverPendingAudio(blocks: List<EntryBlockUiState>): List<EntryBlockUiState> {
-        val recoverer = pendingAudioRecoverer ?: return blocks
-        return blocks.map { block ->
-            val capture = (block as? AudioBlockUiState)?.captureState
-            if (capture is AudioCaptureState.Stopping) {
-                block.copy(captureState = recoverer.recover(capture))
-            } else {
-                block
-            }
-        }
-    }
+    fun setInitialTextContent(content: String) = setInitialTextContentImpl(content)
 
-    /**
-     * Deletes a draft.
-     */
-    fun deleteDraft(draftId: Uuid) {
-        val requestedContentRevision = mutableEditorState.value.contentRevision
-        viewModelScope.launch {
-            draftPersistenceMutex.withLock {
-                draftManager.deleteDraft(draftId).fold(
-                    onSuccess = {
-                        mutableEditorState.update {
-                            val deletedActiveDraft =
-                                (it.draftState as? DraftState.Active)?.id == draftId
-                            val contentUnchanged = it.contentRevision == requestedContentRevision
-                            val newDraftState =
-                                when (val current = it.draftState) {
-                                    is DraftState.Active -> if (current.id == draftId) DraftState.None else current
-                                    DraftState.None -> DraftState.None
-                                }
-                            it.copy(
-                                draftState = newDraftState,
-                                hasJournalSelectionChanges =
-                                    if (deletedActiveDraft && contentUnchanged) {
-                                        false
-                                    } else {
-                                        it.hasJournalSelectionChanges
-                                    },
-                                isModified =
-                                    if (deletedActiveDraft && contentUnchanged) {
-                                        false
-                                    } else {
-                                        it.isModified
-                                    },
-                            )
-                        }
-                    },
-                    onFailure = { e ->
-                        Napier.e("Failed to delete draft: ${e.message}", e)
-                        mutableEditorState.update {
-                            it.copy(errorMessage = "Failed to delete draft: ${e.message}")
-                        }
-                    },
-                )
-            }
-        }
-    }
-
-    /**
-     * Deletes all drafts atomically.
-     */
-    fun deleteAllDrafts() {
-        val requestedContentRevision = mutableEditorState.value.contentRevision
-        viewModelScope.launch {
-            draftPersistenceMutex.withLock {
-                draftManager.deleteAllDrafts().fold(
-                    onSuccess = {
-                        mutableEditorState.update {
-                            it.copy(
-                                draftState = DraftState.None,
-                                hasJournalSelectionChanges =
-                                    if (
-                                        it.draftState is DraftState.Active &&
-                                        it.contentRevision == requestedContentRevision
-                                    ) {
-                                        false
-                                    } else {
-                                        it.hasJournalSelectionChanges
-                                    },
-                                isModified =
-                                    if (
-                                        it.draftState is DraftState.Active &&
-                                        it.contentRevision == requestedContentRevision
-                                    ) {
-                                        false
-                                    } else {
-                                        it.isModified
-                                    },
-                            )
-                        }
-                    },
-                    onFailure = { e ->
-                        Napier.e("Failed to delete all drafts: ${e.message}", e)
-                        mutableEditorState.update {
-                            it.copy(errorMessage = "Failed to delete drafts: ${e.message}")
-                        }
-                    },
-                )
-            }
-        }
-    }
-
-    /**
-     * Sets the initial text content for a new note.
-     * This creates a text block with the given content if there are no blocks yet.
-     *
-     * @param content The initial text content.
-     */
-    fun setInitialTextContent(content: String) {
-        if (content.isBlank()) return
-
-        viewModelScope.launch {
-            try {
-                val currentState = mutableEditorState.value
-
-                if (currentState.blocks.isEmpty()) {
-                    val textBlock = createNewBlock(BlockType.TEXT) as TextBlockUiState
-                    updateBlock(textBlock.copy(content = content))
-                }
-            } catch (e: Exception) {
-                Napier.e("Failed to set initial text content: ${e.message}", e)
-            }
-        }
-    }
-
-    /** Places the suggested photo first, followed by the chosen entry input. */
     fun initializePhotoPrompt(
         photoUri: String,
         record: Boolean,
-    ) {
-        if (photoUri.isBlank() || initializedPhotoPromptUri == photoUri) return
-        initializedPhotoPromptUri = photoUri
-        if (mutableEditorState.value.blocks.none { (it as? MediaBlockUiState)?.uri == photoUri }) {
-            val photo = createNewBlock(BlockType.IMAGE) as ImageBlockUiState
-            updateBlock(photo.copy(uri = photoUri))
-        }
-        createNewBlock(if (record) BlockType.AUDIO else BlockType.TEXT)
-    }
+    ) = initializePhotoPromptImpl(photoUri, record)
 
-    /**
-     * Prepares a new entry for [mode]: a recording for voice, the camera for photos or video, and
-     * nothing extra for text. Safe to call again when the screen recomposes; it never adds a second
-     * capture block.
-     */
-    fun initializeLaunchMode(mode: EditorLaunchMode) {
-        val blocks = mutableEditorState.value.blocks
-        when (mode) {
-            EditorLaunchMode.Text -> Unit
-            EditorLaunchMode.Voice -> {
-                if (blocks.any { it is AudioBlockUiState }) return
-                val audio = createNewBlock(BlockType.AUDIO) as AudioBlockUiState
-                updateBlock(audio.copy(startOnOpen = true))
-            }
-            EditorLaunchMode.Camera, EditorLaunchMode.Video -> {
-                if (blocks.any { it is CameraBlockUiState }) return
-                val camera = createNewBlock(BlockType.CAMERA) as CameraBlockUiState
-                if (mode == EditorLaunchMode.Video) updateBlock(camera.copy(initialCaptureMode = CaptureMode.VIDEO))
-            }
-        }
-    }
+    fun initializeLaunchMode(mode: EditorLaunchMode) = initializeLaunchModeImpl(mode)
 
-    /**
-     * Creates blocks for attachment URIs: those supplied when opening the editor, and media dropped,
-     * pasted, or sent by the keyboard, already copied into LogDate's store.
-     */
-    fun setInitialAttachments(attachmentUris: List<String>) {
-        if (attachmentUris.isEmpty()) return
+    fun setInitialAttachments(attachmentUris: List<String>) = setInitialAttachmentsImpl(attachmentUris)
 
-        viewModelScope.launch {
-            try {
-                attachmentUris.forEach { uri ->
-                    // NoteEditorScreen replays initial intent inputs after an Activity
-                    // recreation. The ViewModel survives configuration changes, so don't append
-                    // another block for a URI that is already attached. LogDate's store names a file
-                    // by its contents, so the same photo pasted twice is also attached once.
-                    val alreadyInitialized =
-                        mutableEditorState.value.blocks.any { block ->
-                            (block as? MediaBlockUiState)?.uri == uri
-                        }
-                    if (alreadyInitialized) return@forEach
-
-                    val blockType = attachmentBlockType(uri)
-
-                    when (blockType) {
-                        BlockType.IMAGE -> {
-                            val block = createNewBlock(BlockType.IMAGE) as ImageBlockUiState
-                            updateBlock(block.copy(uri = uri))
-                        }
-                        BlockType.VIDEO -> {
-                            val block = createNewBlock(BlockType.VIDEO) as VideoBlockUiState
-                            updateBlock(block.copy(uri = uri))
-                        }
-                        BlockType.AUDIO -> {
-                            val block = createNewBlock(BlockType.AUDIO) as AudioBlockUiState
-                            updateBlock(
-                                block.copy(
-                                    captureState = AudioCaptureState.Ready(uri = uri, durationMs = 0L),
-                                ),
-                            )
-                        }
-                        else -> {
-                            Napier.w("Unhandled attachment type for URI: $uri")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Napier.e("Failed to add initial attachments: ${e.message}", e)
-            }
-        }
-    }
-
-    /**
-     * Loads an existing entry for editing.
-     *
-     * Fetches the entry by ID and populates the editor state with its content. If provided,
-     * journalId is used to set the selected journal context.
-     *
-     * @param entryId The unique identifier of the entry to load and display for editing
-     * @param journalId Optional journal ID to set as the selected journal context when loading the entry
-     */
     fun loadExistingEntry(
         entryId: Uuid,
         journalId: Uuid? = null,
-    ) {
-        val request = LoadRequest.Existing(entryId, journalId)
-        if (activeLoadRequest == request) return
-        if (mutableEditorState.value.isEditingLocked || mutableEditorState.value.shouldExit) return
-        activeLoadRequest = request
-        val generation = ++loadGeneration
-        val requestedContentRevision = mutableEditorState.value.contentRevision
-        viewModelScope.launch {
-            mutableEditorState.update { it.copy(isLoading = true) }
+    ) = loadExistingEntryImpl(entryId, journalId)
 
-            contentLoader.loadEntry(entryId).fold(
-                onSuccess = { loaded ->
-                    mutableEditorState.update { currentState ->
-                        if (generation != loadGeneration ||
-                            currentState.contentRevision != requestedContentRevision ||
-                            currentState.isEditingLocked ||
-                            currentState.shouldExit
-                        ) {
-                            return@update currentState
-                        }
-                        currentState.copy(
-                            contentRevision = currentState.contentRevision + 1,
-                            expandedBlockId = null,
-                            blocks = listOf(loaded.block),
-                            capturedOnWatch = loaded.capturedOnWatch,
-                            selectedJournalIds = journalId?.let(::listOf) ?: currentState.selectedJournalIds,
-                            hasJournalSelectionChanges = false,
-                            isLoading = false,
-                            isModified = false,
-                            errorMessage = null,
-                        )
-                    }
-                },
-                onFailure = { e ->
-                    if (generation != loadGeneration || mutableEditorState.value.contentRevision != requestedContentRevision) return@fold
-                    if (activeLoadRequest == request) activeLoadRequest = null
-                    Napier.e("Failed to load existing entry: $entryId", e)
-                    mutableEditorState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = "Failed to load entry: ${e.message}",
-                        )
-                    }
-                },
-            )
-        }
-    }
-
-    private companion object {
+    internal companion object {
         /**
          * MediaRecorder.stop() typically completes in well under a second; the bound is
          * generous so a slow flush on an aging device doesn't cost the user their entry.
@@ -1428,7 +272,7 @@ class EntryEditorViewModel(
         const val AUDIO_FINALIZE_TIMEOUT_MS: Long = 5_000L
     }
 
-    private sealed interface LoadRequest {
+    internal sealed interface LoadRequest {
         data class Draft(
             val id: Uuid,
         ) : LoadRequest

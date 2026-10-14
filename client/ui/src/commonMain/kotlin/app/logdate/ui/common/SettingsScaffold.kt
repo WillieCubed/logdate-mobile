@@ -3,10 +3,12 @@
 package app.logdate.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
@@ -25,6 +27,8 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.common_back
@@ -52,6 +56,7 @@ fun SettingsScaffold(
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState? = null,
     topBarColors: TopAppBarColors? = null,
+    maxContentWidth: Dp = 600.dp,
     content: LazyListScope.() -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
@@ -63,19 +68,23 @@ fun SettingsScaffold(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
-            LargeTopAppBar(
-                title = { Text(title) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = stringResource(Res.string.common_back),
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = topBarColors ?: TopAppBarDefaults.topAppBarColors(),
-            )
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val sideInset = if (maxWidth > maxContentWidth) (maxWidth - maxContentWidth) / 2 else 0.dp
+                LargeTopAppBar(
+                    title = { Text(title) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = stringResource(Res.string.common_back),
+                            )
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = sideInset),
+                    scrollBehavior = scrollBehavior,
+                    colors = topBarColors ?: TopAppBarDefaults.topAppBarColors(),
+                )
+            }
         },
         snackbarHost = {
             if (snackbarHostState != null) {
@@ -83,7 +92,7 @@ fun SettingsScaffold(
             }
         },
     ) { paddingValues ->
-        DefaultSettingsContentContainer {
+        DefaultSettingsContentContainer(maxWidth = maxContentWidth) {
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 // Add a margin on top of the scaffold inset so the first item keeps breathing

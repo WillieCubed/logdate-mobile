@@ -65,6 +65,13 @@ class SharedPreferenceKey<T>(
         /** Whether the watch library includes this week's Rewind. */
         val WindowRewind = SharedPreferenceKey("window.rewind", true, Boolean.serializer())
 
+        val AudioDownloadPolicy =
+            SharedPreferenceKey(
+                "window.audioDownloads",
+                WatchAudioDownloadPolicy.WIFI_OR_CHARGING.stored,
+                String.serializer(),
+            ) { value -> WatchAudioDownloadPolicy.entries.any { it.stored == value } }
+
         val WINDOW_DAY_CHOICES: Set<Int> = setOf(7, 14, 30)
 
         val ALL: List<SharedPreferenceKey<*>> =
@@ -75,6 +82,7 @@ class SharedPreferenceKey<T>(
                 WindowDays,
                 WindowOnThisDay,
                 WindowRewind,
+                AudioDownloadPolicy,
             )
     }
 }

@@ -23,7 +23,7 @@ actual fun rememberHealthConnectPermissionState(): HealthConnectPermissionState 
     )
 
 @Composable
-actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState =
+actual fun rememberMediaLibraryPermissionState(includeVideos: Boolean): MediaLibraryPermissionState =
     MediaLibraryPermissionState(
         hasPermission = true,
         shouldShowRationale = false,

@@ -15,6 +15,9 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
+import app.logdate.feature.core.settings.ui.watch.v2.NoWatchSetupCoordinator
+import app.logdate.feature.core.settings.ui.watch.v2.WatchSetupCoordinator
 import app.logdate.feature.onboarding.flow.OnboardingDeviceState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
@@ -24,14 +27,17 @@ import app.logdate.feature.onboarding.flow.canCompleteOnboarding
 import app.logdate.feature.onboarding.flow.firstIncompleteRequiredOnboardingStep
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 
 /**
@@ -48,6 +54,8 @@ class OnboardingViewModel(
     private val onboardingDeviceStateRepository: OnboardingDeviceStateRepository,
     private val refreshStreakUseCase: RefreshStreakUseCase,
     private val identityKeyManager: IdentityKeyManager,
+    val watchSetup: WatchSetupCoordinator = NoWatchSetupCoordinator,
+    watchRollout: Flow<Boolean> = flowOf(false),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     private val _healthConnectStatus = MutableStateFlow(HealthConnectStatus.CHECKING)
@@ -67,7 +75,7 @@ class OnboardingViewModel(
                 initialValue = onboardingDeviceStateRepository.deviceState.value.activeEntryMode,
             )
 
-    val progressSnapshot: StateFlow<OnboardingProgressSnapshot> =
+    private val baseProgressSnapshot: StateFlow<OnboardingProgressSnapshot> =
         combine(
             observeUserIdentity(),
             combine(
@@ -112,6 +120,7 @@ class OnboardingViewModel(
                 locationHandledOnThisDevice = inputs.deviceState.locationHandledOnThisDevice,
                 locationTrackingEnabled = inputs.locationTrackingEnabled,
                 notificationsHandledOnThisDevice = inputs.deviceState.notificationsHandledOnThisDevice,
+                watchHandledOnThisDevice = inputs.deviceState.watchHandledOnThisDevice,
                 healthConnectStatus = inputs.healthStatus,
             )
         }.stateIn(
@@ -129,9 +138,29 @@ class OnboardingViewModel(
                         onboardingDeviceStateRepository.deviceState.value.locationHandledOnThisDevice,
                     notificationsHandledOnThisDevice =
                         onboardingDeviceStateRepository.deviceState.value.notificationsHandledOnThisDevice,
+                    watchHandledOnThisDevice = onboardingDeviceStateRepository.deviceState.value.watchHandledOnThisDevice,
                     healthConnectStatus = healthConnectStatus.value,
                 ),
         )
+
+    val progressSnapshot: StateFlow<OnboardingProgressSnapshot> =
+        combine(baseProgressSnapshot, watchRollout, watchSetup.connection()) { base, enabled, connection ->
+            base.copy(
+                watchAvailable =
+                    enabled && connection != WatchConnectionState.Loading && connection != WatchConnectionState.NoPairedWatch,
+            )
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, baseProgressSnapshot.value)
+
+    suspend fun markWatchHandled(): Result<Unit> =
+        try {
+            onboardingDeviceStateRepository.markWatchHandled()
+            Result.success(Unit)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.e("Could not save watch setup progress", failure)
+            Result.failure(failure)
+        }
 
     /**
      * Whether contextual recommendations are currently enabled.

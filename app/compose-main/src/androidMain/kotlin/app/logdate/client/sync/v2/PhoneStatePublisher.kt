@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
@@ -82,6 +83,12 @@ class PhoneStatePublisher(
     /** Reads the documents the watches published while this phone's app was not running. */
     suspend fun catchUpWithWatches() {
         channel.peerDocuments().forEach { peer -> peerStates.accept(peer.nodeId, peer.decoded, PeerRole.WATCH) }
+    }
+
+    /** Republish complete current inputs; presence must never publish placeholder account/campfire state. */
+    suspend fun refresh() {
+        catchUpWithWatches()
+        publish(v2Enabled.first(), sharedPreferences.first(), parts.first(), lastReminderAt.first())
     }
 
     suspend fun publish(

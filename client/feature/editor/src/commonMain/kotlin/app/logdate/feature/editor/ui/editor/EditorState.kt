@@ -55,6 +55,7 @@ class EditorState(
     val isEditingLocked: Boolean = false,
     val contentRevision: Long = 0,
     val visitContext: VisitMemoryContext? = null,
+    val markId: String? = null,
     val capturedOnWatch: Boolean = false,
 ) {
     val isRecordingAudio: Boolean
@@ -133,6 +134,7 @@ class EditorState(
         isEditingLocked: Boolean = this.isEditingLocked,
         contentRevision: Long = this.contentRevision,
         visitContext: VisitMemoryContext? = this.visitContext,
+        markId: String? = this.markId,
         capturedOnWatch: Boolean = this.capturedOnWatch,
     ): EditorState =
         EditorState(
@@ -155,6 +157,7 @@ class EditorState(
             isEditingLocked = isEditingLocked,
             contentRevision = contentRevision,
             visitContext = visitContext,
+            markId = markId,
             capturedOnWatch = capturedOnWatch,
         )
 
@@ -180,6 +183,7 @@ class EditorState(
         if (isSaving != other.isSaving) return false
         if (isEditingLocked != other.isEditingLocked) return false
         if (contentRevision != other.contentRevision) return false
+        if (markId != other.markId) return false
         if (visitContext != other.visitContext) return false
         if (capturedOnWatch != other.capturedOnWatch) return false
 
@@ -188,6 +192,7 @@ class EditorState(
 
     override fun hashCode(): Int {
         var result = blocks.hashCode()
+        result = 31 * result + (markId?.hashCode() ?: 0)
         result = 31 * result + (visitContext?.hashCode() ?: 0)
         result = 31 * result + (expandedBlockId?.hashCode() ?: 0)
         result = 31 * result + readOnlyBlocks.hashCode()

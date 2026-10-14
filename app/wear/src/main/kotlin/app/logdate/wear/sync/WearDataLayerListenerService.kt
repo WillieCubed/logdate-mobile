@@ -1,7 +1,13 @@
 package app.logdate.wear.sync
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.reminders.ReminderClaimResponder
 import app.logdate.client.domain.reminders.ReminderDeliveryResponder
 import app.logdate.client.media.storage.androidMediaFileResolver
@@ -11,20 +17,33 @@ import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
+import app.logdate.client.sync.continuity.HandoffFailure
+import app.logdate.client.sync.continuity.PlaybackHandoffResult
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
+import app.logdate.client.sync.datalayer.v2.WatchDiagnosticsProtocol
+import app.logdate.client.sync.datalayer.v2.WatchDiagnosticsResponder
+import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearPaths
+import app.logdate.client.sync.peer.removal.WatchRemovalProtocol
 import app.logdate.client.sync.peer.state.StateDocumentCodec
+import app.logdate.wear.launch.resolveWearServiceKoin
 import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
 import app.logdate.wear.reminders.WearPresenceResponder
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.sync.v2.link.answerWearRequest
+import app.logdate.wear.sync.v2.removal.WatchRemovalEndpoint
+import app.logdate.wear.sync.v2.removal.WatchRemovalEvents
+import app.logdate.wear.sync.v2.removal.WatchRemovalLock
 import app.logdate.wear.sync.v2.window.WindowDataEvents
 import app.logdate.wear.sync.v2.window.WindowItem
+import app.logdate.wear.v2.continuity.WatchPlaybackReceiver
+import app.logdate.wear.v2.continuity.WatchRecordingContinuity
 import app.logdate.wear.v2.surfaces.SurfaceUpdater
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.wearable.CapabilityInfo
@@ -42,28 +61,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
-/**
- * Receives data items from the paired phone via the Wear Data Layer API.
- *
- * Handles notes, journals, journal-content associations, and the phone's state document.
- * Uses [SyncableJournalNotesRepository.createFromSync] (and equivalents) to
- * avoid re-triggering outbound sync.
- *
- * Only changes the phone made are applied: the Data Layer also reports the watch's own writes back
- * to it, and deletions are ignored (see [isChangeFromAnotherDevice]).
- *
- * Messages from the phone (note acknowledgements, sync requests) and the phone becoming reachable
- * again go to [WearPhoneMessageHandler].
- *
- * Koin resilience: If DI is not ready when data arrives (e.g. app was just
- * started by the system), retries up to [MAX_KOIN_RETRIES] times with a short
- * delay before dropping the event.
- */
+/** Applies peer changes through sync repositories and resumes a retained watch removal. */
 class WearDataLayerListenerService : WearableListenerService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val noteDataMapper = NoteDataMapper()
@@ -101,19 +104,44 @@ class WearDataLayerListenerService : WearableListenerService() {
         request: ByteArray,
     ): ByteArray? {
         if (!WatchLinkCoordinator.handles(path) &&
+            path != WearPaths.LIVE_RECORDING_COMMAND &&
+            path != WearPaths.LIVE_PLAYBACK_COMMAND &&
             path != WearPaths.PRESENCE &&
             path != WearPaths.REMINDERS_CLAIM &&
-            path != WearPaths.REMINDERS_DELIVER
+            path != WearPaths.REMINDERS_DELIVER &&
+            path != WatchRemovalProtocol.PATH &&
+            path != WatchDiagnosticsProtocol.PATH
         ) {
             Napier.w("The phone sent a request this watch does not answer: $path")
             return null
         }
-        val koin = resolveKoin()
+        val playbackRequest = path == WearPaths.LIVE_PLAYBACK_COMMAND
+        val koin = resolveWearServiceKoin(if (playbackRequest) 8_000L else 1_000L)
         if (koin == null) {
-            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the phone's link request fails and is tried again")
+            if (playbackRequest) return playbackFailure(HandoffFailure.WATCH_STARTING)
+            Napier.e("Koin unavailable while encrypted storage is not ready; the phone's link request fails and is tried again")
             return null
         }
-        return if (path == WearPaths.REMINDERS_CLAIM) {
+        return if (path == WatchRemovalProtocol.PATH) {
+            koin.get<WatchRemovalEndpoint>().answer(nodeId, request)
+        } else if (path == WatchDiagnosticsProtocol.PATH) {
+            val peers = koin.get<WatchDeliveryPeer>()
+            val flags = koin.get<FeatureFlagStore>()
+            WatchDiagnosticsResponder(
+                current = peers::current,
+                enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+                notificationsAllowed = { NotificationManagerCompat.from(this).areNotificationsEnabled() },
+                microphoneAllowed = {
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                        PackageManager.PERMISSION_GRANTED
+                },
+            ).answer(nodeId, request)
+        } else if (path == WearPaths.LIVE_RECORDING_COMMAND) {
+            withContext(Dispatchers.Main.immediate) { koin.get<WatchRecordingContinuity>().answer(nodeId, request) }
+        } else if (path == WearPaths.LIVE_PLAYBACK_COMMAND) {
+            withTimeoutOrNull(20_000L) { koin.get<WatchPlaybackReceiver>().answer(nodeId, request) }
+                ?: playbackFailure(HandoffFailure.WATCH_DID_NOT_RESPOND)
+        } else if (path == WearPaths.REMINDERS_CLAIM) {
             koin.get<ReminderClaimResponder>().answer(nodeId, request)
         } else if (path == WearPaths.REMINDERS_DELIVER) {
             koin.get<ReminderDeliveryResponder>().answer(nodeId, request)
@@ -123,6 +151,9 @@ class WearDataLayerListenerService : WearableListenerService() {
             koin.get<WatchLinkCoordinator>().answer(nodeId, path, request)
         }
     }
+
+    private fun playbackFailure(failure: HandoffFailure): ByteArray =
+        WearJson.encodeToBytes(PlaybackHandoffResult.serializer(), PlaybackHandoffResult(accepted = false, failure = failure))
 
     /** The watch now belongs to another phone, so the link with [nodeId] is stale. */
     override fun onNodeMigrated(
@@ -134,7 +165,7 @@ class WearDataLayerListenerService : WearableListenerService() {
             withContext(NonCancellable) {
                 val koin = resolveKoin()
                 if (koin == null) {
-                    Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the move to another phone is noticed when it links")
+                    Napier.e("Koin unavailable while encrypted storage is not ready; the move to another phone is noticed when it links")
                     return@withContext
                 }
                 koin.get<WatchLinkCoordinator>().onNodeMigrated(nodeId)
@@ -145,7 +176,7 @@ class WearDataLayerListenerService : WearableListenerService() {
     private suspend fun resolvePhoneMessageHandler(): WearPhoneMessageHandler? {
         val koin = resolveKoin()
         if (koin == null) {
-            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping phone message")
+            Napier.e("Koin unavailable while encrypted storage is not ready, dropping phone message")
             return null
         }
         return koin.get()
@@ -181,7 +212,7 @@ class WearDataLayerListenerService : WearableListenerService() {
 
             val koin = resolveKoin()
             if (koin == null) {
-                Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping ${syncEvents.size} data events")
+                Napier.e("Koin unavailable while encrypted storage is not ready, dropping ${syncEvents.size} data events")
                 return@launch
             }
 
@@ -207,23 +238,28 @@ class WearDataLayerListenerService : WearableListenerService() {
         journalRepository: JournalRepository,
     ) = withContext(NonCancellable) {
         val path = event.path
+        if (koin.get<WatchRemovalEvents>().consume(event.sourceNodeId.orEmpty(), path, event.data)) {
+            return@withContext
+        }
 
-        try {
-            when {
-                koin.get<WindowDataEvents>().consume(WindowItem(event.sourceNodeId.orEmpty(), path, event.data)) -> Unit
-                NoteDataMapper.isDeletePath(
-                    path,
-                ) -> if (koin.get<WindowDataEvents>().legacyNotesAllowed()) handleNoteDelete(path, notesRepository, koin.get())
-                NoteDataMapper.isNotePath(
-                    path,
-                ) -> if (koin.get<WindowDataEvents>().legacyNotesAllowed()) handleNoteSync(path, event.data, notesRepository)
-                JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, journalRepository)
-                JournalDataMapper.isJournalPath(path) -> handleJournalSync(path, event.data, journalRepository)
-                AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, koin)
-                AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(path, event.data, koin)
+        koin.get<WatchRemovalLock>().ingest {
+            try {
+                when {
+                    koin.get<WindowDataEvents>().consume(WindowItem(event.sourceNodeId.orEmpty(), path, event.data)) -> Unit
+                    NoteDataMapper.isDeletePath(
+                        path,
+                    ) -> if (koin.get<WindowDataEvents>().legacyNotesAllowed()) handleNoteDelete(path, notesRepository, koin.get())
+                    NoteDataMapper.isNotePath(
+                        path,
+                    ) -> if (koin.get<WindowDataEvents>().legacyNotesAllowed()) handleNoteSync(path, event.data, notesRepository)
+                    JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, journalRepository)
+                    JournalDataMapper.isJournalPath(path) -> handleJournalSync(path, event.data, journalRepository)
+                    AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, koin)
+                    AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(path, event.data, koin)
+                }
+            } catch (e: Exception) {
+                Napier.e("Unhandled error processing sync event at path: $path", e)
             }
-        } catch (e: Exception) {
-            Napier.e("Unhandled error processing sync event at path: $path", e)
         }
     }
 
@@ -246,11 +282,14 @@ class WearDataLayerListenerService : WearableListenerService() {
         }
         val koin = resolveKoin()
         if (koin == null) {
-            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the phone's state is read again when LogDate next starts")
+            Napier.e("Koin unavailable while encrypted storage is not ready; the phone's state is read again when LogDate next starts")
             return
         }
         withContext(NonCancellable) {
-            koin.get<WatchStateMirror>().onPhoneDocument(sourceNodeId, localNodeId, StateDocumentCodec.fromDataMap(event.data))
+            if (koin.get<WatchRemovalLock>().removed()) return@withContext
+            koin.get<WatchRemovalLock>().ingest {
+                koin.get<WatchStateMirror>().onPhoneDocument(sourceNodeId, localNodeId, StateDocumentCodec.fromDataMap(event.data))
+            }
         }
     }
 
@@ -391,27 +430,8 @@ class WearDataLayerListenerService : WearableListenerService() {
         }
     }
 
-    /**
-     * Resolves the Koin instance, retrying with a short delay if DI isn't ready yet.
-     *
-     * The system may start this service before [Application.onCreate] completes
-     * (and therefore before Koin is initialized). A short retry gives the app
-     * time to finish initialization rather than silently dropping data.
-     */
-    private suspend fun resolveKoin(): org.koin.core.Koin? {
-        repeat(MAX_KOIN_RETRIES) { attempt ->
-            try {
-                return org.koin.java.KoinJavaComponent
-                    .getKoin()
-            } catch (e: Exception) {
-                if (attempt < MAX_KOIN_RETRIES - 1) {
-                    Napier.d("Koin not ready (attempt ${attempt + 1}/$MAX_KOIN_RETRIES), retrying...")
-                    delay(KOIN_RETRY_DELAY_MS)
-                }
-            }
-        }
-        return null
-    }
+    /** Cold messages wait briefly; callers retry instead of executing an expired handoff later. */
+    private suspend fun resolveKoin(): org.koin.core.Koin? = resolveWearServiceKoin()
 
     /**
      * The watch's own Data Layer node, whose writes come back to it as data events, or null when Play
@@ -459,9 +479,4 @@ class WearDataLayerListenerService : WearableListenerService() {
         val type: Int,
         val sourceNodeId: String?,
     )
-
-    private companion object {
-        const val MAX_KOIN_RETRIES = 3
-        const val KOIN_RETRY_DELAY_MS = 500L
-    }
 }

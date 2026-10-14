@@ -64,6 +64,7 @@ enum class PlaybackCommandType {
     SET_SPEED,
     CONTINUE_ON_PHONE,
     CONTINUE_ON_WATCH,
+    PREPARE_ON_WATCH,
 }
 
 /** Sent with `MessageClient.sendRequest` to [WearPaths.LIVE_PLAYBACK_COMMAND]. */

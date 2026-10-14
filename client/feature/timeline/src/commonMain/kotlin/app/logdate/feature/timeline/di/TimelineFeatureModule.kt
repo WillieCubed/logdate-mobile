@@ -14,5 +14,9 @@ val timelineFeatureModule: Module =
         includes(intelligenceModule)
         includes(networkingModule)
 
+        viewModel { parameters ->
+            app.logdate.feature.timeline.ui.marks
+                .MarkedMomentViewModel(parameters.get(), get())
+        }
         viewModel { TimelineViewModel(get(), get(), get(), get(), get(), get()) }
     }

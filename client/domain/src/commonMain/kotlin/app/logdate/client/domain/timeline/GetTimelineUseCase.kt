@@ -115,6 +115,7 @@ data class TimelineDay(
      * Raw journal notes that contributed to this day.
      */
     val entries: List<JournalNote> = emptyList(),
+    val marks: List<app.logdate.client.repository.moments.MarkedMoment> = emptyList(),
 )
 
 data class TimelinePlaceVisit(

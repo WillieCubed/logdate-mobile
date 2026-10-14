@@ -16,6 +16,7 @@ import app.logdate.ui.audio.AudioContext
 import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.util.formatDateLocalized
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -119,6 +120,15 @@ class AudioNoteViewerViewModel(
                 } else {
                     durationResolver.resolveDurationMs(note.mediaRef) ?: 0L
                 }
+            if (note.durationMs <= 0L && durationMs > 0L) {
+                try {
+                    notesRepository.updateAudioDurationIfUnknown(note.uid, note.mediaRef, durationMs)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Napier.w("Could not retain resolved audio duration", error)
+                }
+            }
             val shouldProcess =
                 cachedAudioMediaRef != note.mediaRef ||
                     cachedAudioDurationMs != durationMs ||

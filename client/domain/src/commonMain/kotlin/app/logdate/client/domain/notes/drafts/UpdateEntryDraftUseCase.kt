@@ -36,14 +36,26 @@ class UpdateEntryDraftUseCase(
         selectedJournalIds: List<Uuid>,
         overwrite: Boolean = true,
         visitContext: VisitMemoryContext? = null,
+        markId: String? = null,
     ): Uuid =
-        entryDraftRepository.updateDraft(
-            uid = draftId,
-            notes = content,
-            pendingMedia = pendingMedia,
-            selectedJournalIds = selectedJournalIds,
-            visitContext = visitContext,
-        )
+        if (markId == null) {
+            entryDraftRepository.updateDraft(
+                uid = draftId,
+                notes = content,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
+                visitContext = visitContext,
+            )
+        } else {
+            entryDraftRepository.updateDraft(
+                uid = draftId,
+                notes = content,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
+                visitContext = visitContext,
+                markId = markId,
+            )
+        }
 
     suspend operator fun invoke(
         draftId: Uuid,
@@ -57,5 +69,6 @@ class UpdateEntryDraftUseCase(
             pendingMedia = content.pendingMedia,
             selectedJournalIds = content.selectedJournalIds,
             visitContext = content.visitContext,
+            markId = content.markId,
         )
 }

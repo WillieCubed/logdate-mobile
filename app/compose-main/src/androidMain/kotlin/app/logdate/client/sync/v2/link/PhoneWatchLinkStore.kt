@@ -58,6 +58,7 @@ data class PhoneWatchLink(
     val nextAttemptAt: Long = 0,
     val seenWatchDocAt: Long = 0,
     val linkId: String? = null,
+    val sessionId: String? = null,
 )
 
 /** One record per watch, as one JSON value, and each watch's pair key in secure storage. */
@@ -148,10 +149,12 @@ class PhoneWatchLinkStore(
         nodeId: String,
         at: Long,
         seenWatchDocAt: Long,
+        sessionId: String? = null,
     ) {
         update(nodeId) { previous ->
             checkNotNull(previous) { "Only a recorded link can be confirmed" }.copy(
                 confirmedAt = at,
+                sessionId = sessionId ?: previous.sessionId,
                 seenWatchDocAt = seenWatchDocAt,
                 attempts = 0,
                 lastFailure = null,
@@ -159,6 +162,30 @@ class PhoneWatchLinkStore(
             )
         }
     }
+
+    suspend fun recordSession(
+        nodeId: String,
+        linkId: String,
+        sessionId: String,
+    ) {
+        update(nodeId) { previous ->
+            checkNotNull(previous).let { if (it.linkId == linkId) it.copy(sessionId = sessionId) else it }
+        }
+    }
+
+    suspend fun removalSuppressed(nodeId: String): Boolean = storage.getBoolean("watch.removed.$nodeId")
+
+    suspend fun allowRelink(nodeId: String) = storage.remove("watch.removed.$nodeId")
+
+    suspend fun forget(nodeId: String) =
+        mutex.withLock {
+            storage.putBoolean("watch.removed.$nodeId", true)
+            check(storage.getBoolean("watch.removed.$nodeId"))
+            val records = decode(storage.getString(KEY)) - nodeId
+            storage.putString(KEY, json.encodeToString(serializer, records))
+            check(decode(storage.getString(KEY))[nodeId] == null)
+            pairKeys.remove(nodeId)
+        }
 
     suspend fun claimAttention(
         nodeId: String,

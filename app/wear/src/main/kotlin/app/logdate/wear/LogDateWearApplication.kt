@@ -16,6 +16,9 @@ import app.logdate.wear.di.wearIdentityModule
 import app.logdate.wear.di.wearSyncV2Module
 import app.logdate.wear.di.wearV2Module
 import app.logdate.wear.launch.FeatureSwitch
+import app.logdate.wear.launch.WearStartup
+import app.logdate.wear.launch.WearStartupObservers
+import app.logdate.wear.launch.WearStartupState
 import app.logdate.wear.recording.OngoingRecordingDecorator
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
@@ -26,19 +29,21 @@ import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.v2.WatchStateMirror
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.sync.v2.media.WatchMediaPrefetchScheduler
+import app.logdate.wear.sync.v2.removal.WatchRemovalRecovery
 import app.logdate.wear.sync.v2.window.WindowReconciler
 import app.logdate.wear.v2.surfaces.SurfaceCoordinator
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
-import kotlin.concurrent.thread
 
 /**
  * Application class for LogDate Wear OS app.
@@ -54,6 +59,31 @@ import kotlin.concurrent.thread
 class LogDateWearApplication :
     Application(),
     RecordingNotificationDecorator.Provider {
+    internal val startupWorkScope get() = startupScope
+    private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var launchedAtMs = 0L
+    private val observers = WearStartupObservers()
+    internal val startup =
+        WearStartup(
+            scope = startupScope,
+            openStorage = {
+                val koin =
+                    org.koin.java.KoinJavaComponent
+                        .getKoin()
+                koin.get<LogDateDatabase>()
+            },
+            restoreRemoval = {
+                val recovery =
+                    org.koin.java.KoinJavaComponent
+                        .getKoin()
+                        .get<WatchRemovalRecovery>()
+                recovery.restore()
+                check(recovery.finish()) { "Watch removal is still pending" }
+            },
+            recoverRecording = { recoverInterruptedRecordings(launchedAtMs) },
+            startObservers = { startReadyObservers() },
+        )
+
     /** WATCH_EXPERIENCE_V2 for code that can't suspend, such as the recording notification. */
     internal val newWatchApp: FeatureSwitch by lazy {
         FeatureSwitch(
@@ -66,12 +96,12 @@ class LogDateWearApplication :
     }
 
     override val recordingNotificationDecorator: RecordingNotificationDecorator by lazy {
-        OngoingRecordingDecorator(enabled = { newWatchApp.isOn })
+        OngoingRecordingDecorator(enabled = { startup.state.value is WearStartupState.Ready && newWatchApp.isOn })
     }
 
     override fun onCreate() {
         super.onCreate()
-        val launchedAtMs = System.currentTimeMillis()
+        launchedAtMs = System.currentTimeMillis()
 
         Napier.base(DebugAntilog())
 
@@ -97,43 +127,49 @@ class LogDateWearApplication :
             }
         }
 
-        recoverInterruptedRecordings(launchedAtMs)
-        newWatchApp.start(
+        startup.start()
+        startupScope.launch {
+            startup.state.first { it is WearStartupState.Ready }
+            startSurfaces()
+        }
+    }
+
+    private fun startReadyObservers() {
+        observers.start(
+            "media-migration",
+        ) {
             org.koin.java.KoinJavaComponent
                 .getKoin()
-                .get<CoroutineScope>(),
-        )
+                .get<StoredMediaReferenceMigrationLauncher>()
+                .start()
+        }
+        val scope =
+            org.koin.java.KoinJavaComponent
+                .getKoin()
+                .get<CoroutineScope>()
+        observers.start("feature-switch") { newWatchApp.start(scope) }
         startSync()
-        startSurfaces()
-
         runCatching { LegacyPromptAlarms.cancel(this) }
             .onFailure { error -> Napier.w("Failed to remove the legacy journal prompts", error) }
         applyReminderBridging(this)
-
-        // Trigger database initialization on a background thread.
-        // The database singleton uses runBlocking for SQLCipher passphrase retrieval
-        // and Room database opening. By resolving it here off the main thread, the
-        // heavy I/O (KeyStore, EncryptedSharedPreferences, SQLCipher, Room migrations)
-        // runs in parallel with Activity creation instead of blocking the first UI frame.
-        warmUpDatabase()
     }
 
     /**
      * Saves recordings a killed process left behind. Only files written before this launch are
      * touched, so a recording started right away is never mistaken for one of them.
      */
-    private fun recoverInterruptedRecordings(launchedAtMs: Long) {
-        thread(name = "recording-recovery", isDaemon = true) {
-            try {
-                val recovery =
-                    org.koin.java.KoinJavaComponent
-                        .getKoin()
-                        .get<WearRecordingRecovery>()
-                val recovered = runBlocking { recovery.recover(modifiedBefore = launchedAtMs) }
-                if (recovered > 0) Napier.i("Recovered $recovered interrupted recording(s)")
-            } catch (e: Exception) {
-                Napier.e("Recovering interrupted recordings failed", e)
-            }
+    private suspend fun recoverInterruptedRecordings(launchedAtMs: Long) {
+        try {
+            val recovery =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get<WearRecordingRecovery>()
+            val recovered = recovery.recover(modifiedBefore = launchedAtMs)
+            if (recovered > 0) Napier.i("Recovered $recovered interrupted recording(s)")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.e("Recovering interrupted recordings failed; files are retained", error)
         }
     }
 
@@ -146,16 +182,16 @@ class LogDateWearApplication :
             org.koin.java.KoinJavaComponent
                 .getKoin()
         val scope = koin.get<CoroutineScope>()
-        koin.get<WatchStateMirror>().start(scope)
-        koin.get<WindowReconciler>().start(scope)
-        koin.get<WatchMediaPrefetchScheduler>().start(scope)
-        scope.launch { resumeAccountLink(koin) }
-        scope.launch {
-            newWatchApp.state.collect { restoreReminders(koin.get()) }
-        }
-        scope.launch {
-            requeueSetAsideCaptures(koin.get())
-            koin.get<WatchSyncScheduler>().start(this)
+        observers.start("state-mirror") { koin.get<WatchStateMirror>().start(scope) }
+        observers.start("window") { koin.get<WindowReconciler>().start(scope) }
+        observers.start("media-prefetch") { koin.get<WatchMediaPrefetchScheduler>().start(scope) }
+        observers.start("account-link") { scope.launch { resumeAccountLink(koin) } }
+        observers.start("reminders") { scope.launch { newWatchApp.state.collect { restoreReminders(koin.get()) } } }
+        observers.start("sync") {
+            scope.launch {
+                requeueSetAsideCaptures(koin.get())
+                koin.get<WatchSyncScheduler>().start(this)
+            }
         }
     }
 
@@ -196,19 +232,5 @@ class LogDateWearApplication :
             org.koin.java.KoinJavaComponent
                 .getKoin()
         koin.get<SurfaceCoordinator>().start(koin.get<CoroutineScope>())
-    }
-
-    private fun warmUpDatabase() {
-        thread(name = "db-warmup", isDaemon = true) {
-            try {
-                val koin =
-                    org.koin.java.KoinJavaComponent
-                        .getKoin()
-                koin.get<LogDateDatabase>()
-                koin.get<StoredMediaReferenceMigrationLauncher>().start()
-            } catch (e: Exception) {
-                Napier.w("Background database warmup failed", e)
-            }
-        }
     }
 }

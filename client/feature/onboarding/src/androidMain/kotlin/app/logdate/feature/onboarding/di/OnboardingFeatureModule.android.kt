@@ -1,6 +1,8 @@
 package app.logdate.feature.onboarding.di
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.di.billingModule
 import app.logdate.client.media.AndroidManagedMediaDiscarder
 import app.logdate.client.media.AndroidManagedMediaImportSource
@@ -33,7 +35,22 @@ actual val onboardingFeatureModule: Module =
         }
         single<OnboardingStateResetter> { OnboardingStateResetter { get<OnboardingDeviceStateRepository>().clear() } }
         single { OnboardingCompletionCoordinator(get(), get(), get(), get(), get(), get(), get(), get()) }
-        viewModel { OnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        viewModel {
+            OnboardingViewModel(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                watchSetup = get(),
+                watchRollout = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+            )
+        }
         single<SelectedMemoryMediaImporter> {
             val manager = get<MediaManager>()
             val context = androidContext().applicationContext

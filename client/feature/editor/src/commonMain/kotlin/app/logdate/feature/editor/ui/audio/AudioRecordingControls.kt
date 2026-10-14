@@ -29,6 +29,7 @@ import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.audio.AudioWaveformComponent
+import app.logdate.ui.audio.RecordingStopButton
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberLogDateHaptics
@@ -343,26 +344,13 @@ private fun RecordingActionButton(
     modifier: Modifier = Modifier,
 ) {
     if (recordingState == RecordingState.RECORDING) {
-        Button(
-            onClick = onStopRecording,
+        RecordingStopButton(
+            label = stringResource(Res.string.stop),
+            onStop = onStopRecording,
+            contentDescription = stringResource(Res.string.stop_recording),
             enabled = enabled,
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                ),
             modifier = modifier.testTag("audio_record_stop_button"),
-        ) {
-            Icon(
-                painter = PlatformIcons.stop(),
-                contentDescription = stringResource(Res.string.stop_recording),
-                modifier = Modifier.size(24.dp),
-            )
-            Text(
-                text = stringResource(Res.string.stop),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
-            )
-        }
+        )
     } else {
         Button(
             onClick = onStartRecording,

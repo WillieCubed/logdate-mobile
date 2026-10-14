@@ -7,7 +7,16 @@ import kotlinx.io.RawSource
 import kotlin.time.Duration
 import kotlin.time.Instant
 
+enum class PhotoLibraryAccess { FULL, LIMITED, DENIED }
+
 interface MediaManager {
+    fun photoLibraryAccess(): PhotoLibraryAccess = PhotoLibraryAccess.FULL
+
+    suspend fun observeMediaByDate(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<MediaObject>> = queryMediaByDate(start, end)
+
     /**
      * Retrieves a media object with the given [uri].
      *

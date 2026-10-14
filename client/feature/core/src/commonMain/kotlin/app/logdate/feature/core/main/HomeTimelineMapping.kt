@@ -56,8 +56,9 @@ internal fun TimelineDay.toHomeTimelineUiState(
         notes = noteUiStates,
         placesVisited = placeUiStates,
         events = eventUiStates,
-        isLoadingSummary = tldr.isEmpty(),
-        isLoadingPeople = people.isEmpty() && tldr.isEmpty(),
+        isLoadingSummary = tldr.isEmpty() && marks.isEmpty(),
+        isLoadingPeople = people.isEmpty() && tldr.isEmpty() && marks.isEmpty(),
+        pendingMarks = marks,
     )
 }
 
@@ -83,6 +84,7 @@ private fun Moment.toMomentUiState(
         }
     return MomentUiState(
         id = id.toString(),
+        capturedAt = estimatedStart,
         label = label,
         timeOfDay = timeOfDay,
         textSnippet = textFragments.firstOrNull()?.text,

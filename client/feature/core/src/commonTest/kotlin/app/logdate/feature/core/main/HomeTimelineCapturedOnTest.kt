@@ -5,8 +5,11 @@ import app.logdate.client.domain.timeline.MomentInferenceSource
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.moments.MarkState
+import app.logdate.client.repository.moments.MarkedMoment
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -45,6 +48,38 @@ class HomeTimelineCapturedOnTest {
 
         assertTrue(moments.single { it.id == watchOnly.id.toString() }.capturedOnWatch)
         assertFalse(moments.single { it.id == mixed.id.toString() }.capturedOnWatch)
+    }
+
+    @Test
+    fun `Home projects a pending mark into the semantic day instead of a detached prefix`() {
+        val mark = MarkedMoment(Uuid.random(), at, "UTC", null, null, MarkState.OPEN, "", emptySet(), "watch", at, 0)
+        val day = TimelineDay(start = at, end = at, tldr = "", date = LocalDate(2026, 10, 10), marks = listOf(mark))
+        assertEquals(
+            mark,
+            day
+                .toHomeTimelineUiState()
+                .moments
+                .single()
+                .pendingMark,
+        )
+    }
+
+    @Test
+    fun `Home retains fallback phone note while pending mark is part of same day`() {
+        val mark = MarkedMoment(Uuid.random(), at, "UTC", null, null, MarkState.OPEN, "", emptySet(), "watch", at, 0)
+        val day =
+            TimelineDay(
+                start = at,
+                end = at,
+                tldr = "",
+                date = LocalDate(2026, 10, 10),
+                entries = listOf(fromPhone),
+                marks = listOf(mark),
+            )
+        val moments = day.toHomeTimelineUiState().moments
+        assertEquals(2, moments.size)
+        assertTrue(moments.any { it.textSnippet == fromPhone.content })
+        assertTrue(moments.any { it.pendingMark?.id == mark.id })
     }
 
     private fun moment(notes: List<JournalNote>) =

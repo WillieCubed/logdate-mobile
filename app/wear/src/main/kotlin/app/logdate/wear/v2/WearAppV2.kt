@@ -7,10 +7,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -21,11 +23,14 @@ import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.navigation3.rememberSwipeDismissableSceneStrategy
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.sync.continuity.HandoffFailure
 import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LogDateHaptics
+import app.logdate.wear.R
 import app.logdate.wear.launch.WearLaunchRequest
 import app.logdate.wear.presentation.camera.WearRemoteCameraScreen
 import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
+import app.logdate.wear.sync.PhoneReachability
 import app.logdate.wear.v2.ambient.WatchAmbientScope
 import app.logdate.wear.v2.archive.ArchiveScreen
 import app.logdate.wear.v2.archive.ArchiveViewModel
@@ -33,6 +38,7 @@ import app.logdate.wear.v2.capture.CaptureConfirmation
 import app.logdate.wear.v2.capture.CaptureSheet
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
 import app.logdate.wear.v2.capture.rememberRemoteTextInput
+import app.logdate.wear.v2.continuity.WatchPlaybackHandoff
 import app.logdate.wear.v2.flow.FlowActions
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowViewModel
@@ -66,6 +72,7 @@ import app.logdate.wear.v2.today.TodayPage
 import app.logdate.wear.v2.today.TodayViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -266,6 +273,56 @@ private fun MomentEntry(
     val picker = koinInject<OutputPicker>()
     val canPick = remember(picker) { picker.route != OutputPickerRoute.NONE }
     val playOn: (() -> Unit)? = if (canPick) ({ picker.open() }) else null
+    val handoff = koinInject<WatchPlaybackHandoff>()
+    val reachability = koinInject<PhoneReachability>()
+    val scope = rememberCoroutineScope()
+    val openingMessage = stringResource(R.string.wear_moment_phone_opening)
+    val playingMessage = stringResource(R.string.wear_moment_phone_playing)
+    val playingOpenFailedMessage = stringResource(R.string.wear_moment_phone_playing_open_failed)
+    val audioNotReadyMessage = stringResource(R.string.wear_moment_phone_audio_not_ready)
+    val needsSetupMessage = stringResource(R.string.wear_moment_phone_needs_setup)
+    val playFailedMessage = stringResource(R.string.wear_moment_phone_play_failed)
+    val openedMessage = stringResource(R.string.wear_moment_phone_opened)
+    val openRetryFailedMessage = stringResource(R.string.wear_moment_phone_playing_open_retry_failed)
+    val openFailedMessage = stringResource(R.string.wear_moment_phone_open_failed)
+    var phoneAvailable by remember { mutableStateOf(false) }
+    var handoffBusy by remember { mutableStateOf(false) }
+    var handoffMessage by remember { mutableStateOf<String?>(null) }
+    var phoneOpenFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(handoff, reachability) {
+        reachability.observe().collect { phoneAvailable = it != null && handoff.available() }
+    }
+    val onPhone: (() -> Unit)? =
+        if (phoneAvailable && !handoffBusy) {
+            (
+                {
+                    scope.launch {
+                        handoffBusy = true
+                        phoneOpenFailed = false
+                        handoffMessage = openingMessage
+                        val noteId = kotlin.uuid.Uuid.parse(id)
+                        val failure = handoff.playOnPhone(noteId)
+                        handoffMessage =
+                            when (failure) {
+                                null -> {
+                                    phoneOpenFailed = !handoff.openOnPhone(noteId, target = "play")
+                                    if (phoneOpenFailed) {
+                                        playingOpenFailedMessage
+                                    } else {
+                                        playingMessage
+                                    }
+                                }
+                                HandoffFailure.AUDIO_NOT_ON_PHONE -> audioNotReadyMessage
+                                HandoffFailure.PHONE_NEEDS_SETUP -> needsSetupMessage
+                                else -> playFailedMessage
+                            }
+                        handoffBusy = false
+                    }
+                }
+            )
+        } else {
+            null
+        }
     LaunchedEffect(deleted) {
         if (deleted) onClose()
     }
@@ -279,6 +336,35 @@ private fun MomentEntry(
                 onSkipSilenceChange = viewModel::setSkipSilence,
                 onDelete = viewModel::delete,
                 onPlayOn = playOn,
+                onPlayOnPhone = if (phoneOpenFailed) null else onPhone,
+                onOpenOnPhone =
+                    if (phoneAvailable && !handoffBusy) {
+                        (
+                            {
+                                scope.launch {
+                                    handoffBusy = true
+                                    val retryPlaybackView = phoneOpenFailed
+                                    val opened =
+                                        handoff.openOnPhone(
+                                            kotlin.uuid.Uuid.parse(id),
+                                            target = if (retryPlaybackView) "play" else "edit",
+                                        )
+                                    phoneOpenFailed = retryPlaybackView && !opened
+                                    handoffMessage =
+                                        when {
+                                            opened && retryPlaybackView -> playingMessage
+                                            opened -> openedMessage
+                                            retryPlaybackView -> openRetryFailedMessage
+                                            else -> openFailedMessage
+                                        }
+                                    handoffBusy = false
+                                }
+                            }
+                        )
+                    } else {
+                        null
+                    },
+                phoneHandoffMessage = handoffMessage,
             ),
     )
 }

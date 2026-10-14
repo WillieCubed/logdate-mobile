@@ -11,7 +11,7 @@ expect fun rememberNotificationPermissionState(): NotificationPermissionState
 expect fun rememberHealthConnectPermissionState(): HealthConnectPermissionState
 
 @Composable
-expect fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState
+expect fun rememberMediaLibraryPermissionState(includeVideos: Boolean = true): MediaLibraryPermissionState
 
 @Composable
 expect fun rememberCalendarPermissionState(): CalendarPermissionState
@@ -49,6 +49,7 @@ data class MediaLibraryPermissionState(
     val shouldShowRationale: Boolean,
     val permissionRequested: Boolean,
     val requestPermission: () -> Unit,
+    val refreshRevision: Int = 0,
 )
 
 /**

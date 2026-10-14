@@ -15,6 +15,23 @@ import kotlin.test.assertTrue
  * the current device's configuration state.
  */
 class OnboardingFlowPlannerTest {
+    @kotlin.test.Test
+    fun `watch setup follows notifications only when available and unhandled`() {
+        val present = OnboardingProgressSnapshot(watchAvailable = true)
+        kotlin.test.assertEquals(
+            OnboardingStep.WATCH,
+            nextOnboardingStepAfter(OnboardingStep.NOTIFICATIONS, OnboardingEntryMode.FRESH, present),
+        )
+        kotlin.test.assertEquals(
+            OnboardingStep.COMPLETE,
+            nextOnboardingStepAfter(OnboardingStep.NOTIFICATIONS, OnboardingEntryMode.FRESH, present.copy(watchHandledOnThisDevice = true)),
+        )
+        kotlin.test.assertEquals(
+            OnboardingStep.COMPLETE,
+            nextOnboardingStepAfter(OnboardingStep.NOTIFICATIONS, OnboardingEntryMode.FRESH, present.copy(watchAvailable = false)),
+        )
+    }
+
     @Test
     fun `fresh flow includes full setup sequence when nothing is configured`() {
         val snapshot = OnboardingProgressSnapshot()

@@ -36,6 +36,7 @@ class QuickNoteWriter(
     private val notesRepository: JournalNotesRepository,
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
     private val clock: Clock = Clock.System,
+    private val captureGuard: WatchCaptureWriteGuard = WatchCaptureWriteGuard.Unrestricted,
 ) : FeelingSaver,
     TextNoteSaver {
     override suspend fun save(feeling: Feeling): Boolean = write(MomentNoteCodec.encode(feeling)) != null
@@ -58,7 +59,7 @@ class QuickNoteWriter(
                     location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationCaptureCoordinator.captureForJournalEntry() },
                     timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
                 )
-            notesRepository.create(note)
+            captureGuard.write { notesRepository.create(note) }
             note.uid
         } catch (e: CancellationException) {
             throw e

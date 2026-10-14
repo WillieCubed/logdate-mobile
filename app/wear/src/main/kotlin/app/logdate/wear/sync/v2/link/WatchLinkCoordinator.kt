@@ -196,7 +196,7 @@ class WatchLinkCoordinator(
         if (current?.stale == true || (phoneNode != null && current != null && current.phoneNode != phoneNode)) return
         when (outcome) {
             is InstallOutcome.Installed -> {
-                store.saveCloudLink(phoneNode.orEmpty(), outcome.accountId, outcome.origin, current?.linkId)
+                store.saveCloudLink(phoneNode.orEmpty(), outcome.accountId, outcome.origin, current?.linkId, outcome.sessionId)
                 Napier.i("This watch now syncs with its phone's account")
             }
             is InstallOutcome.Failed -> {

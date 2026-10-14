@@ -37,7 +37,6 @@ class FlowViewModelTest {
             start = LocalDate(2026, 10, 3).atStartOfDayIn(zone),
             end = LocalDate(2026, 10, 4).atStartOfDayIn(zone),
         )
-    private val windowStart = LocalDate(2026, 9, 20).atStartOfDayIn(zone)
     private val dayClock = mockk<DayClock> { every { observe() } returns flowOf(saturday) }
     private val notesRepository = mockk<JournalNotesRepository>()
 
@@ -52,7 +51,7 @@ class FlowViewModelTest {
     }
 
     @Test
-    fun `the list shows the last 7 days and counts the rest of the 14`() =
+    fun `the list shows the last 7 days and counts all retained older moments`() =
         runTest {
             val older = text("Lake walk", at(LocalDateTime(2026, 9, 21, 9, 0)))
             val monday = text("Monday walk", at(LocalDateTime(2026, 9, 28, 9, 0)))
@@ -79,21 +78,21 @@ class FlowViewModelTest {
         }
 
     @Test
-    fun `notes outside the window are left out`() =
+    fun `retained older sources remain available through Earlier`() =
         runTest {
             val tooOld = text("Too old", at(LocalDateTime(2026, 9, 19, 23, 0)))
             val sunday = text("Sunday", at(LocalDateTime(2026, 9, 27, 10, 0)))
             stubWindow(tooOld, sunday)
 
             FlowViewModel(dayClock, notesRepository).uiState.test {
-                assertEquals(FlowUiState.Ready(timeZone = zone, moments = listOf(sunday), earlierCount = 0), expectMostRecentItem())
+                assertEquals(FlowUiState.Ready(timeZone = zone, moments = listOf(sunday), earlierCount = 1), expectMostRecentItem())
             }
         }
 
     @Test
     fun `a failure reading notes shows the failed state`() =
         runTest {
-            every { notesRepository.observeNotesInRange(any(), any()) } returns flow { throw IOException("database closed") }
+            every { notesRepository.allNotesObserved } returns flow { throw IOException("database closed") }
 
             FlowViewModel(dayClock, notesRepository).uiState.test {
                 assertEquals(FlowUiState.Failed, expectMostRecentItem())
@@ -101,7 +100,7 @@ class FlowViewModelTest {
         }
 
     private fun stubWindow(vararg notes: JournalNote) {
-        every { notesRepository.observeNotesInRange(windowStart, saturday.end) } returns flowOf(notes.toList())
+        every { notesRepository.allNotesObserved } returns flowOf(notes.toList())
     }
 
     private fun at(local: LocalDateTime): Instant = local.toInstant(zone)

@@ -19,10 +19,15 @@ interface WatchConnectionManager {
      */
     suspend fun beginAssociation()
 
+    /** Explicitly permits setup of a watch the person previously removed. */
+    suspend fun prepareSetup(nodeId: String?) = Unit
+
     /**
      * Triggers an immediate sync with the connected watch.
      */
     suspend fun requestSync()
+
+    suspend fun requestSync(nodeId: String?) = requestSync()
 
     /**
      * Opens LogDate's Play Store listing on a connected watch: one without LogDate so it can be
@@ -30,8 +35,12 @@ interface WatchConnectionManager {
      */
     suspend fun installAppOnWatch(): WatchRequestResult
 
+    suspend fun installAppOnWatch(nodeId: String?): WatchRequestResult = installAppOnWatch()
+
     /**
      * Opens LogDate at Today on a connected watch that has it installed.
      */
     suspend fun openAppOnWatch(): WatchRequestResult
+
+    suspend fun openAppOnWatch(nodeId: String?): WatchRequestResult = openAppOnWatch()
 }

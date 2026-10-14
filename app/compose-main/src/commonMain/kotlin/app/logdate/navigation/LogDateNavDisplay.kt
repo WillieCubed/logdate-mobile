@@ -38,6 +38,7 @@ import app.logdate.feature.core.account.navigation.CloudAccountSetupRoute
 import app.logdate.feature.core.account.navigation.cloudAccountSetupEntry
 import app.logdate.feature.core.main.HomeRoute
 import app.logdate.feature.core.main.HomeScreen
+import app.logdate.feature.core.main.rememberWatchPlaybackHandoff
 import app.logdate.feature.core.navigation.BaseRoute
 import app.logdate.feature.core.profile.navigation.ProfileRoute
 import app.logdate.feature.core.profile.navigation.profileEntry
@@ -54,6 +55,7 @@ import app.logdate.feature.core.settings.navigation.navigateToSettingsCategory
 import app.logdate.feature.core.settings.navigation.settingsEntries
 import app.logdate.feature.core.settings.navigation.watchEntries
 import app.logdate.feature.core.sync.navigation.syncIssuesEntry
+import app.logdate.feature.core.watch.continuity.watchHandoffEntries
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.editor.navigation.editorEntry
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -226,7 +228,7 @@ fun LogDateNavDisplay(
                     displayName = appUiState.displayName,
                     onUsePasscode = onShowUnlockPrompt,
                 ) {
-                    AudioPlaybackProvider {
+                    AudioPlaybackProvider(handoff = rememberWatchPlaybackHandoff()) {
                         NavDisplay(
                             backStack = backStack,
                             onBack = { backStack.removeLastOrNull() },
@@ -252,6 +254,7 @@ fun LogDateNavDisplay(
                                     taggedEntry<HomeRoute>(metadata = ActivityPresentation.Home.asMetadata()) {
                                         HomeScreen(
                                             onNewEntry = { backStack.add(EntryEditorRoute()) },
+                                            onWriteMark = { backStack.add(EntryEditorRoute(markId = it.toString())) },
                                             onOpenJournal = { backStack.add(JournalDetailsRoute(it)) },
                                             onCreateJournal = { backStack.add(JournalCreationRoute()) },
                                             onBrowseJournals = { backStack.add(JournalsOverviewRoute) },
@@ -264,6 +267,7 @@ fun LogDateNavDisplay(
                                             onImportBackup = { backStack.add(ExportSettingsRoute) },
                                             onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },
                                             onOpenSyncSettings = { backStack.add(SyncSettingsRoute) },
+                                            onOpenWatch = { backStack.add(WatchSettingsRoute) },
                                             onOpenDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
                                             onOpenStreak = { backStack.add(StreakSettingsRoute) },
                                             libraryContent = { modifier ->
@@ -369,6 +373,7 @@ fun LogDateNavDisplay(
                                     )
                                     if (isWatchSupported) {
                                         watchEntries(
+                                            onNavigateToDetail = { backStack.add(it) },
                                             onNavigateToCategory = { backStack.navigateToSettingsCategory(it) },
                                             onNavigateToProfile = { backStack.add(ProfileRoute) },
                                             onBack = { backStack.removeLastOrNull() },
@@ -376,6 +381,21 @@ fun LogDateNavDisplay(
                                             onNavigateToTroubleshooting = { backStack.add(WatchTroubleshootingRoute) },
                                         )
                                     }
+                                    watchHandoffEntries(
+                                        onOpenDay = { day ->
+                                            backStack.removeLastOrNull()
+                                            backStack.add(TimelineDetailRoute(day.toString()))
+                                        },
+                                        onOpenEditor = { id ->
+                                            backStack.removeLastOrNull()
+                                            backStack.add(EntryEditorRoute(entryId = id))
+                                        },
+                                        onOpenPlayback = { id ->
+                                            backStack.removeLastOrNull()
+                                            backStack.add(NoteDetailRoute(id))
+                                        },
+                                        onBack = { backStack.removeLastOrNull() },
+                                    )
                                     cloudAccountSetupEntry(
                                         onAccountCreated = { backStack.removeLastOrNull() },
                                         onSkipped = { backStack.removeLastOrNull() },

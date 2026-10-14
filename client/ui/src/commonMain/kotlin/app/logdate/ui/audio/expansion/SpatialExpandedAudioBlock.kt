@@ -1,10 +1,6 @@
 package app.logdate.ui.audio.expansion
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.audio.formatAudioDuration
@@ -31,8 +26,13 @@ import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.ui.audio.model.AudioSegment
 import app.logdate.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.theme.Spacing
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.audio_transcribing
+import logdate.client.ui.generated.resources.search_type_label_voice_note
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 
 /**
@@ -41,7 +41,7 @@ import kotlin.time.Instant
  * Displays the full waveform with time-of-day palette colors,
  * basic playback controls, and contextual information.
  *
- * Tap expands to ELEVATED state, tap outside collapses.
+ * Playback controls and the output selector handle their own taps.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -55,47 +55,30 @@ fun SpatialExpandedAudioBlock(
     modifier: Modifier = Modifier,
     segments: List<AudioSegment> = emptyList(),
     transcript: String? = null,
+    isTranscribing: Boolean = false,
     onPlayPause: () -> Unit = {},
     onSeek: (Float) -> Unit = {},
-    onExpand: () -> Unit = {},
+    playbackActions: @Composable () -> Unit = {},
 ) {
-    val backgroundBrush =
-        Brush.verticalGradient(
-            colors =
-                listOf(
-                    Color(palette.waveformGradientStart).copy(alpha = 0.1f),
-                    Color(palette.waveformGradientEnd).copy(alpha = 0.05f),
-                ),
-        )
-
     Surface(
-        modifier =
-            modifier
-                .animateContentSize(
-                    animationSpec =
-                        spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow,
-                        ),
-                ).clickable { onExpand() },
-        shape = RoundedCornerShape(16.dp),
-        shadowElevation = 4.dp,
-        tonalElevation = 2.dp,
+        modifier = modifier.animateContentSize(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .background(backgroundBrush)
-                    .padding(16.dp),
-        ) {
+        Box(Modifier.padding(Spacing.md)) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 // The words come first: expanding a recording is how you read all of it.
-                transcript?.let { text ->
+                Text(
+                    text = transcript ?: stringResource(Res.string.search_type_label_voice_note),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                if (transcript == null && isTranscribing) {
                     Text(
-                        text = text,
-                        style = MaterialTheme.typography.bodyLarge,
+                        text = stringResource(Res.string.audio_transcribing),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
@@ -110,9 +93,11 @@ fun SpatialExpandedAudioBlock(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(80.dp)
+                            .height(72.dp)
                             .clip(RoundedCornerShape(8.dp)),
                 )
+
+                playbackActions()
 
                 // Controls row
                 Row(

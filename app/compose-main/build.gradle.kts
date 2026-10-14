@@ -161,6 +161,7 @@ kotlin {
             implementation(libs.coil.compose)
         }
         desktopTest.dependencies {
+            implementation(projects.client.awareness)
             implementation(libs.compose.ui.test)
             implementation(kotlin("test"))
             implementation(libs.kotlin.test.junit)

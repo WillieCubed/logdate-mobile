@@ -85,6 +85,7 @@ import kotlin.time.Clock
 /** Koin module for the phone's side of the version 2 watch protocol. */
 val phoneWatchSyncV2Module =
     module {
+        includes(phoneContinuityModule)
         includes(phoneMomentSyncModule)
         includes(phoneWatchWindowModule)
         includes(phoneReminderClaimsModule)
@@ -117,15 +118,7 @@ val phoneWatchSyncV2Module =
                 acceptsWatchPreferences = { node, document ->
                     peers.current(node)?.let { it.linkId == document.watch?.linkId } == true
                 },
-                features =
-                    setOf(
-                        WearFeatures.PREFS,
-                        WearFeatures.LINK_CLOUD,
-                        WearFeatures.RECEIPTS,
-                        WearFeatures.OPERATION_RECEIPTS,
-                        WearFeatures.WINDOW,
-                        WearFeatures.MEDIA_RANGE,
-                    ),
+                features = phoneWatchFeatures,
                 parts =
                     combine(sessions.getSessionFlow(), campfire(), hours.observe()) { session, fire, waking ->
                         PhoneStateParts(
@@ -285,3 +278,16 @@ val phoneWatchSyncV2Module =
 
 internal fun cloudPresence(session: UserSession?): CloudPresence =
     if (session == null) CloudPresence.NO_ACCOUNT else CloudPresence.SIGNED_IN
+
+val phoneWatchFeatures =
+    setOf(
+        WearFeatures.LIVE,
+        WearFeatures.PHONE_PLAYBACK,
+        WearFeatures.PREFS,
+        WearFeatures.LINK_CLOUD,
+        WearFeatures.RECEIPTS,
+        WearFeatures.OPERATION_RECEIPTS,
+        WearFeatures.MOMENTS,
+        WearFeatures.WINDOW,
+        WearFeatures.MEDIA_RANGE,
+    )

@@ -139,6 +139,7 @@ dependencies {
     implementation(projects.client.device)
     implementation(projects.client.location)
     implementation(projects.client.logdateDatastore)
+    implementation(libs.androidx.datastore.preferences)
     implementation(projects.client.networking)
     implementation(projects.client.sensor)
     implementation(projects.client.notifications)

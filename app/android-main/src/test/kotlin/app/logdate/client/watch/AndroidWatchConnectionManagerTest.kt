@@ -67,6 +67,27 @@ class AndroidWatchConnectionManagerTest {
         }
 
     @Test
+    fun `targeted update stays on selected installed watch despite another missing app`() =
+        runTest {
+            connected(withLogDate, withoutLogDate)
+            every { remoteActivityHelper.startRemoteActivity(linkIntent, any()) } returns accepted
+            assertEquals(WatchRequestResult.Sent, manager().installAppOnWatch("watch-with-logdate"))
+            verify(exactly = 1) { remoteActivityHelper.startRemoteActivity(linkIntent, "watch-with-logdate") }
+            verify(exactly = 0) { remoteActivityHelper.startRemoteActivity(linkIntent, "watch-without-logdate") }
+        }
+
+    @Test
+    fun `targeted open never falls back to another installed watch`() =
+        runTest {
+            connected(withLogDate, withoutLogDate)
+            assertEquals(
+                WatchRequestResult.Failed(WatchRequestFailure.NOT_INSTALLED_ON_WATCH),
+                manager().openAppOnWatch("watch-without-logdate"),
+            )
+            verify(exactly = 0) { remoteActivityHelper.startRemoteActivity(any(), any()) }
+        }
+
+    @Test
     fun `install opens the Play listing on a watch that has LogDate when it is the only one`() =
         runTest {
             connected(withLogDate)

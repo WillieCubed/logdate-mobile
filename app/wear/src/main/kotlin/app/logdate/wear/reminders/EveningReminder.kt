@@ -10,6 +10,7 @@ import app.logdate.client.domain.reminders.WakingHours
 import app.logdate.client.domain.reminders.WakingWindow
 import app.logdate.client.domain.today.TodaySummaryCalculator
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.launch.awaitWearStartup
 import app.logdate.wear.sync.PhoneReachability
 import app.logdate.wear.v2.today.DayClock
 import io.github.aakira.napier.Napier
@@ -135,6 +136,7 @@ class EveningReminderWorker(
     private val notesRepository: JournalNotesRepository by inject()
 
     override suspend fun doWork(): Result {
+        if (!applicationContext.awaitWearStartup()) return Result.retry()
         if (!reminders.awaitActive()) return Result.success()
         return try {
             EveningReminderCheck(

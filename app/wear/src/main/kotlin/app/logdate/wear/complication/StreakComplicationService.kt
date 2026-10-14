@@ -19,6 +19,7 @@ import app.logdate.client.domain.streak.FirePhase
 import app.logdate.client.domain.streak.toStreakDay
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
+import app.logdate.wear.launch.isWearStartupReady
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
@@ -48,6 +49,7 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
         }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
+        if (!isWearStartupReady()) return NoDataComplicationData()
         if (isCampfireEnabled()) {
             val campfire = calculateCampfire() ?: return NoDataComplicationData()
             return campfireComplicationData(

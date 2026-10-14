@@ -267,12 +267,12 @@ private fun AudioDeviceInfo.toMediaDeviceUiState(kind: MediaDeviceKind): MediaDe
     )
 
 private fun AudioDeviceInfo.labelFor(kind: MediaDeviceKind): String {
+    if (type == AudioDeviceInfo.TYPE_BUILTIN_MIC) return "Built-in microphone"
+    if (type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) return "This phone"
     val productName = productName?.toString()?.trim().orEmpty()
     if (productName.isNotBlank()) return productName
 
     return when (type) {
-        AudioDeviceInfo.TYPE_BUILTIN_MIC -> "Built-in microphone"
-        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Built-in speaker"
         AudioDeviceInfo.TYPE_WIRED_HEADSET -> if (kind == MediaDeviceKind.AUDIO_INPUT) "Headset microphone" else "Wired headset"
         AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired headphones"
         AudioDeviceInfo.TYPE_USB_DEVICE -> "USB audio device"

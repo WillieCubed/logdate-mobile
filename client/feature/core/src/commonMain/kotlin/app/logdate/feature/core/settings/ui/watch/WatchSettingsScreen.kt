@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPage
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPreferencesViewModel
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionSections
 import app.logdate.ui.adaptive.FoldableBookLayout
@@ -65,12 +66,34 @@ fun WatchSettingsScreen(
     onNavigateToTroubleshooting: () -> Unit,
     viewModel: WatchSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
+    onNavigateToReminders: () -> Unit = {},
+    onNavigateToTiles: () -> Unit = {},
+    onNavigateToMicrophone: () -> Unit = {},
+    onNavigateToRemove: () -> Unit = {},
+    onNavigateToConnectionCheck: () -> Unit = onNavigateToTroubleshooting,
 ) {
     val flags = koinInject<FeatureFlagStore>()
     val redesign by remember(flags) { flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) }.collectAsState(false)
     val status by viewModel.status.collectAsState()
     val requestFailure by viewModel.requestFailure.collectAsState()
 
+    if (redesign) {
+        WatchCompanionPage(
+            status,
+            requestFailure,
+            onBack,
+            viewModel::beginAssociation,
+            viewModel::installAppOnWatch,
+            onNavigateToReminders,
+            onNavigateToTiles,
+            onNavigateToMicrophone,
+            onNavigateToNotifications,
+            onNavigateToConnectionCheck,
+            onNavigateToRemove,
+            modifier,
+        ) { captureActions -> WatchCompanionSettings(captureActions = captureActions) }
+        return
+    }
     WatchSettingsContent(
         status = status,
         requestFailure = requestFailure,
@@ -91,7 +114,10 @@ fun WatchSettingsScreen(
 }
 
 @Composable
-private fun WatchCompanionSettings(viewModel: WatchCompanionPreferencesViewModel = koinViewModel()) {
+private fun WatchCompanionSettings(
+    captureActions: @Composable () -> Unit = {},
+    viewModel: WatchCompanionPreferencesViewModel = koinViewModel(),
+) {
     val state by viewModel.state.collectAsState()
     val saving by viewModel.saving.collectAsState()
     val saveFailed by viewModel.saveFailed.collectAsState()
@@ -104,7 +130,8 @@ private fun WatchCompanionSettings(viewModel: WatchCompanionPreferencesViewModel
         onRewind = { viewModel.set(SharedPreferenceKey.WindowRewind, it) },
         onPlaces = { viewModel.set(SharedPreferenceKey.CapturePlaces, it) },
         onMood = { viewModel.set(SharedPreferenceKey.MoodAfterRecording, it) },
-        modifier = Modifier.padding(horizontal = Spacing.lg),
+        onAudioDownloads = { viewModel.set(SharedPreferenceKey.AudioDownloadPolicy, it.stored) },
+        captureActions = captureActions,
     )
 }
 

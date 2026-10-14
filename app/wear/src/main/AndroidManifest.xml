@@ -94,6 +94,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/device/removal" />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
@@ -139,11 +140,15 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/logdate/live/recording/command" />
+                <data android:scheme="wear" android:host="*" android:path="/logdate/live/playback/command" />
                 <data
                     android:scheme="wear"
                     android:host="*"
                     android:pathPrefix="/logdate/link" />
                 <data android:path="/logdate/presence" />
+                <data android:path="/logdate/diag/ping" />
+                <data android:path="/logdate/v2/device/removal" />
                 <data android:path="/logdate/reminders/claim" />
                 <data android:path="/logdate/reminders/deliver" />
             </intent-filter>
@@ -368,6 +373,7 @@
                     android:scheme="studio.hypertext.logdate"
                     android:host="watch"
                     android:path="/today" />
+                <data android:scheme="studio.hypertext.logdate" android:host="watch" android:pathPrefix="/moment/" />
             </intent-filter>
         </activity>
     </application>

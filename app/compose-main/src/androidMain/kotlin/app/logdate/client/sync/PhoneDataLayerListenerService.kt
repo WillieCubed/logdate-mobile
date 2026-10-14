@@ -16,6 +16,8 @@ import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.StateDocumentCodec
+import app.logdate.client.sync.v2.continuity.PhonePlaybackHandoffHandler
+import app.logdate.client.sync.v2.continuity.PhoneRecordingContinuity
 import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.client.sync.v2.media.PhoneMediaEndpoint
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
@@ -39,11 +41,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.InputStream
 
 /**
@@ -72,7 +74,6 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         private const val CAMERA_SELECT_BACK = "back"
         private const val CAMERA_SELECT_DEVICE_PREFIX = "device:"
         private const val MAX_KOIN_RETRIES = 3
-        private const val KOIN_RETRY_DELAY_MS = 500L
     }
 
     /** A watch turning on its redesigned app is the moment to link it, even when LogDate was not running. */
@@ -91,6 +92,10 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     override fun onMessageReceived(messageEvent: MessageEvent) {
         serviceScope.launch {
             when {
+                messageEvent.path == WearPaths.LIVE_RECORDING -> {
+                    resolveKoin()?.get<PhoneRecordingContinuity>()?.receive(messageEvent.sourceNodeId, messageEvent.data)
+                }
+
                 messageEvent.path == PATH_CAMERA_OPEN -> {
                     Napier.d("Watch requested camera open")
                     try {
@@ -245,6 +250,9 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         request: ByteArray,
     ): ByteArray? =
         when {
+            path == WearPaths.LIVE_PLAYBACK_COMMAND ->
+                withTimeoutOrNull(5_000L) { resolveKoin()?.get<PhonePlaybackHandoffHandler>() }
+                    ?.answer(nodeId, request)
             path == WearPaths.RECEIPTS && receiptsActive() -> resolveKoin()?.get<WatchReceiptResponder>()?.answer(nodeId, request)
             path == WearPaths.WINDOW_RESYNC -> resolveKoin()?.get<WindowResyncResponder>()?.answer(nodeId, request)
             path == WearPaths.REMINDERS_CLAIM -> resolveKoin()?.get<ReminderClaimResponder>()?.answer(nodeId, request)
@@ -438,21 +446,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         peerStates.accept(watchNode, StateDocumentCodec.fromDataMap(event.data), PeerRole.WATCH)
     }
 
-    /** Retries briefly when dependency injection is not ready. */
-    private suspend fun resolveKoin(): org.koin.core.Koin? {
-        repeat(MAX_KOIN_RETRIES) { attempt ->
-            try {
-                return org.koin.java.KoinJavaComponent
-                    .getKoin()
-            } catch (e: Exception) {
-                if (attempt < MAX_KOIN_RETRIES - 1) {
-                    Napier.d("Koin not ready (attempt ${attempt + 1}/$MAX_KOIN_RETRIES), retrying...")
-                    delay(KOIN_RETRY_DELAY_MS)
-                }
-            }
-        }
-        return null
-    }
+    private suspend fun resolveKoin(): org.koin.core.Koin? = resolvePhoneServiceKoin()
 
     protected open suspend fun publishWindowInstead(nodeId: String): Boolean =
         resolveKoin()?.get<WatchWindowPublisher>()?.publishInstead(nodeId) == true

@@ -121,6 +121,30 @@ interface EntryDraftRepository {
         return updateDraft(uid, notes, pendingMedia, selectedJournalIds)
     }
 
+    suspend fun createDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
+        markId: String?,
+    ): Uuid {
+        check(markId == null) { "This draft repository cannot preserve marked moment context" }
+        return createDraft(uid, notes, pendingMedia, selectedJournalIds, visitContext)
+    }
+
+    suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
+        markId: String?,
+    ): Uuid {
+        check(markId == null) { "This draft repository cannot preserve marked moment context" }
+        return updateDraft(uid, notes, pendingMedia, selectedJournalIds, visitContext)
+    }
+
     /**
      * Deletes any drafts with the given UID.
      *
@@ -162,6 +186,7 @@ data class EntryDraft(
         Uuid,
     > = emptyList(),
     val visitContext: VisitMemoryContext? = null,
+    val markId: String? = null,
 )
 
 /** Type of pending media. Currently only audio is wired; camera/video will follow. */

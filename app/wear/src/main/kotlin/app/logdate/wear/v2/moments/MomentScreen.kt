@@ -77,32 +77,6 @@ import app.logdate.wear.v2.playback.fullTranscript
 import java.text.NumberFormat
 import kotlin.time.Duration.Companion.milliseconds
 
-object MomentTags {
-    const val SCREEN = "moment_screen"
-    const val PLAYER = "moment_player"
-    const val POSITION = "moment_position"
-    const val PLAY_PAUSE = "moment_play_pause"
-    const val SPEED = "moment_speed"
-    const val SKIP_SILENCE = "moment_skip_silence"
-    const val CAPTION = "moment_caption"
-    const val DETAILS = "moment_details"
-    const val DELETE = "moment_delete"
-    const val CONFIRM_DELETE = "moment_confirm_delete"
-    const val MISSING = "moment_missing"
-    const val PLAY_ON = "moment_play_on"
-    const val CHOOSE_OUTPUT = "moment_choose_output"
-}
-
-/** What the person can do on a moment's screen. Delete and Play on appear only with their handlers. */
-data class MomentActions(
-    val onPlayPause: () -> Unit = {},
-    val onCrown: (Float) -> Unit = {},
-    val onCycleSpeed: () -> Unit = {},
-    val onSkipSilenceChange: (Boolean) -> Unit = {},
-    val onDelete: (() -> Unit)? = null,
-    val onPlayOn: (() -> Unit)? = null,
-)
-
 /**
  * One moment. A voice note opens on its player, where turning the crown moves through the
  * recording; swiping up shows its transcript, place and actions. Any other moment opens on those
@@ -133,6 +107,9 @@ fun MomentDetailsPage(
     state: MomentUiState.Ready,
     onDelete: (() -> Unit)?,
     onPlayOn: (() -> Unit)? = null,
+    onPlayOnPhone: (() -> Unit)? = null,
+    onOpenOnPhone: (() -> Unit)? = null,
+    phoneHandoffMessage: String? = null,
     modifier: Modifier = Modifier,
     timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
 ) {
@@ -153,6 +130,25 @@ fun MomentDetailsPage(
             if (onPlayOn != null && note is JournalNote.Audio) {
                 item { PlayOnButton(onPlayOn, Modifier.transformedHeight(this, spec), SurfaceTransformation(spec)) }
             }
+            if (onPlayOnPhone != null && note is JournalNote.Audio) {
+                item {
+                    Button(
+                        onClick = onPlayOnPhone,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.wear_moment_play_on_phone)) },
+                    )
+                }
+            }
+            if (onOpenOnPhone != null && (note !is JournalNote.Audio || onPlayOnPhone == null)) {
+                item {
+                    Button(
+                        onClick = onOpenOnPhone,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.wear_moment_open_on_phone)) },
+                    )
+                }
+            }
+            if (phoneHandoffMessage != null) item { DetailText(phoneHandoffMessage) }
             if (state.deleteFailed) {
                 item { DetailText(stringResource(R.string.wear_moment_delete_failed), MaterialTheme.colorScheme.error) }
             }
@@ -184,7 +180,13 @@ private fun ReadyMoment(
     if (note is JournalNote.Audio) {
         VoiceMoment(note, state, actions, askToDelete, timeSource)
     } else {
-        MomentDetailsPage(state, askToDelete, timeSource = timeSource)
+        MomentDetailsPage(
+            state,
+            askToDelete,
+            onOpenOnPhone = actions.onOpenOnPhone,
+            phoneHandoffMessage = actions.phoneHandoffMessage,
+            timeSource = timeSource,
+        )
     }
     DeleteDialog(
         visible = confirmingDelete,
@@ -211,7 +213,15 @@ private fun VoiceMoment(
                 if (page == PLAYER_PAGE) {
                     MomentPlayerPage(note, state, actions)
                 } else {
-                    MomentDetailsPage(state, onDelete, onPlayOn = actions.onPlayOn, timeSource = timeSource)
+                    MomentDetailsPage(
+                        state,
+                        onDelete,
+                        onPlayOn = actions.onPlayOn,
+                        onPlayOnPhone = actions.onPlayOnPhone,
+                        onOpenOnPhone = actions.onOpenOnPhone,
+                        phoneHandoffMessage = actions.phoneHandoffMessage,
+                        timeSource = timeSource,
+                    )
                 }
             }
         }

@@ -4,6 +4,7 @@ import app.logdate.client.domain.streak.CampfireState
 import app.logdate.client.domain.streak.FirePhase
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.Decoded
+import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.peer.state.CampfireSnapshot
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerDocument
@@ -14,6 +15,7 @@ import app.logdate.client.sync.peer.state.Stamped
 import app.logdate.client.sync.peer.state.StateDocument
 import app.logdate.client.sync.peer.state.StateDocumentChannel
 import app.logdate.client.sync.peer.state.WatchState
+import app.logdate.di.phoneWatchFeatures
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -32,6 +34,54 @@ import kotlin.time.Instant
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneStatePublisherTest {
+    @Test
+    fun `production phone advertises marked moment ingestion with operation receipts`() =
+        runTest {
+            val publisher = PhoneStatePublisher(enabled, channel, capabilities, peerStates, features = phoneWatchFeatures)
+            publisher.refresh()
+            val features =
+                channel.published
+                    .last()
+                    .phone!!
+                    .features
+            kotlin.test.assertTrue(WearFeatures.MOMENTS in features)
+            kotlin.test.assertTrue(WearFeatures.OPERATION_RECEIPTS in features)
+        }
+
+    @Test
+    fun `presence refresh publishes current complete inputs rather than placeholder defaults`() =
+        runTest {
+            val current = PhoneStateParts(cloud = CloudPresence.SIGNED_IN, dayStartHour = 5)
+            val shared = mapOf("window.audioDownloads" to Stamped(JsonPrimitive("on_demand"), 100))
+            val publisher =
+                PhoneStatePublisher(
+                    enabled,
+                    channel,
+                    capabilities,
+                    peerStates,
+                    parts = MutableStateFlow(current),
+                    sharedPreferences = MutableStateFlow(shared),
+                    lastReminderAt = MutableStateFlow(900L),
+                )
+            publisher.refresh()
+            assertEquals(
+                CloudPresence.SIGNED_IN,
+                channel.published
+                    .last()
+                    .phone
+                    ?.cloud,
+            )
+            assertEquals(
+                5,
+                channel.published
+                    .last()
+                    .phone
+                    ?.dayStartHour,
+            )
+            assertEquals(shared, channel.published.last().shared)
+            assertEquals(900L, channel.published.last().lastReminderAt)
+        }
+
     @Test
     fun `learned waking hours are published as phone owned state`() =
         runTest {

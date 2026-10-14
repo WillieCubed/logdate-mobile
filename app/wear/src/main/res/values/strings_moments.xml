@@ -18,8 +18,19 @@
     <string name="wear_moment_delete_title">Delete this moment?</string>
     <string name="wear_moment_delete_body">It’s deleted from your phone too.</string>
     <string name="wear_moment_delete_failed">Couldn’t delete this moment</string>
-    <string name="wear_moment_play_on">Play on…</string>
+    <string name="wear_moment_play_on">Audio output</string>
     <string name="wear_moment_choose_output">Choose output</string>
+    <string name="wear_moment_play_on_phone">Play on phone</string>
+    <string name="wear_moment_open_on_phone">Open on phone</string>
+    <string name="wear_moment_phone_opening">Opening on phone…</string>
+    <string name="wear_moment_phone_playing">Playing on phone</string>
+    <string name="wear_moment_phone_playing_open_failed">Playing on phone. Open LogDate there for controls.</string>
+    <string name="wear_moment_phone_audio_not_ready">This recording hasn’t reached your phone yet. Try again after syncing.</string>
+    <string name="wear_moment_phone_needs_setup">Open LogDate on your phone to finish setup.</string>
+    <string name="wear_moment_phone_play_failed">Couldn’t play on your phone. Try again.</string>
+    <string name="wear_moment_phone_opened">Sent to your phone</string>
+    <string name="wear_moment_phone_playing_open_retry_failed">Still playing on phone. Open LogDate there for controls.</string>
+    <string name="wear_moment_phone_open_failed">Couldn’t reach your phone. Try again.</string>
 
     <!-- The moment list and the Archive, in the new watch app -->
     <string name="wear_flow_earlier">Earlier</string>
@@ -28,7 +39,8 @@
         <item quantity="other">%1$d more moments</item>
     </plurals>
     <string name="wear_archive_title">Earlier</string>
-    <string name="wear_archive_empty">No earlier moments in the last 14 days</string>
+    <string name="wear_archive_starred">Starred</string>
+    <string name="wear_archive_empty">No earlier moments on your watch</string>
     <string name="wear_archive_failed">Couldn’t load earlier moments</string>
 
     <!-- Memory cards, in the new watch app -->

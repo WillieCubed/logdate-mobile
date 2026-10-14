@@ -62,7 +62,13 @@ fun NavKey.settingsCategory(): SettingsCategory? =
         LocationSettingsRoute, LocationTrackingOptionsRoute, LocationIntervalRoute,
         LocationAdvancedRoute,
         -> SettingsCategory.Location
-        WatchSettingsRoute, WatchNotificationSettingsRoute, WatchTroubleshootingRoute -> SettingsCategory.Watch
+        WatchSettingsRoute,
+        WatchNotificationSettingsRoute,
+        WatchTroubleshootingRoute,
+        WatchTilesRoute,
+        WatchCheckConnectionRoute,
+        WatchMicrophoneRoute,
+        -> SettingsCategory.Watch
         SyncSettingsRoute, DataSettingsRoute -> SettingsCategory.Backup
         ExportSettingsRoute -> SettingsCategory.Export
         ResetSettingsRoute, ClearDataSettingsRoute, ResetAppSettingsRoute -> SettingsCategory.Reset

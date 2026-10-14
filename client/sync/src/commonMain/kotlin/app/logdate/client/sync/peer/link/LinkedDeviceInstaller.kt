@@ -66,6 +66,7 @@ sealed interface InstallOutcome {
         val accountId: String,
         val origin: String,
         val leftBehind: Int,
+        val sessionId: String? = null,
     ) : InstallOutcome
 
     data class Failed(
@@ -142,11 +143,11 @@ class LinkedDeviceInstaller(
             save(entry.copy(step = InstallStep.KEYS_INSTALLED))
             val session =
                 when (val redeemed = redeem(fields)) {
-                    is Redeemed.Session -> redeemed.session
+                    is Redeemed.Session -> redeemed
                     is Redeemed.Refused -> return@withLock abandon(redeemed.problem)
                 }
-            sessions.write(fields.origin, session)
-            val saved = entry.copy(step = InstallStep.SESSION_SAVED)
+            sessions.write(fields.origin, session.session)
+            val saved = entry.copy(step = InstallStep.SESSION_SAVED, sessionId = session.sessionId)
             save(saved)
             finish(saved)
         }
@@ -198,7 +199,7 @@ class LinkedDeviceInstaller(
         persistConfiguration()
         journal.remove(KEY)
         Napier.i("This device is linked to its phone's account; ${moved.leftBehind} queued change(s) stayed with its earlier owner")
-        return InstallOutcome.Installed(moved.accountId, moved.origin, moved.leftBehind)
+        return InstallOutcome.Installed(moved.accountId, moved.origin, moved.leftBehind, moved.sessionId)
     }
 
     private suspend fun moveRows(entry: InstallJournal): InstallJournal? {
@@ -246,7 +247,10 @@ class LinkedDeviceInstaller(
         ) {
             return Redeemed.Refused(LinkProblem.SERVER_REFUSED)
         }
-        return Redeemed.Session(UserSession(response.tokens.accessToken, response.tokens.refreshToken, response.accountId))
+        return Redeemed.Session(
+            UserSession(response.tokens.accessToken, response.tokens.refreshToken, response.accountId),
+            response.sessionId,
+        )
     }
 
     private fun problemFor(error: Throwable): LinkProblem {
@@ -289,6 +293,7 @@ class LinkedDeviceInstaller(
     private sealed interface Redeemed {
         data class Session(
             val session: UserSession,
+            val sessionId: String,
         ) : Redeemed
 
         data class Refused(
@@ -313,6 +318,7 @@ class LinkedDeviceInstaller(
         val oldOwner: String,
         val oldOrigin: String,
         val leftBehind: Int = 0,
+        val sessionId: String? = null,
     )
 
     private class CloudLinkFields(

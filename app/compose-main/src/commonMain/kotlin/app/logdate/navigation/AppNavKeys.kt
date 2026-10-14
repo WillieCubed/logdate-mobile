@@ -49,10 +49,14 @@ import app.logdate.feature.core.settings.navigation.StreakSettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
 import app.logdate.feature.core.settings.navigation.TimelineSettingsRoute
 import app.logdate.feature.core.settings.navigation.VoiceNotesSettingsRoute
+import app.logdate.feature.core.settings.navigation.WatchCheckConnectionRoute
+import app.logdate.feature.core.settings.navigation.WatchMicrophoneRoute
 import app.logdate.feature.core.settings.navigation.WatchNotificationSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchSettingsRoute
+import app.logdate.feature.core.settings.navigation.WatchTilesRoute
 import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
 import app.logdate.feature.core.sync.navigation.SyncIssuesRoute
+import app.logdate.feature.core.watch.continuity.WatchHandoffRoute
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalContentPickerRoute
@@ -72,6 +76,7 @@ import app.logdate.feature.onboarding.navigation.FeatureDayBoundaries
 import app.logdate.feature.onboarding.navigation.FeatureLocationTimeline
 import app.logdate.feature.onboarding.navigation.FeatureNotifications
 import app.logdate.feature.onboarding.navigation.FeatureRecommendations
+import app.logdate.feature.onboarding.navigation.FeatureWatch
 import app.logdate.feature.onboarding.navigation.FirstEntryImportOffer
 import app.logdate.feature.onboarding.navigation.FirstEntryMemorySelection
 import app.logdate.feature.onboarding.navigation.MemoryImport
@@ -127,6 +132,7 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(FeatureDayBoundaries::class, FeatureDayBoundaries.serializer())
                     subclass(FeatureLocationTimeline::class, FeatureLocationTimeline.serializer())
                     subclass(FeatureNotifications::class, FeatureNotifications.serializer())
+                    subclass(FeatureWatch::class, FeatureWatch.serializer())
                     subclass(OnboardingComplete::class, OnboardingComplete.serializer())
                     subclass(FirstEntryImportOffer::class, FirstEntryImportOffer.serializer())
                     subclass(FirstEntryMemorySelection::class, FirstEntryMemorySelection.serializer())
@@ -175,6 +181,15 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(PeopleInboxRoute::class, PeopleInboxRoute.serializer())
                     subclass(PersonDetailRoute::class, PersonDetailRoute.serializer())
                     subclass(WatchSettingsRoute::class, WatchSettingsRoute.serializer())
+                    subclass(WatchTilesRoute::class, WatchTilesRoute.serializer())
+                    subclass(
+                        app.logdate.feature.core.settings.navigation.WatchRemovalRoute::class,
+                        app.logdate.feature.core.settings.navigation.WatchRemovalRoute
+                            .serializer(),
+                    )
+                    subclass(WatchCheckConnectionRoute::class, WatchCheckConnectionRoute.serializer())
+                    subclass(WatchMicrophoneRoute::class, WatchMicrophoneRoute.serializer())
+                    subclass(WatchHandoffRoute::class, WatchHandoffRoute.serializer())
                     subclass(WatchNotificationSettingsRoute::class, WatchNotificationSettingsRoute.serializer())
                     subclass(WatchTroubleshootingRoute::class, WatchTroubleshootingRoute.serializer())
 

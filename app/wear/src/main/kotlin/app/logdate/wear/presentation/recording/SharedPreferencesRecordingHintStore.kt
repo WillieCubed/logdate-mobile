@@ -14,8 +14,8 @@ class SharedPreferencesRecordingHintStore(
         preferences.edit { putBoolean(KEY_HINT_SEEN, true) }
     }
 
-    private companion object {
+    companion object {
         const val PREFERENCES_NAME = "wear_recorder"
-        const val KEY_HINT_SEEN = "gesture_hint_seen"
+        private const val KEY_HINT_SEEN = "gesture_hint_seen"
     }
 }

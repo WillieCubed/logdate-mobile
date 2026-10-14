@@ -5,7 +5,10 @@ import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WindowMemberRef
+import app.logdate.client.sync.datalayer.v2.WindowReason
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
@@ -16,6 +19,7 @@ data class WindowProjection(
     val contentVersion: Long,
     val fingerprints: Set<String>,
     val bodyFingerprint: String,
+    val reasons: Set<WindowReason> = emptySet(),
 )
 
 @Serializable
@@ -31,6 +35,9 @@ class WindowMembershipStore(
     private val storage: KeyValueStorage,
     private val kind: RecordKind = RecordKind.NOTE,
 ) {
+    private val updates = MutableSharedFlow<Unit>(replay = 1)
+    val changes = updates.asSharedFlow()
+
     suspend fun read(peer: PeerDeliveryContext): WindowMembership {
         val saved = storage.getString(key(peer)) ?: return WindowMembership()
         return try {
@@ -47,6 +54,7 @@ class WindowMembershipStore(
     ) {
         require(valid(state)) { "Invalid watch library membership" }
         storage.putString(key(peer), WearJson.encode(WindowMembership.serializer(), state))
+        updates.tryEmit(Unit)
     }
 
     private fun key(peer: PeerDeliveryContext): String {

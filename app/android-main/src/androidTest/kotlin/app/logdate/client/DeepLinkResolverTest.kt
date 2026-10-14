@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.ui.navigation.LocationTimelineRoute
 import app.logdate.client.ui.navigation.SearchRoute
+import app.logdate.feature.core.watch.continuity.WatchHandoffRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
@@ -45,6 +46,16 @@ class DeepLinkResolverTest {
         assertEquals(
             NoteDetailRoute(noteId),
             resolveDeepLinkUri(Uri.parse("https://williecubed.logdate.app/note/$noteId")),
+        )
+    }
+
+    @Test
+    fun `watch playback link resolves the same recording`() {
+        val noteId = Uuid.random()
+
+        assertEquals(
+            WatchHandoffRoute(noteId.toString(), "play"),
+            resolveDeepLinkUri(Uri.parse("studio.hypertext.logdate://handoff/$noteId?target=play")),
         )
     }
 

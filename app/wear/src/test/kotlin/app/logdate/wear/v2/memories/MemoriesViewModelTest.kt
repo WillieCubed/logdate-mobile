@@ -54,6 +54,24 @@ class MemoriesViewModelTest {
     }
 
     @Test
+    fun `shared memory choices hide existing cards immediately`() =
+        runTest {
+            val onThisDay = OnThisDay(LocalDate(2025, 10, 10), 1, note, 1, "Beach day")
+            coEvery { finder.find(today.date) } returns onThisDay
+            every { rewindSource.observe(today) } returns flowOf(WeeklyRewind("A week", note))
+            val selection =
+                MutableStateFlow(
+                    app.logdate.client.domain.watch
+                        .WatchWindowPreferences(),
+                )
+            MemoriesViewModel(dayClock, finder, rewindSource, selection).cards.test {
+                assertEquals(note, expectMostRecentItem().rewind?.leadMoment)
+                selection.value = selection.value.copy(onThisDay = false, rewind = false)
+                assertEquals(MemoryCards(), awaitItem())
+            }
+        }
+
+    @Test
     fun `open cards follow edited deleted and newly arrived recalled moments`() =
         runTest {
             val notes = MutableStateFlow<List<JournalNote>>(listOf(note))

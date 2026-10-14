@@ -23,6 +23,13 @@ class WatchReminderHours(
     @Volatile var current: WakingHours = WakingHours.Fallback
         private set
 
+    suspend fun clearForRemoval() =
+        mutex.withLock {
+            storage.remove(STORAGE_KEY)
+            check(storage.getString(STORAGE_KEY) == null) { "The removed watch's waking hours could not be cleared" }
+            current = WakingHours.Fallback
+        }
+
     suspend fun initialize() =
         mutex.withLock {
             val saved = read()

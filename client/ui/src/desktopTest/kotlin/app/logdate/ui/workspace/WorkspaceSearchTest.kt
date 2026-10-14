@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,6 +35,48 @@ class WorkspaceSearchTest {
     @Test fun compactLargeTextKeepsGlobalSearchAndAccountOnOneRow() = verifyCompactAppBar(false)
 
     @Test fun compactLargeTextKeepsPlaceSearchAndAccountOnOneRow() = verifyCompactAppBar(true)
+
+    @Test fun largeTextKeepsCreateActionAboveTimelineContent() = verifyHeaderCreateAction(411, 891, 2f)
+
+    @Test fun compactLargeTextKeepsCreateActionAboveTimelineContent() = verifyHeaderCreateAction(320, 568, 2f)
+
+    @Test fun compactPhoneKeepsCreateActionAboveTimelineContent() = verifyHeaderCreateAction(320, 568, 1f)
+
+    @Test fun standardPhoneKeepsCreateActionAboveTimelineContent() = verifyHeaderCreateAction(411, 891, 1f)
+
+    private fun verifyHeaderCreateAction(
+        width: Int,
+        height: Int,
+        fontScale: Float,
+    ) = runDesktopComposeUiTest(width = width, height = height) {
+        var creations = 0
+        setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+                LogDateTheme {
+                    WorkspaceScaffold(
+                        destinations = listOf(WorkspaceDestination("timeline", "Timeline", Icons.Default.Place)),
+                        selectedKey = "timeline",
+                        onSelect = {},
+                        onCreate = { creations++ },
+                        onSearch = {},
+                        actions = { Box(Modifier.size(48.dp).testTag("account_action")) },
+                    ) {
+                        Box(Modifier.fillMaxSize().testTag("working_panel"))
+                    }
+                }
+            }
+        }
+        val search = onNodeWithTag("workspace_search").fetchSemanticsNode().boundsInRoot
+        val create = onNodeWithContentDescription("Add a memory").fetchSemanticsNode().boundsInRoot
+        val account = onNodeWithTag("account_action").fetchSemanticsNode().boundsInRoot
+        val panel = onNodeWithTag("working_panel").fetchSemanticsNode().boundsInRoot
+        assertEquals(search.center.y, create.center.y, 0.5f)
+        assertEquals(create.center.y, account.center.y, 0.5f)
+        assertTrue(create.right < account.left)
+        assertTrue(create.bottom <= panel.top, "Create action must not cover timeline content")
+        onNodeWithContentDescription("Add a memory").performClick()
+        assertEquals(1, creations)
+    }
 
     private fun verifyCompactAppBar(places: Boolean) =
         runDesktopComposeUiTest(width = 320, height = 568) {

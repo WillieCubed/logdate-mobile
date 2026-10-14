@@ -23,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,15 +31,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LookaheadScope
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.logdate.client.awareness.daylight.DaylightPeriod
-import app.logdate.client.awareness.daylight.stringRes
+import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.ui.audio.MomentAudioCard
 import app.logdate.ui.profiles.PersonUiState
-import app.logdate.ui.provenance.CapturedOnWatchGlyph
-import app.logdate.ui.provenance.showsWatchProvenance
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.DayPresentation
 import app.logdate.ui.timeline.MomentMediaUiState
@@ -46,7 +43,6 @@ import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
 import coil3.compose.AsyncImage
-import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun SemanticTimelineDayContent(
@@ -54,6 +50,7 @@ internal fun SemanticTimelineDayContent(
     style: TimelineDayStyle,
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
+    pendingMomentContent: @Composable (MarkedMoment) -> Unit,
 ) {
     val isCompact = layoutMode == TimelineDayLayoutMode.COMPACT
     val gap =
@@ -76,33 +73,37 @@ internal fun SemanticTimelineDayContent(
             modifier = modifier.fillMaxWidth(),
         ) {
             item.moments.forEach { moment ->
-                val itemModifier =
-                    if (moment.isHero || isCompact) {
-                        Modifier
-                            .fillMaxWidth()
-                            .animateBounds(this@LookaheadScope)
-                    } else {
-                        Modifier
-                            .widthIn(min = momentMinWidth)
-                            .weight(1f, fill = true)
-                            .animateBounds(this@LookaheadScope)
-                    }
+                key(moment.id) {
+                    val itemModifier =
+                        if (moment.isHero || isCompact) {
+                            Modifier
+                                .fillMaxWidth()
+                                .animateBounds(this@LookaheadScope)
+                        } else {
+                            Modifier
+                                .widthIn(min = momentMinWidth)
+                                .weight(1f, fill = true)
+                                .animateBounds(this@LookaheadScope)
+                        }
 
-                when (item.dayPresentation) {
-                    DayPresentation.FLOWING ->
-                        FlowingMomentItem(
-                            moment = moment,
-                            style = style,
-                            layoutMode = layoutMode,
-                            modifier = itemModifier,
-                        )
-                    DayPresentation.STACKED ->
-                        StackedMomentCard(
-                            moment = moment,
-                            style = style,
-                            layoutMode = layoutMode,
-                            modifier = itemModifier,
-                        )
+                    when (item.dayPresentation) {
+                        DayPresentation.FLOWING ->
+                            FlowingMomentItem(
+                                moment = moment,
+                                style = style,
+                                layoutMode = layoutMode,
+                                modifier = itemModifier,
+                                pendingMomentContent = pendingMomentContent,
+                            )
+                        DayPresentation.STACKED ->
+                            StackedMomentCard(
+                                moment = moment,
+                                style = style,
+                                layoutMode = layoutMode,
+                                modifier = itemModifier,
+                                pendingMomentContent = pendingMomentContent,
+                            )
+                    }
                 }
             }
         }
@@ -115,11 +116,18 @@ private fun FlowingMomentItem(
     style: TimelineDayStyle,
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
+    pendingMomentContent: @Composable (MarkedMoment) -> Unit,
 ) {
     if (moment.isHero) {
         HeroMomentContainer(moment = moment, style = style, layoutMode = layoutMode, modifier = modifier)
     } else {
-        SupportingMomentContainer(moment = moment, style = style, layoutMode = layoutMode, modifier = modifier)
+        SupportingMomentContainer(
+            moment = moment,
+            style = style,
+            layoutMode = layoutMode,
+            modifier = modifier,
+            pendingMomentContent = pendingMomentContent,
+        )
     }
 }
 
@@ -192,6 +200,7 @@ private fun SupportingMomentContainer(
     style: TimelineDayStyle,
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
+    pendingMomentContent: @Composable (MarkedMoment) -> Unit,
 ) {
     val hasSingleMedia = moment.media.size == 1
     val hasText = moment.textSnippet != null
@@ -207,33 +216,38 @@ private fun SupportingMomentContainer(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         modifier = modifier.fillMaxWidth().animateContentSize(),
     ) {
-        MomentHeader(moment = moment, timeOfDay = moment.timeOfDay, color = style.accentColor)
-
-        if (useInlineLayout) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                TimelineMediaTile(
-                    media = TimelineMediaItemUiState(uri = moment.media.first().uri, isVideo = moment.media.first().isVideo),
-                    aspectRatio = 1f,
-                    modifier = Modifier.weight(imageWeight),
-                )
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    modifier = Modifier.weight(1f - imageWeight),
-                ) {
-                    TextQuoteContainer(text = moment.textSnippet.orEmpty(), maxLines = 5)
-                    PersonAvatarRow(people = moment.people)
-                }
-            }
+        val pendingMark = moment.pendingMark
+        if (pendingMark != null) {
+            pendingMomentContent(pendingMark)
         } else {
-            if (moment.media.isNotEmpty()) {
-                MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = false)
+            MomentHeader(moment = moment, timeOfDay = moment.timeOfDay, color = style.accentColor)
+
+            if (useInlineLayout) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    TimelineMediaTile(
+                        media = TimelineMediaItemUiState(uri = moment.media.first().uri, isVideo = moment.media.first().isVideo),
+                        aspectRatio = 1f,
+                        modifier = Modifier.weight(imageWeight),
+                    )
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        modifier = Modifier.weight(1f - imageWeight),
+                    ) {
+                        TextQuoteContainer(text = moment.textSnippet.orEmpty(), maxLines = 5)
+                        PersonAvatarRow(people = moment.people)
+                    }
+                }
+            } else {
+                if (moment.media.isNotEmpty()) {
+                    MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = false)
+                }
+                moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
+                moment.textSnippet?.let { snippet -> TextQuoteContainer(text = snippet, maxLines = 6) }
+                PersonAvatarRow(people = moment.people)
             }
-            moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
-            moment.textSnippet?.let { snippet -> TextQuoteContainer(text = snippet, maxLines = 6) }
-            PersonAvatarRow(people = moment.people)
         }
     }
 }
@@ -244,7 +258,12 @@ private fun StackedMomentCard(
     style: TimelineDayStyle,
     layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
+    pendingMomentContent: @Composable (MarkedMoment) -> Unit,
 ) {
+    moment.pendingMark?.let { mark ->
+        Box(modifier = modifier) { pendingMomentContent(mark) }
+        return
+    }
     val cardPadding =
         when (layoutMode) {
             TimelineDayLayoutMode.COMPACT -> Spacing.md
@@ -355,53 +374,6 @@ private fun PersonAvatarRow(
             )
         }
     }
-}
-
-/**
- * A moment's label, followed by the watch glyph when everything in the moment was captured on the
- * watch. `MomentLabel` draws nothing for a blank label, so a moment with neither shows nothing.
- */
-@Composable
-private fun MomentHeader(
-    moment: MomentUiState,
-    timeOfDay: DaylightPeriod?,
-    color: Color,
-) {
-    if (!showsWatchProvenance(moment.capturedOnWatch)) {
-        MomentLabel(label = moment.label, timeOfDay = timeOfDay, color = color)
-        return
-    }
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        MomentLabel(label = moment.label, timeOfDay = timeOfDay, color = color)
-        CapturedOnWatchGlyph()
-    }
-}
-
-@Composable
-private fun MomentLabel(
-    label: String,
-    timeOfDay: DaylightPeriod?,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    if (label.isBlank()) return
-    val periodName = timeOfDay?.let { stringResource(it.stringRes) }
-    val displayText =
-        if (periodName != null && !label.lowercase().contains(periodName.lowercase())) {
-            "$label \u00b7 $periodName"
-        } else {
-            label
-        }
-    Text(
-        text = displayText,
-        style = MaterialTheme.typography.titleSmall,
-        color = color,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier,
-    )
 }
 
 @Composable

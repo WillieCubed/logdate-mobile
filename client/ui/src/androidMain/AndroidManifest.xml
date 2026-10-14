@@ -4,4 +4,8 @@
     <!-- Touch haptics played by AndroidPlatformHaptics. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <queries>
+        <package android:name="com.google.android.apps.wear.companion" />
+        <package android:name="com.samsung.android.app.watchmanager" />
+    </queries>
 </manifest>

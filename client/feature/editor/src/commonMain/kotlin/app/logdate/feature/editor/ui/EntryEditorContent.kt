@@ -329,6 +329,9 @@ fun EntryEditorContent(
             editorContent = {
                 Column(Modifier.fillMaxSize()) {
                     if (!isImmersiveBlockActive) {
+                        editorState.markId?.let {
+                            MarkContextBanner(it, editorState.errorMessage, viewModel::continueWithoutMarkedMoment)
+                        }
                         editorState.visitContext?.let { VisitMemoryContextBanner(it) }
                         if (showsWatchProvenance(editorState.capturedOnWatch)) {
                             CapturedOnWatchBanner()

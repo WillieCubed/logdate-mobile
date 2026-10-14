@@ -24,6 +24,38 @@ class WearLocationCaptureCoordinatorTest {
     private fun coordinator(): WearLocationCaptureCoordinator = WearLocationCaptureCoordinator(locationProvider, settingsRepository)
 
     @Test
+    fun `turning Places off during a location lookup discards the coordinates`() =
+        runTest {
+            var enabled = true
+            every { locationProvider.hasLocationPermission() } returns true
+            coEvery { locationProvider.getCurrentLocation() } coAnswers {
+                enabled = false
+                Location(37.0, -122.0, LocationAltitude(0.0, AltitudeUnit.METERS))
+            }
+            val coordinator = WearLocationCaptureCoordinator(locationProvider, settingsRepository, captureEnabled = { enabled })
+            assertNull(coordinator.captureForJournalEntry())
+        }
+
+    @Test
+    fun `shared Places off never reads location even when legacy capture and permission are on`() =
+        runTest {
+            coEvery { settingsRepository.getSettings() } returns LocationTrackingSettings(autoTrackForJournalEntries = true)
+            every { locationProvider.hasLocationPermission() } returns true
+            val coordinator = WearLocationCaptureCoordinator(locationProvider, settingsRepository, captureEnabled = { false })
+            assertNull(coordinator.captureForJournalEntry())
+            coVerify(exactly = 0) { locationProvider.getCurrentLocation() }
+        }
+
+    @Test
+    fun `shared Places on is still constrained by runtime permission`() =
+        runTest {
+            every { locationProvider.hasLocationPermission() } returns false
+            val coordinator = WearLocationCaptureCoordinator(locationProvider, settingsRepository, captureEnabled = { true })
+            assertNull(coordinator.captureForJournalEntry())
+            coVerify(exactly = 0) { locationProvider.getCurrentLocation() }
+        }
+
+    @Test
     fun `note location is null when journal auto-tagging is disabled`() =
         runTest {
             coEvery { settingsRepository.getSettings() } returns

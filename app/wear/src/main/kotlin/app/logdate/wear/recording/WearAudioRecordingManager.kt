@@ -50,6 +50,7 @@ class WearAudioRecordingManager(
     private val microphonePermission: MicrophonePermissionChecker,
     private val workDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val startTimeout: Duration = DEFAULT_START_TIMEOUT,
+    private val canCapture: suspend () -> Boolean = { true },
 ) : WearRecorder {
     companion object {
         /** Longest recording. About 29 MB of AAC, under the phone's 31 MiB upload ceiling. */
@@ -106,6 +107,7 @@ class WearAudioRecordingManager(
         }
 
     private suspend fun startSessionLocked(): Boolean {
+        if (!canCapture()) return failStart(RecordingStartFailure.RECORDER_UNAVAILABLE)
         if (recordingStateFlow.value) {
             Napier.w("Attempted to start recording while already recording")
             return false

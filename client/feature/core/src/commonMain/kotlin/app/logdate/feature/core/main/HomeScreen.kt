@@ -44,6 +44,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.journals.MergeJournalsUseCase
 import app.logdate.client.domain.timeline.Timeline
+import app.logdate.feature.core.settings.ui.watch.v2.WatchReadyOnPhoneCard
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentationViewModel
@@ -62,9 +63,7 @@ import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.streak.CampfireChip
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineUiState
-import app.logdate.ui.workspace.AdaptiveWorkspaceLayout
 import app.logdate.ui.workspace.WorkspaceDestination
-import app.logdate.ui.workspace.WorkspaceScaffold
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
 import logdate.client.feature.core.generated.resources.Res
@@ -92,8 +91,10 @@ fun HomeScreen(
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
     onOpenSyncSettings: () -> Unit = {},
+    onOpenWatch: () -> Unit = {},
     onOpenDay: (LocalDate) -> Unit = {},
     onOpenStreak: () -> Unit = {},
+    onWriteMark: (Uuid) -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -154,7 +155,7 @@ fun HomeScreen(
         .collectAsStateWithLifecycle(initialValue = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
     if (workspaceEnabled) {
         val sourceState = rememberSaveableStateHolder()
-        WorkspaceScaffold(
+        HomeWorkspaceComposition(
             destinations = visibleDestinations.map { WorkspaceDestination(it.name, it.label, it.selectedIcon) },
             selectedKey = currentDestination.name,
             onSelect = {
@@ -180,6 +181,12 @@ fun HomeScreen(
                     hasMergeRecovery = mergeIssues.value.isNotEmpty(),
                 )
             },
+            status = {
+                Column(Modifier.padding(horizontal = app.logdate.ui.theme.Spacing.lg)) {
+                    WatchRecordingStatus()
+                    WatchReadyOnPhoneCard(onClick = onOpenWatch)
+                }
+            },
             modifier = homeKeys,
         ) {
             val destinationContent: @Composable () -> Unit = {
@@ -189,25 +196,31 @@ fun HomeScreen(
                             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                             val transcriptionState by viewModel.transcriptionState.collectAsStateWithLifecycle()
                             TranscriptionProvider(transcriptionState) {
-                                TimelinePane(
-                                    uiState =
-                                        TimelineUiState(
-                                            uiState.items,
-                                            uiState.loadingState,
-                                            uiState.isLoadingMore,
-                                            uiState.hasMoreOlderContent,
-                                            uiState.appendError,
-                                        ),
-                                    onNewEntry = onNewEntry,
-                                    onOpenDay = onOpenDay,
-                                    onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
-                                    onLoadMoreOlder = viewModel::loadMoreOlder,
-                                    onProfileClick = onOpenSettings,
-                                    onSearchClick = onOpenSearch,
-                                    onOpenDraft = onOpenDraft,
-                                    onImportBackup = onImportBackup,
-                                    timelineSuggestion = uiState.timelineSuggestion,
-                                )
+                                Column {
+                                    TimelinePane(
+                                        uiState =
+                                            TimelineUiState(
+                                                uiState.items,
+                                                uiState.loadingState,
+                                                uiState.isLoadingMore,
+                                                uiState.hasMoreOlderContent,
+                                                uiState.appendError,
+                                            ),
+                                        pendingMomentContent = { mark ->
+                                            app.logdate.feature.timeline.ui.marks
+                                                .MarkedMomentEntry(mark, onWriteMark)
+                                        },
+                                        onNewEntry = onNewEntry,
+                                        onOpenDay = onOpenDay,
+                                        onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
+                                        onLoadMoreOlder = viewModel::loadMoreOlder,
+                                        onProfileClick = onOpenSettings,
+                                        onSearchClick = onOpenSearch,
+                                        onOpenDraft = onOpenDraft,
+                                        onImportBackup = onImportBackup,
+                                        timelineSuggestion = uiState.timelineSuggestion,
+                                    )
+                                }
                             }
                         }
                         HomeRouteDestination.LocationHistory -> locationContent(Modifier.fillMaxSize())
@@ -223,25 +236,7 @@ fun HomeScreen(
                     }
                 }
             }
-            if (currentDestination == HomeRouteDestination.LocationHistory) {
-                destinationContent()
-            } else {
-                AdaptiveWorkspaceLayout(
-                    modifier = Modifier.fillMaxSize(),
-                    browseOnStart = true,
-                    focusConstraints =
-                        if (currentDestination == HomeRouteDestination.Timeline) {
-                            app.logdate.ui.workspace.PanelConstraints.ReadingCollection
-                        } else if (currentDestination ==
-                            HomeRouteDestination.Library
-                        ) {
-                            app.logdate.ui.workspace.PanelConstraints.Visual
-                        } else {
-                            app.logdate.ui.workspace.PanelConstraints.Reading
-                        },
-                    focus = destinationContent,
-                )
-            }
+            destinationContent()
         }
         return
     }
@@ -357,6 +352,8 @@ fun HomeScreen(
                                             .applyScreenStyles()
                                             .safeDrawingPadding(),
                                 ) {
+                                    WatchRecordingStatus()
+                                    WatchReadyOnPhoneCard(onClick = onOpenWatch)
                                     val transcriptionState by viewModel.transcriptionState.collectAsStateWithLifecycle()
                                     TranscriptionProvider(transcriptionState) {
                                         TimelinePane(
@@ -368,6 +365,10 @@ fun HomeScreen(
                                                     hasMoreOlderContent = uiState.hasMoreOlderContent,
                                                     appendError = uiState.appendError,
                                                 ),
+                                            pendingMomentContent = { mark ->
+                                                app.logdate.feature.timeline.ui.marks
+                                                    .MarkedMomentEntry(mark, onWriteMark)
+                                            },
                                             onNewEntry = onNewEntry,
                                             onOpenDay = onOpenDay,
                                             onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,

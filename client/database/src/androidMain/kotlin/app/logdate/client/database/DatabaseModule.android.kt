@@ -1,10 +1,8 @@
 package app.logdate.client.database
 
-import android.content.Context
-import android.util.Log
-import androidx.room.Room
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -20,9 +18,9 @@ actual val databaseModule: Module =
             val context = androidContext()
             val startupMonitor: DatabaseStartupMonitor = get()
 
-            Log.i(DB_INIT_TAG, "Startup: encrypted database initialization starting")
+            Napier.i("Startup: encrypted database initialization starting")
             val passphrase = runBlocking { get<DatabasePassphraseProvider>().getOrCreatePassphrase() }
-            Log.i(DB_INIT_TAG, "Startup: loaded database passphrase (${passphrase.size} bytes)")
+            Napier.i("Startup: loaded database passphrase (${passphrase.size} bytes)")
 
             runCatching {
                 migratePlaintextDatabaseIfNeeded(context, passphrase)
@@ -33,31 +31,20 @@ actual val databaseModule: Module =
                     )
 
                 // Open eagerly so key/migration errors are detected up front.
-                database.openHelper.writableDatabase
-                protectDatabaseFile(context)
+                try {
+                    database.openHelper.writableDatabase
+                    protectDatabaseFile(context)
+                } catch (error: Exception) {
+                    database.close()
+                    throw error
+                }
                 startupMonitor.markReady()
-                Log.i(DB_INIT_TAG, "Startup: encrypted database opened and protections applied")
+                Napier.i("Startup: encrypted database opened and protections applied")
                 database
             }.onFailure { error ->
                 startupMonitor.markRecoveryRequired(error)
-                Log.e(
-                    DB_INIT_TAG,
-                    "Startup: encrypted database unavailable, using in-memory safety mode until recovery action",
-                    error,
-                )
-            }.getOrElse {
-                createRecoveryFallbackDatabase(context)
-            }
+                Napier.e("Startup: encrypted database unavailable; journal access is paused", error)
+            }.getOrThrow()
         }
         includes(daosModule)
     }
-
-private const val DB_INIT_TAG = "LogDateDatabaseInit"
-
-private fun createRecoveryFallbackDatabase(context: Context): LogDateDatabase {
-    Log.w(DB_INIT_TAG, "Creating in-memory fallback database for recovery mode")
-    return getRoomDatabase(
-        builder = Room.inMemoryDatabaseBuilder(context.applicationContext, LogDateDatabase::class.java),
-        driver = null,
-    )
-}

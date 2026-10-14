@@ -31,6 +31,21 @@ class OfflineFirstMarkedMomentRepository(
         updatedAt: Instant,
     ): Boolean = mutate(id, updatedAt) { if (it.state == MarkState.OPEN) it.copy(state = MarkState.DISMISSED) else it }
 
+    override suspend fun updateCaption(
+        id: Uuid,
+        caption: String,
+        updatedAt: Instant,
+    ): Boolean =
+        transactions.withTransaction {
+            val row = dao.getById(id)?.takeIf { it.deletedAt == null } ?: return@withTransaction false
+            val existing = row.toModel()?.takeIf { it.state == MarkState.OPEN } ?: return@withTransaction false
+            if (existing.caption == caption) return@withTransaction true
+            val updated = existing.copy(caption = caption, lastUpdated = maxOf(updatedAt, existing.lastUpdated + 1.milliseconds))
+            dao.upsert(updated.toEntity())
+            metadata.enqueuePending(id.toString(), EntityType.MOMENT, PendingOperation.UPDATE)
+            true
+        }
+
     override suspend fun fill(
         id: Uuid,
         caption: String,

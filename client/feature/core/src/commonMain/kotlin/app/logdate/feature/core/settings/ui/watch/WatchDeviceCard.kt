@@ -23,7 +23,6 @@ import logdate.client.feature.core.generated.resources.watch_settings
 import logdate.client.feature.core.generated.resources.watch_sync_pending
 import logdate.client.feature.core.generated.resources.watch_sync_up_to_date
 import logdate.client.feature.core.generated.resources.watch_unsupported
-import logdate.client.feature.core.generated.resources.watch_window_days
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -32,17 +31,9 @@ internal fun WatchDeviceCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val name =
-        when (status) {
-            is WatchStatus.Ready -> status.watchName
-            is WatchStatus.NeedsAttention -> status.watchName
-            is WatchStatus.NotInstalled -> status.watchName
-            is WatchStatus.SettingUp -> (status.step as? WatchSetupStep.PairWithPhone)?.watchName
-            else -> null
-        }
     MaterialContainer(modifier = modifier) {
         SettingsNavigationItem(
-            title = name ?: stringResource(Res.string.watch_settings),
+            title = stringResource(Res.string.watch_settings),
             description = watchDeviceDescription(status),
             icon = { Icon(Icons.Default.Watch, contentDescription = null) },
             onClick = onClick,
@@ -71,13 +62,10 @@ private fun watchDeviceDescription(status: WatchStatus?): String =
                 is WatchIssue.CapturesNotSent -> stringResource(Res.string.watch_attention_not_sent, issue.count)
             }
         is WatchStatus.Ready ->
-            listOfNotNull(
-                when {
-                    !status.nearby -> stringResource(Res.string.watch_out_of_range)
-                    status.sync == null -> stringResource(Res.string.watch_connected)
-                    status.sync.waiting > 0 -> stringResource(Res.string.watch_sync_pending, status.sync.waiting)
-                    else -> stringResource(Res.string.watch_sync_up_to_date)
-                },
-                status.window?.let { stringResource(Res.string.watch_window_days, it.days) },
-            ).joinToString(" · ")
+            when {
+                !status.nearby -> stringResource(Res.string.watch_out_of_range)
+                status.sync == null -> stringResource(Res.string.watch_connected)
+                status.sync.waiting > 0 -> stringResource(Res.string.watch_sync_pending, status.sync.waiting)
+                else -> stringResource(Res.string.watch_sync_up_to_date)
+            }
     }

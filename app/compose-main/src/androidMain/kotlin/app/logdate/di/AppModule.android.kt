@@ -80,16 +80,19 @@ import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.StateDocumentChannel
 import app.logdate.client.sync.v2.PhonePeerLink
+import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.AndroidCompanionDeviceClient
 import app.logdate.client.watch.AndroidWatchConnectionManager
+import app.logdate.client.watch.AndroidWatchDiagnosticsAccess
 import app.logdate.client.watch.CompanionDeviceClient
 import app.logdate.client.watch.DefaultWatchAssociationRequestFactory
 import app.logdate.client.watch.DefaultWatchCompanionAssociationManager
 import app.logdate.client.watch.WatchAssociationRequestFactory
 import app.logdate.client.watch.WatchCompanionAssociationManager
+import app.logdate.client.watch.presence.WatchPresenceRegistration
 import app.logdate.dynamic.DynamicFeatureLoader
 import app.logdate.dynamic.PlayDynamicFeatureLoader
 import app.logdate.feature.core.export.CloudBackupScheduler
@@ -98,6 +101,9 @@ import app.logdate.feature.core.restore.CloudRestoreScheduler
 import app.logdate.feature.core.settings.ui.watch.PeerStateWatchSnapshotSource
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.ui.watch.WatchPeerSnapshotSource
+import app.logdate.feature.core.settings.ui.watch.v2.DefaultWatchSetupCoordinator
+import app.logdate.feature.core.settings.ui.watch.v2.WatchDiagnosticsAccess
+import app.logdate.feature.core.settings.ui.watch.v2.WatchSetupCoordinator
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.editor.handoff.DraftRefresher
 import app.logdate.feature.editor.handoff.HandoffDraftReceiver
@@ -107,6 +113,7 @@ import coil3.SingletonImageLoader
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -291,7 +298,12 @@ actual val appModule: Module =
         single<DynamicFeatureLoader> { PlayDynamicFeatureLoader(androidContext()) }
 
         single<CoroutineDispatcher>(watchConnectionIoDispatcherQualifier) { Dispatchers.IO }
-        single<CompanionDeviceClient> { AndroidCompanionDeviceClient(androidContext()) }
+        single { WatchPresenceRegistration(androidContext(), get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2)) }
+        single {
+            app.logdate.client.watch
+                .WatchAssociationBindings(get())
+        }
+        single<CompanionDeviceClient> { AndroidCompanionDeviceClient(androidContext(), get(), get()) }
         single<WatchAssociationRequestFactory> { DefaultWatchAssociationRequestFactory() }
         single<WatchCompanionAssociationManager> {
             DefaultWatchCompanionAssociationManager(
@@ -301,6 +313,16 @@ actual val appModule: Module =
             )
         }
 
+        single<app.logdate.client.sync.peer.removal.WatchRemovalAccess> {
+            app.logdate.client.sync.v2.removal
+                .AndroidWatchRemovalAccess(androidContext(), get(), get(), get(), get(), get(), get())
+        }
+        single<WatchDiagnosticsAccess> { AndroidWatchDiagnosticsAccess(androidContext(), get(), get(), get(), get(), get()) }
+        single<WatchSetupCoordinator> {
+            val peers = get<PhoneDeliveryPeers>()
+            DefaultWatchSetupCoordinator(get(), verifiedReady = { state -> state.nodeId?.let { peers.current(it) } != null })
+        }
+
         // Watch connection manager for Wear OS settings
         single<WatchConnectionManager> {
             AndroidWatchConnectionManager(
@@ -308,6 +330,20 @@ actual val appModule: Module =
                 associationManager = get(),
                 messageSender = get(),
                 ioDispatcher = get(qualifier = watchConnectionIoDispatcherQualifier),
+                verifiedAppNodes =
+                    combine(
+                        get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+                        get<app.logdate.client.sync.v2.link.PhoneWatchLinkStore>().observe(),
+                        get<app.logdate.client.datastore.SessionStorage>().getSessionFlow(),
+                        get<app.logdate.shared.config.LogDateConfigRepository>().backendUrl,
+                    ) { enabled, links, _, _ ->
+                        if (enabled) links.keys.filter { get<PhoneDeliveryPeers>().current(it) != null }.toSet() else null
+                    },
+                prepareWatch = { node ->
+                    get<app.logdate.client.sync.v2.PhoneStatePublisher>().refresh()
+                    get<app.logdate.client.sync.v2.link.PhoneWatchLinkStore>().allowRelink(node)
+                    get<app.logdate.client.sync.v2.link.PhoneLinkInitiator>().reconcileNow()
+                },
             )
         }
     }

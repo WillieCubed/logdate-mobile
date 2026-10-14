@@ -18,6 +18,7 @@
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_WATCH" />
+    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
 
     <application
         android:name="app.logdate.client.LogdateApplication"
@@ -123,6 +124,7 @@
                 <data android:host="location" />
                 <data android:host="search" />
                 <data android:host="capture" />
+                <data android:host="handoff" />
             </intent-filter>
 
             <!--
@@ -150,6 +152,7 @@
                 <data android:host="location" />
                 <data android:host="search" />
                 <data android:host="capture" />
+                <data android:host="handoff" />
             </intent-filter>
 
             <intent-filter>
@@ -185,6 +188,13 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="video/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
             </intent-filter>
         </activity>
         
@@ -303,6 +313,7 @@
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/camera" />
+                <data android:scheme="wear" android:host="*" android:path="/logdate/live/recording" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
@@ -327,6 +338,7 @@
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/media/range" />
                 <data android:scheme="wear" android:host="*" android:path="/logdate/v2/window/body" />
                 <data android:scheme="wear" android:host="*" android:path="/logdate/reminders/claim" />
+                <data android:scheme="wear" android:host="*" android:path="/logdate/live/playback/command" />
             </intent-filter>
         </service>
 
@@ -444,6 +456,10 @@
             </intent-filter>
         </receiver>
 
+        <service android:name="app.logdate.client.watch.presence.LogDateCompanionDeviceService"
+            android:exported="true" android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter><action android:name="android.companion.CompanionDeviceService" /></intent-filter>
+        </service>
     </application>
 
 </manifest>

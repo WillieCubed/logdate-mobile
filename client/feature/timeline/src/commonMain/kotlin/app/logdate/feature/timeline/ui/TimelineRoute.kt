@@ -45,6 +45,7 @@ fun TimelineRoute(
     onNewEntry: () -> Unit,
     onOpenEntryInNewWindow: (entryId: Uuid) -> Unit = {},
     onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
+    onWriteMark: (Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: TimelineViewModel = koinViewModel(),
 ) {
@@ -62,6 +63,7 @@ fun TimelineRoute(
             onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
             birthday = viewModel.birthday.collectAsState().value,
             modifier = modifier,
+            onWriteMark = onWriteMark,
         )
     }
 }
@@ -76,6 +78,7 @@ internal fun TimelineScreen(
     onVisibleAudioNoteIdsChanged: (Set<Uuid>) -> Unit,
     birthday: Instant?,
     modifier: Modifier = Modifier,
+    onWriteMark: (Uuid) -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -91,6 +94,10 @@ internal fun TimelineScreen(
         containerColor = Color.Transparent,
     ) { paddingValues ->
         TimelinePane(
+            pendingMomentContent = { mark ->
+                app.logdate.feature.timeline.ui.marks
+                    .MarkedMomentEntry(mark, onWriteMark)
+            },
             uiState =
                 app.logdate.ui.timeline.TimelineUiState(
                     items = state.items,

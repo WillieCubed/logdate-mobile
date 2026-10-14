@@ -31,6 +31,7 @@ import app.logdate.wear.R
 import app.logdate.wear.capture.Feeling
 import app.logdate.wear.capture.MomentNoteCodec
 import app.logdate.wear.capture.MomentNoteKind
+import app.logdate.wear.launch.isWearStartupReady
 import app.logdate.wear.v2.surfaces.todayTileLayout
 import app.logdate.wear.v2.today.DayClock
 import io.github.aakira.napier.Napier
@@ -53,6 +54,7 @@ private const val FRESHNESS_MINUTES = 15
  */
 class TodaySummaryTileService : Material3TileService() {
     override suspend fun MaterialScope.tileResponse(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
+        if (!this@TodaySummaryTileService.isWearStartupReady()) return startupTile()
         val newApp = isNewAppEnabled()
         val summary = fetchTodaySummary(newApp)
         if (!newApp) return todaySummaryTile(requestParams, this@TodaySummaryTileService, summary)

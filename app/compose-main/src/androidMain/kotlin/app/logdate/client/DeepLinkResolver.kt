@@ -42,6 +42,7 @@ import app.logdate.client.ui.navigation.classifyLogdateHost
 import app.logdate.client.ui.navigation.searchRouteFromParams
 import app.logdate.feature.core.notifications.NAV_SOURCE_DATA_TRANSFER
 import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
+import app.logdate.feature.core.watch.continuity.WatchHandoffRoute
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
@@ -103,6 +104,11 @@ private fun resolveCustomSchemeHost(
     when (host) {
         PATH_JOURNAL -> segments.firstOrNull()?.parseUuidTo { JournalDetailsRoute(it) }
         PATH_DAY -> segments.firstOrNull()?.parseDateString { TimelineDetailRoute(it) }
+        "handoff" ->
+            segments.firstOrNull()?.parseUuidTo { id ->
+                val target = uri.getQueryParameter("target")?.takeIf { it in setOf("edit", "share", "day", "play") } ?: "edit"
+                WatchHandoffRoute(id.toString(), target)
+            }
         PATH_NOTE -> segments.firstOrNull()?.parseUuidTo { NoteDetailRoute(it) }
         PATH_POSTCARD -> segments.firstOrNull()?.parseUuidTo { PostcardViewerRoute(it) }
         PATH_REWIND -> segments.firstOrNull()?.parseUuidTo { RewindDetailRoute(it) }

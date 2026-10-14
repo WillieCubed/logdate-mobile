@@ -173,4 +173,8 @@
     <string name="memory_video">Video</string>
     <string name="memory_camera">Camera</string>
     <string name="memory_entry_contents">In this entry</string>
+    <string name="mark_context_label">Marked on your watch · %1$s</string>
+    <string name="mark_context_save">Saving this entry fills in your marked moment.</string>
+    <string name="mark_context_unavailable">This marked moment is unavailable. Your writing is kept here; you can continue as a new entry.</string>
+    <string name="mark_context_continue_new">Continue as a new entry</string>
 </resources>

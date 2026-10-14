@@ -17,3 +17,4 @@ client/feature/library/src/commonMain/kotlin/app/logdate/feature/library/ui/comp
 app/compose-main/src/commonMain/kotlin/app/logdate/navigation/WorkspaceRouteDecorator.kt|rememberWorkspaceRouteDecorator
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/JournalFilterBar.kt|JournalFilterBar
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/merge/JournalMergeScreen.kt|JournalMergeScreenContent
+client/feature/core/src/commonMain/kotlin/app/logdate/feature/core/main/HomeWorkspaceComposition.kt|HomeWorkspaceComposition

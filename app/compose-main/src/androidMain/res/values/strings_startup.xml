@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="application_startup_failed_title">Couldn’t open LogDate</string>
+    <string name="application_startup_failed_message">LogDate couldn’t open your saved journal. Try opening it again.</string>
+    <string name="application_startup_retry">Try again</string>
+</resources>

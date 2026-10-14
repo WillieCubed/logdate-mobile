@@ -138,8 +138,13 @@ class PhoneLinkInitiator(
         target: LinkTarget,
         document: StateDocument?,
     ) {
+        if (store.removalSuppressed(target.nodeId)) return
         val now = clock.now().toEpochMilliseconds()
         val record = store.get(target.nodeId)
+        val watch = document?.watch
+        if (record?.linkId != null && watch?.linkId == record.linkId) {
+            watch.sessionId?.let { store.recordSession(target.nodeId, record.linkId, it) }
+        }
         val plan = bundles.plan(document?.watch?.features.orEmpty())
         when (val decision = PhoneLinkDecision.decide(record, plan, document, now)) {
             PhoneLinkDecision.Wait -> Unit
@@ -195,7 +200,7 @@ class PhoneLinkInitiator(
         now: Long,
     ) {
         if (store.get(target.nodeId)?.confirmedAt == null) notifier.linked(target, mode)
-        store.markConfirmed(target.nodeId, at = now, seenWatchDocAt = document?.writtenAt ?: 0L)
+        store.markConfirmed(target.nodeId, at = now, seenWatchDocAt = document?.writtenAt ?: 0L, sessionId = document?.watch?.sessionId)
     }
 
     private suspend fun exchangeWith(

@@ -9,7 +9,6 @@ import app.logdate.client.domain.dayboundary.DefaultDayBoundarySettingsRepositor
 import app.logdate.client.domain.di.healthDomainModule
 import app.logdate.client.domain.di.locationDomainModule
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
-import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.domain.entities.GetPeopleUseCase
 import app.logdate.client.domain.events.DeleteEventUseCase
@@ -172,7 +171,14 @@ val domainModule: Module =
 
         // Editor
         factory { ObserveEditorDataUseCase(get(), get(), get(), get()) }
-        factory { SaveEntryUseCase(get(), get(), get<app.logdate.client.domain.location.history.LocationHistoryService>()::linkMemory) }
+        factory {
+            app.logdate.client.domain.moments.markedEntrySaveUseCase(
+                get(),
+                get(),
+                get<app.logdate.client.domain.location.history.LocationHistoryService>()::linkMemory,
+                get(),
+            )
+        }
 
         // Rewind
         factory { GetPastRewindsUseCase(get()) }
@@ -210,7 +216,15 @@ val domainModule: Module =
         }
         factory { GroupNotesByDayBoundsUseCase(get(), get(), get()) }
         factory { GetTimelineUseCase(get(), get(), get(), get()) }
-        factory { GetStreamingTimelineUseCase(get(), get(), get(), get()) }
+        factory {
+            GetStreamingTimelineUseCase(
+                get(),
+                get(),
+                get(),
+                get(),
+                get<app.logdate.client.domain.moments.ObserveTimelineMarksUseCase>()(),
+            )
+        }
         factory { GetTimelinePageUseCase(get(), get(), get(), get<GetTimelineDayUseCase>()) }
         factory { InferMomentsUseCase(get(), get()) }
         factory { GetTimelineDayUseCase(get(), get(), get(), get()) }
@@ -309,5 +323,21 @@ val domainModule: Module =
             DefaultWatchPreferencesRepository(get()) { migration.ensure() }
         }
         factory { ReminderPreferences(get(), get()) }
+        factory {
+            app.logdate.client.domain.moments
+                .ObserveTimelineMarksUseCase(get(), get(), get())
+        }
+        factory {
+            app.logdate.client.domain.moments
+                .ObserveMarkPhotoSuggestionsUseCase(get())
+        }
+        factory {
+            app.logdate.client.domain.moments
+                .AttachPhotoToMarkUseCase(get(), get(), get(), get())
+        }
+        factory {
+            app.logdate.client.domain.moments
+                .SaveMarkCaptionUseCase(get(), get(), get())
+        }
         factory { EnrichMarkLocationUseCase(marks = get(), locationHistory = get(), watchPreferences = get()) }
     }

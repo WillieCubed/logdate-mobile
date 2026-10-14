@@ -5,6 +5,7 @@ import app.logdate.client.database.entities.moments.MarkedMomentState
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.wear.capture.WatchCaptureWriteGuard
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -69,6 +70,29 @@ class MarkedMomentStoreTest {
             coVerify { syncMetadataService.enqueuePending(mark.id.toString(), EntityType.MOMENT, PendingOperation.UPDATE) }
             val row = assertNotNull(delivery())
             assertEquals(later.lastUpdated.toEpochMilliseconds(), row.contentVersion)
+        }
+
+    @Test
+    fun `sensor update cannot add a pending write after removal prepare`() =
+        runTest {
+            marks.upsert(mark)
+            val preparedGuard =
+                object : WatchCaptureWriteGuard {
+                    override suspend fun <T> write(block: suspend () -> T): T = throw IllegalStateException("removal prepared")
+                }
+            val preparedStore =
+                MarkedMomentStore(
+                    marks,
+                    deliveries,
+                    syncMetadataService,
+                    clock = FixedClock(now),
+                    transactions = MarkTestTransactions,
+                    captureGuard = preparedGuard,
+                )
+
+            assertFailsWith<IllegalStateException> { preparedStore.update(mark.copy(heartRateBpm = 72)) }
+            assertEquals(mark, marks.rows[mark.id])
+            coVerify(exactly = 0) { syncMetadataService.enqueuePending(any(), any(), any()) }
         }
 
     @Test

@@ -19,6 +19,14 @@ import org.koin.dsl.module
  */
 actual val mediaModule: Module =
     module {
+        factory {
+            val manager = get<MediaManager>()
+            app.logdate.client.media.ManagedMediaImporter(
+                manager,
+                app.logdate.client.media
+                    .BufferedManagedMediaImportSource(manager, System.getProperty("java.io.tmpdir")),
+            )
+        }
         // Include the audio module only
         includes(audioModule)
 

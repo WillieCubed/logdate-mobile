@@ -30,6 +30,31 @@ class KeyValueOnboardingDeviceStateRepositoryTest {
         fakeStorage = FakeKeyValueStorage()
     }
 
+    @Test fun watchProgressSurvivesRepositoryRecreation() =
+        runTest {
+            val repository = createRepository()
+            repository.markWatchHandled()
+            runCurrent()
+            val restored = createRepository()
+            runCurrent()
+            assertTrue(restored.deviceState.value.watchHandledOnThisDevice)
+            restored.clear()
+            runCurrent()
+            assertFalse(restored.deviceState.value.watchHandledOnThisDevice)
+        }
+
+    @Test fun droppedWatchProgressDoesNotAdvance() =
+        runTest {
+            val dropping =
+                object : KeyValueStorage by fakeStorage {
+                    override suspend fun putBoolean(
+                        key: String,
+                        value: Boolean,
+                    ) = Unit
+                }
+            assertFailsWith<IllegalStateException> { KeyValueOnboardingDeviceStateRepository(dropping, backgroundScope).markWatchHandled() }
+        }
+
     @Test
     fun `marking a step handled persists through the storage and is reflected in device state`() =
         runTest {

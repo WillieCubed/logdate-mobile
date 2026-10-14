@@ -61,6 +61,13 @@ interface MarkedMomentRepository {
         updatedAt: Instant,
     ): Boolean
 
+    /** Retains unfinished caption input without resolving or reopening the mark. */
+    suspend fun updateCaption(
+        id: Uuid,
+        caption: String,
+        updatedAt: Instant,
+    ): Boolean = false
+
     /** Resolves a mark with a caption or notes; note associations only grow. */
     suspend fun fill(
         id: Uuid,

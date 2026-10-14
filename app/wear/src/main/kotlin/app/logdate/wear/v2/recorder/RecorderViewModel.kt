@@ -15,6 +15,7 @@ import app.logdate.wear.recording.RecordingStartFailure
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.recording.WearRecorder
 import app.logdate.wear.sync.WearNoteRemovalNotifier
+import app.logdate.wear.v2.continuity.WatchRecordingContinuity
 import app.logdate.wear.v2.permissions.PermissionPrompts
 import app.logdate.wear.v2.permissions.PermissionResult
 import app.logdate.wear.v2.permissions.WatchPermission
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -68,6 +70,8 @@ class RecorderViewModel(
     private val applicationScope: CoroutineScope,
     deleteFile: (String) -> Unit = { path -> File(path).delete() },
     mediaFiles: MediaFileResolver? = null,
+    continuity: WatchRecordingContinuity? = null,
+    private val moodAfterRecording: suspend () -> Boolean = { true },
 ) : ViewModel(),
     RecordGestureListener,
     RecorderActions {
@@ -109,6 +113,17 @@ class RecorderViewModel(
     init {
         observeRecorder()
         observeAfterSave()
+        continuity?.attach(viewModelScope, state) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main.immediate) {
+                if (state.value !is RecorderState.Live) return@withContext false
+                stopAndSave()
+                kotlinx.coroutines.withTimeoutOrNull(4_000) {
+                    state.first {
+                        it is RecorderState.Saved || it is RecorderState.Failed || it is RecorderState.TooShort
+                    } is RecorderState.Saved
+                } ?: false
+            }
+        }
     }
 
     override fun onPressed() {
@@ -368,7 +383,7 @@ class RecorderViewModel(
         saver.save(path, recorder.elapsed.value)
     }
 
-    private fun handle(result: AudioSaveResult) {
+    private suspend fun handle(result: AudioSaveResult) {
         when (result) {
             is AudioSaveResult.Saved -> onSaved(result.note)
             AudioSaveResult.TooShort -> onTooShort()
@@ -379,12 +394,13 @@ class RecorderViewModel(
         }
     }
 
-    private fun onSaved(note: JournalNote.Audio) {
+    private suspend fun onSaved(note: JournalNote.Audio) {
         unsavedPath = null
         haptics.saveSucceeded()
-        afterSave.open(note.uid, offerFeelings = true)
+        val offerFeelings = moodAfterRecording()
+        afterSave.open(note.uid, offerFeelings = offerFeelings)
         mutableState.value =
-            RecorderState.Saved(noteId = note.uid, duration = note.durationMs.milliseconds, feelingsOffered = true)
+            RecorderState.Saved(noteId = note.uid, duration = note.durationMs.milliseconds, feelingsOffered = offerFeelings)
     }
 
     private fun onTooShort() {

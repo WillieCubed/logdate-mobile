@@ -577,7 +577,7 @@ that touch app, feature, UI, theme, or build code. It runs three jobs:
 | `desktop-screenshots` | macOS | `./gradlew validateDesktopScreenshots --continue` |
 | `ios-screenshot-validation` | macOS | `./gradlew validateIosScreenshots --continue` |
 
-Each job uploads its results (rendered images and diffs) as a build artifact. When a job fails,
+Android rendering results, XML, and HTML diagnostics upload even when validation fails; the runner change does not relax image thresholds or regenerate baselines. Each job uploads its results (rendered images and diffs) as a build artifact. When a job fails,
 download the artifact and compare the `diffs/` images with the references.
 
 Android and Wear validation use `TZ=America/Los_Angeles` and

@@ -13,7 +13,11 @@ forbidden; do not uninstall or clear retained LogDate data.
    under the Wear OS track in Play Console.
 3. LogDate is installed on the phone from Play, and you are signed in.
 4. LogDate is installed on the watch from the Play Store on the watch. Allow the microphone when asked.
-5. An older watch install under the retired `app.logdate.wear` package can stay while you test; it is a
+5. On the disposable phone test installation, open Settings → About LogDate, tap the version row
+   seven times, open Labs, and turn on **Redesigned watch app**. Wait for the choice to reach the
+   watch, then reopen LogDate there. The redesign stays off by default on other installations
+   until the acceptance scenarios below pass.
+6. An older watch install under the retired `app.logdate.wear` package can stay while you test; it is a
    separate app and does not interfere. It will not update in place, and it never synced to the phone,
    so any recordings still on it exist nowhere else. Play them back or export them before you
    uninstall it.
@@ -103,6 +107,11 @@ normal release work; this checklist does not silently certify them.
 `WATCH_EXPERIENCE_V2` remains default OFF until the required paired and hardware outcomes below pass.
 Flag-off compatibility must also remain usable. A local test or screenshot cannot substitute for
 paired delivery, cloud persistence, provider revocation, or actual audio/device behavior.
+
+The previous internal Play baseline is source `70ae657cac52a38a2d923047bda6ca910fa01365`:
+phone version code 159 on `internal` and Wear version code 160 on `wear:internal`, recorded by
+[the successful publish run](https://github.com/WillieCubed/logdate-mobile/actions/runs/38345721236).
+This is a rollback reference, not the redesign candidate or proof of installation on a device.
 
 Record once for the final integrated candidate:
 

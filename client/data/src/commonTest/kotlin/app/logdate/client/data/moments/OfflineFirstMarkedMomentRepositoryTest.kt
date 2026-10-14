@@ -54,6 +54,32 @@ class OfflineFirstMarkedMomentRepositoryTest {
     private val at = Instant.fromEpochMilliseconds(1_710_000_000_000)
 
     @Test
+    fun `unfinished caption survives repository reload without resolving the mark`() =
+        runTest {
+            val id = Uuid.random()
+            dao.rows += row(id)
+            assertTrue(repository.updateCaption(id, "A quiet morning", at))
+            val reopened = OfflineFirstMarkedMomentRepository(dao, transactions, metadata)
+            val retained = reopened.observeOpenMarks().first().single()
+            assertEquals("A quiet morning", retained.caption)
+            assertEquals(MarkState.OPEN, retained.state)
+            assertEquals(at, retained.capturedAt)
+            assertEquals("America/Los_Angeles", retained.timeZoneId)
+            assertEquals(PendingOperation.UPDATE, metadata.getPendingUploads(EntityType.MOMENT).single().operation)
+        }
+
+    @Test
+    fun `late caption autosave never overwrites resolved content`() =
+        runTest {
+            val id = Uuid.random()
+            dao.rows += row(id)
+            assertTrue(repository.fill(id, "Final caption", setOf(Uuid.random()), at))
+            assertFalse(repository.updateCaption(id, "Stale typing", at))
+            assertEquals("Final caption", repository.getMark(id)?.caption)
+            assertEquals(MarkState.FILLED, repository.getMark(id)?.state)
+        }
+
+    @Test
     fun `open marks read with their place and notes`() =
         runTest {
             val id = Uuid.random()

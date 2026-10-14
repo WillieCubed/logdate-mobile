@@ -30,6 +30,7 @@ data class LoadedDraft(
     val draftId: Uuid,
     val selectedJournalIds: List<Uuid> = emptyList(),
     val visitContext: VisitMemoryContext? = null,
+    val markId: String? = null,
 )
 
 /**
@@ -88,6 +89,7 @@ class DraftManager(
                         pendingMedia = pendingMedia,
                         selectedJournalIds = state.selectedJournalIds,
                         visitContext = state.visitContext,
+                        markId = state.markId,
                     )
                     pendingDraftId = null
                     draft.id
@@ -100,6 +102,7 @@ class DraftManager(
                         pendingMedia = pendingMedia,
                         selectedJournalIds = state.selectedJournalIds,
                         visitContext = state.visitContext,
+                        markId = state.markId,
                     ).also {
                         pendingDraftId = null
                     }
@@ -135,6 +138,7 @@ class DraftManager(
                     draftId = draft.id,
                     selectedJournalIds = draft.selectedJournalIds,
                     visitContext = draft.visitContext,
+                    markId = draft.markId,
                 )
             }
         } catch (cancellation: CancellationException) {

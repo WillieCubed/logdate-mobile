@@ -14,6 +14,8 @@ import app.logdate.wear.sync.v2.window.WindowProjection
 import app.logdate.wear.sync.v2.window.windowNoteFingerprint
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.uuid.Uuid
 
 /** Downloads only current phone-owned window audio, through the shared verified cache boundary. */
@@ -27,7 +29,11 @@ class WatchMediaPrefetcher(
     private val download: suspend (JournalNote.Audio, PeerDeliveryContext, suspend () -> Boolean) -> Unit,
     private val media: StoredMediaReferences = StoredMediaReferences.Unchanged,
 ) {
-    suspend fun run(): Int {
+    private val running = Mutex()
+
+    suspend fun run(): Int = running.withLock { runOnce() }
+
+    private suspend fun runOnce(): Int {
         if (!enabled()) return 0
         val peer = peers.current() ?: return 0
         if (!active(peer)) return 0

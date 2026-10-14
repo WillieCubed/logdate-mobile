@@ -19,6 +19,7 @@ class MomentPlaybackEngineTest {
     fun `buffering with play requested is not paused`() {
         val status = AudioPlaybackStatus(isPlaying = false, playWhenReady = true)
         assertEquals(true, status.toEngineStatus().playWhenReady)
+        assertEquals(false, status.toEngineStatus().isPlaying)
     }
 
     @Test
@@ -34,7 +35,7 @@ class MomentPlaybackEngineTest {
             )
 
         assertEquals(
-            EngineStatus(noteId, positionMs = 5_000L, durationMs = 42_000L, suppressedForUnsuitableOutput = true),
+            EngineStatus(noteId, positionMs = 5_000L, durationMs = 42_000L, suppressedForUnsuitableOutput = true, isPlaying = true),
             status.toEngineStatus(),
         )
     }

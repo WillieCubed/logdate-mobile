@@ -3,6 +3,7 @@ package app.logdate.feature.core.settings.ui.watch.v2
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.client.domain.watch.WatchAudioDownloadPolicy
 import app.logdate.client.domain.watch.WatchPreferencesRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -20,6 +21,7 @@ data class WatchCompanionPreferences(
     val rewind: Boolean = true,
     val places: Boolean = false,
     val moodAfterRecording: Boolean = true,
+    val audioDownloads: WatchAudioDownloadPolicy = WatchAudioDownloadPolicy.WIFI_OR_CHARGING,
 )
 
 class WatchCompanionPreferencesViewModel(
@@ -32,8 +34,12 @@ class WatchCompanionPreferencesViewModel(
             preferences.observe(SharedPreferenceKey.WindowRewind),
             preferences.observe(SharedPreferenceKey.CapturePlaces),
             preferences.observe(SharedPreferenceKey.MoodAfterRecording),
-            ::WatchCompanionPreferences,
-        ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+            { days, onThisDay, rewind, places, mood -> WatchCompanionPreferences(days, onThisDay, rewind, places, mood) },
+        ).let { base ->
+            combine(base, preferences.observe(SharedPreferenceKey.AudioDownloadPolicy)) { state, policy ->
+                state.copy(audioDownloads = WatchAudioDownloadPolicy.fromStored(policy))
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     private val _saving = MutableStateFlow(false)
     val saving = _saving.asStateFlow()
     private val _saveFailed = MutableStateFlow(false)

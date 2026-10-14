@@ -45,6 +45,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.feature.core.settings.ui.watch.WatchDeviceCard
+import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
+import app.logdate.feature.core.settings.ui.watch.WatchStatus
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -68,6 +73,7 @@ import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_remove
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
@@ -77,8 +83,11 @@ import logdate.client.ui.generated.resources.Res as UiRes
 fun DevicesScreen(
     onBackClick: () -> Unit,
     viewModel: DevicesViewModel = koinInject(),
+    onNavigateToWatch: (() -> Unit)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val flags = koinInject<FeatureFlagStore>()
+    val watchEnabled by remember(flags) { flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) }.collectAsState(false)
 
     DisposableEffect(viewModel) {
         viewModel.loadDevices()
@@ -94,6 +103,12 @@ fun DevicesScreen(
     DevicesScreenContent(
         onBackClick = onBackClick,
         uiState = uiState,
+        watchDevice =
+            if (watchEnabled && onNavigateToWatch != null) {
+                { CompanionDeviceInDevices(uiState, onNavigateToWatch) }
+            } else {
+                null
+            },
         showRenameDialog = showRenameDialog,
         showDeleteDialog = showDeleteDialog,
         showResetDialog = showResetDialog,
@@ -149,6 +164,7 @@ fun DevicesScreenContent(
     onDismissResetDialog: () -> Unit = {},
     connectionAction: @Composable () -> Unit = { DeviceApprovalAction() },
     modifier: Modifier = Modifier,
+    watchDevice: (@Composable () -> Unit)? = null,
 ) {
     if (showRenameDialog && selectedDevice != null) {
         RenameDeviceDialog(
@@ -202,6 +218,7 @@ fun DevicesScreenContent(
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
+                watchDevice?.let { card -> item { card() } }
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
                         connectionAction()
@@ -209,6 +226,27 @@ fun DevicesScreenContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompanionDeviceInDevices(
+    uiState: DevicesUiState,
+    onClick: () -> Unit,
+    model: WatchSettingsViewModel = koinViewModel(),
+) {
+    val status by model.status.collectAsState()
+    val name =
+        when (val current = status) {
+            is WatchStatus.Ready -> current.watchName
+            is WatchStatus.NeedsAttention -> current.watchName
+            is WatchStatus.NotInstalled -> current.watchName
+            else -> return
+        }
+    if (uiState.devices.any { it.platformName == "Wear OS" && it.name == name }) return
+    Column(Modifier.padding(horizontal = Spacing.lg)) {
+        Text("Wear OS", style = MaterialTheme.typography.labelMedium)
+        WatchDeviceCard(status, onClick)
     }
 }
 

@@ -20,6 +20,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.window.layout.WindowMetricsCalculator
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.editor.editorWindowTitle
+import app.logdate.client.launch.whenApplicationReady
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.feature.editor.handoff.DraftRefreshResult
 import app.logdate.feature.editor.handoff.DraftRefresher
@@ -63,12 +64,21 @@ class EditorActivity : FragmentActivity() {
     private val draftRefresher: DraftRefresher by inject()
     private val handoffDraftReceiver: HandoffDraftReceiver by inject()
 
+    private var bootstrapReady = false
+
     // We'll implement EditorInstanceId handling later
     private var instanceId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        whenApplicationReady {
+            bootstrapReady = true
+            completeStartup()
+        }
+    }
 
+    private fun completeStartup() {
         // Initialize FileKit for file operations
         FileKit.init(this)
 
@@ -135,7 +145,8 @@ class EditorActivity : FragmentActivity() {
      * ([HandoffActivityDataRequestInfo.isActiveRequest]), the latest text is also saved and uploaded
      * at once instead of on backup's schedule, so the other device can fetch it while it waits.
      */
-    override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData {
+    override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData? {
+        if (!bootstrapReady) return null
         val draftId = viewModel.draftIdForHandoff()
         if (info.isActiveRequest) uploadDraftForHandoff(viewModel.editorState.value)
         return editorHandoffData(draftId)

@@ -1,0 +1,9 @@
+<resources>
+    <string name="watch_tile_today">Today</string>
+    <string name="watch_tile_empty">Nothing recorded yet today</string>
+    <plurals name="watch_tile_moments"><item quantity="one">%d moment today</item><item quantity="other">%d moments today</item></plurals>
+    <string name="watch_tile_record">Record</string>
+    <string name="watch_tile_voice">Voice note</string>
+    <string name="watch_tile_photo">Photo</string>
+    <string name="watch_tile_video">Video</string>
+</resources>

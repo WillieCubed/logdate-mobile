@@ -38,8 +38,9 @@ class KeyValueOnboardingDeviceStateRepository(
                 )
             },
             storage.observeBoolean(KEY_ACCOUNT_HANDLED),
-        ) { partial, accountHandled ->
-            partial.copy(accountHandledOnThisDevice = accountHandled)
+            storage.observeBoolean(KEY_WATCH_HANDLED),
+        ) { partial, accountHandled, watchHandled ->
+            partial.copy(accountHandledOnThisDevice = accountHandled, watchHandledOnThisDevice = watchHandled)
         }
             // This KeyValueStorage shares its underlying DataStore with unrelated settings, so
             // without this, any write anywhere in that store -- not just onboarding's own keys --
@@ -68,6 +69,11 @@ class KeyValueOnboardingDeviceStateRepository(
         check(storage.getBoolean(KEY_NOTIFICATIONS_HANDLED)) { "Notification setup progress could not be saved" }
     }
 
+    override suspend fun markWatchHandled() {
+        storage.putBoolean(KEY_WATCH_HANDLED, true)
+        check(storage.getBoolean(KEY_WATCH_HANDLED)) { "Watch setup progress could not be saved" }
+    }
+
     override suspend fun markAccountHandled() {
         storage.putBoolean(KEY_ACCOUNT_HANDLED, true)
     }
@@ -85,6 +91,7 @@ class KeyValueOnboardingDeviceStateRepository(
         storage.remove(KEY_LOCATION_HANDLED)
         storage.remove(KEY_NOTIFICATIONS_HANDLED)
         storage.remove(KEY_ACCOUNT_HANDLED)
+        storage.remove(KEY_WATCH_HANDLED)
         storage.remove(KEY_ACTIVE_ENTRY_MODE)
     }
 
@@ -96,6 +103,7 @@ class KeyValueOnboardingDeviceStateRepository(
         const val KEY_DAY_BOUNDARIES_HANDLED = "onboarding_day_boundaries_handled"
         const val KEY_LOCATION_HANDLED = "onboarding_location_handled"
         const val KEY_NOTIFICATIONS_HANDLED = "onboarding_notifications_handled"
+        const val KEY_WATCH_HANDLED = "onboarding_watch_handled"
         const val KEY_ACCOUNT_HANDLED = "onboarding_account_handled"
         const val KEY_ACTIVE_ENTRY_MODE = "onboarding_active_entry_mode"
     }

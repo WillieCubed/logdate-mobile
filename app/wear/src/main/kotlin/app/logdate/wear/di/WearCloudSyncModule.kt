@@ -49,7 +49,6 @@ import app.logdate.client.sync.metadata.KeyValueSyncRetryScheduleStore
 import app.logdate.client.sync.metadata.KeyValueUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.RoutedSyncMetadataService
 import app.logdate.client.sync.moments.MomentSyncConfig
-import app.logdate.client.sync.peer.link.LinkProblem
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
@@ -58,7 +57,6 @@ import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.wear.sync.v2.cloud.WatchCloudAccountRepository
 import app.logdate.wear.sync.v2.delivery.ReleasedToCloud
-import app.logdate.wear.sync.v2.link.WatchLinkStore
 import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
@@ -130,7 +128,6 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
     val cipher = get<SyncPayloadCipher>(WatchCloud)
     val config = get<LogDateConfigRepository>()
     val sessions = get<SessionStorage>()
-    val links = get<WatchLinkStore>()
     return DefaultSyncManager(
         cloudContentDataSource = DefaultCloudContentDataSource(durable, cipher),
         cloudJournalDataSource = DefaultCloudJournalDataSource(durable, cipher),
@@ -167,7 +164,7 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
         unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(storage),
         downloadInbox = get(WatchCloud),
         momentSyncConfig = get(WatchCloud),
-        deviceSessionRevocationListener = DeviceSessionRevocationListener { links.recordProblem(null, LinkProblem.SESSION_REVOKED) },
+        deviceSessionRevocationListener = DeviceSessionRevocationListener { get<app.logdate.wear.sync.v2.removal.WatchDataWiper>().wipe() },
         profile = SyncProfile.LinkedWatch(RecentCaptureFilter(RECENT_CAPTURES)),
     )
 }

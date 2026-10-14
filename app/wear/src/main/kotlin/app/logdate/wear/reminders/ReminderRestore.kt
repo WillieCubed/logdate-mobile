@@ -8,6 +8,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import app.logdate.wear.launch.awaitWearStartup
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import org.koin.core.component.KoinComponent
@@ -41,8 +42,9 @@ class ReminderRestoreWorker(
     KoinComponent {
     private val reminders: WatchReminders by inject()
 
-    override suspend fun doWork(): Result =
-        try {
+    override suspend fun doWork(): Result {
+        if (!applicationContext.awaitWearStartup()) return Result.retry()
+        return try {
             reminders.restore()
             Result.success()
         } catch (e: CancellationException) {
@@ -51,6 +53,7 @@ class ReminderRestoreWorker(
             Napier.e("Restoring reminders after a restart failed", e)
             Result.retry()
         }
+    }
 
     companion object {
         const val UNIQUE_WORK_NAME = "reminder_restore"

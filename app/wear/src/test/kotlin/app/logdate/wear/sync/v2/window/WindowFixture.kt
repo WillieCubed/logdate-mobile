@@ -96,8 +96,9 @@ class WindowFixture {
         note: JournalNote = this.note,
         revision: Long = 1,
         context: PeerDeliveryContext = peer,
+        reasons: Set<app.logdate.client.sync.datalayer.v2.WindowReason> = emptySet(),
     ): WindowItem {
-        val envelope = NoteEnvelopeBody.envelope(note, RecordOrigin.PHONE, DeliveryPriority.BULK).copy(context = context)
+        val envelope = NoteEnvelopeBody.envelope(note, RecordOrigin.PHONE, DeliveryPriority.BULK).copy(context = context, reasons = reasons)
         return WindowItem(
             context.phoneNode,
             WearPaths.windowItem(RecordKind.NOTE, note.uid, context),

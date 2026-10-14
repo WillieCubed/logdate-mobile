@@ -15,6 +15,10 @@ object WearRemoteCameraDeviceStore : RemoteCameraDeviceStore {
     private val _cameraSelection = MutableStateFlow(defaultRemoteCameraSelection())
     override val cameraSelection: StateFlow<MediaDeviceSelectionUiState> = _cameraSelection.asStateFlow()
 
+    fun clearForRemoval() {
+        _cameraSelection.value = defaultRemoteCameraSelection()
+    }
+
     fun update(selection: MediaDeviceSelectionUiState) {
         if (selection.devices.isEmpty()) return
         _cameraSelection.value = selection

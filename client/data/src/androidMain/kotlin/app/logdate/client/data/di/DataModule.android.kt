@@ -302,6 +302,7 @@ actual val dataModule: Module =
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
                 deviceName = { context.userVisibleDeviceName() },
                 accountKeyUnlockCoordinator = get(),
+                beforeSignOut = { getOrNull<app.logdate.client.sync.peer.removal.WatchRemovalAccess>()?.removeAll() ?: true },
             )
         }
         single<ServerScopedAccounts> {
@@ -344,7 +345,7 @@ actual val dataModule: Module =
 
         // Search
         single { OfflineFirstSearchRepository(get(), get()) }
-        single(createdAtStart = true) {
+        single {
             AndroidPlatformSearchIndexManager(
                 context = androidContext(),
                 searchDao = get(),

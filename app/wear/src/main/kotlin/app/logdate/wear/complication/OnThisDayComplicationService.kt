@@ -11,6 +11,7 @@ import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import app.logdate.wear.R
 import app.logdate.wear.launch.WearLaunchIntents
+import app.logdate.wear.launch.isWearStartupReady
 import app.logdate.wear.v2.memories.OnThisDay
 import app.logdate.wear.v2.surfaces.findOnThisDay
 import app.logdate.wear.v2.surfaces.onThisDayPreview
@@ -30,6 +31,7 @@ class OnThisDayComplicationService : SuspendingComplicationDataSourceService() {
     }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
+        if (!isWearStartupReady()) return NoDataComplicationData()
         val day = findOnThisDay() ?: return NoDataComplicationData()
         return onThisDayComplicationData(this, day, WearLaunchIntents.moment(this, day.leadMoment.uid))
     }

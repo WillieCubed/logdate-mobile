@@ -42,6 +42,7 @@ class WatchStateMirror(
     private val initializeShared: suspend () -> Unit = {},
     private val adoptPhonePreferences: suspend (String, StateDocument) -> Unit = { _, _ -> },
     private val lastReminderAt: Flow<Long?> = flowOf(null),
+    private val acceptsPhone: suspend () -> Boolean = { true },
 ) {
     fun start(scope: CoroutineScope): Job =
         scope.launch {
@@ -75,7 +76,7 @@ class WatchStateMirror(
         localNodeId: String?,
         decoded: Decoded<StateDocument>,
     ) {
-        if (sourceNodeId == localNodeId) return
+        if (sourceNodeId == localNodeId || !acceptsPhone()) return
         val document = peerStates.accept(sourceNodeId, decoded, PeerRole.PHONE) ?: return
         val phoneState = merger.merge(phone = document, watch = null).phone
         val enabled = phoneState?.flags?.get(FeatureFlag.WATCH_EXPERIENCE_V2.key) ?: return

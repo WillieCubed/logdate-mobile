@@ -95,6 +95,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         androidMain.dependencies {
+            implementation(libs.androidx.protolayout.material3)
+            implementation(libs.androidx.tiles.renderer)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.kotlinx.datetime)
             // TODO: Move this to proper shared module

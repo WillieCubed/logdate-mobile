@@ -18,7 +18,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class WatchDeviceCardTest {
     @Test
-    fun `reported queue and library are shown and the card opens watch settings`() =
+    fun `watch card opens settings without repeating device details`() =
         runDesktopComposeUiTest(width = 411, height = 600) {
             var opens = 0
             setContent {
@@ -29,7 +29,7 @@ class WatchDeviceCardTest {
                     )
                 }
             }
-            onNodeWithText("Pixel Watch").performClick()
+            onNodeWithText("Watch").performClick()
             assertEquals(1, opens)
             System.getenv("LOGDATE_SETTINGS_SCREENSHOT_DIR")?.let { directory ->
                 val image = onRoot().captureToImage()
@@ -40,7 +40,9 @@ class WatchDeviceCardTest {
                 }
                 ImageIO.write(output, "png", File(directory, "watch-device-card.png").also { it.parentFile.mkdirs() })
             }
-            onNodeWithText("Up to date · 14 days of moments on your watch").assertExists()
+            onNodeWithText("Up to date").assertExists()
+            onNodeWithText("Pixel Watch").assertDoesNotExist()
+            onNodeWithText("14 days of moments on your watch").assertDoesNotExist()
         }
 
     @Test
@@ -51,7 +53,7 @@ class WatchDeviceCardTest {
                     WatchDeviceCard(WatchStatus.Ready("Pixel Watch", false), onClick = {})
                 }
             }
-            onNodeWithText("Pixel Watch").assertExists()
+            onNodeWithText("Watch").assertExists()
             onNodeWithText("Out of range").assertExists()
             onNodeWithText("Up to date", substring = true).assertDoesNotExist()
         }

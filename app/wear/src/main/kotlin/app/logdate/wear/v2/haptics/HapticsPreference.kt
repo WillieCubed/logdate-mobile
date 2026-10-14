@@ -28,6 +28,8 @@ interface HapticsPreferenceStore {
     val preference: StateFlow<HapticsPreference>
 
     fun set(preference: HapticsPreference)
+
+    fun clearForRemoval() = set(HapticsPreference.ALL)
 }
 
 /** [HapticsPreferenceStore] in the watch's own SharedPreferences file, [PREFERENCES_NAME]. */
@@ -41,6 +43,11 @@ class SharedPreferencesHapticsPreferenceStore(
     override fun set(preference: HapticsPreference) {
         preferences.edit { putString(KEY_HAPTICS, preference.storedName) }
         current.value = preference
+    }
+
+    override fun clearForRemoval() {
+        check(preferences.edit().clear().commit()) { "The removed watch's haptics preference could not be cleared" }
+        current.value = HapticsPreference.ALL
     }
 
     companion object {

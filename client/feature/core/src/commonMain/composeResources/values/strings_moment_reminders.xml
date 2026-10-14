@@ -20,7 +20,7 @@
     <string name="phone_reminders_supplements_title">Drafts and memories</string>
     <string name="phone_reminders_supplements_body">A draft to finish or an older entry to revisit. These share the same daily reminder.</string>
     <string name="phone_reminders_workout_title">After a workout</string>
-    <string name="phone_reminders_workout_unavailable">Unavailable</string>
+    <string name="phone_reminders_workout_unavailable">Phone workout reminders aren’t included in this version. On a compatible watch, allow activity access for workout reminders.</string>
     <string name="phone_reminders_places_consent_title">Add places to your moments?</string>
     <string name="phone_reminders_places_consent_body">Use location history to recognize places and add them to moments on your phone and watch. You choose whether to record location history in Places settings.</string>
     <string name="phone_reminders_places_consent_confirm">Enable Places</string>

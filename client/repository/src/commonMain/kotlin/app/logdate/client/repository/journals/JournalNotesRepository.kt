@@ -157,6 +157,13 @@ interface JournalNotesRepository {
      */
     suspend fun getNoteById(noteId: Uuid): JournalNote?
 
+    /** Fills missing audio metadata only while the same live note still owns [mediaRef]. */
+    suspend fun updateAudioDurationIfUnknown(
+        noteId: Uuid,
+        mediaRef: String,
+        durationMs: Long,
+    ): Boolean = false
+
     /**
      * Creates a new note.
      */

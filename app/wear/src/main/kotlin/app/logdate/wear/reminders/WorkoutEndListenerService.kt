@@ -5,9 +5,10 @@ import androidx.core.content.edit
 import androidx.health.services.client.PassiveListenerService
 import androidx.health.services.client.data.UserActivityInfo
 import androidx.health.services.client.data.UserActivityState
+import app.logdate.wear.LogDateWearApplication
+import app.logdate.wear.launch.awaitWearStartup
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -127,11 +128,12 @@ class WorkoutEndListenerService :
     PassiveListenerService(),
     KoinComponent {
     private val watcher: WorkoutWatcher by inject()
-    private val applicationScope: CoroutineScope by inject()
+    private val applicationScope: CoroutineScope get() = (application as LogDateWearApplication).startupWorkScope
 
     override fun onUserActivityInfoReceived(info: UserActivityInfo) {
         val changedAt = Instant.fromEpochMilliseconds(info.stateChangeTime.toEpochMilli())
-        applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+        applicationScope.launch {
+            if (!awaitWearStartup()) return@launch
             if (watcher.onActivityWhenReady(info.userActivityState.toActivityKind(), changedAt)) {
                 Napier.i("A workout ended at $changedAt; a reminder was shown")
             }

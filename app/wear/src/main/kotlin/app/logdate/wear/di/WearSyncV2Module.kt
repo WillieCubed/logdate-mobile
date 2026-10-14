@@ -41,9 +41,15 @@ import org.koin.dsl.module
 /** Koin module for the watch's version 2 sync: linking, delivery and the library window. */
 val wearSyncV2Module =
     module {
-        includes(wearWatchWindowModule, wearPhoneMediaModule)
+        includes(wearWatchWindowModule, wearPhoneMediaModule, wearRemovalModule)
         single<PairKeyVault> { SecureStoragePairKeyVault(get(), prefix = "watch.link.pair_key.") }
-        single { WatchLinkStore(storage = get(), pairKeys = get()) }
+        single {
+            WatchLinkStore(
+                storage = get(),
+                pairKeys = get(),
+                onLinked = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>()::reset,
+            )
+        }
         single { WatchLinkExchange(handshake = BouncyCastleLinkHandshake(), nonces = LinkNonceLedger()) }
         single {
             val nodeClient = Wearable.getNodeClient(get<Context>())
@@ -52,7 +58,10 @@ val wearSyncV2Module =
             WatchLinkCoordinator(
                 exchange = get(),
                 store = get(),
-                v2Enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+                v2Enabled = {
+                    val removal = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>().state()
+                    flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) && (removal == null || removal == "removed")
+                },
                 localNodeId = { nodeClient.localNodeIdOrNull() },
                 installer = get<LinkInstaller>(),
                 installScope = get<CoroutineScope>(),
@@ -68,6 +77,7 @@ val wearSyncV2Module =
                 config = get(),
                 localNodeId = { nodeClient.localNodeIdOrNull() },
                 active = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+                removed = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>()::removed,
             )
         }
         factory { parameters ->
@@ -161,14 +171,18 @@ val wearSyncV2Module =
         single {
             WatchOwnState(
                 links = get<WatchLinkStore>().observe(),
-                features =
-                    setOf(
-                        WearFeatures.LINK_CLOUD,
-                        WearFeatures.RECEIPTS,
-                        WearFeatures.OPERATION_RECEIPTS,
-                        WearFeatures.WINDOW,
-                        WearFeatures.MEDIA_RANGE,
-                    ),
+                features = watchSyncFeatures,
             )
         }
     }
+
+internal val watchSyncFeatures =
+    setOf(
+        WearFeatures.LIVE,
+        WearFeatures.LINK_CLOUD,
+        WearFeatures.RECEIPTS,
+        WearFeatures.OPERATION_RECEIPTS,
+        WearFeatures.MOMENTS,
+        WearFeatures.WINDOW,
+        WearFeatures.MEDIA_RANGE,
+    )

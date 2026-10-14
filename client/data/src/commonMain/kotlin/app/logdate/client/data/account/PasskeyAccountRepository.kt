@@ -61,6 +61,7 @@ class DefaultPasskeyAccountRepository(
     private val createsRestoreKey: Boolean = true,
     private val adoptCanonicalOwner: (suspend (String) -> Boolean)? = null,
     private val accountKeyUnlockCoordinator: AccountKeyUnlockCoordinator? = null,
+    private val beforeSignOut: suspend () -> Boolean = { true },
 ) : PasskeyAccountRepository {
     private val sessionState = PasskeyAccountSessionState()
     override val currentAccount: StateFlow<LogDateAccount?> = sessionState.currentAccount
@@ -188,7 +189,12 @@ class DefaultPasskeyAccountRepository(
 
     override suspend fun signInWithGoogle(): Result<LogDateAccount> = googleSignInCoordinator.signInWithGoogle()
 
-    override suspend fun signOut(): Result<Unit> = sessionRefreshCoordinator.signOut()
+    override suspend fun signOut(): Result<Unit> =
+        if (beforeSignOut()) {
+            sessionRefreshCoordinator.signOut()
+        } else {
+            Result.failure(IllegalStateException("The linked watch could not be removed safely. Keep it nearby and try again."))
+        }
 
     override suspend fun deleteAccount(): Result<Unit> = sessionRefreshCoordinator.deleteAccount()
 

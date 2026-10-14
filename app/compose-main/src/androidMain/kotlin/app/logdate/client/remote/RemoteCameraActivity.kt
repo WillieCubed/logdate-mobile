@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import app.logdate.client.launch.whenApplicationReady
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -29,6 +30,10 @@ class RemoteCameraActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        whenApplicationReady { showCamera() }
+    }
+
+    private fun showCamera() {
         setContent {
             LogDateTheme {
                 CameraCaptureContent(

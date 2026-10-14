@@ -325,6 +325,8 @@ fun rememberEditorAutoSave(
  */
 internal fun getEditorDraftFingerprint(state: EditorState): String =
     buildString {
+        appendFingerprintField("mark")
+        appendFingerprintField(state.markId)
         appendFingerprintField("visit")
         appendFingerprintField(state.visitContext)
         appendFingerprintField("journals")

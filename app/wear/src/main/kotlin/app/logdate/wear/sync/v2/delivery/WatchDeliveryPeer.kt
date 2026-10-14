@@ -14,6 +14,7 @@ class WatchDeliveryPeer(
     private val config: LogDateConfigRepository,
     private val localNodeId: suspend () -> String?,
     private val active: suspend () -> Boolean,
+    private val removed: suspend () -> Boolean = { false },
 ) {
     suspend fun current(): PeerDeliveryContext? =
         try {
@@ -25,8 +26,13 @@ class WatchDeliveryPeer(
             null
         }
 
-    private suspend fun capture(): PeerDeliveryContext? {
-        if (!active()) return null
+    suspend fun forRemoval(): PeerDeliveryContext? = capture(requireActive = false, allowRemoved = true)
+
+    private suspend fun capture(
+        requireActive: Boolean = true,
+        allowRemoved: Boolean = false,
+    ): PeerDeliveryContext? {
+        if ((requireActive && !active()) || (!allowRemoved && removed())) return null
         val record = links.current() ?: return null
         if (record.stale || record.installing || record.problem != null) return null
         val bound = sessions.getOriginBoundSession()
@@ -54,7 +60,7 @@ class WatchDeliveryPeer(
                         bound.origin == backend
             }
         if (!accountMatches ||
-            !active() ||
+            (requireActive && !active()) ||
             links.current() != record ||
             sessions.getOriginBoundSession() != bound ||
             sessions.getSession() != session ||

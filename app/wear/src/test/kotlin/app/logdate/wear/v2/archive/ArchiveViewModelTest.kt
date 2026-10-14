@@ -9,8 +9,10 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -37,8 +39,6 @@ class ArchiveViewModelTest {
             start = LocalDate(2026, 10, 3).atStartOfDayIn(zone),
             end = LocalDate(2026, 10, 4).atStartOfDayIn(zone),
         )
-    private val windowStart = LocalDate(2026, 9, 20).atStartOfDayIn(zone)
-    private val recentStart = LocalDate(2026, 9, 27).atStartOfDayIn(zone)
     private val dayClock = mockk<DayClock> { every { observe() } returns flowOf(saturday) }
     private val notesRepository = mockk<JournalNotesRepository>()
 
@@ -59,7 +59,7 @@ class ArchiveViewModelTest {
             val evening = text("Dinner on the roof", at(LocalDateTime(2026, 9, 21, 20, 0)))
             val thursday = text("Long call", at(LocalDateTime(2026, 9, 24, 21, 0)))
             val checkIn = text("#mood:ok Fine", at(LocalDateTime(2026, 9, 24, 7, 0)))
-            every { notesRepository.observeNotesInRange(windowStart, recentStart) } returns
+            every { notesRepository.allNotesObserved } returns
                 flowOf(listOf(morning, checkIn, evening, thursday))
 
             ArchiveViewModel(dayClock, notesRepository).uiState.test {
@@ -80,7 +80,7 @@ class ArchiveViewModelTest {
     @Test
     fun `nothing earlier is an empty archive`() =
         runTest {
-            every { notesRepository.observeNotesInRange(windowStart, recentStart) } returns flowOf(emptyList())
+            every { notesRepository.allNotesObserved } returns flowOf(emptyList())
 
             ArchiveViewModel(dayClock, notesRepository).uiState.test {
                 assertEquals(ArchiveUiState.Ready(timeZone = zone, days = emptyList()), expectMostRecentItem())
@@ -88,9 +88,31 @@ class ArchiveViewModelTest {
         }
 
     @Test
+    fun `starred older moments remain accessible offline and follow favorite changes`() =
+        runTest {
+            val favorite = voice(at(LocalDateTime(2025, 9, 21, 8, 0)))
+            val ordinary = text("Long call", at(LocalDateTime(2026, 9, 24, 21, 0)))
+            val changes = MutableStateFlow(0)
+            var starred = setOf(favorite.uid)
+            every { notesRepository.allNotesObserved } returns flowOf(listOf(favorite, ordinary))
+
+            ArchiveViewModel(dayClock, notesRepository, starred = { starred }, windowChanges = changes.map { }).uiState.test {
+                val first = expectMostRecentItem() as ArchiveUiState.Ready
+                assertEquals(listOf(favorite), first.starredMoments)
+                assertEquals(listOf(ArchiveDay(LocalDate(2026, 9, 24), listOf(ordinary))), first.days)
+
+                starred = emptySet()
+                changes.value++
+                val changed = awaitItem() as ArchiveUiState.Ready
+                assertEquals(emptyList(), changed.starredMoments)
+                assertEquals(2, changed.days.size)
+            }
+        }
+
+    @Test
     fun `a failure reading notes shows the failed state`() =
         runTest {
-            every { notesRepository.observeNotesInRange(any(), any()) } returns flow { throw IOException("database closed") }
+            every { notesRepository.allNotesObserved } returns flow { throw IOException("database closed") }
 
             ArchiveViewModel(dayClock, notesRepository).uiState.test {
                 assertEquals(ArchiveUiState.Failed, expectMostRecentItem())

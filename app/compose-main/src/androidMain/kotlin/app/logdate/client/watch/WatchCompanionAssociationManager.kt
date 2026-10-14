@@ -9,14 +9,15 @@ import android.content.IntentSender
 import android.os.Build
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
+import app.logdate.client.watch.presence.WatchPresenceRegistration
+import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
-private const val LOGDATE_WATCH_ASSOCIATION_NAME = "LogDate Watch"
+import kotlinx.coroutines.tasks.await
 
 interface WatchCompanionAssociationManager {
     /** Emits the latest app-level watch association state observed on the phone. */
@@ -39,6 +40,7 @@ class DefaultWatchCompanionAssociationManager(
     private val associationRequestFactory: WatchAssociationRequestFactory = DefaultWatchAssociationRequestFactory(),
 ) : WatchCompanionAssociationManager {
     private val associationState = MutableStateFlow<WatchAssociationSnapshot>(WatchAssociationSnapshot.Unsupported)
+    private var pendingTarget: WatchNodeSnapshot? = null
     private var launcher: ActivityResultLauncher<IntentSenderRequest>? = null
 
     init {
@@ -60,9 +62,15 @@ class DefaultWatchCompanionAssociationManager(
             return
         }
 
+        val target = companionDeviceClient.associationTarget()
+        if (target == null) {
+            refreshAssociationState()
+            return
+        }
+        pendingTarget = target
         associationState.value = WatchAssociationSnapshot.Pending
         companionDeviceClient.associate(
-            request = associationRequestFactory.createRequest(),
+            request = associationRequestFactory.createRequest(target),
             callback = associationCallback(activityLauncher),
         )
     }
@@ -145,11 +153,12 @@ class DefaultWatchCompanionAssociationManager(
     }
 
     private fun onAssociationCreated(associationInfo: AssociationInfo) {
-        associationState.value =
-            WatchAssociationSnapshot.Associated(
-                displayName = associationInfo.displayName?.toString(),
-                macAddress = associationInfo.deviceMacAddress?.toString(),
-            )
+        val target = pendingTarget ?: return
+        pendingTarget = null
+        applicationScope.launch {
+            companionDeviceClient.rememberAssociation(associationInfo, target)
+            associationState.value = companionDeviceClient.currentAssociation()
+        }
     }
 
     private fun onAssociationFailed(
@@ -172,6 +181,13 @@ interface CompanionDeviceClient {
     /** Returns the current LogDate watch association snapshot, if any. */
     suspend fun currentAssociation(): WatchAssociationSnapshot
 
+    suspend fun associationTarget(): WatchNodeSnapshot? = null
+
+    suspend fun rememberAssociation(
+        info: AssociationInfo,
+        target: WatchNodeSnapshot,
+    ) = Unit
+
     /** Starts the framework association request. */
     fun associate(
         request: AssociationRequest,
@@ -179,25 +195,11 @@ interface CompanionDeviceClient {
     )
 }
 
-/** Factory that builds the framework association request used for watch pairing. */
-interface WatchAssociationRequestFactory {
-    fun createRequest(): AssociationRequest
-}
-
-/** Default watch association request for LogDate's phone-to-watch relationship. */
-class DefaultWatchAssociationRequestFactory : WatchAssociationRequestFactory {
-    override fun createRequest(): AssociationRequest =
-        AssociationRequest
-            .Builder()
-            .setDeviceProfile(AssociationRequest.DEVICE_PROFILE_WATCH)
-            .setDisplayName(LOGDATE_WATCH_ASSOCIATION_NAME)
-            .setSingleDevice(false)
-            .build()
-}
-
 /** Thin Android wrapper around [CompanionDeviceManager] to keep the manager testable. */
 class AndroidCompanionDeviceClient(
     private val context: Context,
+    private val presence: WatchPresenceRegistration? = null,
+    private val bindings: WatchAssociationBindings,
 ) : CompanionDeviceClient {
     private val companionDeviceManager =
         context.getSystemService(CompanionDeviceManager::class.java)
@@ -212,17 +214,39 @@ class AndroidCompanionDeviceClient(
             return WatchAssociationSnapshot.Unsupported
         }
 
+        presence?.registerCurrent()
         val association =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                manager
-                    .myAssociations
-                    .firstOrNull { it.deviceProfile == AssociationRequest.DEVICE_PROFILE_WATCH }
-                    ?.toSnapshot()
+            if (Build.VERSION.SDK_INT >= 33) {
+                manager.myAssociations
+                    .asSequence()
+                    .filter { it.deviceProfile == AssociationRequest.DEVICE_PROFILE_WATCH }
+                    .mapNotNull { info ->
+                        val binding = bindings.current().values.singleOrNull { it.associationId == info.id }
+                        binding?.let { info.toSnapshot(it.nodeId) }
+                    }.firstOrNull()
             } else {
                 manager.legacyWatchAssociation()
             }
 
         return association ?: WatchAssociationSnapshot.Unassociated
+    }
+
+    override suspend fun associationTarget(): WatchNodeSnapshot? =
+        Wearable.getNodeClient(context).connectedNodes.await().singleOrNull()?.let {
+            WatchNodeSnapshot(it.id, it.displayName, it.isNearby)
+        }
+
+    override suspend fun rememberAssociation(
+        info: AssociationInfo,
+        target: WatchNodeSnapshot,
+    ) {
+        if (Build.VERSION.SDK_INT >= 33 && info.deviceProfile == AssociationRequest.DEVICE_PROFILE_WATCH) {
+            val node =
+                info.deviceMacAddress?.toString()?.let {
+                    Wearable.getNodeClient(context).getNodeId(it).await()
+                }
+            if (node == target.id) bindings.bind(WatchAssociationBinding(info.id, target.id, target.displayName))
+        }
     }
 
     override fun associate(
@@ -234,10 +258,12 @@ class AndroidCompanionDeviceClient(
     }
 }
 
-private fun AssociationInfo.toSnapshot(): WatchAssociationSnapshot.Associated =
+private fun AssociationInfo.toSnapshot(nodeId: String): WatchAssociationSnapshot.Associated =
     WatchAssociationSnapshot.Associated(
         displayName = displayName?.toString(),
         macAddress = deviceMacAddress?.toString(),
+        nodeId = nodeId,
+        associationId = id,
     )
 
 @Suppress("DEPRECATION")

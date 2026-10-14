@@ -26,6 +26,7 @@ enum class OnboardingStep {
     DAY_BOUNDARIES,
     LOCATION,
     NOTIFICATIONS,
+    WATCH,
     COMPLETE,
     WELCOME_BACK,
 }
@@ -42,6 +43,8 @@ data class OnboardingProgressSnapshot(
     val locationHandledOnThisDevice: Boolean = false,
     val locationTrackingEnabled: Boolean = false,
     val notificationsHandledOnThisDevice: Boolean = false,
+    val watchAvailable: Boolean = false,
+    val watchHandledOnThisDevice: Boolean = false,
     val healthConnectStatus: HealthConnectStatus = HealthConnectStatus.CHECKING,
 )
 
@@ -91,6 +94,7 @@ private fun onboardingStepOrderFor(
         }
         add(OnboardingStep.LOCATION)
         add(OnboardingStep.NOTIFICATIONS)
+        add(OnboardingStep.WATCH)
         add(terminalStepFor(entryMode))
     }
 
@@ -106,6 +110,7 @@ private fun shouldIncludeStep(
         OnboardingStep.DAY_BOUNDARIES -> !snapshot.hasResolvedDayBoundaries()
         OnboardingStep.LOCATION -> !snapshot.hasResolvedLocation()
         OnboardingStep.NOTIFICATIONS -> !snapshot.notificationsHandledOnThisDevice
+        OnboardingStep.WATCH -> snapshot.watchAvailable && !snapshot.watchHandledOnThisDevice
         else -> true
     }
 

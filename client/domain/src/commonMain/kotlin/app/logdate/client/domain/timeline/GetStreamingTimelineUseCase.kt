@@ -45,6 +45,10 @@ class GetStreamingTimelineUseCase(
     private val getTimelineDayUseCase: GetTimelineDayUseCase,
     private val groupNotesByDayBoundsUseCase: GroupNotesByDayBoundsUseCase,
     private val eventRepository: EventRepository,
+    private val marks: Flow<Map<LocalDate, List<app.logdate.client.repository.moments.MarkedMoment>>> =
+        kotlinx.coroutines.flow.flowOf(
+            emptyMap(),
+        ),
 ) {
     /**
      * Gets streaming timeline based on the request type
@@ -53,6 +57,24 @@ class GetStreamingTimelineUseCase(
         when (request) {
             is StreamingTimelineRequest.RecentTimeline -> getRecentTimeline(request.sortOrder, request.pageSize)
             is StreamingTimelineRequest.TimelineInRange -> getTimelineInRange(request.start, request.end, request.sortOrder)
+        }.combine(marks) { timeline, markedDays ->
+            val included =
+                if (request is StreamingTimelineRequest.TimelineInRange) {
+                    markedDays
+                        .mapValues { (_, rows) -> rows.filter { it.capturedAt >= request.start && it.capturedAt < request.end } }
+                        .filterValues { it.isNotEmpty() }
+                } else {
+                    markedDays
+                }
+            val merged =
+                app.logdate.client.domain.moments
+                    .withTimelineMarks(timeline, included)
+            val order =
+                when (request) {
+                    is StreamingTimelineRequest.RecentTimeline -> request.sortOrder
+                    is StreamingTimelineRequest.TimelineInRange -> request.sortOrder
+                }
+            merged.copy(days = applySorting(merged.days, order))
         }
 
     private fun getRecentTimeline(

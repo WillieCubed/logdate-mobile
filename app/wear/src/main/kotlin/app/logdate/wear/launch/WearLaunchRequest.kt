@@ -48,7 +48,12 @@ sealed interface WearLaunchRequest {
         private const val TODAY_LINK = "studio.hypertext.logdate://watch/today"
 
         /** Parses a link the phone sent to this watch, or null for a link this app doesn't open. */
-        fun parseLink(link: String?): WearLaunchRequest? = if (link == TODAY_LINK) Home else null
+        fun parseLink(link: String?): WearLaunchRequest? {
+            if (link == TODAY_LINK) return Home
+            val prefix = "studio.hypertext.logdate://watch/moment/"
+            if (link?.startsWith(prefix) != true) return null
+            return Uuid.parseOrNull(link.removePrefix(prefix))?.let(::Moment)
+        }
 
         /**
          * Parses a route name and, for `moment`, its note ID. Returns null for a missing or unknown

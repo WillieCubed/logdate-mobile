@@ -76,7 +76,7 @@ internal fun WatchStatusCard(
                     iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                     title = stringResource(Res.string.watch_no_paired),
                     description = stringResource(Res.string.watch_no_paired_description),
-                )
+                ) { WatchSystemSetupButton() }
             is WatchStatus.SettingUp -> SettingUpStatus(status.step, onBeginAssociation)
             is WatchStatus.NotInstalled ->
                 CenteredStatus(

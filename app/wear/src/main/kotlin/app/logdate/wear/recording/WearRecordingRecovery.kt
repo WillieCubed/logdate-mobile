@@ -6,6 +6,7 @@ import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
+import app.logdate.wear.capture.WatchCaptureWriteGuard
 import io.github.aakira.napier.Napier
 import java.io.File
 import kotlin.time.Clock
@@ -32,12 +33,14 @@ class WearRecordingRecovery(
     private val notesRepository: JournalNotesRepository,
     private val durationResolver: AudioDurationResolver,
     private val remuxer: AudioRemuxer,
+    private val captureGuard: WatchCaptureWriteGuard = WatchCaptureWriteGuard.Unrestricted,
 ) {
     /**
      * @param modifiedBefore Only raw files last written before this epoch millisecond are considered.
      * @return how many notes were created.
      */
-    suspend fun recover(modifiedBefore: Long = Long.MAX_VALUE): Int = rawRecordings(modifiedBefore).count { recover(it) }
+    suspend fun recover(modifiedBefore: Long = Long.MAX_VALUE): Int =
+        captureGuard.write { rawRecordings(modifiedBefore).count { recover(it) } }
 
     private fun rawRecordings(modifiedBefore: Long): List<File> =
         audioDirectory

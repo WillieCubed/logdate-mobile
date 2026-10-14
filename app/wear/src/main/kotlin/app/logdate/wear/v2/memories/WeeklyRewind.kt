@@ -9,9 +9,12 @@ import app.logdate.wear.v2.library.LibraryWindow
 import app.logdate.wear.v2.today.TodayWindow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
+import kotlin.uuid.Uuid
 
 /** This week's Rewind as the watch shows it: its title, and the moment that opens it. */
 data class WeeklyRewind(
@@ -20,17 +23,29 @@ data class WeeklyRewind(
 )
 
 /**
- * The newest Rewind that ended in the last [REWIND_AGE_DAYS] days, when one of its voice or text
- * moments is on this watch; null otherwise.
+ * Verified phone-window Rewind notes form the card without copying the phone's Rewind database.
+ * Legacy callers may use the newest local Rewind that ended in the last [REWIND_AGE_DAYS] days.
  */
 class WeeklyRewindSource(
     private val rewinds: RewindRepository,
     private val notesRepository: JournalNotesRepository,
+    private val windowRewind: suspend () -> Set<Uuid>? = { null },
+    private val windowChanges: Flow<Unit> = flowOf(Unit),
 ) {
     fun observe(today: TodayWindow): Flow<WeeklyRewind?> {
         val since = today.date.minus(REWIND_AGE_DAYS, DateTimeUnit.DAY).atStartOfDayIn(today.timeZone)
-        return combine(rewinds.getAllRewinds(), notesRepository.allNotesObserved) { all, _ ->
-            all.filter { it.endDate >= since }.maxByOrNull(Rewind::endDate)?.let { rewind -> leadFor(rewind) }
+        return combine(rewinds.getAllRewinds(), notesRepository.allNotesObserved, windowChanges.onStart { emit(Unit) }) { all, notes, _ ->
+            val selected = windowRewind()
+            val lead =
+                notes
+                    .filter { it.uid in selected.orEmpty() && LibraryWindow.isLibraryMoment(it) }
+                    .sortedByDescending(JournalNote::creationTimestamp)
+                    .firstOrNull()
+            if (selected != null) {
+                lead?.let { WeeklyRewind("This week's Rewind", it) }
+            } else {
+                all.filter { it.endDate >= since }.maxByOrNull(Rewind::endDate)?.let { rewind -> leadFor(rewind) }
+            }
         }
     }
 

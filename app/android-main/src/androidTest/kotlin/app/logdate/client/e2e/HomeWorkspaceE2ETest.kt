@@ -391,22 +391,28 @@ class HomeWorkspaceE2ETest {
     private fun awaitNativeMap(apiKey: String) {
         try {
             compose.waitUntil(timeoutMillis = 30_000) {
-                compose.onAllNodes(
-                    SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Map loaded"),
-                ).fetchSemanticsNodes().isNotEmpty()
+                compose
+                    .onAllNodes(
+                        SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Map loaded"),
+                    ).fetchSemanticsNodes()
+                    .isNotEmpty()
             }
         } catch (failure: ComposeTimeoutException) {
-            val directory = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
-                ?: throw failure
+            val directory =
+                InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+                    ?: throw failure
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             val prefix = "workspace-native-map-failure-${device.displayWidth}x${device.displayHeight}"
             runCatching {
                 File(directory).mkdirs()
                 device.takeScreenshot(File(directory, "$prefix.png"))
                 File(directory, "$prefix-semantics.txt").writeText(compose.onRoot(useUnmergedTree = true).printToString())
-                val logs = device.executeShellCommand(
-                    "logcat -d -s 'Google Maps Android API' 'MapsInitializer' 'DynamiteModule' 'GooglePlayServicesUtil' '*:S'",
-                ).replace(apiKey, "[REDACTED]").replace(Regex("AIza[0-9A-Za-z_-]+"), "[REDACTED]")
+                val logs =
+                    device
+                        .executeShellCommand(
+                            "logcat -d -s 'Google Maps Android API' 'MapsInitializer' 'DynamiteModule' 'GooglePlayServicesUtil' '*:S'",
+                        ).replace(apiKey, "[REDACTED]")
+                        .replace(Regex("AIza[0-9A-Za-z_-]+"), "[REDACTED]")
                 File(directory, "$prefix-maps.txt").writeText(logs)
             }.onFailure { failure.addSuppressed(it) }
             throw failure

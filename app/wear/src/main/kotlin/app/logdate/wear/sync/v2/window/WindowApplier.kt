@@ -14,6 +14,7 @@ import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.datalayer.v2.WindowMemberRef
+import app.logdate.client.sync.datalayer.v2.WindowReason
 import app.logdate.client.sync.datalayer.v2.WindowResyncResponse
 import app.logdate.client.sync.datalayer.v2.WindowTombstoneDataMap
 import app.logdate.client.sync.metadata.EntityType
@@ -55,6 +56,7 @@ class WindowApplier(
     private data class Copy(
         val note: JournalNote,
         val ref: WindowMemberRef,
+        val reasons: Set<WindowReason>,
     )
 
     private class GuardChanged : IllegalStateException()
@@ -215,7 +217,7 @@ class WindowApplier(
                 ) {
                     null
                 } else {
-                    Copy(note, WindowMemberRef(RecordKind.NOTE, note.uid.toString(), envelope.contentVersion, revision))
+                    Copy(note, WindowMemberRef(RecordKind.NOTE, note.uid.toString(), envelope.contentVersion, revision), envelope.reasons)
                 }
             }
         } catch (e: IllegalArgumentException) {
@@ -237,7 +239,14 @@ class WindowApplier(
         // A matching phone echo may settle an edit to a known projection, never adopt an unknown capture.
         if (before != null && (entry == null || fingerprint(before) !in entry.fingerprints && fingerprint(before) != wanted)) return false
         if (entry?.revision == copy.ref.revision && wanted != entry.bodyFingerprint) return false
-        val intent = WindowProjection(copy.ref.revision, copy.ref.contentVersion, setOfNotNull(before?.let(::fingerprint), wanted), wanted)
+        val intent =
+            WindowProjection(
+                copy.ref.revision,
+                copy.ref.contentVersion,
+                setOfNotNull(before?.let(::fingerprint), wanted),
+                wanted,
+                copy.reasons,
+            )
         members.write(peer, state.copy(entries = state.entries + (id to intent)))
         var accepted = wanted
         try {
@@ -245,17 +254,7 @@ class WindowApplier(
                 guard(peer, id)
                 val current = notes.getNoteById(copy.note.uid)
                 if (current?.let(::fingerprint) != before?.let(::fingerprint)) throw GuardChanged()
-                if (current is JournalNote.Audio &&
-                    (
-                        copy.note !is JournalNote.Audio ||
-                            current.mediaRef != copy.note.mediaRef ||
-                            current.lastUpdated != copy.note.lastUpdated
-                    )
-                ) {
-                    forgetMedia(current.uid)
-                    guard(peer, id)
-                    if (notes.getNoteById(current.uid)?.let(::fingerprint) != before?.let(::fingerprint)) throw GuardChanged()
-                }
+                forgetChangedAudio(peer, copy, current, before)
                 prepareNote(copy.note)
                 guard(peer, id)
                 notes.createFromSync(copy.note)
@@ -286,6 +285,25 @@ class WindowApplier(
             ),
         )
         return true
+    }
+
+    private suspend fun forgetChangedAudio(
+        peer: PeerDeliveryContext,
+        copy: Copy,
+        current: JournalNote?,
+        before: JournalNote?,
+    ) {
+        if (current is JournalNote.Audio &&
+            (
+                copy.note !is JournalNote.Audio ||
+                    current.mediaRef != copy.note.mediaRef ||
+                    current.lastUpdated != copy.note.lastUpdated
+            )
+        ) {
+            forgetMedia(current.uid)
+            guard(peer, copy.ref.id)
+            if (notes.getNoteById(current.uid)?.let(::fingerprint) != before?.let(::fingerprint)) throw GuardChanged()
+        }
     }
 
     private suspend fun remove(

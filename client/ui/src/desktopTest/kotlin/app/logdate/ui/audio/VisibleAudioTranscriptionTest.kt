@@ -2,15 +2,31 @@ package app.logdate.ui.audio
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.timeline.MomentAudioUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class VisibleAudioTranscriptionTest {
+    @Test
+    fun `audio stays in a readable column on a wide window`() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            setContent {
+                LogDateTheme(dynamicColor = false) {
+                    MomentAudioCard(MomentAudioUiState("file:///wide.wav", 5000), timeOfDay = null)
+                }
+            }
+            val rootWidth = onRoot().fetchSemanticsNode().boundsInRoot.width
+            val cardWidth = onNodeWithTag("moment-audio-card").fetchSemanticsNode().boundsInRoot.width
+            assertTrue(cardWidth < rootWidth * 0.65f, "Audio card should not stretch across a wide window")
+        }
+
     @Test
     fun `visible persisted audio requests transcription once for each media revision`() =
         runDesktopComposeUiTest(width = 400, height = 800) {

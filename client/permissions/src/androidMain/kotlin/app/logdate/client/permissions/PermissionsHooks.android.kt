@@ -193,9 +193,10 @@ actual fun rememberContactsPermissionState(): ContactsPermissionState {
 }
 
 @Composable
-actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
+actual fun rememberMediaLibraryPermissionState(includeVideos: Boolean): MediaLibraryPermissionState {
     val context = LocalContext.current
-    var permissionGranted by remember { mutableStateOf(hasMediaLibraryPermission(context)) }
+    var permissionGranted by remember { mutableStateOf(hasMediaLibraryPermission(context, includeVideos)) }
+    var refreshRevision by remember { mutableStateOf(0) }
     var shouldShowRationale by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
 
@@ -203,8 +204,9 @@ actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestMultiplePermissions(),
         ) {
-            permissionGranted = hasMediaLibraryPermission(context)
+            permissionGranted = hasMediaLibraryPermission(context, includeVideos)
             permissionRequested = true
+            refreshRevision += 1
             if (!permissionGranted) {
                 shouldShowRationale = true
             }
@@ -214,13 +216,17 @@ actual fun rememberMediaLibraryPermissionState(): MediaLibraryPermissionState {
         hasPermission = permissionGranted,
         shouldShowRationale = shouldShowRationale,
         permissionRequested = permissionRequested,
+        refreshRevision = refreshRevision,
         requestPermission = {
-            permissionLauncher.launch(mediaLibraryPermissions())
+            permissionLauncher.launch(mediaLibraryPermissions(includeVideos))
         },
     )
 }
 
-private fun hasMediaLibraryPermission(context: android.content.Context): Boolean {
+private fun hasMediaLibraryPermission(
+    context: android.content.Context,
+    includeVideos: Boolean,
+): Boolean {
     val hasPermission = { permission: String ->
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
     }
@@ -232,18 +238,19 @@ private fun hasMediaLibraryPermission(context: android.content.Context): Boolean
     }
 
     return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        hasPermission(Manifest.permission.READ_MEDIA_IMAGES) || hasPermission(Manifest.permission.READ_MEDIA_VIDEO)
+        hasPermission(Manifest.permission.READ_MEDIA_IMAGES) || (includeVideos && hasPermission(Manifest.permission.READ_MEDIA_VIDEO))
     } else {
         hasPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 }
 
-private fun mediaLibraryPermissions(): Array<String> =
+private fun mediaLibraryPermissions(includeVideos: Boolean): Array<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        arrayOf(
-            Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VIDEO,
-        )
+        buildList {
+            add(Manifest.permission.READ_MEDIA_IMAGES)
+            if (includeVideos) add(Manifest.permission.READ_MEDIA_VIDEO)
+            if (Build.VERSION.SDK_INT >= 34) add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+        }.toTypedArray()
     } else {
         arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }

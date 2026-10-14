@@ -143,3 +143,15 @@ data object WatchNotificationSettingsRoute : NavKey
 
 @Serializable
 data object WatchTroubleshootingRoute : NavKey
+
+@Serializable
+data object WatchTilesRoute : NavKey
+
+@Serializable
+data object WatchCheckConnectionRoute : NavKey
+
+@Serializable
+data object WatchMicrophoneRoute : NavKey
+
+@kotlinx.serialization.Serializable
+data object WatchRemovalRoute : NavKey

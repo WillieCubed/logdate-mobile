@@ -28,6 +28,8 @@ sealed interface WatchAssociationSnapshot {
     data class Associated(
         val displayName: String? = null,
         val macAddress: String? = null,
+        val nodeId: String? = null,
+        val associationId: Int? = null,
     ) : WatchAssociationSnapshot
 }
 
@@ -48,7 +50,7 @@ fun resolveWatchConnectionState(
             if (connectedWatch == null) {
                 WatchConnectionState.NoPairedWatch
             } else {
-                WatchConnectionState.NeedsAssociation(connectedWatch.displayName)
+                WatchConnectionState.NeedsAssociation(connectedWatch.displayName, connectedWatch.id)
             }
         }
     }
@@ -57,11 +59,10 @@ private fun resolveLegacyWatchConnectionState(transport: WatchTransportSnapshot)
     val connectedWatch = transport.connectedNodes.firstOrNull() ?: return WatchConnectionState.NoPairedWatch
     val installedNodes = installedConnectedNodes(transport)
     if (installedNodes.isEmpty()) {
-        return WatchConnectionState.AppNotInstalled(connectedWatch.displayName)
+        return WatchConnectionState.AppNotInstalled(connectedWatch.displayName, connectedWatch.id)
     }
-    val watchName = installedNodes.first().displayName
-    if (installedNodes.any(WatchNodeSnapshot::isNearby)) return WatchConnectionState.Connected(watchName)
-    return WatchConnectionState.OutOfRange(watchName)
+    val watch = installedNodes.first()
+    return WatchConnectionState.Connected(watch.displayName, watch.id)
 }
 
 /** Resolves watch state once LogDate already has an app-level companion association. */
@@ -69,19 +70,36 @@ private fun resolveAssociatedWatchConnectionState(
     association: WatchAssociationSnapshot.Associated,
     transport: WatchTransportSnapshot,
 ): WatchConnectionState {
-    val installedNodes = installedConnectedNodes(transport)
-    val connectedWatch = transport.connectedNodes.firstOrNull()
+    val boundTransport =
+        association.nodeId?.let { node ->
+            transport.copy(connectedNodes = transport.connectedNodes.filter { it.id == node })
+        } ?: transport
+    val installedNodes = installedConnectedNodes(boundTransport)
+    val connectedWatch = boundTransport.connectedNodes.firstOrNull()
     val watchName =
         installedNodes.firstOrNull()?.displayName ?: connectedWatch?.displayName ?: association.displayName ?: FALLBACK_WATCH_NAME
 
-    if (connectedWatch == null) return WatchConnectionState.OutOfRange(watchName)
-    if (installedNodes.isEmpty()) return WatchConnectionState.AppNotInstalled(watchName)
-    if (installedNodes.any(WatchNodeSnapshot::isNearby)) return WatchConnectionState.Connected(watchName)
-    return WatchConnectionState.OutOfRange(watchName)
+    if (connectedWatch == null) return WatchConnectionState.OutOfRange(watchName, association.nodeId)
+    if (installedNodes.isEmpty()) return WatchConnectionState.AppNotInstalled(watchName, connectedWatch.id)
+    val watch = installedNodes.first()
+    return WatchConnectionState.Connected(watch.displayName, watch.id)
 }
 
 /** Returns the connected nodes that also advertise the LogDate watch capability. */
 private fun installedConnectedNodes(transport: WatchTransportSnapshot): List<WatchNodeSnapshot> {
-    val connectedNodeIds = transport.connectedNodes.map(WatchNodeSnapshot::id).toSet()
-    return transport.appNodes.filter { it.id in connectedNodeIds }
+    val installedNodeIds = transport.appNodes.map(WatchNodeSnapshot::id).toSet()
+    return transport.connectedNodes.filter { it.id in installedNodeIds }
+}
+
+/** Wear app pairing is verified by the same exact peer audience used for captures and playback. */
+fun resolveWearAppConnection(
+    transport: WatchTransportSnapshot,
+    verifiedNodes: Set<String>,
+): WatchConnectionState {
+    val watch =
+        transport.connectedNodes.firstOrNull { it.id in verifiedNodes }
+            ?: transport.connectedNodes.firstOrNull() ?: return WatchConnectionState.NoPairedWatch
+    if (transport.appNodes.none { it.id == watch.id }) return WatchConnectionState.AppNotInstalled(watch.displayName, watch.id)
+    if (watch.id !in verifiedNodes) return WatchConnectionState.NeedsAssociation(watch.displayName, watch.id)
+    return WatchConnectionState.Connected(watch.displayName, watch.id)
 }

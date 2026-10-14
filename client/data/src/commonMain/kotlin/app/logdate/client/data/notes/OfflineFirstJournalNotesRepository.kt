@@ -445,19 +445,28 @@ class OfflineFirstJournalNotesRepository(
         }
     }
 
+    private val mediaMetadata =
+        NoteMediaMetadataWriter(
+            audioNoteDao,
+            imageNoteDao,
+            videoNoteDao,
+            transactionManager,
+            syncMetadataService,
+            mediaReferences,
+            transcriptionRepository,
+            ::getNoteById,
+        )
+
+    override suspend fun updateAudioDurationIfUnknown(
+        noteId: Uuid,
+        mediaRef: String,
+        durationMs: Long,
+    ): Boolean = mediaMetadata.fillAudioDuration(noteId, mediaRef, durationMs).also { changed -> if (changed) triggerContentSync() }
+
     override suspend fun updateMediaRef(
         noteId: Uuid,
         mediaRef: String,
-    ) {
-        val storedRef = mediaReferences.storedReference(mediaRef)
-        transactionManager.withTransaction {
-            val previous = (getNoteById(noteId) as? JournalNote.Audio)?.mediaRef
-            if (previous != null) transcriptionRepository?.rebindMediaReference(noteId, previous, storedRef)
-            imageNoteDao.updateContentUri(noteId, storedRef)
-            audioNoteDao.updateContentUri(noteId, storedRef)
-            videoNoteDao.updateContentUri(noteId, storedRef)
-        }
-    }
+    ) = mediaMetadata.updateReference(noteId, mediaRef)
 
     private val contentSyncDebouncer =
         SyncDebouncer(scope = syncScope) {

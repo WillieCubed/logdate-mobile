@@ -4,15 +4,19 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.work.WorkManager
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.ui.platform.LogDateHaptics
+import app.logdate.wear.LogDateWearApplication
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
+import kotlinx.datetime.TimeZone
+import java.util.concurrent.TimeUnit
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Marks the moment for [MarkMomentReceiver]. A background app can read neither the place nor the
@@ -24,10 +28,14 @@ class BackgroundMarker(
     private val haptics: LogDateHaptics,
 ) {
     /** Returns whether a mark was saved. Nothing is marked while the new watch app is off. */
-    suspend fun mark(): Boolean =
+    suspend fun mark(
+        capturedAt: Instant? = null,
+        timeZoneId: String? = null,
+        markId: Uuid? = null,
+    ): Boolean =
         try {
             if (featureFlags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) {
-                markMoment.mark()
+                markMoment.mark(capturedAt, timeZoneId, markId)
                 haptics.momentMarked()
                 true
             } else {
@@ -46,21 +54,25 @@ class BackgroundMarker(
  * Marks the moment from outside the app: a complication, a tile or a notification action fires
  * [pendingIntent]. It isn't exported, so only this app's own pending intents reach it.
  */
-class MarkMomentReceiver :
-    BroadcastReceiver(),
-    KoinComponent {
-    private val marker: BackgroundMarker by inject()
-    private val scope: CoroutineScope by inject()
-
+class MarkMomentReceiver : BroadcastReceiver() {
     override fun onReceive(
         context: Context,
         intent: Intent,
     ) {
         if (intent.action != ACTION_MARK_MOMENT) return
+        val request = ColdMarkWorker.request(Clock.System.now(), TimeZone.currentSystemDefault().id, Uuid.random())
         val pending = goAsync()
-        scope.launch {
+        (context.applicationContext as LogDateWearApplication).startupWorkScope.launch {
             try {
-                marker.mark()
+                WorkManager
+                    .getInstance(context)
+                    .enqueue(request)
+                    .result
+                    .get(3, TimeUnit.SECONDS)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Napier.e("The mark could not be queued", error)
             } finally {
                 pending.finish()
             }

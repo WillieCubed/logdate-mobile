@@ -51,6 +51,7 @@ data class EntryEditorRoute(
     val launchMode: EditorLaunchMode = EditorLaunchMode.Text,
     val promptPhotoUri: String? = null,
     val initialText: String? = null,
+    val markId: String? = null,
 ) : NavKey
 
 /** Pushes the editor onto the back stack with optional entry / draft / journal context. */
@@ -111,6 +112,7 @@ fun EntryProviderScope<NavKey>.editorEntry(
                 launchMode = route.launchMode,
                 promptPhotoUri = route.promptPhotoUri,
                 initialTextContent = route.initialText,
+                markId = route.markId?.let(Uuid::parse),
                 modifier = sharedBoundsModifier,
             )
         }

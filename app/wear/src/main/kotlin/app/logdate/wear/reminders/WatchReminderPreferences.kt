@@ -15,6 +15,8 @@ interface WatchReminderPreferences {
 
     fun setEnabled(enabled: Boolean)
 
+    fun clearForRemoval() = setEnabled(false)
+
     fun lastReminderAt(): Instant?
 
     fun observeLastReminderAt(): Flow<Instant?> = flowOf(lastReminderAt())
@@ -60,6 +62,13 @@ class SharedPreferencesWatchReminderPreferences(
     override fun setEnabled(enabled: Boolean) {
         preferences.edit { putBoolean(KEY_ENABLED, enabled) }
         current.value = enabled
+    }
+
+    @Synchronized
+    override fun clearForRemoval() {
+        current.value = false
+        posted.value = null
+        check(preferences.edit().clear().commit()) { "The removed watch's reminders could not be cleared" }
     }
 
     override fun lastReminderAt(): Instant? =

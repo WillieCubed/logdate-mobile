@@ -53,6 +53,7 @@ kotlin {
             implementation(projects.shared.model)
             implementation(projects.client.ui)
             implementation(projects.client.domain)
+            implementation(projects.client.permissions)
             implementation(projects.client.repository)
             implementation(projects.client.intelligence)
             implementation(projects.client.media)
@@ -62,6 +63,7 @@ kotlin {
             implementation(projects.client.feature.editor)
             // Compose plugin dependencies
             implementation(libs.compose.runtime)
+            implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material.icons.extended)
             implementation(libs.compose.material3)

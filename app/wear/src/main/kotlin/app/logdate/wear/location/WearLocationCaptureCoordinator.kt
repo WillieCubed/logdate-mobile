@@ -6,6 +6,7 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.shared.model.Location
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 
 /**
  * Centralizes Wear journal-entry geotagging policy.
@@ -16,16 +17,24 @@ import io.github.aakira.napier.Napier
 class WearLocationCaptureCoordinator(
     private val locationProvider: ClientLocationProvider,
     private val settingsRepository: LocationTrackingSettingsRepository,
+    private val captureEnabled: suspend () -> Boolean? = { null },
 ) {
     suspend fun captureForJournalEntry(): NoteLocation? {
-        val settings = settingsRepository.getSettings()
-        if (!settings.autoTrackForJournalEntries) return null
+        if (!isCaptureEnabled()) return null
         if (!locationProvider.hasLocationPermission()) return null
 
-        return runCatching { locationProvider.getCurrentLocation().toNoteLocation() }
-            .onFailure { error -> Napier.w("Wear journal location capture failed", error) }
-            .getOrNull()
+        return try {
+            val location = locationProvider.getCurrentLocation()
+            if (isCaptureEnabled() && locationProvider.hasLocationPermission()) location.toNoteLocation() else null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.w("Wear journal location capture failed", e)
+            null
+        }
     }
+
+    private suspend fun isCaptureEnabled(): Boolean = captureEnabled() ?: settingsRepository.getSettings().autoTrackForJournalEntries
 }
 
 private fun Location.toNoteLocation(): NoteLocation =

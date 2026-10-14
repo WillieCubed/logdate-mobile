@@ -1,0 +1,23 @@
+<resources>
+    <string name="recording_session_active">Recording</string>
+    <string name="recording_session_paused">Recording paused</string>
+    <string name="recording_source_watch">Watch</string>
+    <string name="recording_session_source_elapsed">%1$s · %2$s</string>
+    <string name="recording_session_stop">Stop recording</string>
+    <string name="recording_session_stop_short">Stop</string>
+    <string name="recording_session_saving">Saving…</string>
+    <string name="recording_session_watch_unreachable">Couldn't reach your watch. Your recording continues there; stop it on your watch or try again.</string>
+    <string name="playback_handoff_accepted">Playing on your watch.</string>
+    <string name="playback_handoff_failed">Playback is still on your phone. Check your watch connection and try again.</string>
+    <string name="playback_handoff_retry">Try again</string>
+    <string name="playback_handoff_opening">Opening on watch…</string>
+    <string name="playback_handoff_continue">Continue on watch</string>
+    <string name="audio_transcribing">Transcribing…</string>
+    <string name="playback_handoff_not_on_watch">This recording is not available in your watch library yet. Check what syncs in Watch settings, then try again. Playback is still on your phone.</string>
+    <string name="playback_handoff_starting">Your watch is still starting LogDate. Open LogDate on your watch, then try again. Playback is still on your phone.</string>
+    <string name="playback_handoff_unreachable">Your watch did not answer the handoff. Check its connection and try again. Playback is still on your phone.</string>
+    <string name="playback_handoff_not_opened">LogDate could not open the recording on your watch. Open the watch app, then try again. Playback is still on your phone.</string>
+    <string name="playback_handoff_setup">Your watch could not verify this phone. Finish watch setup or reconnect it in Watch settings. Playback is still on your phone.</string>
+    <string name="playback_handoff_watch_playback">Your watch could not start playback. Check its speaker or headphones, then try again. Playback is still on your phone.</string>
+    <string name="playback_handoff_phone_changed">The recording on your phone changed or finished before the handoff completed. Start it again to continue on your watch.</string>
+</resources>

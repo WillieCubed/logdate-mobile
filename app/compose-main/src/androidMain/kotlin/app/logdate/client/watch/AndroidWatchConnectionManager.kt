@@ -21,6 +21,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -56,17 +58,33 @@ class AndroidWatchConnectionManager(
     private val capabilityClient: CapabilityClient = Wearable.getCapabilityClient(context),
     private val remoteActivityHelper: RemoteActivityHelper = RemoteActivityHelper(context),
     private val linkIntent: (String) -> Intent = ::watchLinkIntent,
+    private val prepareWatch: suspend (String) -> Unit = {},
+    private val verifiedAppNodes: Flow<Set<String>?> = flowOf(null),
 ) : WatchConnectionManager {
     override fun observeConnectionState(): Flow<WatchConnectionState> =
         combine(
             associationManager.observeAssociationState(),
             observeTransportSnapshot(),
-        ) { associationState, transportSnapshot ->
-            resolveWatchConnectionState(associationState, transportSnapshot)
+            verifiedAppNodes,
+        ) { associationState, transportSnapshot, appNodes ->
+            if (appNodes != null) {
+                resolveWearAppConnection(transportSnapshot, appNodes)
+            } else {
+                resolveWatchConnectionState(associationState, transportSnapshot)
+            }
         }
 
+    override suspend fun prepareSetup(nodeId: String?) {
+        nodeId?.let { prepareWatch(it) }
+    }
+
     override suspend fun beginAssociation() {
-        associationManager.beginAssociation()
+        if (verifiedAppNodes.first() != null) {
+            val node = nodeClient.connectedNodes.await().singleOrNull() ?: return
+            prepareWatch(node.id)
+        } else {
+            associationManager.beginAssociation()
+        }
     }
 
     /** Asks every reachable watch running LogDate to send what it has waiting. */
@@ -90,6 +108,37 @@ class AndroidWatchConnectionManager(
         if (watches.isEmpty()) return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
         val target = watches.withApp.firstOrNull() ?: return WatchRequestResult.Failed(WatchRequestFailure.NOT_INSTALLED_ON_WATCH)
         return startOnWatch(WATCH_TODAY_LINK, target)
+    }
+
+    override suspend fun installAppOnWatch(nodeId: String?): WatchRequestResult {
+        if (nodeId == null) return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        val watches = connectedWatches() ?: return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        val target =
+            (watches.withApp + watches.withoutApp).firstOrNull { it.id == nodeId }
+                ?: return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        return startOnWatch(playListingLink(context.packageName), target)
+    }
+
+    override suspend fun openAppOnWatch(nodeId: String?): WatchRequestResult {
+        if (nodeId == null) return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        val watches = connectedWatches() ?: return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        val target =
+            watches.withApp.firstOrNull { it.id == nodeId }
+                ?: return WatchRequestResult.Failed(
+                    if (watches.withoutApp.any { it.id == nodeId }) {
+                        WatchRequestFailure.NOT_INSTALLED_ON_WATCH
+                    } else {
+                        WatchRequestFailure.NO_WATCH_CONNECTED
+                    },
+                )
+        return startOnWatch(WATCH_TODAY_LINK, target)
+    }
+
+    override suspend fun requestSync(nodeId: String?) {
+        checkNotNull(nodeId) { "No watch selected" }
+        val watches = checkNotNull(connectedWatches()) { "Could not look up the selected watch" }
+        check(watches.withApp.any { it.id == nodeId }) { "Selected watch is not reachable" }
+        Wearable.getMessageClient(context).sendMessage(nodeId, WearAudioRequestPaths.SYNC_REQUEST_PATH, ByteArray(0)).await()
     }
 
     private suspend fun startOnWatch(

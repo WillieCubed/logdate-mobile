@@ -34,6 +34,7 @@ class WatchOwnState(
                 features = features,
                 linkProblem = link?.problem,
                 linkId = link?.linkId,
+                sessionId = link?.sessionId,
             )
         }.distinctUntilChanged()
 }

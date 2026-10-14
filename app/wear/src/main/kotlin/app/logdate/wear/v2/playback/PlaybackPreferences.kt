@@ -14,6 +14,11 @@ interface PlaybackPreferencesStore {
     fun setSpeed(speed: PlaybackSpeed)
 
     fun setSkipSilence(enabled: Boolean)
+
+    fun clearForRemoval() {
+        setSpeed(PlaybackSpeed.fromStored(null))
+        setSkipSilence(false)
+    }
 }
 
 /** [PlaybackPreferencesStore] in the watch's own SharedPreferences file, [PREFERENCES_NAME]. */
@@ -34,6 +39,12 @@ class SharedPreferencesPlaybackPreferencesStore(
     override fun setSkipSilence(enabled: Boolean) {
         preferences.edit { putBoolean(KEY_SKIP_SILENCE, enabled) }
         currentSkipSilence.value = enabled
+    }
+
+    override fun clearForRemoval() {
+        check(preferences.edit().clear().commit()) { "The removed watch's playback preferences could not be cleared" }
+        currentSpeed.value = PlaybackSpeed.fromStored(null)
+        currentSkipSilence.value = false
     }
 
     companion object {

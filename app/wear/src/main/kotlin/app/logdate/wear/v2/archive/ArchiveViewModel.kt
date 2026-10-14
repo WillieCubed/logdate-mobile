@@ -9,16 +9,20 @@ import app.logdate.wear.v2.today.DayClock
 import app.logdate.wear.v2.today.TodayWindow
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /** One day of the Archive: its date and its moments, newest first. */
 data class ArchiveDay(
@@ -33,6 +37,7 @@ sealed interface ArchiveUiState {
     data class Ready(
         val timeZone: TimeZone,
         val days: List<ArchiveDay>,
+        val starredMoments: List<JournalNote> = emptyList(),
     ) : ArchiveUiState
 
     data object Failed : ArchiveUiState
@@ -42,16 +47,28 @@ sealed interface ArchiveUiState {
 class ArchiveViewModel(
     dayClock: DayClock,
     notesRepository: JournalNotesRepository,
+    private val starred: suspend () -> Set<Uuid> = { emptySet() },
+    private val windowChanges: Flow<Unit> = flowOf(Unit),
 ) : ViewModel() {
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<ArchiveUiState> =
         dayClock
             .observe()
             .flatMapLatest<TodayWindow, ArchiveUiState> { today ->
-                val start = LibraryWindow.windowStart(today)
+                val start = Instant.DISTANT_PAST
                 val end = LibraryWindow.recentStart(today)
-                notesRepository.observeNotesInRange(start, end).map { notes ->
-                    ArchiveUiState.Ready(timeZone = today.timeZone, days = archiveDays(notes, start, end, today.timeZone))
+                combine(notesRepository.allNotesObserved, windowChanges.onStart { emit(Unit) }) { notes, _ ->
+                    val earlier = notes.filter { it.creationTimestamp >= start && it.creationTimestamp < end }
+                    val starredIds = starred()
+                    val favorites =
+                        earlier
+                            .filter { it.uid in starredIds && LibraryWindow.isLibraryMoment(it) }
+                            .sortedByDescending(JournalNote::creationTimestamp)
+                    ArchiveUiState.Ready(
+                        timeZone = today.timeZone,
+                        days = archiveDays(earlier.filterNot { it.uid in starredIds }, start, end, today.timeZone),
+                        starredMoments = favorites,
+                    )
                 }
             }.catch { error ->
                 Napier.e("Couldn't load earlier moments on the watch", error)

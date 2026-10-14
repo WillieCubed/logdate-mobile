@@ -8,12 +8,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import app.logdate.wear.LogDateWearApplication
 import app.logdate.wear.launch.WearExperience
 import app.logdate.wear.launch.WearExperienceGate
 import app.logdate.wear.launch.WearLaunchRequest
+import app.logdate.wear.launch.WearStartupState
 import app.logdate.wear.launch.toWearLaunchRequest
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -34,18 +37,27 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         setTheme(android.R.style.Theme_DeviceDefault)
-        splashScreen.setKeepOnScreenCondition { experience.value == null }
-        resolveExperience(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition { false }
+        val startup = (application as LogDateWearApplication).startup
+        lifecycleScope.launch {
+            startup.state.first { it is WearStartupState.Ready }
+            resolveExperience(savedInstanceState)
+        }
 
         val initialRequest = intent.toWearLaunchRequest()
         val newRequests = launchRequests.receiveAsFlow()
         setContent {
+            val startupState by startup.state.collectAsState()
             val resolvedExperience by experience.collectAsState()
-            MainActivityContent(
-                experience = resolvedExperience,
-                initialRequest = initialRequest,
-                newRequests = newRequests,
-            )
+            if (startupState !is WearStartupState.Ready || resolvedExperience == null) {
+                WearStartupScreen(startupState, startup::start)
+            } else {
+                MainActivityContent(
+                    experience = resolvedExperience,
+                    initialRequest = initialRequest,
+                    newRequests = newRequests,
+                )
+            }
         }
     }
 

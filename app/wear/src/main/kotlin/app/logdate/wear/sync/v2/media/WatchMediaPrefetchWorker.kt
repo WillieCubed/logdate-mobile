@@ -3,6 +3,7 @@ package app.logdate.wear.sync.v2.media
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import app.logdate.wear.launch.awaitWearStartup
 import app.logdate.wear.playback.NoRoomForAudioException
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -19,8 +20,9 @@ class WatchMediaPrefetchWorker(
     KoinComponent {
     private val prefetcher: WatchMediaPrefetcher by inject()
 
-    override suspend fun doWork(): Result =
-        try {
+    override suspend fun doWork(): Result {
+        return try {
+            if (!applicationContext.awaitWearStartup()) return Result.retry()
             withContext(Dispatchers.IO) { prefetcher.run() }
             Result.success()
         } catch (e: CancellationException) {
@@ -32,6 +34,7 @@ class WatchMediaPrefetchWorker(
             Napier.w("Phone audio prefetch could not finish", e)
             if (runAttemptCount >= MAX_RETRIES) Result.success() else Result.retry()
         }
+    }
 
     companion object {
         const val UNIQUE_WORK_NAME = "watch_verified_media_prefetch"

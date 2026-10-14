@@ -100,6 +100,15 @@ class OfflineFirstEntryDraftRepository(
         pendingMedia: List<PendingMediaRecord>,
         selectedJournalIds: List<Uuid>,
         visitContext: VisitMemoryContext?,
+    ): Uuid = createDraft(uid, notes, pendingMedia, selectedJournalIds, visitContext, null)
+
+    override suspend fun createDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
+        markId: String?,
     ): Uuid =
         mutationMutex.withLock {
             val now = Clock.System.now()
@@ -113,6 +122,7 @@ class OfflineFirstEntryDraftRepository(
                     pendingMedia = pendingMedia,
                     selectedJournalIds = resolveSelection(selectedJournalIds),
                     visitContext = visitContext,
+                    markId = markId,
                 )
 
             // The store is authoritative: expose the draft only after its complete snapshot is durable.
@@ -156,9 +166,18 @@ class OfflineFirstEntryDraftRepository(
         pendingMedia: List<PendingMediaRecord>,
         selectedJournalIds: List<Uuid>,
         visitContext: VisitMemoryContext?,
+    ): Uuid = updateDraft(uid, notes, pendingMedia, selectedJournalIds, visitContext, null)
+
+    override suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
+        markId: String?,
     ): Uuid =
         mutationMutex.withLock {
-            persistUpdatedDraft(requireDraft(uid), notes, pendingMedia, selectedJournalIds, visitContext)
+            persistUpdatedDraft(requireDraft(uid), notes, pendingMedia, selectedJournalIds, visitContext, markId)
         }
 
     override suspend fun setPendingMedia(
@@ -238,6 +257,7 @@ class OfflineFirstEntryDraftRepository(
         pendingMedia: List<PendingMediaRecord>,
         selectedJournalIds: List<Uuid>,
         visitContext: VisitMemoryContext? = existingDraft.visitContext,
+        markId: String? = existingDraft.markId,
     ): Uuid {
         val updatedDraft =
             existingDraft.copy(
@@ -246,6 +266,7 @@ class OfflineFirstEntryDraftRepository(
                 selectedJournalIds = resolveSelection(selectedJournalIds),
                 updatedAt = Clock.System.now(),
                 visitContext = visitContext,
+                markId = markId,
             )
         draftStore.saveDraft(updatedDraft)
         draftsFlow.value = draftsFlow.value + (existingDraft.id to updatedDraft)

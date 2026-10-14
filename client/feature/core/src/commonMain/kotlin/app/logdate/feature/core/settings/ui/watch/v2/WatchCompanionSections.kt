@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,7 +42,7 @@ import logdate.client.feature.core.generated.resources.watch_preferences_save_fa
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun WatchCompanionSections(
+fun WatchCompanionSections(
     state: WatchCompanionPreferences?,
     saving: Boolean,
     saveFailed: Boolean,
@@ -51,6 +52,8 @@ internal fun WatchCompanionSections(
     onPlaces: (Boolean) -> Unit,
     onMood: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onAudioDownloads: (app.logdate.client.domain.watch.WatchAudioDownloadPolicy) -> Unit = {},
+    captureActions: @Composable () -> Unit = {},
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         if (saveFailed) {
@@ -76,8 +79,10 @@ internal fun WatchCompanionSections(
                 onCheckedChange = onRewind,
                 enabled = !saving,
             )
+            WatchAudioDownloadPolicyItem(state.audioDownloads, !saving, onAudioDownloads)
         }
         SettingsSection(title = stringResource(Res.string.watch_capture_section)) {
+            captureActions()
             ToggleSettingsItem(
                 title = stringResource(Res.string.watch_capture_places),
                 description = stringResource(Res.string.watch_capture_places_description),
@@ -117,13 +122,16 @@ private fun WatchLibraryDaysItem(
             text = {
                 Column {
                     SharedPreferenceKey.WINDOW_DAY_CHOICES.sorted().forEach { choice ->
-                        TextButton(
+                        SimpleSettingsItem(
+                            title = stringResource(Res.string.watch_library_days_value, choice),
+                            description = "",
                             onClick = {
                                 choosing = false
                                 onDays(choice)
                             },
                             enabled = enabled,
-                        ) { Text(stringResource(Res.string.watch_library_days_value, choice)) }
+                            action = { RadioButton(selected = choice == days, onClick = null) },
+                        )
                     }
                 }
             },
