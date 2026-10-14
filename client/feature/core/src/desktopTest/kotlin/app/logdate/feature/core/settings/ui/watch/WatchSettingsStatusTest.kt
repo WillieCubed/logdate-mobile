@@ -4,11 +4,17 @@ package app.logdate.feature.core.settings.ui.watch
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Density
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * The Watch page says only what the watch reported. A connected watch that reports nothing shows its
@@ -39,6 +45,32 @@ class WatchSettingsStatusTest {
             onNodeWithText("Connected").assertExists()
             onNodeWithText("Not yet synced").assertDoesNotExist()
             onNodeWithText("Up to date").assertDoesNotExist()
+        }
+
+    @Test
+    fun `manual sync belongs inside the connected watch card`() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            setContent { WatchPage(WatchStatus.Ready("Pixel Watch", nearby = true)) }
+
+            val card = onNodeWithTag("watch_status_card").fetchSemanticsNode().boundsInRoot
+            val action = onNodeWithText("Sync Now").fetchSemanticsNode().boundsInRoot
+            assertTrue(action.left >= card.left && action.right <= card.right, "Sync action should be inside the watch card: $action $card")
+            assertTrue(action.top >= card.top && action.bottom <= card.bottom, "Sync action should be inside the watch card: $action $card")
+        }
+
+    @Test
+    fun `manual sync remains inside a narrow watch card at large text`() =
+        runDesktopComposeUiTest(width = 320, height = 700) {
+            setContent {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                    WatchPage(WatchStatus.Ready("Pixel Watch", nearby = true, sync = WatchSyncLine(waiting = 2)))
+                }
+            }
+
+            onNodeWithText("Sync Now").performScrollTo()
+            val card = onNodeWithTag("watch_status_card").fetchSemanticsNode().boundsInRoot
+            val action = onNodeWithText("Sync Now").fetchSemanticsNode().boundsInRoot
+            assertTrue(action.left >= card.left && action.right <= card.right, "Large-text sync action overflows its card: $action $card")
         }
 
     @Test

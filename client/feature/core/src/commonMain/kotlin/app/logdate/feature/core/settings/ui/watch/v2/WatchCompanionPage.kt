@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
@@ -18,10 +22,14 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Troubleshoot
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -35,7 +43,9 @@ import app.logdate.feature.core.settings.ui.watch.WatchStatusCard
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.watch.WatchSetupProvider
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.watch_connected
 import logdate.client.feature.core.generated.resources.watch_link_on_its_own
@@ -57,8 +67,11 @@ import logdate.client.feature.core.generated.resources.watch_v2_remove
 import logdate.client.feature.core.generated.resources.watch_v2_remove_description
 import logdate.client.feature.core.generated.resources.watch_v2_tiles
 import logdate.client.feature.core.generated.resources.watch_v2_tiles_description
+import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WatchCompanionPage(
     status: WatchStatus?,
@@ -74,26 +87,34 @@ fun WatchCompanionPage(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     installRequestSent: Boolean = false,
+    setupLauncher: ((WatchSetupProvider) -> Boolean)? = null,
     preferences: @Composable (captureActions: @Composable () -> Unit) -> Unit = {},
 ) {
     val installed = status is WatchStatus.Ready || status is WatchStatus.NeedsAttention
     if (!installed) {
-        SettingsScaffold(
-            title = stringResource(Res.string.watch_settings),
-            onBack = onBack,
-            modifier = modifier,
-            maxContentWidth = 1040.dp,
-        ) {
-            item {
-                WatchSetupContent(
-                    status = status,
-                    requestFailure = requestFailure,
-                    installRequestSent = installRequestSent,
-                    onAssociate = onAssociate,
-                    onInstall = onInstall,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+        Scaffold(
+            modifier = modifier.fillMaxSize().applyScreenStyles(),
+            contentWindowInsets = WindowInsets.navigationBars,
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(Res.string.watch_settings)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(UiRes.string.common_back))
+                        }
+                    },
                 )
-            }
+            },
+        ) { insets ->
+            WatchSetupContent(
+                status = status,
+                requestFailure = requestFailure,
+                installRequestSent = installRequestSent,
+                onAssociate = onAssociate,
+                onInstall = onInstall,
+                setupLauncher = setupLauncher,
+                modifier = Modifier.fillMaxSize().padding(insets),
+            )
         }
         return
     }

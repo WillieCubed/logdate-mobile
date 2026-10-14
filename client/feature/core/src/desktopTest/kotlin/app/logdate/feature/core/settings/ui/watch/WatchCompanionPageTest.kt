@@ -6,12 +6,15 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
@@ -19,6 +22,7 @@ import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPage
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPreferences
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionSections
 import app.logdate.ui.theme.LogDateTheme
+import app.logdate.ui.watch.WatchSetupProvider
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
@@ -50,7 +54,7 @@ class WatchCompanionPageTest {
                     }
                 }
             }
-            onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Open Play"))
+            onNodeWithText("Open Play").performScrollTo()
             val action = onNodeWithText("Open Play").fetchSemanticsNode().boundsInRoot
             assertTrue(action.left >= 0f && action.right <= 320f, "Setup action overflows compact width: $action")
             saveScreenshot(onRoot().captureToImage(), "watch-setup-compact-large-text.png")
@@ -58,6 +62,40 @@ class WatchCompanionPageTest {
 
     @Test fun `without a paired watch the page offers setup and no watch settings`() =
         runDesktopComposeUiTest(width = 411, height = 900) {
+            setContent {
+                LogDateTheme(dynamicColor = false, darkTheme = false) {
+                    WatchCompanionPage(
+                        status = WatchStatus.NoWatch,
+                        requestFailure = null,
+                        onBack = {},
+                        onAssociate = {},
+                        onInstall = {},
+                        onReminders = {},
+                        onTiles = {},
+                        onMicrophone = {},
+                        onNotifications = {},
+                        onDiagnostics = {},
+                        onRemove = {},
+                        setupLauncher = { true },
+                    )
+                }
+            }
+            onNodeWithText("Add a watch").assertExists()
+            onNodeWithText("Set up your watch").assertExists()
+            onNodeWithText("Set up your watch").assertIsEnabled()
+            val art = onNodeWithTag("watch_setup_art").fetchSemanticsNode().boundsInRoot
+            val title = onNodeWithText("Add a watch").fetchSemanticsNode().boundsInRoot
+            assertTrue(art.bottom <= title.top, "Compact setup artwork should lead into the action: $art $title")
+            assertTrue(art.height > 300f, "The compact setup should use the available pane: $art")
+            assertTrue(title.top > 500f, "The action should anchor the lower part of the compact pane: $title")
+            onNodeWithText("Check connection").assertDoesNotExist()
+            onNodeWithText("Timeline history").assertDoesNotExist()
+            onNodeWithText("Reminders").assertDoesNotExist()
+            saveScreenshot(onRoot().captureToImage(), "watch-setup-no-watch.png")
+        }
+
+    @Test fun `wide unpaired setup uses the second pane for watch artwork`() =
+        runDesktopComposeUiTest(width = 1100, height = 800) {
             setContent {
                 LogDateTheme(dynamicColor = false) {
                     WatchCompanionPage(
@@ -72,18 +110,48 @@ class WatchCompanionPageTest {
                         onNotifications = {},
                         onDiagnostics = {},
                         onRemove = {},
+                        setupLauncher = { true },
                     )
                 }
             }
-            onNodeWithText("Add a watch").assertExists()
-            onNodeWithText("Set up your watch").assertExists()
+            val art = onNodeWithTag("watch_setup_art").fetchSemanticsNode().boundsInRoot
+            val title = onNodeWithText("Add a watch").fetchSemanticsNode().boundsInRoot
+            assertTrue(art.left > title.right, "Wide setup should use its second pane: $art $title")
+            assertTrue(art.height > 400f, "Wide setup artwork should fill its pane: $art")
             onNodeWithText("Check connection").assertDoesNotExist()
-            onNodeWithText("Timeline history").assertDoesNotExist()
-            onNodeWithText("Reminders").assertDoesNotExist()
-            saveScreenshot(onRoot().captureToImage(), "watch-setup-no-watch.png")
+            saveScreenshot(onRoot().captureToImage(), "watch-setup-no-watch-wide.png")
         }
 
-    @Test fun `watch install explains both paths and confirms a sent Play request`() =
+    @Test fun `setup opens the selected watch companion path`() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            var selected: WatchSetupProvider? = null
+            setContent {
+                LogDateTheme(dynamicColor = false) {
+                    WatchCompanionPage(
+                        status = WatchStatus.NoWatch,
+                        requestFailure = null,
+                        onBack = {},
+                        onAssociate = {},
+                        onInstall = {},
+                        onReminders = {},
+                        onTiles = {},
+                        onMicrophone = {},
+                        onNotifications = {},
+                        onDiagnostics = {},
+                        onRemove = {},
+                        setupLauncher = { provider ->
+                            selected = provider
+                            true
+                        },
+                    )
+                }
+            }
+            onNodeWithText("Set up your watch").performClick()
+            onNodeWithText("Google Pixel Watch").performClick()
+            assertEquals(WatchSetupProvider.PIXEL, selected)
+        }
+
+    @Test fun `watch install confirms a sent Play request without extra setup copy`() =
         runDesktopComposeUiTest(width = 411, height = 900) {
             var installRequests = 0
             setContent {
@@ -107,7 +175,7 @@ class WatchCompanionPageTest {
             onNodeWithText("Open Play").performClick()
             assertEquals(1, installRequests)
             onNodeWithText("Check your watch", substring = true).assertExists()
-            onNodeWithText("Already installed", substring = true).assertExists()
+            onNodeWithText("Already installed", substring = true).assertDoesNotExist()
             onNodeWithText("Check connection").assertDoesNotExist()
             onNodeWithText("Timeline history").assertDoesNotExist()
             saveScreenshot(onRoot().captureToImage(), "watch-setup-install.png")

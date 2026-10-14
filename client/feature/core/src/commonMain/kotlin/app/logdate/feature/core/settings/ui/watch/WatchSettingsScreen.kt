@@ -6,22 +6,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,10 +43,6 @@ import logdate.client.feature.core.generated.resources.watch_notifications_title
 import logdate.client.feature.core.generated.resources.watch_privacy_description
 import logdate.client.feature.core.generated.resources.watch_privacy_title
 import logdate.client.feature.core.generated.resources.watch_settings
-import logdate.client.feature.core.generated.resources.watch_sync
-import logdate.client.feature.core.generated.resources.watch_sync_now
-import logdate.client.feature.core.generated.resources.watch_sync_pending
-import logdate.client.feature.core.generated.resources.watch_sync_up_to_date
 import logdate.client.feature.core.generated.resources.watch_troubleshooting
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_description
 import org.jetbrains.compose.resources.stringResource
@@ -168,6 +158,7 @@ fun WatchSettingsContent(
                     onBeginAssociation = onBeginAssociation,
                     onInstallOnWatch = onInstallOnWatch,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
+                    onRequestSync = onRequestSync,
                 )
                 WatchPrivacyNote()
             }
@@ -182,11 +173,7 @@ fun WatchSettingsContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 if (status.hasLogDate()) companionSettings?.invoke()
-                WatchConnectedSections(
-                    status = status,
-                    onRequestSync = onRequestSync,
-                    onNavigateToNotifications = onNavigateToNotifications,
-                )
+                WatchConnectedSections(onNavigateToNotifications)
                 WatchTroubleshootingSection(onNavigateToTroubleshooting)
             }
         },
@@ -203,16 +190,13 @@ fun WatchSettingsContent(
                         onBeginAssociation = onBeginAssociation,
                         onInstallOnWatch = onInstallOnWatch,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
+                        onRequestSync = onRequestSync,
                     )
                 }
                 if (status.hasLogDate()) {
                     companionSettings?.let { settings -> item { settings() } }
                     item {
-                        WatchConnectedSections(
-                            status = status,
-                            onRequestSync = onRequestSync,
-                            onNavigateToNotifications = onNavigateToNotifications,
-                        )
+                        WatchConnectedSections(onNavigateToNotifications)
                     }
                 }
                 item {
@@ -226,77 +210,21 @@ fun WatchSettingsContent(
     )
 }
 
-/** Sync and notification settings exist only for a watch that has LogDate. */
+/** Notification settings exist only for a watch that has LogDate. */
 private fun WatchStatus?.hasLogDate(): Boolean = this is WatchStatus.Ready || this is WatchStatus.NeedsAttention
 
 @Composable
-private fun WatchConnectedSections(
-    status: WatchStatus?,
-    onRequestSync: () -> Unit,
-    onNavigateToNotifications: () -> Unit,
-) {
-    val nearby =
-        when (status) {
-            is WatchStatus.Ready -> status.nearby
-            is WatchStatus.NeedsAttention -> status.nearby
-            else -> return
-        }
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+private fun WatchConnectedSections(onNavigateToNotifications: () -> Unit) {
+    SettingsSection(
+        title = stringResource(Res.string.watch_notifications),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
     ) {
-        SettingsSection(
-            title = stringResource(Res.string.watch_sync),
-            modifier = Modifier.padding(horizontal = Spacing.lg),
-        ) {
-            (status as? WatchStatus.Ready)?.sync?.let { SyncStatusRow(it) }
-
-            OutlinedButton(
-                onClick = onRequestSync,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = Spacing.sm),
-                enabled = nearby,
-            ) {
-                Icon(
-                    Icons.Default.Sync,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(Spacing.sm))
-                Text(stringResource(Res.string.watch_sync_now))
-            }
-        }
-
-        SettingsSection(
-            title = stringResource(Res.string.watch_notifications),
-            modifier = Modifier.padding(horizontal = Spacing.lg),
-        ) {
-            SettingsNavItem(
-                title = stringResource(Res.string.watch_notifications_title),
-                description = stringResource(Res.string.watch_notifications_description),
-                onClick = onNavigateToNotifications,
-            )
-        }
+        SettingsNavItem(
+            title = stringResource(Res.string.watch_notifications_title),
+            description = stringResource(Res.string.watch_notifications_description),
+            onClick = onNavigateToNotifications,
+        )
     }
-}
-
-/** Shown only when the watch reported how many moments wait; the phone does not know otherwise. */
-@Composable
-private fun SyncStatusRow(sync: WatchSyncLine) {
-    val text =
-        if (sync.waiting > 0) {
-            stringResource(Res.string.watch_sync_pending, sync.waiting)
-        } else {
-            stringResource(Res.string.watch_sync_up_to_date)
-        }
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = Spacing.sm),
-    )
 }
 
 @Composable

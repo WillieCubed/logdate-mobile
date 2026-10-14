@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material.icons.outlined.Watch
 import androidx.compose.material3.Button
@@ -18,6 +21,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.theme.Spacing
@@ -48,6 +53,9 @@ import logdate.client.feature.core.generated.resources.watch_no_paired
 import logdate.client.feature.core.generated.resources.watch_no_paired_description
 import logdate.client.feature.core.generated.resources.watch_out_of_range
 import logdate.client.feature.core.generated.resources.watch_pair_watch
+import logdate.client.feature.core.generated.resources.watch_sync_now
+import logdate.client.feature.core.generated.resources.watch_sync_pending
+import logdate.client.feature.core.generated.resources.watch_sync_up_to_date
 import logdate.client.feature.core.generated.resources.watch_unsupported
 import logdate.client.feature.core.generated.resources.watch_window_days
 import org.jetbrains.compose.resources.stringResource
@@ -60,8 +68,9 @@ internal fun WatchStatusCard(
     onBeginAssociation: () -> Unit,
     onInstallOnWatch: () -> Unit,
     modifier: Modifier = Modifier,
+    onRequestSync: (() -> Unit)? = null,
 ) {
-    MaterialContainer(modifier = modifier) {
+    MaterialContainer(modifier = modifier.testTag("watch_status_card")) {
         when (status) {
             null -> LookingForWatch()
             WatchStatus.Unsupported ->
@@ -90,8 +99,8 @@ internal fun WatchStatusCard(
                     }
                     requestFailure?.let { WatchRequestFailureMessage(it) }
                 }
-            is WatchStatus.Ready -> ReadyStatus(status)
-            is WatchStatus.NeedsAttention -> AttentionStatus(status)
+            is WatchStatus.Ready -> ReadyStatus(status, onRequestSync)
+            is WatchStatus.NeedsAttention -> AttentionStatus(status, onRequestSync)
         }
     }
 }
@@ -192,7 +201,10 @@ private fun CenteredStatus(
 }
 
 @Composable
-private fun ReadyStatus(status: WatchStatus.Ready) {
+private fun ReadyStatus(
+    status: WatchStatus.Ready,
+    onRequestSync: (() -> Unit)?,
+) {
     WatchReportSurface {
         WatchNameRow(
             name = status.watchName,
@@ -209,24 +221,42 @@ private fun ReadyStatus(status: WatchStatus.Ready) {
                 },
                 status.window?.let { stringResource(Res.string.watch_window_days, it.days) },
             )
-        if (lines.isEmpty()) return@WatchReportSurface
-        Column(
-            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            lines.forEach { line ->
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        if (lines.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                lines.forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
+        }
+        onRequestSync?.let { sync ->
+            WatchSyncAction(
+                statusText =
+                    status.sync?.let {
+                        if (it.waiting > 0) {
+                            stringResource(Res.string.watch_sync_pending, it.waiting)
+                        } else {
+                            stringResource(Res.string.watch_sync_up_to_date)
+                        }
+                    },
+                enabled = status.nearby,
+                onClick = sync,
+            )
         }
     }
 }
 
 @Composable
-private fun AttentionStatus(status: WatchStatus.NeedsAttention) {
+private fun AttentionStatus(
+    status: WatchStatus.NeedsAttention,
+    onRequestSync: (() -> Unit)?,
+) {
     val (title, description) =
         when (val issue = status.issue) {
             WatchIssue.SetUpAgain ->
@@ -244,6 +274,36 @@ private fun AttentionStatus(status: WatchStatus.NeedsAttention) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
         )
+        if (status.issue is WatchIssue.CapturesNotSent && onRequestSync != null) {
+            WatchSyncAction(statusText = null, enabled = status.nearby, onClick = onRequestSync)
+        }
+    }
+}
+
+@Composable
+private fun WatchSyncAction(
+    statusText: String?,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        statusText?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        OutlinedButton(onClick = onClick, enabled = enabled) {
+            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(stringResource(Res.string.watch_sync_now))
+        }
     }
 }
 
