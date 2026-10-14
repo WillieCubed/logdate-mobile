@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Headphones
@@ -17,7 +18,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -174,12 +174,14 @@ private fun ReadyMoment(
     val note = state.note
     if (note is JournalNote.Audio) {
         val available = actions.onPlayOn != null || actions.onPlayOnPhone != null
-        val menuActions =
-            actions.copy(
-                onPlayOn = if (available) ({ choosingOutput = true }) else null,
-                onPlayOnPhone = null,
-            )
-        VoiceMoment(note, state, menuActions, askToDelete, timeSource)
+        VoiceMoment(
+            note,
+            state,
+            actions,
+            askToDelete,
+            timeSource,
+            onChooseDestination = if (available) ({ choosingOutput = true }) else null,
+        )
         PlayOnDialog(
             visible = choosingOutput,
             onDismiss = { choosingOutput = false },
@@ -212,6 +214,7 @@ private fun VoiceMoment(
     actions: MomentActions,
     onDelete: (() -> Unit)?,
     timeSource: TimeSource,
+    onChooseDestination: (() -> Unit)?,
 ) {
     val pagerState = rememberPagerState(pageCount = { VOICE_PAGES })
     VerticalPagerScaffold(pagerState = pagerState) {
@@ -223,7 +226,7 @@ private fun VoiceMoment(
                     MomentDetailsPage(
                         state,
                         onDelete,
-                        onPlayOn = actions.onPlayOn,
+                        onPlayOn = onChooseDestination,
                         onOpenOnPhone = actions.onOpenOnPhone,
                         phoneHandoffMessage = actions.phoneHandoffMessage,
                         timeSource = timeSource,
@@ -350,7 +353,7 @@ private fun PlayerControls(
 
 @Composable
 private fun AudioOutputButton(onClick: () -> Unit) {
-    val outputDescription = stringResource(R.string.wear_moment_play_on)
+    val outputDescription = stringResource(R.string.wear_audio_output)
     FilledTonalIconButton(
         onClick = onClick,
         modifier =
@@ -359,7 +362,7 @@ private fun AudioOutputButton(onClick: () -> Unit) {
                 .testTag(MomentTags.CHOOSE_OUTPUT)
                 .semantics { contentDescription = outputDescription },
     ) {
-        Icon(Icons.Filled.VolumeUp, contentDescription = null)
+        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
     }
 }
 

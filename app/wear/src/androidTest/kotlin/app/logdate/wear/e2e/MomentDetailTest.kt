@@ -186,11 +186,8 @@ class MomentDetailTest {
 
         composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
 
-        assertEquals(0, picks)
-        waitForTag(MomentTags.PLAY_ON_WATCH)
-        composeRule.onNodeWithTag(MomentTags.PLAY_ON_WATCH).performClick()
-
         assertEquals(1, picks)
+        assertTrue(composeRule.onAllNodesWithTag(MomentTags.PLAY_ON_WATCH).fetchSemanticsNodes().isEmpty())
     }
 
     @Test
@@ -200,11 +197,8 @@ class MomentDetailTest {
 
         composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
 
-        assertEquals(0, picks)
-        waitForTag(MomentTags.PLAY_ON_WATCH)
-        composeRule.onNodeWithTag(MomentTags.PLAY_ON_WATCH).performClick()
-
         assertEquals(1, picks)
+        assertTrue(composeRule.onAllNodesWithTag(MomentTags.PLAY_ON_WATCH).fetchSemanticsNodes().isEmpty())
     }
 
     @Test
@@ -213,7 +207,11 @@ class MomentDetailTest {
         var phonePicks = 0
         show(ready(voice), MomentActions(onPlayOn = { watchPicks++ }, onPlayOnPhone = { phonePicks++ }))
 
-        composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
+        composeRule.onNodeWithTag(MomentTags.SCREEN).performTouchInput { swipeUp() }
+        waitForTag(MomentTags.DETAILS)
+        composeRule.onNodeWithTag(MomentTags.DETAILS).performRotaryScrollInput { rotateToScrollVertically(CROWN_STEP) }
+        waitForTag(MomentTags.PLAY_ON)
+        composeRule.onNodeWithTag(MomentTags.PLAY_ON).performClick()
 
         waitForTag(MomentTags.PLAY_ON_WATCH)
         composeRule.onNodeWithTag(MomentTags.PLAY_ON_PHONE).assertIsDisplayed().performClick()
