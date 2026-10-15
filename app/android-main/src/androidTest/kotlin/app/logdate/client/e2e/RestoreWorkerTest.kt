@@ -35,8 +35,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
+import org.koin.core.context.loadKoinModules
 import org.koin.dsl.module
 import java.io.File
 import java.io.FileOutputStream
@@ -64,14 +63,16 @@ import kotlin.uuid.Uuid
 class RestoreWorkerTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    private lateinit var originalBindings: RestoreWorkerTestBindings
+
     @Before
     fun setup() {
-        stopKoin()
+        originalBindings = RestoreWorkerTestBindings()
     }
 
     @After
     fun teardown() {
-        stopKoin()
+        originalBindings.restore()
     }
 
     @Test
@@ -315,23 +316,21 @@ class RestoreWorkerTest {
         restoreLauncher: RestoreLauncher,
         diagnostics: RestoreDiagnosticEvents? = null,
     ) {
-        startKoin {
-            modules(
-                module {
-                    factory { restoreUseCase }
-                    single<MediaManager> { mediaManager }
-                    single<RestoreLauncher> { restoreLauncher }
-                    single<app.logdate.client.device.identity.CanonicalOwnerProvider> {
-                        mockk { coEvery { getCanonicalOwnerId() } returns "synthetic-archive-worker" }
-                    }
-                    single<app.logdate.shared.config.LogDateConfigRepository> {
-                        mockk { coEvery { getCurrentBackendUrl() } returns "https://example.test" }
-                    }
-                    single<SessionStorage> { mockk(relaxed = true) }
-                    if (diagnostics != null) single<RestoreDiagnosticEvents> { diagnostics }
-                },
-            )
-        }
+        val overrides =
+            module {
+                factory { restoreUseCase }
+                single<MediaManager> { mediaManager }
+                single<RestoreLauncher> { restoreLauncher }
+                single<app.logdate.client.device.identity.CanonicalOwnerProvider> {
+                    mockk { coEvery { getCanonicalOwnerId() } returns "synthetic-archive-worker" }
+                }
+                single<app.logdate.shared.config.LogDateConfigRepository> {
+                    mockk { coEvery { getCurrentBackendUrl() } returns "https://example.test" }
+                }
+                single<SessionStorage> { mockk(relaxed = true) }
+                single<RestoreDiagnosticEvents> { diagnostics ?: RecordingRestoreDiagnostics() }
+            }
+        loadKoinModules(overrides)
     }
 }
 

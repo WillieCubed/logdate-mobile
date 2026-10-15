@@ -277,11 +277,13 @@ class RestoreWorker(
     }
 
     private suspend fun repairSummary(base: RestoreSummary): RestoreSummary {
-        if (includeMedia) return ArchiveMediaRecoveryEngine(context, getKoin()).repair(requireNotNull(store.read(recoveryId)))
-        val pending = requireNotNull(store.read(recoveryId)).pending
+        val record = requireNotNull(store.read(recoveryId))
+        if (includeMedia && record.pending.isNotEmpty()) return ArchiveMediaRecoveryEngine(context, getKoin()).repair(record)
+        val pending = record.pending
         return base
             .copy(
                 recoveryId = recoveryId,
+                recoveringMedia = false,
                 unavailableOriginals = pending.count { it.role == RecoveryMediaRole.ORIGINAL },
                 unavailablePreviews = pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
             ).also { store.finish(recoveryId, it) }
