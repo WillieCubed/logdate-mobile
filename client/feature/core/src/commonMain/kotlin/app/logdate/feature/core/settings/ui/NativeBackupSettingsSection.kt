@@ -14,10 +14,14 @@ import app.logdate.client.device.restore.NativeBackupStatus
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.native_backup_coverage
+import logdate.client.feature.core.generated.resources.native_backup_cloud_detail
+import logdate.client.feature.core.generated.resources.native_backup_cloud_requirement
+import logdate.client.feature.core.generated.resources.native_backup_cloud_title
 import logdate.client.feature.core.generated.resources.native_backup_export
 import logdate.client.feature.core.generated.resources.native_backup_quota_failure
 import logdate.client.feature.core.generated.resources.native_backup_title
+import logdate.client.feature.core.generated.resources.native_backup_transfer_detail
+import logdate.client.feature.core.generated.resources.native_backup_transfer_title
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -29,12 +33,32 @@ internal fun NativeBackupSettingsSection(
     if (status !is NativeBackupStatus.Available) return
     SettingsSection(title = stringResource(Res.string.native_backup_title), modifier = modifier) {
         Column(modifier = Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Text(stringResource(Res.string.native_backup_coverage), style = MaterialTheme.typography.bodyMedium)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(stringResource(Res.string.native_backup_cloud_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(Res.string.native_backup_cloud_detail),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(Res.string.native_backup_cloud_requirement),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(stringResource(Res.string.native_backup_transfer_title), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(Res.string.native_backup_transfer_detail),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (status.lastQuotaFailure != null) {
                 Text(
                     stringResource(Res.string.native_backup_quota_failure),
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
             OutlinedButton(onClick = onExportArchive) { Text(stringResource(Res.string.native_backup_export)) }

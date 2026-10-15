@@ -4,6 +4,7 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.material3.Button
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import logdate.client.feature.core.generated.resources.Res
@@ -20,7 +21,11 @@ internal fun ExportDataItem(onShowExportOptions: () -> Unit) {
     ListItem(
         headlineContent = { Text(stringResource(Res.string.settings_export_entries_label)) },
         supportingContent = {
-            Text(stringResource(Res.string.settings_export_entries_description))
+            Text(
+                text = stringResource(Res.string.settings_export_entries_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         },
         trailingContent = {
             Button(onClick = onShowExportOptions) {
@@ -35,7 +40,11 @@ internal fun ImportBackupItem(onShowRestoreSheet: () -> Unit) {
     ListItem(
         headlineContent = { Text(stringResource(Res.string.import_backup)) },
         supportingContent = {
-            Text(stringResource(Res.string.restore_entries_from_a_logdate_export_archive))
+            Text(
+                text = stringResource(Res.string.restore_entries_from_a_logdate_export_archive),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         },
         trailingContent = {
             Button(onClick = onShowRestoreSheet) {

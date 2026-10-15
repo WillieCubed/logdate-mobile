@@ -2,13 +2,15 @@
 
 package app.logdate.feature.core.restore
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -17,7 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.common.DataStatsGrid
 import app.logdate.feature.core.common.OperationFailureCard
@@ -25,11 +27,12 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.restore_complete_description
 import logdate.client.feature.core.generated.resources.restore_complete_title
 import logdate.client.feature.core.generated.resources.restore_failed_title
 import logdate.client.feature.core.generated.resources.restore_interrupted_description
 import logdate.client.feature.core.generated.resources.restore_interrupted_title
+import logdate.client.feature.core.generated.resources.restore_missing_originals
+import logdate.client.feature.core.generated.resources.restore_missing_previews
 import logdate.client.feature.core.generated.resources.restore_partial_description
 import logdate.client.feature.core.generated.resources.restore_partial_title
 import logdate.client.feature.core.generated.resources.restore_paused_description
@@ -58,67 +61,93 @@ internal fun RestoreSuccessCard(
         summary.needsAnotherArchive || summary.metadataIncomplete || summary.unavailableOriginals + summary.unavailablePreviews > 0
     Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.Start,
     ) {
-        Icon(
-            painter = PlatformIcons.checkCircle(),
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.md))
-
-        Text(
-            text =
-                stringResource(
-                    if (summary.metadataIncomplete && summary.recoveringMedia) {
-                        Res.string.restore_resuming_title
-                    } else if (summary.metadataIncomplete && summary.canResume) {
-                        Res.string.restore_paused_title
-                    } else if (summary.metadataIncomplete) {
-                        Res.string.restore_interrupted_title
-                    } else if (summary.needsAnotherArchive) {
-                        Res.string.restore_unreadable_title
-                    } else if (summary.recoveringMedia) {
-                        Res.string.restore_recovering_media
-                    } else if (incomplete) {
-                        Res.string.restore_partial_title
-                    } else {
-                        Res.string.restore_complete_title
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Icon(
+                painter =
+                    when {
+                        summary.metadataIncomplete && summary.canResume -> PlatformIcons.pause()
+                        summary.metadataIncomplete || summary.recoveringMedia -> PlatformIcons.history()
+                        summary.needsAnotherArchive -> PlatformIcons.info()
+                        else -> PlatformIcons.checkCircle()
                     },
-                ),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+
+            Text(
+                text =
+                    stringResource(
+                        if (summary.metadataIncomplete && summary.recoveringMedia) {
+                            Res.string.restore_resuming_title
+                        } else if (summary.metadataIncomplete && summary.canResume) {
+                            Res.string.restore_paused_title
+                        } else if (summary.metadataIncomplete) {
+                            Res.string.restore_interrupted_title
+                        } else if (summary.needsAnotherArchive) {
+                            Res.string.restore_unreadable_title
+                        } else if (summary.recoveringMedia) {
+                            Res.string.restore_recovering_media
+                        } else if (incomplete) {
+                            Res.string.restore_partial_title
+                        } else {
+                            Res.string.restore_complete_title
+                        },
+                    ),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+        }
 
         Spacer(modifier = Modifier.height(Spacing.sm))
 
-        Text(
-            text =
-                if (summary.metadataIncomplete && summary.recoveringMedia) {
-                    stringResource(Res.string.restore_resuming_description)
-                } else if (summary.metadataIncomplete && summary.canResume) {
-                    stringResource(Res.string.restore_paused_description)
-                } else if (summary.metadataIncomplete) {
-                    stringResource(Res.string.restore_interrupted_description)
-                } else if (summary.needsAnotherArchive) {
-                    stringResource(Res.string.restore_unreadable_description)
-                } else if (summary.recoveringMedia) {
-                    stringResource(Res.string.restore_recovering_description)
-                } else if (incomplete) {
-                    stringResource(
-                        Res.string.restore_partial_description,
-                        summary.unavailableOriginals,
-                        summary.unavailablePreviews,
+        if (incomplete || summary.recoveringMedia) {
+            Text(
+                text =
+                    if (summary.metadataIncomplete && summary.recoveringMedia) {
+                        stringResource(Res.string.restore_resuming_description)
+                    } else if (summary.metadataIncomplete && summary.canResume) {
+                        stringResource(Res.string.restore_paused_description)
+                    } else if (summary.metadataIncomplete) {
+                        stringResource(Res.string.restore_interrupted_description)
+                    } else if (summary.needsAnotherArchive) {
+                        stringResource(Res.string.restore_unreadable_description)
+                    } else if (summary.recoveringMedia) {
+                        stringResource(Res.string.restore_recovering_description)
+                    } else if (incomplete) {
+                        stringResource(Res.string.restore_partial_description)
+                    } else {
+                        ""
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (summary.unavailableOriginals > 0 || summary.unavailablePreviews > 0) {
+            Spacer(modifier = Modifier.height(Spacing.sm))
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                if (summary.unavailableOriginals > 0) {
+                    Text(
+                        stringResource(Res.string.restore_missing_originals, summary.unavailableOriginals),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else {
-                    stringResource(Res.string.restore_complete_description)
-                },
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+                }
+                if (summary.unavailablePreviews > 0) {
+                    Text(
+                        stringResource(Res.string.restore_missing_previews, summary.unavailablePreviews),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(Spacing.lg))
 
@@ -139,16 +168,21 @@ internal fun RestoreSuccessCard(
 
         Spacer(modifier = Modifier.height(Spacing.xl))
 
-        if (incomplete &&
-            (!summary.recoveringMedia || summary.needsAnotherArchive && !summary.metadataIncomplete) &&
-            summary.recoveryId != null
-        ) {
-            TextButton(onClick = onRecoverMedia) {
+        val needsAction =
+            incomplete &&
+                (!summary.recoveringMedia || summary.needsAnotherArchive && !summary.metadataIncomplete) &&
+                summary.recoveryId != null
+        if (needsAction) {
+            Button(onClick = onRecoverMedia, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(if (summary.canResume) Res.string.restore_resume_import else Res.string.restore_recover_media))
             }
-        }
-        TextButton(onClick = onDismiss) {
-            Text(stringResource(UiRes.string.common_done))
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(UiRes.string.common_done))
+            }
+        } else {
+            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(UiRes.string.common_done))
+            }
         }
     }
 }
@@ -162,15 +196,18 @@ private fun ArchiveMetadataRow(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 1.dp,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier.padding(Spacing.md),
         ) {
             Text(
                 text = fileName,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
             val details =
                 buildList {

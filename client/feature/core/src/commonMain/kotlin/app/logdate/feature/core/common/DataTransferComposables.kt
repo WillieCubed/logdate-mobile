@@ -49,8 +49,9 @@ internal fun DataTransferProgressCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 1.dp,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),
@@ -90,7 +91,7 @@ internal fun DataTransferProgressCard(
                     Spacer(modifier = Modifier.height(Spacing.sm))
                     Text(
                         text = message,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -163,11 +164,12 @@ internal fun StatCell(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 2.dp,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
-            modifier = Modifier.padding(vertical = Spacing.md, horizontal = Spacing.lg),
+            modifier = Modifier.padding(Spacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -176,7 +178,7 @@ internal fun StatCell(
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -193,7 +195,7 @@ internal fun OperationFailureCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.errorContainer,
     ) {
         Column(
@@ -206,7 +208,7 @@ internal fun OperationFailureCard(
                 Icon(
                     painter = PlatformIcons.error(),
                     contentDescription = null,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
                 Text(
@@ -220,7 +222,7 @@ internal fun OperationFailureCard(
 
             Text(
                 text = reason,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
 

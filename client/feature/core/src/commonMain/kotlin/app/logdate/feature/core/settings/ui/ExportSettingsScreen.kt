@@ -3,10 +3,7 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,13 +22,7 @@ import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.data_management
-import logdate.client.feature.core.generated.resources.export
 import logdate.client.feature.core.generated.resources.export_and_import
-import logdate.client.feature.core.generated.resources.`import`
-import logdate.client.feature.core.generated.resources.import_backup
-import logdate.client.feature.core.generated.resources.restore_entries_from_a_logdate_export_archive
-import logdate.client.feature.core.generated.resources.settings_export_entries_description
-import logdate.client.feature.core.generated.resources.settings_export_entries_label
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -129,28 +120,8 @@ fun ExportSettingsContent(
                 title = stringResource(Res.string.data_management),
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                ListItem(
-                    headlineContent = { Text(stringResource(Res.string.settings_export_entries_label)) },
-                    supportingContent = {
-                        Text(stringResource(Res.string.settings_export_entries_description))
-                    },
-                    trailingContent = {
-                        Button(onClick = onShowExportOptions) {
-                            Text(stringResource(Res.string.export))
-                        }
-                    },
-                )
-                ListItem(
-                    headlineContent = { Text(stringResource(Res.string.import_backup)) },
-                    supportingContent = {
-                        Text(stringResource(Res.string.restore_entries_from_a_logdate_export_archive))
-                    },
-                    trailingContent = {
-                        Button(onClick = onShowRestoreSheet) {
-                            Text(stringResource(Res.string.`import`))
-                        }
-                    },
-                )
+                ExportDataItem(onShowExportOptions)
+                ImportBackupItem(onShowRestoreSheet)
             }
         }
     }

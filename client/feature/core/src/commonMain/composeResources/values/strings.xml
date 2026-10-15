@@ -35,7 +35,7 @@
     <string name="settings_biometric_label">Require biometrics</string>
     <string name="settings_biometric_description">Require fingerprint or screen lock to open</string>
     <string name="settings_export_entries_label">Export data</string>
-    <string name="settings_export_entries_description">Export all journal entries to a JSON file</string>
+    <string name="settings_export_entries_description">Save a journal archive</string>
     <string name="settings_reset_app_title">Reset app</string>
     <string name="settings_reset_app_description">Removes all data from this device</string>
     <string name="timeline_settings">Timeline</string>

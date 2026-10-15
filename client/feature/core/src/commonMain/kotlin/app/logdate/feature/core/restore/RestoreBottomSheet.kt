@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -160,14 +159,14 @@ private fun RestoreConfirmContent(
     Column {
         Text(
             text = stringResource(Res.string.import_backup),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleMedium,
         )
 
         Spacer(modifier = Modifier.height(Spacing.sm))
 
         Text(
             text = stringResource(Res.string.restore_confirm_description),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
@@ -226,12 +225,12 @@ private fun RestorePreviewContent(
     Column {
         Text(
             text = stringResource(Res.string.import_backup),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleMedium,
         )
         Spacer(modifier = Modifier.height(Spacing.xs))
         Text(
             text = stringResource(Res.string.restore_preview_description),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
@@ -239,13 +238,14 @@ private fun RestorePreviewContent(
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            tonalElevation = 1.dp,
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             Column(modifier = Modifier.padding(Spacing.md)) {
                 Text(
                     text = fileName,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 val details =
                     buildList {
@@ -284,7 +284,7 @@ private fun RestorePreviewContent(
             )
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = Spacing.md),
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                color = MaterialTheme.colorScheme.outlineVariant,
             )
         }
         if (preview.hasMedia) {
