@@ -24,4 +24,6 @@ sealed interface AIUnavailableReason {
     data object ProviderDisabled : AIUnavailableReason
 
     data object MissingCredentials : AIUnavailableReason
+
+    data object InputTooLarge : AIUnavailableReason
 }

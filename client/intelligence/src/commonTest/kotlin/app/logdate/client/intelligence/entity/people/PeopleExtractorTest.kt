@@ -1,6 +1,7 @@
 package app.logdate.client.intelligence.entity.people
 
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
@@ -27,6 +28,16 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PeopleExtractorTest {
+    @Test
+    fun `oversized retained entries never reach cache normalization or provider requests`() =
+        runTest(testDispatcher) {
+            setup()
+            val result = peopleExtractor.extractPeople("large-restored-entry", "q".repeat(MAX_AI_INPUT_CHARACTERS + 1))
+            assertTrue(result is AIResult.Unavailable)
+            assertTrue(fakeCache.getEntryCalls.isEmpty())
+            assertEquals(null, fakeAIClient.getLastSubmission())
+        }
+
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()

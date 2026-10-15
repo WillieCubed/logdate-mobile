@@ -2,6 +2,8 @@ package app.logdate.client.intelligence.structured
 
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIUnavailableReason
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
@@ -95,6 +97,7 @@ abstract class StructuredAIExtractor<Input, Output>(
     ): AIResult<Output> =
         withContext(ioDispatcher) {
             val serializedInput = serializeInput(input)
+            if (serializedInput.length > MAX_AI_INPUT_CHARACTERS) return@withContext AIResult.Unavailable(AIUnavailableReason.InputTooLarge)
             val cacheRequest =
                 GenerativeAICacheRequest(
                     contentType = cacheContentType,

@@ -1,5 +1,6 @@
 package app.logdate.client.intelligence.cache
 
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.util.platformIODispatcher
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
@@ -24,6 +25,7 @@ class OfflineGenerativeAICache(
 ) : GenerativeAICache {
     override suspend fun getEntry(request: GenerativeAICacheRequest): GenerativeAICacheEntry? {
         return withContext(ioDispatcher) {
+            if (request.inputText.length > MAX_AI_INPUT_CHARACTERS) return@withContext null
             val cacheKey = keyStrategy.createKey(request.toKeyInput())
             val memoryHit = memoryStore.get(cacheKey.value)
             if (memoryHit != null && isEntryValid(memoryHit, cacheKey, request)) {
@@ -53,6 +55,7 @@ class OfflineGenerativeAICache(
         request: GenerativeAICacheRequest,
         content: String,
     ) = withContext(ioDispatcher) {
+        if (request.inputText.length > MAX_AI_INPUT_CHARACTERS) return@withContext
         val cacheKey = keyStrategy.createKey(request.toKeyInput())
         val now = clock.now()
         val expiresAt = now + request.policy.ttlSeconds.seconds

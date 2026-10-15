@@ -3,6 +3,7 @@ package app.logdate.client.domain.timeline
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.EntrySummarizer
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.intelligence.cache.AICacheKeyInput
 import app.logdate.client.intelligence.cache.DefaultAICacheKeyStrategy
 import app.logdate.client.intelligence.cache.GenerativeAICache
@@ -42,6 +43,14 @@ import kotlin.uuid.Uuid
  * for identical sets of entries.
  */
 class SummarizeJournalEntriesUseCaseTest {
+    @Test
+    fun `large restored content stays out of optional summary prompts`() =
+        runTest {
+            val result = useCase(listOf(createTestNote("q".repeat(MAX_AI_INPUT_CHARACTERS + 1))))
+            assertEquals(SummarizeJournalEntriesResult.SummaryUnavailable, result)
+            assertTrue(fakeChatClient.prompts.isEmpty())
+        }
+
     private lateinit var fakeCache: FakeGenerativeAICache
     private lateinit var fakeChatClient: FakeGenerativeAIChatClient
     private lateinit var mockNetworkMonitor: MockNetworkAvailabilityMonitor

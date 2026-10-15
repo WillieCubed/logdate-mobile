@@ -25,6 +25,16 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EntrySummarizerTest {
+    @Test
+    fun `oversized input does not construct cache keys or contact a provider`() =
+        runTest(testDispatcher) {
+            setup()
+            val result = entrySummarizer.summarize("large-restored-entry", "q".repeat(MAX_AI_INPUT_CHARACTERS + 1))
+            assertEquals(AIResult.Unavailable(AIUnavailableReason.InputTooLarge), result)
+            assertTrue(fakeCache.getEntryCalls.isEmpty())
+            assertEquals(null, fakeAIClient.getLastSubmission())
+        }
+
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()

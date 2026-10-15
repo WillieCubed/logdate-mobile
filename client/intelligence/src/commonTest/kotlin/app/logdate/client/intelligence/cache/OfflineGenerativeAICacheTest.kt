@@ -1,5 +1,6 @@
 package app.logdate.client.intelligence.cache
 
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,6 +19,24 @@ import kotlin.time.Instant
  * underlying persistent data source.
  */
 class OfflineGenerativeAICacheTest {
+    @Test
+    fun `oversized requests bypass normalization hashing and persistence`() =
+        runTest {
+            val dataSource = TestLocalDataSource()
+            val cache =
+                OfflineGenerativeAICache(
+                    dataSource,
+                    keyStrategy =
+                        object : AICacheKeyStrategy {
+                            override fun createKey(input: AICacheKeyInput): AICacheKey = error("Oversized input reached key construction")
+                        },
+                )
+            val request = requestFor("q".repeat(MAX_AI_INPUT_CHARACTERS + 1), 60)
+            cache.putEntry(request, "summary")
+            assertNull(cache.getEntry(request))
+            assertEquals(0, dataSource.entries().size)
+        }
+
     @Test
     fun `get entry expires after ttl`() =
         runTest {

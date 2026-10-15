@@ -4,6 +4,7 @@ package app.logdate.client.domain.timeline
 
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
 import app.logdate.client.intelligence.entity.moments.ExtractedMoment
@@ -45,6 +46,24 @@ import kotlin.uuid.Uuid
  * and location when AI is unavailable or fails.
  */
 class InferMomentsUseCaseTest {
+    @Test
+    fun `oversized retained notes use bounded moment previews and keep their source text`() =
+        runTest {
+            val content = "q".repeat(MAX_AI_INPUT_CHARACTERS + 1)
+            val note = textNote(content, morningTime)
+            val useCase = InferMomentsUseCase(FailingMomentExtractor(), FakeAudioTagRepository())
+            val moments = useCase(date, listOf(note), emptyList())
+
+            assertEquals(content, (moments.single().sourceNotes.single() as JournalNote.Text).content)
+            assertTrue(
+                moments
+                    .single()
+                    .textFragments
+                    .single()
+                    .text.length <= 2_000,
+            )
+        }
+
     private val date = LocalDate(2025, 3, 15)
 
     // Use local-time-aware timestamps to avoid timezone issues in tests

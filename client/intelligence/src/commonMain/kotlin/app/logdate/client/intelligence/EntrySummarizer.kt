@@ -50,6 +50,7 @@ class EntrySummarizer(
         useCached: Boolean = true,
     ): AIResult<String> =
         withContext(ioDispatcher) {
+            if (text.length > MAX_AI_INPUT_CHARACTERS) return@withContext AIResult.Unavailable(AIUnavailableReason.InputTooLarge)
             val cacheRequest =
                 GenerativeAICacheRequest(
                     contentType = GenerativeAICacheContentType.Summary,

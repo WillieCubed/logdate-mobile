@@ -3,6 +3,7 @@ package app.logdate.client.domain.timeline
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.AIUnavailableReason
 import app.logdate.client.intelligence.EntrySummarizer
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.repository.journals.JournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.TimeZone
@@ -28,6 +29,10 @@ class SummarizeJournalEntriesUseCase(
             entries
                 .filterIsInstance<JournalNote.Text>()
                 .sortedBy { it.creationTimestamp }
+
+        if (sortedEntries.sumOf { it.content.length.toLong() + 64 } > MAX_AI_INPUT_CHARACTERS) {
+            return SummarizeJournalEntriesResult.SummaryUnavailable
+        }
 
         val summaryPrompt =
             sortedEntries

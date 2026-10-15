@@ -1,6 +1,7 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.intelligence.entity.moments.ExtractedMoment
 import app.logdate.client.intelligence.entity.moments.MomentExtractor
 import app.logdate.client.repository.audio.AudioTag
@@ -30,6 +31,19 @@ class InferMomentsUseCase(
         places: List<TimelinePlaceVisit>,
     ): List<Moment> {
         if (entries.isEmpty()) return emptyList()
+
+        val inputCharacters =
+            entries.sumOf { note ->
+                val contentLength =
+                    when (note) {
+                        is JournalNote.Text -> note.content.length
+                        is JournalNote.Image -> note.caption.length
+                        is JournalNote.Video -> note.caption.length
+                        is JournalNote.Audio -> 0
+                    }
+                256L + contentLength + (note.location?.displayName?.length ?: 0)
+            }
+        if (inputCharacters > MAX_AI_INPUT_CHARACTERS) return inferMomentsHeuristically(date, entries, places)
 
         val ambientSoundsByNote = collectAmbientSounds(entries)
         val serialized = serializeEntries(entries, ambientSoundsByNote)
@@ -200,7 +214,7 @@ private fun buildMomentFromNotes(
 ): Moment {
     val textFragments =
         notes.filterIsInstance<JournalNote.Text>().map { note ->
-            MomentTextFragment(text = note.content, sourceNoteId = note.uid)
+            MomentTextFragment(text = note.content.take(MAX_MOMENT_PREVIEW_CHARACTERS), sourceNoteId = note.uid)
         }
     val media = notes.flatMap { it.toMomentMedia() }
     val audio = notes.flatMap { it.toMomentAudio() }
@@ -318,3 +332,4 @@ private fun isNearby(
 }
 
 private const val TAG = "InferMomentsUseCase"
+private const val MAX_MOMENT_PREVIEW_CHARACTERS = 2_000

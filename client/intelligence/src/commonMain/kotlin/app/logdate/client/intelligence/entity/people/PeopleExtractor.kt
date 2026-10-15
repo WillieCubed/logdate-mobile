@@ -2,6 +2,8 @@ package app.logdate.client.intelligence.entity.people
 
 import app.logdate.client.intelligence.AIError
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIUnavailableReason
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICache
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
@@ -84,6 +86,7 @@ If no names are present, return an empty array.
         useCached: Boolean = true,
     ): AIResult<List<Person>> =
         withContext(ioDispatcher) {
+            if (text.length > MAX_AI_INPUT_CHARACTERS) return@withContext AIResult.Unavailable(AIUnavailableReason.InputTooLarge)
             val cacheRequest =
                 GenerativeAICacheRequest(
                     contentType = GenerativeAICacheContentType.People,

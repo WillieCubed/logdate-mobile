@@ -1,6 +1,8 @@
 package app.logdate.client.intelligence.entity.moments
 
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.AIUnavailableReason
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.intelligence.cache.AICachePolicy
 import app.logdate.client.intelligence.cache.GenerativeAICacheContentType
 import app.logdate.client.intelligence.cache.GenerativeAICacheRequest
@@ -27,6 +29,16 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MomentExtractorTest {
+    @Test
+    fun `oversized retained input bypasses optional structured extraction`() =
+        runTest(testDispatcher) {
+            setup()
+            val result = momentExtractor.extract("q".repeat(MAX_AI_INPUT_CHARACTERS + 1))
+            assertEquals(AIResult.Unavailable(AIUnavailableReason.InputTooLarge), result)
+            assertTrue(fakeCache.getEntryCalls.isEmpty())
+            assertEquals(null, fakeAIClient.getLastSubmission())
+        }
+
     private val testDispatcher = StandardTestDispatcher()
     private val fakeCache = FakeGenerativeAICache()
     private val fakeAIClient = FakeGenerativeAIChatClient()
