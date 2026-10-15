@@ -6,9 +6,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportMetadata
 import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreResult
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.media.MediaManager
@@ -38,14 +40,17 @@ import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import java.io.File
 import java.io.FileOutputStream
-import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Instrumented tests for the [RestoreWorker] background task.
@@ -121,7 +126,7 @@ class RestoreWorkerTest {
                 val recordingLauncher = RecordingRestoreLauncher()
                 val diagnosticEvents = RecordingRestoreDiagnostics()
                 setupKoin(mockUseCase, mockk(relaxed = true), recordingLauncher, diagnosticEvents)
-                val operationId = UUID.randomUUID().toString()
+                val operationId = Uuid.random().toString()
 
                 val worker =
                     TestListenableWorkerBuilder<RestoreWorker>(context)
@@ -231,6 +236,73 @@ class RestoreWorkerTest {
             }
         }
 
+    @Test
+    fun `audio archive import cannot replace an accepted recording with the same name`() =
+        runTest {
+            val name = "archive-collision-${Uuid.random()}.wav"
+            val accepted =
+                File(context.filesDir, "audio_notes/$name").apply {
+                    parentFile?.mkdirs()
+                    writeBytes(byteArrayOf(1, 2, 3))
+                }
+            val incoming = "RIFF0000WAVEincoming archive recording".encodeToByteArray()
+            val archive = createMinimalArchive(context, mapOf("media/audio/$name" to incoming))
+            var restored: File? = null
+            val expected =
+                RestoreResult(
+                    ExportMetadata(
+                        exportDate = Instant.fromEpochMilliseconds(0),
+                        userId = "synthetic",
+                        deviceId = "synthetic",
+                        appVersion = "1.0",
+                        stats = ExportStats(0, 0, 0, 1),
+                    ),
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    emptyList(),
+                )
+            val useCase =
+                mockk<RestoreUserDataUseCase> {
+                    coEvery {
+                        restore(
+                            archive = any(),
+                            options = any(),
+                            mediaImporter = anyNullable(),
+                            onProgress = anyNullable(),
+                        )
+                    } coAnswers
+                        {
+                            val reference = thirdArg<MediaImporter>().importMedia("media/audio/$name")
+                            restored = File(requireNotNull(Uri.parse(requireNotNull(reference)).path))
+                            expected
+                        }
+                }
+            try {
+                setupKoin(useCase, mockk(relaxed = true), RecordingRestoreLauncher())
+                val worker =
+                    TestListenableWorkerBuilder<RestoreWorker>(context)
+                        .setInputData(
+                            androidx.work.Data
+                                .Builder()
+                                .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(archive).toString())
+                                .build(),
+                        ).build()
+                assertIs<ListenableWorker.Result.Success>(worker.doWork())
+                val imported = assertNotNull(restored)
+                assertNotEquals(accepted, imported)
+                assertContentEquals(byteArrayOf(1, 2, 3), accepted.readBytes())
+                assertContentEquals(incoming, imported.readBytes())
+                assertEquals("audio_notes", imported.parentFile?.name)
+            } finally {
+                accepted.delete()
+                restored?.delete()
+                archive.delete()
+            }
+        }
+
     private fun setupKoin(
         restoreUseCase: RestoreUserDataUseCase,
         mediaManager: MediaManager,
@@ -243,6 +315,7 @@ class RestoreWorkerTest {
                     factory { restoreUseCase }
                     single<MediaManager> { mediaManager }
                     single<RestoreLauncher> { restoreLauncher }
+                    single<SessionStorage> { mockk(relaxed = true) }
                     if (diagnostics != null) single<RestoreDiagnosticEvents> { diagnostics }
                 },
             )
@@ -270,7 +343,10 @@ private class RecordingRestoreDiagnostics : RestoreDiagnosticEvents {
  * required [ExportFileStructure] entries with empty JSON payloads. The caller is
  * responsible for deleting the file when done.
  */
-private fun createMinimalArchive(context: Context): File {
+private fun createMinimalArchive(
+    context: Context,
+    attachments: Map<String, ByteArray> = emptyMap(),
+): File {
     val file = File.createTempFile("restore_test_archive", ".zip", context.cacheDir)
     ZipOutputStream(FileOutputStream(file)).use { zip ->
         mapOf(
@@ -283,6 +359,11 @@ private fun createMinimalArchive(context: Context): File {
         ).forEach { (name, content) ->
             zip.putNextEntry(ZipEntry(name))
             zip.write(content.toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+        }
+        attachments.forEach { (name, bytes) ->
+            zip.putNextEntry(ZipEntry(name))
+            zip.write(bytes)
             zip.closeEntry()
         }
     }

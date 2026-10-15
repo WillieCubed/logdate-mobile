@@ -21,6 +21,7 @@ import app.logdate.shared.model.diagnostics.DiagnosticReason
 import app.logdate.shared.model.diagnostics.DiagnosticReportCodec
 import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.koin.core.component.KoinComponent
@@ -232,6 +233,8 @@ class RestoreWorker(
     private suspend fun trySetForeground(foregroundInfo: ForegroundInfo) {
         try {
             setForeground(foregroundInfo)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.w("Could not show foreground notification, restore continues without it")
         }
@@ -325,6 +328,8 @@ class RestoreWorker(
                 }
             Napier.d("Restore attachment imported")
             return savedPath
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.e("Restore attachment import failed")
             return null
@@ -347,12 +352,11 @@ class RestoreWorker(
     private fun saveAudioToInternalStorage(
         sourceFile: File,
         fileName: String,
-    ): String {
-        val audioDir = File(context.filesDir, "audio_notes").apply { mkdirs() }
-        val destFile = File(audioDir, fileName)
-        sourceFile.copyTo(destFile, overwrite = true)
-        return Uri.fromFile(destFile).toString()
-    }
+    ): String =
+        Uri
+            .fromFile(
+                ArchiveAudioFileStore(File(context.filesDir, "audio_notes"), context.cacheDir).import(sourceFile, fileName),
+            ).toString()
 
     private fun detectMimeTypeFromBytes(file: File): String =
         try {
