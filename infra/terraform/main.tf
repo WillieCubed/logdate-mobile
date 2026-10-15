@@ -33,13 +33,22 @@ locals {
     WEBAUTHN_ORIGIN = var.webauthn_origin
   } : {}
 
+  webauthn_additional_origins_env = length(var.webauthn_additional_origins) > 0 ? {
+    WEBAUTHN_ALLOWED_ORIGINS = join(",", concat(
+      [var.webauthn_origin],
+      [for role in ["staging", "upload", "play_app_signing"] : var.android_signing_certificates[role].apk_key_hash_origin if try(var.android_signing_certificates[role], null) != null],
+      var.webauthn_additional_origins,
+    ))
+  } : {}
+
   env_vars = merge(
     local.base_env,
     local.cloud_sql_env,
     local.bucket_env,
     local.webauthn_env,
     local.webauthn_origin_env,
-    var.cloud_run_env
+    var.cloud_run_env,
+    local.webauthn_additional_origins_env
   )
 
   secret_ids = toset(concat(
@@ -367,6 +376,16 @@ resource "google_cloud_run_v2_service" "server" {
 
   lifecycle {
     ignore_changes = [template[0].containers[0].image]
+
+    precondition {
+      condition = length(var.webauthn_additional_origins) == 0 || (
+        var.project_id == "logdate-dev" &&
+        var.service_name == "logdate-server-staging" &&
+        var.webauthn_rp_id == "cloud-staging.logdate.app" &&
+        var.webauthn_origin == "https://cloud-staging.logdate.app"
+      )
+      error_message = "Additional passkey browser origins require the isolated LogDate staging service and relying party."
+    }
   }
 
   depends_on = [

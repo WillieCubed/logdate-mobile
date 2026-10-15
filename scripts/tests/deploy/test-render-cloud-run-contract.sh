@@ -75,6 +75,7 @@ def is_root_snapshot_file(path: pathlib.Path) -> bool:
         name.endswith(".tf")
         or name.endswith(".tfvars")
         or name == ".terraform.lock.hcl"
+        or name == "staging-contract-template.json"
         or name == ".terraform.tfstate.lock.info"
         or name == "terraform.tfstate"
         or name.startswith("terraform.tfstate.")
@@ -157,6 +158,7 @@ cat >"$FIXTURE_DIR/staging-source.json" <<'EOF'
   "artifact_registry_image_name": "logdate-server",
   "domains": ["cloud-staging.logdate.app"],
   "domain": "",
+  "webauthn_additional_origins": ["https://app.cloud-staging.logdate.app"],
   "android_signing_certificates": {
     "staging": {
       "fingerprint": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A",
@@ -222,6 +224,7 @@ cat >"$FIXTURE_DIR/production-source.json" <<'EOF'
   "artifact_registry_image_name": "logdate-server",
   "domains": ["cloud.logdate.app"],
   "domain": "",
+  "webauthn_additional_origins": [],
   "android_signing_certificates": {
     "upload": {
       "fingerprint": "11:98:70:B8:78:F3:AB:5F:55:C0:DF:65:C7:87:89:C0:24:59:CA:9F:F3:22:A0:89:40:AE:43:A2:9D:1D:D5:AB",
@@ -281,6 +284,7 @@ initialize_synthetic_repo() {
     mkdir -p "$repo/infra/terraform" "$repo/scripts"
     cp "$OPERATOR_ROOT"/infra/terraform/*.tf "$repo/infra/terraform/"
     cp "$OPERATOR_ROOT/infra/terraform/.terraform.lock.hcl" "$repo/infra/terraform/.terraform.lock.hcl"
+    cp "$OPERATOR_ROOT/infra/terraform/staging-contract-template.json" "$repo/infra/terraform/staging-contract-template.json"
     cp "$OPERATOR_ROOT/$SCRIPT" "$repo/$SCRIPT"
     chmod +x "$repo/$SCRIPT"
     git -C "$repo" init -q
@@ -293,6 +297,7 @@ commit_synthetic_repo() {
     git -C "$repo" update-index --add -- \
         scripts/render-cloud-run-contract.sh \
         infra/terraform/.terraform.lock.hcl \
+        infra/terraform/staging-contract-template.json \
         infra/terraform/*.tf \
         infra/terraform/staging.tfvars \
         infra/terraform/production.tfvars
@@ -306,6 +311,18 @@ commit_synthetic_repo() {
     printf '%s\n' "$commit"
 }
 
+# Bind the current checkout sources in the existing disposable fixture before
+# invoking the renderer, which intentionally requires committed input bytes.
+initialize_synthetic_repo "$CURRENT_INPUTS_REPO"
+cp "$OPERATOR_ROOT/infra/terraform/staging.tfvars" "$CURRENT_INPUTS_REPO/infra/terraform/staging.tfvars"
+cp "$OPERATOR_ROOT/infra/terraform/production.tfvars" "$CURRENT_INPUTS_REPO/infra/terraform/production.tfvars"
+CURRENT_RELEASE_SHA="$(commit_synthetic_repo "$CURRENT_INPUTS_REPO" 'test: create current-input renderer release')"
+snapshot_synthetic_sources "$CURRENT_INPUTS_REPO" "$CURRENT_REPO_HASHES_BEFORE"
+assert_equals "$(shasum -a 256 "$OPERATOR_ROOT/infra/terraform/staging.tfvars" | awk '{print $1}')" \
+    "$(shasum -a 256 "$CURRENT_INPUTS_REPO/infra/terraform/staging.tfvars" | awk '{print $1}')"
+assert_equals "$(shasum -a 256 "$OPERATOR_ROOT/infra/terraform/production.tfvars" | awk '{print $1}')" \
+    "$(shasum -a 256 "$CURRENT_INPUTS_REPO/infra/terraform/production.tfvars" | awk '{print $1}')"
+
 # CI staging uses the committed template rather than Terraform evaluation.
 assert_equals "true" "$(jq -r '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED' \
     "$OPERATOR_ROOT/infra/terraform/staging-contract-template.json")"
@@ -313,12 +330,11 @@ assert_equals "true" "$(jq -r '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED'
 # Because CI deploys staging from that template instead of evaluating Terraform, the template has
 # to describe exactly what staging.tfvars does. Otherwise a new secret or setting committed to
 # staging.tfvars never reaches staging.
-OPERATOR_HEAD="$(git -C "$OPERATOR_ROOT" rev-parse HEAD)"
-TEMPLATE_CONTRACT="$(cd "$OPERATOR_ROOT" && CI=true "./$SCRIPT" --environment staging \
-    --release-sha "$OPERATOR_HEAD" 2>"$LOG_DIR/staging-template-render.err" | jq -S .)" ||
+TEMPLATE_CONTRACT="$(cd "$CURRENT_INPUTS_REPO" && CI=true "./$SCRIPT" --environment staging \
+    --release-sha "$CURRENT_RELEASE_SHA" 2>"$LOG_DIR/staging-template-render.err" | jq -S .)" ||
     fail "staging contract could not be rendered from staging-contract-template.json"
-TERRAFORM_CONTRACT="$(cd "$OPERATOR_ROOT" && CI=false "./$SCRIPT" --environment staging \
-    --release-sha "$OPERATOR_HEAD" 2>"$LOG_DIR/staging-terraform-render.err" | jq -S .)" ||
+TERRAFORM_CONTRACT="$(cd "$CURRENT_INPUTS_REPO" && CI=false "./$SCRIPT" --environment staging \
+    --release-sha "$CURRENT_RELEASE_SHA" 2>"$LOG_DIR/staging-terraform-render.err" | jq -S .)" ||
     fail "staging contract could not be rendered from staging.tfvars"
 assert_equals "$TERRAFORM_CONTRACT" "$TEMPLATE_CONTRACT"
 
@@ -335,6 +351,7 @@ domains                     = ["cloud-staging.logdate.app"]
 domain                      = ""
 webauthn_rp_id              = "cloud-staging.logdate.app"
 webauthn_origin             = "https://cloud-staging.logdate.app"
+webauthn_additional_origins = ["https://app.cloud-staging.logdate.app"]
 gcs_bucket_name             = "logdate-media-staging"
 request_concurrency         = 16
 android_signing_certificates = {
@@ -648,6 +665,7 @@ cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
     "expected_build_signer_role": "staging"
   },
   "canonical_origin": "https://cloud-staging.logdate.app",
+  "webauthn_additional_origins": ["https://app.cloud-staging.logdate.app"],
   "env_vars": {
     "ANDROID_CERT_FINGERPRINTS": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A,F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F",
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
@@ -666,7 +684,7 @@ cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
     "SERVER_ENCRYPTION_ENABLED": "true",
     "SYNC_MEDIA_SIGNED_URLS": "true",
     "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
-    "WEBAUTHN_ALLOWED_ORIGINS": "https://cloud-staging.logdate.app,android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo,android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8",
+    "WEBAUTHN_ALLOWED_ORIGINS": "https://cloud-staging.logdate.app,android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo,android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8,https://app.cloud-staging.logdate.app",
     "WEBAUTHN_ORIGIN": "https://cloud-staging.logdate.app",
     "WEBAUTHN_RP_ID": "cloud-staging.logdate.app"
   },
@@ -853,16 +871,6 @@ cmp -s "$FIXTURE_DIR/production-contract.sorted.json" "$REAL_PRODUCTION_OUT" || 
 pass
 assert_zero_bytes "$REAL_PRODUCTION_ERR"
 
-initialize_synthetic_repo "$CURRENT_INPUTS_REPO"
-git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/staging.tfvars >"$CURRENT_INPUTS_REPO/infra/terraform/staging.tfvars"
-git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/production.tfvars >"$CURRENT_INPUTS_REPO/infra/terraform/production.tfvars"
-CURRENT_RELEASE_SHA="$(commit_synthetic_repo "$CURRENT_INPUTS_REPO" 'test: create current-input renderer release')"
-snapshot_synthetic_sources "$CURRENT_INPUTS_REPO" "$CURRENT_REPO_HASHES_BEFORE"
-assert_equals "$(git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/staging.tfvars | shasum -a 256 | awk '{print $1}')" \
-    "$(shasum -a 256 "$CURRENT_INPUTS_REPO/infra/terraform/staging.tfvars" | awk '{print $1}')"
-assert_equals "$(git -C "$OPERATOR_ROOT" show HEAD:infra/terraform/production.tfvars | shasum -a 256 | awk '{print $1}')" \
-    "$(shasum -a 256 "$CURRENT_INPUTS_REPO/infra/terraform/production.tfvars" | awk '{print $1}')"
-
 CURRENT_STAGING_OUT="$TMP_DIR/current-staging.out"
 CURRENT_STAGING_ERR="$TMP_DIR/current-staging.err"
 run_real_renderer "$CURRENT_INPUTS_REPO" staging "$CURRENT_RELEASE_SHA" "$CURRENT_STAGING_OUT" "$CURRENT_STAGING_ERR" ||
@@ -927,7 +935,7 @@ assert_exit_code 0 "$staging_only_status"
 assert_zero_bytes "$STAGING_ONLY_ERR"
 assert_equals "staging" "$(jq -r '.android_signing.certificates | keys | join(",")' "$STAGING_ONLY_OUT")"
 assert_equals \
-    "$(jq -r '[.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin] | join(",")' "$STAGING_ONLY_OUT")" \
+    "$(jq -r '([.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin] + (.webauthn_additional_origins // [])) | join(",")' "$STAGING_ONLY_OUT")" \
     "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$STAGING_ONLY_OUT")"
 
 # Production before the application exists in Play Console. Play issues the
@@ -963,7 +971,7 @@ assert_equals \
     "$(jq -r '[.android_signing.certificates.staging.fingerprint, .android_signing.certificates.play_app_signing.fingerprint] | join(",")' "$LOWERCASE_STAGING_OUT")" \
     "$(jq -r '.env_vars.ANDROID_CERT_FINGERPRINTS' "$LOWERCASE_STAGING_OUT")"
 assert_equals \
-    "$(jq -r '[.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] | join(",")' "$LOWERCASE_STAGING_OUT")" \
+    "$(jq -r '([.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] + (.webauthn_additional_origins // [])) | join(",")' "$LOWERCASE_STAGING_OUT")" \
     "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$LOWERCASE_STAGING_OUT")"
 assert_equals \
     "$(jq -r '.android_signing.certificates[.android_signing.expected_build_signer_role].fingerprint' "$LOWERCASE_STAGING_OUT")" \
@@ -1023,6 +1031,29 @@ expect_failure production-play-certificate-mismatch production "$RELEASE_SHA" pr
 
 jq '.artifact_registry_image_name = "logdate-server-staging"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/wrong-image-name.json"
 expect_failure wrong-image-name staging "$RELEASE_SHA" wrong-image-name.json "artifact_registry_image_name must be logdate-server"
+
+# Additional browser origins are explicit, exact and isolated to staging.
+origin_case=0
+for origins in \
+    '["https://app.cloud-staging.logdate.app/"]' \
+    '["https://app.cloud-staging.logdate.app:443"]' \
+    '["https://user@app.cloud-staging.logdate.app"]' \
+    '["https://app.cloud-staging.logdate.app?query=1"]' \
+    '["https://app.cloud-staging.logdate.app#fragment"]' \
+    '["https://*.cloud-staging.logdate.app"]' \
+    '["https://unapproved.example.test"]' \
+    '["https://app.cloud-staging.logdate.app","https://app.cloud-staging.logdate.app"]'; do
+    origin_case=$((origin_case + 1))
+    jq --argjson origins "$origins" '.webauthn_additional_origins = $origins' \
+        "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/bad-browser-origin-$origin_case.json"
+    expect_failure "bad-browser-origin-$origin_case" staging "$RELEASE_SHA" \
+        "bad-browser-origin-$origin_case.json" \
+        "additional WebAuthn origins must be empty or contain only the approved staging frontend"
+done
+jq '.webauthn_additional_origins = ["https://app.cloud-staging.logdate.app"]' \
+    "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/production-browser-origin.json"
+expect_failure production-browser-origin production "$RELEASE_SHA" production-browser-origin.json \
+    "additional WebAuthn origins must be empty or contain only the approved staging frontend"
 
 jq '.domains += ["extra.logdate.app"]' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/extra-domain.json"
 expect_failure extra-domain staging "$RELEASE_SHA" extra-domain.json "environment domains must contain exactly cloud-staging.logdate.app"

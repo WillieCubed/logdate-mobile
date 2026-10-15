@@ -39,12 +39,14 @@ cat >"$tmp_dir/contract.unsorted.json" <<EOF
 {
   "release_sha": "$RELEASE_SHA",
   "canonical_origin": "$CANONICAL_ORIGIN",
+  "environment": "staging",
+  "webauthn_additional_origins": ["https://app.cloud-staging.example.test"],
   "android_package_name": "$PACKAGE_NAME",
   "env_vars": {
     "RELEASE_VERSION": "$EXPECTED_RELEASE",
     "ATPROTO_HANDLE_DOMAIN": "$HANDLE_DOMAIN",
     "WEBAUTHN_RP_ID": "$RP_ID",
-    "WEBAUTHN_ALLOWED_ORIGINS": "$CANONICAL_ORIGIN,$APK_ORIGIN_ONE,$APK_ORIGIN_TWO",
+    "WEBAUTHN_ALLOWED_ORIGINS": "$CANONICAL_ORIGIN,$APK_ORIGIN_ONE,$APK_ORIGIN_TWO,https://app.cloud-staging.example.test",
     "ANDROID_CERT_FINGERPRINTS": "$CERT_ONE,$CERT_TWO"
   },
   "android_signing": {
@@ -834,7 +836,7 @@ chmod 600 "$missing_package_contract"
 set +e
 missing_package_output="$(
     SMOKE_SCENARIO=ok HEALTH_INTERNAL_TOKEN="$HEALTH_TOKEN" \
-    PASSKEY_VERIFY_PYTHON="scripts/passkey-verify/.venv/bin/python" \
+    PASSKEY_VERIFY_PYTHON="$tmp_dir/bin/passkey-python" \
     "$SCRIPT" --service-url "$CANDIDATE_ORIGIN" --contract-file "$missing_package_contract" \
         --expected-release "$EXPECTED_RELEASE" --invoker-token-file "$invoker_token_file" \
         --phase health-only --state-file "$state_file" 2>&1
@@ -851,7 +853,7 @@ chmod 600 "$bad_contract"
 set +e
 bad_contract_output="$(
     SMOKE_SCENARIO=ok HEALTH_INTERNAL_TOKEN="$HEALTH_TOKEN" \
-    PASSKEY_VERIFY_PYTHON="scripts/passkey-verify/.venv/bin/python" \
+    PASSKEY_VERIFY_PYTHON="$tmp_dir/bin/passkey-python" \
     "$SCRIPT" --service-url "$CANDIDATE_ORIGIN" --contract-file "$bad_contract" \
         --expected-release "$EXPECTED_RELEASE" --invoker-token-file "$invoker_token_file" \
         --phase health-only --state-file "$state_file" 2>&1
@@ -859,7 +861,29 @@ bad_contract_output="$(
 bad_contract_status=$?
 set -e
 assert_exit_code 1 "$bad_contract_status"
-assert_contains "contract Android origin set does not match signing certificates" "$bad_contract_output"
+assert_contains "contract WebAuthn origin set does not match declared browser and signing origins" "$bad_contract_output"
+
+# Browser-origin declarations must be approved and agree with the actual aggregate.
+for browser_mutation in \
+    '.webauthn_additional_origins = ["https://unapproved.example.test"]' \
+    '.webauthn_additional_origins += .webauthn_additional_origins' \
+    'del(.webauthn_additional_origins)' \
+    '.environment = "production"'; do
+    jq "$browser_mutation" "$contract" | jq -S . >"$bad_contract"
+    chmod 600 "$bad_contract"
+    set +e
+    browser_contract_output="$(
+        SMOKE_SCENARIO=ok HEALTH_INTERNAL_TOKEN="$HEALTH_TOKEN" \
+        PASSKEY_VERIFY_PYTHON="$tmp_dir/bin/passkey-python" \
+        "$SCRIPT" --service-url "$CANDIDATE_ORIGIN" --contract-file "$bad_contract" \
+            --expected-release "$EXPECTED_RELEASE" --invoker-token-file "$invoker_token_file" \
+            --phase health-only --state-file "$state_file" 2>&1
+    )"
+    browser_contract_status=$?
+    set -e
+    assert_exit_code 1 "$browser_contract_status"
+    assert_contains "contract WebAuthn origin set does not match declared browser and signing origins" "$browser_contract_output"
+done
 
 # Mutation caught by each scenario: wrong release, missing durable DB, wrong first-party
 # descriptor identity/capabilities, incomplete DAL relations/certificates, or auth bypass.

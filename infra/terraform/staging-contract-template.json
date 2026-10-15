@@ -5,6 +5,7 @@
   "artifact_registry_image_name": "logdate-server",
   "domains": ["cloud-staging.logdate.app"],
   "domain": "",
+  "webauthn_additional_origins": ["https://app.cloud-staging.logdate.app"],
   "env_vars": {
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
     "ATPROTO_PDS_SERVICE_URL": "https://cloud-staging.logdate.app",

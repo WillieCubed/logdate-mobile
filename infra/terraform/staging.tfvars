@@ -9,8 +9,9 @@ cloud_run_image = "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server
 # across `*.logdate.app`; if staging used the apex too, a passkey created here
 # would also unlock prod (`cloud.logdate.app`). Subdomain-bound rpId keeps the
 # two environments isolated.
-webauthn_rp_id  = "cloud-staging.logdate.app"
-webauthn_origin = "https://cloud-staging.logdate.app"
+webauthn_rp_id              = "cloud-staging.logdate.app"
+webauthn_origin             = "https://cloud-staging.logdate.app"
+webauthn_additional_origins = ["https://app.cloud-staging.logdate.app"]
 
 enable_github_oidc = true
 github_repo        = "WillieCubed/logdate-mobile"

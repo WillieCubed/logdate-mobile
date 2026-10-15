@@ -158,6 +158,19 @@ variable "webauthn_origin" {
   default     = ""
 }
 
+variable "webauthn_additional_origins" {
+  type        = list(string)
+  description = "Explicit additional browser origins for the isolated staging passkey frontend."
+  default     = []
+
+  validation {
+    condition = length(distinct(var.webauthn_additional_origins)) == length(var.webauthn_additional_origins) && alltrue([
+      for origin in var.webauthn_additional_origins : origin == "https://app.cloud-staging.logdate.app"
+    ])
+    error_message = "Additional origins must be unique and use the approved staging frontend HTTPS origin."
+  }
+}
+
 variable "create_gcs_bucket" {
   type        = bool
   description = "Whether to create a GCS bucket for media."

@@ -476,13 +476,15 @@ if ! jq -e --arg canonical "$CANONICAL_ORIGIN" '
 fi
 if ! jq -e --arg canonical "$CANONICAL_ORIGIN" '
     def csv: split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0));
-    ([.android_signing.certificates[] | .apk_key_hash_origin] + [$canonical]) as $expected |
+    (.webauthn_additional_origins // []) as $browser |
+    ($browser == [] or (.environment == "staging" and $browser == ["https://app." + ($canonical | sub("^https://"; ""))])) and
+    (([.android_signing.certificates[] | .apk_key_hash_origin] + [$canonical] + $browser) as $expected |
     (.env_vars.WEBAUTHN_ALLOWED_ORIGINS | csv) as $actual |
     ($expected | length) == ($expected | unique | length) and
     ($actual | length) == ($actual | unique | length) and
-    ($expected | sort) == ($actual | sort)
+    ($expected | sort) == ($actual | sort))
 ' "$CONTRACT_FILE" >/dev/null; then
-    fail "contract Android origin set does not match signing certificates"
+    fail "contract WebAuthn origin set does not match declared browser and signing origins"
     exit 1
 fi
 

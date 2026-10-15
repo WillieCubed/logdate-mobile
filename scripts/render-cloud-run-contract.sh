@@ -279,6 +279,10 @@ variable "webauthn_origin" {
   type = string
   default = ""
 }
+variable "webauthn_additional_origins" {
+  type = list(string)
+  default = []
+}
 variable "webauthn_rp_id" {
   type = string
   default = ""
@@ -322,6 +326,7 @@ jsonencode({
   artifact_registry_image_name  = var.artifact_registry_image_name,
   domains                       = var.domains,
   domain                        = var.domain,
+  webauthn_additional_origins = var.webauthn_additional_origins,
   android_signing_certificates = {
     for role, certificate in var.android_signing_certificates :
     role => certificate
@@ -486,6 +491,7 @@ try:
         "domains",
         "domain",
         "android_signing_certificates",
+        "webauthn_additional_origins",
         "env_vars",
         "secret_env",
         "runtime",
@@ -519,6 +525,11 @@ try:
         fail("legacy domain shim must be blank")
     canonical_domain = expected_domain
     canonical_origin = f"https://{canonical_domain}"
+
+    additional_origins = source["webauthn_additional_origins"]
+    approved_origins = ["https://app.cloud-staging.logdate.app"] if environment == "staging" else []
+    if additional_origins not in ([], approved_origins):
+        fail("additional WebAuthn origins must be empty or contain only the approved staging frontend")
 
     signing = source["android_signing_certificates"]
     if not isinstance(signing, dict):
@@ -740,7 +751,7 @@ try:
             positive_integer(probe[key], f"runtime probe {key}")
 
     rendered_env = dict(env_vars)
-    rendered_env["WEBAUTHN_ALLOWED_ORIGINS"] = ",".join([canonical_origin, *android_origins])
+    rendered_env["WEBAUTHN_ALLOWED_ORIGINS"] = ",".join([canonical_origin, *android_origins, *additional_origins])
     rendered_env["ANDROID_CERT_FINGERPRINTS"] = ",".join(fingerprints)
     rendered_env["RELEASE_VERSION"] = f"logdate-server@{release_sha}"
     expected_build_signer = normalized_certificates[expected_build_signer_role]
@@ -764,6 +775,8 @@ try:
         "secret_env": normalized_secrets,
         "runtime": runtime,
     }
+    if additional_origins:
+        contract["webauthn_additional_origins"] = additional_origins
     pathlib.Path(output_path).write_text(json.dumps(contract, separators=(",", ":")))
 except ContractError as error:
     print(f"ERROR: {error}", file=sys.stderr)

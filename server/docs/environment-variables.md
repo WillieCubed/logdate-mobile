@@ -305,6 +305,9 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Required**: No, but required in practice for native Android passkeys
 - **Notes**:
   - The canonical `WEBAUTHN_ORIGIN` is always accepted whether or not it is repeated here.
+  - First-party deployment tooling owns the aggregate from the canonical origin and declared Android signers. Do not override it directly in `cloud_run_env`.
+  - Staging declares `webauthn_additional_origins = ["https://app.cloud-staging.logdate.app"]` in its Terraform inputs and CI contract template. The deployment renderer and revision smoke check retain that browser origin alongside the existing signer origins; the RP remains `cloud-staging.logdate.app`.
+  - Production leaves the additional-origin input empty. Terraform includes the browser aggregate only when additional origins are configured. A Terraform precondition requires the staging project, service, RP and canonical origin before adding that aggregate.
   - List one `android:apk-key-hash:` entry per signing certificate. With Play App Signing this means both the upload certificate and the Google-managed app-signing certificate; for local/staging builds it means the debug keystore certificate. The hash is `base64url(SHA-256(DER-encoded signing cert))` — the same certificate whose colon-hex SHA-256 goes in `assetlinks.json` (served by the `logdate-web` project at the relying-party domain).
   - Malformed entries are logged and skipped so one typo cannot break passkey verification for everyone.
 
