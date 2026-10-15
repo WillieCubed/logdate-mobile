@@ -411,6 +411,16 @@ class DefaultSyncManager(
                     ).recover(accessToken)
             else -> Unit
         }
+        app.logdate.client.sync.recovery
+            .NativeMediaRecovery(
+                inbox,
+                journalNotesRepository,
+                journalRepository,
+                mediaManager,
+                mediaTransfer,
+                mediaSyncRefStore,
+                transactionManager,
+            ).recover(accessToken, entityType)
     }
 
     private val mediaTransfer =

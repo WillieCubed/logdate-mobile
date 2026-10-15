@@ -208,6 +208,7 @@ class LocalFirstDraftRepository(
             }
             val drafts = read(scope)
             if (drafts.find { it.id == id } != expected) return@withLock false
+            if (expected == replacement) return@withLock true
             val updated = drafts.filterNot { it.id == id } + listOfNotNull(replacement)
             write(scope, updated)
             true

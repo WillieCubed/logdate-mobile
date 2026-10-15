@@ -140,7 +140,8 @@ class OfflineFirstJournalRepository(
         expected: EditorDraft?,
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope?,
-    ): Boolean = withContext(dispatcher) { draftPersistence.compareAndSet(id, expected, replacement, recoveryScope) }
+        enqueue: Boolean,
+    ): Boolean = withContext(dispatcher) { draftPersistence.compareAndSet(id, expected, replacement, recoveryScope, enqueue) }
 
     override suspend fun getLatestDraft(): EditorDraft? =
         withContext(dispatcher) { draftRepository.getLatestDraft()?.let { resolveDraft(it) } }
@@ -206,9 +207,6 @@ class OfflineFirstJournalRepository(
     ) = withContext(dispatcher) {
         journalDao.updateSyncMetadata(journalId, syncVersion, syncedAt)
     }
-
-    private suspend fun resolveDraft(draft: EditorDraft): EditorDraft =
-        draft.copy(selectedJournalIds = draft.selectedJournalIds.map { resolveJournalId(it) }.distinct())
 
     override suspend fun previewMerge(
         sourceId: Uuid,

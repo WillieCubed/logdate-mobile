@@ -54,4 +54,18 @@ class JournalDraftRecoveryIntentTest {
             persistence.ensureRecoveryQueued(imported.id, null)
             assertEquals(1, metadata.getPendingUploads(EntityType.DRAFT).size)
         }
+
+    @Test
+    fun `attachment hydration preserves modification time and does not enqueue an upload`() =
+        runTest {
+            val repository = FakeDraftRepository()
+            val metadata = FakeSyncMetadataService()
+            val original = EditorDraft()
+            repository.saveDraft(original)
+            val hydrated = original.copy(blocks = emptyList())
+            val persistence = JournalDraftPersistence(repository, metadata, { it }, {})
+            kotlin.test.assertTrue(persistence.compareAndSet(original.id, original, hydrated, null, enqueue = false))
+            assertEquals(original.lastModifiedAt, repository.getDraft(original.id)?.lastModifiedAt)
+            assertEquals(emptyList(), metadata.getPendingUploads(EntityType.DRAFT))
+        }
 }

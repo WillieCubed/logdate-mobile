@@ -117,16 +117,22 @@ interface JournalRepository {
         recoveryScope: DraftRecoveryScope?,
     ) = Unit
 
-    /** Replace a captured draft only while it is unchanged and queue the resulting local mutation. */
+    /** Atomically replace an unchanged draft. Attachment hydration disables [enqueue] to avoid echoing a download. */
     suspend fun compareAndSetDraftForRestore(
         id: Uuid,
         expected: EditorDraft?,
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope? = null,
+        enqueue: Boolean = true,
     ): Boolean {
         check(recoveryScope == null || getDraftRecoveryScope() == recoveryScope) { "Draft recovery account changed" }
         if (getDraftForRestore(id) != expected) return false
-        if (replacement == null) deleteDraft(id) else saveDraft(replacement)
+        if (enqueue) {
+            if (replacement == null) deleteDraft(id) else saveDraft(replacement)
+        } else {
+            val syncable = this as? SyncableDraftRepository ?: error("Sync draft repository unavailable")
+            if (replacement == null) syncable.deleteDraftFromSync(id) else syncable.saveDraftFromSync(replacement)
+        }
         return true
     }
 

@@ -78,11 +78,12 @@ internal class JournalDraftPersistence(
         expected: EditorDraft?,
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope? = null,
+        enqueue: Boolean = true,
     ): Boolean {
         requireStorageScope(recoveryScope)
         val changed = drafts.compareAndSetDraftForRestore(id, expected, replacement, recoveryScope)
         requireStorageScope(recoveryScope)
-        if (changed) {
+        if (changed && enqueue) {
             val operation = if (replacement == null) PendingOperation.DELETE else PendingOperation.UPDATE
             val captured = uploadScope(recoveryScope)
             if (captured == null) {
@@ -103,3 +104,6 @@ internal class JournalDraftPersistence(
         changed()
     }
 }
+
+internal suspend fun app.logdate.client.repository.journals.JournalRepository.resolveDraft(draft: EditorDraft): EditorDraft =
+    draft.copy(selectedJournalIds = draft.selectedJournalIds.map { resolveJournalId(it) }.distinct())

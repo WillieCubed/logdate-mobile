@@ -79,7 +79,7 @@ internal class SyncMediaTransfer(
     ): String? {
         if (uri == null || isRemoteRef(uri)) return uri
         val cached = mediaSyncRefStore.getDraftAsset(draftId, blockId, kind)
-        if (cached != null && sameLocalFile(cached.localUri, uri) && cached.remoteUrl.isNotBlank()) return cached.remoteUrl
+        if (cached != null && matchesLocalFile(cached, uri) && cached.remoteUrl.isNotBlank()) return cached.remoteUrl
         val media = mediaManager.openMedia(uri)
         val named = MediaFileSource("draft-$kind-${media.fileName}", media.mimeType, media.sizeBytes) { media.open() }
         val uploaded = cloudMediaDataSource.uploadMedia(accessToken, blockId, named).getOrThrow()
@@ -105,42 +105,51 @@ internal class SyncMediaTransfer(
     ): DraftMediaHydrationResult {
         val mappings = mutableListOf<DraftAssetMapping>()
         val blocks = draft.blocks.toMutableList()
-        return try {
-            draft.blocks.forEachIndexed { index, block ->
-                when (block) {
-                    is SerializableImageBlock ->
-                        blocks[index] =
-                            block.copy(uri = hydrateDraftAsset(accessToken, draft.id, block.id, "image", block.uri, mappings))
-                    is SerializableVideoBlock -> {
-                        val video = block.copy(uri = hydrateDraftAsset(accessToken, draft.id, block.id, "video", block.uri, mappings))
-                        blocks[index] = video
-                        blocks[index] =
-                            video.copy(
-                                thumbnailUri =
-                                    hydrateDraftAsset(
-                                        accessToken,
-                                        draft.id,
-                                        block.id,
-                                        "thumbnail",
-                                        block.thumbnailUri,
-                                        mappings,
-                                    ),
-                            )
-                    }
-                    is SerializableAudioBlock ->
-                        blocks[index] =
-                            block.copy(uri = hydrateDraftAsset(accessToken, draft.id, block.id, "audio", block.uri, mappings))
-                    is SerializableCameraBlock ->
-                        blocks[index] =
-                            block.copy(uri = hydrateDraftAsset(accessToken, draft.id, block.id, "camera", block.uri, mappings))
-                    else -> Unit
-                }
+        val failures = mutableListOf<DiagnosticReason>()
+
+        suspend fun recoverAsset(
+            blockId: Uuid,
+            kind: String,
+            reference: String?,
+        ): String? =
+            try {
+                hydrateDraftAsset(accessToken, draft.id, blockId, kind, reference, mappings)
+            } catch (error: DraftMediaFailure) {
+                failures += error.reason
+                reference
             }
-            DraftMediaHydrationResult.Available(draft.copy(blocks = blocks), mappings)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: DraftMediaFailure) {
-            DraftMediaHydrationResult.Pending(error.reason, draft.copy(blocks = blocks), mappings)
+        draft.blocks.forEachIndexed { index, block ->
+            when (block) {
+                is SerializableImageBlock ->
+                    blocks[index] =
+                        block.copy(uri = recoverAsset(block.id, "image", block.uri))
+                is SerializableVideoBlock -> {
+                    val video = block.copy(uri = recoverAsset(block.id, "video", block.uri))
+                    blocks[index] = video
+                    blocks[index] =
+                        video.copy(
+                            thumbnailUri =
+                                recoverAsset(block.id, "thumbnail", block.thumbnailUri),
+                        )
+                }
+                is SerializableAudioBlock ->
+                    blocks[index] =
+                        block.copy(uri = recoverAsset(block.id, "audio", block.uri))
+                is SerializableCameraBlock ->
+                    blocks[index] =
+                        block.copy(uri = recoverAsset(block.id, "camera", block.uri))
+                else -> Unit
+            }
+        }
+        val updated = draft.copy(blocks = blocks)
+        val reason =
+            failures.firstOrNull {
+                it == DiagnosticReason.KEY_RECOVERY_REQUIRED || it == DiagnosticReason.SIGN_IN_REQUIRED
+            } ?: failures.firstOrNull()
+        return if (reason == null) {
+            DraftMediaHydrationResult.Available(updated, mappings)
+        } else {
+            DraftMediaHydrationResult.Pending(reason, updated, mappings)
         }
     }
 
@@ -152,12 +161,15 @@ internal class SyncMediaTransfer(
         uri: String?,
         mappings: MutableList<DraftAssetMapping>,
     ): String? {
-        if (uri == null || !isRemoteRef(uri)) return uri
+        if (uri == null) return null
+        if (!isRemoteRef(uri) && mediaManager.exists(uri)) return uri
         val cached = mediaSyncRefStore.getDraftAsset(draftId, blockId, kind)
-        if (cached?.remoteUrl == uri && !isRemoteRef(cached.localUri) && mediaManager.exists(cached.localUri)) {
+        val remote = if (isRemoteRef(uri)) uri else cached?.takeIf { matchesLocalFile(it, uri) }?.remoteUrl
+        if (remote == null || !isRemoteRef(remote)) throw DraftMediaFailure(DiagnosticReason.MISSING_MEDIA)
+        if (cached?.remoteUrl == remote && !isRemoteRef(cached.localUri) && mediaManager.exists(cached.localUri)) {
             return cached.localUri
         }
-        val mediaId = extractMediaId(uri) ?: throw DraftMediaFailure(DiagnosticReason.MISSING_MEDIA)
+        val mediaId = extractMediaId(remote) ?: throw DraftMediaFailure(DiagnosticReason.MISSING_MEDIA)
         val downloaded =
             try {
                 cloudMediaDataSource.downloadMedia(accessToken, mediaId).getOrThrow()
@@ -182,6 +194,8 @@ internal class SyncMediaTransfer(
                 mediaManager.saveMedia(
                     MediaPayload(downloaded.fileName, downloaded.mimeType, downloaded.data.size.toLong(), downloaded.data),
                 )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 throw DraftMediaFailure(DiagnosticReason.LOCAL_STORAGE)
             }
@@ -194,9 +208,20 @@ internal class SyncMediaTransfer(
                 MediaSyncRef(
                     noteId = blockId.toString(),
                     localUri = localUri,
-                    remoteUrl = uri,
+                    remoteUrl = remote,
                     mediaId = mediaId,
                     updatedAt = Clock.System.now().toEpochMilliseconds(),
+                    // Keep a retry connected to its old path if a concurrent editor save rejects the draft patch.
+                    localAliases =
+                        if (cached?.remoteUrl == remote) {
+                            (cached.localAliases + cached.localUri + listOfNotNull(uri.takeUnless(::isRemoteRef)))
+                                .asReversed()
+                                .distinct()
+                                .take(8)
+                                .asReversed()
+                        } else {
+                            emptyList()
+                        },
                 ),
             )
         return localUri
@@ -211,7 +236,7 @@ internal class SyncMediaTransfer(
             return Result.success(note)
         }
         val cached = mediaSyncRefStore.get(note.uid)
-        if (cached != null && sameLocalFile(cached.localUri, mediaRef) && cached.remoteUrl.isNotBlank()) {
+        if (cached != null && matchesLocalFile(cached, mediaRef) && cached.remoteUrl.isNotBlank()) {
             return Result.success(note.withMediaRef(cached.remoteUrl))
         }
 
@@ -276,8 +301,15 @@ internal class SyncMediaTransfer(
         note: JournalNote,
     ): MediaHydrationResult {
         val mediaRef = note.mediaRefOrNull() ?: return MediaHydrationResult.Available(note)
-        if (!isRemoteRef(mediaRef)) return MediaHydrationResult.Available(note)
-        val mediaId = extractMediaId(mediaRef) ?: return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
+        if (!isRemoteRef(mediaRef) && mediaManager.exists(mediaRef)) return MediaHydrationResult.Available(note)
+        val remote =
+            if (isRemoteRef(mediaRef)) {
+                mediaRef
+            } else {
+                mediaSyncRefStore.get(note.uid)?.takeIf { matchesLocalFile(it, mediaRef) }?.remoteUrl
+            }
+        if (remote == null || !isRemoteRef(remote)) return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
+        val mediaId = extractMediaId(remote) ?: return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
         val downloaded =
             try {
                 cloudMediaDataSource.downloadMedia(accessToken, mediaId).getOrThrow()
@@ -310,7 +342,7 @@ internal class SyncMediaTransfer(
                 MediaSyncRef(
                     noteId = note.uid.toString(),
                     localUri = localUri,
-                    remoteUrl = mediaRef,
+                    remoteUrl = remote,
                     mediaId = mediaId,
                     updatedAt = Clock.System.now().toEpochMilliseconds(),
                 ),
@@ -321,6 +353,11 @@ internal class SyncMediaTransfer(
             MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
         }
     }
+
+    private fun matchesLocalFile(
+        mapping: MediaSyncRef,
+        reference: String,
+    ): Boolean = sameLocalFile(mapping.localUri, reference) || mapping.localAliases.any { sameLocalFile(it, reference) }
 
     private fun extractMediaId(mediaRef: String): String? =
         runCatching {

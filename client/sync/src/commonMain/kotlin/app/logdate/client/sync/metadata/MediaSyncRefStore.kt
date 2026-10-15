@@ -25,6 +25,7 @@ data class MediaSyncRef(
     val updatedAt: Long,
     val serverOrigin: String? = null,
     val ownerId: String? = null,
+    val localAliases: List<String> = emptyList(),
 )
 
 /**

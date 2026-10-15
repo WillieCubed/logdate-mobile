@@ -1,8 +1,8 @@
 package app.logdate.client.sync.recovery
 
 import app.logdate.client.database.entities.sync.DownloadInboxEntity
+import app.logdate.client.repository.journals.DraftRecoveryScope
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.SyncableDraftRepository
 import app.logdate.client.sync.DraftAssetMapping
 import app.logdate.client.sync.DraftMediaHydrationResult
 import app.logdate.client.sync.SyncMediaTransfer
@@ -46,7 +46,8 @@ internal class SyncDraftMediaRecovery(
                 inbox.applied("MEDIA_DRAFT", row.entityId, row.version, scope)
                 return true
             }
-            val current = drafts.getDraft(id)
+            val draftScope = drafts.getDraftRecoveryScope()
+            val current = drafts.getDraftForRestore(id)
             if (current == null) {
                 inbox.applied("MEDIA_DRAFT", row.entityId, row.version, scope)
                 return true
@@ -54,7 +55,7 @@ internal class SyncDraftMediaRecovery(
             started = true
             inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.STARTED, source)
             val result = transfer.hydrateDraftMedia(accessToken, current)
-            return applyHydration(scope, row, id, current, result, attemptId, source)
+            return applyHydration(scope, draftScope, row, id, current, result, attemptId, source)
         } catch (cancelled: CancellationException) {
             if (started) inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.INTERRUPTED, source)
             throw cancelled
@@ -67,6 +68,7 @@ internal class SyncDraftMediaRecovery(
     /** Returns false when the download scope changed and the remaining rows must not be processed. */
     private suspend fun applyHydration(
         scope: DownloadScope,
+        draftScope: DraftRecoveryScope?,
         row: DownloadInboxEntity,
         id: Uuid,
         current: EditorDraft,
@@ -79,7 +81,7 @@ internal class SyncDraftMediaRecovery(
                 is DraftMediaHydrationResult.Pending -> result.draft to result.mappings
                 is DraftMediaHydrationResult.Available -> result.draft to result.mappings
             }
-        if (!persistProgress(scope, row.entityId, row.version, id, current, draft, mappings)) {
+        if (!persistProgress(scope, draftScope, row.entityId, row.version, id, current, draft, mappings)) {
             inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.INTERRUPTED, source)
             return true
         }
@@ -100,6 +102,7 @@ internal class SyncDraftMediaRecovery(
 
     private suspend fun persistProgress(
         scope: DownloadScope,
+        draftScope: DraftRecoveryScope?,
         entityId: String,
         version: Long,
         draftId: Uuid,
@@ -111,7 +114,7 @@ internal class SyncDraftMediaRecovery(
         transactions.withTransaction {
             if (scope != inbox.currentScope() ||
                 !inbox.isCurrentVersion("DRAFT", entityId, version, scope) ||
-                drafts.getDraft(draftId) != original
+                drafts.getDraftForRestore(draftId) != original
             ) {
                 return@withTransaction
             }
@@ -124,12 +127,7 @@ internal class SyncDraftMediaRecovery(
                     mapping.ref.copy(ownerId = scope.owner, serverOrigin = scope.origin),
                 )
             }
-            if (updated != original) {
-                val syncable =
-                    drafts as? SyncableDraftRepository
-                        ?: error("Sync draft repository unavailable")
-                syncable.saveDraftFromSync(updated)
-            }
+            if (!drafts.compareAndSetDraftForRestore(draftId, original, updated, draftScope, enqueue = false)) return@withTransaction
             persisted = scope == inbox.currentScope()
         }
         return persisted

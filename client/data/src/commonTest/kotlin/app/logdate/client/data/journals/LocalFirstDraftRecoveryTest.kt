@@ -23,7 +23,23 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LocalFirstDraftRecoveryTest {
+    @Test
+    fun `a no-progress media retry validates the snapshot without writing or reordering drafts`() =
+        runTest {
+            val preferences = RecoveryPreferences()
+            val repository = LocalFirstDraftRepository(DataStoreKeyValueStorage(preferences), Json)
+            val first = EditorDraft()
+            val second = EditorDraft()
+            repository.saveDraftFromSync(first)
+            repository.saveDraftFromSync(second)
+            val before = preferences.writes
+            assertTrue(repository.compareAndSetDraftForRestore(first.id, first, first, repository.getDraftRecoveryScope()))
+            assertEquals(before, preferences.writes)
+            assertEquals(listOf(first.id, second.id), repository.getAllDrafts().map { it.id })
+        }
+
     @Test
     fun `scope switching between validation and capture cannot redirect a recovery write`() =
         runTest {
@@ -168,6 +184,7 @@ class LocalFirstDraftRecoveryTest {
 
 private class RecoveryPreferences : DataStore<Preferences> {
     private val state = MutableStateFlow(emptyPreferences())
+    var writes = 0
     var failRead = false
     var failWrite = false
     override val data: Flow<Preferences> =
@@ -178,6 +195,7 @@ private class RecoveryPreferences : DataStore<Preferences> {
 
     override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
         if (failWrite) error("Draft persistence failed")
+        writes++
         return transform(state.value).also { state.value = it }
     }
 }
