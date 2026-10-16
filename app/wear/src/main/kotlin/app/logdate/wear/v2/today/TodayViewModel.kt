@@ -7,6 +7,8 @@ import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.domain.today.TodaySummaryCalculator
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.sync.SyncPausedReason
+import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.peer.state.PeerLinkState
 import app.logdate.wear.capture.Feeling
 import app.logdate.wear.sync.v2.link.WatchLinkRecord
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -33,8 +36,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Today on the watch: the day's moments, places and voice time, the campfire, and an offer to get
- * LogDate on a paired Android phone that lacks it or still needs watch setup. The day moves at
- * midnight and when the time zone changes.
+ * LogDate on a paired Android phone that lacks it or still needs watch setup. Setup is offered again
+ * when the watch's sync waits for its phone to link it. The day moves at midnight and when the time
+ * zone changes.
  */
 class TodayViewModel(
     dayClock: DayClock,
@@ -43,6 +47,7 @@ class TodayViewModel(
     phoneLinks: PhoneLinkRepository,
     watchLinks: WatchLinkStore,
     private val phoneHandoff: PhoneHandoff,
+    syncStatus: Flow<SyncStatus>,
 ) : ViewModel() {
     private val mutableHandoff = MutableStateFlow(HandoffState.IDLE)
 
@@ -54,8 +59,9 @@ class TodayViewModel(
             observeCampfire(),
             phoneLinks.observe(),
             watchLinks.observe(),
-        ) { day, campfire, phone, link ->
-            readyState(day, campfire, phone, link)
+            syncStatus.map { it.pausedReason == SyncPausedReason.NEEDS_DEVICE_LINK }.distinctUntilChanged(),
+        ) { day, campfire, phone, link, needsLink ->
+            readyState(day, campfire, phone, link, needsLink)
         }.catch { error ->
             Napier.e("Couldn't load today on the watch", error)
             emit(TodayUiState.Failed)
@@ -114,6 +120,7 @@ class TodayViewModel(
         campfire: CampfireState?,
         phone: PhoneLink,
         link: WatchLinkRecord?,
+        needsLink: Boolean,
     ): TodayUiState {
         val summary = TodaySummaryCalculator.calculate(day.notes) { tag -> Feeling.fromTag(tag) != null }
         return TodayUiState.Ready(
@@ -126,7 +133,7 @@ class TodayViewModel(
                 when (phone) {
                     is PhoneLink.AppMissing -> PhoneCard.GetApp(phone.nodeId)
                     is PhoneLink.Connected ->
-                        if (link?.phoneNode == phone.nodeId && link.peerLinkState() == PeerLinkState.LINKED) {
+                        if (link?.phoneNode == phone.nodeId && link.peerLinkState() == PeerLinkState.LINKED && !needsLink) {
                             PhoneCard.None
                         } else {
                             PhoneCard.SetUp(phone.nodeId)

@@ -65,6 +65,25 @@ class WatchSettingsTest {
     }
 
     @Test
+    fun a_watch_that_needs_a_link_says_to_set_it_up_from_the_phone() {
+        show(WatchSettingsUiState(status = WatchStatus.NeedsDeviceLink))
+
+        composeRule.onNodeWithText("Set up this watch from your phone").assertIsDisplayed()
+        composeRule.onNodeWithText("This watch can’t sync until LogDate on your phone sets it up again").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_failing_backup_says_so_and_retries_on_tap() {
+        var retries = 0
+        show(WatchSettingsUiState(status = WatchStatus.BackupFailing(1)), WatchSettingsActions(onRetrySync = { retries++ }))
+
+        composeRule.onNodeWithText("Some moments couldn’t back up").assertIsDisplayed()
+        composeRule.onNodeWithTag(WatchSettingsTags.STATUS).performClick()
+
+        assertEquals(1, retries)
+    }
+
+    @Test
     fun choosing_essential_haptics_reports_it() {
         val chosen = mutableListOf<HapticsPreference>()
         show(WatchSettingsUiState(), WatchSettingsActions(onHaptics = { chosen += it }))

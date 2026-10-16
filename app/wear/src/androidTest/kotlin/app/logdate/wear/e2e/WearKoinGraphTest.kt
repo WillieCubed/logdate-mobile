@@ -3,12 +3,14 @@ package app.logdate.wear.e2e
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.metadata.CloudEligibility
 import app.logdate.client.sync.peer.link.LinkInstaller
 import app.logdate.client.sync.peer.link.LinkWire
+import app.logdate.wear.sync.WatchSyncFacade
 import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDataLayerSyncManager
 import app.logdate.wear.sync.v2.delivery.ReleasedToCloud
@@ -29,6 +31,7 @@ import org.koin.java.KoinJavaComponent
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /**
  * Resolves the watch's version 2 sync graph the way the installed app builds it, so a missing binding
@@ -60,6 +63,14 @@ class WearKoinGraphTest {
         val engine = koin.get<DefaultSyncManager>(named("watchCloud"))
 
         assertEquals(SyncPausedReason.NEEDS_DEVICE_LINK, runBlocking { engine.getSyncStatus() }.pausedReason)
+    }
+
+    @Test
+    fun theWatchSyncStatusCombinesBothPathsAndStaysQuietBeforeLinking() {
+        val manager = koin.get<SyncManager>()
+
+        assertTrue(manager is WatchSyncFacade)
+        kotlin.test.assertNull(runBlocking { manager.getSyncStatus() }.pausedReason)
     }
 
     @Test
