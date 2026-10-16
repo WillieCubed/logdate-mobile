@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.account.signin
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -35,8 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.feature.core.settings.ui.dialogs.DangerConfirmationDialog
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.common.formatting.LocalToday
 import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.theme.Spacing
@@ -205,7 +205,7 @@ private fun PasskeyItem(
     onRemove: () -> Unit,
 ) {
     val name = passkey.deviceName ?: stringResource(Res.string.sign_in_methods_unnamed_passkey)
-    ListItem(
+    SettingsRow(
         leadingContent = { Icon(Icons.Outlined.Key, contentDescription = null) },
         headlineContent = { Text(name) },
         supportingContent = {
@@ -273,7 +273,9 @@ private fun AddPasskeyItem(
     isAdding: Boolean,
     onClick: () -> Unit,
 ) {
-    ListItem(
+    SimpleSettingsItem(
+        title = stringResource(if (isAdding) Res.string.sign_in_methods_adding_passkey else Res.string.sign_in_methods_add_passkey),
+        description = stringResource(Res.string.sign_in_methods_add_passkey_description),
         leadingContent = {
             if (isAdding) {
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
@@ -281,17 +283,9 @@ private fun AddPasskeyItem(
                 Icon(Icons.Outlined.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
         },
-        headlineContent = {
-            Text(
-                text =
-                    stringResource(
-                        if (isAdding) Res.string.sign_in_methods_adding_passkey else Res.string.sign_in_methods_add_passkey,
-                    ),
-                color = MaterialTheme.colorScheme.primary,
-            )
-        },
-        supportingContent = { Text(stringResource(Res.string.sign_in_methods_add_passkey_description)) },
-        modifier = Modifier.clickable(enabled = !isAdding, onClick = onClick),
+        onClick = onClick,
+        enabled = !isAdding,
+        action = {},
     )
 }
 
@@ -318,7 +312,7 @@ private fun LinkedProviderItem(provider: LinkedProviderRow) {
                 )
             else -> provider.email ?: lastSignIn
         }
-    ListItem(
+    SettingsRow(
         leadingContent = { Icon(Icons.Outlined.AccountCircle, contentDescription = null) },
         headlineContent = {
             Text(

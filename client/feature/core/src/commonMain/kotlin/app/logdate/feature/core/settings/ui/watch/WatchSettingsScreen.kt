@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.ui.watch
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,10 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +29,7 @@ import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPage
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionPreferencesViewModel
 import app.logdate.feature.core.settings.ui.watch.v2.WatchCompanionSections
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -219,7 +217,7 @@ private fun WatchConnectedSections(onNavigateToNotifications: () -> Unit) {
         title = stringResource(Res.string.watch_notifications),
         modifier = Modifier.padding(horizontal = Spacing.lg),
     ) {
-        SettingsNavItem(
+        SettingsNavigationItem(
             title = stringResource(Res.string.watch_notifications_title),
             description = stringResource(Res.string.watch_notifications_description),
             onClick = onNavigateToNotifications,
@@ -233,36 +231,12 @@ private fun WatchTroubleshootingSection(onNavigateToTroubleshooting: () -> Unit)
         title = stringResource(Res.string.watch_help),
         modifier = Modifier.padding(horizontal = Spacing.lg),
     ) {
-        SettingsNavItem(
+        SettingsNavigationItem(
             title = stringResource(Res.string.watch_troubleshooting),
             description = stringResource(Res.string.watch_troubleshooting_description),
             onClick = onNavigateToTroubleshooting,
         )
     }
-}
-
-@Composable
-private fun SettingsNavItem(
-    title: String,
-    description: String,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = {
-            Text(
-                text = description,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = null,
-            )
-        },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
 }
 
 @Composable

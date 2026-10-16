@@ -19,7 +19,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -36,14 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.core.settings.ui.CheckedServer
 import app.logdate.feature.core.settings.ui.ServerProblem
 import app.logdate.shared.config.DefaultLogDateConfigRepository
-import app.logdate.shared.model.DeploymentKind
-import app.logdate.shared.model.ServerDescriptor
-import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsRow
+import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.step.StepBusyButton
 import app.logdate.ui.step.StepHeroIcon
 import app.logdate.ui.step.StepScaffold
@@ -240,7 +237,7 @@ private fun ReviewStep(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            ReviewSection(stringResource(Res.string.move_review_what_moves)) {
+            SettingsSection(stringResource(Res.string.move_review_what_moves)) {
                 Fact(
                     stringResource(
                         Res.string.sign_in_methods_detail_pair,
@@ -255,7 +252,7 @@ private fun ReviewStep(
                     Fact(pluralStringResource(Res.plurals.move_review_drafts, state.survey.drafts, state.survey.drafts))
                 }
             }
-            ReviewSection(stringResource(Res.string.move_review_what_changes)) {
+            SettingsSection(stringResource(Res.string.move_review_what_changes)) {
                 Fact(stringResource(Res.string.move_review_passkey, destination))
                 Fact(stringResource(Res.string.move_review_recovery_phrase))
                 Fact(stringResource(Res.string.move_review_source_copy, state.source.name))
@@ -439,19 +436,8 @@ private fun FinishedStep(
 }
 
 @Composable
-private fun ReviewSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Text(title, style = MaterialTheme.typography.titleSmall)
-        MaterialContainer { content() }
-    }
-}
-
-@Composable
 private fun Fact(text: String) {
-    ListItem(headlineContent = { Text(text, style = MaterialTheme.typography.bodyMedium) })
+    SettingsRow(headlineContent = { Text(text) })
 }
 
 @Composable
@@ -484,38 +470,3 @@ private fun accountProblemMessage(
     }
 
 private fun CheckedServer.name(): String = MoveEndpoint(origin, descriptor).name
-
-@Preview
-@Composable
-private fun MoveServerReviewPreview() {
-    val cloud = MoveEndpoint("https://cloud.logdate.app", null)
-    MoveServerContent(
-        state =
-            MoveServerUiState.Review(
-                source = cloud,
-                destination =
-                    CheckedServer(
-                        origin = "https://journal.example.com",
-                        descriptor =
-                            ServerDescriptor(
-                                serverOrigin = "https://journal.example.com",
-                                apiBaseUrl = "https://journal.example.com/api/v1",
-                                deploymentKind = DeploymentKind.SELF_HOSTED,
-                                displayName = "Alex's journal server",
-                            ),
-                        version = "1.4.0",
-                    ),
-                survey = MoveSurvey(entries = 312, journals = 4, media = 48, drafts = 3, remoteOnlyMedia = 0),
-            ),
-        onClose = {},
-        onAddressChange = {},
-        onCheckServer = {},
-        onBack = {},
-        onContinueToAccount = {},
-        onCreateAccount = {},
-        onSignInInstead = {},
-        onDeleteSource = {},
-        onSignInToSourceAndDelete = {},
-        onKeepSource = {},
-    )
-}

@@ -2,9 +2,11 @@
 
 package app.logdate.ui.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -12,10 +14,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -24,6 +26,11 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -68,33 +75,28 @@ fun SettingsSection(
 @Composable
 fun SimpleSettingsItem(
     title: String,
-    description: String,
+    description: String?,
     overline: String? = null,
-    onClick: (() -> Unit)? = {},
+    onClick: (() -> Unit)? = null,
     enabled: Boolean = LocalSettingsEnabled.current,
     leadingContent: (@Composable () -> Unit)? = null,
     action: @Composable () -> Unit,
 ) {
-    ListItem(
+    SettingsRow(
+        enabled = enabled,
         leadingContent = leadingContent,
         headlineContent = { Text(title) },
-        supportingContent = {
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        },
+        supportingContent = description?.let { { Text(it) } },
         overlineContent = overline?.let { { Text(it) } },
         trailingContent = action,
         modifier =
             Modifier
                 .fillMaxWidth()
-                .disabledAlpha(enabled)
                 .then(
                     if (onClick == null) {
                         Modifier
                     } else {
-                        Modifier.clickable(enabled = enabled, onClick = onClick)
+                        Modifier.clickable(enabled = enabled, role = Role.Button, onClick = onClick)
                     },
                 ),
     )
@@ -111,25 +113,21 @@ fun SimpleSettingsItem(
 @Composable
 fun ToggleSettingsItem(
     title: String,
-    description: String,
+    description: String?,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     overline: String? = null,
     enabled: Boolean = LocalSettingsEnabled.current,
+    leadingContent: (@Composable () -> Unit)? = null,
 ) {
-    SimpleSettingsItem(
-        title = title,
-        description = description,
-        overline = overline,
-        onClick = { onCheckedChange(!checked) },
+    SettingsRow(
+        headlineContent = { Text(title) },
+        supportingContent = description?.let { { Text(it) } },
+        leadingContent = leadingContent,
+        overlineContent = overline?.let { { Text(it) } },
         enabled = enabled,
-        action = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = enabled,
-            )
-        },
+        modifier = Modifier.toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
+        trailingContent = { Switch(checked = checked, onCheckedChange = null, enabled = enabled) },
     )
 }
 
@@ -151,45 +149,32 @@ fun LinkedToggleSettingsItem(
     enabled: Boolean = LocalSettingsEnabled.current,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).disabledAlpha(enabled),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .background(MaterialTheme.colorScheme.surface)
+                .disabledAlpha(enabled),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .clickable(enabled = enabled, onClick = onNavigate)
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            if (overline != null) {
-                Text(
-                    text = overline,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        SettingsRow(
+            headlineContent = { Text(title) },
+            supportingContent = { Text(description) },
+            overlineContent = overline?.let { { Text(it) } },
+            modifier = Modifier.weight(1f).clickable(enabled = enabled, role = Role.Button, onClick = onNavigate),
+            enabled = true,
+        )
         VerticalDivider(modifier = Modifier.fillMaxHeight().padding(vertical = Spacing.sm))
         Box(
             modifier =
                 Modifier
-                    .clickable(enabled = enabled) { onCheckedChange(!checked) }
+                    .semantics { contentDescription = title }
+                    .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
                     .padding(horizontal = Spacing.lg)
                     .fillMaxHeight(),
             contentAlignment = Alignment.Center,
         ) {
-            Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+            Switch(checked = checked, onCheckedChange = null, enabled = enabled)
         }
     }
 }
@@ -222,28 +207,40 @@ fun MasterFeatureToggle(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.disabledAlpha(enabled),
+        modifier =
+            modifier
+                .disabledAlpha(enabled)
+                .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        BoxWithConstraints(
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = enabled,
-            )
+            val stacked = maxWidth < 256.dp * LocalDensity.current.fontScale
+            val control: @Composable () -> Unit = {
+                Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+            }
+            if (stacked) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(label, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge)
+                    Box(Modifier.align(Alignment.End)) { control() }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.weight(1f).padding(end = Spacing.lg),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    control()
+                }
+            }
         }
     }
 }
@@ -257,19 +254,21 @@ fun MasterFeatureToggle(
 fun SettingsNavigationItem(
     title: String,
     description: String,
-    icon: @Composable () -> Unit,
+    icon: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
     enabled: Boolean = LocalSettingsEnabled.current,
     onClickLabel: String? = null,
+    destructive: Boolean = false,
 ) {
-    ListItem(
-        headlineContent = { Text(text = title) },
-        supportingContent = {
+    SettingsRow(
+        enabled = enabled,
+        headlineContent = {
             Text(
-                text = description,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = title,
+                color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
             )
         },
+        supportingContent = { Text(description) },
         leadingContent = icon,
         trailingContent = {
             Icon(
@@ -279,7 +278,6 @@ fun SettingsNavigationItem(
         },
         modifier =
             Modifier
-                .disabledAlpha(enabled)
-                .clickable(enabled = enabled, onClickLabel = onClickLabel, onClick = onClick),
+                .clickable(enabled = enabled, role = Role.Button, onClickLabel = onClickLabel, onClick = onClick),
     )
 }

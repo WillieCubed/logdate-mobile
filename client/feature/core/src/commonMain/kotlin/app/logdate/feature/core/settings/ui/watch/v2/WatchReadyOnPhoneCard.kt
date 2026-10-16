@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -22,6 +21,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import app.logdate.feature.core.settings.ui.watch.WatchPeerSnapshotSource
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsRow
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,7 +44,7 @@ fun WatchReadyOnPhoneCard(onClick: () -> Unit) {
     val watchName by model.watchName.collectAsState()
     watchName?.let { name ->
         MaterialContainer {
-            ListItem(
+            SettingsRow(
                 headlineContent = { Text(stringResource(Res.string.watch_v2_ready_card, name)) },
                 supportingContent = { Text(stringResource(Res.string.watch_v2_ready_card_description)) },
                 leadingContent = { Icon(Icons.Default.Watch, null) },

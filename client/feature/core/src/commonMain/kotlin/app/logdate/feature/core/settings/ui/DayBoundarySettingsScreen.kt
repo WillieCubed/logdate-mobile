@@ -12,16 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,15 +36,10 @@ import app.logdate.client.permissions.rememberHealthConnectPermissionState
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MasterFeatureToggle
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
-import app.logdate.util.asTime
 import io.github.aakira.napier.Napier
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
-import kotlinx.datetime.todayIn
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.day_schedule
 import logdate.client.feature.core.generated.resources.day_schedule_detail_description
@@ -74,13 +65,9 @@ import logdate.client.feature.core.generated.resources.day_schedule_health_setup
 import logdate.client.feature.core.generated.resources.day_schedule_health_setup_required_detail
 import logdate.client.feature.core.generated.resources.day_schedule_health_turn_off
 import logdate.client.feature.core.generated.resources.use_sleep_schedule
-import logdate.client.ui.generated.resources.common_cancel
-import logdate.client.ui.generated.resources.common_confirm
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.time.Clock
-import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun DayBoundarySettingsScreen(
@@ -224,14 +211,14 @@ fun DayBoundarySettingsContent(
                                 Res.string.day_schedule_disabled_explanation
                             },
                         ),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
                 Spacer(modifier = Modifier.height(Spacing.sm))
 
                 MaterialContainer {
-                    ListItem(
+                    SettingsRow(
                         headlineContent = {
                             Text(stringResource(Res.string.day_schedule_fallback_time))
                         },
@@ -301,14 +288,14 @@ fun DayBoundarySettingsContent(
                                         Res.string.day_schedule_disabled_explanation
                                     },
                                 ),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
 
                         Spacer(modifier = Modifier.height(Spacing.sm))
 
                         MaterialContainer {
-                            ListItem(
+                            SettingsRow(
                                 headlineContent = {
                                     Text(stringResource(Res.string.day_schedule_fallback_time))
                                 },
@@ -463,40 +450,3 @@ private fun resolveDayBoundaryPrimaryActionLabel(gateState: HealthConnectGateSta
         HealthConnectGateKind.READY,
         -> null
     }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimePickerDialog(
-    initialHour: Int,
-    onConfirm: (Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val state =
-        rememberTimePickerState(
-            initialHour = initialHour,
-            initialMinute = 0,
-        )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour) }) {
-                Text(stringResource(UiRes.string.common_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(UiRes.string.common_cancel))
-            }
-        },
-        text = {
-            TimePicker(state = state)
-        },
-    )
-}
-
-private fun formatHour(hour: Int): String {
-    val tz = TimeZone.currentSystemDefault()
-    val today = Clock.System.todayIn(tz)
-    return LocalDateTime(today, LocalTime(hour, 0)).toInstant(tz).asTime
-}

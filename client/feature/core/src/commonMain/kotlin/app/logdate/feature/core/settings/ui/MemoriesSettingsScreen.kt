@@ -11,7 +11,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -23,8 +22,8 @@ import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.LinkedToggleSettingsItem
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsChoiceItem
 import app.logdate.ui.common.SettingsScaffold
-import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -247,27 +246,18 @@ private fun MemoriesWidgetSection(
         )
 
         MaterialContainer {
-            SimpleSettingsItem(
+            SettingsChoiceItem(
                 title = stringResource(Res.string.recall_mode_on_this_day),
                 description = stringResource(Res.string.recall_mode_on_this_day_description),
+                selected = recallMode == RecallMode.ON_THIS_DAY,
                 onClick = { onSetRecallMode(RecallMode.ON_THIS_DAY) },
-            ) {
-                RadioButton(
-                    selected = recallMode == RecallMode.ON_THIS_DAY,
-                    onClick = { onSetRecallMode(RecallMode.ON_THIS_DAY) },
-                )
-            }
-
-            SimpleSettingsItem(
+            )
+            SettingsChoiceItem(
                 title = stringResource(Res.string.recall_mode_rediscover),
                 description = stringResource(Res.string.recall_mode_rediscover_description),
+                selected = recallMode == RecallMode.REDISCOVER,
                 onClick = { onSetRecallMode(RecallMode.REDISCOVER) },
-            ) {
-                RadioButton(
-                    selected = recallMode == RecallMode.REDISCOVER,
-                    onClick = { onSetRecallMode(RecallMode.REDISCOVER) },
-                )
-            }
+            )
         }
 
         // Unsupported launchers get no CTA here because a dead-end button is worse

@@ -20,7 +20,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +36,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -124,7 +124,7 @@ fun DeleteAccountContent(
                     Consequence(Icons.Outlined.WarningAmber, stringResource(Res.string.delete_account_what_permanent))
                 }
                 MaterialContainer {
-                    ListItem(
+                    SettingsRow(
                         leadingContent = { Checkbox(checked = state.eraseThisDevice, onCheckedChange = null) },
                         headlineContent = { Text(stringResource(Res.string.delete_account_erase_device)) },
                         supportingContent = { Text(stringResource(Res.string.delete_account_erase_device_description)) },
@@ -203,9 +203,9 @@ private fun Consequence(
     icon: ImageVector,
     text: String,
 ) {
-    ListItem(
+    SettingsRow(
         leadingContent = { Icon(icon, contentDescription = null) },
-        headlineContent = { Text(text, style = MaterialTheme.typography.bodyMedium) },
+        headlineContent = { Text(text) },
     )
 }
 

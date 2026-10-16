@@ -7,7 +7,8 @@ import androidx.compose.runtime.Composable
 object SharedScreenshotCatalog {
     val onboardingMainScenes: List<SharedScreenshotSceneSpec> = catalogOnboardingMainScenes
     val onboardingExtendedScenes: List<SharedScreenshotSceneSpec> = catalogOnboardingExtendedScenes
-    val settingsScenes: List<SharedScreenshotSceneSpec> = personalSettingsScenes + systemSettingsScenes + nativeBackupScenes
+    val settingsScenes: List<SharedScreenshotSceneSpec> =
+        personalSettingsScenes + systemSettingsScenes + nativeBackupScenes + settingsRowScenes
     val searchScenes: List<SharedScreenshotSceneSpec> = catalogSearchScenes
     val desktopOnlyScenes: List<SharedScreenshotSceneSpec> = catalogDesktopOnlyScenes
     val allScenes: List<SharedScreenshotSceneSpec> =

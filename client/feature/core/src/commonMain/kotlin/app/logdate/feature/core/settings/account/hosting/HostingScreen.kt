@@ -11,7 +11,6 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +25,7 @@ import app.logdate.feature.core.settings.account.ConnectedServerInfo
 import app.logdate.feature.core.settings.account.ServerHealth
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsNavigationItem
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -81,7 +81,7 @@ fun HostingContent(
                 title = server.displayName ?: server.host,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                ListItem(
+                SettingsRow(
                     leadingContent = { Icon(Icons.Outlined.Language, contentDescription = null) },
                     overlineContent = { Text(stringResource(Res.string.hosting_address)) },
                     headlineContent = { Text(server.host) },
@@ -109,7 +109,7 @@ private fun StatusItem(
     health: ServerHealth?,
     onCheckAgain: () -> Unit,
 ) {
-    ListItem(
+    SettingsRow(
         leadingContent = {
             when (health) {
                 null -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)

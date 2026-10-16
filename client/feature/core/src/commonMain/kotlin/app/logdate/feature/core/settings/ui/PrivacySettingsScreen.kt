@@ -2,15 +2,11 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -135,27 +132,12 @@ fun PrivacySettingsContent(
                 title = stringResource(Res.string.location_privacy),
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                ListItem(
-                    headlineContent = { Text(stringResource(Res.string.location_settings)) },
-                    supportingContent = {
-                        Text(
-                            stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                    trailingContent = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                            contentDescription = stringResource(Res.string.navigate_to_location_settings),
-                        )
-                    },
-                    modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
+                SettingsNavigationItem(
+                    title = stringResource(Res.string.location_settings),
+                    description = stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
+                    icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                    onClick = onNavigateToLocationSettings,
+                    onClickLabel = stringResource(Res.string.navigate_to_location_settings),
                 )
             }
         }

@@ -18,6 +18,7 @@ import app.logdate.client.domain.today.TodaySummary
 import app.logdate.feature.core.settings.ui.watch.WatchRequestFailure
 import app.logdate.feature.core.settings.ui.watch.WatchRequestFailureMessage
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.theme.Spacing
@@ -121,7 +122,7 @@ private fun ComplicationProvider(
     title: org.jetbrains.compose.resources.StringResource,
     description: org.jetbrains.compose.resources.StringResource,
 ) {
-    androidx.compose.material3.ListItem(
+    SettingsRow(
         headlineContent = { Text(stringResource(title)) },
         supportingContent = { Text(stringResource(description)) },
         leadingContent = {
@@ -176,11 +177,11 @@ private fun WatchSurfaceGallery(
                 app.logdate.ui.watch.OnThisDayTilePresentation(
                     title = stringResource(Res.string.watch_v2_tiles_anniversary),
                     yearsAgo =
-                        memory?.takeIf { it.memory != null }?.let {
+                        memory.takeIf { it.memory != null }?.let {
                             org.jetbrains.compose.resources
                                 .pluralStringResource(Res.plurals.watch_v2_tile_years, it.yearsAgo, it.yearsAgo)
                         },
-                    summary = memory?.memory?.summary ?: stringResource(Res.string.watch_v2_tile_memory_empty),
+                    summary = memory.memory?.summary ?: stringResource(Res.string.watch_v2_tile_memory_empty),
                 ),
             )
         }

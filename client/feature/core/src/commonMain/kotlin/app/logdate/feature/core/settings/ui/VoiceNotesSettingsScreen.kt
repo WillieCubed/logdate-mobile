@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -168,30 +168,16 @@ private fun ModelRow(
     onDownload: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    MaterialContainer(modifier = modifier) {
-        Column(
-            modifier = Modifier.padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+    MaterialCard(title = title, modifier = modifier) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-
             ModelStatusLine(status = row.status)
-
             ModelProgress(status = row.status)
-
-            ModelAction(
-                status = row.status,
-                onDownload = onDownload,
-            )
+            ModelAction(status = row.status, onDownload = onDownload)
         }
     }
 }

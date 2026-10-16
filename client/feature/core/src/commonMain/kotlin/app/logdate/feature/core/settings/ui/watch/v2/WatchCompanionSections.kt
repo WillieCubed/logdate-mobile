@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import app.logdate.client.domain.watch.SharedPreferenceKey
+import app.logdate.ui.common.SettingsChoiceItem
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.common.ToggleSettingsItem
@@ -122,15 +122,14 @@ private fun WatchLibraryDaysItem(
             text = {
                 Column {
                     SharedPreferenceKey.WINDOW_DAY_CHOICES.sorted().forEach { choice ->
-                        SimpleSettingsItem(
+                        SettingsChoiceItem(
                             title = stringResource(Res.string.watch_library_days_value, choice),
-                            description = "",
+                            selected = choice == days,
                             onClick = {
                                 choosing = false
                                 onDays(choice)
                             },
                             enabled = enabled,
-                            action = { RadioButton(selected = choice == days, onClick = null) },
                         )
                     }
                 }

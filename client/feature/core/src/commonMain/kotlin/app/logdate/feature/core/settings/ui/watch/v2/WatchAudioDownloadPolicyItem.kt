@@ -7,7 +7,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -16,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import app.logdate.client.domain.watch.WatchAudioDownloadPolicy
+import app.logdate.ui.common.SettingsChoiceItem
 import app.logdate.ui.common.SimpleSettingsItem
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.watch_audio_charging_only
@@ -49,15 +49,14 @@ internal fun WatchAudioDownloadPolicyItem(
                 Column {
                     Text(stringResource(Res.string.watch_audio_policy_description))
                     WatchAudioDownloadPolicy.entries.forEach { choice ->
-                        SimpleSettingsItem(
+                        SettingsChoiceItem(
                             title = policyLabel(choice),
-                            description = "",
+                            selected = choice == policy,
                             onClick = {
                                 choosing = false
                                 onSelect(choice)
                             },
                             enabled = enabled,
-                            action = { RadioButton(selected = choice == policy, onClick = null) },
                         )
                     }
                 }

@@ -3,7 +3,6 @@
 package app.logdate.feature.events.ui.calendarsync
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -30,6 +26,8 @@ import app.logdate.client.calendar.DeviceCalendar
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.events.generated.resources.Res
 import logdate.client.feature.events.generated.resources.calendar_sync_calendars_default_label
@@ -214,26 +212,9 @@ private fun AccountSection(
     selectedIds: Set<String>,
     onToggle: (String) -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            text = accountName,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(vertical = Spacing.sm),
-        )
-        MaterialContainer {
-            calendars.forEach { calendar ->
-                CalendarRow(
-                    calendar = calendar,
-                    selected = calendar.id in selectedIds,
-                    onToggle = onToggle,
-                )
-            }
+    SettingsSection(title = accountName, modifier = Modifier.padding(horizontal = Spacing.lg)) {
+        calendars.forEach { calendar ->
+            CalendarRow(calendar = calendar, selected = calendar.id in selectedIds, onToggle = onToggle)
         }
     }
 }
@@ -244,32 +225,12 @@ private fun CalendarRow(
     selected: Boolean,
     onToggle: (String) -> Unit,
 ) {
-    ListItem(
-        headlineContent = { Text(calendar.displayName) },
-        supportingContent =
-            if (calendar.isPrimary) {
-                {
-                    Text(
-                        text = stringResource(Res.string.calendar_sync_calendars_default_label),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                null
-            },
+    ToggleSettingsItem(
+        title = calendar.displayName,
+        description = if (calendar.isPrimary) stringResource(Res.string.calendar_sync_calendars_default_label) else null,
+        checked = selected,
+        onCheckedChange = { onToggle(calendar.id) },
         leadingContent = { CalendarColorBadge(color = calendar.color) },
-        trailingContent = {
-            Switch(
-                checked = selected,
-                onCheckedChange = { onToggle(calendar.id) },
-            )
-        },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable { onToggle(calendar.id) },
     )
 }
 

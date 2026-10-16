@@ -11,7 +11,9 @@ new presentation. These are production examples of navigation and passive status
 | Settings destination | `SettingsScaffold` | Owns page title, back action, scrolling and insets |
 | Related rows | `SettingsSection` | Owns heading, container shape and spacing between rows |
 | Opens another screen | `SettingsNavigationItem` | Whole row is clickable; supplies the trailing chevron |
+| Specialized compound row | `SettingsRow` | Shared layout and text roles; use only when an ordinary wrapper cannot express independent actions |
 | Status or an inline action | `SimpleSettingsItem` | Use `onClick = null` for passive information; supply an action only when useful |
+| One of several choices | `SettingsChoiceItem` | Whole row selects one value and owns radio-button semantics |
 | Boolean preference | `ToggleSettingsItem` | Represents a preference the app can actually change |
 | Linked preference | `LinkedToggleSettingsItem` | Uses the established linked-toggle behavior |
 | Feature-wide enablement | `MasterFeatureToggle` | Enables or disables a real feature, not a status indicator |
@@ -21,6 +23,45 @@ Android cloud backup and device transfer are platform-managed capabilities. Thei
 coverage rows are passive information, not in-app switches or navigation targets.
 Keep LogDate Cloud account actions in the shared `SyncPromotionCard` and signed-in
 status in `BackupStatusItem` rather than recreating those cards in each page.
+
+## One base for each function
+
+`SettingsRow` is the only settings implementation allowed to call Material 3
+`ListItem`. `SimpleSettingsItem`, `SettingsNavigationItem`, `ToggleSettingsItem`,
+`SettingsChoiceItem` and the navigation portion of `LinkedToggleSettingsItem` all delegate to it.
+Every title uses `bodyLarge`; every supporting description uses `bodyMedium`;
+overlines use `labelSmall`. Do not override supporting text styles in a feature.
+A passive description, navigation description and toggle description have the
+same role even when they appear on different pages.
+
+Use `SettingsNavigationItem` for navigation, including destinations without an
+icon. Do not recreate its chevron or clickable modifier. `ToggleSettingsItem`
+owns one switch semantics node for the entire row; its visual switch delegates
+to that action. `LinkedToggleSettingsItem` intentionally keeps navigation and
+preference changes as separate targets. The master feature control stacks its
+switch below the label when its local width is too narrow for the user's text
+scale, giving long words the full label width without shrinking type. It retains
+one toggle action in either layout. A passive `SimpleSettingsItem` has no
+click action unless a real callback is supplied.
+
+Use the slot-based `SettingsRow` for compound controls such as passkey removal,
+checkbox confirmation or a time-picker button, keeping each action's enabled
+state explicit. Editors, segmented choice forms, diagnostic log previews,
+calendar event lists, journal insights and destructive confirmation dialogs keep
+their specialized content: they are not interchangeable preference rows.
+
+```kotlin
+SettingsNavigationItem(title = title, description = description, onClick = openDetails)
+ToggleSettingsItem(title = title, description = description, checked = enabled,
+    onCheckedChange = setEnabled)
+SimpleSettingsItem(title = title, description = description, action = {})
+```
+
+The contract rejects raw `ListItem`, `Switch` and `RadioButton` calls in settings
+packages and sources using settings scaffolds or sections, including aliased
+imports. It also rejects local supporting text styles in `SettingsRow`. Its grouping rules
+also recognize `SettingsRow`. Extend its tests when introducing a new component
+rather than bypassing the shared base.
 
 ## Emit rows directly
 
@@ -48,8 +89,8 @@ SettingsSection(title = stringResource(Res.string.data_management)) {
 ```
 
 Remove the wrapper to repair grouping. Do not compensate with dividers, nested
-containers, per-row backgrounds or a new section API. A form with radio buttons,
-explanatory text or controls may still need its own layout inside a section.
+containers, per-row backgrounds or a new section API. A form with segmented choices, explanatory text or controls may still need its
+own layout inside a section. Radio preferences use `SettingsChoiceItem`.
 
 `checkSettingsUiContract` parses Kotlin and rejects layout wrappers around multiple
 known settings rows. It runs with the core module's `check` and `ktlintCheck` tasks.
@@ -72,6 +113,13 @@ or what happens next without exposing internal exceptions or offering choices th
 app can resolve automatically.
 
 ## Examples and visual verification
+
+`SettingsRowScreenshotScenes.kt` is a runnable shared example containing passive,
+navigation, toggle, linked-toggle and disabled rows with matching descriptions.
+Render the `settings-components` scene to compare their typography together.
+`SettingsRowsTest.kt` verifies the supporting text role, passive semantics,
+disabled preferences and independent linked actions. `SettingsMasterLayoutTest`
+checks long-word wrapping and the single toggle target at 200% text.
 
 `NativeBackupScreenshotScenes.kt` supplies the same signed-out, signed-in and
 quota-limited states to Android previews and desktop screenshot tests. It explicitly

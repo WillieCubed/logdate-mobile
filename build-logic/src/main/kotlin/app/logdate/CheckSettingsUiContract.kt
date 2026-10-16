@@ -38,9 +38,12 @@ interface SettingsUiContractParameters : WorkParameters {
 
 abstract class SettingsUiContractWork : WorkAction<SettingsUiContractParameters> {
     override fun execute() {
-        val failures = parameters.sources.files.filter { "SettingsSection" in it.readText() }.flatMap { file ->
+        val failures = parameters.sources.files.filter { file ->
+            val source = file.readText()
+            listOf("Settings", "ListItem", "Switch", "RadioButton").any { it in source }
+        }.flatMap { file ->
             SettingsUiContract.inspect(file.readText()).map { line ->
-                "${file.path}:$line: Emit settings rows directly inside SettingsSection; see docs/reference/standards/settings-ui.md"
+                "${file.path}:$line: Use shared settings rows, supporting typography and direct section children; see docs/reference/standards/settings-ui.md"
             }
         }
         if (failures.isNotEmpty()) throw GradleException(failures.joinToString("\n"))

@@ -47,6 +47,7 @@ enum class SharedScreenshotSceneId(
     CloudAccountSignIn("cloud-account-sign-in"),
     PasskeyAccountCreationFinal("passkey-account-creation-final"),
     SettingsOverview("settings-overview"),
+    SettingsRows("settings-components"),
     AccountSettings("account-settings"),
     PrivacySettings("privacy-settings"),
     SignInMethods("sign-in-methods"),

@@ -249,6 +249,9 @@ bounds. Preserve each destination's established browsing and playback interactio
 Before changing settings UI, read [Settings UI composition](docs/reference/standards/settings-ui.md)
 and compare the main Settings page's existing composition. Emit individual rows directly inside
 `SettingsSection`; a `Column` around multiple rows suppresses the container's automatic gaps.
-Use the shared row/card components and theme tokens. Extend shared state fixtures and inspect
+Use functional wrappers (`SettingsNavigationItem`, `ToggleSettingsItem`, `SettingsChoiceItem`,
+`LinkedToggleSettingsItem`, `SimpleSettingsItem`) before their shared `SettingsRow` base.
+Only `SettingsRow` implements Material 3 `ListItem` for settings; supporting text inherits its
+`bodyMedium` role. Use theme tokens. Extend shared state fixtures and inspect
 matching renders, including visible platform-specific rows, before accepting screenshot references.
 Run `:client:feature:core:checkSettingsUiContract` for settings changes.

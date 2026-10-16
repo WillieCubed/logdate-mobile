@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Event
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeRangeShort
@@ -166,12 +166,11 @@ private fun ImportedEventRow(
     event: Event,
     onClick: () -> Unit,
 ) {
-    ListItem(
+    SettingsRow(
         headlineContent = { Text(event.title) },
         supportingContent = {
             Text(
                 text = event.startTime.toReadableDateTimeRangeShort(end = event.endTime, isAllDay = event.isAllDay),
-                style = MaterialTheme.typography.bodySmall,
             )
         },
         modifier =

@@ -10,11 +10,13 @@ import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtLambdaExpression
 import org.jetbrains.kotlin.psi.KtPsiFactory
 
-/** Detects grouping that turns several settings rows into one MaterialContainer child. */
+/** Enforces shared settings layout, typography and functional row controls. */
 object SettingsUiContract {
     private val layouts = setOf("Column", "Row", "MaterialContainer")
     private val rows =
         setOf(
+            "SettingsRow",
+            "SettingsChoiceItem",
             "SimpleSettingsItem",
             "SettingsNavigationItem",
             "ToggleSettingsItem",
@@ -41,7 +43,8 @@ object SettingsUiContract {
             fun name(call: KtCallExpression): String? =
                 call.calleeExpression?.text?.substringAfterLast('.')?.let { aliases[it] ?: it }
 
-            return PsiTreeUtil.findChildrenOfType(file, KtCallExpression::class.java)
+            val calls = PsiTreeUtil.findChildrenOfType(file, KtCallExpression::class.java)
+            val grouping = calls
                 .filter { name(it) == "SettingsSection" }
                 .flatMap { section ->
                     section.valueArguments.mapNotNull { it.getArgumentExpression() as? KtLambdaExpression }
@@ -54,6 +57,20 @@ object SettingsUiContract {
                         }
                         .map { wrapper -> source.take(wrapper.textOffset).count { it == '\n' } + 1 }
                 }
+            val settingsImplementation = file.packageFqName.asString().split('.').contains("settings") ||
+                calls.any { name(it) == "SettingsScaffold" || name(it) == "SettingsSection" }
+            val duplicatedRows = if (settingsImplementation) calls.filter { name(it) in setOf("ListItem", "Switch", "RadioButton") } else emptyList()
+            val typographyOverrides = calls.filter { name(it) == "SettingsRow" }.flatMap { row ->
+                row.valueArguments.filter { it.getArgumentName()?.asName?.asString() == "supportingContent" }
+                    .mapNotNull { it.getArgumentExpression() }
+                    .flatMap { PsiTreeUtil.findChildrenOfType(it, KtCallExpression::class.java) }
+                    .filter { call -> name(call) == "Text" && call.valueArguments.any {
+                        it.getArgumentName()?.asName?.asString() == "style"
+                    } }
+            }
+            return (grouping + (duplicatedRows + typographyOverrides).map { call ->
+                source.take(call.textOffset).count { it == '\n' } + 1
+            }).distinct().sorted()
         } finally {
             Disposer.dispose(disposable)
         }

@@ -19,7 +19,6 @@ import androidx.compose.material.icons.outlined.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -32,6 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.watch_app_not_installed
@@ -324,7 +324,7 @@ private fun WatchNameRow(
     supporting: String,
     accent: Color,
 ) {
-    ListItem(
+    SettingsRow(
         headlineContent = { Text(name) },
         supportingContent = {
             Text(

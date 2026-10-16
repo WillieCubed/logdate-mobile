@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,8 +27,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.common.ToggleSettingsItem
-import app.logdate.ui.common.disabledAlpha
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.diagnostics_clear
@@ -114,7 +112,6 @@ internal fun LocalDiagnosticsSettingsSection(
                 }
             Text(
                 stringResource(resource),
-                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = Spacing.sm),
             )
@@ -152,14 +149,13 @@ private fun DiagnosticsActionItem(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(description, style = MaterialTheme.typography.bodySmall) },
+    SimpleSettingsItem(
+        title = title,
+        description = description,
         leadingContent = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-        modifier =
-            Modifier
-                .disabledAlpha(enabled)
-                .clickable(enabled = enabled, onClick = onClick),
+        onClick = onClick,
+        enabled = enabled,
+        action = {},
     )
 }
 

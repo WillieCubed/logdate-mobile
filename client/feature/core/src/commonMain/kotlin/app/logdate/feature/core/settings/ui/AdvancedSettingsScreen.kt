@@ -9,7 +9,6 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,6 +23,7 @@ import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsNavigationItem
+import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -83,7 +83,7 @@ fun AdvancedSettingsContent(
     SettingsScaffold(title = stringResource(Res.string.about_logdate), onBack = onBack) {
         item {
             MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-                ListItem(
+                SettingsRow(
                     headlineContent = { Text(installedVersionLabel(appUpdateUiState)) },
                     modifier = Modifier.clickable { versionTaps = (versionTaps + 1).coerceAtMost(7) },
                 )

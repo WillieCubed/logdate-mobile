@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,11 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.SegmentedButton
@@ -34,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -56,7 +54,6 @@ import logdate.client.feature.core.generated.resources.location_tracking_options
 import logdate.client.feature.core.generated.resources.location_tracking_options_description
 import logdate.client.feature.core.generated.resources.location_update_interval
 import logdate.client.feature.core.generated.resources.location_update_interval_description
-import logdate.client.feature.core.generated.resources.navigate_to_title
 import logdate.client.feature.core.generated.resources.view_location_timeline
 import logdate.client.feature.core.generated.resources.view_timeline
 import org.jetbrains.compose.resources.stringResource
@@ -126,7 +123,7 @@ fun LocationSettingsContent(
                         onCheckedChange = onToggleBackgroundTracking,
                     )
 
-                    LocationSettingsNavItem(
+                    SettingsNavigationItem(
                         title = stringResource(Res.string.location_tracking_options),
                         description = stringResource(Res.string.location_tracking_options_description),
                         onClick = onNavigateToTrackingOptions,
@@ -156,7 +153,7 @@ fun LocationSettingsContent(
                         title = "",
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     ) {
-                        LocationSettingsNavItem(
+                        SettingsNavigationItem(
                             title = stringResource(Res.string.location_update_interval),
                             description = stringResource(Res.string.location_update_interval_description),
                             onClick = onNavigateToInterval,
@@ -231,7 +228,7 @@ fun LocationSettingsContent(
                             onCheckedChange = onToggleBackgroundTracking,
                         )
 
-                        LocationSettingsNavItem(
+                        SettingsNavigationItem(
                             title = stringResource(Res.string.location_tracking_options),
                             description = stringResource(Res.string.location_tracking_options_description),
                             onClick = onNavigateToTrackingOptions,
@@ -254,7 +251,7 @@ fun LocationSettingsContent(
                                 title = "",
                                 modifier = Modifier.padding(horizontal = Spacing.lg),
                             ) {
-                                LocationSettingsNavItem(
+                                SettingsNavigationItem(
                                     title = stringResource(Res.string.location_update_interval),
                                     description = stringResource(Res.string.location_update_interval_description),
                                     onClick = onNavigateToInterval,
@@ -365,34 +362,6 @@ private fun CaptureModeSelector(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-}
-
-@Composable
-private fun LocationSettingsNavItem(
-    title: String,
-    description: String,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = {
-            Text(
-                text = description,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        trailingContent = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription =
-                    stringResource(
-                        Res.string.navigate_to_title,
-                        title,
-                    ),
-            )
-        },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
 }
 
 @Composable

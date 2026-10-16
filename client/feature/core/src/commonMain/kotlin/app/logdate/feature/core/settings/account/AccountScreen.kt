@@ -27,7 +27,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
@@ -52,6 +51,7 @@ import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_delete_row_description
@@ -343,20 +343,22 @@ private fun HostingAndSessionSections(
     }
 
     MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
-        ListItem(
+        SimpleSettingsItem(
+            title = stringResource(Res.string.account_sign_out_action),
+            description = stringResource(Res.string.account_sign_out_row_description),
             leadingContent = { Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null) },
-            headlineContent = { Text(stringResource(Res.string.account_sign_out_action)) },
-            supportingContent = { Text(stringResource(Res.string.account_sign_out_row_description)) },
-            trailingContent = {
+            onClick = onSignOut,
+            enabled = !state.isSigningOut,
+            action = {
                 if (state.isSigningOut) CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             },
-            modifier = Modifier.clickable(enabled = !state.isSigningOut, onClick = onSignOut),
         )
-        ListItem(
-            leadingContent = { Icon(Icons.Outlined.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            headlineContent = { Text(stringResource(Res.string.account_delete_title), color = MaterialTheme.colorScheme.error) },
-            supportingContent = { Text(stringResource(Res.string.account_delete_row_description, state.server.displayName())) },
-            modifier = Modifier.clickable(onClick = destinations.onDeleteAccount),
+        SettingsNavigationItem(
+            title = stringResource(Res.string.account_delete_title),
+            description = stringResource(Res.string.account_delete_row_description, state.server.displayName()),
+            icon = { Icon(Icons.Outlined.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            onClick = destinations.onDeleteAccount,
+            destructive = true,
         )
     }
 }
@@ -372,12 +374,21 @@ private fun EmailItem(
             email.isVerified -> stringResource(Res.string.account_email_verified, email.address)
             else -> stringResource(Res.string.account_email_not_verified, email.address)
         }
-    ListItem(
-        leadingContent = { Icon(Icons.Outlined.MailOutline, contentDescription = null) },
-        headlineContent = { Text(stringResource(Res.string.account_email_title)) },
-        supportingContent = { Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-        modifier = if (email.canVerify) Modifier.clickable(onClick = onOpenEmailVerification) else Modifier,
-    )
+    if (email.canVerify) {
+        SettingsNavigationItem(
+            title = stringResource(Res.string.account_email_title),
+            description = description,
+            icon = { Icon(Icons.Outlined.MailOutline, contentDescription = null) },
+            onClick = onOpenEmailVerification,
+        )
+    } else {
+        SimpleSettingsItem(
+            title = stringResource(Res.string.account_email_title),
+            description = description,
+            leadingContent = { Icon(Icons.Outlined.MailOutline, contentDescription = null) },
+            action = {},
+        )
+    }
 }
 
 @Composable

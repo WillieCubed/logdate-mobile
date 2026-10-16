@@ -3,10 +3,10 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.material3.Button
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import app.logdate.ui.common.SettingsRow
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.export
 import logdate.client.feature.core.generated.resources.`import`
@@ -18,12 +18,11 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun ExportDataItem(onShowExportOptions: () -> Unit) {
-    ListItem(
+    SettingsRow(
         headlineContent = { Text(stringResource(Res.string.settings_export_entries_label)) },
         supportingContent = {
             Text(
                 text = stringResource(Res.string.settings_export_entries_description),
-                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
@@ -37,12 +36,11 @@ internal fun ExportDataItem(onShowExportOptions: () -> Unit) {
 
 @Composable
 internal fun ImportBackupItem(onShowRestoreSheet: () -> Unit) {
-    ListItem(
+    SettingsRow(
         headlineContent = { Text(stringResource(Res.string.import_backup)) },
         supportingContent = {
             Text(
                 text = stringResource(Res.string.restore_entries_from_a_logdate_export_archive),
-                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },

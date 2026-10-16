@@ -31,7 +31,7 @@ class SettingsUiContractTest {
     fun `forms and text mentioning components are allowed`() {
         val source = """
             fun Example() {
-                SettingsSection { Column { Text("SimpleSettingsItem()"); RadioButton() } }
+                SettingsSection { Column { Text("SimpleSettingsItem()"); Slider() } }
                 // SettingsSection { Column { SimpleSettingsItem(); SimpleSettingsItem() } }
             }
         """.trimIndent()
@@ -48,5 +48,48 @@ class SettingsUiContractTest {
     fun `one row inside a form is allowed`() {
         val source = "fun Example() { SettingsSection { Column { SimpleSettingsItem(); Text() } } }"
         assertTrue(SettingsUiContract.inspect(source).isEmpty())
+    }
+
+    @Test
+    fun `settings implementations cannot bypass the shared row base`() {
+        val source = """
+            package app.logdate.feature.core.settings.ui
+            import androidx.compose.material3.ListItem as RawRow
+            fun Example() { RawRow(headlineContent = { Text("Title") }) }
+        """.trimIndent()
+        assertEquals(listOf(3), SettingsUiContract.inspect(source))
+    }
+
+    @Test
+    fun `ordinary content lists outside settings remain allowed`() {
+        val source = "package app.logdate.feature.timeline; fun Entries() { ListItem() }"
+        assertTrue(SettingsUiContract.inspect(source).isEmpty())
+    }
+
+    @Test
+    fun `supporting typography cannot override the shared role`() {
+        val source = """
+            package app.logdate.feature.core.settings.ui
+            fun Example() { SettingsRow(supportingContent = { Text("Description", style = MaterialTheme.typography.bodySmall) }) }
+        """.trimIndent()
+        assertEquals(listOf(2), SettingsUiContract.inspect(source))
+    }
+
+    @Test
+    fun `settings scaffolds outside a settings package use shared rows`() {
+        val source = """
+            package app.logdate.feature.events.ui.calendarsync
+            fun Calendars() { SettingsScaffold { ListItem() } }
+        """.trimIndent()
+        assertEquals(listOf(2), SettingsUiContract.inspect(source))
+    }
+
+    @Test
+    fun `boolean and choice controls use the shared functional wrappers`() {
+        val source = """
+            package app.logdate.feature.core.settings.ui
+            fun Example() { Row { Text("Title"); Switch(); RadioButton() } }
+        """.trimIndent()
+        assertEquals(listOf(2), SettingsUiContract.inspect(source))
     }
 }
