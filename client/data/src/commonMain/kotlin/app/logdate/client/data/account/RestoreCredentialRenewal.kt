@@ -39,6 +39,13 @@ class RestoreCredentialRenewal(
         owner: String,
     ) = markerMutex.withLock { storage.putString(key(origin), "$owner\n${Uuid.random()}") }
 
+    internal suspend fun ensurePendingIfAbsent(
+        origin: String,
+        owner: String,
+    ) = markerMutex.withLock {
+        if (storage.getString(key(origin)) == null) storage.putString(key(origin), "$owner\n${Uuid.random()}")
+    }
+
     suspend fun isPending(
         origin: String,
         owner: String,

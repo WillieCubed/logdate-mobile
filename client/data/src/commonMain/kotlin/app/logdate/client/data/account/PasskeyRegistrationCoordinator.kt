@@ -17,6 +17,9 @@ import app.logdate.shared.model.CompleteAuthenticationRequest
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 
 /**
@@ -37,6 +40,8 @@ internal class PasskeyRegistrationCoordinator(
     private val credentialCodec: PasskeyCredentialCodec,
     private val sessionState: PasskeyAccountSessionState,
     private val createRestoreKey: suspend () -> Result<Unit>,
+    private val beforeSessionPersist: suspend (String, String) -> Unit = { _, _ -> },
+    private val onSessionPersisted: () -> Unit = {},
     private val updateTokensOrRegisterPlatformAccount: suspend (
         account: LogDateAccount,
         accessToken: String,
@@ -48,6 +53,7 @@ internal class PasskeyRegistrationCoordinator(
 ) {
     suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
         return try {
+            val origin = configRepository.getCurrentBackendUrl()
             bindingGuard.requireCanonicalOwnerBinding()
             // Step 1: Begin account creation
             val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
@@ -99,6 +105,7 @@ internal class PasskeyRegistrationCoordinator(
                 accessToken = completeData.tokens.accessToken,
                 refreshToken = completeData.tokens.refreshToken,
                 accountId = completeData.account.id.toString(),
+                origin = origin,
             )
 
             // Step 5: Add account to platform account manager
@@ -110,16 +117,15 @@ internal class PasskeyRegistrationCoordinator(
 
             sessionState.markAuthenticated(completeData.account)
 
-            // Attempt to create a restore key for seamless re-authentication after device restore.
-            // Logged at WARN on failure so operators see the broken-recovery path; non-fatal
-            // for account creation itself. UI surfaces should observe a future
-            // restoreKeyStatus signal and prompt the user to retry from settings.
+            // Android enrollment is durable and continues independently of this sign-up result.
             createRestoreKey().onFailure { error ->
                 Napier.w("Account created but restore key registration failed — user has no recovery path", error)
             }
 
             Napier.i("Account created successfully for user: ${completeData.account.username}")
             Result.success(completeData.account)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.w("Failed to create account with passkey", e)
             Result.failure(e)
@@ -132,6 +138,7 @@ internal class PasskeyRegistrationCoordinator(
     ): Result<LogDateAccount> {
         var unlockSecret: ByteArray? = null
         return try {
+            val origin = configRepository.getCurrentBackendUrl()
             bindingGuard.requireCanonicalOwnerBinding()
             val originalOwner = canonicalOwnerProvider.getCanonicalOwnerId()
             val apiBaseUrl = configRepository.apiBaseUrl.first()
@@ -186,6 +193,7 @@ internal class PasskeyRegistrationCoordinator(
                 accessToken = completeData.tokens.accessToken,
                 refreshToken = completeData.tokens.refreshToken,
                 accountId = completeData.account.id.toString(),
+                origin = origin,
             )
 
             // Step 6: Update tokens in platform account manager (or register it, if this
@@ -203,6 +211,8 @@ internal class PasskeyRegistrationCoordinator(
 
             Napier.i("Authentication successful for user: ${completeData.account.username}")
             Result.success(completeData.account)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.w("Failed to authenticate with passkey", e)
             Result.failure(e)
@@ -252,7 +262,12 @@ internal class PasskeyRegistrationCoordinator(
         accessToken: String,
         refreshToken: String,
         accountId: String,
+        origin: String,
     ) {
+        check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
+        beforeSessionPersist(origin, accountId)
+        currentCoroutineContext().ensureActive()
+        check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
         sessionStorage.saveSession(
             UserSession(
                 accessToken = accessToken,
@@ -260,5 +275,7 @@ internal class PasskeyRegistrationCoordinator(
                 accountId = accountId,
             ),
         )
+        onSessionPersisted()
+        currentCoroutineContext().ensureActive()
     }
 }

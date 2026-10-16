@@ -123,6 +123,12 @@ retries local-only creation specifically when cloud end-to-end encryption is una
 of onboarding preferences, and transient errors remain retryable. Account recovery does not
 automatically import an archive over an intact transferred database.
 
+Before explicit passkey or Google authentication publishes its session, enrollment is marked
+pending for the authentication request's original server and owner. An already signed-in Android
+installation without an enrollment record initializes one at startup. Temporary storage failures
+remain inside the retry loop; resolved startup records do not rotate keys on every launch. Accounts
+opened for a secondary server do not enroll over the connected installation's provider credential.
+
 After background sign-in, a durable, origin-bound marker keeps replacement restore-key registration
 pending until the provider and server confirm it. While signed in, transient failures retry with
 backoff from 30 seconds to 15 minutes; a process restart resumes from the marker. Sign-out or a

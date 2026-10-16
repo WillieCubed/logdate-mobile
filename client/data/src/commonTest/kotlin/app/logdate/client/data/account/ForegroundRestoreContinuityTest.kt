@@ -98,10 +98,10 @@ class ForegroundRestoreContinuityTest {
             }
             val repository = fixture.repository()
             runCurrent()
-            assertEquals(0, attempts)
+            assertEquals(1, attempts, "signed-in installations initialize missing enrollment")
             assertTrue(repository.signInWithRestoreKey().isSuccess)
             runCurrent()
-            assertEquals(1, attempts)
+            assertEquals(2, attempts, "an unchanged restored session still wakes its new obligation")
             assertFalse(fixture.renewal.isPending(fixture.origin, fixture.owner))
         }
 

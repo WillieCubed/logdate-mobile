@@ -118,9 +118,9 @@ interface PasskeyAccountRepository {
     suspend fun deleteAccount(): Result<Unit> = Result.failure(UnsupportedOperationException("Deleting accounts is not supported"))
 
     /**
-     * Create a restore key backed up to the device's encrypted cloud backup.
-     * Should be called after successful account creation.
-     * Non-fatal — returns success even if the device does not support E2EE backup.
+     * Enroll a restore key backed by native device backup. Android persists the enrollment
+     * request and completes it in the background, retrying temporary provider/server failures.
+     * Success means the request is accepted; journal access does not wait for enrollment.
      */
     suspend fun createRestoreKey(): Result<Unit>
 
@@ -133,7 +133,7 @@ interface PasskeyAccountRepository {
 
     /**
      * Delete the restore credential. Should be called on sign-out.
-     * Non-fatal — failures are silently ignored.
+     * Returns provider failures; sign-out remains durable.
      */
     suspend fun deleteRestoreKey(): Result<Unit>
 

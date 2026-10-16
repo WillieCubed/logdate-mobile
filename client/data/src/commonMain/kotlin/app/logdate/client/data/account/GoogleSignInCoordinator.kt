@@ -10,6 +10,9 @@ import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.LogDateAccount
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Creates and authenticates LogDate Cloud accounts using Google Sign-In, exchanging a Google ID
@@ -26,12 +29,15 @@ internal class GoogleSignInCoordinator(
     private val serverClientId: String,
     private val sessionState: PasskeyAccountSessionState,
     private val createRestoreKey: suspend () -> Result<Unit>,
+    private val beforeSessionPersist: suspend (String, String) -> Unit = { _, _ -> },
+    private val onSessionPersisted: () -> Unit = {},
 ) {
     suspend fun signUpWithGoogle(
         username: String?,
         displayName: String?,
     ): Result<LogDateAccount> {
         return try {
+            val origin = configRepository.getCurrentBackendUrl()
             bindingGuard.requireCanonicalOwnerBinding()
             val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
             val tokenResult = googleSignInManager.getGoogleIdToken(serverClientId)
@@ -54,7 +60,7 @@ internal class GoogleSignInCoordinator(
             if (data.account.id.toString() != canonicalOwnerId) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
-            persistAuthenticatedSession(data.account, data.tokens, isNewAccount = true)
+            persistAuthenticatedSession(data.account, data.tokens, isNewAccount = true, origin = origin)
 
             createRestoreKey().onFailure { error ->
                 Napier.w("Google account created but restore key registration failed — user has no recovery path", error)
@@ -62,6 +68,8 @@ internal class GoogleSignInCoordinator(
 
             Napier.i("Account created with Google for user: ${data.account.username}")
             Result.success(data.account)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.w("Failed to sign up with Google", e)
             Result.failure(e)
@@ -70,6 +78,7 @@ internal class GoogleSignInCoordinator(
 
     suspend fun signInWithGoogle(): Result<LogDateAccount> {
         return try {
+            val origin = configRepository.getCurrentBackendUrl()
             bindingGuard.requireCanonicalOwnerBinding()
             val tokenResult = googleSignInManager.getGoogleIdToken(serverClientId)
             if (tokenResult.isFailure) {
@@ -85,10 +94,12 @@ internal class GoogleSignInCoordinator(
             if (!bindingGuard.belongsToCanonicalOwner(data.account)) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
-            persistAuthenticatedSession(data.account, data.tokens, isNewAccount = false)
+            persistAuthenticatedSession(data.account, data.tokens, isNewAccount = false, origin = origin)
 
             Napier.i("Authentication with Google successful for user: ${data.account.username}")
             Result.success(data.account)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.w("Failed to sign in with Google", e)
             Result.failure(e)
@@ -104,7 +115,12 @@ internal class GoogleSignInCoordinator(
         account: LogDateAccount,
         tokens: AccountTokens,
         isNewAccount: Boolean,
+        origin: String,
     ) {
+        check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
+        beforeSessionPersist(origin, account.id.toString())
+        currentCoroutineContext().ensureActive()
+        check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
         sessionStorage.saveSession(
             UserSession(
                 accessToken = tokens.accessToken,
@@ -113,6 +129,8 @@ internal class GoogleSignInCoordinator(
             ),
         )
 
+        onSessionPersisted()
+        currentCoroutineContext().ensureActive()
         val backendUrl = configRepository.getCurrentBackendUrl()
         val platformResult =
             if (isNewAccount) {

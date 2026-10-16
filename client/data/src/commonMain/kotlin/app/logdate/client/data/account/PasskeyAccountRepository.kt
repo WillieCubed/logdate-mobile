@@ -22,6 +22,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -123,7 +124,9 @@ class DefaultPasskeyAccountRepository(
             bindingGuard = bindingGuard,
             credentialCodec = credentialCodec,
             sessionState = sessionState,
-            createRestoreKey = { if (createsRestoreKey) createRestoreKey() else Result.success(Unit) },
+            createRestoreKey = ::enrollAfterAccountCreation,
+            beforeSessionPersist = ::prepareRestoreEnrollment,
+            onSessionPersisted = ::resumeRestoreEnrollment,
             updateTokensOrRegisterPlatformAccount = sessionRefreshCoordinator::updateTokensOrRegisterPlatformAccount,
             deviceName = deviceName,
             accountKeyUnlockCoordinator = accountKeyUnlockCoordinator,
@@ -149,7 +152,9 @@ class DefaultPasskeyAccountRepository(
             googleSignInManager = googleSignInManager,
             serverClientId = serverClientId,
             sessionState = sessionState,
-            createRestoreKey = { if (createsRestoreKey) createRestoreKey() else Result.success(Unit) },
+            createRestoreKey = ::enrollAfterAccountCreation,
+            beforeSessionPersist = ::prepareRestoreEnrollment,
+            onSessionPersisted = ::resumeRestoreEnrollment,
         )
 
     init {
@@ -180,6 +185,7 @@ class DefaultPasskeyAccountRepository(
     }
 
     private suspend fun renewBackgroundRestoreKey(session: app.logdate.client.datastore.UserSession) {
+        if (!createsRestoreKey) return
         val renewal = restoreCredentialRenewal ?: return
         val origin = configRepository.getCurrentBackendUrl()
 
@@ -191,7 +197,10 @@ class DefaultPasskeyAccountRepository(
             )
         val isCurrent = { configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session }
         retryRestoreCredentialRenewal(
-            isPending = { renewal.isPending(origin, session.accountId) },
+            isPending = {
+                renewal.ensurePendingIfAbsent(origin, session.accountId)
+                renewal.isPending(origin, session.accountId)
+            },
             isCurrent = isCurrent,
             renew = {
                 restoreCredentialRegistrationMutex.withLock {
@@ -206,6 +215,28 @@ class DefaultPasskeyAccountRepository(
                 }
             },
         )
+    }
+
+    private suspend fun enrollAfterAccountCreation(): Result<Unit> {
+        if (!createsRestoreKey) return Result.success(Unit)
+        if (restoreCredentialRenewal == null) return createRestoreKey()
+        return Result.success(Unit)
+    }
+
+    private suspend fun prepareRestoreEnrollment(
+        origin: String,
+        owner: String,
+    ) {
+        if (!createsRestoreKey) return
+        val renewal = restoreCredentialRenewal ?: return
+        check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
+        renewal.mark(origin, owner)
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
+    }
+
+    private fun resumeRestoreEnrollment() {
+        if (createsRestoreKey && restoreCredentialRenewal != null) restoreRenewalRequests.update { it + 1 }
     }
 
     override suspend fun checkUsernameAvailability(username: String): Result<Boolean> =
@@ -255,7 +286,22 @@ class DefaultPasskeyAccountRepository(
 
     override suspend fun listLinkedSignInProviders(): Result<List<LinkedSignInProvider>> = enrollmentCoordinator.listLinkedSignInProviders()
 
-    override suspend fun createRestoreKey(): Result<Unit> = restoreCredentialCoordinator.createRestoreKey()
+    override suspend fun createRestoreKey(): Result<Unit> {
+        if (!createsRestoreKey) return Result.success(Unit)
+        if (restoreCredentialRenewal == null) return restoreCredentialCoordinator.createRestoreKey()
+        return try {
+            val origin = configRepository.getCurrentBackendUrl()
+            val session = sessionStorage.getSession() ?: return Result.failure(IllegalStateException("No active session"))
+            prepareRestoreEnrollment(origin, session.accountId)
+            check(sessionStorage.getSession() == session) { "Enrollment session changed" }
+            resumeRestoreEnrollment()
+            Result.success(Unit)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+    }
 
     override suspend fun signInWithRestoreKey(): Result<LogDateAccount> = restoreCredentialCoordinator.signInWithRestoreKey()
 
