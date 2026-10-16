@@ -78,7 +78,7 @@ region          = "us-central1"
 service_name    = "logdate-server-staging"
 cloud_run_image = "us-central1-docker.pkg.dev/logdate-staging/logdate/logdate-server:latest"
 webauthn_rp_id  = "staging.logdate.app"
-webauthn_origin = "https://staging.logdate.app"
+webauthn_origin = "https://app.staging.logdate.app"
 
 enable_github_oidc = true
 github_repo        = "your-org/logdate"

@@ -23,8 +23,8 @@
     "SERVER_ENCRYPTION_ENABLED": "true",
     "SYNC_MEDIA_SIGNED_URLS": "true",
     "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
-    "WEBAUTHN_ORIGIN": "https://app.logdate-preview.hypertext.studio",
-    "WEBAUTHN_RP_ID": "logdate-preview.hypertext.studio"
+    "WEBAUTHN_ORIGIN": "https://app.staging.logdate.app",
+    "WEBAUTHN_RP_ID": "staging.logdate.app"
   },
   "project_id": "logdate-dev",
   "region": "us-central1",

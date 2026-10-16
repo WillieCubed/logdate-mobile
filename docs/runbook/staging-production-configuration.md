@@ -16,10 +16,10 @@ resolved.
 | GCP project | `logdate-dev` | `logdate` |
 | Cloud Run service | `logdate-server-staging` | `logdate-server` |
 | Public host | `cloud-staging.logdate.app` | `cloud.logdate.app` |
-| WebAuthn RP ID | `cloud-staging.logdate.app` | `logdate.app` |
-| WebAuthn origin | `https://cloud-staging.logdate.app` | `https://cloud.logdate.app` |
+| WebAuthn RP ID | `staging.logdate.app` | `logdate.app` |
+| WebAuthn origin | `https://app.staging.logdate.app` | `https://cloud.logdate.app` |
 | Auto migrations | `AUTO_MIGRATE=false` | `AUTO_MIGRATE=false` |
-| Allowed origins | `https://cloud-staging.logdate.app` | `https://cloud.logdate.app` |
+| Browser passkey origins | `https://app.staging.logdate.app` | `https://cloud.logdate.app` |
 | Secret storage | Staging project's Secret Manager | Production project's Secret Manager |
 | Media bucket | `logdate-media-staging` | `logdate-media-logdate` |
 
@@ -62,13 +62,31 @@ revision consume the rendered Neon contract.
 - Do not change production `AUTO_MIGRATE=false` without a reviewed rollback
   plan. Production migrations should be explicit and observable.
 - Do not set staging `webauthn_rp_id` to `logdate.app`. Staging uses
-  `cloud-staging.logdate.app` so passkeys created in staging cannot unlock
-  production.
+  `staging.logdate.app` with the exact browser origin
+  `https://app.staging.logdate.app`, so staging passkeys use a distinct relying
+  party. Never authorize the production frontend origin `https://app.logdate.app`
+  or the production backend origin `https://cloud.logdate.app` in staging.
 - Do not add non-Cloud-Run domains to Terraform `domains`. Marketing redirects
   and unrelated DNS live outside this Cloud Run service.
 - Do not mount optional Cloud Run secrets until the Secret Manager container
   has at least one version. Cloud Run rejects revisions with empty mounted
   secrets.
+
+## Staging Browser Namespace
+
+The staging frontend uses `staging.logdate.app`, browser authentication uses
+`app.staging.logdate.app`, and tenant portals use
+`<username>.staging.logdate.app`. Browser sessions must use host-only cookies;
+tenant portals obtain their own session through the authorization code handoff.
+These frontend hosts are separate from the Cloud Run API and identity host,
+`cloud-staging.logdate.app`, which remains the backend deployment domain.
+
+Changing the staging WebAuthn relying party from
+`logdate-preview.hypertext.studio` to `staging.logdate.app` requires staging
+users to enroll new passkeys. Existing staging credentials cannot authenticate
+under the new RP ID. Production passkeys and the production RP ID are unchanged.
+The staging Android signing certificate, package, and `android:apk-key-hash`
+origins remain unchanged.
 
 ## App Builds
 

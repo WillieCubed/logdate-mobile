@@ -651,11 +651,13 @@ try:
     if len(relying_party) > 253 or not re.fullmatch(rf"{dns_label}(?:\.{dns_label})+", relying_party):
         fail("WEBAUTHN_RP_ID must be a DNS hostname")
     if environment == "staging" and (
-        relying_party == "logdate.app" or relying_party.endswith(".logdate.app") or
+        relying_party == "logdate.app" or
         "logdate.app".endswith("." + relying_party)
     ):
-        fail("staging relying party must be outside the production cookie domain")
+        fail("staging relying party must not be the production relying party or its ancestor")
     browser_origins = [env_vars["WEBAUTHN_ORIGIN"], *additional_origins]
+    if environment == "staging" and {"https://app.logdate.app", "https://cloud.logdate.app"}.intersection(browser_origins):
+        fail("staging must not authorize production WebAuthn browser origins")
     if len(browser_origins) != len(set(browser_origins)):
         fail("WebAuthn browser origins must be unique origin-only HTTPS URLs within the relying party")
     for browser_origin in browser_origins:

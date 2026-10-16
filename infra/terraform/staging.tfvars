@@ -6,8 +6,8 @@ service_name = "logdate-server-staging"
 cloud_run_image = "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest"
 # Browser passkeys use the isolated frontend namespace, independently of API
 # identity handles and the backend canonical hostname. Production RP is unchanged.
-webauthn_rp_id              = "logdate-preview.hypertext.studio"
-webauthn_origin             = "https://app.logdate-preview.hypertext.studio"
+webauthn_rp_id              = "staging.logdate.app"
+webauthn_origin             = "https://app.staging.logdate.app"
 webauthn_additional_origins = []
 
 enable_github_oidc = true

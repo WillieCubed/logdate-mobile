@@ -399,10 +399,12 @@ resource "google_cloud_run_v2_service" "server" {
     precondition {
       condition = var.service_name != "logdate-server-staging" || (
         var.webauthn_rp_id != "logdate.app" &&
-        !endswith(var.webauthn_rp_id, ".logdate.app") &&
-        !endswith("logdate.app", ".${var.webauthn_rp_id}")
+        !endswith("logdate.app", ".${var.webauthn_rp_id}") &&
+        !anytrue([for origin in concat([var.webauthn_origin], var.webauthn_additional_origins) :
+          contains(["https://app.logdate.app", "https://cloud.logdate.app"], origin)
+        ])
       )
-      error_message = "Staging passkeys must use a relying party outside the production cookie domain."
+      error_message = "Staging must use a distinct relying party without authorizing production browser origins."
     }
   }
 
