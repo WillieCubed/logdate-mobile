@@ -67,6 +67,7 @@ enum class SharedScreenshotSceneId(
     DeveloperTools("developer-tools"),
     FeaturePreviews("feature-previews"),
     DevicesSettings("devices-settings"),
+    DevicesLinkedWatch("devices-linked-watch"),
     StreakSettings("streak-settings"),
     CampfireStates("campfire-states"),
     CampfireStreakUnlit("campfire-streak-unlit"),

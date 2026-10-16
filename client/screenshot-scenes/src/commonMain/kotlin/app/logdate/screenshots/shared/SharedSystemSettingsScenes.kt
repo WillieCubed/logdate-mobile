@@ -32,6 +32,8 @@ import app.logdate.feature.core.settings.ui.TimelineSettingsContent
 import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
 import app.logdate.feature.core.settings.ui.devices.DevicesUiState
+import app.logdate.feature.core.settings.ui.devices.LinkedDeviceUiState
+import app.logdate.feature.core.settings.ui.devices.LinkedDevicesUiState
 import app.logdate.feature.core.settings.ui.labs.LabsFlag
 import app.logdate.feature.core.settings.ui.labs.LabsSettingsContent
 import app.logdate.feature.core.settings.ui.labs.LabsUiState
@@ -166,6 +168,40 @@ internal val systemSettingsScenes: List<SharedScreenshotSceneSpec> =
                                     lastActiveFormatted = "Yesterday",
                                     appVersion = "1.0.0",
                                     isCurrentDevice = false,
+                                ),
+                            ),
+                    ),
+            )
+        },
+        sharedScene(SharedScreenshotSceneId.DevicesLinkedWatch, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+            DevicesScreenContent(
+                onBackClick = {},
+                uiState =
+                    DevicesUiState(
+                        isLoading = false,
+                        devices =
+                            listOf(
+                                DeviceInfoUiState(
+                                    id = Uuid.parse("10000000-0000-0000-0000-000000000001"),
+                                    name = "Alex's Pixel 9 Pro",
+                                    platformName = "Android",
+                                    lastActiveFormatted = "Today",
+                                    appVersion = "1.0.0",
+                                    isCurrentDevice = true,
+                                ),
+                            ),
+                        linked =
+                            LinkedDevicesUiState.Listed(
+                                listOf(
+                                    LinkedDeviceUiState(
+                                        id = "watch-session",
+                                        name = "Alex's Pixel Watch 3",
+                                        platformName = "Wear OS",
+                                        linkedAtFormatted = "Oct 3, 2026, 9:41 AM",
+                                        lastSeenFormatted = "Oct 16, 2026, 8:02 AM",
+                                        pairedWatch = false,
+                                        erasesData = true,
+                                    ),
                                 ),
                             ),
                     ),
