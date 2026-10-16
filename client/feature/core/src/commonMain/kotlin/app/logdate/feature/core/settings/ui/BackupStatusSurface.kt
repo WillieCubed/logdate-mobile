@@ -71,8 +71,6 @@ internal fun BackupStatusItem(
         shape = MaterialTheme.shapes.extraLarge,
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        elevation = 0.dp,
-        contentPadding = Spacing.lg,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {

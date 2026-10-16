@@ -712,3 +712,10 @@ Recommended workflow for desktop screenshot changes:
 3. Use visible mode only when you need to inspect transitions or layout behavior live.
 4. Refresh baselines with `:app:compose-main:updateDesktopScreenshotTest` after the render path is deterministic.
 5. Re-run `:app:compose-main:desktopTest --tests 'app.logdate.screenshots.DesktopScreenshotTest.shared_catalog_matches_baselines'` before committing.
+
+## Native backup settings fixtures
+
+The shared catalog includes signed-out, signed-in and native-quota states in
+`NativeBackupScreenshotScenes.kt`. Each explicitly enables Android coverage rows
+and uses the OS integration viewport matrix. Follow the scoped commands and review
+criteria in [Settings UI composition](../reference/standards/settings-ui.md).

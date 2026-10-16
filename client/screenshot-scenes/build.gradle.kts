@@ -62,6 +62,7 @@ kotlin {
             implementation(projects.client.repository)
             implementation(projects.client.sync)
             implementation(projects.client.ui)
+            implementation(projects.client.device)
 
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

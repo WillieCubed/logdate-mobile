@@ -63,4 +63,17 @@ class SharedScreenshotCatalogTest {
         val privacy = SharedScreenshotCatalog.scene(SharedScreenshotSceneId.PrivacySettings)
         assertTrue(privacy.variants.containsAll(osIntegrationVariants))
     }
+
+    @Test
+    fun `native backup states render in every os integration variant`() {
+        val states =
+            listOf(
+                SharedScreenshotSceneId.NativeBackupSignedOut,
+                SharedScreenshotSceneId.NativeBackupReady,
+                SharedScreenshotSceneId.NativeBackupQuota,
+            )
+        states.forEach { id ->
+            assertEquals(osIntegrationVariants, SharedScreenshotCatalog.scene(id).variants)
+        }
+    }
 }

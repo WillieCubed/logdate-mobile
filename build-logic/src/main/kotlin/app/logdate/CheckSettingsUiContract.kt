@@ -1,0 +1,48 @@
+package app.logdate
+
+import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
+import org.gradle.workers.WorkAction
+import org.gradle.workers.WorkParameters
+import org.gradle.workers.WorkerExecutor
+import javax.inject.Inject
+
+abstract class CheckSettingsUiContract
+    @Inject
+    constructor(
+        private val workers: WorkerExecutor,
+    ) : DefaultTask() {
+        @get:Classpath abstract val parserClasspath: ConfigurableFileCollection
+
+        @get:InputFiles
+        @get:PathSensitive(PathSensitivity.RELATIVE)
+        abstract val sources: ConfigurableFileCollection
+
+        @TaskAction
+        fun check() {
+            workers.classLoaderIsolation { classpath.from(parserClasspath) }.submit(SettingsUiContractWork::class.java) {
+                sources.from(this@CheckSettingsUiContract.sources)
+            }
+        }
+    }
+
+interface SettingsUiContractParameters : WorkParameters {
+    val sources: ConfigurableFileCollection
+}
+
+abstract class SettingsUiContractWork : WorkAction<SettingsUiContractParameters> {
+    override fun execute() {
+        val failures = parameters.sources.files.filter { "SettingsSection" in it.readText() }.flatMap { file ->
+            SettingsUiContract.inspect(file.readText()).map { line ->
+                "${file.path}:$line: Emit settings rows directly inside SettingsSection; see docs/reference/standards/settings-ui.md"
+            }
+        }
+        if (failures.isNotEmpty()) throw GradleException(failures.joinToString("\n"))
+    }
+}

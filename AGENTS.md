@@ -243,3 +243,12 @@ buttons or permanent backup banners to the shared header. Visual/supporting comp
 both minimum widths and a useful dominant visual area; medium portrait should use the transforming
 supporting sheet rather than forcing two narrow columns. Grid/media sizes respond to panel-local
 bounds. Preserve each destination's established browsing and playback interactions while migrating framing.
+
+## Settings UI contract
+
+Before changing settings UI, read [Settings UI composition](docs/reference/standards/settings-ui.md)
+and compare the main Settings page's existing composition. Emit individual rows directly inside
+`SettingsSection`; a `Column` around multiple rows suppresses the container's automatic gaps.
+Use the shared row/card components and theme tokens. Extend shared state fixtures and inspect
+matching renders, including visible platform-specific rows, before accepting screenshot references.
+Run `:client:feature:core:checkSettingsUiContract` for settings changes.

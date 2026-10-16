@@ -27,7 +27,9 @@ import androidx.compose.ui.Modifier
 import app.logdate.ui.theme.Spacing
 
 /**
- * A block of related settings items used to group options together.
+ * A titled group of settings rows. Emit rows directly in [content]: the container spaces
+ * direct layout children. A Column around several rows removes their automatic separation.
+ * See docs/reference/standards/settings-ui.md for component choices and examples.
  */
 @Composable
 fun SettingsSection(

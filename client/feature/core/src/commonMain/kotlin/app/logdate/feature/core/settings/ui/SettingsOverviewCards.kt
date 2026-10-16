@@ -71,8 +71,6 @@ internal fun SyncPromotionCard(
         shape = MaterialTheme.shapes.extraLarge,
         containerColor = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        elevation = 0.dp,
-        contentPadding = Spacing.lg,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Text(description, style = MaterialTheme.typography.bodyMedium)

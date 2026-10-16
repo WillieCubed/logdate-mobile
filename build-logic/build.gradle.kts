@@ -26,6 +26,10 @@ tasks.test {
 
 gradlePlugin {
     plugins {
+        register("settingsUi") {
+            id = "app.logdate.settings-ui"
+            implementationClass = "app.logdate.SettingsUiPlugin"
+        }
         register("homeWorkspace") {
             id = "app.logdate.home-workspace"
             implementationClass = "app.logdate.HomeWorkspacePlugin"

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -18,37 +17,22 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.theme.Spacing
 
 /**
- * A standardized Material Card component that can be reused throughout the application.
- * This component enforces consistent styling while providing flexibility through parameters.
- *
- * Features:
- * - Optional title section
- * - Configurable shape, colors, and elevation
- * - Consistent padding and styling that follows Material Design guidelines
- * - Built on top of Material3 Card component
- *
- * @param modifier Modifier for customizing the card
- * @param title Optional title to display at the top of the card
- * @param titleStyle Text style for the title (defaults to titleMedium)
- * @param shape Shape of the card (defaults to RoundedCornerShape with 12dp radius)
- * @param containerColor Background color of the card (defaults to surface)
- * @param contentColor Text color within the card (defaults to onSurface)
- * @param elevation Elevation of the card (defaults to 2dp)
- * @param contentPadding Padding around the content (defaults to 16dp)
- * @param content The content to display inside the card
+ * Shared filled card. Defaults follow the theme; override colors together for a semantic role.
+ * Settings row groups use [SettingsSection] instead of this card.
  */
 @Composable
 fun MaterialCard(
     modifier: Modifier = Modifier,
     title: String? = null,
     titleStyle: TextStyle = MaterialTheme.typography.titleMedium,
-    shape: Shape = RoundedCornerShape(12.dp),
-    containerColor: Color = MaterialTheme.colorScheme.surface,
+    shape: Shape = MaterialTheme.shapes.large,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    elevation: Dp = 2.dp,
-    contentPadding: Dp = 16.dp,
+    elevation: Dp = 0.dp,
+    contentPadding: Dp = Spacing.lg,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
@@ -70,17 +54,15 @@ fun MaterialCard(
                     .fillMaxWidth()
                     .padding(contentPadding),
         ) {
-            // Title section if provided
             title?.let {
                 Text(
                     text = it,
                     style = titleStyle,
                     color = contentColor,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(bottom = Spacing.sm),
                 )
             }
 
-            // Card content
             content()
         }
     }

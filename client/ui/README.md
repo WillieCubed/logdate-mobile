@@ -201,3 +201,10 @@ actual class PlatformDimensions actual constructor() {
 - [ ] Add staggered animation support
 - [ ] Improve transition performance
 - [ ] Add gesture-driven animations
+
+## Settings composition
+
+[Settings UI composition](../../docs/reference/standards/settings-ui.md) explains the shared
+section, row and card APIs, includes correct and incorrect grouping examples, and names the
+production and screenshot fixtures to follow. Rows are direct children of `SettingsSection`;
+its container supplies their separation. Do not wrap multiple rows in a layout or add manual dividers.
