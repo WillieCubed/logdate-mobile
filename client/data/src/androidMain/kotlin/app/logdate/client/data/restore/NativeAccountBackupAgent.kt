@@ -40,7 +40,8 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
             try {
                 val vault = SecureSessionStorage(secure, config, CoroutineScope(coroutineContext + observerJob))
                 val origin = config.getCurrentBackendUrl()
-                val existing = vault.read(origin)
+                val guard = vault.captureInstallationGuard() ?: return@coroutineScope
+                val existing = vault.getSession()
                 if (existing != null) {
                     if (policy.accepts(existing.accountId)) detector.acknowledgeAccountRecovery(delivery)
                     return@coroutineScope
@@ -62,7 +63,12 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
                                 current[boundKey] = "true"
                             }
                             RestoreCredentialRenewal(secure).mark(origin, accountId)
-                            vault.write(origin, UserSession(authenticated.tokens.accessToken, authenticated.tokens.refreshToken, accountId))
+                            check(
+                                vault.installSessionIfCurrent(
+                                    guard,
+                                    UserSession(authenticated.tokens.accessToken, authenticated.tokens.refreshToken, accountId),
+                                ),
+                            )
                         },
                         acknowledge = { detector.acknowledgeAccountRecovery(delivery) },
                     )()

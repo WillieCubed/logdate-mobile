@@ -147,9 +147,22 @@ without delaying access to the recovered journal.
 Restore assertions have a passive authentication contract. The dedicated server restore verifier
 validates origin, RP, challenge, registered-key signature, ownership, and replay without requiring
 a fresh user-presence or biometric ceremony. Ordinary passkey verification is a separate path.
-The server consumes the exact verified active credential and records its counter in one
-conditional mutation. Concurrent assertions cannot both spend it, and revocation or replacement
-after lookup prevents authentication.
+Android retains restore keys after authentication until they are explicitly cleared. The server
+therefore consumes the challenge and atomically updates the verified active credential's counter;
+it keeps the key available for a fresh signed challenge after a dropped response, account-preparation
+outage, or interrupted session write. A repeated challenge remains invalid. Positive counter updates
+use compare-and-set; zero-counter credentials can authenticate concurrently with distinct challenges.
+
+Registration adds the verified key without invalidating keys held by other installations. Failed
+storage never reports successful enrollment or revokes an existing key. Post-restore enrollment
+remains enabled for compatibility with older servers that consumed keys; it is not required to make
+the corrected server key usable again. Retained historical server keys require explicit revocation;
+local sign-out clears the provider credential rather than revoking every device's keys.
+
+The secure session's durable sign-out tombstone prevents both application recovery and the native
+backup callback from signing in again after provider clearing fails or the process restarts. Explicit
+sign-in replaces that tombstone. In-flight recovery must install through the same conditional vault
+operation, so a later sign-out wins. Failure to read the tombstone cannot authorize restoration.
 
 ## Emulator acceptance
 

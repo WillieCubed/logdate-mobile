@@ -200,8 +200,8 @@ then remove that compatibility path atomically.
 `restore.py` checks the deployed server's Restore Credentials contract without
 Google credential delivery. It creates a disposable account, registers a signed
 restore credential, authenticates with neither user-presence nor verification
-flags, and checks signature/origin rejection, challenge replay and reuse of a
-consumed credential with a higher signature counter. It verifies the restored
+flags, and checks signature/origin rejection, challenge replay, and successful
+fresh-challenge recovery with zero and advancing signature counters. Stale positive counters fail. It verifies each restored
 token through `/auth/me` and deletes the fixture using its original identity.
 Tokens and generated private keys are not printed or saved.
 

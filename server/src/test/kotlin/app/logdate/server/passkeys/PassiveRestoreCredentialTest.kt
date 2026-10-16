@@ -30,12 +30,24 @@ import kotlin.uuid.Uuid
 @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 class PassiveRestoreCredentialTest {
     @Test
-    fun `strict restore accepts a signed passive assertion once`() {
+    fun `strict restore accepts fresh assertions and rejects exact challenge replay`() {
         val (service, authenticator) = registeredRestore()
         val challenge = service.generateAuthOptions().challenge
         assertTrue(service.verifyAuthentication(challenge, authenticator.assertion(challenge)).success)
         val nextChallenge = service.generateAuthOptions().challenge
-        assertFalse(service.verifyAuthentication(nextChallenge, authenticator.assertion(nextChallenge)).success)
+        assertTrue(service.verifyAuthentication(nextChallenge, authenticator.assertion(nextChallenge)).success)
+        assertFalse(service.verifyAuthentication(challenge, authenticator.assertion(challenge)).success)
+    }
+
+    @Test
+    fun `positive counters must advance on fresh challenges`() {
+        val (service, authenticator) = registeredRestore()
+        val first = service.generateAuthOptions().challenge
+        assertTrue(service.verifyAuthentication(first, authenticator.assertion(first, signCount = 1)).success)
+        val stale = service.generateAuthOptions().challenge
+        assertFalse(service.verifyAuthentication(stale, authenticator.assertion(stale, signCount = 1)).success)
+        val next = service.generateAuthOptions().challenge
+        assertTrue(service.verifyAuthentication(next, authenticator.assertion(next, signCount = 2)).success)
     }
 
     @Test
@@ -81,9 +93,11 @@ class PassiveRestoreCredentialTest {
     }
 }
 
-internal class PassiveRestoreAuthenticator {
+internal class PassiveRestoreAuthenticator(
+    idSeed: Int = 1,
+) {
     private val key = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
-    private val credentialId = ByteArray(32) { (it + 1).toByte() }
+    private val credentialId = ByteArray(32) { (it + idSeed).toByte() }
 
     fun registration(options: PasskeyRegistrationOptions): PasskeyRegistrationResponse {
         val data =
@@ -108,10 +122,11 @@ internal class PassiveRestoreAuthenticator {
     fun assertion(
         challenge: String,
         origin: String = ORIGIN,
+        signCount: Int = 0,
     ): PasskeyAuthenticationResponse {
         val clientData = clientData("webauthn.get", challenge, origin)
         // Passive restore provides no fresh user-presence or biometric ceremony.
-        val authenticatorData = hash("logdate.app".toByteArray()) + byteArrayOf(0) + ByteBuffer.allocate(4).putInt(1).array()
+        val authenticatorData = hash("logdate.app".toByteArray()) + byteArrayOf(0) + ByteBuffer.allocate(4).putInt(signCount).array()
         val signature =
             Signature.getInstance("SHA256withECDSA").run {
                 initSign(key.private)

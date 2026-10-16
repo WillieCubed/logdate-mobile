@@ -85,7 +85,7 @@ class PostgreSQLRestoreCredentialRepository : RestoreCredentialRepository {
             } > 0
         }
 
-    override suspend fun consume(
+    override suspend fun recordAuthentication(
         expected: StoredRestoreCredentialData,
         newSignCount: Long,
     ): Boolean =
@@ -98,7 +98,6 @@ class PostgreSQLRestoreCredentialRepository : RestoreCredentialRepository {
                     (RestoreCredentialsTable.signCount eq expected.signCount)
             }) {
                 it[signCount] = newSignCount
-                it[isActive] = false
                 it[lastUsedAt] = Clock.System.now()
             } == 1
         }

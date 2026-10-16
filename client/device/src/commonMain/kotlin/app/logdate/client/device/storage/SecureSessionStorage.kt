@@ -56,7 +56,11 @@ class SecureSessionStorage(
     )
 
     private val sessionState = MutableStateFlow(CachedSession(null, null, 0))
-    private val identityMutex = kotlinx.coroutines.sync.Mutex()
+
+    private companion object {
+        // Native backup callbacks construct a separate vault over the same secure store.
+        val identityMutex = kotlinx.coroutines.sync.Mutex()
+    }
 
     init {
         scope.launch {
@@ -75,9 +79,14 @@ class SecureSessionStorage(
     override suspend fun captureInstallationGuard(): SessionInstallationGuard? {
         val origin = configRepository.getCurrentBackendUrl()
         if (sessionState.value.origin != origin) loadCurrentSession(origin)
-        val cached = sessionState.value
-        if (cached.origin != origin || configRepository.getCurrentBackendUrl() != origin) return null
-        return SessionInstallationGuard(origin, cached.revision)
+        return identityMutex.withLock {
+            // The existing sign-out tombstone also prevents provider credentials from reviving
+            // this session after a restart, even when the provider could not clear its key.
+            if (secureStorage.getString(scopedKey(StorageKeys.RECORD, origin)) == "null") return@withLock null
+            val cached = sessionState.value
+            if (cached.origin != origin || configRepository.getCurrentBackendUrl() != origin) return@withLock null
+            SessionInstallationGuard(origin, cached.revision)
+        }
     }
 
     override suspend fun installSessionIfCurrent(
@@ -90,6 +99,12 @@ class SecureSessionStorage(
                 cached.revision != expected.revision ||
                 configRepository.getCurrentBackendUrl() != expected.origin
             ) {
+                return@mutateIdentity false
+            }
+            val persisted = secureStorage.getString(scopedKey(StorageKeys.RECORD, expected.origin))
+            val expectedRecord = cached.session?.let { encodeSession(it) }
+            if (persisted != expectedRecord) {
+                sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
                 return@mutateIdentity false
             }
             try {
@@ -158,9 +173,12 @@ class SecureSessionStorage(
     ) {
         secureStorage.putString(
             scopedKey(StorageKeys.RECORD, origin),
-            Json.encodeToString(StoredSession(session.accessToken, session.refreshToken, session.accountId)),
+            encodeSession(session),
         )
     }
+
+    private fun encodeSession(session: UserSession): String =
+        Json.encodeToString(StoredSession(session.accessToken, session.refreshToken, session.accountId))
 
     override suspend fun clearSession() = clear(configRepository.getCurrentBackendUrl())
 

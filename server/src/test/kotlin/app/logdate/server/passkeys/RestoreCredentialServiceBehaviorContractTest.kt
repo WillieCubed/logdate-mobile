@@ -30,8 +30,7 @@ import kotlin.uuid.Uuid
  *
  * Restore credentials are a specific type of passkey used for account recovery.
  * This suite verifies the unique lifecycle of these credentials, including
- * the automatic deactivation of previous restore credentials upon successful
- * registration and the prevention of credential replay during authentication.
+ * independent registration for each installation and one-use authentication challenges.
  */
 @OptIn(ExperimentalUuidApi::class)
 class RestoreCredentialServiceBehaviorContractTest {
@@ -67,7 +66,7 @@ class RestoreCredentialServiceBehaviorContractTest {
     }
 
     @Test
-    fun `simplified registration deactivates previous credentials before storing new one`() {
+    fun `simplified registration preserves previous credentials when storing new one`() {
         val repository = mockk<RestoreCredentialRepository>()
         val userId = Uuid.random()
         coEvery { repository.getCredentialIdsForUser(userId) } returns listOf("old-cred")
@@ -89,7 +88,7 @@ class RestoreCredentialServiceBehaviorContractTest {
             )
 
         assertTrue(result.success)
-        coVerify(exactly = 1) { repository.deactivateAllForUser(userId) }
+        coVerify(exactly = 0) { repository.deactivateAllForUser(userId) }
         coVerify(exactly = 1) { repository.store(userId, any(), any(), any()) }
     }
 
@@ -124,7 +123,7 @@ class RestoreCredentialServiceBehaviorContractTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `simplified authentication returns userId and deactivates credential`() {
+    fun `simplified authentication returns userId and retains credential`() {
         val userId = Uuid.random()
         val repository = mockk<RestoreCredentialRepository>()
         val stored =
@@ -135,7 +134,7 @@ class RestoreCredentialServiceBehaviorContractTest {
                 userId = userId,
             )
         coEvery { repository.findByCredentialId("cred-xyz") } returns stored
-        coEvery { repository.consume(stored, 0L) } returns true
+        coEvery { repository.recordAuthentication(stored, 0L) } returns true
 
         val service = RestoreCredentialService(restoreCredentialRepository = repository, strictVerificationEnabled = false)
         val options = service.generateAuthOptions()
@@ -159,7 +158,7 @@ class RestoreCredentialServiceBehaviorContractTest {
         assertTrue(result.success)
         assertEquals(userId, result.userId)
         assertEquals("cred-xyz", result.credentialId)
-        coVerify(exactly = 1) { repository.consume(stored, 0L) }
+        coVerify(exactly = 1) { repository.recordAuthentication(stored, 0L) }
     }
 
     @Test
@@ -185,7 +184,7 @@ class RestoreCredentialServiceBehaviorContractTest {
     }
 
     @Test
-    fun `simplified authentication prevents replay — deactivated credential is not found again`() {
+    fun `simplified authentication prevents challenge replay`() {
         val userId = Uuid.random()
         val repository = InMemoryRestoreCredentialRepository()
         val service = RestoreCredentialService(restoreCredentialRepository = repository, strictVerificationEnabled = false)
@@ -214,10 +213,9 @@ class RestoreCredentialServiceBehaviorContractTest {
             )
         assertTrue(firstAttempt.success)
 
-        val authOptions2 = service.generateAuthOptions()
         val replayAttempt =
             service.verifyAuthentication(
-                authOptions2.challenge,
+                authOptions1.challenge,
                 PasskeyAuthenticationResponse(
                     id = credentialId,
                     rawId = credentialId,
@@ -225,7 +223,7 @@ class RestoreCredentialServiceBehaviorContractTest {
                 ),
             )
         assertFalse(replayAttempt.success)
-        assertContains(replayAttempt.error.orEmpty(), "Restore credential not found")
+        assertContains(replayAttempt.error.orEmpty(), "Invalid or expired challenge")
     }
 
     // -----------------------------------------------------------------------

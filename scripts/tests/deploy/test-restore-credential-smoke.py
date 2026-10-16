@@ -26,7 +26,7 @@ class Response:
 
 
 class Session:
-    def __init__(self, rejects=True, cleanup=204, broken_registration=False, reusable=False, wrong_token_owner=False):
+    def __init__(self, rejects=True, cleanup=204, broken_registration=False, reusable=True, wrong_token_owner=False):
         self.rejects = rejects
         self.reusable = reusable
         self.wrong_token_owner = wrong_token_owner
@@ -59,9 +59,9 @@ class Session:
         self.assertions.append(payload)
         if len(self.assertions) == 3:
             return Response(200, {"data": {"account": {"id": OWNER}, "tokens": {"accessToken": "restored-secret"}}})
-        if len(self.assertions) == 5 and self.reusable:
+        if len(self.assertions) in (5, 6, 8) and self.reusable:
             raw = smoke.sim.b64u_decode(payload["credential"]["response"]["authenticatorData"])
-            return Response(200 if int.from_bytes(raw[33:37], "big") > 1 else 401)
+            return Response(200 if int.from_bytes(raw[33:37], "big") in (0, 1, 2) else 401, {"data": {"account": {"id": OWNER}, "tokens": {"accessToken": "restored-secret"}}})
         return Response(401 if self.rejects else 200)
 
 
@@ -77,7 +77,7 @@ class RestoreSmokeTests(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             self.run_smoke(session)
         self.assertTrue(session.deleted)
-        self.assertEqual(5, len(session.assertions))
+        self.assertEqual(8, len(session.assertions))
         data = smoke.sim.b64u_decode(session.assertions[2]["credential"]["response"]["authenticatorData"])
         self.assertEqual(0, data[32], "The success case must not assert UP or UV")
         self.assertNotIn("fixture-secret", output.getvalue())
@@ -101,8 +101,8 @@ class RestoreSmokeTests(unittest.TestCase):
             self.run_smoke(session)
         self.assertTrue(session.deleted)
 
-    def test_fresh_counter_exposes_a_credential_that_was_not_consumed(self):
-        session = Session(reusable=True)
+    def test_server_consuming_the_key_fails_retry_acceptance(self):
+        session = Session(reusable=False)
         with self.assertRaises(smoke.sim.VerifierError):
             self.run_smoke(session)
         self.assertTrue(session.deleted)

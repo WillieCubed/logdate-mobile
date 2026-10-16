@@ -8,14 +8,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 class RestoreCredentialConsumptionTest {
     @Test
-    fun `two signed challenges consume the same credential only once`() {
+    fun `two distinct signed zero-counter challenges both authenticate`() {
         val backing = InMemoryRestoreCredentialRepository()
         val barrier = CyclicBarrier(2)
         val repository =
@@ -37,7 +36,7 @@ class RestoreCredentialConsumptionTest {
                             fixture.service.verifyAuthentication(challenge, fixture.authenticator.assertion(challenge)).success
                         }
                     }.map { it.get(10, TimeUnit.SECONDS) }
-            assertEquals(1, results.count { it })
+            assertEquals(2, results.count { it })
         } finally {
             executor.shutdownNow()
         }
@@ -60,7 +59,7 @@ class RestoreCredentialConsumptionTest {
     }
 
     @Test
-    fun `legacy padded ID consumes the actual verified stored record`() =
+    fun `legacy padded ID retains the actual verified stored record`() =
         runBlocking {
             val backing = InMemoryRestoreCredentialRepository()
             val fixture = registered(backing)
@@ -71,7 +70,48 @@ class RestoreCredentialConsumptionTest {
             val challenge = fixture.service.generateAuthOptions().challenge
             val assertion = fixture.authenticator.assertion(challenge).copy(id = padded, rawId = padded)
             assertTrue(fixture.service.verifyAuthentication(challenge, assertion).success)
-            assertNull(backing.findByCredentialId(padded))
+            assertNotNull(backing.findByCredentialId(padded))
+            Unit
+        }
+
+    @Test
+    fun `fresh challenge recovers after lost response and server restart`() {
+        val repository = InMemoryRestoreCredentialRepository()
+        val fixture = registered(repository)
+        val first = fixture.service.generateAuthOptions().challenge
+        assertTrue(fixture.service.verifyAuthentication(first, fixture.authenticator.assertion(first)).success)
+        val restarted = RestoreCredentialService(repository, origins = setOf("https://logdate.app"), strictVerificationEnabled = true)
+        val retry = restarted.generateAuthOptions().challenge
+        assertTrue(restarted.verifyAuthentication(retry, fixture.authenticator.assertion(retry)).success)
+        assertFalse(restarted.verifyAuthentication(retry, fixture.authenticator.assertion(retry)).success)
+    }
+
+    @Test
+    fun `registration on another installation preserves existing recovery key`() =
+        runBlocking {
+            val repository = InMemoryRestoreCredentialRepository()
+            val fixture = registered(repository)
+            val old = assertNotNull(repository.findByCredentialId(fixture.credentialId))
+            val other = PassiveRestoreAuthenticator(42)
+            val options = fixture.service.generateRegistrationOptions(old.userId, "fixture", "Fixture")
+            assertTrue(fixture.service.verifyRegistration(old.userId, options.challenge, other.registration(options)).success)
+            val challenge = fixture.service.generateAuthOptions().challenge
+            assertTrue(fixture.service.verifyAuthentication(challenge, fixture.authenticator.assertion(challenge)).success)
+            assertEquals(2, repository.getCredentialIdsForUser(old.userId).size)
+        }
+
+    @Test
+    fun `failed registration preserves existing recovery key and reports failure`() =
+        runBlocking {
+            val repository = InMemoryRestoreCredentialRepository()
+            val fixture = registered(repository)
+            val old = assertNotNull(repository.findByCredentialId(fixture.credentialId))
+            val duplicate = fixture.service.generateRegistrationOptions(old.userId, "fixture", "Fixture")
+            assertFalse(
+                fixture.service.verifyRegistration(old.userId, duplicate.challenge, fixture.authenticator.registration(duplicate)).success,
+            )
+            assertNotNull(repository.findByCredentialId(old.credentialId))
+            Unit
         }
 
     private fun registered(repository: RestoreCredentialRepository): Fixture {

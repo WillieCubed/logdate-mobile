@@ -23,8 +23,8 @@ interface RestoreCredentialRepository {
 
     suspend fun deactivate(credentialId: String): Boolean
 
-    /** Atomically spend the exact verified active record; concurrent use or revocation wins. */
-    suspend fun consume(
+    /** Atomically update the verified active record; counter changes or revocation invalidate stale verification. */
+    suspend fun recordAuthentication(
         expected: StoredRestoreCredentialData,
         newSignCount: Long,
     ): Boolean
@@ -106,14 +106,13 @@ class InMemoryRestoreCredentialRepository : RestoreCredentialRepository {
             true
         }
 
-    override suspend fun consume(
+    override suspend fun recordAuthentication(
         expected: StoredRestoreCredentialData,
         newSignCount: Long,
     ): Boolean =
         synchronized(lock) {
             if (activeFlags[expected.credentialId] != true || credentials[expected.credentialId] != expected) return@synchronized false
             credentials[expected.credentialId] = expected.copy(publicKey = expected.publicKey.copyOf(), signCount = newSignCount)
-            activeFlags[expected.credentialId] = false
             true
         }
 

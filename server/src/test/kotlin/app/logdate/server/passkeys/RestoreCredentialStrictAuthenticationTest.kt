@@ -188,7 +188,7 @@ class RestoreCredentialStrictAuthenticationTest {
     }
 
     @Test
-    fun `strict authentication returns userId and deactivates credential on success`() {
+    fun `strict authentication returns userId and records authentication on success`() {
         val repository = mockk<RestoreCredentialRepository>()
         val userId = Uuid.random()
         val credentialBytes = byteArrayOf(0xAA.toByte(), 0xBB.toByte())
@@ -207,7 +207,7 @@ class RestoreCredentialStrictAuthenticationTest {
         val attestedCredentialData = mockk<AttestedCredentialData>()
 
         coEvery { repository.findByCredentialId(credentialId) } returns stored
-        coEvery { repository.consume(stored, 5L) } returns true
+        coEvery { repository.recordAuthentication(stored, 5L) } returns true
         every { converter.convert(stored.publicKey) } returns attestedCredentialData
         every { manager.verify(any<AuthenticationRequest>(), any<AuthenticationParameters>()) } returns authenticationData
         every { authenticationData.authenticatorData } returns authDataObj
@@ -237,6 +237,6 @@ class RestoreCredentialStrictAuthenticationTest {
         assertTrue(result.success)
         assertEquals(userId, result.userId)
         assertEquals(credentialId, result.credentialId)
-        coVerify(exactly = 1) { repository.consume(stored, 5L) }
+        coVerify(exactly = 1) { repository.recordAuthentication(stored, 5L) }
     }
 }

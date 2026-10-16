@@ -126,7 +126,7 @@ def run_acceptance(session, base, origin, rp, expected_release=None):
             request(session, base, "POST", endpoint + "complete", payload=payload, expected=401)
             print("Rejected", label, flush=True)
         challenge = begin()
-        payload = assertion(key, credential_id, challenge, rp, origin)
+        payload = assertion(key, credential_id, challenge, rp, origin, sign_count=0)
         restored = data(request(session, base, "POST", endpoint + "complete", payload=payload))
         if restored["account"]["id"] != owner:
             raise sim.VerifierError("Restore authenticated a different account")
@@ -136,9 +136,24 @@ def run_acceptance(session, base, origin, rp, expected_release=None):
             raise sim.VerifierError("Restore token authenticates a different account")
         print("Passive assertion restored the correct account", flush=True)
         request(session, base, "POST", endpoint + "complete", payload=payload, expected=401)
-        payload = assertion(key, credential_id, begin(), rp, origin, sign_count=2)
-        request(session, base, "POST", endpoint + "complete", payload=payload, expected=401)
-        print("Rejected replay and consumed credential reuse", flush=True)
+        payload = assertion(key, credential_id, begin(), rp, origin, sign_count=0)
+        retried = data(request(session, base, "POST", endpoint + "complete", payload=payload))
+        if retried["account"]["id"] != owner:
+            raise sim.VerifierError("Restore retry authenticated a different account")
+        identity = data(request(session, base, "GET", "/api/v1/auth/me", token=retried["tokens"]["accessToken"]))
+        if identity["account"]["id"] != owner:
+            raise sim.VerifierError("Restore retry token authenticates a different account")
+        for counter, expected in [(1, 200), (1, 401), (2, 200)]:
+            payload = assertion(key, credential_id, begin(), rp, origin, sign_count=counter)
+            response = request(session, base, "POST", endpoint + "complete", payload=payload, expected=expected)
+            if expected == 200:
+                result = data(response)
+                if result["account"]["id"] != owner:
+                    raise sim.VerifierError("Counter advancement authenticated a different account")
+                identity = data(request(session, base, "GET", "/api/v1/auth/me", token=result["tokens"]["accessToken"]))
+                if identity["account"]["id"] != owner:
+                    raise sim.VerifierError("Counter advancement token authenticates a different account")
+        print("Rejected exact replay and stale counters; accepted fresh zero and advancing counter assertions", flush=True)
     finally:
         delete_fixture(session, base, token, owner)
     if expected_release:

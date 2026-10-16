@@ -13,7 +13,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -21,7 +20,7 @@ import kotlin.uuid.Uuid
 @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 class RestoreCredentialConsumptionRepositoryTest {
     @Test
-    fun `both stores consume a credential once under contention`() =
+    fun `both stores reject stale positive counter updates under contention`() =
         withStores { repository, owner ->
             val id = Uuid.random().toString()
             assertTrue(repository.store(owner, id, byteArrayOf(1, 2, 3), 0))
@@ -34,37 +33,37 @@ class RestoreCredentialConsumptionRepositoryTest {
                         .map {
                             executor.submit<Boolean> {
                                 barrier.await(5, TimeUnit.SECONDS)
-                                runBlocking { repository.consume(expected, 1) }
+                                runBlocking { repository.recordAuthentication(expected, 1) }
                             }
                         }.map { it.get(10, TimeUnit.SECONDS) }
                 assertEquals(1, results.count { it })
-                assertNull(repository.findByCredentialId(id))
+                assertEquals(1, assertNotNull(repository.findByCredentialId(id)).signCount)
             } finally {
                 executor.shutdownNow()
             }
         }
 
     @Test
-    fun `both stores reject a changed verified record without consuming its replacement`() =
+    fun `both stores reject a changed verified record`() =
         withStores { repository, owner ->
             val id = Uuid.random().toString()
             assertTrue(repository.store(owner, id, byteArrayOf(1, 2, 3), 0))
             val expected = assertNotNull(repository.findByCredentialId(id))
-            assertFalse(repository.consume(expected.copy(userId = Uuid.random()), 1))
-            assertFalse(repository.consume(expected.copy(publicKey = byteArrayOf(4, 5, 6)), 1))
-            assertFalse(repository.consume(expected.copy(signCount = 1), 2))
+            assertFalse(repository.recordAuthentication(expected.copy(userId = Uuid.random()), 1))
+            assertFalse(repository.recordAuthentication(expected.copy(publicKey = byteArrayOf(4, 5, 6)), 1))
+            assertFalse(repository.recordAuthentication(expected.copy(signCount = 1), 2))
             assertNotNull(repository.findByCredentialId(id))
-            assertTrue(repository.consume(expected, 1))
+            assertTrue(repository.recordAuthentication(expected, 1))
         }
 
     @Test
-    fun `both stores refuse consumption after account-wide revocation`() =
+    fun `both stores refuse authentication after account-wide revocation`() =
         withStores { repository, owner ->
             val id = Uuid.random().toString()
             assertTrue(repository.store(owner, id, byteArrayOf(1, 2, 3), 0))
             val expected = assertNotNull(repository.findByCredentialId(id))
             assertTrue(repository.deactivateAllForUser(owner))
-            assertFalse(repository.consume(expected, 1))
+            assertFalse(repository.recordAuthentication(expected, 1))
         }
 
     private fun withStores(block: suspend (RestoreCredentialRepository, Uuid) -> Unit) =

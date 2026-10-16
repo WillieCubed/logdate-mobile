@@ -14,7 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
 
-/** Remembers a consumed restore key until the signed-in installation registers its replacement. */
+/** Persists enrollment after restore, including compatibility with servers that consumed restore keys. */
 class RestoreCredentialRenewal(
     private val storage: SecureStorage,
     private val apiFactory: ((LogDateConfigRepository) -> PasskeyApiClientContract)? = null,

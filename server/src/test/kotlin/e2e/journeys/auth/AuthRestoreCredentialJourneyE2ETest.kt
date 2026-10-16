@@ -403,7 +403,7 @@ class AuthRestoreCredentialJourneyE2ETest {
                 }
             assertEquals(HttpStatusCode.OK, complete1.status, "first restore sign-in must succeed")
 
-            // Replay attempt with a fresh challenge but the now-deactivated credential → 401
+            // A fresh challenge permits recovery after a lost response.
             val begin2 = client.post("/api/v1/auth/restore/begin")
             val challenge2 =
                 json
@@ -437,6 +437,6 @@ class AuthRestoreCredentialJourneyE2ETest {
                         """.trimIndent(),
                     )
                 }
-            assertEquals(HttpStatusCode.Unauthorized, complete2.status, "replay of consumed credential must fail")
+            assertEquals(HttpStatusCode.OK, complete2.status, "fresh challenge must preserve recovery after response loss")
         }
 }

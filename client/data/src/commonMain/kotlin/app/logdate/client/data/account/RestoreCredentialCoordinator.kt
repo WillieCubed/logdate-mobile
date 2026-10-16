@@ -97,7 +97,6 @@ internal class RestoreCredentialCoordinator(
         restoreCredentialManager
             .clearRestoreCredential()
             .onFailure { Napier.w("Failed to clear restore credential (non-fatal)", it) }
-            .let { Result.success(Unit) }
 
     suspend fun signInWithRestoreKey(): Result<LogDateAccount> {
         if (!bindingGuard.currentServerSupportsCanonicalOwnerBinding()) {
@@ -136,7 +135,7 @@ internal class RestoreCredentialCoordinator(
                     completeData.tokens.refreshToken,
                     completeData.account.id.toString(),
                 )
-            // The consumed credential's replacement must survive even an interrupted vault write.
+            // Retain enrollment across interruption, including compatibility with older consuming servers.
             pendingRenewal.mark(guard.origin, session.accountId)
             currentCoroutineContext().ensureActive()
             check(isCurrent()) { "Restore configuration changed" }
@@ -146,7 +145,7 @@ internal class RestoreCredentialCoordinator(
             onSessionInstalled()
             sessionState.markAuthenticated(completeData.account)
             currentCoroutineContext().ensureActive()
-            Napier.i("Restore sign-in succeeded; replacement credential will register automatically")
+            Napier.i("Restore sign-in succeeded; credential enrollment will resume automatically")
             Result.success(completeData.account)
         } catch (cancelled: CancellationException) {
             throw cancelled

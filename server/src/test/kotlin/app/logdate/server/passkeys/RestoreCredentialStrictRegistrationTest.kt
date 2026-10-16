@@ -152,7 +152,7 @@ class RestoreCredentialStrictRegistrationTest {
     }
 
     @Test
-    fun `strict registration stores credential and deactivates previous on success`() {
+    fun `strict registration stores credential without deactivating other installations`() {
         val repository = mockk<RestoreCredentialRepository>()
         coEvery { repository.getCredentialIdsForUser(any()) } returns listOf("old-cred")
         coEvery { repository.deactivateAllForUser(any()) } returns true
@@ -198,7 +198,7 @@ class RestoreCredentialStrictRegistrationTest {
 
         assertTrue(result.success)
         assertEquals(canonicalId, result.credentialId)
-        coVerify(exactly = 1) { repository.deactivateAllForUser(userId) }
+        coVerify(exactly = 0) { repository.deactivateAllForUser(userId) }
         coVerify(exactly = 1) { repository.store(userId, canonicalId, byteArrayOf(0xFF.toByte()), 0L) }
     }
 }

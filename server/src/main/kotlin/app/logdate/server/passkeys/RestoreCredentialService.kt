@@ -34,7 +34,7 @@ private const val CHALLENGE_TYPE_AUTHENTICATION = "restore-authentication"
  *
  * Uses separately scoped challenges, WebAuthn4J instances, and a repository isolated
  * from [WebAuthnPasskeyService]. Restore credentials are not user-visible passkeys and have
- * a different lifecycle: one per user, rotated on re-registration, consumed on authentication.
+ * a persistent lifecycle: each installation may register a key; authentication consumes only its challenge.
  */
 @OptIn(ExperimentalUuidApi::class)
 class RestoreCredentialService(
@@ -147,16 +147,17 @@ class RestoreCredentialService(
 
             val credentialId = normalizeCredentialId(registrationResponse.id) ?: registrationResponse.id
 
-            runBlocking {
-                restoreCredentialRepository.deactivateAllForUser(userId)
-                restoreCredentialRepository.store(
-                    userId = userId,
-                    credentialId = credentialId,
-                    publicKey = registrationResponse.response.attestationObject.toByteArray(),
-                    signCount = 0L,
-                )
-            }
+            val stored =
+                runBlocking {
+                    restoreCredentialRepository.store(
+                        userId = userId,
+                        credentialId = credentialId,
+                        publicKey = registrationResponse.response.attestationObject.toByteArray(),
+                        signCount = 0L,
+                    )
+                }
 
+            if (!stored) return RegistrationResult(success = false, error = "Restore credential could not be stored")
             RegistrationResult(success = true, credentialId = credentialId)
         } catch (e: Exception) {
             Napier.e("Restore registration verification failed", e)
@@ -204,16 +205,17 @@ class RestoreCredentialService(
             val canonicalCredentialId = encodeBase64Url(attestedCredentialData.credentialId)
             val publicKeyBytes = attestedCredentialDataConverter.convert(attestedCredentialData)
 
-            runBlocking {
-                restoreCredentialRepository.deactivateAllForUser(userId)
-                restoreCredentialRepository.store(
-                    userId = userId,
-                    credentialId = canonicalCredentialId,
-                    publicKey = publicKeyBytes,
-                    signCount = registrationData.attestationObject?.authenticatorData?.signCount ?: 0L,
-                )
-            }
+            val stored =
+                runBlocking {
+                    restoreCredentialRepository.store(
+                        userId = userId,
+                        credentialId = canonicalCredentialId,
+                        publicKey = publicKeyBytes,
+                        signCount = registrationData.attestationObject?.authenticatorData?.signCount ?: 0L,
+                    )
+                }
 
+            if (!stored) return RegistrationResult(success = false, error = "Restore credential could not be stored")
             RegistrationResult(success = true, credentialId = canonicalCredentialId)
         } catch (e: DataConversionException) {
             RegistrationResult(success = false, error = "Registration data conversion failed")
@@ -238,7 +240,7 @@ class RestoreCredentialService(
                         }
                 } ?: return AuthenticationResult(success = false, error = "Restore credential not found")
 
-            if (!runBlocking { restoreCredentialRepository.consume(stored, stored.signCount) }) {
+            if (!runBlocking { restoreCredentialRepository.recordAuthentication(stored, stored.signCount) }) {
                 return AuthenticationResult(success = false, error = "Restore credential is no longer available")
             }
 
@@ -308,7 +310,7 @@ class RestoreCredentialService(
                 )
 
             val newSignCount = authenticationData.authenticatorData?.signCount ?: stored.signCount
-            if (!runBlocking { restoreCredentialRepository.consume(stored, newSignCount) }) {
+            if (!runBlocking { restoreCredentialRepository.recordAuthentication(stored, newSignCount) }) {
                 return AuthenticationResult(success = false, error = "Restore credential is no longer available")
             }
 
