@@ -48,7 +48,7 @@
     <string name="google_sign_in_account_conflict">This Google account is already linked to a different LogDate account.</string>
     <string name="google_sign_in_rate_limited">Too many attempts. Please wait a moment before trying again.</string>
     <string name="google_sign_in_network_error">Network error. Please check your connection and try again.</string>
-    <string name="google_sign_in_server_error">Something went wrong on our end. Please try again in a few minutes.</string>
+    <string name="google_sign_in_server_error">LogDate Cloud couldn&apos;t complete sign-in. Please try again in a few minutes.</string>
     <string name="sign_in_without_username">Sign In without Username</string>
     <string name="signing_in">Signing In...</string>
     <string name="sign_in_to_enable_cloud_backup">Sign in to enable cloud backup and sync.</string>
