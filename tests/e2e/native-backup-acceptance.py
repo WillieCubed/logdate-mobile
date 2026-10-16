@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import time
 import xml.etree.ElementTree as ET
 
 
@@ -42,6 +43,19 @@ def private_file(path, contents):
         output.write(contents)
 
 
+def select_local_transport(serial, attempts=30):
+    for attempt in range(attempts):
+        transports = adb(serial, "shell", "bmgr", "list", "transports", timeout=10).decode().splitlines()
+        if any(line.lstrip("* ").strip() == TRANSPORT for line in transports):
+            adb(serial, "shell", "bmgr", "transport", TRANSPORT, timeout=10)
+            selected = adb(serial, "shell", "bmgr", "list", "transports", timeout=10).decode().splitlines()
+            if any(line.strip() == "* " + TRANSPORT for line in selected):
+                return
+        if attempt + 1 < attempts:
+            time.sleep(1)
+    raise RuntimeError("Android's local backup transport did not become selected")
+
+
 def prepare(serial):
     if adb(serial, "shell", "getprop", "ro.kernel.qemu").strip() != b"1":
         raise RuntimeError("target did not identify itself as an emulator")
@@ -53,7 +67,7 @@ def prepare(serial):
     if adb(serial, "shell", "id", "-u").strip() != b"0":
         raise RuntimeError("a rootable Google APIs emulator is required for the local transport")
     adb(serial, "shell", "bmgr", "enable", "true")
-    adb(serial, "shell", "bmgr", "transport", TRANSPORT)
+    select_local_transport(serial)
     adb(serial, "shell", "settings", "put", "secure", "backup_local_transport_parameters",
         "is_encrypted=true,is_device_transfer=true")
     adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable")
