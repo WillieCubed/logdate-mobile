@@ -31,11 +31,12 @@ class RestoreDraftContinuityTest {
     private val now = Instant.parse("2026-01-01T00:00:00Z")
     private val drafts = mutableMapOf<Uuid, EditorDraft>()
     private val repository = mockk<JournalRepository>(relaxed = true)
+    private val notes = mockk<app.logdate.client.repository.journals.JournalNotesRepository>(relaxed = true)
     private val importer = mockk<MediaImporter>(relaxed = true)
     private val restore =
         RestoreUserDataUseCase(
             repository,
-            mockk(relaxed = true),
+            notes,
             mockk(relaxed = true),
             mockk(relaxed = true),
             mockk(relaxed = true),
@@ -47,6 +48,8 @@ class RestoreDraftContinuityTest {
     @BeforeTest
     fun setup() {
         coEvery { repository.getDraftRecoveryScope() } returns null
+        coEvery { repository.getJournalRecoveryScope() } returns null
+        coEvery { notes.getNoteRecoveryScope() } returns null
         coEvery { repository.getDraft(any()) } answers { drafts[firstArg()] }
         coEvery { repository.getDraftForRestore(any()) } answers { drafts[firstArg()] }
         coEvery { repository.saveDraft(any()) } answers { drafts[firstArg<EditorDraft>().id] = firstArg() }
@@ -54,7 +57,7 @@ class RestoreDraftContinuityTest {
             drafts.remove(firstArg())
             Unit
         }
-        coEvery { repository.compareAndSetDraftForRestore(any(), any(), any()) } coAnswers {
+        coEvery { repository.compareAndSetDraftForRestore(any(), any(), any(), any(), true, any()) } coAnswers {
             currentCoroutineContext().ensureActive()
             val id = firstArg<Uuid>()
             if (drafts[id] != secondArg<EditorDraft?>()) {
@@ -89,11 +92,11 @@ class RestoreDraftContinuityTest {
             val first = drafts[Uuid.parse(incoming.id)]
             assertEquals(0, restore.restore(archive).draftsImported)
             assertEquals(first, drafts[Uuid.parse(incoming.id)])
-            coVerify(exactly = 1) { repository.compareAndSetDraftForRestore(any(), any(), any()) }
+            coVerify(exactly = 1) { repository.compareAndSetDraftForRestore(any(), any(), any(), any(), true, any()) }
         }
 
     @Test
-    fun `failed replacement restores the previous local draft and removes only new drafts`() =
+    fun `a later failure keeps drafts already restored`() =
         runTest {
             val local = localDraft()
             drafts[local.id] = local
@@ -105,7 +108,8 @@ class RestoreDraftContinuityTest {
                     onProgress = { if (it == RestoreProgressPhase.COMPLETED) error("Interrupted archive import") },
                 )
             }
-            assertEquals(mapOf(local.id to local), drafts)
+            assertEquals(now + 1.days, drafts.getValue(local.id).lastModifiedAt)
+            assertEquals(now, drafts.getValue(created).lastModifiedAt)
             coVerify(exactly = 0) { repository.deleteDraft(local.id) }
         }
 
@@ -130,7 +134,7 @@ class RestoreDraftContinuityTest {
         }
 
     @Test
-    fun `duplicate draft IDs roll back to the original snapshot`() =
+    fun `a later failure keeps the last accepted duplicate snapshot`() =
         runTest {
             val local = localDraft()
             drafts[local.id] = local
@@ -140,11 +144,11 @@ class RestoreDraftContinuityTest {
                     onProgress = { if (it == RestoreProgressPhase.COMPLETED) error("Interrupted after duplicate ID") },
                 )
             }
-            assertEquals(local, drafts[local.id])
+            assertEquals(now + 2.days, drafts.getValue(local.id).lastModifiedAt)
         }
 
     @Test
-    fun `cancellation still restores the original draft`() =
+    fun `cancellation retains a draft already written`() =
         runTest {
             val local = localDraft()
             drafts[local.id] = local
@@ -163,7 +167,7 @@ class RestoreDraftContinuityTest {
                 }
             imported.await()
             job.cancelAndJoin()
-            assertEquals(local, drafts[local.id])
+            assertEquals(now + 1.days, drafts.getValue(local.id).lastModifiedAt)
         }
 
     @Test
@@ -179,17 +183,17 @@ class RestoreDraftContinuityTest {
         }
 
     @Test
-    fun `a failed duplicate write still rolls back an earlier successful write`() =
+    fun `a failed duplicate write keeps an earlier successful write`() =
         runTest {
             val local = localDraft()
             drafts[local.id] = local
             coEvery {
-                repository.compareAndSetDraftForRestore(local.id, any(), match { it?.lastModifiedAt == now + 2.days })
+                repository.compareAndSetDraftForRestore(local.id, any(), match { it?.lastModifiedAt == now + 2.days }, any(), any(), any())
             } throws IllegalStateException("Second draft write failed")
             assertFailsWith<IllegalStateException> {
                 restore.restore(bundle(exportDraft(local.id, now + 1.days), exportDraft(local.id, now + 2.days)))
             }
-            assertEquals(local, drafts[local.id])
+            assertEquals(now + 1.days, drafts.getValue(local.id).lastModifiedAt)
         }
 
     @Test

@@ -46,9 +46,13 @@ internal fun ArchiveSnapshot.mediaRequests(exportZone: TimeZone): List<MediaRequ
         }
     val fromDrafts =
         drafts.flatMap { draft ->
-            draft.blocks.mapNotNull { block ->
-                val reference = block.mediaReference() ?: return@mapNotNull null
-                MediaRequest(reference, block.mediaKind(), block.timestamp, exportZone)
+            draft.blocks.flatMap { block ->
+                buildList {
+                    block.mediaReference()?.let { add(MediaRequest(it, block.mediaKind(), block.timestamp, exportZone)) }
+                    if (block is SerializableVideoBlock) {
+                        block.thumbnailUri?.let { add(MediaRequest(it, MediaKind.PHOTO, block.timestamp, exportZone)) }
+                    }
+                }
             }
         }
     return fromNotes + fromDrafts
@@ -160,6 +164,7 @@ private fun SerializableEntryBlock.toArchiveBlock(media: MediaReferences): Archi
             base.copy(
                 type = ArchiveBlockType.VIDEO,
                 media = uri?.let(media::refFor),
+                thumbnail = thumbnailUri?.let(media::refFor),
                 caption = caption.ifEmpty { null },
             )
         is SerializableAudioBlock ->

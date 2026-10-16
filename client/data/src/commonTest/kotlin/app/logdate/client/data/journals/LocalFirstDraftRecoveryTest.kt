@@ -26,6 +26,56 @@ import kotlin.uuid.Uuid
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class LocalFirstDraftRecoveryTest {
     @Test
+    fun `a skipped pending draft deletion remains skipped after settling`() =
+        runTest {
+            val drafts = LocalFirstDraftRepository(DataStoreKeyValueStorage(RecoveryPreferences()), Json)
+            val metadata =
+                app.logdate.client.data.fakes
+                    .FakeSyncMetadataService()
+            val draft = EditorDraft()
+            metadata.enqueuePending(
+                draft.id.toString(),
+                app.logdate.client.sync.metadata.EntityType.DRAFT,
+                app.logdate.client.sync.metadata.PendingOperation.DELETE,
+            )
+            val persistence = JournalDraftPersistence(drafts, metadata, { it }, {})
+            val recovery = Uuid.random().toString()
+            assertFalse(persistence.compareAndSet(draft.id, null, draft, drafts.getDraftRecoveryScope(), recoveryId = recovery))
+            metadata.clearPending()
+            assertFalse(persistence.compareAndSet(draft.id, null, draft, drafts.getDraftRecoveryScope(), recoveryId = recovery))
+            assertEquals(null, drafts.getDraftForRestore(draft.id))
+        }
+
+    @Test
+    fun `a concurrent draft decision survives subsequent deletion`() =
+        runTest {
+            val storage = DataStoreKeyValueStorage(RecoveryPreferences())
+            val repository = LocalFirstDraftRepository(storage, Json)
+            val draft = EditorDraft()
+            repository.saveDraftFromSync(draft)
+            val recovery = Uuid.random().toString()
+            assertFalse(repository.compareAndSetDraftForRestore(draft.id, null, draft, repository.getDraftRecoveryScope(), recovery))
+            repository.deleteDraft(draft.id)
+            assertFalse(repository.compareAndSetDraftForRestore(draft.id, null, draft, repository.getDraftRecoveryScope(), recovery))
+            assertEquals(null, repository.getDraftForRestore(draft.id))
+        }
+
+    @Test
+    fun `an applied archive receipt survives deletion and a new repository instance`() =
+        runTest {
+            val preferences = RecoveryPreferences()
+            val storage = DataStoreKeyValueStorage(preferences)
+            val repository = LocalFirstDraftRepository(storage, Json)
+            val draft = EditorDraft()
+            val recoveryId = Uuid.random().toString()
+            assertTrue(repository.compareAndSetDraftForRestore(draft.id, null, draft, repository.getDraftRecoveryScope(), recoveryId))
+            repository.deleteDraft(draft.id)
+            val restarted = LocalFirstDraftRepository(storage, Json)
+            assertFalse(restarted.compareAndSetDraftForRestore(draft.id, null, draft, restarted.getDraftRecoveryScope(), recoveryId))
+            assertEquals(null, restarted.getDraftForRestore(draft.id))
+        }
+
+    @Test
     fun `a no-progress media retry validates the snapshot without writing or reordering drafts`() =
         runTest {
             val preferences = RecoveryPreferences()

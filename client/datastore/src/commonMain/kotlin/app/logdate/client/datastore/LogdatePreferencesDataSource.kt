@@ -28,6 +28,11 @@ class LogdatePreferencesDataSource(
     private val userPreferences: DataStore<Preferences>,
     private val featureAvailable: (FeatureFlag) -> Boolean = { it.availableForLaunch },
 ) {
+    private val historyPreferences by lazy { HistoryPreferences(userPreferences) }
+    private val profilePreferences by lazy { ProfilePreferences(userPreferences, userData, ::setBirthdate) }
+
+    fun archiveProfileRecoveryStore() = ArchiveProfileRecoveryStore(userPreferences)
+
     // TODO: Migrate to datastore-proto
     companion object {
         val BIRTHDAY = longPreferencesKey("birthday")
@@ -119,9 +124,6 @@ class LogdatePreferencesDataSource(
             )
         }
 
-    /**
-     * Observes whether the Library feature is enabled.
-     */
     fun observeLibraryEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
             prefs[LIBRARY_ENABLED] ?: FeatureFlag.LIBRARY.defaultEnabled
@@ -137,9 +139,6 @@ class LogdatePreferencesDataSource(
             prefs[ANDROID_PLATFORM_SEARCH_INDEX_GENERATION]
         }
 
-    /**
-     * Sets whether the Library feature is enabled.
-     */
     suspend fun setLibraryEnabled(enabled: Boolean) {
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
@@ -148,9 +147,6 @@ class LogdatePreferencesDataSource(
         }
     }
 
-    /**
-     * Observes whether the Events feature is enabled.
-     */
     fun observeEventsEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
             featureAvailable(FeatureFlag.EVENTS) &&
@@ -159,9 +155,6 @@ class LogdatePreferencesDataSource(
 
     suspend fun isEventsEnabled(): Boolean = observeEventsEnabled().first()
 
-    /**
-     * Sets whether the Events feature is enabled.
-     */
     suspend fun setEventsEnabled(enabled: Boolean) {
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
@@ -170,11 +163,6 @@ class LogdatePreferencesDataSource(
         }
     }
 
-    /**
-     * Observes whether the People slice is enabled for this installation.
-     *
-     * The People experience remains unavailable for the first public Android release.
-     */
     fun observePeopleEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
             featureAvailable(FeatureFlag.PEOPLE) &&
@@ -234,26 +222,16 @@ class LogdatePreferencesDataSource(
         }
     }
 
-    /**
-     * Observes the user's preferred day start hour.
-     * Returns null when the user hasn't set a preference.
-     */
     fun observeDayStartHour(): Flow<Int?> =
         userPreferences.data.map { prefs ->
             prefs[DAY_START_HOUR]
         }
 
-    /**
-     * Observes the persisted journal layout mode preference.
-     */
     fun observeJournalLayoutMode(): Flow<String> =
         userPreferences.data.map { prefs ->
             prefs[JOURNAL_LAYOUT_MODE] ?: "CAROUSEL"
         }
 
-    /**
-     * Persists the journal layout mode preference.
-     */
     suspend fun setJournalLayoutMode(modeName: String) {
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
@@ -315,10 +293,6 @@ class LogdatePreferencesDataSource(
         Napier.d("Birthday update complete")
     }
 
-    /**
-     * Returns the set of account IDs that have already received a one-time local-data backfill
-     * into the sync queue. See [BACKFILLED_ACCOUNT_IDS] for the why.
-     */
     suspend fun getBackfilledAccountIds(): Set<String> = userPreferences.data.first()[BACKFILLED_ACCOUNT_IDS] ?: emptySet()
 
     suspend fun markAccountBackfilled(accountId: String) {
@@ -330,9 +304,6 @@ class LogdatePreferencesDataSource(
         }
     }
 
-    /**
-     * Gets the user preferences
-     */
     suspend fun getPreferences(): UserPreferences {
         // Using first() to get the first emission from the flow
         // This avoids collecting indefinitely
@@ -345,9 +316,6 @@ class LogdatePreferencesDataSource(
             }.first()
     }
 
-    /**
-     * Sets the day start and end hours
-     */
     suspend fun setDayBounds(
         startHour: Int,
         endHour: Int,
@@ -362,114 +330,22 @@ class LogdatePreferencesDataSource(
         }
     }
 
-    /**
-     * Updates the user's display name
-     */
-    suspend fun updateDisplayName(displayName: String): Result<UserData> =
-        try {
-            val updatedPrefs =
-                userPreferences.updateData { preferences ->
-                    preferences.toMutablePreferences().apply {
-                        this[DISPLAY_NAME] = displayName
-                        // Set profile created timestamp if not already set
-                        if (this[PROFILE_CREATED_AT] == null) {
-                            this[PROFILE_CREATED_AT] = Clock.System.now().toEpochMilliseconds()
-                        }
-                    }
-                }
+    suspend fun updateDisplayName(displayName: String): Result<UserData> = profilePreferences.updateDisplayName(displayName)
 
-            val userData = userData.first()
-            Result.success(userData)
-        } catch (e: Exception) {
-            Napier.e("Failed to update display name", e)
-            Result.failure(e)
-        }
+    suspend fun updateBirthday(birthday: Instant): Result<UserData> = profilePreferences.updateBirthday(birthday)
 
-    /**
-     * Updates the user's birthday
-     */
-    suspend fun updateBirthday(birthday: Instant): Result<UserData> =
-        try {
-            setBirthdate(birthday)
-            val userData = userData.first()
-            Result.success(userData)
-        } catch (e: Exception) {
-            Napier.e("Failed to update birthday", e)
-            Result.failure(e)
-        }
-
-    /**
-     * Updates the user's profile photo URI
-     */
     suspend fun updateProfilePhotoUri(profilePhotoUri: String?): Result<UserData> =
-        try {
-            userPreferences.updateData { preferences ->
-                preferences.toMutablePreferences().apply {
-                    if (profilePhotoUri != null) {
-                        this[PROFILE_PHOTO_URI] = profilePhotoUri
-                    } else {
-                        this.remove(PROFILE_PHOTO_URI)
-                    }
-                }
-            }
+        profilePreferences.updateProfilePhotoUri(profilePhotoUri)
 
-            val userData = userData.first()
-            Result.success(userData)
-        } catch (e: Exception) {
-            Napier.e("Failed to update profile photo URI", e)
-            Result.failure(e)
-        }
-
-    /**
-     * Updates the user's bio and original bio
-     */
     suspend fun updateBio(
         bio: String?,
         originalBio: String?,
-    ): Result<UserData> =
-        try {
-            userPreferences.updateData { preferences ->
-                preferences.toMutablePreferences().apply {
-                    if (bio != null) {
-                        this[BIO] = bio
-                    } else {
-                        this.remove(BIO)
-                    }
+    ): Result<UserData> = profilePreferences.updateBio(bio, originalBio)
 
-                    if (originalBio != null) {
-                        this[ORIGINAL_BIO] = originalBio
-                    } else {
-                        this.remove(ORIGINAL_BIO)
-                    }
-                }
-            }
+    suspend fun updateProfileLastUpdated(timestamp: Instant) = profilePreferences.updateProfileLastUpdated(timestamp)
 
-            val userData = userData.first()
-            Result.success(userData)
-        } catch (e: Exception) {
-            Napier.e("Failed to update bio", e)
-            Result.failure(e)
-        }
-
-    /**
-     * Updates the profile last updated timestamp
-     */
-    suspend fun updateProfileLastUpdated(timestamp: Instant) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[PROFILE_LAST_UPDATED_AT] = timestamp.toEpochMilliseconds()
-            }
-        }
-    }
-
-    /**
-     * Gets the current user data synchronously
-     */
     suspend fun getCurrentUserData(): UserData = userData.first()
 
-    /**
-     * Clears all user data
-     */
     suspend fun clearUserData(): Result<Unit> =
         try {
             userPreferences.updateData { preferences ->
@@ -483,26 +359,14 @@ class LogdatePreferencesDataSource(
             Result.failure(e)
         }
 
-    /**
-     * Observes the user's preferred first day of the week.
-     *
-     * Returns null when no preference has been saved, allowing callers to apply
-     * their own fallback (typically the device locale default).
-     */
     fun observeFirstDayOfWeek(): Flow<DayOfWeek?> =
         userPreferences.data.map { prefs ->
             val stored = prefs[FIRST_DAY_OF_WEEK] ?: return@map null
             runCatching { DayOfWeek.valueOf(stored) }.getOrNull()
         }
 
-    /**
-     * Gets the user's preferred first day of the week, or null if not set.
-     */
     suspend fun getFirstDayOfWeek(): DayOfWeek? = observeFirstDayOfWeek().first()
 
-    /**
-     * Sets the user's preferred first day of the week.
-     */
     suspend fun setFirstDayOfWeek(dayOfWeek: DayOfWeek) {
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
@@ -511,297 +375,80 @@ class LogdatePreferencesDataSource(
         }
     }
 
-    /**
-     * Observes whether weekly rewinds should be generated automatically in the background.
-     *
-     * Defaults to true so existing users keep getting weekly rewinds without opt-in.
-     */
-    fun observeRewindAutoGenerationEnabled(): Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[REWIND_AUTO_GENERATION_ENABLED] ?: true
-        }
+    fun observeRewindAutoGenerationEnabled(): Flow<Boolean> = historyPreferences.observeRewindAutoGenerationEnabled()
 
-    suspend fun isRewindAutoGenerationEnabled(): Boolean = observeRewindAutoGenerationEnabled().first()
+    suspend fun isRewindAutoGenerationEnabled(): Boolean = historyPreferences.isRewindAutoGenerationEnabled()
 
-    suspend fun setRewindAutoGenerationEnabled(enabled: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[REWIND_AUTO_GENERATION_ENABLED] = enabled
-            }
-        }
-    }
+    suspend fun setRewindAutoGenerationEnabled(enabled: Boolean) = historyPreferences.setRewindAutoGenerationEnabled(enabled)
 
-    /**
-     * Observes whether the user wants a notification when a new weekly rewind is ready.
-     *
-     * Defaults to true. Independent of the system-level notification channel: this gates
-     * whether the app even tries to post the notification, so users who turn rewinds off
-     * here also stop seeing them in the notification settings flow.
-     */
-    fun observeRewindNotificationsEnabled(): Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[REWIND_NOTIFICATIONS_ENABLED] ?: true
-        }
+    fun observeRewindNotificationsEnabled(): Flow<Boolean> = historyPreferences.observeRewindNotificationsEnabled()
 
-    suspend fun isRewindNotificationsEnabled(): Boolean = observeRewindNotificationsEnabled().first()
+    suspend fun isRewindNotificationsEnabled(): Boolean = historyPreferences.isRewindNotificationsEnabled()
 
-    suspend fun setRewindNotificationsEnabled(enabled: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[REWIND_NOTIFICATIONS_ENABLED] = enabled
-            }
-        }
-    }
+    suspend fun setRewindNotificationsEnabled(enabled: Boolean) = historyPreferences.setRewindNotificationsEnabled(enabled)
 
-    /**
-     * Observes whether the user wants to be able to type replies to a rewind's noticing prompts.
-     *
-     * Defaults to true. When false, the rewind detail screen still shows the prompts but hides
-     * the reply chrome — useful for people who experience the prompts as decoration rather than
-     * an invitation.
-     */
-    fun observeRewindReflectionRepliesEnabled(): Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[REWIND_REFLECTION_REPLIES_ENABLED] ?: true
-        }
+    fun observeRewindReflectionRepliesEnabled(): Flow<Boolean> = historyPreferences.observeRewindReflectionRepliesEnabled()
 
-    suspend fun setRewindReflectionRepliesEnabled(enabled: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[REWIND_REFLECTION_REPLIES_ENABLED] = enabled
-            }
-        }
-    }
+    suspend fun setRewindReflectionRepliesEnabled(enabled: Boolean) = historyPreferences.setRewindReflectionRepliesEnabled(enabled)
 
-    /**
-     * Whether the user has seen the first-Rewind onboarding bottom sheet that explains
-     * how the cadence, share, and curation strictness work. Defaults to false so brand-new
-     * users still see it; gets set true the first time the sheet is dismissed.
-     */
-    fun observeHasSeenRewindOnboarding(): Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[HAS_SEEN_REWIND_ONBOARDING] ?: false
-        }
+    fun observeHasSeenRewindOnboarding(): Flow<Boolean> = historyPreferences.observeHasSeenRewindOnboarding()
 
-    suspend fun hasSeenRewindOnboarding(): Boolean = observeHasSeenRewindOnboarding().first()
+    suspend fun hasSeenRewindOnboarding(): Boolean = historyPreferences.hasSeenRewindOnboarding()
 
-    suspend fun setHasSeenRewindOnboarding(value: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[HAS_SEEN_REWIND_ONBOARDING] = value
-            }
-        }
-    }
+    suspend fun setHasSeenRewindOnboarding(value: Boolean) = historyPreferences.setHasSeenRewindOnboarding(value)
 
-    /**
-     * How aggressively photo curation drops borderline items. Persisted as the enum name
-     * (`LENIENT`, `STANDARD`, `STRICT`) so the lexicon can extend without renumbering.
-     * Defaults to STANDARD for new users.
-     */
-    fun observeRewindCurationStrictness(): Flow<String> =
-        userPreferences.data.map { prefs ->
-            prefs[REWIND_CURATION_STRICTNESS] ?: "STANDARD"
-        }
+    fun observeRewindCurationStrictness(): Flow<String> = historyPreferences.observeRewindCurationStrictness()
 
-    suspend fun getRewindCurationStrictness(): String = observeRewindCurationStrictness().first()
+    suspend fun getRewindCurationStrictness(): String = historyPreferences.getRewindCurationStrictness()
 
-    suspend fun setRewindCurationStrictness(strictness: String) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[REWIND_CURATION_STRICTNESS] = strictness
-            }
-        }
-    }
+    suspend fun setRewindCurationStrictness(strictness: String) = historyPreferences.setRewindCurationStrictness(strictness)
 
-    /**
-     * Whether screenshots are allowed to land in a Rewind. Defaults to false so brand-new
-     * users get a clean story; the user can opt in from the Rewind settings screen if they
-     * want their UI screenshots and saved images to participate.
-     */
-    fun observeRewindIncludeScreenshots(): Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[REWIND_INCLUDE_SCREENSHOTS] ?: false
-        }
+    fun observeRewindIncludeScreenshots(): Flow<Boolean> = historyPreferences.observeRewindIncludeScreenshots()
 
-    suspend fun isRewindIncludeScreenshots(): Boolean = observeRewindIncludeScreenshots().first()
+    suspend fun isRewindIncludeScreenshots(): Boolean = historyPreferences.isRewindIncludeScreenshots()
 
-    suspend fun setRewindIncludeScreenshots(value: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[REWIND_INCLUDE_SCREENSHOTS] = value
-            }
-        }
-    }
+    suspend fun setRewindIncludeScreenshots(value: Boolean) = historyPreferences.setRewindIncludeScreenshots(value)
 
-    /**
-     * Observes the user's auto-event inference sensitivity, defaulting to medium when unset.
-     *
-     * Persisted as the enum name (`LOW`, `MEDIUM`, `HIGH`) so we can extend the set later
-     * without renumbering existing values.
-     */
-    fun observeEventInferenceSensitivity(): Flow<String> =
-        userPreferences.data.map { prefs ->
-            prefs[EVENT_INFERENCE_SENSITIVITY] ?: "MEDIUM"
-        }
+    fun observeEventInferenceSensitivity(): Flow<String> = historyPreferences.observeEventInferenceSensitivity()
 
-    suspend fun getEventInferenceSensitivity(): String = observeEventInferenceSensitivity().first()
+    suspend fun getEventInferenceSensitivity(): String = historyPreferences.getEventInferenceSensitivity()
 
-    suspend fun setEventInferenceSensitivity(sensitivity: String) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[EVENT_INFERENCE_SENSITIVITY] = sensitivity
-            }
-        }
-    }
+    suspend fun setEventInferenceSensitivity(sensitivity: String) = historyPreferences.setEventInferenceSensitivity(sensitivity)
 
-    /**
-     * Whether the inference worker is allowed to call out to the on-device extractor for
-     * naming. Off → every event uses the heuristic fallback name, no network call.
-     */
-    fun observeEventInferenceAiNamingEnabled(): Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[EVENT_INFERENCE_AI_NAMING_ENABLED] ?: true
-        }
+    fun observeEventInferenceAiNamingEnabled(): Flow<Boolean> = historyPreferences.observeEventInferenceAiNamingEnabled()
 
-    suspend fun isEventInferenceAiNamingEnabled(): Boolean = observeEventInferenceAiNamingEnabled().first()
+    suspend fun isEventInferenceAiNamingEnabled(): Boolean = historyPreferences.isEventInferenceAiNamingEnabled()
 
-    suspend fun setEventInferenceAiNamingEnabled(enabled: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[EVENT_INFERENCE_AI_NAMING_ENABLED] = enabled
-            }
-        }
-    }
+    suspend fun setEventInferenceAiNamingEnabled(enabled: Boolean) = historyPreferences.setEventInferenceAiNamingEnabled(enabled)
 
-    /**
-     * Observes the most recent event inference worker run summary so the settings screen can
-     * show "Last run / events created / last error" without standing up a new repository.
-     */
-    fun observeEventInferenceStats(): Flow<EventInferenceStats> =
-        userPreferences.data.map { prefs ->
-            EventInferenceStats(
-                lastRunAt =
-                    prefs[EVENT_INFERENCE_LAST_RUN_AT]?.let { millis ->
-                        if (millis == 0L) null else Instant.fromEpochMilliseconds(millis)
-                    },
-                lastCreatedCount = prefs[EVENT_INFERENCE_LAST_CREATED_COUNT] ?: 0,
-                recentCreatedCount = prefs[EVENT_INFERENCE_RECENT_CREATED_COUNT] ?: 0,
-                lastErrorKind = prefs[EVENT_INFERENCE_LAST_ERROR_KIND],
-            )
-        }
+    fun observeEventInferenceStats(): Flow<EventInferenceStats> = historyPreferences.observeEventInferenceStats()
 
-    /**
-     * Records the result of one event inference worker run. Atomic — the recent rolling
-     * total is incremented inside the same `updateData` block as the per-run stats so two
-     * concurrent worker runs (immediate + periodic) can't lose increments to a stale read.
-     *
-     * [errorKind] is the `EventInferenceFailure` enum name (or `null` on success); the
-     * settings screen translates the kind to a localized string instead of showing raw
-     * exception messages.
-     */
     suspend fun recordEventInferenceRun(
         runAt: Instant,
         createdThisRun: Int,
         errorKind: String?,
-    ) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[EVENT_INFERENCE_LAST_RUN_AT] = runAt.toEpochMilliseconds()
-                this[EVENT_INFERENCE_LAST_CREATED_COUNT] = createdThisRun
-                val previousRecent = this[EVENT_INFERENCE_RECENT_CREATED_COUNT] ?: 0
-                this[EVENT_INFERENCE_RECENT_CREATED_COUNT] = previousRecent + createdThisRun
-                if (errorKind != null) {
-                    this[EVENT_INFERENCE_LAST_ERROR_KIND] = errorKind
-                } else {
-                    this.remove(EVENT_INFERENCE_LAST_ERROR_KIND)
-                }
-            }
-        }
-    }
+    ) = historyPreferences.recordEventInferenceRun(runAt, createdThisRun, errorKind)
 
-    /**
-     * Whether the user has turned on device calendar sync. When `false` the import worker
-     * still gets scheduled, but its first action is to short-circuit out — that keeps the
-     * worker registered so flipping the toggle on takes effect on the next periodic tick
-     * without re-bootstrapping WorkManager.
-     */
-    fun observeDeviceCalendarSyncEnabled(): Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[DEVICE_CALENDAR_SYNC_ENABLED] ?: false
-        }
+    fun observeDeviceCalendarSyncEnabled(): Flow<Boolean> = historyPreferences.observeDeviceCalendarSyncEnabled()
 
-    suspend fun isDeviceCalendarSyncEnabled(): Boolean = observeDeviceCalendarSyncEnabled().first()
+    suspend fun isDeviceCalendarSyncEnabled(): Boolean = historyPreferences.isDeviceCalendarSyncEnabled()
 
-    suspend fun setDeviceCalendarSyncEnabled(enabled: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[DEVICE_CALENDAR_SYNC_ENABLED] = enabled
-            }
-        }
-    }
+    suspend fun setDeviceCalendarSyncEnabled(enabled: Boolean) = historyPreferences.setDeviceCalendarSyncEnabled(enabled)
 
-    /**
-     * The set of device calendar ids the user has opted into. Empty by default; the
-     * settings overview surfaces an explicit "choose calendars" affordance when nothing's
-     * been picked yet.
-     */
-    fun observeDeviceCalendarEnabledIds(): Flow<Set<String>> =
-        userPreferences.data.map { prefs ->
-            prefs[DEVICE_CALENDAR_ENABLED_IDS] ?: emptySet()
-        }
+    fun observeDeviceCalendarEnabledIds(): Flow<Set<String>> = historyPreferences.observeDeviceCalendarEnabledIds()
 
-    suspend fun getDeviceCalendarEnabledIds(): Set<String> = observeDeviceCalendarEnabledIds().first()
+    suspend fun getDeviceCalendarEnabledIds(): Set<String> = historyPreferences.getDeviceCalendarEnabledIds()
 
-    suspend fun setDeviceCalendarEnabledIds(ids: Set<String>) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[DEVICE_CALENDAR_ENABLED_IDS] = ids
-            }
-        }
-    }
+    suspend fun setDeviceCalendarEnabledIds(ids: Set<String>) = historyPreferences.setDeviceCalendarEnabledIds(ids)
 
-    /**
-     * Most recent device calendar import worker run. Surfaced verbatim by the calendar
-     * sync settings status card; the worker writes via [recordDeviceCalendarSyncRun].
-     */
-    fun observeDeviceCalendarSyncStats(): Flow<DeviceCalendarSyncStats> =
-        userPreferences.data.map { prefs ->
-            DeviceCalendarSyncStats(
-                lastRunAt =
-                    prefs[DEVICE_CALENDAR_SYNC_LAST_RUN_AT]?.let { millis ->
-                        if (millis == 0L) null else Instant.fromEpochMilliseconds(millis)
-                    },
-                lastCreatedCount = prefs[DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT] ?: 0,
-                lastUpdatedCount = prefs[DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT] ?: 0,
-                lastErrorKind = prefs[DEVICE_CALENDAR_SYNC_LAST_ERROR_KIND],
-            )
-        }
+    fun observeDeviceCalendarSyncStats(): Flow<DeviceCalendarSyncStats> = historyPreferences.observeDeviceCalendarSyncStats()
 
-    /**
-     * Records the result of one calendar import worker run. [errorKind] is the
-     * `CalendarImportFailure` enum name (or `null` on success); the settings screen
-     * translates the kind to a localized string instead of showing raw exception
-     * messages.
-     */
     suspend fun recordDeviceCalendarSyncRun(
         runAt: Instant,
         created: Int,
         updated: Int,
         errorKind: String?,
-    ) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[DEVICE_CALENDAR_SYNC_LAST_RUN_AT] = runAt.toEpochMilliseconds()
-                this[DEVICE_CALENDAR_SYNC_LAST_CREATED_COUNT] = created
-                this[DEVICE_CALENDAR_SYNC_LAST_UPDATED_COUNT] = updated
-                if (errorKind != null) {
-                    this[DEVICE_CALENDAR_SYNC_LAST_ERROR_KIND] = errorKind
-                } else {
-                    this.remove(DEVICE_CALENDAR_SYNC_LAST_ERROR_KIND)
-                }
-            }
-        }
-    }
+    ) = historyPreferences.recordDeviceCalendarSyncRun(runAt, created, updated, errorKind)
 
     private fun millisToInstantOrDistantPast(millis: Long?): Instant {
         val value = millis ?: 0L

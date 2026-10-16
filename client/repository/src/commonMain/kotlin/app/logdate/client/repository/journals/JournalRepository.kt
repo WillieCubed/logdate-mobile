@@ -19,6 +19,20 @@ interface JournalRepository {
      */
     suspend fun getJournalById(id: Uuid): Journal?
 
+    suspend fun getJournalRecoveryScope(): JournalMergeScope? = null
+
+    suspend fun compareAndSetJournalForRestore(
+        expected: Journal?,
+        replacement: Journal,
+        scope: JournalMergeScope? = null,
+        recoveryId: String? = null,
+    ): Boolean {
+        if (getJournalById(replacement.id) != expected) return false
+        if (expected == replacement) return true
+        if (expected == null) create(replacement) else update(replacement)
+        return true
+    }
+
     suspend fun resolveJournalId(journalId: Uuid): Uuid = journalId
 
     suspend fun previewMerge(
@@ -124,9 +138,11 @@ interface JournalRepository {
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope? = null,
         enqueue: Boolean = true,
+        recoveryId: String? = null,
     ): Boolean {
         check(recoveryScope == null || getDraftRecoveryScope() == recoveryScope) { "Draft recovery account changed" }
         if (getDraftForRestore(id) != expected) return false
+        if (expected == replacement) return true
         if (enqueue) {
             if (replacement == null) deleteDraft(id) else saveDraft(replacement)
         } else {

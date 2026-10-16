@@ -38,6 +38,14 @@ interface MediaSyncRefStore {
     /** The note's reference on the current server, or `null` if it has none there. */
     suspend fun get(noteId: Uuid): MediaSyncRef?
 
+    suspend fun getScoped(
+        noteId: Uuid,
+        scope: UploadScope,
+    ): MediaSyncRef? =
+        get(noteId)?.takeIf {
+            it.ownerId == scope.ownerId && it.serverOrigin == scope.serverOrigin
+        }
+
     /** Saves [ref] as belonging to the current server. */
     suspend fun upsert(ref: MediaSyncRef)
 
@@ -53,6 +61,14 @@ interface MediaSyncRefStore {
         blockId: Uuid,
         kind: String,
     ): MediaSyncRef? = null
+
+    suspend fun getDraftAssetScoped(
+        draftId: Uuid,
+        blockId: Uuid,
+        kind: String,
+        scope: UploadScope,
+    ): MediaSyncRef? =
+        getDraftAsset(draftId, blockId, kind)?.takeIf { it.ownerId == scope.ownerId && it.serverOrigin == scope.serverOrigin }
 
     suspend fun upsertDraftAsset(
         draftId: Uuid,
@@ -75,6 +91,18 @@ class KeyValueMediaSyncRefStore(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : MediaSyncRefStore {
     override suspend fun get(noteId: Uuid): MediaSyncRef? = read(noteId.toString(), selectedScope())
+
+    override suspend fun getScoped(
+        noteId: Uuid,
+        scope: UploadScope,
+    ): MediaSyncRef? = read(noteId.toString(), scope)
+
+    override suspend fun getDraftAssetScoped(
+        draftId: Uuid,
+        blockId: Uuid,
+        kind: String,
+        scope: UploadScope,
+    ): MediaSyncRef? = read("draft:$draftId:$blockId:$kind", scope)
 
     override suspend fun getDraftAsset(
         draftId: Uuid,

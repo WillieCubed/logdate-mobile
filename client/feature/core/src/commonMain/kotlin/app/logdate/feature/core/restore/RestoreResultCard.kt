@@ -2,9 +2,7 @@
 
 package app.logdate.feature.core.restore
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,22 +19,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.client.domain.restore.IntegrityCategory
 import app.logdate.feature.core.common.DataStatsGrid
 import app.logdate.feature.core.common.OperationFailureCard
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.export_category_drafts
-import logdate.client.feature.core.generated.resources.export_category_journals
-import logdate.client.feature.core.generated.resources.export_category_media
-import logdate.client.feature.core.generated.resources.export_category_notes
 import logdate.client.feature.core.generated.resources.restore_complete_description
 import logdate.client.feature.core.generated.resources.restore_complete_title
 import logdate.client.feature.core.generated.resources.restore_failed_title
-import logdate.client.feature.core.generated.resources.restore_integrity_mismatch
-import logdate.client.feature.core.generated.resources.restore_warnings_title
+import logdate.client.feature.core.generated.resources.restore_interrupted_description
+import logdate.client.feature.core.generated.resources.restore_interrupted_title
+import logdate.client.feature.core.generated.resources.restore_partial_description
+import logdate.client.feature.core.generated.resources.restore_partial_title
+import logdate.client.feature.core.generated.resources.restore_paused_description
+import logdate.client.feature.core.generated.resources.restore_paused_title
+import logdate.client.feature.core.generated.resources.restore_recover_media
+import logdate.client.feature.core.generated.resources.restore_recovering_description
+import logdate.client.feature.core.generated.resources.restore_recovering_media
+import logdate.client.feature.core.generated.resources.restore_resume_import
+import logdate.client.feature.core.generated.resources.restore_resuming_description
+import logdate.client.feature.core.generated.resources.restore_resuming_title
+import logdate.client.feature.core.generated.resources.restore_unreadable_description
+import logdate.client.feature.core.generated.resources.restore_unreadable_title
 import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
@@ -46,8 +51,11 @@ import logdate.client.ui.generated.resources.Res as UiRes
 internal fun RestoreSuccessCard(
     summary: RestoreSummary,
     onDismiss: () -> Unit,
+    onRecoverMedia: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val incomplete =
+        summary.needsAnotherArchive || summary.metadataIncomplete || summary.unavailableOriginals + summary.unavailablePreviews > 0
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -62,7 +70,24 @@ internal fun RestoreSuccessCard(
         Spacer(modifier = Modifier.height(Spacing.md))
 
         Text(
-            text = stringResource(Res.string.restore_complete_title),
+            text =
+                stringResource(
+                    if (summary.metadataIncomplete && summary.recoveringMedia) {
+                        Res.string.restore_resuming_title
+                    } else if (summary.metadataIncomplete && summary.canResume) {
+                        Res.string.restore_paused_title
+                    } else if (summary.metadataIncomplete) {
+                        Res.string.restore_interrupted_title
+                    } else if (summary.needsAnotherArchive) {
+                        Res.string.restore_unreadable_title
+                    } else if (summary.recoveringMedia) {
+                        Res.string.restore_recovering_media
+                    } else if (incomplete) {
+                        Res.string.restore_partial_title
+                    } else {
+                        Res.string.restore_complete_title
+                    },
+                ),
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
@@ -70,7 +95,26 @@ internal fun RestoreSuccessCard(
         Spacer(modifier = Modifier.height(Spacing.sm))
 
         Text(
-            text = stringResource(Res.string.restore_complete_description),
+            text =
+                if (summary.metadataIncomplete && summary.recoveringMedia) {
+                    stringResource(Res.string.restore_resuming_description)
+                } else if (summary.metadataIncomplete && summary.canResume) {
+                    stringResource(Res.string.restore_paused_description)
+                } else if (summary.metadataIncomplete) {
+                    stringResource(Res.string.restore_interrupted_description)
+                } else if (summary.needsAnotherArchive) {
+                    stringResource(Res.string.restore_unreadable_description)
+                } else if (summary.recoveringMedia) {
+                    stringResource(Res.string.restore_recovering_description)
+                } else if (incomplete) {
+                    stringResource(
+                        Res.string.restore_partial_description,
+                        summary.unavailableOriginals,
+                        summary.unavailablePreviews,
+                    )
+                } else {
+                    stringResource(Res.string.restore_complete_description)
+                },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -93,39 +137,16 @@ internal fun RestoreSuccessCard(
             mediaCount = summary.mediaImported,
         )
 
-        val allWarnings =
-            buildList {
-                addAll(
-                    summary.integrityMismatches.map { mismatch ->
-                        val categoryName =
-                            when (mismatch.category) {
-                                IntegrityCategory.JOURNALS -> stringResource(Res.string.export_category_journals)
-                                IntegrityCategory.NOTES -> stringResource(Res.string.export_category_notes)
-                                IntegrityCategory.DRAFTS -> stringResource(Res.string.export_category_drafts)
-                                IntegrityCategory.MEDIA -> stringResource(Res.string.export_category_media)
-                                IntegrityCategory.PROFILE -> "Profile"
-                                IntegrityCategory.PLACES -> "Places"
-                                IntegrityCategory.LOCATION_HISTORY -> "Location History"
-                            }
-                        stringResource(
-                            Res.string.restore_integrity_mismatch,
-                            mismatch.expected,
-                            categoryName,
-                            mismatch.actual,
-                        )
-                    },
-                )
-                addAll(summary.warnings)
-            }
-
-        if (allWarnings.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(Spacing.lg))
-
-            RestoreWarningsSection(warnings = allWarnings)
-        }
-
         Spacer(modifier = Modifier.height(Spacing.xl))
 
+        if (incomplete &&
+            (!summary.recoveringMedia || summary.needsAnotherArchive && !summary.metadataIncomplete) &&
+            summary.recoveryId != null
+        ) {
+            TextButton(onClick = onRecoverMedia) {
+                Text(stringResource(if (summary.canResume) Res.string.restore_resume_import else Res.string.restore_recover_media))
+            }
+        }
         TextButton(onClick = onDismiss) {
             Text(stringResource(UiRes.string.common_done))
         }
@@ -161,50 +182,6 @@ private fun ArchiveMetadataRow(
                     text = details,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RestoreWarningsSection(
-    warnings: List<String>,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-    ) {
-        Column(
-            modifier = Modifier.padding(Spacing.md),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    painter = PlatformIcons.error(),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-                Text(
-                    text = stringResource(Res.string.restore_warnings_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.sm))
-
-            warnings.forEach { warning ->
-                Text(
-                    text = warning,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.padding(start = Spacing.lg + Spacing.sm),
                 )
             }
         }

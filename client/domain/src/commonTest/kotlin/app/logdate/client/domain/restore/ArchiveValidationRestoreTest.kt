@@ -81,7 +81,7 @@ internal class ArchiveValidationRestoreTest : RestoreArchiveTestFixture() {
         }
 
     @Test
-    fun `restore rolls back created entities on failure`() =
+    fun `restore preserves durable entries when a later import fails`() =
         runTest {
             val journalId = Uuid.random()
             val noteId1 = Uuid.random()
@@ -102,8 +102,10 @@ internal class ArchiveValidationRestoreTest : RestoreArchiveTestFixture() {
             val exception = runCatching { useCase.restore(bundle) }.exceptionOrNull()
 
             assertTrue(exception is RuntimeException, "Should propagate exception")
-            assertTrue(journalRepo.deleted.contains(journalId), "Created journal should be rolled back")
-            assertTrue(notesRepo.removed.contains(noteId1), "Created note should be rolled back")
+            assertTrue(journalRepo.deleted.isEmpty())
+            assertTrue(journalId in journalRepo.existingJournals)
+            assertTrue(notesRepo.removed.isEmpty())
+            assertTrue(noteId1 in notesRepo.existingNotes)
         }
 
     // endregion

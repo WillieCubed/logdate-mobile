@@ -13,6 +13,8 @@
     <string name="restore_channel_name">Data restore</string>
     <string name="restore_channel_description">Restoring user data from backup</string>
     <string name="restore_title_progress">Restoring data</string>
+    <string name="restore_title_partial">Entries restored; media missing</string>
+    <string name="restore_notification_partial_message">Your entries are kept. Open LogDate to recover missing originals or previews.</string>
     <string name="restore_title_complete">Restore complete</string>
     <string name="restore_title_failed">Restore failed</string>
     <string name="restore_notification_complete_message">Your data has been restored.</string>

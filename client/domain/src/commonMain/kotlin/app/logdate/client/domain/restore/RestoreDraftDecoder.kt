@@ -8,139 +8,126 @@ import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
-import io.github.aakira.napier.Napier
 import kotlin.uuid.Uuid
 
 internal class RestoreDraftDecoder(
-    private val resolveMediaReference: suspend (String?) -> MediaResolution,
-    private val warnings: MutableList<String>,
-    private val onMediaImported: (Boolean) -> Unit,
+    private val resolveMediaReference: suspend (String?, String?, Boolean) -> MediaResolution,
+    private val recoveryId: String,
 ) {
-    suspend fun decode(draft: ExportDraft): EditorDraft {
-        val restoredBlocks =
+    private val unavailable = mutableListOf<UnavailableMediaAsset>()
+    private var imported = 0
+
+    suspend fun decode(
+        draft: ExportDraft,
+        existing: EditorDraft? = null,
+    ): DecodedArchiveDraft {
+        unavailable.clear()
+        imported = 0
+        val blocks =
             if (draft.blocks.isNotEmpty()) {
-                draft.blocks.mapNotNull { block ->
-                    restoreDraftBlock(block)
+                draft.blocks.map { block ->
+                    restoreBlock(
+                        draft.id,
+                        block,
+                        existing?.blocks?.firstOrNull {
+                            it.id == block.id &&
+                                it::class == block::class
+                        },
+                    )
                 }
             } else {
-                emptyList()
+                buildList {
+                    if (draft.content.isNotBlank()) {
+                        add(
+                            SerializableTextBlock(
+                                Uuid.random(),
+                                draft.createdAt,
+                                locationLat = draft.location?.latitude,
+                                locationLng = draft.location?.longitude,
+                                content = draft.content,
+                            ),
+                        )
+                    }
+                    draft.mediaReferences.forEach { reference ->
+                        val id = Uuid.random()
+                        add(SerializableCameraBlock(id, draft.updatedAt, uri = resolve(draft.id, id, reference, kind = "camera")))
+                    }
+                }
             }
-
-        if (restoredBlocks.isNotEmpty()) {
-            return EditorDraft(
-                id = runCatching { Uuid.parse(draft.id) }.getOrDefault(Uuid.random()),
-                blocks = restoredBlocks,
+        val restored =
+            EditorDraft(
+                id = Uuid.parse(draft.id),
+                blocks = blocks,
                 selectedJournalIds = draft.parseSelectedJournalIds(),
                 createdAt = draft.createdAt,
                 lastModifiedAt = draft.updatedAt,
             )
-        }
-
-        val blocks = mutableListOf<SerializableEntryBlock>()
-        if (draft.content.isNotBlank()) {
-            blocks.add(
-                SerializableTextBlock(
-                    id = Uuid.random(),
-                    timestamp = draft.createdAt,
-                    locationLat = draft.location?.latitude,
-                    locationLng = draft.location?.longitude,
-                    content = draft.content,
-                ),
-            )
-        }
-
-        draft.mediaReferences.forEach { reference ->
-            val resolution = resolveMediaReference(reference)
-            onMediaImported(resolution.imported)
-            val uri = resolution.uri ?: return@forEach
-            blocks.add(
-                SerializableCameraBlock(
-                    id = Uuid.random(),
-                    timestamp = draft.updatedAt,
-                    uri = uri,
-                ),
-            )
-        }
-
-        val selectedJournalIds =
-            draft.parseSelectedJournalIds()
-
-        return EditorDraft(
-            id = runCatching { Uuid.parse(draft.id) }.getOrDefault(Uuid.random()),
-            blocks = blocks,
-            selectedJournalIds = selectedJournalIds,
-            createdAt = draft.createdAt,
-            lastModifiedAt = draft.updatedAt,
-        )
+        return DecodedArchiveDraft(restored, imported, unavailable.toList())
     }
 
-    private suspend fun restoreDraftBlock(block: SerializableEntryBlock): SerializableEntryBlock? =
+    private suspend fun restoreBlock(
+        draftId: String,
+        block: SerializableEntryBlock,
+        existing: SerializableEntryBlock?,
+    ): SerializableEntryBlock =
         when (block) {
             is SerializableTextBlock -> block
             is SerializableImageBlock ->
-                resolveSimpleBlock(block.uri, block.id) {
-                    block.copy(uri = it)
-                }
-            is SerializableVideoBlock -> {
-                val mediaResolution = resolveMediaReference(block.uri)
-                onMediaImported(mediaResolution.imported)
-                val thumbnailResolution = resolveMediaReference(block.thumbnailUri)
-                onMediaImported(thumbnailResolution.imported)
-                resolvedDraftBlockOrDropped(block.uri, mediaResolution, block.id) {
-                    block.copy(uri = it, thumbnailUri = thumbnailResolution.uri)
-                }
-            }
+                block.copy(
+                    uri = resolve(draftId, block.id, block.uri, fallback = (existing as? SerializableImageBlock)?.uri, kind = "image"),
+                )
             is SerializableAudioBlock ->
-                resolveSimpleBlock(block.uri, block.id) {
-                    block.copy(uri = it)
-                }
+                block.copy(
+                    uri = resolve(draftId, block.id, block.uri, fallback = (existing as? SerializableAudioBlock)?.uri, kind = "audio"),
+                )
             is SerializableCameraBlock ->
-                resolveSimpleBlock(block.uri, block.id) {
-                    block.copy(uri = it)
-                }
+                block.copy(
+                    uri = resolve(draftId, block.id, block.uri, fallback = (existing as? SerializableCameraBlock)?.uri, kind = "camera"),
+                )
+            is SerializableVideoBlock -> {
+                val previous = existing as? SerializableVideoBlock
+                val uri = resolve(draftId, block.id, block.uri, fallback = previous?.uri, kind = "video")
+                block.copy(
+                    uri = uri,
+                    thumbnailUri =
+                        resolve(
+                            draftId,
+                            block.id,
+                            block.thumbnailUri,
+                            RecoveryMediaRole.THUMBNAIL,
+                            fallback = previous?.thumbnailUri?.takeIf { uri != null && uri == previous.uri },
+                            allowEmptyFallback = uri != null && uri == previous?.uri,
+                            kind = "video",
+                        ),
+                )
+            }
         }
 
-    /**
-     * Shared resolution path for the draft block types that only carry a single media
-     * reference (image, audio, camera). [SerializableVideoBlock] resolves a second
-     * reference (its thumbnail) and so is handled separately in [restoreDraftBlock].
-     */
-    private suspend fun resolveSimpleBlock(
-        uri: String?,
+    private suspend fun resolve(
+        draftId: String,
         blockId: Uuid,
-        copy: (String?) -> SerializableEntryBlock,
-    ): SerializableEntryBlock? {
-        val resolution = resolveMediaReference(uri)
-        onMediaImported(resolution.imported)
-        return resolvedDraftBlockOrDropped(uri, resolution, blockId, copy)
-    }
-
-    /**
-     * Drops a draft media block when it had a real reference that couldn't be resolved, rather
-     * than silently keeping it with a dead `uri = null`. A block that never had media to begin
-     * with (blank/null [originalUri]) is left alone -- there was nothing to resolve.
-     */
-    private fun resolvedDraftBlockOrDropped(
-        originalUri: String?,
-        resolution: MediaResolution,
-        blockId: Uuid,
-        copy: (String?) -> SerializableEntryBlock,
-    ): SerializableEntryBlock? {
-        if (resolution.uri == null && !originalUri.isNullOrBlank()) {
-            val message = "Skipped draft media block (ID: $blockId) - media file not found in archive"
-            Napier.w(message)
-            warnings.add(message)
-            return null
-        }
-        return copy(resolution.uri)
+        reference: String?,
+        role: RecoveryMediaRole = RecoveryMediaRole.ORIGINAL,
+        fallback: String? = null,
+        allowEmptyFallback: Boolean = false,
+        kind: String? = null,
+    ): String? {
+        val resolution = resolveMediaReference(reference, fallback, allowEmptyFallback)
+        if (resolution.imported) imported++
+        resolution.unavailableAsset(draftId, blockId.toString(), role, recoveryId, kind)?.let(unavailable::add)
+        return resolution.retainedReference(draftId, blockId.toString(), role, recoveryId)
     }
 
     private fun ExportDraft.parseSelectedJournalIds(): List<Uuid> =
         if (journalIds.isNotEmpty()) {
             journalIds.mapNotNull { runCatching { Uuid.parse(it) }.getOrNull() }
         } else {
-            journalId?.let { value ->
-                runCatching { listOf(Uuid.parse(value)) }.getOrNull() ?: emptyList()
-            } ?: emptyList()
+            journalId?.let { runCatching { listOf(Uuid.parse(it)) }.getOrNull() }.orEmpty()
         }
 }
+
+internal data class DecodedArchiveDraft(
+    val draft: EditorDraft,
+    val mediaImported: Int,
+    val unavailableMedia: List<UnavailableMediaAsset>,
+)

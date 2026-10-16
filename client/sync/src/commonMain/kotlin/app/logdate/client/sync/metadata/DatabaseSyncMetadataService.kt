@@ -214,6 +214,34 @@ class DatabaseSyncMetadataService(
         )
     }
 
+    override suspend fun hasPendingDeletion(
+        entityId: String,
+        entityType: EntityType,
+        scope: UploadScope?,
+    ): Boolean {
+        val selected = scope ?: UploadScope(currentOwnerId(), currentOrigin())
+        return dao.getPending(selected.ownerId, selected.serverOrigin, entityType.name, entityId)?.operation == "DELETE" ||
+            dao.getPending(LEGACY_OWNER_ID, selected.serverOrigin, entityType.name, entityId)?.operation == "DELETE"
+    }
+
+    override suspend fun enqueueRestoreMutation(
+        entityId: String,
+        entityType: EntityType,
+        operation: PendingOperation,
+        scope: UploadScope?,
+    ): Boolean {
+        val selected = scope ?: UploadScope(currentOwnerId(), currentOrigin())
+        require(selected.ownerId.isNotBlank() && selected.serverOrigin.isNotBlank())
+        return dao.enqueueRestoreMutation(
+            selected.ownerId,
+            selected.serverOrigin,
+            entityId,
+            entityType.name,
+            operation.name,
+            Clock.System.now().toEpochMilliseconds(),
+        )
+    }
+
     override suspend fun enqueueTranscriptMutation(noteId: String): Boolean =
         dao.enqueueTranscriptMutation(currentOwnerId(), currentOrigin(), noteId, Clock.System.now().toEpochMilliseconds())
 

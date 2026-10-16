@@ -128,11 +128,12 @@ class StandardProfileCharacterizationTest {
     @Test
     fun `a remote note is stored with its media`() =
         runTest {
+            val noteId = Uuid.random().toString()
             val api = fakeCloudApiClient()
             api.downloadMediaResponse =
                 Result.success(
                     MediaDownloadResponse(
-                        contentId = Uuid.random().toString(),
+                        contentId = noteId,
                         fileName = "downloaded-media.bin",
                         mimeType = "application/octet-stream",
                         sizeBytes = 4,
@@ -146,7 +147,7 @@ class StandardProfileCharacterizationTest {
                         changes =
                             listOf(
                                 ContentChange(
-                                    id = Uuid.random().toString(),
+                                    id = noteId,
                                     type = "IMAGE",
                                     mediaUri = "https://example.com/api/v1/media/image-media/binary",
                                     createdAt = CHANGED_AT,

@@ -37,6 +37,7 @@ sealed class RestoreState {
     data class Failed(
         val error: RestoreError,
         val canRetry: Boolean = true,
+        val recoveryId: String? = null,
     ) : RestoreState()
 }
 
@@ -49,8 +50,22 @@ class UserDataRestoreViewModel(
 
     private val _isSheetVisible = MutableStateFlow(false)
     val isSheetVisible: StateFlow<Boolean> = _isSheetVisible.asStateFlow()
+    private var selectionRecoveryState: RestoreState? = null
 
     init {
+        restoreLauncher.setRecoveryUpdateCallback { summary ->
+            _restoreState.update { current ->
+                if (current is RestoreState.Completed &&
+                    current.summary.recoveryId == summary.recoveryId
+                ) {
+                    RestoreState.Completed(summary)
+                } else {
+                    current
+                }
+            }
+            val previous = selectionRecoveryState as? RestoreState.Completed
+            if (previous?.summary?.recoveryId == summary.recoveryId) selectionRecoveryState = RestoreState.Completed(summary)
+        }
         restoreLauncher.setRestoreCompletionCallback { outcome ->
             when (outcome) {
                 is RestoreOutcome.Started -> _restoreState.update { RestoreState.Restoring() }
@@ -59,11 +74,14 @@ class UserDataRestoreViewModel(
                     _isSheetVisible.value = false
                 }
                 is RestoreOutcome.Success -> {
+                    selectionRecoveryState = null
                     _restoreState.update { RestoreState.Completed(outcome.summary) }
                     _isSheetVisible.value = true
                 }
                 is RestoreOutcome.Failure -> {
-                    _restoreState.update { RestoreState.Failed(outcome.error) }
+                    _restoreState.update {
+                        RestoreState.Failed(outcome.error, recoveryId = outcome.recoveryId ?: recoveryIdentity(selectionRecoveryState))
+                    }
                     _isSheetVisible.value = true
                 }
             }
@@ -71,8 +89,8 @@ class UserDataRestoreViewModel(
 
         restoreLauncher.setFileSelectedCallback { fileInfo ->
             if (fileInfo == null) {
-                _restoreState.update { RestoreState.Idle }
-                _isSheetVisible.value = false
+                _restoreState.value = selectionRecoveryState ?: RestoreState.Idle
+                _isSheetVisible.value = selectionRecoveryState != null
                 return@setFileSelectedCallback
             }
             try {
@@ -80,7 +98,7 @@ class UserDataRestoreViewModel(
                 val preview = previewArchiveUseCase.preview(metadataJson)
                 if (preview.version.major > ExportSchemaVersion.CURRENT.major) {
                     _restoreState.update {
-                        RestoreState.Failed(RestoreError.UNSUPPORTED_VERSION)
+                        RestoreState.Failed(RestoreError.UNSUPPORTED_VERSION, recoveryId = recoveryIdentity(selectionRecoveryState))
                     }
                     return@setFileSelectedCallback
                 }
@@ -93,7 +111,7 @@ class UserDataRestoreViewModel(
             } catch (e: Exception) {
                 Napier.e("Failed to parse archive metadata")
                 _restoreState.update {
-                    RestoreState.Failed(RestoreError.INVALID_ARCHIVE)
+                    RestoreState.Failed(RestoreError.INVALID_ARCHIVE, recoveryId = recoveryIdentity(selectionRecoveryState))
                 }
             }
         }
@@ -135,6 +153,7 @@ class UserDataRestoreViewModel(
     }
 
     fun selectFile() {
+        selectionRecoveryState = null
         _restoreState.update { RestoreState.Selecting }
         restoreLauncher.startFileSelection()
     }
@@ -163,12 +182,22 @@ class UserDataRestoreViewModel(
     fun dismissSheet() {
         val current = _restoreState.value
         _isSheetVisible.value = false
+        if (current is RestoreState.Completed &&
+            (
+                current.summary.needsAnotherArchive ||
+                    current.summary.metadataIncomplete ||
+                    current.summary.unavailableOriginals + current.summary.unavailablePreviews > 0
+            )
+        ) {
+            return
+        }
+        if (current is RestoreState.Failed && current.recoveryId != null) return
         when (current) {
             is RestoreState.Confirming,
             is RestoreState.Previewing,
             is RestoreState.Completed,
             is RestoreState.Failed,
-            -> _restoreState.update { RestoreState.Idle }
+            -> _restoreState.update { selectionRecoveryState ?: RestoreState.Idle }
             else -> Unit
         }
     }
@@ -187,8 +216,22 @@ class UserDataRestoreViewModel(
     }
 
     fun retryRestore() {
+        val recoveryId = recoveryIdentity(_restoreState.value)
+        if (recoveryId != null) {
+            selectionRecoveryState = _restoreState.value
+            _restoreState.value = RestoreState.Selecting
+            restoreLauncher.selectArchiveForMediaRecovery(recoveryId)
+            return
+        }
         _restoreState.update { RestoreState.Selecting }
         _isSheetVisible.value = true
         restoreLauncher.startFileSelection()
     }
+
+    private fun recoveryIdentity(state: RestoreState?): String? =
+        when (state) {
+            is RestoreState.Completed -> state.summary.recoveryId
+            is RestoreState.Failed -> state.recoveryId
+            else -> null
+        }
 }

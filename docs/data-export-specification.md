@@ -124,6 +124,15 @@ draft attachment is skipped; a source-device path is never retained as a fallbac
 An omitted file has an `omittedReason` and no path, so nothing ever points at a file that is not
 there. `data/media.json` lists every included file with its size and SHA-256.
 
+Draft video blocks may also contain an optional `thumbnail` using the same media-reference shape.
+The original and preview have independent inclusion status and inventory entries. A readable preview
+does not establish that the original video was included.
+
+Restoring an omitted or unreadable original retains its entry or draft block, including captions,
+duration, transcription, block order, and journal selections. A missing original remains distinct
+from an unfinished draft block with no attachment. Android records unresolved attachments separately
+and offers attachment-only recovery from another archive, preserving edits made after import.
+
 **Time zones.** A note stores an instant in UTC. When the device recorded the zone the note was written
 in, the note also has `timeZone` (an IANA name) and `createdAtLocal`, the same moment as local time
 with its offset. A note that was written before zones were recorded has neither; the export does not

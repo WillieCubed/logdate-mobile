@@ -3,32 +3,22 @@ package app.logdate.client.domain.restore
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.export.ExportLocationHistoryItem
-import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportMediaManifest
 import app.logdate.client.domain.export.ExportMetadata
-import app.logdate.client.domain.export.ExportNote
 import app.logdate.client.domain.export.ExportPlace
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.LocationHistoryPayload
 import app.logdate.client.domain.export.PlacesPayload
 import app.logdate.client.domain.export.ProfilePayload
-import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalContentRepository
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.NoteCoordinates
-import app.logdate.client.repository.journals.NoteLocation
-import app.logdate.client.repository.journals.NotePlace
-import app.logdate.client.repository.journals.withTimeZoneId
+import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
-import app.logdate.shared.model.PhotoPresentation
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlin.uuid.Uuid
@@ -56,9 +46,12 @@ class RestoreUserDataUseCase(
         options: RestoreOptions = RestoreOptions(),
         mediaImporter: MediaImporter? = null,
         onProgress: (suspend (RestoreProgressPhase) -> Unit)? = null,
+        onPendingMedia: ((UnavailableMediaAsset) -> Unit)? = null,
+        mediaRecoveryId: String = Uuid.random().toString(),
+        expectedNoteScope: app.logdate.client.repository.journals.JournalMergeScope? = null,
     ): RestoreResult {
         val adapted = bundle.adaptForRestore(canonicalOwnerProvider.getCanonicalOwnerId(), deviceIdProvider.getDeviceId().value.toString())
-        val restored = restore(adapted.legacy, options, mediaImporter, onProgress)
+        val restored = restore(adapted.legacy, options, mediaImporter, onProgress, onPendingMedia, mediaRecoveryId, expectedNoteScope)
         return restored.copy(
             metadata = adapted.metadata,
             warnings = adapted.warnings + restored.warnings,
@@ -70,10 +63,31 @@ class RestoreUserDataUseCase(
         options: RestoreOptions = RestoreOptions(),
         mediaImporter: MediaImporter? = null,
         onProgress: (suspend (RestoreProgressPhase) -> Unit)? = null,
+        onPendingMedia: ((UnavailableMediaAsset) -> Unit)? = null,
+        mediaRecoveryId: String = Uuid.random().toString(),
+        expectedNoteScope: app.logdate.client.repository.journals.JournalMergeScope? = null,
     ): RestoreResult =
         when (archive) {
-            is RestoreArchiveBundle.V1 -> restore(archive.bundle, options, mediaImporter, onProgress)
-            is RestoreArchiveBundle.V2 -> restore(archive.bundle, options, mediaImporter, onProgress)
+            is RestoreArchiveBundle.V1 ->
+                restore(
+                    archive.bundle,
+                    options,
+                    mediaImporter,
+                    onProgress,
+                    onPendingMedia,
+                    mediaRecoveryId,
+                    expectedNoteScope,
+                )
+            is RestoreArchiveBundle.V2 ->
+                restore(
+                    archive.bundle,
+                    options,
+                    mediaImporter,
+                    onProgress,
+                    onPendingMedia,
+                    mediaRecoveryId,
+                    expectedNoteScope,
+                )
         }
 
     suspend fun restore(
@@ -81,7 +95,15 @@ class RestoreUserDataUseCase(
         options: RestoreOptions = RestoreOptions(),
         mediaImporter: MediaImporter? = null,
         onProgress: (suspend (RestoreProgressPhase) -> Unit)? = null,
+        onPendingMedia: ((UnavailableMediaAsset) -> Unit)? = null,
+        mediaRecoveryId: String = Uuid.random().toString(),
+        expectedNoteScope: app.logdate.client.repository.journals.JournalMergeScope? = null,
     ): RestoreResult {
+        val noteRecoveryScope = journalNotesRepository.getNoteRecoveryScope()
+        val journalRecoveryScope = journalRepository.getJournalRecoveryScope()
+        check(expectedNoteScope == null || noteRecoveryScope == expectedNoteScope && journalRecoveryScope == expectedNoteScope) {
+            "Archive recovery account changed"
+        }
         val metadata = json.decodeFromString<ExportMetadata>(bundle.metadataJson)
 
         if (metadata.version.major != ExportSchemaVersion.V1_0.major || metadata.version > ExportSchemaVersion.V1_2) {
@@ -115,6 +137,19 @@ class RestoreUserDataUseCase(
         var linksImported = 0
         var mediaImported = 0
         val warnings = mutableListOf<String>()
+        val unavailableMedia = mutableListOf<UnavailableMediaAsset>()
+        val mediaResolver = RestoreMediaResolver(manifestIndex, mediaImporter, options.includeMedia)
+
+        fun recordUnavailable(asset: UnavailableMediaAsset) {
+            unavailableMedia += asset
+            val message =
+                if (asset.role == RecoveryMediaRole.THUMBNAIL) {
+                    "Some media previews are unavailable. Their entries were kept."
+                } else {
+                    "Some media originals are unavailable. Their entries were kept."
+                }
+            if (message !in warnings) warnings += message
+        }
 
         // Verify metadata.json stats match actual archive contents
         val integrityMismatches =
@@ -134,15 +169,20 @@ class RestoreUserDataUseCase(
         // back, and they leave nothing queued -- an archive restored that way was invisible to
         // sync for ever, however many times Sync Now was pressed. An archive is local data the
         // server has never seen, so it has to be queued like anything else written on the device.
-        val createdJournalIds = mutableListOf<Uuid>()
-        val createdNoteIds = mutableListOf<Uuid>()
-        val createdLinks = mutableListOf<Pair<Uuid, Uuid>>()
         val draftRestorer =
             RestoreDraftReconciler(
                 journalRepository,
                 warnings,
-                RestoreDraftDecoder({ resolveMediaReference(it, manifestIndex, mediaImporter) }, warnings) { imported ->
-                    if (imported) mediaImported++
+                RestoreDraftDecoder(
+                    resolveMediaReference = mediaResolver::resolve,
+                    recoveryId = mediaRecoveryId,
+                ),
+                onPendingMedia = { onPendingMedia?.invoke(it) },
+                expectedScope = expectedNoteScope ?: noteRecoveryScope,
+                recoveryId = mediaRecoveryId,
+                onApplied = { decoded ->
+                    mediaImported += decoded.mediaImported
+                    decoded.unavailableMedia.forEach(::recordUnavailable)
                 },
             )
         val availableNoteIds = mutableSetOf<Uuid>()
@@ -153,26 +193,51 @@ class RestoreUserDataUseCase(
             for (journal in migrated.journals) {
                 val existing = journalRepository.getJournalById(journal.id)
                 val shouldWrite = shouldOverwrite(existing?.lastUpdated, journal.lastUpdated, options.strategy)
-                if (existing == null) {
-                    journalRepository.create(journal)
-                    createdJournalIds.add(journal.id)
-                    journalsImported++
-                } else if (shouldWrite) {
-                    journalRepository.update(journal)
-                    journalsImported++
+                if (existing == null || shouldWrite) {
+                    if (journalRepository.compareAndSetJournalForRestore(existing, journal, journalRecoveryScope, mediaRecoveryId)) {
+                        journalsImported++
+                    } else {
+                        warnings.add("Kept a journal changed during archive recovery")
+                    }
+                } else {
+                    journalRepository.compareAndSetJournalForRestore(
+                        existing,
+                        requireNotNull(existing),
+                        journalRecoveryScope,
+                        mediaRecoveryId,
+                    )
                 }
             }
 
             onProgress?.invoke(RestoreProgressPhase.RESTORING_NOTES)
             Napier.i("Restore: importing ${migrated.notes.size} notes")
             for (note in migrated.notes) {
+                check(journalNotesRepository.getNoteRecoveryScope() == noteRecoveryScope) { "Note recovery account changed" }
                 val parsedId = parseUuid(note.id, warnings) ?: continue
                 val existing = journalNotesRepository.getNoteById(parsedId)
-                val mediaResolution = resolveMediaReference(note.mediaPath, manifestIndex, mediaImporter)
+                val source =
+                    note.mediaPath?.takeIf { it.isNotBlank() } ?: if (note.type.lowercase() in setOf("image", "video", "audio")) {
+                        unavailableArchiveReference(note.id)
+                    } else {
+                        null
+                    }
+                var mediaResolution = mediaResolver.resolve(source)
+                val localOriginal = existing?.mediaRefOrNull()
+                if (mediaResolution.unavailableReason != null &&
+                    existing?.type?.name?.lowercase() == note.type.lowercase() &&
+                    localOriginal != null &&
+                    mediaImporter?.isAvailable(localOriginal) == true
+                ) {
+                    mediaResolution = MediaResolution(localOriginal, false, false)
+                }
                 if (mediaResolution.imported) {
                     mediaImported++
                 }
-                val restored = note.toJournalNote(parsedId, mediaResolution)
+                val restored =
+                    note.toJournalNote(
+                        parsedId,
+                        mediaResolution.copy(uri = mediaResolution.retainedReference(note.id, generation = mediaRecoveryId)),
+                    )
                 if (restored == null) {
                     val normalizedType = note.type.lowercase()
                     val message =
@@ -196,14 +261,32 @@ class RestoreUserDataUseCase(
 
                 availableNoteIds += parsedId
                 val shouldWrite = shouldOverwrite(existing?.lastUpdated, restored.lastUpdated, options.strategy)
-                if (existing == null) {
-                    journalNotesRepository.create(restored)
-                    createdNoteIds.add(parsedId)
-                    notesImported++
-                } else if (shouldWrite) {
-                    journalNotesRepository.removeById(parsedId)
-                    journalNotesRepository.create(restored.withTimeZoneId(restored.timeZoneId ?: existing.timeZoneId))
-                    notesImported++
+                if (existing == null || shouldWrite) {
+                    val replacement = restored.withExistingCaptureMetadata(existing)
+                    mediaResolution
+                        .unavailableAsset(
+                            note.id,
+                            generation = mediaRecoveryId,
+                            kind = note.type.lowercase(),
+                        )?.let { onPendingMedia?.invoke(it) }
+                    if (journalNotesRepository.compareAndSetNoteForRestore(existing, replacement, noteRecoveryScope, mediaRecoveryId)) {
+                        mediaResolution
+                            .unavailableAsset(
+                                note.id,
+                                generation = mediaRecoveryId,
+                                kind = note.type.lowercase(),
+                            )?.let(::recordUnavailable)
+                        notesImported++
+                    } else {
+                        warnings.add("Kept a note changed during archive recovery")
+                    }
+                } else {
+                    journalNotesRepository.compareAndSetNoteForRestore(
+                        existing,
+                        requireNotNull(existing),
+                        noteRecoveryScope,
+                        mediaRecoveryId,
+                    )
                 }
             }
 
@@ -219,9 +302,11 @@ class RestoreUserDataUseCase(
                     continue
                 }
 
-                journalContentRepository.addContentToJournal(noteId, journalId)
-                createdLinks.add(noteId to journalId)
-                linksImported++
+                if (journalNotesRepository.getNoteById(noteId) != null &&
+                    journalContentRepository.addContentToJournalForRestore(noteId, journalId, noteRecoveryScope, mediaRecoveryId)
+                ) {
+                    linksImported++
+                }
             }
 
             if (options.includeDrafts) {
@@ -230,9 +315,9 @@ class RestoreUserDataUseCase(
                 draftsImported = draftRestorer.restore(migrated.drafts, options.strategy)
             }
 
-            profileRestorer.restore(profilePayload?.profile, options, warnings, onProgress)
-            restorePlaces(placesPayload?.places.orEmpty(), warnings, onProgress)
-            restoreLocationHistory(locationHistoryPayload?.locationHistory.orEmpty(), warnings, onProgress)
+            profileRestorer.restore(profilePayload?.profile, options, onProgress, noteRecoveryScope, mediaRecoveryId)
+            restorePlaces(placesPayload?.places.orEmpty(), noteRecoveryScope, mediaRecoveryId, onProgress)
+            restoreLocationHistory(locationHistoryPayload?.locationHistory.orEmpty(), noteRecoveryScope, mediaRecoveryId, onProgress)
 
             onProgress?.invoke(RestoreProgressPhase.COMPLETED)
 
@@ -245,35 +330,10 @@ class RestoreUserDataUseCase(
                 mediaImported = mediaImported,
                 warnings = warnings,
                 integrityMismatches = integrityMismatches,
+                unavailableMedia = unavailableMedia.distinctBy { Triple(it.entityId, it.blockId, it.role) },
             )
         } catch (e: Exception) {
-            withContext(NonCancellable) {
-                draftRestorer.rollback()
-                rollback(createdLinks, createdNoteIds, createdJournalIds)
-            }
             throw e
-        }
-    }
-
-    private suspend fun rollback(
-        links: List<Pair<Uuid, Uuid>>,
-        noteIds: List<Uuid>,
-        journalIds: List<Uuid>,
-    ) {
-        Napier.w(
-            "Restore failed, rolling back ${links.size} links, ${noteIds.size} notes, ${journalIds.size} journals",
-        )
-        for ((contentId, journalId) in links) {
-            runCatching { journalContentRepository.removeContentFromJournal(contentId, journalId) }
-                .onFailure { Napier.e("Rollback: failed to remove link $contentId->$journalId", it) }
-        }
-        for (noteId in noteIds) {
-            runCatching { journalNotesRepository.removeById(noteId) }
-                .onFailure { Napier.e("Rollback: failed to remove note $noteId", it) }
-        }
-        for (journalId in journalIds) {
-            runCatching { journalRepository.delete(journalId) }
-                .onFailure { Napier.e("Rollback: failed to delete journal $journalId", it) }
         }
     }
 
@@ -313,7 +373,8 @@ class RestoreUserDataUseCase(
 
     private suspend fun restorePlaces(
         places: List<ExportPlace>,
-        warnings: MutableList<String>,
+        scope: app.logdate.client.repository.journals.JournalMergeScope?,
+        recoveryId: String,
         onProgress: (suspend (RestoreProgressPhase) -> Unit)?,
     ) {
         if (places.isEmpty()) {
@@ -322,25 +383,15 @@ class RestoreUserDataUseCase(
 
         onProgress?.invoke(RestoreProgressPhase.RESTORING_PLACES)
         Napier.i("Restore: importing ${places.size} places")
-        val existingPlaces = userPlacesRepository.getAllPlaces().associateBy { it.uid.toString() }
         for (place in places) {
-            val restored = place.toPlace()
-            val existing = existingPlaces[place.id]
-            if (existing == null) {
-                userPlacesRepository
-                    .createPlace(restored)
-                    .onFailure { warnings.add("Failed to restore place ${place.displayName}: ${it.message ?: "unknown error"}") }
-            } else {
-                userPlacesRepository
-                    .updatePlace(restored)
-                    .onFailure { warnings.add("Failed to update place ${place.displayName}: ${it.message ?: "unknown error"}") }
-            }
+            userPlacesRepository.restorePlaceForArchive(place.toPlace(), scope, recoveryId).getOrThrow()
         }
     }
 
     private suspend fun restoreLocationHistory(
         entries: List<ExportLocationHistoryItem>,
-        warnings: MutableList<String>,
+        scope: app.logdate.client.repository.journals.JournalMergeScope?,
+        recoveryId: String,
         onProgress: (suspend (RestoreProgressPhase) -> Unit)?,
     ) {
         if (entries.isEmpty()) {
@@ -354,11 +405,7 @@ class RestoreUserDataUseCase(
             if (!seenSampleIds.add(entry.sampleId)) {
                 continue
             }
-            locationHistoryRepository
-                .logLocation(entry.toLocationLogRecord())
-                .onFailure { error ->
-                    warnings.add("Failed to restore location sample ${entry.sampleId}: ${error.message ?: "unknown error"}")
-                }
+            locationHistoryRepository.restoreLocationForArchive(entry.toLocationLogRecord(), scope, recoveryId).getOrThrow()
         }
     }
 
@@ -369,112 +416,4 @@ class RestoreUserDataUseCase(
         runCatching { Uuid.parse(value) }
             .onFailure { warnings.add("Invalid UUID in restore payload: $value") }
             .getOrNull()
-
-    private suspend fun resolveMediaReference(
-        sourceUri: String?,
-        manifestIndex: Map<String, ExportMediaFile>?,
-        mediaImporter: MediaImporter?,
-    ): MediaResolution {
-        if (sourceUri.isNullOrBlank()) {
-            return MediaResolution(uri = null, imported = false, allowSourceFallback = false)
-        }
-        val manifestEntry = manifestIndex?.get(sourceUri)
-        val exportPath = manifestEntry?.exportPath ?: sourceUri
-        val imported = mediaImporter?.importMedia(exportPath)
-        return when {
-            imported != null -> MediaResolution(uri = imported, imported = true, allowSourceFallback = false)
-            // A manifest exists but has no entry for this file: export already determined the
-            // bytes were unrecoverable and deliberately left it out. sourceUri is a raw path from
-            // the *original* device's private storage and will essentially never resolve here --
-            // falling back to it used to plant a note that looked normal but could never play.
-            // Only the true legacy case below (no manifest at all) gets the best-effort fallback.
-            manifestIndex != null && manifestEntry == null ->
-                MediaResolution(uri = null, imported = false, allowSourceFallback = false)
-            mediaImporter == null || manifestEntry == null ->
-                MediaResolution(uri = sourceUri, imported = false, allowSourceFallback = true)
-            else -> MediaResolution(uri = null, imported = false, allowSourceFallback = false)
-        }
-    }
-
-    private fun ExportNote.toJournalNote(
-        id: Uuid,
-        mediaResolution: MediaResolution,
-    ): JournalNote? {
-        val location = location?.toNoteLocation()
-        val resolvedMediaRef =
-            mediaResolution.uri ?: mediaPath?.takeIf { mediaResolution.allowSourceFallback && it.isNotBlank() }
-        return when (type.lowercase()) {
-            "text" ->
-                JournalNote.Text(
-                    uid = id,
-                    creationTimestamp = createdAt,
-                    lastUpdated = updatedAt,
-                    content = content.orEmpty(),
-                    timeZoneId = timeZone,
-                    capturedOn = CaptureDevice.fromWireName(capturedOn),
-                    syncVersion = syncVersion,
-                    location = location,
-                )
-            "image" ->
-                JournalNote.Image(
-                    uid = id,
-                    creationTimestamp = createdAt,
-                    lastUpdated = updatedAt,
-                    mediaRef = resolvedMediaRef ?: return null,
-                    caption = caption.orEmpty(),
-                    presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
-                    timeZoneId = timeZone,
-                    capturedOn = CaptureDevice.fromWireName(capturedOn),
-                    syncVersion = syncVersion,
-                    location = location,
-                )
-            "video" ->
-                JournalNote.Video(
-                    uid = id,
-                    creationTimestamp = createdAt,
-                    lastUpdated = updatedAt,
-                    mediaRef = resolvedMediaRef ?: return null,
-                    caption = caption.orEmpty(),
-                    timeZoneId = timeZone,
-                    capturedOn = CaptureDevice.fromWireName(capturedOn),
-                    syncVersion = syncVersion,
-                    location = location,
-                )
-            "audio" ->
-                JournalNote.Audio(
-                    uid = id,
-                    creationTimestamp = createdAt,
-                    lastUpdated = updatedAt,
-                    mediaRef = resolvedMediaRef ?: return null,
-                    durationMs = this.durationMs ?: 0,
-                    transcript = transcript,
-                    caption = caption.orEmpty(),
-                    timeZoneId = timeZone,
-                    capturedOn = CaptureDevice.fromWireName(capturedOn),
-                    syncVersion = syncVersion,
-                    location = location,
-                )
-            else -> null
-        }
-    }
-
-    private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation {
-        val coords =
-            NoteCoordinates(
-                latitude = latitude,
-                longitude = longitude,
-                altitude = altitude,
-                accuracy = accuracy,
-            )
-        val place =
-            placeName?.let {
-                NotePlace(
-                    id = Uuid.random(),
-                    name = it,
-                    latitude = latitude,
-                    longitude = longitude,
-                )
-            }
-        return NoteLocation(coordinates = coords, place = place)
-    }
 }

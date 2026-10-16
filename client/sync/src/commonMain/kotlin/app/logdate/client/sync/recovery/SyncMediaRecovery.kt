@@ -87,7 +87,11 @@ internal class SyncMediaRecovery(
         transactions.withTransaction {
             if (scope != inbox.currentScope()) throw CancellationException("Download scope changed")
             val current = notes.getNoteById(id)
-            if (current == owner && inbox.isCurrentVersion("NOTE", row.entityId, row.version, scope)) {
+            if (current?.mediaRefOrNull() == owner.mediaRefOrNull() &&
+                current?.type == owner.type &&
+                current.syncVersion == row.version &&
+                inbox.isCurrentVersion("NOTE", row.entityId, row.version, scope)
+            ) {
                 val syncable =
                     notes as? SyncableJournalNotesRepository
                         ?: error("Sync repository unavailable")

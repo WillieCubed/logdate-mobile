@@ -218,20 +218,21 @@ internal class V2ArchiveRestoreTest : RestoreArchiveTestFixture() {
 
             assertEquals(ExportSchemaVersion.V2_0, result.metadata.version)
             assertEquals(1, result.journalsImported)
-            assertEquals(1, result.notesImported)
-            assertEquals(1, result.journalLinksImported)
+            assertEquals(2, result.notesImported)
+            assertEquals(2, result.journalLinksImported)
             assertEquals(1, result.draftsImported)
             assertEquals(1, result.mediaImported)
             assertEquals("Daily", journalRepo.created.single().title)
-            val restoredNote = assertIs<JournalNote.Image>(notesRepo.created.single())
+            val restoredNote = assertIs<JournalNote.Image>(notesRepo.created.single { it.uid == noteId })
             assertEquals("file:///restored/photo.jpg", restoredNote.mediaRef)
             assertEquals("Sunset", restoredNote.caption)
             assertEquals("America/Los_Angeles", restoredNote.timeZoneId)
-            assertEquals(listOf(noteId to journalId), contentRepo.links)
-            assertTrue(result.warnings.any { "Skipped image note" in it })
-            assertTrue(result.warnings.any { omittedDraftBlockId.toString() in it && "omitted" in it })
+            assertEquals(setOf(noteId to journalId, omittedNoteId to journalId), contentRepo.links.toSet())
+            assertEquals(2, result.unavailableMedia.size)
+            assertTrue(result.unavailableMedia.any { it.blockId == omittedDraftBlockId.toString() })
+            assertTrue(result.unavailableMedia.any { it.entityId == omittedNoteId.toString() })
             assertEquals(
-                1,
+                2,
                 journalRepo.savedDrafts
                     .single()
                     .blocks.size,

@@ -20,6 +20,12 @@ import kotlin.uuid.Uuid
 
 interface MediaImporter {
     suspend fun importMedia(exportPath: String): String?
+
+    suspend fun isAvailable(reference: String): Boolean = false
+
+    suspend fun recoverMedia(asset: UnavailableMediaAsset): String? = null
+
+    fun containsMedia(exportPath: String): Boolean? = null
 }
 
 data class RestoreBundle(
@@ -55,6 +61,7 @@ data class RestoreResult(
     val mediaImported: Int,
     val warnings: List<String>,
     val integrityMismatches: List<IntegrityMismatch> = emptyList(),
+    val unavailableMedia: List<UnavailableMediaAsset> = emptyList(),
 )
 
 /**
@@ -82,6 +89,8 @@ internal data class MediaResolution(
     val uri: String?,
     val imported: Boolean,
     val allowSourceFallback: Boolean,
+    val archivePath: String? = null,
+    val unavailableReason: UnavailableMediaReason? = null,
 )
 
 @Serializable

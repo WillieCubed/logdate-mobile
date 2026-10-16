@@ -15,7 +15,7 @@ import kotlin.uuid.Uuid
 
 internal class ArchiveMediaRestoreTest : RestoreArchiveTestFixture() {
     @Test
-    fun `media note without media path adds warning`() =
+    fun `media note without an original retains its metadata and unavailable state`() =
         runTest {
             val bundle =
                 buildBundle(
@@ -33,7 +33,9 @@ internal class ArchiveMediaRestoreTest : RestoreArchiveTestFixture() {
 
             val result = useCase.restore(bundle)
 
-            assertEquals(0, result.notesImported)
+            assertEquals(1, result.notesImported)
+            assertTrue(assertIs<JournalNote.Image>(notesRepo.created.single()).mediaRef.startsWith("logdate-unavailable://archive/"))
+            assertEquals(UnavailableMediaReason.NOT_IN_ARCHIVE, result.unavailableMedia.single().reason)
         }
 
     // endregion
@@ -138,17 +140,13 @@ internal class ArchiveMediaRestoreTest : RestoreArchiveTestFixture() {
 
             val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
 
-            assertEquals(0, result.notesImported)
+            assertEquals(1, result.notesImported)
+            assertEquals(UnavailableMediaReason.IMPORT_FAILED, result.unavailableMedia.single().reason)
         }
 
     @Test
-    fun `restore drops note and warns when the manifest exists but excludes this media`() =
+    fun `restore retains a note when the archive excludes its original`() =
         runTest {
-            // Simulates a modern archive whose export step recorded MEDIA_BYTES_MISSING for this
-            // file (bytes were already gone on the source device) -- the manifest exists, but has
-            // no entry for this note's media. Falling back to the raw source path here would plant
-            // a note that looks normal but can never play, since that path belongs to another
-            // device's private storage.
             val noteId = Uuid.random()
             val sourceUri = "/data/user/0/studio.hypertext.logdate/files/audio_notes/recording_abc.m4a"
             val bundle =
@@ -168,16 +166,14 @@ internal class ArchiveMediaRestoreTest : RestoreArchiveTestFixture() {
 
             val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
 
-            assertEquals(0, result.notesImported)
-            assertTrue(notesRepo.created.isEmpty())
-            assertTrue(
-                result.warnings.any { it.contains(noteId.toString()) && it.contains("not found in archive") },
-                "Expected a warning naming the dropped note and the missing media, got: ${result.warnings}",
-            )
+            assertEquals(1, result.notesImported)
+            assertEquals(result.unavailableMedia.single().reference, assertIs<JournalNote.Audio>(notesRepo.created.single()).mediaRef)
+            assertEquals(noteId.toString(), result.unavailableMedia.single().entityId)
+            assertEquals(UnavailableMediaReason.NOT_IN_ARCHIVE, result.unavailableMedia.single().reason)
         }
 
     @Test
-    fun `restore falls back to the source path for legacy archives with no media manifest at all`() =
+    fun `legacy archive preserves an unavailable original when import fails`() =
         runTest {
             // Pre-manifest archive format: there is no way to know whether this media was ever
             // recorded as present, so the best-effort fallback is preserved rather than dropping
@@ -204,7 +200,8 @@ internal class ArchiveMediaRestoreTest : RestoreArchiveTestFixture() {
             assertEquals(1, result.notesImported)
             val restored = notesRepo.created.first()
             assertIs<JournalNote.Audio>(restored)
-            assertEquals(sourceUri, restored.mediaRef)
+            assertEquals(result.unavailableMedia.single().reference, restored.mediaRef)
+            assertEquals(UnavailableMediaReason.IMPORT_FAILED, result.unavailableMedia.single().reason)
         }
 
     // endregion

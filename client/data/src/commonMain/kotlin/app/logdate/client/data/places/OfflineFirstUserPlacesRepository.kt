@@ -1,8 +1,12 @@
 package app.logdate.client.data.places
 
+import app.logdate.client.data.journals.ArchiveRecoveryReceipts
+import app.logdate.client.data.journals.DirectArchiveRecoveryTransactions
 import app.logdate.client.database.dao.UserPlaceDao
 import app.logdate.client.database.entities.UserPlaceEntity
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.places.UserPlacesRepository
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.shared.model.Place
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +21,9 @@ import kotlin.uuid.Uuid
 
 class OfflineFirstUserPlacesRepository(
     private val userPlaceDao: UserPlaceDao,
+    private val transactionManager: SyncTransactionManager = DirectArchiveRecoveryTransactions,
+    private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
+    private val currentRecoveryScope: suspend () -> JournalMergeScope? = { null },
 ) : UserPlacesRepository {
     override suspend fun getAllPlaces(): List<Place> = userPlaceDao.getAllPlaces().map { place -> place.toModel() }
 
@@ -78,6 +85,22 @@ class OfflineFirstUserPlacesRepository(
             userPlace
         }.onFailure { error ->
             Napier.e("Failed to update user place", error)
+        }
+
+    override suspend fun restorePlaceForArchive(
+        place: Place,
+        scope: JournalMergeScope?,
+        recoveryId: String,
+    ): Result<Unit> =
+        runCatching {
+            transactionManager.withTransaction {
+                check(currentRecoveryScope() == scope) { "Place recovery account changed" }
+                val id = place.uid.toString()
+                if (scope != null && recoveryReceipts.contains(scope, "PLACE", recoveryId, id)) return@withTransaction
+                if (userPlaceDao.getPlaceById(id) == null) userPlaceDao.insertPlace(place.asUserDefinedPlace().toEntity())
+                if (scope != null) recoveryReceipts.record(scope, "PLACE", recoveryId, id)
+                check(currentRecoveryScope() == scope) { "Place recovery account changed" }
+            }
         }
 
     override suspend fun deletePlace(placeId: String): Result<Unit> =

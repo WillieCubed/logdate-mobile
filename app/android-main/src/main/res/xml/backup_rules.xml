@@ -12,6 +12,7 @@
 <full-backup-content>
     <include domain="file" path="logdate.preferences_pb"
              requireFlags="clientSideEncryption"/>
+    <include domain="file" path="archive_recovery/records/" requireFlags="clientSideEncryption"/>
     <include domain="file" path="datastore/"
              requireFlags="clientSideEncryption"/>
     <include domain="file" path="db_recovery/"
@@ -26,6 +27,8 @@
              requireFlags="clientSideEncryption"/>
     <include domain="file" path="logdate.preferences_pb"
              requireFlags="deviceToDeviceTransfer"/>
+    <include domain="file" path="archive_recovery/records/" requireFlags="deviceToDeviceTransfer"/>
+    <include domain="file" path="archive_recovery/sources/" requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="datastore/"
              requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="db_recovery/"

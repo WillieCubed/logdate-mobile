@@ -24,7 +24,7 @@ class JournalDraftRecoveryIntentTest {
         }
 
     @Test
-    fun `replay repairs missing upload intent after persistence completed before enqueue`() =
+    fun `an unavailable outbox prevents persistence and retry safely imports the draft`() =
         runTest {
             val repository = FakeDraftRepository()
             val metadata =
@@ -46,9 +46,9 @@ class JournalDraftRecoveryIntentTest {
             val imported = EditorDraft()
             val persistence = JournalDraftPersistence(repository, metadata, { it }, {})
             assertFailsWith<IllegalStateException> { persistence.compareAndSet(imported.id, null, imported, null) }
-            assertEquals(imported, repository.getDraft(imported.id))
+            assertEquals(null, repository.getDraft(imported.id))
             assertEquals(emptyList(), metadata.getPendingUploads(EntityType.DRAFT))
-            persistence.ensureRecoveryQueued(imported.id, null)
+            kotlin.test.assertTrue(persistence.compareAndSet(imported.id, null, imported, null))
             assertEquals(imported, repository.getDraft(imported.id))
             assertEquals(listOf(imported.id.toString()), metadata.getPendingUploads(EntityType.DRAFT).map { it.entityId })
             persistence.ensureRecoveryQueued(imported.id, null)

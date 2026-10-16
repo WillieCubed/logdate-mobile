@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.database.entities.NoteContentUri
 import kotlinx.coroutines.flow.Flow
@@ -74,6 +75,9 @@ interface AudioNoteDao {
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addNote(note: AudioNoteEntity)
+
+    @Update
+    suspend fun updateForRestore(note: AudioNoteEntity): Int
 
     /**
      * Counts how many notes still point at [contentUri].

@@ -95,12 +95,8 @@ internal class ArchiveDraftRestoreTest : RestoreArchiveTestFixture() {
         }
 
     @Test
-    fun `restore drops draft audio block and warns when the manifest exists but excludes this media`() =
+    fun `restore retains an audio block when the archive excludes its original`() =
         runTest {
-            // Mirrors "restore drops note and warns when the manifest exists but excludes this
-            // media" for the draft-blocks path: restoreDraftBlock used to always keep the block,
-            // just with uri set to whatever resolveMediaReference returned (including null),
-            // silently persisting a draft that looks normal but can never play.
             val draftId = Uuid.random()
             val blockId = Uuid.random()
             val sourceUri = "/data/user/0/studio.hypertext.logdate/files/audio_notes/recording_abc.m4a"
@@ -130,14 +126,11 @@ internal class ArchiveDraftRestoreTest : RestoreArchiveTestFixture() {
 
             assertEquals(1, result.draftsImported)
             val saved = journalRepo.savedDrafts.first()
-            assertTrue(
-                saved.blocks.none { it is SerializableAudioBlock },
-                "Unresolvable audio block must be dropped, not persisted with uri=null",
-            )
-            assertTrue(
-                result.warnings.any { it.contains(blockId.toString()) && it.contains("not found in archive") },
-                "Expected a warning naming the dropped draft block and the missing media, got: ${result.warnings}",
-            )
+            val retained = saved.blocks.filterIsInstance<SerializableAudioBlock>().single()
+            assertEquals(blockId, retained.id)
+            assertEquals(result.unavailableMedia.single().reference, retained.uri)
+            assertEquals(blockId.toString(), result.unavailableMedia.single().blockId)
+            assertEquals(UnavailableMediaReason.NOT_IN_ARCHIVE, result.unavailableMedia.single().reason)
         }
 
     @Test

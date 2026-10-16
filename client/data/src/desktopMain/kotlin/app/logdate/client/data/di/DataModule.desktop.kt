@@ -48,6 +48,7 @@ import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.di.deviceInstanceModule
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.networking.EmailVerificationApiClient
@@ -68,6 +69,7 @@ import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.knowledge.DeviceContactsReader
@@ -95,6 +97,7 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import app.logdate.client.sync.RoomSyncTransactionManager
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.config.configModule
 import kotlinx.coroutines.flow.combine
 import kotlinx.serialization.json.Json
@@ -151,6 +154,10 @@ actual val dataModule: Module =
                         get<app.logdate.shared.config.LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/'),
                     )
                 },
+                recoveryReceipts =
+                    app.logdate.client.data.journals.RoomArchiveRecoveryReceipts(
+                        get<app.logdate.client.database.LogDateDatabase>().downloadInboxDao(),
+                    ),
             )
         }
 
@@ -172,6 +179,16 @@ actual val dataModule: Module =
                 syncMetadataService = get(),
                 transcriptionRepository = get(),
                 mediaReferences = get(),
+                currentRecoveryScope = {
+                    app.logdate.client.repository.journals.JournalMergeScope(
+                        get<app.logdate.client.device.identity.CanonicalOwnerProvider>().getCanonicalOwnerId(),
+                        get<app.logdate.shared.config.LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/'),
+                    )
+                },
+                recoveryReceipts =
+                    app.logdate.client.data.journals.RoomArchiveRecoveryReceipts(
+                        get<app.logdate.client.database.LogDateDatabase>().downloadInboxDao(),
+                    ),
             )
         }
         single {
@@ -194,6 +211,10 @@ actual val dataModule: Module =
                 get(),
                 syncMetadataService = get(),
                 transactionManager = get(),
+                recoveryReceipts =
+                    app.logdate.client.data.journals.RoomArchiveRecoveryReceipts(
+                        get<app.logdate.client.database.LogDateDatabase>().downloadInboxDao(),
+                    ),
             )
         }
 
@@ -212,12 +233,43 @@ actual val dataModule: Module =
         single<ActivityTimelineRepository> { OfflineFirstActivityTimelineRepository() }
 
         // Location
-        single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get(), get()) }
+        single<LocationHistoryRepository> {
+            OfflineFirstLocationHistoryRepository(
+                get(),
+                get(),
+                transactionManager = get(),
+                recoveryReceipts =
+                    app.logdate.client.data.journals.RoomArchiveRecoveryReceipts(
+                        get<app.logdate.client.database.LogDateDatabase>().downloadInboxDao(),
+                    ),
+                currentRecoveryScope = {
+                    JournalMergeScope(
+                        get<CanonicalOwnerProvider>().getCanonicalOwnerId(),
+                        get<LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/'),
+                    )
+                },
+            )
+        }
         single<HistoryRecordStore> { RoomHistoryRecordStore(get()) }
         single<ActivityHistoryRepository> { OfflineFirstActivityHistoryRepository(get()) }
 
         // Places
-        single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }
+        single<UserPlacesRepository> {
+            OfflineFirstUserPlacesRepository(
+                get(),
+                transactionManager = get(),
+                recoveryReceipts =
+                    app.logdate.client.data.journals.RoomArchiveRecoveryReceipts(
+                        get<app.logdate.client.database.LogDateDatabase>().downloadInboxDao(),
+                    ),
+                currentRecoveryScope = {
+                    JournalMergeScope(
+                        get<CanonicalOwnerProvider>().getCanonicalOwnerId(),
+                        get<LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/'),
+                    )
+                },
+            )
+        }
         single<MarkedMomentRepository> {
             OfflineFirstMarkedMomentRepository(get(), RoomSyncTransactionManager(get<app.logdate.client.database.LogDateDatabase>()), get())
         }
@@ -252,7 +304,14 @@ actual val dataModule: Module =
         single<DeviceContactsReader> { UnavailableDeviceContactsReader() }
 
         // Profile
-        single<ProfileRepository> { OfflineFirstProfileRepository(get()) }
+        single<ProfileRepository> {
+            OfflineFirstProfileRepository(get(), currentRecoveryScope = {
+                JournalMergeScope(
+                    get<CanonicalOwnerProvider>().getCanonicalOwnerId(),
+                    get<LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/'),
+                )
+            })
+        }
 
         // User
         single<UserDeviceRepository> { LocalUserDeviceRepository }

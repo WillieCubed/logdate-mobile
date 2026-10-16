@@ -40,6 +40,11 @@
     <string name="restore_confirm_import">Import</string>
     <string name="restore_progress_title">Importing\u2026</string>
     <string name="restore_progress_description">Restoring your data\u2026</string>
+    <string name="restore_interrupted_title">Choose an archive to finish recovery</string>
+    <string name="restore_interrupted_description">The earlier import was interrupted. Entries already saved have been kept. Choose the original archive to finish importing.</string>
+    <string name="restore_partial_title">Entries restored; media missing</string>
+    <string name="restore_partial_description">Your entries and drafts are kept. %1$d originals and %2$d previews are unavailable. Choose an archive containing these files to recover them without replacing your edits.</string>
+    <string name="restore_recover_media">Choose archive for missing media</string>
     <string name="restore_complete_title">Import complete</string>
     <string name="restore_complete_description">Your data has been restored.</string>
     <string name="restore_failed_title">Import failed</string>
@@ -87,4 +92,13 @@
     <string name="notes_count_with_comma">%1$d notes, </string>
     <string name="last_export_path">Last export: %1$s</string>
     <string name="warnings_count">Warnings: %1$d</string>
+    <string name="restore_recovering_description">You can use your journal now. LogDate will keep recovering your photos, videos, and recordings in the background.</string>
+    <string name="restore_recovering_media">Your journal is available; media is recovering</string>
+    <string name="restore_resuming_title">Finishing your import</string>
+    <string name="restore_resuming_description">LogDate is continuing from where the import stopped. Entries already restored are ready to use.</string>
+    <string name="restore_paused_title">Import paused</string>
+    <string name="restore_paused_description">Your saved entries are kept. Resume to import the remaining entries from the archive already on this device.</string>
+    <string name="restore_resume_import">Resume import</string>
+    <string name="restore_unreadable_title">Some entries need another archive copy</string>
+    <string name="restore_unreadable_description">The readable entries are saved. Choose another copy of this archive to recover the remaining entries while keeping your edits.</string>
 </resources>

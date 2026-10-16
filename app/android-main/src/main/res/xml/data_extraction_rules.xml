@@ -19,6 +19,7 @@
     <cloud-backup disableIfNoEncryptionCapabilities="true">
         <include domain="file" path="logdate.preferences_pb"/>
         <include domain="file" path="datastore/"/>
+        <include domain="file" path="archive_recovery/records/"/>
         <include domain="file" path="db_recovery/"/>
         <include domain="file" path="identity_recovery/"/>
         <include domain="database" path="logdate"/>
@@ -32,8 +33,10 @@
     <device-transfer>
         <include domain="file" path="logdate.preferences_pb"/>
         <include domain="file" path="datastore/"/>
+        <include domain="file" path="archive_recovery/records/"/>
         <include domain="file" path="db_recovery/"/>
         <include domain="file" path="identity_recovery/"/>
+        <include domain="file" path="archive_recovery/sources/"/>
         <include domain="file" path="media/"/>
         <include domain="file" path="user_media/"/>
         <include domain="file" path="audio_notes/"/>

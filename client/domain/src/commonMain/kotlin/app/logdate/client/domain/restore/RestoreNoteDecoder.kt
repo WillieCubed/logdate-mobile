@@ -1,0 +1,103 @@
+package app.logdate.client.domain.restore
+
+import app.logdate.client.domain.export.ExportNote
+import app.logdate.client.repository.journals.CaptureDevice
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
+import app.logdate.shared.model.PhotoPresentation
+import kotlin.uuid.Uuid
+
+internal fun ExportNote.toJournalNote(
+    id: Uuid,
+    mediaResolution: MediaResolution,
+): JournalNote? {
+    val location = location?.toNoteLocation()
+    val resolvedMediaRef =
+        mediaResolution.uri ?: mediaPath?.takeIf { mediaResolution.allowSourceFallback && it.isNotBlank() }
+    return when (type.lowercase()) {
+        "text" ->
+            JournalNote.Text(
+                uid = id,
+                creationTimestamp = createdAt,
+                lastUpdated = updatedAt,
+                content = content.orEmpty(),
+                timeZoneId = timeZone,
+                capturedOn = CaptureDevice.fromWireName(capturedOn),
+                syncVersion = syncVersion,
+                location = location,
+            )
+        "image" ->
+            JournalNote.Image(
+                uid = id,
+                creationTimestamp = createdAt,
+                lastUpdated = updatedAt,
+                mediaRef = resolvedMediaRef ?: return null,
+                caption = caption.orEmpty(),
+                presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
+                timeZoneId = timeZone,
+                capturedOn = CaptureDevice.fromWireName(capturedOn),
+                syncVersion = syncVersion,
+                location = location,
+            )
+        "video" ->
+            JournalNote.Video(
+                uid = id,
+                creationTimestamp = createdAt,
+                lastUpdated = updatedAt,
+                mediaRef = resolvedMediaRef ?: return null,
+                caption = caption.orEmpty(),
+                timeZoneId = timeZone,
+                capturedOn = CaptureDevice.fromWireName(capturedOn),
+                syncVersion = syncVersion,
+                location = location,
+            )
+        "audio" ->
+            JournalNote.Audio(
+                uid = id,
+                creationTimestamp = createdAt,
+                lastUpdated = updatedAt,
+                mediaRef = resolvedMediaRef ?: return null,
+                durationMs = this.durationMs ?: 0,
+                transcript = transcript,
+                caption = caption.orEmpty(),
+                timeZoneId = timeZone,
+                capturedOn = CaptureDevice.fromWireName(capturedOn),
+                syncVersion = syncVersion,
+                location = location,
+            )
+        else -> null
+    }
+}
+
+private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation {
+    val coords =
+        NoteCoordinates(
+            latitude = latitude,
+            longitude = longitude,
+            altitude = altitude,
+            accuracy = accuracy,
+        )
+    val place =
+        placeName?.let {
+            NotePlace(
+                id = Uuid.random(),
+                name = it,
+                latitude = latitude,
+                longitude = longitude,
+            )
+        }
+    return NoteLocation(coordinates = coords, place = place)
+}
+
+internal fun JournalNote.withExistingCaptureMetadata(existing: JournalNote?): JournalNote {
+    val zone = timeZoneId ?: existing?.timeZoneId
+    val device = existing?.capturedOn ?: capturedOn
+    return when (this) {
+        is JournalNote.Text -> copy(timeZoneId = zone, capturedOn = device)
+        is JournalNote.Image -> copy(timeZoneId = zone, capturedOn = device)
+        is JournalNote.Audio -> copy(timeZoneId = zone, capturedOn = device)
+        is JournalNote.Video -> copy(timeZoneId = zone, capturedOn = device)
+    }
+}

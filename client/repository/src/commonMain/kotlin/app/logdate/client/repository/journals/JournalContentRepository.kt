@@ -31,6 +31,17 @@ interface JournalContentRepository {
         journalId: Uuid,
     )
 
+    /** Adds a recovered membership only while its note survives in the captured account. */
+    suspend fun addContentToJournalForRestore(
+        contentId: Uuid,
+        journalId: Uuid,
+        scope: JournalMergeScope? = null,
+        recoveryId: String? = null,
+    ): Boolean {
+        addContentToJournal(contentId, journalId)
+        return true
+    }
+
     /**
      * Adds the provided content to a journal without changing the source content or its other
      * journal memberships. Implementations return how many new associations were created.

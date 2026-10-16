@@ -1,5 +1,6 @@
 package app.logdate.client.repository.location
 
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.shared.model.Location
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -10,6 +11,12 @@ import kotlin.uuid.Uuid
  * Repository for managing location history and logging.
  */
 interface LocationHistoryRepository {
+    suspend fun restoreLocationForArchive(
+        record: LocationLogRecord,
+        scope: JournalMergeScope?,
+        recoveryId: String,
+    ): Result<Unit> = logLocation(record)
+
     /**
      * Gets all location history, ordered by most recent first.
      */

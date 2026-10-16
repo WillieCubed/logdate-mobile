@@ -53,6 +53,7 @@ internal object RestoreArchiveTestFixtures {
         }
 
         override suspend fun saveDraft(draft: EditorDraft) {
+            savedDrafts.removeAll { it.id == draft.id }
             savedDrafts.add(draft)
         }
 
@@ -60,7 +61,7 @@ internal object RestoreArchiveTestFixtures {
 
         override suspend fun getAllDrafts(): List<EditorDraft> = emptyList()
 
-        override suspend fun getDraft(id: Uuid): EditorDraft? = null
+        override suspend fun getDraft(id: Uuid): EditorDraft? = savedDrafts.lastOrNull { it.id == id }
 
         override suspend fun deleteDraft(id: Uuid) {
             deletedDrafts.add(id)
@@ -101,6 +102,17 @@ internal object RestoreArchiveTestFixtures {
             created.add(note)
             existingNotes[note.uid] = note
             return note.uid
+        }
+
+        override suspend fun compareAndSetNoteForRestore(
+            expected: JournalNote?,
+            replacement: JournalNote,
+            scope: app.logdate.client.repository.journals.JournalMergeScope?,
+            recoveryId: String?,
+        ): Boolean {
+            if (existingNotes[replacement.uid] != expected) return false
+            create(replacement)
+            return true
         }
 
         override suspend fun remove(note: JournalNote) {

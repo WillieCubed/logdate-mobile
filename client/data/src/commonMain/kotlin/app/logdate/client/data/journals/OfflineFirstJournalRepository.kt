@@ -19,8 +19,6 @@ import app.logdate.client.sync.SyncDebouncer
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.AssociationPendingKey
-import app.logdate.client.sync.metadata.EntityType
-import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.EditorDraft
@@ -52,6 +50,7 @@ class OfflineFirstJournalRepository(
     private val currentScope: suspend () -> JournalMergeScope = { JournalMergeScope("", "") },
     private val mergeTransactionManager: SyncTransactionManager? = null,
     private val mergeScopeChanges: Flow<*> = flowOf(Unit),
+    private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
 ) : JournalRepository,
     SyncableDraftRepository,
     SyncableJournalRepository {
@@ -83,46 +82,48 @@ class OfflineFirstJournalRepository(
         }
 
     override suspend fun getJournalById(id: Uuid): Journal? =
-        withContext(dispatcher) {
-            journalDao.getJournalById(resolveJournalId(id))?.toModel()
-        }
+        withContext(dispatcher) { journalDao.getJournalById(resolveJournalId(id))?.toModel() }
 
-    override suspend fun create(journal: Journal): Uuid =
-        withContext(dispatcher) {
-            withJournalTransaction {
-                check(resolveJournalId(journal.id) == journal.id) { "Journal was merged" }
-                journalDao.create(journal.toEntity())
-                syncMetadataService.enqueuePending(journal.id.toString(), EntityType.JOURNAL, PendingOperation.CREATE)
-            }
-            syncDebouncer.trigger()
-            journal.id
-        }
+    private val localMutations by lazy {
+        JournalLocalMutations(
+            journalDao,
+            syncMetadataService,
+            mergeTransactionManager.takeIf {
+                database != null
+            },
+            currentScope,
+            ::resolveJournalId,
+            syncDebouncer::trigger,
+            recoveryReceipts,
+        )
+    }
 
-    override suspend fun update(journal: Journal): Unit =
-        withContext(dispatcher) {
-            withJournalTransaction {
-                if (resolveJournalId(journal.id) != journal.id) return@withJournalTransaction
-                journalDao.update(journal.toEntity())
-                syncMetadataService.enqueuePending(journal.id.toString(), EntityType.JOURNAL, PendingOperation.UPDATE)
-            }
-            syncDebouncer.trigger()
-        }
+    override suspend fun create(journal: Journal): Uuid = withContext(dispatcher) { localMutations.create(journal) }
 
-    override suspend fun delete(journalId: Uuid): Unit =
-        withContext(dispatcher) {
-            withJournalTransaction {
-                if (resolveJournalId(journalId) != journalId) return@withJournalTransaction
-                journalDao.delete(journalId)
-                syncMetadataService.enqueuePending(journalId.toString(), EntityType.JOURNAL, PendingOperation.DELETE)
-            }
-            syncDebouncer.trigger()
-        }
+    override suspend fun update(journal: Journal) = withContext(dispatcher) { localMutations.update(journal) }
+
+    override suspend fun delete(journalId: Uuid) = withContext(dispatcher) { localMutations.delete(journalId) }
+
+    override suspend fun getJournalRecoveryScope() = localMutations.recoveryScope()
+
+    override suspend fun compareAndSetJournalForRestore(
+        expected: Journal?,
+        replacement: Journal,
+        scope: JournalMergeScope?,
+        recoveryId: String?,
+    ): Boolean = withContext(dispatcher) { localMutations.restore(expected, replacement, scope, recoveryId) }
 
     private suspend fun <T> withJournalTransaction(block: suspend () -> T): T =
         if (database == null) block() else transactionManager.withTransaction(block)
 
     private val draftPersistence =
-        JournalDraftPersistence(draftRepository, syncMetadataService, ::resolveDraft, draftSyncDebouncer::trigger)
+        JournalDraftPersistence(
+            draftRepository,
+            syncMetadataService,
+            ::resolveDraft,
+            draftSyncDebouncer::trigger,
+            mergeTransactionManager ?: DirectArchiveRecoveryTransactions,
+        )
 
     override suspend fun saveDraft(draft: EditorDraft) = withContext(dispatcher) { draftPersistence.save(draft) }
 
@@ -141,7 +142,8 @@ class OfflineFirstJournalRepository(
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope?,
         enqueue: Boolean,
-    ): Boolean = withContext(dispatcher) { draftPersistence.compareAndSet(id, expected, replacement, recoveryScope, enqueue) }
+        recoveryId: String?,
+    ): Boolean = withContext(dispatcher) { draftPersistence.compareAndSet(id, expected, replacement, recoveryScope, enqueue, recoveryId) }
 
     override suspend fun getLatestDraft(): EditorDraft? =
         withContext(dispatcher) { draftRepository.getLatestDraft()?.let { resolveDraft(it) } }

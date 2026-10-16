@@ -97,6 +97,28 @@ interface SyncMetadataService {
         error("Scoped recovery repair requires a scope-aware metadata store")
     }
 
+    suspend fun hasPendingDeletion(
+        entityId: String,
+        entityType: EntityType,
+        scope: UploadScope? = null,
+    ): Boolean = getPendingUploads(entityType).any { it.entityId == entityId && it.operation == PendingOperation.DELETE }
+
+    /** Joins the caller's note transaction and refuses a queued deletion without taking a service mutex. */
+    suspend fun enqueueRestoreMutation(
+        entityId: String,
+        entityType: EntityType,
+        operation: PendingOperation,
+        scope: UploadScope? = null,
+    ): Boolean {
+        if (getPendingUploads(entityType).any { it.entityId == entityId && it.operation == PendingOperation.DELETE }) return false
+        if (scope == null) {
+            enqueuePending(entityId, entityType, operation)
+        } else {
+            enqueuePendingForScope(entityId, entityType, operation, scope)
+        }
+        return true
+    }
+
     /** Queue a fresh transcript mutation; durable stores must join the caller's data transaction. */
     suspend fun enqueueTranscriptMutation(noteId: String): Boolean {
         if (getPendingUploads(EntityType.NOTE).any { it.entityId == noteId && it.operation == PendingOperation.DELETE }) return false

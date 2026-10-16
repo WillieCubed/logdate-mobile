@@ -9,6 +9,9 @@ import app.logdate.client.sync.cloud.MediaFile
 import app.logdate.client.sync.cloud.MediaUploadResult
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.test.InMemoryMediaSyncRefStore
+import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.SerializableAudioBlock
+import app.logdate.shared.model.SerializableTextBlock
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,6 +57,19 @@ class SyncMediaTransferReferenceTest {
         assertTrue(transfer.sameLocalFile("file:///install/media/beach.jpg", "logdate-media://library/beach.jpg"))
         assertFalse(transfer.sameLocalFile("file:///install/media/beach.jpg", "logdate-media://library/other.jpg"))
     }
+
+    @Test
+    fun `explicitly unavailable originals preserve uploadable note and draft metadata`() =
+        runTest {
+            val reference = "logdate-unavailable://archive/synthetic/original"
+            val note = JournalNote.Audio(creationTimestamp = created, lastUpdated = created, mediaRef = reference, caption = "Keep caption")
+            val text = SerializableTextBlock(Uuid.random(), created, content = "Keep text")
+            val audio = SerializableAudioBlock(Uuid.random(), created, uri = reference, transcription = "Keep transcript")
+            val draft = EditorDraft(Uuid.random(), listOf(text, audio), emptyList(), created, created)
+            assertEquals(note, transfer().uploadIfNeeded("token", note).getOrThrow())
+            assertEquals(draft, transfer().uploadDraftMediaIfNeeded("token", draft).getOrThrow())
+            assertTrue(uploads.uploaded.isEmpty())
+        }
 
     private fun transfer(media: InMemoryMediaManager = InMemoryMediaManager()) = SyncMediaTransfer(media, refs, uploads, references)
 

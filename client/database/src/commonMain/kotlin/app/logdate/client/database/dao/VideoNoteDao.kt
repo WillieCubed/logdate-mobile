@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import app.logdate.client.database.entities.NoteContentUri
 import app.logdate.client.database.entities.VideoNoteEntity
 import kotlinx.coroutines.flow.Flow
@@ -73,6 +74,9 @@ interface VideoNoteDao {
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addNote(note: VideoNoteEntity)
+
+    @Update
+    suspend fun updateForRestore(note: VideoNoteEntity): Int
 
     /**
      * Counts how many notes still point at [contentUri].

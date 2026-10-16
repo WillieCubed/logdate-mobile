@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -70,7 +69,7 @@ class LocalFirstDraftRepository(
     private fun ownerMarker(scope: DraftStorageScope): String =
         "${scope.ownerId.length}:${scope.ownerId}:${scope.serverOrigin.length}:${scope.serverOrigin}"
 
-    private fun decode(value: String?): List<EditorDraft> = if (value.isNullOrEmpty()) emptyList() else json.decodeFromString(value)
+    private fun decode(value: String?): List<EditorDraft> = ArchiveDraftStorageState.decode(json, value).drafts
 
     /** The owner marker is durable before copying; a failed copy resumes only for that owner. */
     private suspend fun migrateLegacy(scope: DraftStorageScope?) {
@@ -89,7 +88,10 @@ class LocalFirstDraftRepository(
         val scoped = decode(keyValueStorage.getStringOrThrow(scopedKey(scope)))
         val existingIds = scoped.map { it.id }.toSet()
         val merged = decode(legacy).filterNot { it.id in existingIds } + scoped
-        keyValueStorage.putStringOrThrow(scopedKey(scope), json.encodeToString(merged))
+        val receipts =
+            ArchiveDraftStorageState.decode(json, legacy).appliedRecoveries +
+                ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(scopedKey(scope))).appliedRecoveries
+        keyValueStorage.putStringOrThrow(scopedKey(scope), ArchiveDraftStorageState(merged, receipts).encode(json))
         keyValueStorage.putBoolean(doneKey, true)
     }
 
@@ -103,9 +105,12 @@ class LocalFirstDraftRepository(
     private suspend fun write(
         scope: DraftStorageScope?,
         drafts: List<EditorDraft>,
+        receipt: String? = null,
     ) {
         check(currentScope?.invoke() == scope) { "Draft account changed during write" }
-        keyValueStorage.putStringOrThrow(storageKey(scope), json.encodeToString(drafts))
+        val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+        val receipts = state.appliedRecoveries + listOfNotNull(receipt)
+        keyValueStorage.putStringOrThrow(storageKey(scope), ArchiveDraftStorageState(drafts, receipts).encode(json))
         check(currentScope?.invoke() == scope) { "Draft account changed during write" }
     }
 
@@ -193,11 +198,27 @@ class LocalFirstDraftRepository(
     override suspend fun getDraftRecoveryScope(): DraftRecoveryScope =
         currentScope?.invoke()?.let { DraftRecoveryScope(it.ownerId, it.serverOrigin) } ?: DraftRecoveryScope(null, null)
 
+    override suspend fun hasArchiveRecoveryDecision(
+        id: Uuid,
+        recoveryScope: DraftRecoveryScope?,
+        recoveryId: String,
+    ): Boolean =
+        storageMutex.withLock {
+            val scope = currentScope?.invoke()
+            check(recoveryScope == null || scope?.ownerId == recoveryScope.ownerId && scope?.serverOrigin == recoveryScope.serverOrigin) {
+                "Draft recovery account changed"
+            }
+            val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+            check(currentScope?.invoke() == scope) { "Draft recovery account changed" }
+            "$recoveryId:$id" in state.appliedRecoveries
+        }
+
     override suspend fun compareAndSetDraftForRestore(
         id: Uuid,
         expected: EditorDraft?,
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope?,
+        recoveryId: String?,
     ): Boolean =
         storageMutex.withLock {
             require(expected == null || expected.id == id)
@@ -207,10 +228,16 @@ class LocalFirstDraftRepository(
                 "Draft recovery account changed"
             }
             val drafts = read(scope)
-            if (drafts.find { it.id == id } != expected) return@withLock false
-            if (expected == replacement) return@withLock true
-            val updated = drafts.filterNot { it.id == id } + listOfNotNull(replacement)
-            write(scope, updated)
+            val receipt = recoveryId?.let { "$it:$id" }
+            val state = ArchiveDraftStorageState.decode(json, keyValueStorage.getStringOrThrow(storageKey(scope)))
+            if (receipt != null && receipt in state.appliedRecoveries) return@withLock false
+            if (drafts.find { it.id == id } != expected) {
+                if (receipt != null) write(scope, drafts, receipt)
+                return@withLock false
+            }
+            if (expected == replacement && receipt == null) return@withLock true
+            val updated = if (expected == replacement) drafts else drafts.filterNot { it.id == id } + listOfNotNull(replacement)
+            write(scope, updated, receipt)
             true
         }
 

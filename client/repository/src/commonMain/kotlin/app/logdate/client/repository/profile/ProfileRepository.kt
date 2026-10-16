@@ -1,5 +1,6 @@
 package app.logdate.client.repository.profile
 
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
@@ -11,6 +12,24 @@ import kotlin.time.Instant
  * to users for app personalization, independent of cloud account connectivity.
  */
 interface ProfileRepository {
+    suspend fun compareAndSetProfileForRestore(
+        expected: LogDateProfile,
+        replacement: LogDateProfile,
+        scope: JournalMergeScope?,
+        recoveryId: String,
+    ): Boolean {
+        if (getCurrentProfile() != expected) return false
+        if (expected.displayName != replacement.displayName) updateDisplayName(replacement.displayName).getOrThrow()
+        if (expected.birthday != replacement.birthday) updateBirthday(replacement.birthday).getOrThrow()
+        if (expected.profilePhotoUri != replacement.profilePhotoUri) updateProfilePhoto(replacement.profilePhotoUri).getOrThrow()
+        if (expected.bio != replacement.bio ||
+            expected.originalBio != replacement.originalBio
+        ) {
+            updateBio(replacement.bio, replacement.originalBio).getOrThrow()
+        }
+        return true
+    }
+
     /**
      * Current local profile information as a Flow.
      */

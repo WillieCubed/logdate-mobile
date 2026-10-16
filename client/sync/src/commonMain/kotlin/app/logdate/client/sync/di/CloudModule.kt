@@ -5,10 +5,12 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.LocationHistoryApiClient
 import app.logdate.client.repository.location.ActivityHistoryRepository
 import app.logdate.client.repository.location.HistoryOwnerAdoptionRepair
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.sync.AutomaticMediaRecovery
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudBackupDataSource
@@ -136,4 +138,16 @@ val cloudModule =
         single { MediaPayloadKeyProvider(get(), get(), get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get(), get()) }
+        single {
+            AutomaticMediaRecovery(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                references = getOrNull<StoredMediaReferences>() ?: StoredMediaReferences.Unchanged,
+                owner = get(),
+                config = get(),
+            )
+        }
     }

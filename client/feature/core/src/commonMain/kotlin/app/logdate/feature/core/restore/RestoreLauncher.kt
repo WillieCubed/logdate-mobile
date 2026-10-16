@@ -1,5 +1,6 @@
 package app.logdate.feature.core.restore
 
+import app.logdate.client.domain.restore.IntegrityCategory
 import app.logdate.client.domain.restore.IntegrityMismatch
 import app.logdate.client.domain.restore.RestoreResult
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,8 @@ interface RestoreLauncher {
      * Opens the file picker for archive selection without starting a restore.
      */
     fun startFileSelection()
+
+    fun selectArchiveForMediaRecovery(recoveryId: String) = startFileSelection()
 
     /**
      * Starts the data restore process with the given options.
@@ -64,6 +67,10 @@ interface RestoreLauncher {
      */
     fun completeRestore(outcome: RestoreOutcome)
 
+    fun setRecoveryUpdateCallback(callback: (RestoreSummary) -> Unit) = Unit
+
+    fun updateRecovery(summary: RestoreSummary) = Unit
+
     /**
      * Observable progress stream for the current restore operation.
      */
@@ -81,6 +88,7 @@ sealed class RestoreOutcome {
 
     data class Failure(
         val error: RestoreError,
+        val recoveryId: String? = null,
     ) : RestoreOutcome()
 }
 
@@ -103,6 +111,7 @@ enum class RestoreError {
 /**
  * Options controlling what data to include in the import.
  */
+@Serializable
 data class ImportOptions(
     val includeDrafts: Boolean = true,
     val includeMedia: Boolean = true,
@@ -197,6 +206,15 @@ data class RestoreSummary(
     val mediaImported: Int,
     val warnings: List<String> = emptyList(),
     val integrityMismatches: List<IntegrityMismatch> = emptyList(),
+    val unavailableOriginals: Int = 0,
+    val unavailablePreviews: Int = 0,
+    val recoveryId: String? = null,
+    val metadataIncomplete: Boolean = false,
+    val recoveringMedia: Boolean = false,
+    val needsAnotherArchive: Boolean =
+        warnings.any { it.startsWith("Skipped") || it.startsWith("Invalid UUID") } ||
+            integrityMismatches.any { it.actual < it.expected && it.category != IntegrityCategory.MEDIA },
+    val canResume: Boolean = false,
 )
 
 fun RestoreResult.toSummary(source: String): RestoreSummary =
@@ -212,4 +230,6 @@ fun RestoreResult.toSummary(source: String): RestoreSummary =
         mediaImported = mediaImported,
         warnings = warnings,
         integrityMismatches = integrityMismatches,
+        unavailableOriginals = unavailableMedia.count { it.role == app.logdate.client.domain.restore.RecoveryMediaRole.ORIGINAL },
+        unavailablePreviews = unavailableMedia.count { it.role == app.logdate.client.domain.restore.RecoveryMediaRole.THUMBNAIL },
     )

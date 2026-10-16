@@ -136,6 +136,7 @@ data class ArchiveDraftBlock(
     val durationMs: Long? = null,
     val transcription: String? = null,
     val location: ArchiveLocation? = null,
+    val thumbnail: ArchiveMediaRef? = null,
 )
 
 @Serializable

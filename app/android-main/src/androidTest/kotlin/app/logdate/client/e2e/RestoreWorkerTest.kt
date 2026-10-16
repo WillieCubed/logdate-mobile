@@ -120,6 +120,9 @@ class RestoreWorkerTest {
                                 options = any(),
                                 mediaImporter = anyNullable(),
                                 onProgress = anyNullable(),
+                                onPendingMedia = anyNullable(),
+                                mediaRecoveryId = any(),
+                                expectedNoteScope = anyNullable(),
                             )
                         } returns restoreResult
                     }
@@ -272,6 +275,9 @@ class RestoreWorkerTest {
                             options = any(),
                             mediaImporter = anyNullable(),
                             onProgress = anyNullable(),
+                            onPendingMedia = anyNullable(),
+                            mediaRecoveryId = any(),
+                            expectedNoteScope = anyNullable(),
                         )
                     } coAnswers
                         {
@@ -315,6 +321,12 @@ class RestoreWorkerTest {
                     factory { restoreUseCase }
                     single<MediaManager> { mediaManager }
                     single<RestoreLauncher> { restoreLauncher }
+                    single<app.logdate.client.device.identity.CanonicalOwnerProvider> {
+                        mockk { coEvery { getCanonicalOwnerId() } returns "synthetic-archive-worker" }
+                    }
+                    single<app.logdate.shared.config.LogDateConfigRepository> {
+                        mockk { coEvery { getCurrentBackendUrl() } returns "https://example.test" }
+                    }
                     single<SessionStorage> { mockk(relaxed = true) }
                     if (diagnostics != null) single<RestoreDiagnosticEvents> { diagnostics }
                 },

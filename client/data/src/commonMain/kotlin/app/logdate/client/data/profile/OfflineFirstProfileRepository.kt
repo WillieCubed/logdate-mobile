@@ -1,6 +1,7 @@
 package app.logdate.client.data.profile
 
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.shared.model.profile.LogDateProfile
 import io.github.aakira.napier.Napier
@@ -17,7 +18,20 @@ import kotlin.time.Instant
  */
 class OfflineFirstProfileRepository(
     private val preferencesDataSource: LogdatePreferencesDataSource,
+    private val currentRecoveryScope: suspend () -> JournalMergeScope? = { null },
 ) : ProfileRepository {
+    override suspend fun compareAndSetProfileForRestore(
+        expected: LogDateProfile,
+        replacement: LogDateProfile,
+        scope: JournalMergeScope?,
+        recoveryId: String,
+    ): Boolean {
+        val receipt = "${scope?.ownerId?.length}:${scope?.ownerId}${scope?.serverOrigin?.length}:${scope?.serverOrigin}:$recoveryId"
+        return preferencesDataSource.archiveProfileRecoveryStore().compareAndSet(expected, replacement, receipt) {
+            check(currentRecoveryScope() == scope) { "Profile recovery account changed" }
+        }
+    }
+
     override val currentProfile: Flow<LogDateProfile> =
         preferencesDataSource.userData.map { userData ->
             LogDateProfile(
@@ -190,17 +204,8 @@ class OfflineFirstProfileRepository(
 
     override suspend fun clearProfile(): Result<Unit> =
         try {
-            val result = preferencesDataSource.clearUserData()
-            result.fold(
-                onSuccess = {
-                    Napier.d("Profile cleared successfully")
-                    Result.success(Unit)
-                },
-                onFailure = { exception ->
-                    Napier.e("Failed to clear profile", exception)
-                    Result.failure(exception)
-                },
-            )
+            preferencesDataSource.archiveProfileRecoveryStore().clearProfile()
+            Result.success(Unit)
         } catch (e: Exception) {
             Napier.e("Unexpected error clearing profile", e)
             Result.failure(e)

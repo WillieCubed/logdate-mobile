@@ -49,6 +49,37 @@ class NativeMissingMediaRecoveryTest {
         }
 
     @Test
+    fun `remote reference reuses its transferred original without a network request`() =
+        runTest {
+            val local = media.saveMedia(MediaPayload("existing.mp4", "video/mp4", 1, byteArrayOf(1)))
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = remote)
+            refs.upsert(mapping(note.uid).copy(localUri = local))
+            val result = assertIs<MediaHydrationResult.Available>(SyncMediaTransfer(media, refs, cloud).hydrate("token", note))
+            assertEquals(local, (result.note as JournalNote.Video).mediaRef)
+            assertTrue(downloads.isEmpty())
+        }
+
+    @Test
+    fun `an old local alias reuses the current cached original offline`() =
+        runTest {
+            val local = media.saveMedia(MediaPayload("existing.mp4", "video/mp4", 1, byteArrayOf(1)))
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = missing)
+            refs.upsert(mapping(note.uid).copy(localUri = local, localAliases = listOf(missing)))
+            val result = assertIs<MediaHydrationResult.Available>(SyncMediaTransfer(media, refs, cloud).hydrate("token", note))
+            assertEquals(local, (result.note as JournalNote.Video).mediaRef)
+            assertTrue(downloads.isEmpty())
+        }
+
+    @Test
+    fun `a download for another entry cannot be installed as the missing original`() =
+        runTest {
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = remote)
+            downloadedOwner = Uuid.random()
+            val result = assertIs<MediaHydrationResult.Pending>(SyncMediaTransfer(media, refs, cloud).hydrate("token", note))
+            assertEquals(DiagnosticReason.CORRUPT_PAYLOAD, result.reason)
+        }
+
+    @Test
     fun `missing local originals use their scoped remote mapping`() =
         runTest {
             val note =

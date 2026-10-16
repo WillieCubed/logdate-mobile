@@ -3,6 +3,7 @@ package app.logdate.client.data.journals
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -12,6 +13,7 @@ import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.CoroutineDispatcher
@@ -34,6 +36,7 @@ class OfflineFirstJournalContentRepository(
     private val syncMetadataService: SyncMetadataService,
     private val transactionManager: SyncTransactionManager = PassthroughJournalContentTransactionManager,
     private val dispatcher: CoroutineDispatcher = platformIODispatcher,
+    private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
 ) : JournalContentRepository,
     SyncableJournalContentRepository {
     override fun observeJournalItemCounts(): Flow<Map<Uuid, Int>> =
@@ -72,6 +75,46 @@ class OfflineFirstJournalContentRepository(
         addContentsToJournal(listOf(contentId), journalId)
         Unit
     }
+
+    override suspend fun addContentToJournalForRestore(
+        contentId: Uuid,
+        journalId: Uuid,
+        scope: JournalMergeScope?,
+        recoveryId: String?,
+    ): Boolean =
+        transactionManager.withTransaction {
+            check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership recovery account changed" }
+            if (journalNotesRepository.getNoteById(contentId) == null) return@withTransaction false
+            val uploadScope = scope?.let { UploadScope(it.ownerId, it.serverOrigin) }
+            if (syncMetadataService.hasPendingDeletion(contentId.toString(), EntityType.NOTE, uploadScope)) return@withTransaction false
+            val destination = journalRepository.resolveJournalId(journalId)
+            if (journalRepository.getJournalById(destination) == null ||
+                syncMetadataService.hasPendingDeletion(destination.toString(), EntityType.JOURNAL, uploadScope)
+            ) {
+                return@withTransaction false
+            }
+            val key = AssociationPendingKey(destination, contentId).toPendingId()
+            val receiptKey = AssociationPendingKey(journalId, contentId).toPendingId()
+            if (scope != null &&
+                recoveryId != null &&
+                recoveryReceipts.contains(scope, "ASSOCIATION", recoveryId, receiptKey)
+            ) {
+                return@withTransaction false
+            }
+            if (!syncMetadataService.enqueueRestoreMutation(
+                    key,
+                    EntityType.ASSOCIATION,
+                    PendingOperation.CREATE,
+                    uploadScope,
+                )
+            ) {
+                return@withTransaction false
+            }
+            journalContentDao.addContentToJournal(JournalContentEntityLink(destination, contentId))
+            if (scope != null && recoveryId != null) recoveryReceipts.record(scope, "ASSOCIATION", recoveryId, receiptKey)
+            check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership recovery account changed" }
+            true
+        }
 
     override suspend fun addContentsToJournal(
         contentIds: Collection<Uuid>,

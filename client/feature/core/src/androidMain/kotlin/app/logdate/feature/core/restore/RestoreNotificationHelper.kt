@@ -17,9 +17,10 @@ class RestoreNotificationHelper(
     workId: Uuid,
 ) : DataTransferNotificationHelper(context, workId) {
     override val channelId = LogDateNotificationChannelKey.DATA_RESTORE.id
-    override val notificationId = LogDateNotificationChannelKey.DATA_RESTORE.notificationId ?: 1002
+    override val notificationId = (workId.hashCode() and 0x3fffffff) + 1002
     override val progressTitleResId = R.string.restore_title_progress
-    override val completeTitleResId = R.string.restore_title_complete
+    private var incompleteMedia = false
+    override val completeTitleResId get() = if (incompleteMedia) R.string.restore_title_partial else R.string.restore_title_complete
     override val failedTitleResId = R.string.restore_title_failed
     override val phaseStarts = RestoreStage.entries.map { it.defaultProgressPercent }
 
@@ -29,7 +30,14 @@ class RestoreNotificationHelper(
             message = resolveStageMessage(stage),
         )
 
-    fun createCompletionInfo(): ForegroundInfo = createCompletionInfo(context.getString(R.string.restore_notification_complete_message))
+    fun createCompletionInfo(unavailable: Int = 0): ForegroundInfo {
+        incompleteMedia = unavailable > 0
+        return createCompletionInfo(
+            context.getString(
+                if (incompleteMedia) R.string.restore_notification_partial_message else R.string.restore_notification_complete_message,
+            ),
+        )
+    }
 
     private fun resolveStageMessage(stage: RestoreStage): String =
         when (stage) {

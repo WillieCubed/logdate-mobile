@@ -56,6 +56,7 @@ class TranscriptMediaReplacementTest {
             InMemoryMediaSyncRefStore().apply {
                 upsert(MediaSyncRef(original.uid.toString(), localUri, "https://server.example/media/original", "original", 2))
             }
+        if (preserve) media.deleteOwnedMedia(localUri)
         val api =
             FakeCloudApiClient().apply {
                 downloadMediaResponse =

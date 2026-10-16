@@ -17,6 +17,8 @@ a file beneath `datastore/`.
 | Database passphrase recovery | Included | Included |
 | Phrase-derived or account-bound identity recovery and independent media keys | Included | Included |
 | Committed originals and accepted camera drafts | Excluded | Included |
+| Incomplete archive recovery records | Included | Included |
+| Retained source archives for incomplete recovery | Excluded | Included |
 | Keystore-bound preferences, vendor installation state, background jobs, caches, and staging | Excluded | Excluded |
 
 Cloud backup requires client-side encryption for the portable recovery material. Android's 25 MB
@@ -45,10 +47,14 @@ Pending sign-in recovery can retry when the app resumes or networking reconnects
 
 Archive retries preserve drafts with newer or equal saved modification times. Recovery reads and
 writes propagate storage failures, retain archive timestamps, and stay bound to the account and
-server selected at the start. Conditional writes and rollback preserve later editor saves;
-duplicate records share their original undo snapshot, and invalid draft IDs are skipped. A retry
+server selected at the start. Conditional writes preserve later editor saves;
+duplicate records track their captured snapshots, and invalid draft IDs are skipped. A retry
 repairs a missing upload request after an interrupted persistence/enqueue boundary without
-replacing a later pending mutation.
+replacing a later pending mutation. Successful note, journal, and membership writes survive a later
+archive failure; recovery never deletes an accepted original as failure cleanup. Draft writes also
+survive later failures, and captured snapshots cannot replace a later edit.
+Per-entry application receipts commit with Room rows or the draft DataStore value, so replay cannot
+recreate an entry deleted after import even after that deletion has synced.
 
 Android Keystore ciphertext is not portable. The database passphrase has a recoverable copy under
 `db_recovery/`. Phrase-derived content identities retain their recovery phrase under
@@ -70,6 +76,39 @@ owner cannot mint an unrelated replacement identity. Account-key backups validat
 over the owner and key to detect corruption. Conflicting database key copies preserve both for
 recovery. Backfill validates retained identity and media copies against the primary keys before
 writing, and preserves conflicting or malformed material. Key files are replaced atomically, and incomplete replacements are excluded from backup.
+
+## Incomplete media recovery
+
+Before importing content, Android stores a private copy of the archive and a recovery record bound
+to the canonical owner and server. Each missing attachment is recorded before its entry is written.
+Unavailable references identify the recovery generation, entry, block, and original or preview role.
+They keep text and captions uploadable without attempting to read absent bytes. A recovered video
+preview cannot stand in for its original.
+
+Recovery runs as separate WorkManager jobs. It first reuses available originals and checkpointed
+candidates, then searches retained archives and the current account's Cloud media. Other retained
+archives must match the expected bytes by SHA-256; a repeated filename is insufficient. Cloud
+recovery refreshes expired credentials and stays bound to the captured owner and server. Temporary
+failures retain their checkpoints and retry without requiring another app launch.
+
+Conditional reference patches preserve captions, timestamps, text, block order, and memberships.
+Deleted entries, replaced attachments, and pending deletions take precedence. Notes, journals,
+memberships, places, location samples, drafts, and profile decisions have durable application
+receipts, including decisions to preserve newer content. Draft recovery admits its sync write
+inside a Room transaction before committing preferences; an interrupted Room commit can repair
+its upload intent without replaying the draft.
+
+A restarted worker uses its retained source even if the original picker permission or file is gone.
+Native cloud backup carries the compact records; direct transfer also carries retained source
+archives. A source ZIP is unnecessary for attachment repair once metadata is safely imported.
+Explicit cancellation persists before source copying can finish; a paused import can resume from
+its retained archive. Source replacement checkpoints unfinished metadata replay across restart.
+
+The result sheet reports background repair quietly. It requests another archive only when the
+remaining content needs a source the app cannot recover itself, and retains that action after the
+sheet closes. Technical warnings remain in recovery records instead of appearing as raw error
+strings. Completing all pending content removes the retained source copy. Manual imports do not
+acknowledge native delivery markers.
 
 ## Account recovery
 
@@ -93,13 +132,21 @@ a rich draft, and a deleted entry. Destination assertions cover owner and conten
 a distinct device ID, original bytes, offline decoding/playback, draft structure, and an offline
 edit retained across process restart. The `legacy-account` identity scenario starts with enrolled
 secure keys but no portable key backup, and checks that the native backup callback prepares them.
-An independently encrypted media payload must decrypt on the replacement phone. The harness requires explicit `emulator-NNNN` serials and
+An independently encrypted media payload must decrypt on the replacement phone. The harness
+requires explicit `emulator-NNNN` serials and
 refuses a destination that already has the debug application installed. The optional
 `--exercise-quota` scenario creates an oversized synthetic source entry and checks Android's
 quota rejection and persisted callback record. Optional summarization and entity extraction
 reject inputs beyond their processing budget before constructing prompts or normalizing cache
 keys. Moment inference checks the budget before serializing a day and uses bounded preview
 fragments for large entries; the source entries remain intact.
+
+The optional `--exercise-archive-recovery` scenario also transfers an incomplete archive import.
+It preserves edited captions, reordered draft blocks, text, memberships, and a video preview while
+two originals are unavailable. The destination retries from the retained archive after the picker
+file is gone, accepts a replacement archive with different media paths, and verifies recovered
+bytes and offline playback across another process restart. Test IDs travel as instrumentation
+arguments; the application's recovery record and source ZIP must arrive through native backup.
 
 The local transport exercises file selection, native callbacks, and application recovery using
 test encryption and direct-transfer flags. Google credential delivery and setup transfer require

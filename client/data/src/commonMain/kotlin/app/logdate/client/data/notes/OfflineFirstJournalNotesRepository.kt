@@ -1,5 +1,6 @@
 package app.logdate.client.data.notes
 
+import app.logdate.client.data.journals.ArchiveRecoveryReceipts
 import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.MediaCaptionDao
@@ -55,6 +56,8 @@ class OfflineFirstJournalNotesRepository(
     private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val transcriptionRepository: TranscriptionRepository? = null,
     private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
+    private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
+    private val currentRecoveryScope: suspend () -> app.logdate.client.repository.journals.JournalMergeScope? = { null },
 ) : JournalNotesRepository,
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
@@ -252,15 +255,8 @@ class OfflineFirstJournalNotesRepository(
     }
 
     /**
-     * Removes the media a deleted note pointed at, if nothing else points at it.
-     *
-     * Media is stored content-addressed, so two entries holding identical bytes share one file --
-     * deleting one entry must not take the other's photo with it. This runs after the note rows
-     * are gone, so the count it reads is the number of *remaining* references, under both the
-     * spelling the deleted note used and the one LogDate stores.
-     *
-     * [MediaManager.deleteOwnedMedia] refuses anything LogDate did not store itself, so a note
-     * that referenced a photo from the user's own library leaves that photo alone.
+     * Deletes owned media only after the last note reference, including legacy path spellings,
+     * is gone. [MediaManager.deleteOwnedMedia] preserves files from the user's own library.
      */
     private suspend fun deleteMediaIfUnreferenced(contentUri: String?) {
         if (contentUri.isNullOrEmpty()) return
@@ -404,46 +400,48 @@ class OfflineFirstJournalNotesRepository(
         triggerAssociationSync()
     }
 
-    override suspend fun createFromSync(note: JournalNote) {
-        when (val storedNote = note.withStoredMediaRef()) {
-            is JournalNote.Text -> textNoteDao.addNote(storedNote.toEntity())
-            is JournalNote.Image -> {
-                imageNoteDao.addNote(storedNote.toEntity())
-                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
-            }
-            is JournalNote.Audio -> {
-                audioNoteDao.addNote(storedNote.toEntity())
-                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
-                storedNote.persistTranscript(transcriptionRepository)
-            }
-            is JournalNote.Video -> {
-                videoNoteDao.addNote(storedNote.toEntity())
-                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
-            }
-        }
+    private val recovery by lazy {
+        JournalNoteRecoveryPersistence(
+            textNoteDao,
+            imageNoteDao,
+            audioNoteDao,
+            videoNoteDao,
+            mediaCaptionDao,
+            transcriptionRepository,
+            transactionManager,
+            syncMetadataService,
+            mediaReferences,
+            ::getNoteById,
+            currentRecoveryScope,
+            ::triggerContentSync,
+            ::indexAvailableRecoveryMedia,
+            recoveryReceipts,
+        )
     }
 
-    override suspend fun deleteFromSync(noteId: Uuid) {
-        textNoteDao.removeNote(noteId)
-        imageNoteDao.removeNote(noteId)
-        transcriptionRepository?.deleteTranscription(noteId)
-        audioNoteDao.removeNote(noteId)
-        videoNoteDao.removeNote(noteId)
-        mediaCaptionDao.deleteCaption(noteId)
+    private suspend fun indexAvailableRecoveryMedia(note: JournalNote) {
+        val reference = note.mediaRefOrNull() ?: return
+        if (mediaManager?.exists(reference) == true) indexPendingMediaIfNeeded(buildPendingMediaIndex(note))
     }
+
+    override suspend fun getNoteRecoveryScope() = currentRecoveryScope()
+
+    override suspend fun compareAndSetNoteForRestore(
+        expected: JournalNote?,
+        replacement: JournalNote,
+        scope: app.logdate.client.repository.journals.JournalMergeScope?,
+        recoveryId: String?,
+    ): Boolean = recovery.compareAndSet(expected, replacement, scope, recoveryId)
+
+    override suspend fun createFromSync(note: JournalNote) = recovery.createFromSync(note)
+
+    override suspend fun deleteFromSync(noteId: Uuid) = recovery.deleteFromSync(noteId)
 
     override suspend fun updateSyncMetadata(
         note: JournalNote,
         syncVersion: Long,
         syncedAt: Instant,
-    ) {
-        when (note) {
-            is JournalNote.Text -> textNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
-            is JournalNote.Image -> imageNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
-            is JournalNote.Audio -> audioNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
-            is JournalNote.Video -> videoNoteDao.updateSyncMetadata(note.uid, syncVersion, syncedAt)
-        }
-    }
+    ) = recovery.updateSyncMetadata(note, syncVersion, syncedAt)
 
     private val mediaMetadata =
         NoteMediaMetadataWriter(

@@ -48,12 +48,19 @@ interface DraftRepository {
     /** Capture before reading recovery snapshots and retain for later writes and undo. */
     suspend fun getDraftRecoveryScope(): DraftRecoveryScope? = null
 
+    suspend fun hasArchiveRecoveryDecision(
+        id: Uuid,
+        recoveryScope: DraftRecoveryScope?,
+        recoveryId: String,
+    ): Boolean = false
+
     /** Concurrent stores must compare and persist atomically, preserving timestamps and the captured scope. */
     suspend fun compareAndSetDraftForRestore(
         id: Uuid,
         expected: EditorDraft?,
         replacement: EditorDraft?,
         recoveryScope: DraftRecoveryScope? = null,
+        recoveryId: String? = null,
     ): Boolean {
         check(recoveryScope == null || getDraftRecoveryScope() == recoveryScope) { "Draft recovery account changed" }
         if (getDraftForRestore(id) != expected) return false

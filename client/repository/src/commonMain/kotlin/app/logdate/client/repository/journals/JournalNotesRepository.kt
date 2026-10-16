@@ -169,6 +169,20 @@ interface JournalNotesRepository {
      */
     suspend fun create(note: JournalNote): Uuid
 
+    suspend fun getNoteRecoveryScope(): JournalMergeScope? = null
+
+    /** Restores a captured note without deleting its media or journal memberships. */
+    suspend fun compareAndSetNoteForRestore(
+        expected: JournalNote?,
+        replacement: JournalNote,
+        scope: JournalMergeScope? = null,
+        recoveryId: String? = null,
+    ): Boolean {
+        if (expected != null) return false
+        create(replacement)
+        return true
+    }
+
     /**
      * Deletes a note.
      */

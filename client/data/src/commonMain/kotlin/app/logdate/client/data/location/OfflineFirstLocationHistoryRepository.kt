@@ -1,14 +1,18 @@
 package app.logdate.client.data.location
 
+import app.logdate.client.data.journals.ArchiveRecoveryReceipts
+import app.logdate.client.data.journals.DirectArchiveRecoveryTransactions
 import app.logdate.client.database.dao.LocationActivityDao
 import app.logdate.client.database.dao.LocationHistoryDao
 import app.logdate.client.database.entities.Coordinates
 import app.logdate.client.database.entities.LocationLogEntity
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.location.LocationLogRecord
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -23,6 +27,9 @@ import kotlin.time.Instant
 class OfflineFirstLocationHistoryRepository(
     private val locationHistoryDao: LocationHistoryDao,
     private val activityDao: LocationActivityDao? = null,
+    private val transactionManager: SyncTransactionManager = DirectArchiveRecoveryTransactions,
+    private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
+    private val currentRecoveryScope: suspend () -> JournalMergeScope? = { null },
 ) : LocationHistoryRepository {
     override suspend fun getAllLocationHistory(): List<LocationHistoryItem> =
         locationHistoryDao.getAllLocationHistory().map {
@@ -133,6 +140,21 @@ class OfflineFirstLocationHistoryRepository(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+
+    override suspend fun restoreLocationForArchive(
+        record: LocationLogRecord,
+        scope: JournalMergeScope?,
+        recoveryId: String,
+    ): Result<Unit> =
+        runCatching {
+            transactionManager.withTransaction {
+                check(currentRecoveryScope() == scope) { "Location recovery account changed" }
+                if (scope != null && recoveryReceipts.contains(scope, "LOCATION", recoveryId, record.sampleId)) return@withTransaction
+                if (locationHistoryDao.getBySampleId(record.sampleId) == null) logLocation(record).getOrThrow()
+                if (scope != null) recoveryReceipts.record(scope, "LOCATION", recoveryId, record.sampleId)
+                check(currentRecoveryScope() == scope) { "Location recovery account changed" }
+            }
         }
 
     override suspend fun deleteLocationEntry(

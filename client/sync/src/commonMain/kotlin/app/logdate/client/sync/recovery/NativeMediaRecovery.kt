@@ -74,7 +74,8 @@ internal class NativeMediaRecovery(
                     is MediaHydrationResult.Available ->
                         transactions.withTransaction {
                             if (scope != inbox.currentScope()) throw CancellationException("Native media recovery scope changed")
-                            if (notes.getNoteById(id) == original) {
+                            val current = notes.getNoteById(id)
+                            if (current?.mediaRefOrNull() == row.payload && current.type == original.type) {
                                 val syncable = notes as? SyncableJournalNotesRepository ?: error("Sync note repository unavailable")
                                 syncable.updateMediaRef(id, requireNotNull(result.note.mediaRefOrNull()))
                                 result.mapping?.let { refs.upsert(it.copy(ownerId = scope.owner, serverOrigin = scope.origin)) }

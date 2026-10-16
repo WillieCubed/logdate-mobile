@@ -1,5 +1,6 @@
 package app.logdate.client.repository.places
 
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.shared.model.Place
 import kotlinx.coroutines.flow.Flow
 
@@ -10,6 +11,15 @@ import kotlinx.coroutines.flow.Flow
  * or learned from their location patterns.
  */
 interface UserPlacesRepository {
+    suspend fun restorePlaceForArchive(
+        place: Place,
+        scope: JournalMergeScope?,
+        recoveryId: String,
+    ): Result<Unit> =
+        runCatching {
+            if (getPlaceById(place.uid.toString()) == null) createPlace(place).getOrThrow()
+        }
+
     /**
      * Gets all user-defined places.
      */

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.NoteContentUri
 import kotlinx.coroutines.flow.Flow
@@ -82,6 +83,9 @@ interface ImageNoteDao {
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addNote(note: ImageNoteEntity)
+
+    @Update
+    suspend fun updateForRestore(note: ImageNoteEntity): Int
 
     /**
      * Counts how many notes still point at [contentUri].

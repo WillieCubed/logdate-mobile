@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import app.logdate.client.database.entities.TextNoteEntity
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
@@ -81,6 +82,9 @@ interface TextNoteDao {
      */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addNote(note: TextNoteEntity)
+
+    @Update
+    suspend fun updateForRestore(note: TextNoteEntity): Int
 
     /**
      * Removes the given note from the DB.

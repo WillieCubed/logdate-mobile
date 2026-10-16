@@ -4,13 +4,16 @@ import app.logdate.client.domain.export.ExportDraft
 import app.logdate.client.repository.journals.DraftRecoveryScope
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.shared.model.EditorDraft
-import io.github.aakira.napier.Napier
 import kotlin.uuid.Uuid
 
 internal class RestoreDraftReconciler(
     private val repository: JournalRepository,
     private val warnings: MutableList<String>,
     private val decoder: RestoreDraftDecoder,
+    private val onPendingMedia: (UnavailableMediaAsset) -> Unit,
+    private val onApplied: (DecodedArchiveDraft) -> Unit,
+    private val expectedScope: app.logdate.client.repository.journals.JournalMergeScope?,
+    private val recoveryId: String,
 ) {
     private data class Undo(
         val original: EditorDraft?,
@@ -25,6 +28,13 @@ internal class RestoreDraftReconciler(
         strategy: RestoreStrategy,
     ): Int {
         recoveryScope = repository.getDraftRecoveryScope()
+        check(
+            expectedScope == null ||
+                recoveryScope?.outboxOwnerId == expectedScope.ownerId &&
+                recoveryScope?.outboxServerOrigin == expectedScope.serverOrigin,
+        ) {
+            "Draft recovery account changed"
+        }
         var imported = 0
         for (draft in drafts) {
             check(repository.getDraftRecoveryScope() == recoveryScope) { "Draft recovery account changed" }
@@ -40,12 +50,18 @@ internal class RestoreDraftReconciler(
                 warnings.add("Kept a draft changed during archive recovery")
                 continue
             }
-            if (!shouldOverwrite(existing?.lastModifiedAt, draft.updatedAt, strategy)) continue
-            val restored = decoder.decode(draft)
+            if (!shouldOverwrite(existing?.lastModifiedAt, draft.updatedAt, strategy)) {
+                repository.compareAndSetDraftForRestore(id, existing, existing, recoveryScope, enqueue = false, recoveryId = recoveryId)
+                continue
+            }
+            val decoded = decoder.decode(draft, existing)
+            val restored = decoded.draft
+            decoded.unavailableMedia.forEach(onPendingMedia)
             val snapshot = undo.getOrPut(id) { Undo(existing) }
-            // Include a possibly durable write in rollback even if its sync enqueue subsequently fails.
+            // Track a possibly durable write so a duplicate cannot overwrite an intervening edit.
             snapshot.writes.add(restored)
-            if (repository.compareAndSetDraftForRestore(id, existing, restored, recoveryScope)) {
+            if (repository.compareAndSetDraftForRestore(id, existing, restored, recoveryScope, recoveryId = recoveryId)) {
+                onApplied(decoded)
                 imported++
             } else {
                 snapshot.writes.removeAt(snapshot.writes.lastIndex)
@@ -54,15 +70,5 @@ internal class RestoreDraftReconciler(
         }
         check(repository.getDraftRecoveryScope() == recoveryScope) { "Draft recovery account changed" }
         return imported
-    }
-
-    suspend fun rollback() {
-        for ((id, snapshot) in undo) {
-            runCatching {
-                for (applied in snapshot.writes.asReversed()) {
-                    if (repository.compareAndSetDraftForRestore(id, applied, snapshot.original, recoveryScope)) break
-                }
-            }.onFailure { Napier.e("Rollback: draft recovery could not be reverted", it) }
-        }
     }
 }

@@ -89,9 +89,9 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
 
             assertEquals(ExportSchemaVersion.V2_0, result.metadata.version)
             assertEquals(2, result.journalsImported)
-            assertEquals(3, result.notesImported)
+            assertEquals(4, result.notesImported)
             assertEquals(1, result.draftsImported)
-            assertEquals(3, result.journalLinksImported)
+            assertEquals(4, result.journalLinksImported)
             assertEquals("Sam", profile.profile.displayName)
             assertEquals("Home", (places.places.single() as Place.UserDefined).displayName)
             assertEquals(1, locations.entries.size)
@@ -113,6 +113,7 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
             )
             assertEquals(CaptureDevice.WATCH, notes.getNoteById(audioNote.uid)?.capturedOn)
             assertNull(notes.getNoteById(textNote.uid)?.capturedOn)
-            assertTrue(result.warnings.any { "not restored" in it || "Skipped" in it })
+            assertEquals(videoNote.uid.toString(), result.unavailableMedia.single().entityId)
+            assertTrue(notes.getNoteById(videoNote.uid) is JournalNote.Video)
         }
 }

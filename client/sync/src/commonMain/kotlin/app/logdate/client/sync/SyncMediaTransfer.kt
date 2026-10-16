@@ -5,6 +5,7 @@ import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudApiException
@@ -36,6 +37,8 @@ internal class SyncMediaTransfer(
     ): Boolean = first == second || mediaReferences.storedReference(first) == mediaReferences.storedReference(second)
 
     fun isRemoteRef(mediaRef: String): Boolean = mediaRef.startsWith("http://") || mediaRef.startsWith("https://")
+
+    fun requiresUpload(reference: String): Boolean = !isRemoteRef(reference) && !UnavailableMediaReferences.isUnavailable(reference)
 
     /** Resolve every local attachment before the draft record can reference it remotely. */
     suspend fun uploadDraftMediaIfNeeded(
@@ -77,7 +80,7 @@ internal class SyncMediaTransfer(
         kind: String,
         uri: String?,
     ): String? {
-        if (uri == null || isRemoteRef(uri)) return uri
+        if (uri == null || !requiresUpload(uri)) return uri
         val cached = mediaSyncRefStore.getDraftAsset(draftId, blockId, kind)
         if (cached != null && matchesLocalFile(cached, uri) && cached.remoteUrl.isNotBlank()) return cached.remoteUrl
         val media = mediaManager.openMedia(uri)
@@ -153,7 +156,7 @@ internal class SyncMediaTransfer(
         }
     }
 
-    private suspend fun hydrateDraftAsset(
+    internal suspend fun hydrateDraftAsset(
         accessToken: String,
         draftId: Uuid,
         blockId: Uuid,
@@ -212,27 +215,33 @@ internal class SyncMediaTransfer(
                     mediaId = mediaId,
                     updatedAt = Clock.System.now().toEpochMilliseconds(),
                     // Keep a retry connected to its old path if a concurrent editor save rejects the draft patch.
-                    localAliases =
-                        if (cached?.remoteUrl == remote) {
-                            (cached.localAliases + cached.localUri + listOfNotNull(uri.takeUnless(::isRemoteRef)))
-                                .asReversed()
-                                .distinct()
-                                .take(8)
-                                .asReversed()
-                        } else {
-                            emptyList()
-                        },
+                    localAliases = hydrationAliases(cached, remote, uri),
                 ),
             )
         return localUri
     }
+
+    private fun hydrationAliases(
+        cached: MediaSyncRef?,
+        remote: String,
+        uri: String,
+    ): List<String> =
+        if (cached?.remoteUrl == remote) {
+            (cached.localAliases + cached.localUri + listOfNotNull(uri.takeUnless(::isRemoteRef)))
+                .asReversed()
+                .distinct()
+                .take(8)
+                .asReversed()
+        } else {
+            emptyList()
+        }
 
     suspend fun uploadIfNeeded(
         accessToken: String,
         note: JournalNote,
     ): Result<JournalNote> {
         val mediaRef = note.mediaRefOrNull() ?: return Result.success(note)
-        if (isRemoteRef(mediaRef)) {
+        if (!requiresUpload(mediaRef)) {
             return Result.success(note)
         }
         val cached = mediaSyncRefStore.get(note.uid)
@@ -302,11 +311,13 @@ internal class SyncMediaTransfer(
     ): MediaHydrationResult {
         val mediaRef = note.mediaRefOrNull() ?: return MediaHydrationResult.Available(note)
         if (!isRemoteRef(mediaRef) && mediaManager.exists(mediaRef)) return MediaHydrationResult.Available(note)
+        val cached = mediaSyncRefStore.get(note.uid)
+        cachedOriginal(cached, mediaRef)?.let { return MediaHydrationResult.Available(note.withMediaRef(it), cached) }
         val remote =
             if (isRemoteRef(mediaRef)) {
                 mediaRef
             } else {
-                mediaSyncRefStore.get(note.uid)?.takeIf { matchesLocalFile(it, mediaRef) }?.remoteUrl
+                cached?.takeIf { matchesLocalFile(it, mediaRef) }?.remoteUrl
             }
         if (remote == null || !isRemoteRef(remote)) return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
         val mediaId = extractMediaId(remote) ?: return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
@@ -326,6 +337,7 @@ internal class SyncMediaTransfer(
                     }
                 return MediaHydrationResult.Pending(reason)
             }
+        if (downloaded.contentId != note.uid) return MediaHydrationResult.Pending(DiagnosticReason.CORRUPT_PAYLOAD)
         return try {
             val localUri =
                 mediaManager.saveMedia(
@@ -353,6 +365,15 @@ internal class SyncMediaTransfer(
             MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
         }
     }
+
+    private suspend fun cachedOriginal(
+        mapping: MediaSyncRef?,
+        reference: String,
+    ): String? =
+        mapping
+            ?.takeIf { it.remoteUrl == reference || matchesLocalFile(it, reference) }
+            ?.localUri
+            ?.takeIf { !isRemoteRef(it) && mediaManager.exists(it) }
 
     private fun matchesLocalFile(
         mapping: MediaSyncRef,
@@ -415,7 +436,7 @@ internal sealed interface DraftMediaHydrationResult {
     ) : DraftMediaHydrationResult
 }
 
-private class DraftMediaFailure(
+internal class DraftMediaFailure(
     val reason: DiagnosticReason,
 ) : Exception()
 

@@ -230,6 +230,7 @@ object ArchiveSchemas {
                                 "timestamp" to ref("instant"),
                                 "text" to string(),
                                 "media" to ref("mediaRef"),
+                                "thumbnail" to ref("mediaRef"),
                                 "caption" to string(),
                                 "durationMs" to count(),
                                 "transcription" to string(),

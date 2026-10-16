@@ -136,6 +136,33 @@ interface SyncMetadataDao {
     }
 
     @Transaction
+    suspend fun enqueueRestoreMutation(
+        ownerId: String,
+        serverOrigin: String,
+        entityId: String,
+        entityType: String,
+        operation: String,
+        createdAt: Long,
+    ): Boolean {
+        val scoped = getPending(ownerId, serverOrigin, entityType, entityId)
+        val legacy = getPending("", serverOrigin, entityType, entityId)
+        if (scoped?.operation == "DELETE" || legacy?.operation == "DELETE") return false
+        val existing = scoped ?: legacy
+        insertPending(
+            PendingUploadEntity(
+                ownerId = ownerId,
+                serverOrigin = serverOrigin,
+                entityType = entityType,
+                entityId = entityId,
+                operation = if (existing?.operation == "CREATE") "CREATE" else operation,
+                createdAt = existing?.createdAt ?: createdAt,
+                expectedServerVersion = existing?.expectedServerVersion,
+            ),
+        )
+        return true
+    }
+
+    @Transaction
     suspend fun advancePendingVersionAfterUpload(
         ownerId: String,
         serverOrigin: String,

@@ -66,6 +66,30 @@ class NativeMediaRecoveryTest {
     private fun recovery() = NativeMediaRecovery(inbox, notes, drafts, media, SyncMediaTransfer(media, refs, cloud), refs, db)
 
     @Test
+    fun `caption edits during download keep the recovered original without another network attempt`() =
+        runTest {
+            val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = local, caption = "Before")
+            notes.create(note)
+            owner = note.uid
+            refs.upsert(mapping(note.uid))
+            onDownload =
+                {
+                    notes.updateSyncMetadata(
+                        note.copy(caption = "Edited during recovery", lastUpdated = Instant.fromEpochMilliseconds(2)),
+                        0,
+                        timestamp,
+                    )
+                }
+            recovery().recover("token", EntityType.NOTE)
+            val repaired = assertIs<JournalNote.Image>(notes.getNoteById(note.uid))
+            assertEquals("Edited during recovery", repaired.caption)
+            assertTrue(media.exists(repaired.mediaRef))
+            unavailable = true
+            recovery().recover("token", EntityType.NOTE)
+            assertEquals(1, downloads.size)
+        }
+
+    @Test
     fun `a native journal with settled download rows recovers missing originals`() =
         runTest {
             val note =

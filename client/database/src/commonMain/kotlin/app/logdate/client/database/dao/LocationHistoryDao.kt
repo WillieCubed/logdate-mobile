@@ -11,6 +11,9 @@ import kotlin.time.Instant
 
 @Dao
 interface LocationHistoryDao {
+    @Query("SELECT * FROM location_logs WHERE sample_id = :sampleId LIMIT 1")
+    suspend fun getBySampleId(sampleId: String): LocationLogEntity?
+
     @Query("SELECT * FROM location_logs ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLastLocation(): LocationLogEntity?
 

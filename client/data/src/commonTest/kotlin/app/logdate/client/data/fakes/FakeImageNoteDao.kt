@@ -86,6 +86,13 @@ class FakeImageNoteDao : ImageNoteDao {
             .distinct()
     }
 
+    override suspend fun updateForRestore(note: ImageNoteEntity): Int {
+        if (note.uid !in notes) return 0
+        notes[note.uid] = note
+        updateFlow()
+        return 1
+    }
+
     override suspend fun removeNote(noteId: Uuid) {
         notes.remove(noteId)
         updateFlow()

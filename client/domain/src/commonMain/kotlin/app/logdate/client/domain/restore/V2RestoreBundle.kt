@@ -23,8 +23,10 @@ import app.logdate.client.domain.export.archive.ArchiveLocation
 import app.logdate.client.domain.export.archive.ArchiveLocationSample
 import app.logdate.client.domain.export.archive.ArchiveManifest
 import app.logdate.client.domain.export.archive.ArchiveMediaFile
+import app.logdate.client.domain.export.archive.ArchiveMediaRef
 import app.logdate.client.domain.export.archive.ArchiveMediaStatus
 import app.logdate.client.domain.export.archive.ArchiveNoteFile
+import app.logdate.client.domain.export.archive.ArchiveNoteType
 import app.logdate.client.domain.export.archive.ArchivePlaceFile
 import app.logdate.client.domain.export.archive.ArchiveProfileFile
 import app.logdate.shared.model.Journal
@@ -71,11 +73,10 @@ internal fun V2RestoreBundle.adaptForRestore(
 ): AdaptedV2RestoreBundle {
     val manifest = decodeManifest()
     val metadata = buildExportMetadata(manifest)
-    val adapterWarnings = mutableListOf<String>()
 
     val journals = decodeAndMapJournals()
     val (exportNotes, journalNoteRelations) = decodeAndMapNotes()
-    val exportDrafts = decodeAndMapDrafts(adapterWarnings)
+    val exportDrafts = decodeAndMapDrafts()
     val exportPlaces = decodeAndMapPlaces()
     val exportLocationHistory = decodeAndMapLocationHistory(ownerId, deviceId)
     val mediaManifest = decodeAndMapMediaManifest()
@@ -95,7 +96,7 @@ internal fun V2RestoreBundle.adaptForRestore(
                 mediaManifest = mediaManifest,
             ),
         metadata = metadata,
-        warnings = adapterWarnings,
+        warnings = emptyList(),
     )
 }
 
@@ -153,10 +154,9 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                 caption = note.caption,
                 photoPresentation = note.photoPresentation,
                 mediaPath =
-                    note.media
-                        ?.path
-                        ?.value
-                        .takeIf { note.media?.status == ArchiveMediaStatus.INCLUDED },
+                    note.media?.toRestoreReference(note.id) ?: unavailableArchiveReference(note.id).takeUnless {
+                        note.type == ArchiveNoteType.TEXT
+                    },
                 durationMs = note.durationMs,
                 transcript = note.transcript,
                 createdAt = note.createdAt,
@@ -170,7 +170,7 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
     return exportNotes to relations
 }
 
-private fun V2RestoreBundle.decodeAndMapDrafts(warnings: MutableList<String>): List<ExportDraft> {
+private fun V2RestoreBundle.decodeAndMapDrafts(): List<ExportDraft> {
     val drafts = draftsJson?.let { ArchiveJson.document.decodeFromString(ArchiveDraftFile.serializer(), it).drafts }.orEmpty()
     return drafts.map { draft ->
         ExportDraft(
@@ -179,7 +179,7 @@ private fun V2RestoreBundle.decodeAndMapDrafts(warnings: MutableList<String>): L
             content = "",
             createdAt = draft.createdAt,
             updatedAt = draft.updatedAt,
-            blocks = draft.blocks.mapNotNull { toSerializableBlock(it, warnings) },
+            blocks = draft.blocks.map { toSerializableBlock(it, draft.id) },
         )
     }
 }
@@ -258,19 +258,11 @@ private fun ArchiveLocation.toExportLocation() = ExportLocation(latitude, longit
 
 private fun toSerializableBlock(
     block: ArchiveDraftBlock,
-    warnings: MutableList<String>,
-): SerializableEntryBlock? {
+    draftId: String,
+): SerializableEntryBlock {
     val id = Uuid.parse(block.id)
     val location = block.location
-    val mediaPath =
-        block.media
-            ?.path
-            ?.value
-            .takeIf { block.media?.status == ArchiveMediaStatus.INCLUDED }
-    if (block.type != ArchiveBlockType.TEXT && mediaPath == null) {
-        warnings += "Skipped draft media block (ID: $id) - media was omitted from the archive"
-        return null
-    }
+    val mediaPath = block.media?.toRestoreReference(draftId, block.id)
     return when (block.type) {
         ArchiveBlockType.TEXT ->
             SerializableTextBlock(
@@ -300,6 +292,7 @@ private fun toSerializableBlock(
                 location?.longitude,
                 location?.altitudeMeters,
                 mediaPath,
+                thumbnailUri = block.thumbnail?.toRestoreReference(draftId, block.id, RecoveryMediaRole.THUMBNAIL),
                 caption = block.caption.orEmpty(),
             )
         ArchiveBlockType.AUDIO ->
@@ -369,3 +362,9 @@ private data class LegacyDraftsPayload(
 private data class LegacyJournalNotesPayload(
     @SerialName("journal_notes") val journalNotes: List<ExportJournalNoteRelation>,
 )
+
+private fun ArchiveMediaRef.toRestoreReference(
+    entityId: String,
+    blockId: String? = null,
+    role: RecoveryMediaRole = RecoveryMediaRole.ORIGINAL,
+): String = path?.value?.takeIf { status == ArchiveMediaStatus.INCLUDED } ?: unavailableArchiveReference(entityId, blockId, role)

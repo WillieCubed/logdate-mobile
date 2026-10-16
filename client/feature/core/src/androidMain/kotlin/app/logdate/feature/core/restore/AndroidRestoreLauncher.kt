@@ -6,12 +6,8 @@ import android.net.Uri
 import androidx.activity.result.ActivityResultLauncher
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.domain.export.ExportFormat
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.ZipSignature
@@ -62,7 +58,8 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 class AndroidRestoreLauncher(
     private val context: Context,
-) : RestoreLauncher {
+) : RestoreLauncher,
+    org.koin.core.component.KoinComponent {
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
@@ -81,13 +78,20 @@ class AndroidRestoreLauncher(
 
     @Volatile private var activeWorkId: UUID? = null
 
+    @Volatile private var completedWorkId: UUID? = null
+    private var enqueueJob: Job? = null
+    private var reconnectJob: Job? = null
+
     /** The active metadata extraction job, if any. Cancelled before starting a new one. */
     private var metadataExtractionJob: Job? = null
 
     private var lastSelectedUri: Uri? = null
+    private var selectedRecoveryId: String? = null
     private var workInfoObserver: Observer<List<WorkInfo>>? = null
 
     @Volatile private var completionCallback: ((RestoreOutcome) -> Unit)? = null
+
+    @Volatile private var recoveryUpdateCallback: ((RestoreSummary) -> Unit)? = null
 
     @Volatile private var fileSelectedCallback: ((ArchiveFileInfo?) -> Unit)? = null
 
@@ -112,6 +116,17 @@ class AndroidRestoreLauncher(
      * host activity; typically in `onCreate`.
      */
     fun setupWorkObserver(lifecycleOwner: LifecycleOwner) {
+        launcherScope.launch {
+            try {
+                ArchiveRecoveryScheduler.enqueueAll(context, getKoin())
+            } catch (
+                cancelled: CancellationException,
+            ) {
+                throw cancelled
+            } catch (_: Exception) {
+                Napier.w("Recovery scheduling will resume on the next launch")
+            }
+        }
         workInfoObserver?.let {
             WorkManager
                 .getInstance(context)
@@ -125,44 +140,18 @@ class AndroidRestoreLauncher(
                     val currentWorkId = activeWorkId ?: return@Observer
                     val workInfo = workInfoList.firstOrNull { it.id == currentWorkId } ?: return@Observer
 
-                    when (workInfo.state) {
-                        WorkInfo.State.SUCCEEDED -> {
-                            _restoreProgress.value = RestoreProgressInfo.Idle
-                            if (restoreCompleted.compareAndSet(false, true)) {
-                                val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
-                                val summary =
-                                    summaryJson?.let {
-                                        runCatching { json.decodeFromString<RestoreSummary>(it) }.getOrNull()
-                                    }
-                                completionCallback?.invoke(
-                                    if (summary != null) {
-                                        RestoreOutcome.Success(summary)
-                                    } else {
-                                        RestoreOutcome.Failure(
-                                            if (summaryJson != null) {
-                                                RestoreError.INVALID_SUMMARY
-                                            } else {
-                                                RestoreError.NO_SUMMARY_RETURNED
-                                            },
-                                        )
-                                    },
+                    val outcome =
+                        when (workInfo.state) {
+                            WorkInfo.State.SUCCEEDED -> completedWorkOutcome(workInfo)
+                            WorkInfo.State.FAILED ->
+                                RestoreOutcome.Failure(
+                                    RestoreError.RESTORE_FAILED,
+                                    workInfo.outputData.getString(RestoreWorker.RECOVERY_ID_KEY),
                                 )
-                            }
+                            WorkInfo.State.CANCELLED -> RestoreOutcome.Cancelled
+                            else -> null
                         }
-                        WorkInfo.State.FAILED -> {
-                            _restoreProgress.value = RestoreProgressInfo.Idle
-                            if (restoreCompleted.compareAndSet(false, true)) {
-                                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
-                            }
-                        }
-                        WorkInfo.State.CANCELLED -> {
-                            _restoreProgress.value = RestoreProgressInfo.Idle
-                            if (restoreCompleted.compareAndSet(false, true)) {
-                                completionCallback?.invoke(RestoreOutcome.Cancelled)
-                            }
-                        }
-                        else -> Unit
-                    }
+                    outcome?.let { completeRestoreForWork(currentWorkId, it) }
                 }
             }
 
@@ -172,8 +161,44 @@ class AndroidRestoreLauncher(
             .observe(lifecycleOwner, workInfoObserver!!)
     }
 
+    private fun completedWorkOutcome(workInfo: WorkInfo): RestoreOutcome {
+        val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
+        val summary = summaryJson?.let { runCatching { json.decodeFromString<RestoreSummary>(it) }.getOrNull() }
+        if (summary != null) return RestoreOutcome.Success(summary)
+        return RestoreOutcome.Failure(if (summaryJson == null) RestoreError.NO_SUMMARY_RETURNED else RestoreError.INVALID_SUMMARY)
+    }
+
     override fun setRestoreCompletionCallback(callback: (RestoreOutcome) -> Unit) {
         completionCallback = callback
+        synchronized(workCompletionLock) {
+            reconnectJob?.cancel()
+            reconnectJob =
+                launcherScope.launch {
+                    try {
+                        ArchiveRecoveryLauncher(context, getKoin()).reconnect(completedWorkId, { workId ->
+                            beginRestoreWork(workId)
+                            if (completionCallback === callback) callback(RestoreOutcome.Started)
+                        }, ::commitRestoreWork) { outcome ->
+                            if (activeWorkId == null && completionCallback === callback) {
+                                if (outcome is RestoreOutcome.Success) selectedRecoveryId = outcome.summary.recoveryId
+                                callback(outcome)
+                            }
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Napier.w("Could not reconnect archive recovery")
+                    }
+                }
+        }
+    }
+
+    override fun setRecoveryUpdateCallback(callback: (RestoreSummary) -> Unit) {
+        recoveryUpdateCallback = callback
+    }
+
+    override fun updateRecovery(summary: RestoreSummary) {
+        recoveryUpdateCallback?.invoke(summary)
     }
 
     override fun setFileSelectedCallback(callback: (ArchiveFileInfo?) -> Unit) {
@@ -191,9 +216,13 @@ class AndroidRestoreLauncher(
      * arrives first (rare), this call is a no-op.
      */
     override fun completeRestore(outcome: RestoreOutcome) {
-        _restoreProgress.value = RestoreProgressInfo.Idle
-        if (restoreCompleted.compareAndSet(false, true)) {
-            completionCallback?.invoke(outcome)
+        synchronized(workCompletionLock) {
+            _restoreProgress.value = RestoreProgressInfo.Idle
+            if (restoreCompleted.compareAndSet(false, true)) {
+                completedWorkId = activeWorkId
+                activeWorkId = null
+                completionCallback?.invoke(outcome)
+            }
         }
     }
 
@@ -218,7 +247,27 @@ class AndroidRestoreLauncher(
         }
     }
 
+    override fun selectArchiveForMediaRecovery(recoveryId: String) {
+        synchronized(workCompletionLock) {
+            selectedRecoveryId = recoveryId
+            enqueueJob?.cancel()
+            enqueueJob =
+                launcherScope.launch {
+                    val resumed = ArchiveRecoveryLauncher(context, getKoin()).resume(recoveryId, ::commitRestoreWork)
+                    if (resumed != null) {
+                        completionCallback?.invoke(RestoreOutcome.Success(resumed))
+                    } else {
+                        kotlinx.coroutines.withContext(Dispatchers.Main) {
+                            startFileSelection()
+                            selectedRecoveryId = recoveryId
+                        }
+                    }
+                }
+        }
+    }
+
     override fun startFileSelection() {
+        selectedRecoveryId = null
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -248,42 +297,57 @@ class AndroidRestoreLauncher(
         completionCallback?.invoke(RestoreOutcome.Started)
         _restoreProgress.value = RestoreProgressInfo.Idle
 
-        val inputData =
-            Data
-                .Builder()
-                .putString(RestoreWorker.SOURCE_URI_KEY, uri.toString())
-                .putString(NativeRestoreWorkState.DELIVERY_KEY, PostRestoreDetector(context).pendingContentRecoveryId())
-                .putBoolean(RestoreWorker.INCLUDE_DRAFTS_KEY, options.includeDrafts)
-                .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, options.includeMedia)
-                .build()
-
-        val workRequest =
-            OneTimeWorkRequestBuilder<RestoreWorker>()
-                .setInputData(inputData)
-                .build()
-        beginRestoreWork(workRequest.id)
-
-        WorkManager
-            .getInstance(context)
-            .enqueueUniqueWork(
-                RestoreWorker.WORK_NAME,
-                ExistingWorkPolicy.REPLACE,
-                workRequest,
-            )
-
-        Napier.i("Restore work enqueued with WorkManager")
+        val recoveryId = selectedRecoveryId
+        val session = getKoin().get<app.logdate.client.datastore.SessionStorage>().getOriginBoundSession()
+        val backend = getKoin().get<app.logdate.shared.config.LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/')
+        synchronized(workCompletionLock) {
+            reconnectJob?.cancel()
+            enqueueJob?.cancel()
+            enqueueJob =
+                launcherScope.launch {
+                    try {
+                        ArchiveRecoveryLauncher(
+                            context,
+                            getKoin(),
+                        ).enqueueSelected(uri, options, recoveryId, session, backend, ::beginRestoreWork, ::commitRestoreWork)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Napier.w("Could not enqueue archive recovery")
+                        completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                    }
+                }
+        }
     }
 
     override fun cancelRestore() {
-        metadataExtractionJob?.cancel()
-        metadataExtractionJob = null
-        lastSelectedUri = null
-        WorkManager.getInstance(context).cancelUniqueWork(RestoreWorker.WORK_NAME)
-        _restoreProgress.value = RestoreProgressInfo.Idle
-        if (restoreCompleted.compareAndSet(false, true)) {
-            completionCallback?.invoke(RestoreOutcome.Cancelled)
+        synchronized(workCompletionLock) {
+            reconnectJob?.cancel()
+            reconnectJob = null
+            enqueueJob?.cancel()
+            enqueueJob = null
+            metadataExtractionJob?.cancel()
+            metadataExtractionJob = null
+            lastSelectedUri = null
+            val activeId = activeWorkId?.toString()
+            val store = context.archiveRecoveryStore()
+            runCatching {
+                listOfNotNull(activeId, selectedRecoveryId).distinct().forEach {
+                    store.setPaused(it, true)
+                    ArchiveRecoveryScheduler.cancel(context, it)
+                }
+            }.onFailure { Napier.w("Could not pause retained recovery") }
+            WorkManager.getInstance(context).cancelUniqueWork(RestoreWorker.WORK_NAME)
+            _restoreProgress.value = RestoreProgressInfo.Idle
+            if (restoreCompleted.compareAndSet(false, true)) {
+                completionCallback?.invoke(RestoreOutcome.Cancelled)
+            }
+            Napier.i("Restore cancelled")
         }
-        Napier.i("Restore cancelled")
+    }
+
+    private fun commitRestoreWork(action: () -> Unit) {
+        synchronized(workCompletionLock) { action() }
     }
 
     /**

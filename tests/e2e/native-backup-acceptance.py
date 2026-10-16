@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import xml.etree.ElementTree as ET
 
@@ -73,7 +74,21 @@ def probe(serial, mode, output, metadata=None, identity="phrase"):
         raise RuntimeError(f"native {mode} probe failed; inspect {output}")
 
 
-def transfer(source, destination, app_apk, test_apk, output, identity):
+def archive_probe(serial, mode, output, fixture=None):
+    arguments = ["am", "instrument", "-w", "-r", "-e", "class",
+                 "app.logdate.client.e2e.ArchiveMediaRecoveryE2ETest",
+                 "-e", "archiveRecoveryMode", mode,
+                 "-e", "archiveRecoveryFixtureLabel", "transfer"]
+    if fixture:
+        arguments.extend(("-e", "archiveRecoveryFixture", fixture))
+    arguments.append(RUNNER)
+    result = adb(serial, "shell", shlex.join(arguments))
+    private_file(output, result)
+    if b"OK (1 test)" not in result or b"Process crashed" in result:
+        raise RuntimeError(f"archive {mode} probe failed; inspect {output}")
+
+
+def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False):
     print("Seeding a synthetic source journal", flush=True)
     adb(source, "install", "-t", str(app_apk))
     adb(source, "install", "-t", str(test_apk))
@@ -81,6 +96,11 @@ def transfer(source, destination, app_apk, test_apk, output, identity):
     raw_metadata = adb(source, "exec-out", "cat", f"/data/user/0/{PACKAGE}/no_backup/native-backup-fixture.json")
     private_file(output / "source-fixture.json", raw_metadata)
     metadata = json.loads(raw_metadata)
+    archive_fixture = None
+    if exercise_archive_recovery:
+        archive_probe(source, "seed", output / "archive-source-seed.log")
+        archive_fixture = adb(source, "exec-out", "cat", f"/data/user/0/{PACKAGE}/no_backup/archive-media-recovery-transfer.json")
+        private_file(output / "archive-source-fixture.json", archive_fixture)
     backup = adb(source, "shell", "bmgr", "backupnow", PACKAGE)
     private_file(output / "native-backup.log", backup)
     if f"Package {PACKAGE} with result: Success".encode() not in backup:
@@ -102,6 +122,10 @@ def transfer(source, destination, app_apk, test_apk, output, identity):
     probe(destination, "verify", output / "destination-verify.log", metadata, identity)
     adb(destination, "shell", "am", "force-stop", PACKAGE)
     probe(destination, "verify", output / "destination-restart.log", metadata, identity)
+    if archive_fixture:
+        archive_probe(destination, "repair", output / "archive-destination-repair.log", archive_fixture.decode())
+        adb(destination, "shell", "am", "force-stop", PACKAGE)
+        archive_probe(destination, "verify", output / "archive-destination-restart.log")
     launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
     private_file(output / "destination-launch.log", launch)
     for attempt in range(3):
@@ -147,6 +171,7 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--identity", choices=("phrase", "account", "legacy-account"), default="phrase")
     parser.add_argument("--exercise-quota", action="store_true", help="also verify native quota rejection on the synthetic source")
+    parser.add_argument("--exercise-archive-recovery", action="store_true", help="transfer an edited partial archive and recover its originals on the destination")
     options = parser.parse_args()
     if options.source == options.destination:
         parser.error("source and destination must be different emulators")
@@ -155,7 +180,7 @@ def main():
     options.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     prepare(options.source)
     prepare(options.destination)
-    transfer(options.source, options.destination, options.app_apk.resolve(), options.test_apk.resolve(), options.output.resolve(), options.identity)
+    transfer(options.source, options.destination, options.app_apk.resolve(), options.test_apk.resolve(), options.output.resolve(), options.identity, options.exercise_archive_recovery)
     if options.exercise_quota:
         verify_quota(options.source, options.output.resolve())
 
