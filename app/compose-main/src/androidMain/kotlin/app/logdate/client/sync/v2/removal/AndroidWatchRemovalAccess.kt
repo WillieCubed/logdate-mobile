@@ -68,21 +68,31 @@ class AndroidWatchRemovalAccess(
         return WatchRemovalTarget(peer, record.displayName, state?.outboxCount, state?.sessionId ?: record.sessionId)
     }
 
+    override suspend fun targetForSession(sessionId: String): WatchRemovalTarget? {
+        val nodes = links.observe().first().keys
+        return nodes.firstNotNullOfOrNull { node -> linkedTarget(node)?.takeIf { it.sessionId == sessionId } }
+    }
+
     override suspend fun removeAll(): Boolean {
         val records = links.observe().first()
         for (node in records.keys) {
-            val peer = peers.forRemoval(node) ?: return false
-            val record = links.get(peer.watchNode) ?: return false
-            val state =
-                states
-                    .documents(PeerRole.WATCH)
-                    .first()[peer.watchNode]
-                    ?.watch
-                    ?.takeIf { it.linkId == peer.linkId }
-            val target = WatchRemovalTarget(peer, record.displayName, state?.outboxCount, state?.sessionId ?: record.sessionId)
+            val target = linkedTarget(node) ?: return false
             if (remove(target) is WatchRemovalResult.Failed) return false
         }
         return true
+    }
+
+    /** The removal target for the watch linked as [node], whether or not it is in reach. */
+    private suspend fun linkedTarget(node: String): WatchRemovalTarget? {
+        val peer = peers.forRemoval(node) ?: return null
+        val record = links.get(peer.watchNode) ?: return null
+        val state =
+            states
+                .documents(PeerRole.WATCH)
+                .first()[peer.watchNode]
+                ?.watch
+                ?.takeIf { it.linkId == peer.linkId }
+        return WatchRemovalTarget(peer, record.displayName, state?.outboxCount, state?.sessionId ?: record.sessionId)
     }
 
     override suspend fun remove(target: WatchRemovalTarget): WatchRemovalResult =
