@@ -16,25 +16,31 @@ internal class RestoreCredentialExchange(
     private val begin: suspend () -> Result<BeginAuthenticationData>,
     private val getCredential: suspend (PasskeyAuthenticationOptions) -> Result<String>,
     private val complete: suspend (CompleteAuthenticationRequest) -> Result<CompleteAuthenticationData>,
+    private val isCurrent: () -> Boolean = { true },
 ) {
-    constructor(api: PasskeyApiClientContract, credentials: RestoreCredentialManager) : this(
+    constructor(api: PasskeyApiClientContract, credentials: RestoreCredentialManager, isCurrent: () -> Boolean = { true }) : this(
         api::beginRestoreSignIn,
         credentials::getRestoreCredential,
         api::completeRestoreSignIn,
+        isCurrent,
     )
 
     suspend operator fun invoke(): Result<CompleteAuthenticationData> =
         try {
+            check(isCurrent()) { "Restore configuration changed" }
             val options = begin().getOrThrow()
             currentCoroutineContext().ensureActive()
+            check(isCurrent()) { "Restore configuration changed" }
             val credential =
                 getCredential(
                     PasskeyAuthenticationOptions(options.challenge, options.rpId, options.allowCredentials.map { it.id }, options.timeout),
                 ).getOrThrow()
             currentCoroutineContext().ensureActive()
+            check(isCurrent()) { "Restore configuration changed" }
             val assertion = PasskeyCredentialCodec(Json { ignoreUnknownKeys = true }).parseAssertionResponse(credential)
             val authenticated = complete(CompleteAuthenticationRequest(assertion, options.challenge)).getOrThrow()
             currentCoroutineContext().ensureActive()
+            check(isCurrent()) { "Restore configuration changed" }
             Result.success(authenticated)
         } catch (cancelled: CancellationException) {
             throw cancelled

@@ -2,16 +2,17 @@ package app.logdate.client.data.account
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
-import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.RestoreCredentialError
 import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.shared.config.LogDateConfigRepository
-import app.logdate.shared.model.AccountTokens
+import app.logdate.shared.config.PinnedLogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.ServerCapability
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -24,12 +25,13 @@ internal class RestoreCredentialCoordinator(
     private val apiClient: PasskeyApiClientContract,
     private val restoreCredentialManager: RestoreCredentialManager,
     private val sessionStorage: SessionStorage,
-    private val platformAccountManager: PlatformAccountManager,
     private val configRepository: LogDateConfigRepository,
     private val bindingGuard: CanonicalOwnerBindingGuard,
     private val sessionState: PasskeyAccountSessionState,
     private val sessionRefreshCoordinator: AccountSessionRefreshCoordinator,
     private val registrationMutex: Mutex = Mutex(),
+    private val renewal: RestoreCredentialRenewal? = null,
+    private val onSessionInstalled: () -> Unit = {},
 ) {
     suspend fun createRestoreKey(): Result<Unit> = registrationMutex.withLock { registerRestoreKey() }
 
@@ -107,27 +109,44 @@ internal class RestoreCredentialCoordinator(
         }
 
         return try {
-            val completeData = RestoreCredentialExchange(apiClient, restoreCredentialManager)().getOrThrow()
+            val pendingRenewal = renewal ?: return Result.failure(IllegalStateException("Native restore is unavailable"))
+            val guard =
+                sessionStorage.captureInstallationGuard()
+                    ?: return Result.failure(IllegalStateException("Account recovery is not ready"))
+            val initialSession = sessionStorage.getSession()
+            val pinned = PinnedLogDateConfigRepository(guard.origin, serverDescriptor, configRepository.apiVersion.value)
+            val isCurrent = {
+                configRepository.getCurrentBackendUrl() == guard.origin &&
+                    configRepository.getCurrentServerDescriptor() == serverDescriptor &&
+                    configRepository.apiVersion.value == pinned.apiVersion.value &&
+                    sessionStorage.getSession() == initialSession
+            }
+            val pinnedApi =
+                pendingRenewal.apiFor(pinned)
+                    ?: return Result.failure(IllegalStateException("Native restore is unavailable"))
+            val completeData = RestoreCredentialExchange(pinnedApi, restoreCredentialManager, isCurrent)().getOrThrow()
             if (!bindingGuard.belongsToCanonicalOwner(completeData.account)) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
-            persistSession(
-                accessToken = completeData.tokens.accessToken,
-                refreshToken = completeData.tokens.refreshToken,
-                accountId = completeData.account.id.toString(),
-            )
-
-            updatePlatformAccountTokens(completeData.account, completeData.tokens)
-
+            currentCoroutineContext().ensureActive()
+            check(isCurrent()) { "Restore configuration changed" }
+            val session =
+                UserSession(
+                    completeData.tokens.accessToken,
+                    completeData.tokens.refreshToken,
+                    completeData.account.id.toString(),
+                )
+            // The consumed credential's replacement must survive even an interrupted vault write.
+            pendingRenewal.mark(guard.origin, session.accountId)
+            currentCoroutineContext().ensureActive()
+            check(isCurrent()) { "Restore configuration changed" }
+            check(sessionStorage.installSessionIfCurrent(guard, session)) { "Restore session changed" }
+            currentCoroutineContext().ensureActive()
+            check(configRepository.getCurrentBackendUrl() == guard.origin && sessionStorage.getSession() == session)
+            onSessionInstalled()
             sessionState.markAuthenticated(completeData.account)
-
-            // Re-register a restore credential for this device so future restores work.
-            // The old credential was consumed server-side; this issues a fresh one.
-            createRestoreKey().onFailure { error ->
-                Napier.w("Restore sign-in succeeded but re-registering restore key failed — next restore won't work", error)
-            }
-
-            Napier.i("Restore sign-in succeeded")
+            currentCoroutineContext().ensureActive()
+            Napier.i("Restore sign-in succeeded; replacement credential will register automatically")
             Result.success(completeData.account)
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -135,32 +154,5 @@ internal class RestoreCredentialCoordinator(
             Napier.i("Restore sign-in remains pending")
             Result.failure(e)
         }
-    }
-
-    private suspend fun updatePlatformAccountTokens(
-        account: LogDateAccount,
-        tokens: AccountTokens,
-    ) {
-        platformAccountManager
-            .updateTokens(
-                username = account.username,
-                backendUrl = configRepository.getCurrentBackendUrl(),
-                accessToken = tokens.accessToken,
-                refreshToken = tokens.refreshToken,
-            ).onFailure { Napier.w("Failed to update platform account tokens after restore sign-in", it) }
-    }
-
-    private suspend fun persistSession(
-        accessToken: String,
-        refreshToken: String,
-        accountId: String,
-    ) {
-        sessionStorage.saveSession(
-            UserSession(
-                accessToken = accessToken,
-                refreshToken = refreshToken,
-                accountId = accountId,
-            ),
-        )
     }
 }

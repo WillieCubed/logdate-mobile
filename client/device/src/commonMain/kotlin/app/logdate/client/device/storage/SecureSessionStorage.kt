@@ -2,6 +2,7 @@ package app.logdate.client.device.storage
 
 import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.OriginSessionVault
+import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.shared.config.LogDateConfigRepository
@@ -10,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -70,6 +72,39 @@ class SecureSessionStorage(
 
     override fun getSession(): UserSession? = getOriginBoundSession()?.session
 
+    override suspend fun captureInstallationGuard(): SessionInstallationGuard? {
+        val origin = configRepository.getCurrentBackendUrl()
+        if (sessionState.value.origin != origin) loadCurrentSession(origin)
+        val cached = sessionState.value
+        if (cached.origin != origin || configRepository.getCurrentBackendUrl() != origin) return null
+        return SessionInstallationGuard(origin, cached.revision)
+    }
+
+    override suspend fun installSessionIfCurrent(
+        expected: SessionInstallationGuard,
+        session: UserSession,
+    ): Boolean =
+        mutateIdentity({ getSession()?.accountId != session.accountId }) {
+            val cached = sessionState.value
+            if (cached.origin != expected.origin ||
+                cached.revision != expected.revision ||
+                configRepository.getCurrentBackendUrl() != expected.origin
+            ) {
+                return@mutateIdentity false
+            }
+            try {
+                persistSession(expected.origin, session)
+            } catch (error: Exception) {
+                // A storage adapter can commit before reporting interruption. Force reconciliation.
+                sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
+                throw error
+            }
+            if (configRepository.getCurrentBackendUrl() != expected.origin) return@mutateIdentity false
+            val installed = sessionState.compareAndSet(cached, CachedSession(expected.origin, session, cached.revision + 1))
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            installed
+        }
+
     override suspend fun replaceSessionIfCurrent(
         expected: OriginBoundSession,
         updated: UserSession,
@@ -96,8 +131,8 @@ class SecureSessionStorage(
 
     private suspend fun loadCurrentSession(origin: String): Boolean {
         val expected = sessionState.value
-        if (expected.origin == origin && expected.session != null) {
-            return configRepository.getCurrentBackendUrl() == origin
+        if (expected.origin == origin) {
+            return expected.session != null && configRepository.getCurrentBackendUrl() == origin
         }
         val loaded = loadSession(origin)
         if (configRepository.getCurrentBackendUrl() != origin) return false

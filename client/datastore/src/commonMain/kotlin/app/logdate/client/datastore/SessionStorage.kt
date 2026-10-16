@@ -34,10 +34,23 @@ data class OriginBoundSession(
     val session: UserSession,
 )
 
+/** A vault revision that prevents an in-flight sign-in from replacing a later identity decision. */
+data class SessionInstallationGuard(
+    val origin: String,
+    val revision: Long,
+)
+
 /**
  * Interface for session storage
  */
 interface SessionStorage {
+    suspend fun captureInstallationGuard(): SessionInstallationGuard? = null
+
+    suspend fun installSessionIfCurrent(
+        expected: SessionInstallationGuard,
+        session: UserSession,
+    ): Boolean = false
+
     /**
      * Gets the current session synchronously from the latest cached value.
      */

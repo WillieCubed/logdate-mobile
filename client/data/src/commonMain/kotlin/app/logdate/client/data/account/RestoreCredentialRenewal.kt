@@ -16,6 +16,19 @@ class RestoreCredentialRenewal(
     private val storage: SecureStorage,
     private val apiFactory: ((LogDateConfigRepository) -> PasskeyApiClientContract)? = null,
 ) {
+    internal fun apiFor(config: LogDateConfigRepository): PasskeyApiClientContract? {
+        val origin = config.getCurrentBackendUrl().trimEnd('/')
+        require(config.getCurrentApiBaseUrl().startsWith("$origin/"))
+        require(
+            config
+                .getCurrentServerDescriptor()
+                ?.serverOrigin
+                ?.trimEnd('/')
+                ?.let { it == origin } != false,
+        )
+        return apiFactory?.invoke(config)
+    }
+
     suspend fun mark(
         origin: String,
         owner: String,
@@ -37,16 +50,7 @@ class RestoreCredentialRenewal(
     ) {
         val origin = config.getCurrentBackendUrl()
         if (!isPending(origin, session.accountId)) return
-        val canonicalOrigin = origin.trimEnd('/')
-        require(config.getCurrentApiBaseUrl().startsWith("$canonicalOrigin/"))
-        require(
-            config
-                .getCurrentServerDescriptor()
-                ?.serverOrigin
-                ?.trimEnd('/')
-                ?.let { it == canonicalOrigin } != false,
-        )
-        val api = apiFactory?.invoke(config) ?: return
+        val api = apiFor(config) ?: return
 
         fun checkCurrent() {
             check(isCurrent()) { "Restore key renewal account changed" }

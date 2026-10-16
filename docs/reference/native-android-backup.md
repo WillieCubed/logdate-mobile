@@ -125,6 +125,14 @@ captured server, and conditional vault writes prevent an old refresh from replac
 Foreground registration and background replacement share a lock because the provider holds one
 restore credential per app.
 
+Foreground restore also records the replacement obligation before publishing the recovered
+session. Its requests use a pinned server configuration, and vault installation compares an
+initialized origin and revision so a later login or sign-out wins. A server switch during a
+completed secure write leaves that session only in its issuing server's vault. Cancellation
+retains pending renewal, and an explicit trigger resumes registration even when the recovered
+session matches the existing session. Platform account creation and registration failures retry
+without delaying access to the recovered journal.
+
 Restore assertions have a passive authentication contract. The dedicated server restore verifier
 validates origin, RP, challenge, registered-key signature, ownership, and replay without requiring
 a fresh user-presence or biometric ceremony. Ordinary passkey verification is a separate path.

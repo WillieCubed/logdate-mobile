@@ -22,9 +22,12 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -83,6 +86,7 @@ class DefaultPasskeyAccountRepository(
 
     private val credentialCodec = PasskeyCredentialCodec(json)
     private val restoreCredentialRegistrationMutex = Mutex()
+    private val restoreRenewalRequests = MutableStateFlow(0L)
 
     private val sessionRefreshCoordinator =
         AccountSessionRefreshCoordinator(
@@ -99,12 +103,13 @@ class DefaultPasskeyAccountRepository(
             apiClient = apiClient,
             restoreCredentialManager = restoreCredentialManager,
             sessionStorage = sessionStorage,
-            platformAccountManager = platformAccountManager,
             configRepository = configRepository,
             bindingGuard = bindingGuard,
             sessionState = sessionState,
             sessionRefreshCoordinator = sessionRefreshCoordinator,
             registrationMutex = restoreCredentialRegistrationMutex,
+            renewal = restoreCredentialRenewal,
+            onSessionInstalled = { restoreRenewalRequests.update { it + 1 } },
         )
 
     private val registrationCoordinator =
@@ -149,7 +154,7 @@ class DefaultPasskeyAccountRepository(
 
     init {
         repositoryScope.launch {
-            sessionStorage.getSessionFlow().collectLatest { session ->
+            combine(sessionStorage.getSessionFlow(), restoreRenewalRequests) { session, _ -> session }.collectLatest { session ->
                 if (session != null && !bindingGuard.sessionBelongsToCanonicalOwner(session)) {
                     Napier.w("Discarding credentials for a different LogDate identity")
                     sessionStorage.clearSession()
