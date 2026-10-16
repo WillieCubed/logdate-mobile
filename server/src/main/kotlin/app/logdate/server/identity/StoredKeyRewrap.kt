@@ -10,6 +10,10 @@ data class EncryptedPrivateKey(
 
 /** A table of private keys encrypted at rest, as [StoredKeyRewrap] sees it. */
 interface EncryptedPrivateKeyStore {
+    /**
+     * The keys that can still be used to sign. Revoked keys are never decrypted again, so they are
+     * left out: there is nothing to re-encrypt, and one nobody can read is not a fault.
+     */
     suspend fun encryptedPrivateKeys(): List<EncryptedPrivateKey>
 
     /**

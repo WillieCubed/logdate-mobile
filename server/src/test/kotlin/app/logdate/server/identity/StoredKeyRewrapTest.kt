@@ -59,6 +59,20 @@ class StoredKeyRewrapTest {
         }
 
     @Test
+    fun `revoked signing keys are neither re-encrypted nor reported`() =
+        runTest {
+            val signingKeys = InMemorySigningKeyRepository()
+            val unreadable = AtRestKeyCipher(OTHER_KEK).encrypt(SIGNING_KEY)
+            signingKeys.save(signingKey(unreadable).copy(revokedAt = Clock.System.now()))
+            val active = signingKeys.save(signingKey(oldCipher.encrypt(SIGNING_KEY)))
+
+            val report = rewrap(signingKeys, InMemoryOAuthSigningKeyRepository()).run()
+
+            assertEquals(StoredKeyRewrap.Report(rewrapped = 1, alreadyCurrent = 0, unreadable = emptyList()), report)
+            assertEquals(listOf(active.id.toString()), signingKeys.encryptedPrivateKeys().map { it.id })
+        }
+
+    @Test
     fun `a key another instance already replaced isn't overwritten`() =
         runTest {
             val signingKeys = InMemorySigningKeyRepository()

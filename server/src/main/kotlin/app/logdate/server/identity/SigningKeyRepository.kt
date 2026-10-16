@@ -50,7 +50,9 @@ class InMemorySigningKeyRepository : SigningKeyRepository {
     }
 
     override suspend fun encryptedPrivateKeys(): List<EncryptedPrivateKey> =
-        keysById.values.map { EncryptedPrivateKey(id = it.id.toString(), privateKeyEncrypted = it.privateKeyEncrypted) }
+        keysById.values
+            .filter { it.revokedAt == null }
+            .map { EncryptedPrivateKey(id = it.id.toString(), privateKeyEncrypted = it.privateKeyEncrypted) }
 
     override suspend fun replaceEncryptedPrivateKey(
         id: String,

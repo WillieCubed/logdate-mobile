@@ -60,6 +60,7 @@ class PostgreSQLSigningKeyRepository : SigningKeyRepository {
         transaction {
             SigningKeysTable
                 .select(SigningKeysTable.id, SigningKeysTable.privateKeyEncrypted)
+                .where { SigningKeysTable.revokedAt eq null }
                 .map {
                     EncryptedPrivateKey(
                         id = it[SigningKeysTable.id].toString(),

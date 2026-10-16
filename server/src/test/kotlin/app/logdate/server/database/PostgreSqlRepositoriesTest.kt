@@ -236,6 +236,9 @@ class PostgreSqlRepositoriesTest {
                 assertFalse(repository.replaceEncryptedPrivateKey(stored.id.toString(), "stale", "encrypted-new"))
                 assertTrue(repository.replaceEncryptedPrivateKey(stored.id.toString(), "encrypted-old", "encrypted-new"))
                 assertEquals("encrypted-new", repository.findActiveByAccountId(accountId)?.privateKeyEncrypted)
+
+                repository.revokeActiveKeys(accountId)
+                assertEquals(emptyList(), repository.encryptedPrivateKeys())
             }
         }
     }
