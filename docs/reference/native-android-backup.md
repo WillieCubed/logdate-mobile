@@ -117,6 +117,14 @@ retries local-only creation specifically when cloud end-to-end encryption is una
 of onboarding preferences, and transient errors remain retryable. Account recovery does not
 automatically import an archive over an intact transferred database.
 
+After background sign-in, a durable, origin-bound marker keeps replacement restore-key registration
+pending until the provider and server confirm it. While signed in, transient failures retry with
+backoff from 30 seconds to 15 minutes; a process restart resumes from the marker. Sign-out or a
+server/account change stops that session's retry loop. Expired access tokens refresh through the
+captured server, and conditional vault writes prevent an old refresh from replacing a new login.
+Foreground registration and background replacement share a lock because the provider holds one
+restore credential per app.
+
 Restore assertions have a passive authentication contract. The dedicated server restore verifier
 validates origin, RP, challenge, registered-key signature, ownership, and replay without requiring
 a fresh user-presence or biometric ceremony. Ordinary passkey verification is a separate path.

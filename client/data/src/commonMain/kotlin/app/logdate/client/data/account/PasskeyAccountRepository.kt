@@ -6,6 +6,8 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.networking.PasskeyApiErrorCodes
+import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.permissions.GoogleSignInManager
 import app.logdate.client.permissions.NoOpGoogleSignInManager
 import app.logdate.client.permissions.PasskeyManager
@@ -24,6 +26,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 /**
@@ -78,6 +82,7 @@ class DefaultPasskeyAccountRepository(
         )
 
     private val credentialCodec = PasskeyCredentialCodec(json)
+    private val restoreCredentialRegistrationMutex = Mutex()
 
     private val sessionRefreshCoordinator =
         AccountSessionRefreshCoordinator(
@@ -99,6 +104,7 @@ class DefaultPasskeyAccountRepository(
             bindingGuard = bindingGuard,
             sessionState = sessionState,
             sessionRefreshCoordinator = sessionRefreshCoordinator,
+            registrationMutex = restoreCredentialRegistrationMutex,
         )
 
     private val registrationCoordinator =
@@ -171,21 +177,29 @@ class DefaultPasskeyAccountRepository(
     private suspend fun renewBackgroundRestoreKey(session: app.logdate.client.datastore.UserSession) {
         val renewal = restoreCredentialRenewal ?: return
         val origin = configRepository.getCurrentBackendUrl()
-        try {
-            val pinned =
-                app.logdate.shared.config.PinnedLogDateConfigRepository(
-                    origin,
-                    configRepository.getCurrentServerDescriptor(),
-                    configRepository.apiVersion.value,
-                )
-            renewal.renew(pinned, session, restoreCredentialManager, platformAccountManager) {
-                configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session
-            }
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            Napier.w("Restore key renewal remains pending")
-        }
+        val pinned =
+            app.logdate.shared.config.PinnedLogDateConfigRepository(
+                origin,
+                configRepository.getCurrentServerDescriptor(),
+                configRepository.apiVersion.value,
+            )
+        val isCurrent = { configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session }
+        retryRestoreCredentialRenewal(
+            isPending = { renewal.isPending(origin, session.accountId) },
+            isCurrent = isCurrent,
+            renew = {
+                restoreCredentialRegistrationMutex.withLock {
+                    renewal.renew(pinned, session, restoreCredentialManager, platformAccountManager, isCurrent)
+                }
+            },
+            onFailure = { error ->
+                if (error is PasskeyApiException &&
+                    error.errorCode in setOf(PasskeyApiErrorCodes.INVALID_TOKEN, PasskeyApiErrorCodes.UNAUTHORIZED)
+                ) {
+                    renewal.refreshSession(pinned, session, sessionStorage, isCurrent)
+                }
+            },
+        )
     }
 
     override suspend fun checkUsernameAvailability(username: String): Result<Boolean> =

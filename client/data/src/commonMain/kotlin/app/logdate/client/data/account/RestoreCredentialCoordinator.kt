@@ -12,6 +12,8 @@ import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.ServerCapability
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Registers, clears, and signs in with restore credentials backed by the device's encrypted
@@ -27,8 +29,11 @@ internal class RestoreCredentialCoordinator(
     private val bindingGuard: CanonicalOwnerBindingGuard,
     private val sessionState: PasskeyAccountSessionState,
     private val sessionRefreshCoordinator: AccountSessionRefreshCoordinator,
+    private val registrationMutex: Mutex = Mutex(),
 ) {
-    suspend fun createRestoreKey(): Result<Unit> {
+    suspend fun createRestoreKey(): Result<Unit> = registrationMutex.withLock { registerRestoreKey() }
+
+    private suspend fun registerRestoreKey(): Result<Unit> {
         if (sessionStorage.getSession() == null) {
             return Result.failure(Exception("No active session"))
         }

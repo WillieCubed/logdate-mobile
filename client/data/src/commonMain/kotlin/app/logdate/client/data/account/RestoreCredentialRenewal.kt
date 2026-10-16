@@ -1,5 +1,6 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.storage.SecureStorage
@@ -72,6 +73,23 @@ class RestoreCredentialRenewal(
         currentCoroutineContext().ensureActive()
         checkCurrent()
         complete(origin)
+    }
+
+    /** Refresh only the captured origin/session; a concurrent switch cannot receive its tokens. */
+    internal suspend fun refreshSession(
+        config: LogDateConfigRepository,
+        session: UserSession,
+        sessions: SessionStorage,
+        isCurrent: () -> Boolean,
+    ) {
+        val origin = config.getCurrentBackendUrl()
+        val bound = sessions.getOriginBoundSession() ?: return
+        if (bound.origin != origin || bound.session != session || !isCurrent()) return
+        val api = apiFactory?.invoke(config) ?: return
+        val token = api.refreshToken(session.refreshToken).getOrThrow()
+        currentCoroutineContext().ensureActive()
+        if (!isCurrent()) return
+        sessions.replaceSessionIfCurrent(bound, session.copy(accessToken = token))
     }
 
     private fun key(origin: String): String = "restore_key_renewal_${Base64.UrlSafe.encode(origin.encodeToByteArray())}"

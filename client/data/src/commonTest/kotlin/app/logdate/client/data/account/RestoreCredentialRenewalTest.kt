@@ -153,7 +153,7 @@ class RestoreCredentialRenewalTest {
         )
 }
 
-private class RenewalStorage : SecureStorage {
+internal class RenewalStorage : SecureStorage {
     private val values = mutableMapOf<String, String>()
 
     override suspend fun getString(key: String): String? = values[key]
