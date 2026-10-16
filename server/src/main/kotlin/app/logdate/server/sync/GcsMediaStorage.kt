@@ -137,7 +137,6 @@ class GcsMediaStorage(
                 )
             url.toString()
         } catch (e: Exception) {
-            Napier.e("Failed to generate signed URL")
             throw MediaStorageException("Failed to generate download URL", e)
         }
     }

@@ -51,6 +51,8 @@ private val approvedNotices =
         KeyCustodyNotices.OAUTH_KEY_PROMOTED to "SERVER_OAUTH_KEY_PROMOTED",
         KeyCustodyNotices.OAUTH_KEY_RETIRED to "SERVER_OAUTH_KEY_RETIRED",
         KeyCustodyNotices.OAUTH_KEY_ROTATION_FAILED to "SERVER_OAUTH_KEY_ROTATION_FAILED",
+        DownloadUrlSigningNotices.MEDIA_SIGNING_FAILED to "SERVER_MEDIA_URL_SIGNING_FAILED",
+        DownloadUrlSigningNotices.BACKUP_SIGNING_FAILED to "SERVER_BACKUP_URL_SIGNING_FAILED",
     )
 
 /**
@@ -66,6 +68,17 @@ internal object KeyCustodyNotices {
     const val OAUTH_KEY_PROMOTED = "Promoted the next OAuth signing key"
     const val OAUTH_KEY_RETIRED = "Deleted the retired OAuth signing key"
     const val OAUTH_KEY_ROTATION_FAILED = "OAuth signing key rotation check failed"
+}
+
+/**
+ * Fixed log messages for when signing a direct storage download URL fails and the response falls
+ * back to the server's own binary endpoint. Downloads keep working, but every one is proxied
+ * through the server. On Cloud Run the usual cause is that the runtime service account isn't
+ * allowed to sign as itself (`iam.serviceAccounts.signBlob`).
+ */
+internal object DownloadUrlSigningNotices {
+    const val MEDIA_SIGNING_FAILED = "Signing a media download URL failed; serving it through the server instead"
+    const val BACKUP_SIGNING_FAILED = "Signing a backup download URL failed; serving it through the server instead"
 }
 
 internal fun safeServerMessage(

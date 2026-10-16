@@ -17,6 +17,7 @@ import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.logdate.LogDateMedia
 import app.logdate.server.logdate.LogDateRecordState
+import app.logdate.server.logging.DownloadUrlSigningNotices
 import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
@@ -40,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.io.readByteArray
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
 
 // --- Pagination + metric names ------------------------------------------------------------------
 
@@ -467,7 +469,8 @@ internal suspend fun resolveMediaDownloadUrl(
         return runCatching {
             withContext(Dispatchers.IO) { mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours) }
         }.getOrElse { error ->
-            Napier.e("Media download authorization failed")
+            if (error is CancellationException) throw error
+            Napier.e(DownloadUrlSigningNotices.MEDIA_SIGNING_FAILED)
             buildMediaDownloadUrl(call, record.mediaId)
         }
     }
@@ -483,8 +486,9 @@ internal suspend fun resolveBackupDownloadUrl(
     if (accessPolicy.useSignedUrls && mediaStorage != null) {
         return runCatching {
             withContext(Dispatchers.IO) { mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours) }
-        }.getOrElse {
-            Napier.e("Failed to generate signed URL for backup")
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            Napier.e(DownloadUrlSigningNotices.BACKUP_SIGNING_FAILED)
             buildBackupDownloadUrl(call, record.id.toString())
         }
     }

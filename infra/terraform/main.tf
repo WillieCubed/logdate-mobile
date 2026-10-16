@@ -178,6 +178,15 @@ resource "google_service_account_iam_member" "github_deploy_runtime_sa" {
   member             = "serviceAccount:${google_service_account.github_deploy[0].email}"
 }
 
+# Signed media and backup download URLs are signed by the runtime account itself, through the IAM
+# Credentials signBlob API, because Cloud Run has no private key file to sign with. Without this
+# grant every signing attempt is denied and downloads fall back to being proxied by the server.
+resource "google_service_account_iam_member" "runtime_url_signing" {
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 resource "google_storage_bucket" "media" {
   count                       = var.create_gcs_bucket ? 1 : 0
   name                        = var.gcs_bucket_name
