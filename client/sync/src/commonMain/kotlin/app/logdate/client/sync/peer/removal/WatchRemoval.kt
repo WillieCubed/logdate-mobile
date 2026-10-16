@@ -47,6 +47,9 @@ data class WatchRemovalTarget(
 interface WatchRemovalAccess {
     suspend fun target(): WatchRemovalTarget?
 
+    /** The watch this phone linked whose device session is [sessionId], whether or not it is in reach now. */
+    suspend fun targetForSession(sessionId: String): WatchRemovalTarget? = null
+
     suspend fun remove(target: WatchRemovalTarget): WatchRemovalResult
 
     suspend fun removeAll(): Boolean = false

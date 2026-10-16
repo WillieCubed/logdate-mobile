@@ -1,14 +1,22 @@
 package app.logdate.feature.core.settings.ui.devices
 
+import androidx.lifecycle.viewModelScope
 import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.DeviceRepository
 import app.logdate.client.device.models.DeviceInfo
 import app.logdate.client.device.models.DevicePlatform
+import app.logdate.client.sync.peer.devices.LinkedDeviceRemoval
+import app.logdate.client.sync.peer.devices.LinkedDeviceSession
+import app.logdate.client.sync.peer.devices.LinkedDevicesFailure
+import app.logdate.client.sync.peer.devices.LinkedDevicesLoad
+import app.logdate.client.sync.peer.devices.LinkedDevicesRepository
 import app.logdate.client.text.UiText
 import app.logdate.client.text.toUiText
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +44,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -53,6 +62,7 @@ class DevicesViewModelTest {
     private lateinit var viewModel: DevicesViewModel
     private val testDispatcher = StandardTestDispatcher()
     private val testScope = TestScope(testDispatcher)
+    private val linked = FakeLinkedDevicesRepository()
 
     private val currentDeviceId = Uuid.parse("123e4567-e89b-12d3-a456-426614174000")
     private val device1Id = Uuid.parse("223e4567-e89b-12d3-a456-426614174000")
@@ -91,7 +101,7 @@ class DevicesViewModelTest {
         repository.addAssociatedDevice(device2)
 
         // Create view model
-        viewModel = DevicesViewModel(deviceManager)
+        viewModel = DevicesViewModel(deviceManager, linked)
     }
 
     @AfterTest
@@ -284,6 +294,223 @@ class DevicesViewModelTest {
             // Then
             assertEquals(Res.string.devices_error_remove, (state.error as? UiText.Resource)?.resource, "Error message should be set")
         }
+
+    @Test
+    fun `linked devices stay hidden while linking is unavailable`() =
+        testScope.runTest {
+            linked.isAvailable = false
+
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            assertEquals(LinkedDevicesUiState.Unavailable, viewModel.uiState.value.linked)
+            assertEquals(0, linked.loads)
+        }
+
+    @Test
+    fun `linked devices are listed with their platform and times`() =
+        testScope.runTest {
+            linked.answers += LinkedDevicesLoad.Loaded(listOf(linkedWatch))
+
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            assertEquals(LinkedDevicesUiState.Listed(listOf(linkedWatchUi)), viewModel.uiState.value.linked)
+        }
+
+    @Test
+    fun `an account without linked devices lists none`() =
+        testScope.runTest {
+            linked.answers += LinkedDevicesLoad.Loaded(emptyList())
+
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            assertEquals(LinkedDevicesUiState.Listed(emptyList()), viewModel.uiState.value.linked)
+        }
+
+    @Test
+    fun `linked devices show as loading until the server answers`() =
+        testScope.runTest {
+            val answer = CompletableDeferred<LinkedDevicesLoad>()
+            linked.pending = answer
+
+            viewModel.loadDevices()
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Loading, viewModel.uiState.value.linked)
+
+            answer.complete(LinkedDevicesLoad.Loaded(listOf(linkedWatch)))
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Listed(listOf(linkedWatchUi)), viewModel.uiState.value.linked)
+        }
+
+    @Test
+    fun `a failed load says why and can be tried again`() =
+        testScope.runTest {
+            linked.answers += LinkedDevicesLoad.Failed(LinkedDevicesFailure.Unreachable)
+            linked.answers += LinkedDevicesLoad.Loaded(listOf(linkedWatch))
+
+            viewModel.loadDevices()
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Failed(LinkedDevicesFailure.Unreachable), viewModel.uiState.value.linked)
+
+            viewModel.loadLinkedDevices()
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Listed(listOf(linkedWatchUi)), viewModel.uiState.value.linked)
+        }
+
+    @Test
+    fun `removing a linked device lists the devices that remain`() =
+        testScope.runTest {
+            val removal = CompletableDeferred<LinkedDeviceRemoval>()
+            linked.answers += LinkedDevicesLoad.Loaded(listOf(linkedWatch))
+            linked.answers += LinkedDevicesLoad.Loaded(emptyList())
+            linked.removal = removal
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            viewModel.removeLinkedDevice(linkedWatch.id)
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Listed(listOf(linkedWatchUi), removingId = linkedWatch.id), viewModel.uiState.value.linked)
+
+            removal.complete(LinkedDeviceRemoval.Removed)
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Listed(emptyList()), viewModel.uiState.value.linked)
+            assertEquals(listOf(linkedWatch), linked.removed)
+        }
+
+    @Test
+    fun `reloading the page while a removal runs lets the removal finish`() =
+        testScope.runTest {
+            val removal = CompletableDeferred<LinkedDeviceRemoval>()
+            linked.answers += LinkedDevicesLoad.Loaded(listOf(linkedWatch))
+            linked.answers += LinkedDevicesLoad.Loaded(emptyList())
+            linked.removal = removal
+            viewModel.loadDevices()
+            advanceUntilIdle()
+            viewModel.removeLinkedDevice(linkedWatch.id)
+            advanceUntilIdle()
+
+            viewModel.loadDevices()
+            viewModel.renameDevice("Kitchen phone")
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Listed(listOf(linkedWatchUi), removingId = linkedWatch.id), viewModel.uiState.value.linked)
+            assertTrue(linked.removalActive)
+
+            removal.complete(LinkedDeviceRemoval.Removed)
+            advanceUntilIdle()
+            assertEquals(LinkedDevicesUiState.Listed(emptyList()), viewModel.uiState.value.linked)
+            assertTrue(linked.removalFinished)
+        }
+
+    @Test
+    fun `a removal finishes even when the page closes`() =
+        testScope.runTest {
+            val removal = CompletableDeferred<LinkedDeviceRemoval>()
+            linked.answers += LinkedDevicesLoad.Loaded(listOf(linkedWatch))
+            linked.removal = removal
+            viewModel.loadDevices()
+            advanceUntilIdle()
+            viewModel.removeLinkedDevice(linkedWatch.id)
+            advanceUntilIdle()
+
+            viewModel.viewModelScope.cancel()
+            removal.complete(LinkedDeviceRemoval.Removed)
+            advanceUntilIdle()
+
+            assertTrue(linked.removalFinished)
+        }
+
+    @Test
+    fun `a watch removed while away says it erases its data when it connects`() =
+        testScope.runTest {
+            linked.answers += LinkedDevicesLoad.Loaded(listOf(linkedWatch))
+            linked.answers += LinkedDevicesLoad.Loaded(emptyList())
+            linked.removal = CompletableDeferred(LinkedDeviceRemoval.RemovedWillWipeOnNextConnect)
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            viewModel.removeLinkedDevice(linkedWatch.id)
+            advanceUntilIdle()
+
+            assertEquals(
+                LinkedDevicesUiState.Listed(emptyList(), notice = LinkedDeviceNotice.ErasesOnNextConnect("Pixel Watch 3")),
+                viewModel.uiState.value.linked,
+            )
+            viewModel.dismissLinkedDeviceNotice()
+            assertEquals(LinkedDevicesUiState.Listed(emptyList()), viewModel.uiState.value.linked)
+        }
+
+    @Test
+    fun `a failed removal keeps the device and says why`() =
+        testScope.runTest {
+            val failure = LinkedDevicesFailure.WatchRemovalStopped("sync")
+            linked.answers += LinkedDevicesLoad.Loaded(listOf(linkedWatch))
+            linked.removal = CompletableDeferred(LinkedDeviceRemoval.Failed(failure))
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            viewModel.removeLinkedDevice(linkedWatch.id)
+            advanceUntilIdle()
+
+            assertEquals(
+                LinkedDevicesUiState.Listed(
+                    listOf(linkedWatchUi),
+                    notice = LinkedDeviceNotice.RemoveFailed(linkedWatch.id, "Pixel Watch 3", failure),
+                ),
+                viewModel.uiState.value.linked,
+            )
+            assertEquals(1, linked.loads)
+        }
+
+    private val linkedWatch =
+        LinkedDeviceSession(
+            id = "watch-session",
+            name = "Pixel Watch 3",
+            platform = "wear_os",
+            linkedAt = Instant.fromEpochMilliseconds(1_760_000_000_000),
+            lastSeenAt = Instant.fromEpochMilliseconds(1_760_600_000_000),
+        )
+
+    private val linkedWatchUi =
+        LinkedDeviceUiState(
+            id = "watch-session",
+            name = "Pixel Watch 3".toUiText(),
+            platformName = Res.string.devices_platform_wear_os,
+            linkedAtFormatted = formatDeviceLastActive(linkedWatch.linkedAt)!!.toUiText(),
+            lastSeenFormatted = formatDeviceLastActive(linkedWatch.lastSeenAt)!!.toUiText(),
+            pairedWatch = false,
+            erasesData = true,
+        )
+
+    private class FakeLinkedDevicesRepository : LinkedDevicesRepository {
+        var isAvailable = true
+        val answers = ArrayDeque<LinkedDevicesLoad>()
+        var pending: CompletableDeferred<LinkedDevicesLoad>? = null
+        var removal = CompletableDeferred<LinkedDeviceRemoval>(LinkedDeviceRemoval.Removed)
+        val removed = mutableListOf<LinkedDeviceSession>()
+        var loads = 0
+
+        override suspend fun available(): Boolean = isAvailable
+
+        override suspend fun load(): LinkedDevicesLoad {
+            loads++
+            pending?.let { return it.await() }
+            return answers.removeFirstOrNull() ?: LinkedDevicesLoad.Unavailable
+        }
+
+        var removalActive = false
+        var removalFinished = false
+
+        override suspend fun remove(device: LinkedDeviceSession): LinkedDeviceRemoval {
+            removed += device
+            removalActive = true
+            return removal.await().also {
+                removalActive = false
+                removalFinished = true
+            }
+        }
+    }
 
     /**
      * A test implementation of DeviceManager for view model tests.
