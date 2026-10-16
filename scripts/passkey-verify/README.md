@@ -55,8 +55,8 @@ sign-in check with:
 ```bash
 .venv/bin/python sim.py \
   --base https://cloud-staging.logdate.app \
-  --origin https://app.logdate-preview.hypertext.studio \
-  --expected-rp-id logdate-preview.hypertext.studio \
+  --origin https://app.staging.logdate.app \
+  --expected-rp-id staging.logdate.app \
   --username verify_… \
   --signin-only
 ```
@@ -66,8 +66,8 @@ For a custom location:
 ```bash
 .venv/bin/python sim.py \
   --base https://cloud-staging.logdate.app \
-  --origin https://app.logdate-preview.hypertext.studio \
-  --expected-rp-id logdate-preview.hypertext.studio \
+  --origin https://app.staging.logdate.app \
+  --expected-rp-id staging.logdate.app \
   --username verify_… \
   --credential-file /secure/scratch/logdate-staging-passkey.json
 ```
@@ -194,3 +194,31 @@ The positional `smoke-test-revision.sh <url> [origin]` form remains temporarily
 available with a deprecation warning so the current deployment workflow is not
 broken. Task 6 must switch every official caller to the immutable contract and
 then remove that compatibility path atomically.
+
+## Passive native restore acceptance
+
+`restore.py` checks the deployed server's Restore Credentials contract without
+Google credential delivery. It creates a disposable account, registers a signed
+restore credential, authenticates with neither user-presence nor verification
+flags, and checks signature/origin rejection, challenge replay and reuse of a
+consumed credential with a higher signature counter. It verifies the restored
+token through `/auth/me` and deletes the fixture using its original identity.
+Tokens and generated private keys are not printed or saved.
+
+Use the same Python environment and requirements as the passkey verifier. All
+target inputs are explicit; the command checks the healthy release before and
+after the flow. Run against staging first. Select production only as part of an
+authorized production acceptance check.
+
+```bash
+python scripts/passkey-verify/restore.py \
+  --base https://cloud-staging.logdate.app \
+  --origin https://app.staging.logdate.app \
+  --expected-rp-id staging.logdate.app \
+  --expected-release 'logdate-server@<full-commit-sha>'
+```
+
+A nonzero result means acceptance failed, including when fixture cleanup fails.
+The command respects server signup limits; do not loop on rate-limit responses.
+This verifies the server assertion contract. Google provider delivery and setup
+transfer remain separate emulator acceptance cases.
