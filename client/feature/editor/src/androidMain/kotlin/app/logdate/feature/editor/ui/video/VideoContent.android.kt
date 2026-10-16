@@ -106,8 +106,8 @@ import logdate.client.feature.editor.generated.resources.choose_from_gallery
 import logdate.client.feature.editor.generated.resources.enter_picture_in_picture
 import logdate.client.feature.editor.generated.resources.pause_video
 import logdate.client.feature.editor.generated.resources.play_video
+import logdate.client.feature.editor.generated.resources.selected_video_add_failed
 import logdate.client.feature.editor.generated.resources.video_thumbnail
-import logdate.client.feature.editor.generated.resources.we_couldnt_add_selected_video
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -679,7 +679,7 @@ private fun VideoPickerCard(
 
                 ManagedMediaSelectionState.Failed -> {
                     Text(
-                        text = stringResource(Res.string.we_couldnt_add_selected_video),
+                        text = stringResource(Res.string.selected_video_add_failed),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                         textAlign = TextAlign.Center,

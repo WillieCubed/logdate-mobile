@@ -50,8 +50,8 @@ import logdate.client.feature.editor.generated.resources.open_app_settings
 import logdate.client.feature.editor.generated.resources.partial_photo_access_message
 import logdate.client.feature.editor.generated.resources.pick_from_your_library_or_browse_all_your_photos
 import logdate.client.feature.editor.generated.resources.recent_photos
-import logdate.client.feature.editor.generated.resources.we_couldnt_add_selected_photo
-import logdate.client.feature.editor.generated.resources.we_couldnt_load_your_recent_photos
+import logdate.client.feature.editor.generated.resources.recent_photos_load_failed
+import logdate.client.feature.editor.generated.resources.selected_photo_add_failed
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
@@ -188,7 +188,7 @@ internal fun ImagePickerBrowser(
                                 modifier = Modifier.size(28.dp),
                             )
                         },
-                        message = stringResource(Res.string.we_couldnt_add_selected_photo),
+                        message = stringResource(Res.string.selected_photo_add_failed),
                         action =
                             onRetryImport?.let { retry ->
                                 {
@@ -311,7 +311,7 @@ internal fun ImagePickerBrowser(
                                 modifier = Modifier.size(28.dp),
                             )
                         },
-                        message = stringResource(Res.string.we_couldnt_load_your_recent_photos),
+                        message = stringResource(Res.string.recent_photos_load_failed),
                         action =
                             onRetryLoading?.let { retry ->
                                 {
