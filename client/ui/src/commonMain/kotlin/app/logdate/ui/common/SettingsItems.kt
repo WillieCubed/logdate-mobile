@@ -70,9 +70,11 @@ fun SimpleSettingsItem(
     overline: String? = null,
     onClick: (() -> Unit)? = {},
     enabled: Boolean = LocalSettingsEnabled.current,
+    leadingContent: (@Composable () -> Unit)? = null,
     action: @Composable () -> Unit,
 ) {
     ListItem(
+        leadingContent = leadingContent,
         headlineContent = { Text(title) },
         supportingContent = {
             Text(

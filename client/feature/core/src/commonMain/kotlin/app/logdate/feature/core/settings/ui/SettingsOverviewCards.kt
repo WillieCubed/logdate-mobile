@@ -7,27 +7,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.streak.Campfire
 import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.theme.Spacing
@@ -49,42 +50,38 @@ import kotlin.time.Instant
 internal fun SyncPromotionCard(
     onCreateAccount: () -> Unit,
     onSignIn: () -> Unit,
-    onNavigateToSync: () -> Unit,
+    onNavigateToSync: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    title: String = stringResource(Res.string.sync_promotion_title),
+    description: String = stringResource(Res.string.sync_devices_subtitle),
 ) {
-    Column(
+    MaterialCard(
         modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.secondaryContainer)
-                .clickable(onClick = onNavigateToSync)
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            modifier.then(
+                if (onNavigateToSync !=
+                    null
+                ) {
+                    Modifier.clip(MaterialTheme.shapes.extraLarge).clickable(onClick = onNavigateToSync)
+                } else {
+                    Modifier
+                },
+            ),
+        title = title,
+        titleStyle = MaterialTheme.typography.titleLarge,
+        shape = MaterialTheme.shapes.extraLarge,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        elevation = 0.dp,
+        contentPadding = Spacing.lg,
     ) {
-        Icon(
-            imageVector = Icons.Default.Cloud,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-        )
-        Text(
-            text = stringResource(Res.string.sync_promotion_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-        )
-        Text(
-            text = stringResource(Res.string.sync_devices_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Button(onClick = onCreateAccount) {
-                Text(stringResource(Res.string.create_account))
-            }
-            OutlinedButton(onClick = onSignIn) {
-                Text(stringResource(Res.string.sign_in))
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Text(description, style = MaterialTheme.typography.bodyMedium)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Button(onClick = onCreateAccount) { Text(stringResource(Res.string.create_account)) }
+                TextButton(onClick = onSignIn) { Text(stringResource(Res.string.sign_in)) }
             }
         }
     }

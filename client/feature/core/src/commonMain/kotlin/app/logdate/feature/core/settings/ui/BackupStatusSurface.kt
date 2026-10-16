@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDone
@@ -20,7 +19,6 @@ import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,8 +31,10 @@ import app.logdate.client.sync.SyncStatus
 import app.logdate.feature.core.sync.AccountSyncStatus
 import app.logdate.feature.core.sync.SyncProgressIndicator
 import app.logdate.feature.core.sync.messageResource
+import app.logdate.ui.common.MaterialCard
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.backup_cloud_title
 import logdate.client.feature.core.generated.resources.sync_account_mobile_data
 import logdate.client.feature.core.generated.resources.sync_heading_background
 import logdate.client.feature.core.generated.resources.sync_heading_failed
@@ -64,13 +64,17 @@ internal fun BackupStatusItem(
             -> Res.string.sync_heading_failed
             else -> status.messageResource()
         }
-    Surface(
+    MaterialCard(
         modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+        title = stringResource(Res.string.backup_cloud_title),
+        titleStyle = MaterialTheme.typography.titleLarge,
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        elevation = 0.dp,
+        contentPadding = Spacing.lg,
     ) {
-        Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
                     if (status == AccountSyncStatus.SYNCING) {
@@ -89,11 +93,11 @@ internal fun BackupStatusItem(
                                 AccountSyncStatus.WAITING -> Icons.Rounded.Schedule
                                 else -> Icons.Rounded.CloudSync
                             }
-                        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                        Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(24.dp))
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
                     if (title != status.messageResource()) {
                         val detail =
                             if (title ==
@@ -106,7 +110,7 @@ internal fun BackupStatusItem(
                         Text(
                             stringResource(detail),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                     }
                 }
