@@ -157,11 +157,35 @@
     <string name="enter_a_new_name_for_this_device">Enter a new name for this device:</string>
     <string name="sync_device_remove_label">Remove device</string>
     <string name="sync_device_remove_title">Remove Device</string>
+    <string name="remove_linked_watch_confirmation">Remove &quot;%1$s&quot; from your account? It stops syncing and erases its LogDate data, including any moments it hasn’t sent yet.</string>
     <string name="remove_device_confirmation">Are you sure you want to remove &quot;%1$s&quot; from your account? This device will no longer receive notifications or sync data.</string>
     <string name="sync_device_rename_label">Rename device</string>
     <string name="sync_device_options_label">Device options</string>
     <string name="sync_device_rename_title">Rename Device</string>
     <string name="devices_wear_os">Wear OS</string>
+    <string name="linked_devices_title">Linked devices</string>
+    <string name="linked_devices_loading">Loading linked devices…</string>
+    <string name="linked_device_times">Linked %1$s · Last seen %2$s</string>
+    <string name="linked_device_removing">Removing…</string>
+    <string name="linked_devices_error_unreachable">The LogDate server couldn’t be reached to list linked devices. Check your connection.</string>
+    <string name="linked_devices_error_sign_in">Sign in again on this phone to see the devices linked to your account.</string>
+    <string name="linked_devices_error_refused">The LogDate server couldn’t list linked devices (HTTP %1$d).</string>
+    <string name="linked_devices_error_unreadable">The LogDate server’s list of linked devices couldn’t be read.</string>
+    <string name="linked_devices_error_account_changed">The account on this phone changed while linked devices were loading.</string>
+    <string name="linked_devices_error_unexpected">Linked devices couldn’t be loaded.</string>
+    <string name="linked_device_remove_unreachable">The LogDate server couldn’t be reached to remove %1$s. Check your connection.</string>
+    <string name="linked_device_remove_sign_in">Sign in again on this phone to remove %1$s.</string>
+    <string name="linked_device_remove_refused">The LogDate server couldn’t remove %1$s (HTTP %2$d).</string>
+    <string name="linked_device_remove_unreadable">The LogDate server’s answer about removing %1$s couldn’t be read.</string>
+    <string name="linked_device_remove_account_changed">The account on this phone changed while %1$s was being removed.</string>
+    <string name="linked_device_remove_unexpected">%1$s couldn’t be removed.</string>
+    <string name="linked_device_remove_watch_sync">%1$s still has moments to send. Bring it near your phone and try again.</string>
+    <string name="linked_device_remove_watch_revoke">%1$s couldn’t be removed from your account.</string>
+    <string name="linked_device_remove_watch_erase">%1$s was removed from your account, but it couldn’t be asked to erase its LogDate data.</string>
+    <string name="linked_device_remove_watch_forget">%1$s was removed from your account, but this phone couldn’t finish forgetting it.</string>
+    <string name="linked_device_remove_watch_changed">The link with %1$s changed while it was being removed.</string>
+    <string name="linked_device_remove_watch_unfinished">Removing %1$s didn’t finish.</string>
+    <string name="linked_device_erases_on_next_connect">%1$s was removed. It erases its LogDate data the next time it connects to this phone.</string>
 
     <!-- Debug / developer -->
     <string name="app_version_label">App version: %1$s</string>

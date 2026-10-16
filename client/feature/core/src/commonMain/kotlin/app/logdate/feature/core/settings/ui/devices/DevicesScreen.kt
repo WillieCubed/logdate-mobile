@@ -61,6 +61,7 @@ import logdate.client.feature.core.generated.resources.enter_a_new_name_for_this
 import logdate.client.feature.core.generated.resources.last_active_label
 import logdate.client.feature.core.generated.resources.loading_devices
 import logdate.client.feature.core.generated.resources.remove_device_confirmation
+import logdate.client.feature.core.generated.resources.remove_linked_watch_confirmation
 import logdate.client.feature.core.generated.resources.rename
 import logdate.client.feature.core.generated.resources.reset
 import logdate.client.feature.core.generated.resources.reset_device_id
@@ -141,6 +142,9 @@ fun DevicesScreen(
         onDismissRenameDialog = { showRenameDialog = false },
         onDismissDeleteDialog = { showDeleteDialog = false },
         onDismissResetDialog = { showResetDialog = false },
+        onRemoveLinkedDevice = viewModel::removeLinkedDevice,
+        onRetryLinkedDevices = viewModel::loadLinkedDevices,
+        onDismissLinkedDeviceNotice = viewModel::dismissLinkedDeviceNotice,
     )
 }
 
@@ -166,6 +170,9 @@ fun DevicesScreenContent(
     connectionAction: @Composable () -> Unit = { DeviceApprovalAction() },
     modifier: Modifier = Modifier,
     watchDevice: (@Composable () -> Unit)? = null,
+    onRemoveLinkedDevice: (String) -> Unit = {},
+    onRetryLinkedDevices: () -> Unit = {},
+    onDismissLinkedDeviceNotice: () -> Unit = {},
 ) {
     if (showRenameDialog && selectedDevice != null) {
         RenameDeviceDialog(
@@ -220,6 +227,19 @@ fun DevicesScreenContent(
                     )
                 }
                 watchDevice?.let { card -> item { card() } }
+                val hidePairedWatch = watchDevice != null
+                if (uiState.linked.isShown(hidePairedWatch)) {
+                    item {
+                        LinkedDevicesSection(
+                            state = uiState.linked,
+                            hidePairedWatch = hidePairedWatch,
+                            onRemove = onRemoveLinkedDevice,
+                            onRetry = onRetryLinkedDevices,
+                            onDismissNotice = onDismissLinkedDeviceNotice,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
                         connectionAction()
@@ -387,6 +407,7 @@ fun RemoveDeviceDialog(
     deviceName: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    erasesData: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -394,7 +415,7 @@ fun RemoveDeviceDialog(
         text = {
             Text(
                 stringResource(
-                    Res.string.remove_device_confirmation,
+                    if (erasesData) Res.string.remove_linked_watch_confirmation else Res.string.remove_device_confirmation,
                     deviceName,
                 ),
             )
