@@ -24,6 +24,7 @@ class IdentityKeyManager(
     private val cryptoManager: CryptoManager,
     private val backupStore: IdentityKeyBackupStore = NoOpIdentityKeyBackupStore,
     private val mintPolicy: IdentityMintPolicy = IdentityMintPolicy.ALLOWED,
+    private val expectedAccountOwner: (suspend () -> String?)? = null,
 ) {
     suspend fun isRecoveryPhraseVerified(): Boolean = hasIdentityKey() && secureStorage.getString(KEY_RECOVERY_VERIFIED) == "true"
 
@@ -65,19 +66,36 @@ class IdentityKeyManager(
     suspend fun installAccountKey(
         accountId: String,
         key: ByteArray,
+        mediaKey: ByteArray? = null,
     ) {
+        require(mediaKey == null || mediaKey.size == 32)
         require(key.size == 32) { "Invalid identity key length" }
         identityMutex.withLock {
             val owner = secureStorage.getString(KEY_ACCOUNT_ID)
             require(owner == null || owner == accountId) { "Identity key belongs to a different account" }
+            expectedAccountOwner?.invoke()?.let { expected ->
+                require(expected == accountId) { "Identity key does not match the retained journal owner" }
+            }
             val existing = secureStorage.getBytes(KEY_IDENTITY_KEY)
             require(existing == null || existing.contentEquals(key)) { "Local identity key conflicts with account key" }
+            val (retainedAccount, retainedPhrase) = portable.validateRoot(key, accountId)
+            val cachedMedia = secureStorage.getBytes(KEY_MEDIA_KEY)
+            require(
+                mediaKey == null || cachedMedia == null || cachedMedia.contentEquals(mediaKey),
+            ) { "Local media key conflicts with account key" }
+            val selectedMedia = portable.validateMedia(key, mediaKey ?: cachedMedia, retainedAccount)
+            val installedMedia = mediaKey ?: cachedMedia ?: selectedMedia
+            val phrase = secureStorage.getString(KEY_RECOVERY_PHRASE) ?: retainedPhrase
+            if (phrase == null) {
+                backupStore.writeAccountIdentity(AccountIdentityBackup(accountId, key, installedMedia))
+            } else if (installedMedia != null) {
+                portable.preserveMedia(key, installedMedia)
+            }
             secureStorage.putString(KEY_ACCOUNT_ID, accountId)
-            if (existing != null) return@withLock
-            backupStore.clear()
             secureStorage.putBytes(KEY_IDENTITY_KEY, key)
-            secureStorage.remove(KEY_RECOVERY_PHRASE)
-            secureStorage.remove(KEY_RECOVERY_VERIFIED)
+            if (phrase != null) secureStorage.putString(KEY_RECOVERY_PHRASE, phrase)
+            if (installedMedia != null) secureStorage.putBytes(KEY_MEDIA_KEY, installedMedia)
+            if (existing == null) secureStorage.remove(KEY_RECOVERY_VERIFIED)
         }
     }
 
@@ -114,6 +132,7 @@ class IdentityKeyManager(
     }
 
     private val identityMutex = Mutex()
+    private val portable = IdentityBackupCoordinator(secureStorage, cryptoManager, backupStore)
 
     /**
      * Guarantees this device has an identity key, creating one if it does not.
@@ -132,13 +151,55 @@ class IdentityKeyManager(
      * Idempotent, and safe to call concurrently: callers racing here would otherwise each derive a
      * different key and the later write would orphan content encrypted under the earlier one.
      */
-    suspend fun ensureIdentityKey() {
+    suspend fun ensureIdentityKey() = identityMutex.withLock { ensureIdentityKeyLocked() }
+
+    private suspend fun ensureIdentityKeyLocked() {
+        if (hasIdentityKey()) {
+            ensurePortableBackupLocked()
+            return
+        }
+        if (restoreFromBackupLocked()) return
+        check(!backupStore.hasBackup()) { "The existing identity backup needs recovery" }
+        check(expectedAccountOwner?.invoke() == null) { "The retained account needs its original encryption identity" }
+        setupNewIdentityLocked()
+    }
+
+    /** Keeps derived media selection and persistence in the same transaction as identity recovery. */
+    suspend fun <T> withIdentityKey(block: suspend (ByteArray) -> T): T =
         identityMutex.withLock {
-            if (hasIdentityKey()) return@withLock
-            if (restoreFromBackupLocked()) return@withLock
-            setupNewIdentity()
+            ensureIdentityKeyLocked()
+            val result = block(getIdentityKey())
+            ensurePortableBackupLocked()
+            result
+        }
+
+    suspend fun <T> withIdentityMutation(block: suspend () -> T): T = identityMutex.withLock { block() }
+
+    /** Backfills an existing installation without restoring or minting a different identity. */
+    suspend fun ensureExistingIdentityBackup() {
+        identityMutex.withLock {
+            if (hasIdentityKey()) ensurePortableBackupLocked()
         }
     }
+
+    private suspend fun ensurePortableBackupLocked() {
+        portable.synchronize(getIdentityKey(), secureStorage.getString(KEY_RECOVERY_PHRASE), secureStorage.getString(KEY_ACCOUNT_ID))
+    }
+
+    suspend fun snapshotAccountKeys(
+        accountId: String,
+        selectMedia: suspend (ByteArray) -> ByteArray,
+    ): AccountIdentityBackup =
+        identityMutex.withLock {
+            ensureIdentityKeyLocked()
+            require(canUseForAccount(accountId)) { "Local keys belong to another account" }
+            expectedAccountOwner?.invoke()?.let { require(it == accountId) { "Keys do not match the retained journal owner" } }
+            secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+            val root = getIdentityKey()
+            val media = selectMedia(root)
+            ensurePortableBackupLocked()
+            AccountIdentityBackup(accountId, root, media)
+        }
 
     /**
      * Sets up a new identity for the first time.
@@ -151,18 +212,23 @@ class IdentityKeyManager(
      *
      * @return The recovery phrase the user must store safely
      */
-    suspend fun setupNewIdentity(): RecoveryPhrase {
+    suspend fun setupNewIdentity(): RecoveryPhrase = identityMutex.withLock { setupNewIdentityLocked() }
+
+    private suspend fun setupNewIdentityLocked(): RecoveryPhrase {
         if (mintPolicy == IdentityMintPolicy.NEVER) throw IdentityMintingNotAllowedException()
         require(!hasIdentityKey()) { "Identity key already exists" }
+        check(!backupStore.hasBackup() && secureStorage.getBytes(KEY_MEDIA_KEY) == null) {
+            "The retained encryption recovery material needs recovery"
+        }
 
         val phrase = cryptoManager.generateRecoveryPhrase()
         val identityKey = cryptoManager.deriveMasterKey(phrase)
         val phraseText = phrase.joinToString(" ")
 
-        secureStorage.remove(KEY_RECOVERY_VERIFIED)
-        secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
-        secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
         backupStore.writePhrase(phraseText)
+        secureStorage.remove(KEY_RECOVERY_VERIFIED)
+        secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
+        secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
         Napier.d("New identity established")
 
         return RecoveryPhrase(phrase)
@@ -176,19 +242,26 @@ class IdentityKeyManager(
      * @param phrase The 12-word recovery phrase
      * @throws IllegalArgumentException if phrase is invalid
      */
-    suspend fun recoverIdentity(phrase: List<String>) {
-        require(cryptoManager.validateRecoveryPhrase(phrase)) {
-            "Invalid recovery phrase"
-        }
+    suspend fun recoverIdentity(phrase: List<String>) =
+        identityMutex.withLock {
+            require(cryptoManager.validateRecoveryPhrase(phrase)) {
+                "Invalid recovery phrase"
+            }
 
-        val identityKey = cryptoManager.deriveMasterKey(phrase)
-        val phraseText = phrase.joinToString(" ")
-        secureStorage.remove(KEY_RECOVERY_VERIFIED)
-        secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
-        secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
-        backupStore.writePhrase(phraseText)
-        Napier.d("Identity recovered from recovery phrase")
-    }
+            val identityKey = cryptoManager.deriveMasterKey(phrase)
+            val phraseText = phrase.joinToString(" ")
+            val paired = backupStore.readAccountIdentity()
+            if (paired?.mediaKey != null) portable.preserveMedia(paired.key, paired.mediaKey)
+            val outgoingRoot = secureStorage.getBytes(KEY_IDENTITY_KEY)
+            val outgoingMedia = secureStorage.getBytes(KEY_MEDIA_KEY)
+            if (outgoingRoot != null && outgoingMedia != null) portable.preserveMedia(outgoingRoot, outgoingMedia)
+            if (outgoingRoot == null || !outgoingRoot.contentEquals(identityKey)) secureStorage.remove(KEY_MEDIA_KEY)
+            secureStorage.remove(KEY_RECOVERY_VERIFIED)
+            secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
+            secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
+            backupStore.writePhrase(phraseText)
+            Napier.d("Identity recovered from recovery phrase")
+        }
 
     /**
      * Attempts to silently restore the identity key from [backupStore] when [SecureStorage] has
@@ -206,6 +279,23 @@ class IdentityKeyManager(
     private suspend fun restoreFromBackupLocked(): Boolean {
         if (hasIdentityKey()) return false
 
+        val accountBackup = backupStore.readAccountIdentity()
+        if (accountBackup != null) {
+            check(accountBackup.key.size == 32 && accountBackup.accountId.isNotBlank()) { "Invalid account identity backup" }
+            val storedAccount = secureStorage.getString(KEY_ACCOUNT_ID)
+            check(storedAccount == null || storedAccount == accountBackup.accountId) { "Identity backup belongs to another account" }
+            expectedAccountOwner?.let { expected ->
+                check(expected() == accountBackup.accountId) { "Identity backup does not match the retained journal owner" }
+            }
+            secureStorage.putString(KEY_ACCOUNT_ID, accountBackup.accountId)
+            secureStorage.putBytes(KEY_IDENTITY_KEY, accountBackup.key)
+            secureStorage.remove(KEY_RECOVERY_PHRASE)
+            secureStorage.remove(KEY_RECOVERY_VERIFIED)
+            ensurePortableBackupLocked()
+            Napier.i("Account encryption identity restored from native backup")
+            return true
+        }
+
         val phraseText = backupStore.readPhrase() ?: return false
         val words =
             phraseText
@@ -221,6 +311,7 @@ class IdentityKeyManager(
         secureStorage.remove(KEY_RECOVERY_VERIFIED)
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
         secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
+        ensurePortableBackupLocked()
         Napier.i("Identity key silently restored from backup store")
         return true
     }
@@ -266,16 +357,19 @@ class IdentityKeyManager(
      *
      * Used when user explicitly signs out or unlinks device.
      */
-    suspend fun clearIdentityKey() {
-        secureStorage.remove(KEY_IDENTITY_KEY)
-        secureStorage.remove(KEY_ACCOUNT_ID)
-        secureStorage.remove(KEY_RECOVERY_PHRASE)
-        secureStorage.remove(KEY_RECOVERY_VERIFIED)
-        backupStore.clear()
-        Napier.d("Identity key cleared from device")
-    }
+    suspend fun clearIdentityKey() =
+        identityMutex.withLock {
+            secureStorage.remove(KEY_IDENTITY_KEY)
+            secureStorage.remove(KEY_MEDIA_KEY)
+            secureStorage.remove(KEY_ACCOUNT_ID)
+            secureStorage.remove(KEY_RECOVERY_PHRASE)
+            secureStorage.remove(KEY_RECOVERY_VERIFIED)
+            backupStore.clear()
+            Napier.d("Identity key cleared from device")
+        }
 
     companion object {
+        private const val KEY_MEDIA_KEY = "media_payload_key_v1"
         private const val KEY_IDENTITY_KEY = "identity_key_v1"
         private const val KEY_ACCOUNT_ID = "identity_account_id_v1"
         private const val KEY_RECOVERY_PHRASE = "identity_recovery_phrase_v1"

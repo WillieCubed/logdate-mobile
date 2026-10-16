@@ -2,10 +2,10 @@ package app.logdate.client.database
 
 import android.content.Context
 import android.os.CancellationSignal
-import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import io.github.aakira.napier.Napier
 import net.zetetic.database.sqlcipher.SQLiteConnection
 import net.zetetic.database.sqlcipher.SQLiteDatabaseHook
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
@@ -41,16 +41,16 @@ fun getDatabaseBuilder(
         if (hasExistingDb) {
             val opensWithCurrent = canOpenEncryptedDatabaseWithCurrentSettings(dbFile, passphrase)
             needsLegacyHook = !opensWithCurrent && canOpenEncryptedDatabaseWithLegacySettings(dbFile, passphrase)
-            Log.i(
-                DB_MIGRATION_TAG,
+            Napier.i(
                 "Existing encrypted DB probe: opensWithCurrent=$opensWithCurrent needsLegacyHook=$needsLegacyHook",
+                tag = DB_MIGRATION_TAG,
             )
         }
 
-        Log.i(DB_MIGRATION_TAG, "Configuring SQLCipher open helper (existingDb=$hasExistingDb)")
+        Napier.i("Configuring SQLCipher open helper (existingDb=$hasExistingDb)", tag = DB_MIGRATION_TAG)
         val migrationHook =
             if (needsLegacyHook) {
-                Log.i(DB_MIGRATION_TAG, "Applying legacy SQLCipher compatibility hook before keying")
+                Napier.i("Applying legacy SQLCipher compatibility hook before keying", tag = DB_MIGRATION_TAG)
                 createLegacySqlCipherHook()
             } else {
                 null
@@ -69,15 +69,15 @@ fun getDatabaseBuilder(
             object : RoomDatabase.Callback() {
                 override fun onOpen(db: SupportSQLiteDatabase) {
                     super.onOpen(db)
-                    Log.i(DB_MIGRATION_TAG, "Running PRAGMA cipher_migrate on existing encrypted database")
+                    Napier.i("Running PRAGMA cipher_migrate on existing encrypted database", tag = DB_MIGRATION_TAG)
                     runCatching {
                         db.query("PRAGMA cipher_migrate").use { cursor ->
                             if (cursor.moveToFirst()) {
-                                Log.i(DB_MIGRATION_TAG, "cipher_migrate result=${cursor.getInt(0)}")
+                                Napier.i("cipher_migrate result=${cursor.getInt(0)}", tag = DB_MIGRATION_TAG)
                             }
                         }
                     }.onFailure { error ->
-                        Log.e(DB_MIGRATION_TAG, "PRAGMA cipher_migrate failed", error)
+                        Napier.e("PRAGMA cipher_migrate failed", error, tag = DB_MIGRATION_TAG)
                         throw error
                     }
                 }
@@ -102,79 +102,79 @@ fun migratePlaintextDatabaseIfNeeded(
 ) {
     val dbFile = context.applicationContext.getDatabasePath(DATABASE_NAME)
     if (!dbFile.exists()) {
-        Log.i(DB_MIGRATION_TAG, "No existing database file found; skipping plaintext migration")
+        Napier.i("No existing database file found; skipping plaintext migration", tag = DB_MIGRATION_TAG)
         return
     }
     System.loadLibrary("sqlcipher")
 
     if (!isPlaintextSqliteDatabase(dbFile)) {
         if (canOpenEncryptedDatabaseWithCurrentSettings(dbFile, passphrase)) {
-            Log.i(DB_MIGRATION_TAG, "Existing database opens with current SQLCipher settings; skipping plaintext migration")
+            Napier.i("Existing database opens with current SQLCipher settings; skipping plaintext migration", tag = DB_MIGRATION_TAG)
             return
         }
         if (canOpenEncryptedDatabaseWithLegacySettings(dbFile, passphrase)) {
-            Log.i(DB_MIGRATION_TAG, "Existing database opens with legacy SQLCipher settings; skipping plaintext migration")
+            Napier.i("Existing database opens with legacy SQLCipher settings; skipping plaintext migration", tag = DB_MIGRATION_TAG)
             return
         }
 
         val plaintextBackup = findLatestPlaintextBackup(dbFile)
         if (plaintextBackup != null && isPlaintextSqliteDatabase(plaintextBackup)) {
             val unreadableBackup = File(dbFile.parentFile, "$DATABASE_NAME.unreadable-backup-${System.currentTimeMillis()}")
-            Log.w(
-                DB_MIGRATION_TAG,
+            Napier.w(
                 "Database is neither plaintext nor openable with key. Restoring latest plaintext backup ${plaintextBackup.name} to recover safely.",
+                tag = DB_MIGRATION_TAG,
             )
             moveReplacing(dbFile, unreadableBackup)
             moveReplacing(plaintextBackup, dbFile)
-            Log.i(DB_MIGRATION_TAG, "Restored plaintext backup. Unreadable DB preserved at ${unreadableBackup.absolutePath}")
+            Napier.i("Restored plaintext backup. Unreadable DB preserved at ${unreadableBackup.absolutePath}", tag = DB_MIGRATION_TAG)
         } else {
-            Log.e(
-                DB_MIGRATION_TAG,
+            Napier.e(
                 "Existing database is not plaintext and cannot be opened with SQLCipher key; no plaintext backup available for safe recovery",
+                tag = DB_MIGRATION_TAG,
             )
             return
         }
     }
-    Log.w(DB_MIGRATION_TAG, "Detected plaintext SQLite DB. Starting one-time SQLCipher migration")
+    Napier.w("Detected plaintext SQLite DB. Starting one-time SQLCipher migration", tag = DB_MIGRATION_TAG)
 
     val tempEncryptedFile = File(dbFile.parentFile, "$DATABASE_NAME.sqlcipher-migrating")
     val backupBase = File(dbFile.parentFile, "$DATABASE_NAME.plaintext-backup-${System.currentTimeMillis()}")
     var movedOriginal = false
 
     runCatching { tempEncryptedFile.delete() }.onFailure { error ->
-        Log.w(DB_MIGRATION_TAG, "Failed to clear stale temp migration file: ${tempEncryptedFile.absolutePath}", error)
+        Napier.w("Failed to clear stale temp migration file: ${tempEncryptedFile.absolutePath}", error, tag = DB_MIGRATION_TAG)
     }
 
     try {
-        Log.i(DB_MIGRATION_TAG, "Exporting plaintext DB to encrypted temp file")
+        Napier.i("Exporting plaintext DB to encrypted temp file", tag = DB_MIGRATION_TAG)
         exportPlaintextDatabaseToEncrypted(
             plaintextFile = dbFile,
             encryptedFile = tempEncryptedFile,
             passphrase = passphrase,
         )
 
-        Log.i(DB_MIGRATION_TAG, "Validating encrypted temp database")
+        Napier.i("Validating encrypted temp database", tag = DB_MIGRATION_TAG)
         verifyEncryptedDatabase(encryptedFile = tempEncryptedFile, passphrase = passphrase)
 
-        Log.i(DB_MIGRATION_TAG, "Backing up original plaintext DB to ${backupBase.absolutePath}")
+        Napier.i("Backing up original plaintext DB to ${backupBase.absolutePath}", tag = DB_MIGRATION_TAG)
         moveIfExists(dbFile, backupBase)
         movedOriginal = true
         moveIfExists(File("${dbFile.absolutePath}-wal"), File("${backupBase.absolutePath}-wal"))
         moveIfExists(File("${dbFile.absolutePath}-shm"), File("${backupBase.absolutePath}-shm"))
         moveIfExists(File("${dbFile.absolutePath}-journal"), File("${backupBase.absolutePath}-journal"))
 
-        Log.i(DB_MIGRATION_TAG, "Replacing live DB with encrypted migration output")
+        Napier.i("Replacing live DB with encrypted migration output", tag = DB_MIGRATION_TAG)
         moveReplacing(tempEncryptedFile, dbFile)
-        Log.i(DB_MIGRATION_TAG, "Migrated plaintext DB to SQLCipher. Backup: ${backupBase.absolutePath}")
+        Napier.i("Migrated plaintext DB to SQLCipher. Backup: ${backupBase.absolutePath}", tag = DB_MIGRATION_TAG)
     } catch (error: Throwable) {
-        Log.e(DB_MIGRATION_TAG, "Plaintext to SQLCipher migration failed", error)
+        Napier.e("Plaintext to SQLCipher migration failed", error, tag = DB_MIGRATION_TAG)
         runCatching { tempEncryptedFile.delete() }
         if (movedOriginal && !dbFile.exists() && backupBase.exists()) {
             runCatching {
                 moveReplacing(backupBase, dbFile)
-                Log.w(DB_MIGRATION_TAG, "Restored original plaintext DB after migration failure")
+                Napier.w("Restored original plaintext DB after migration failure", tag = DB_MIGRATION_TAG)
             }.onFailure { rollbackError ->
-                Log.e(DB_MIGRATION_TAG, "Failed to restore original DB after migration failure", rollbackError)
+                Napier.e("Failed to restore original DB after migration failure", rollbackError, tag = DB_MIGRATION_TAG)
             }
         }
         throw error
@@ -232,9 +232,9 @@ private fun canOpenEncryptedDatabaseWithCurrentSettings(
 
     return runCatching { openAndPingEncryptedDatabase(encryptedFile, passphrase, hook = null) }
         .onFailure { error ->
-            Log.w(
-                DB_MIGRATION_TAG,
+            Napier.w(
                 "Database did not open with current SQLCipher settings: ${error::class.java.simpleName}: ${error.message}",
+                tag = DB_MIGRATION_TAG,
             )
         }.isSuccess
 }
@@ -250,9 +250,9 @@ private fun canOpenEncryptedDatabaseWithLegacySettings(
     return runCatching {
         openAndPingEncryptedDatabase(encryptedFile, passphrase, hook = createLegacySqlCipherHook())
     }.onFailure { error ->
-        Log.w(
-            DB_MIGRATION_TAG,
+        Napier.w(
             "Database did not open with legacy SQLCipher settings: ${error::class.java.simpleName}: ${error.message}",
+            tag = DB_MIGRATION_TAG,
         )
     }.isSuccess
 }
@@ -314,7 +314,7 @@ private fun createLegacySqlCipherHook(): SQLiteDatabaseHook =
         }
     }
 
-private fun isPlaintextSqliteDatabase(dbFile: File): Boolean {
+internal fun isPlaintextSqliteDatabase(dbFile: File): Boolean {
     if (!dbFile.isFile || dbFile.length() < SQLITE_FILE_HEADER.size) {
         return false
     }
@@ -326,7 +326,7 @@ private fun isPlaintextSqliteDatabase(dbFile: File): Boolean {
             bytesRead == SQLITE_FILE_HEADER.size && header.contentEquals(SQLITE_FILE_HEADER)
         }
     }.onFailure { error ->
-        Log.e(DB_MIGRATION_TAG, "Failed reading DB header for plaintext detection", error)
+        Napier.e("Failed reading DB header for plaintext detection", error, tag = DB_MIGRATION_TAG)
     }.getOrDefault(false)
 }
 

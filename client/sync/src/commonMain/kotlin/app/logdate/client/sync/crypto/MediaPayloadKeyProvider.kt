@@ -1,12 +1,12 @@
 package app.logdate.client.sync.crypto
 
+import app.logdate.client.device.crypto.AccountIdentityBackup
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
-import io.github.aakira.napier.Napier
 
 /**
  * Supplies the key media payloads are encrypted with.
@@ -24,48 +24,60 @@ class MediaPayloadKeyProvider(
     private val keyDerivation: KeyDerivation,
 ) {
     suspend fun getOrCreateKey(): ByteArray {
+        val legacy =
+            identityKeyManager.withIdentityMutation {
+                if (!identityKeyManager.hasIdentityKey()) {
+                    secureStorage
+                        .getBytes(
+                            KEY_STORAGE_KEY,
+                        )?.takeIf { it.size == KEY_LENGTH_BYTES }
+                } else {
+                    null
+                }
+            }
+        if (legacy != null) return legacy
+        return identityKeyManager.withIdentityKey { getOrCreateKeyLocked(it) }
+    }
+
+    suspend fun getAccountKeys(accountId: String): AccountIdentityBackup =
+        identityKeyManager.snapshotAccountKeys(accountId, ::getOrCreateKeyLocked)
+
+    private suspend fun getOrCreateKeyLocked(identityKey: ByteArray): ByteArray {
         val existing = secureStorage.getBytes(KEY_STORAGE_KEY)
-        if (existing != null && existing.size == KEY_LENGTH_BYTES) {
+        if (existing != null) {
+            check(existing.size == KEY_LENGTH_BYTES) { "Stored media key needs recovery" }
             return existing
         }
-        if (existing != null) {
-            // A stored key of the wrong length cannot decrypt anything that was encrypted with the
-            // real one. Replacing it silently is how key loss turns into unreadable media with no
-            // error, so say so before moving on.
-            Napier.e("Stored media key has the wrong length; deriving a fresh one")
-        }
-
-        identityKeyManager.ensureIdentityKey()
-        val derived =
-            keyDerivation.deriveKey(
-                identityKey = identityKeyManager.getIdentityKey(),
-                context = CONTEXT_MEDIA,
-                contentId = MEDIA_KEY_ID,
-            )
+        val derived = keyDerivation.deriveKey(identityKey, CONTEXT_MEDIA, MEDIA_KEY_ID)
         secureStorage.putBytes(KEY_STORAGE_KEY, derived)
         return derived
     }
 
     /**
-     * Forgets the cached media key so the next [getOrCreateKey] re-derives it from the current
+     * Forgets the cached media key so the next [getOrCreateKey] selects its retained key or derives one from the current
      * identity key. Call after recovering a different identity: the cache otherwise keeps serving
      * a key derived from whatever identity minted it, silently wrong for media encrypted under
      * the newly-recovered one.
      */
-    suspend fun clearCachedKey() {
-        secureStorage.remove(KEY_STORAGE_KEY)
-    }
+    suspend fun clearCachedKey() =
+        identityKeyManager.withIdentityMutation {
+            secureStorage.remove(KEY_STORAGE_KEY)
+        }
 
-    suspend fun canInstallAccountKey(key: ByteArray): Boolean {
-        val existing = secureStorage.getBytes(KEY_STORAGE_KEY)
-        return key.size == KEY_LENGTH_BYTES && (existing == null || existing.contentEquals(key))
-    }
+    suspend fun canInstallAccountKey(key: ByteArray): Boolean =
+        identityKeyManager.withIdentityMutation {
+            val existing = secureStorage.getBytes(KEY_STORAGE_KEY)
+            key.size == KEY_LENGTH_BYTES && (existing == null || existing.contentEquals(key))
+        }
 
     suspend fun installAccountKey(key: ByteArray) {
-        require(key.size == KEY_LENGTH_BYTES) { "Invalid media key length" }
-        val existing = secureStorage.getBytes(KEY_STORAGE_KEY)
-        require(existing == null || existing.contentEquals(key)) { "Local media key conflicts with account key" }
-        secureStorage.putBytes(KEY_STORAGE_KEY, key)
+        identityKeyManager.withIdentityMutation {
+            require(key.size == KEY_LENGTH_BYTES) { "Invalid media key length" }
+            val existing = secureStorage.getBytes(KEY_STORAGE_KEY)
+            require(existing == null || existing.contentEquals(key)) { "Local media key conflicts with account key" }
+            secureStorage.putBytes(KEY_STORAGE_KEY, key)
+        }
+        identityKeyManager.ensureExistingIdentityBackup()
     }
 
     private companion object {

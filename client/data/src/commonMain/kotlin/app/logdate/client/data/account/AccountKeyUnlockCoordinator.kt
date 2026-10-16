@@ -33,8 +33,9 @@ class AccountKeyUnlockCoordinator(
         }
         if (!mayPublishLocalKeys || !identity.hasIdentityKey()) return AccountKeyUnlockStatus.APPROVAL_REQUIRED
         require(identity.bindToAccount(accountId)) { "Local keys belong to another account" }
-        val rootKey = identity.getIdentityKey()
-        val mediaKey = media.getOrCreateKey()
+        val snapshot = media.getAccountKeys(accountId)
+        val rootKey = snapshot.key
+        val mediaKey = requireNotNull(snapshot.mediaKey)
         try {
             val sealed = Base64.encode(cipher.seal(accountId, credentialId, unlockSecret, rootKey, mediaKey))
             api.store(apiBaseUrl, accessToken, credentialId, sealed).getOrElse { failure ->
@@ -61,8 +62,7 @@ class AccountKeyUnlockCoordinator(
         val keys = cipher.open(accountId, credentialId, secret, bytes)
         try {
             require(media.canInstallAccountKey(keys.media)) { "Local media key conflicts with account key" }
-            identity.installAccountKey(accountId, keys.identity)
-            media.installAccountKey(keys.media)
+            identity.installAccountKey(accountId, keys.identity, keys.media)
         } finally {
             keys.identity.fill(0)
             keys.media.fill(0)

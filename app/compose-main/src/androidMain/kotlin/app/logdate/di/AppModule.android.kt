@@ -181,7 +181,7 @@ actual val appModule: Module =
         workerOf(::CalendarImportWorker)
 
         single { CloudBackupScheduler(androidContext()) }
-        single { CloudRestoreScheduler(androidContext()) }
+        single { CloudRestoreScheduler(androidContext(), get()) }
         workerOf(::CloudBackupWorker)
 
         single {

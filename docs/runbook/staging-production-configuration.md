@@ -89,9 +89,10 @@ The shared app default is production cloud:
 - `gradle.properties` sets `logdate.origin=logdate.app` and
   `logdate.apiBaseUrl=https://logdate.app` for generated app BuildConfig
   values used by deep links and origin classification.
-- Override `logdate.origin` or `logdate.apiBaseUrl` in `local.properties`, CI
-  Gradle properties, or an explicit local Gradle invocation when testing a
-  non-production backend.
+- Set `-Plogdate.backendUrl=https://cloud-staging.logdate.app` when building
+  against staging. `shared/config/build.gradle.kts` uses this Gradle property
+  to generate the shared client's default backend URL. Changing `logdate.origin`
+  or `logdate.apiBaseUrl` does not change that backend default.
 
 This default is intentional for shipped builds: users should not land on
 staging by accident. It also means staging app testing must be explicit; never

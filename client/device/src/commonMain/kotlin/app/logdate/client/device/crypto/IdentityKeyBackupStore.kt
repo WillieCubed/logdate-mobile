@@ -6,9 +6,9 @@ package app.logdate.client.device.crypto
  * device-to-device transfer, or a cloud restore onto a new phone that leaves the platform
  * keystore empty even though the account already has data in the cloud.
  *
- * Only the recovery phrase is kept here, never the derived identity key itself -- the key is
- * deterministically re-derived from the phrase (see [IdentityKeyManager.setupNewIdentity]), so
- * backing up the phrase is enough to restore the key on a new device.
+ * Phrase-derived identities retain their recovery phrase. Implementations supporting
+ * phrase-less account identities also retain an account-bound key through the same
+ * protected native transport. Writing either representation replaces the other.
  *
  * Implementations trade the hardware-backed defense-in-depth of [app.logdate.client.device.storage.SecureStorage]
  * for durability across exactly the transfers that break it: an Android file mirrored into the
@@ -17,6 +17,18 @@ package app.logdate.client.device.crypto
  * irrecoverably orphaning a user's already-synced data.
  */
 interface IdentityKeyBackupStore {
+    suspend fun readAccountIdentity(): AccountIdentityBackup? = null
+
+    suspend fun writeAccountIdentity(identity: AccountIdentityBackup) = clear()
+
+    suspend fun readMediaIdentity(identityBinding: String): MediaIdentityBackup? = null
+
+    suspend fun hasMediaBackup(): Boolean = false
+
+    suspend fun writeMediaIdentity(identity: MediaIdentityBackup) = Unit
+
+    suspend fun hasBackup(): Boolean = readPhrase() != null || readAccountIdentity() != null || hasMediaBackup()
+
     /**
      * Reads the backed-up recovery phrase, or null if no backup exists or it's unreadable.
      */
@@ -32,6 +44,17 @@ interface IdentityKeyBackupStore {
      */
     suspend fun clear()
 }
+
+class AccountIdentityBackup(
+    val accountId: String,
+    val key: ByteArray,
+    val mediaKey: ByteArray? = null,
+)
+
+class MediaIdentityBackup(
+    val identityBinding: String,
+    val key: ByteArray,
+)
 
 /**
  * A backup store that never has anything to restore and silently discards writes.

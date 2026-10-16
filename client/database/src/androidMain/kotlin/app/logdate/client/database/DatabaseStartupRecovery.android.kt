@@ -1,8 +1,8 @@
 package app.logdate.client.database
 
 import android.content.Context
-import android.util.Log
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +13,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 sealed interface DatabaseStartupState {
+    data object Initializing : DatabaseStartupState
+
     data object Ready : DatabaseStartupState
 
     data class RecoveryRequired(
@@ -22,12 +24,12 @@ sealed interface DatabaseStartupState {
 }
 
 class DatabaseStartupMonitor {
-    private val _state = MutableStateFlow<DatabaseStartupState>(DatabaseStartupState.Ready)
+    private val _state = MutableStateFlow<DatabaseStartupState>(DatabaseStartupState.Initializing)
     val state: StateFlow<DatabaseStartupState> = _state.asStateFlow()
 
     fun markReady() {
         _state.value = DatabaseStartupState.Ready
-        Log.i(DB_RECOVERY_TAG, "Database startup state: Ready")
+        Napier.i("Database startup state: Ready", tag = DB_RECOVERY_TAG)
     }
 
     fun markRecoveryRequired(error: Throwable) {
@@ -35,7 +37,7 @@ class DatabaseStartupMonitor {
         val reason = classifyRecoveryReason(rootCause.message.orEmpty())
         val detail = "${rootCause::class.java.simpleName}: ${rootCause.message ?: "unknown"}"
         _state.value = DatabaseStartupState.RecoveryRequired(reason = reason, detail = detail)
-        Log.e(DB_RECOVERY_TAG, "Database startup state: RecoveryRequired ($reason)")
+        Napier.e("Database startup state: RecoveryRequired ($reason)", tag = DB_RECOVERY_TAG)
     }
 }
 
@@ -55,10 +57,7 @@ class DatabaseRecoveryController(
                         "$DATABASE_NAME.recovery-backup-${System.currentTimeMillis()}",
                     )
 
-                Log.w(
-                    DB_RECOVERY_TAG,
-                    "Reset requested. Quarantining current encrypted DB before clearing key.",
-                )
+                Napier.w("Reset requested. Quarantining current encrypted DB before clearing key.", tag = DB_RECOVERY_TAG)
                 moveIfExists(dbFile, backupBase)
                 moveIfExists(File("${dbFile.absolutePath}-wal"), File("${backupBase.absolutePath}-wal"))
                 moveIfExists(File("${dbFile.absolutePath}-shm"), File("${backupBase.absolutePath}-shm"))
@@ -67,10 +66,7 @@ class DatabaseRecoveryController(
                 passphraseProvider.clearPassphrase()
                 startupMonitor.markReady()
 
-                Log.w(
-                    DB_RECOVERY_TAG,
-                    "Encrypted DB/key reset complete. Backup preserved at ${backupBase.absolutePath}",
-                )
+                Napier.w("Encrypted DB/key reset complete. Backup preserved at ${backupBase.absolutePath}", tag = DB_RECOVERY_TAG)
 
                 backupBase
             }

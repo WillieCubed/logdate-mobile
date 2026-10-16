@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.device.restore.NativeBackupStatus
 import app.logdate.client.domain.journals.MergeJournalsUseCase
 import app.logdate.client.repository.journals.JournalMergeOperation
 import app.logdate.ui.common.SettingsScaffold
@@ -70,12 +71,14 @@ fun SyncSettingsScreen(
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
     onNavigateToRecoveryPhrase: () -> Unit = {},
+    onNavigateToExport: () -> Unit = {},
     onRecoverJournalMerge: (JournalMergeOperation) -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
     mergeJournals: MergeJournalsUseCase = koinInject(),
 ) {
     val mergeIssues by remember(mergeJournals) { mergeJournals.observeIssues() }.collectAsState(emptyList())
     val uiState by viewModel.uiState.collectAsState()
+    val nativeBackupStatus by viewModel.nativeBackupStatus.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // This screen owns the Sync Now the user actually reaches from Settings, so it reports the
@@ -139,6 +142,8 @@ fun SyncSettingsScreen(
         onRecoverJournalMerge = onRecoverJournalMerge,
         syncStatus = uiState.syncStatus,
         cloudArchiveStatus = uiState.cloudArchiveStatus,
+        nativeBackupStatus = nativeBackupStatus,
+        onExportArchive = onNavigateToExport,
         isAuthenticated = isAuthenticated,
         onSyncNow = { viewModel.syncNow() },
         onSyncUsingMobileData = { viewModel.syncNow(allowMeteredMedia = true) },
@@ -157,6 +162,8 @@ fun SyncSettingsContent(
     onBack: () -> Unit,
     syncStatus: app.logdate.client.sync.SyncStatus?,
     cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
+    nativeBackupStatus: NativeBackupStatus = NativeBackupStatus.Unsupported,
+    onExportArchive: () -> Unit = {},
     isAuthenticated: Boolean,
     onSyncNow: () -> Unit,
     onSyncUsingMobileData: () -> Unit = {},
@@ -177,12 +184,17 @@ fun SyncSettingsContent(
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     ) {
+        if (nativeBackupStatus is NativeBackupStatus.Available) {
+            item {
+                NativeBackupSettingsSection(nativeBackupStatus, onExportArchive, Modifier.padding(horizontal = Spacing.lg))
+            }
+        }
         item {
             if (!isAuthenticated) {
                 SyncPromoContent(
                     onCreateAccount = onNavigateToCloudAccountCreation,
                     onSignIn = onNavigateToSignIn,
-                    modifier = Modifier.fillParentMaxHeight(),
+                    modifier = if (nativeBackupStatus is NativeBackupStatus.Available) Modifier else Modifier.fillParentMaxHeight(),
                 )
             } else {
                 BackupStatusItem(

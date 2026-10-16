@@ -11,7 +11,11 @@ import org.koin.dsl.module
 actual val databaseModule: Module =
     module {
         single { PassphraseBackupStore(androidContext()) }
-        single { DatabasePassphraseProvider(get(), get()) }
+        single {
+            DatabasePassphraseProvider(get(), get()) {
+                retainedDatabaseNeedsExistingKey(androidContext().getDatabasePath(DATABASE_NAME))
+            }
+        }
         single { DatabaseStartupMonitor() }
         single { DatabaseRecoveryController(androidContext(), get(), get()) }
         single {
@@ -19,10 +23,9 @@ actual val databaseModule: Module =
             val startupMonitor: DatabaseStartupMonitor = get()
 
             Napier.i("Startup: encrypted database initialization starting")
-            val passphrase = runBlocking { get<DatabasePassphraseProvider>().getOrCreatePassphrase() }
-            Napier.i("Startup: loaded database passphrase (${passphrase.size} bytes)")
 
             runCatching {
+                val passphrase = runBlocking { get<DatabasePassphraseProvider>().getOrCreatePassphrase() }
                 migratePlaintextDatabaseIfNeeded(context, passphrase)
                 val database =
                     getRoomDatabase(
@@ -48,3 +51,6 @@ actual val databaseModule: Module =
         }
         includes(daosModule)
     }
+
+internal fun retainedDatabaseNeedsExistingKey(file: java.io.File): Boolean =
+    file.exists() && file.length() > 0L && !isPlaintextSqliteDatabase(file)

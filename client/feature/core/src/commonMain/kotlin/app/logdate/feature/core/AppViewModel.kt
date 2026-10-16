@@ -9,6 +9,9 @@ import app.logdate.client.networking.NetworkState
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.user.AppSecurityLevel
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +21,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.TimeSource
 
 /**
  * A view model that provides app-wide state and actions.
@@ -34,6 +39,9 @@ class AppViewModel(
     private val appLockState = MutableStateFlow(AppLockState.Unlocked)
     private val securityLevelState = MutableStateFlow(AppSecurityLevel.NONE)
     private var hasAttemptedCloudRestoreSignIn = false
+    private var pendingNativeRecovery: NativeAccountRecoveryRequest? = null
+    private var nativeRecoveryJob: Job? = null
+    private var lastNativeFailure: kotlin.time.TimeMark? = null
 
     private val networkState: Flow<NetworkState> = networkMonitor.observeNetwork()
 
@@ -66,6 +74,9 @@ class AppViewModel(
 
     init {
         viewModelScope.launch {
+            networkState.collect { if (it is NetworkState.Connected) retryPendingNativeRecovery() }
+        }
+        viewModelScope.launch {
             var isInitialEmission = true
             userStateRepository.userData.collect { userData ->
                 val newLevel = userData.securityLevel
@@ -94,33 +105,71 @@ class AppViewModel(
     }
 
     /**
-     * Silently attempts to sign into the cloud account using a restore credential from the
-     * device's backup after Android startup has detected a cloud restore.
+     * Recovers account access independently of native content delivery. Transferred
+     * journals do not need an archive import merely because their session was not portable.
      */
-    fun tryRestoreSignInAfterCloudRestore() {
+    fun tryRestoreSignInAfterCloudRestore(
+        recoverMissingContent: Boolean = true,
+        onAccountResolved: () -> Unit = {},
+    ) {
         if (hasAttemptedCloudRestoreSignIn) return
-        hasAttemptedCloudRestoreSignIn = true
-
-        viewModelScope.launch {
-            tryRestoreSignInAfterCloudRestoreInternal()
-        }
+        pendingNativeRecovery = NativeAccountRecoveryRequest(recoverMissingContent, onAccountResolved)
+        retryPendingNativeRecovery()
     }
 
-    private suspend fun tryRestoreSignInAfterCloudRestoreInternal() {
-        val userData = userStateRepository.userData.first()
-        if (!userData.isOnboarded) return
-        if (sessionStorage.hasValidSession()) return
+    private fun retryPendingNativeRecovery() {
+        val request = pendingNativeRecovery ?: return
+        if (nativeRecoveryJob?.isActive == true) return
+        hasAttemptedCloudRestoreSignIn = true
+        nativeRecoveryJob =
+            viewModelScope.launch {
+                val elapsed = lastNativeFailure?.elapsedNow()?.inWholeMilliseconds ?: RETRY_DELAY_MS
+                delay((RETRY_DELAY_MS - elapsed).coerceAtLeast(0))
+                try {
+                    val resolved =
+                        withTimeoutOrNull(ATTEMPT_TIMEOUT_MS) {
+                            tryRestoreSignInAfterCloudRestoreInternal(request.recoverMissingContent, request.onAccountResolved)
+                        } == true
+                    if (resolved && pendingNativeRecovery === request) pendingNativeRecovery = null
+                    if (!resolved) lastNativeFailure = TimeSource.Monotonic.markNow()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    lastNativeFailure = TimeSource.Monotonic.markNow()
+                    Napier.w("Native account recovery remains pending")
+                } finally {
+                    hasAttemptedCloudRestoreSignIn = pendingNativeRecovery == null
+                }
+            }
+    }
+
+    private suspend fun tryRestoreSignInAfterCloudRestoreInternal(
+        recoverMissingContent: Boolean,
+        onAccountResolved: () -> Unit,
+    ): Boolean {
+        if (sessionStorage.hasValidSession()) {
+            onAccountResolved()
+            if (recoverMissingContent) onCloudRestoreSignIn()
+            return true
+        }
+        networkState.first { it is NetworkState.Connected }
 
         Napier.i("Cloud restore detected with no valid session — attempting restore sign-in")
-        when (val result = tryRestoreSignInUseCase()) {
+        return when (val result = tryRestoreSignInUseCase()) {
             is TryRestoreSignInUseCase.Result.Success -> {
                 Napier.i("Restore sign-in succeeded for ${result.account.username}")
-                onCloudRestoreSignIn()
+                onAccountResolved()
+                if (recoverMissingContent) onCloudRestoreSignIn()
+                true
             }
-            is TryRestoreSignInUseCase.Result.NoCredential ->
+            is TryRestoreSignInUseCase.Result.NoCredential -> {
                 Napier.d("No restore credential on cloud-restored device — using manual sign-in")
-            is TryRestoreSignInUseCase.Result.Error ->
+                false
+            }
+            is TryRestoreSignInUseCase.Result.Error -> {
                 Napier.i("Restore sign-in fell back to manual sign-in: ${result.message}")
+                false
+            }
         }
     }
 
@@ -141,10 +190,22 @@ class AppViewModel(
     /**
      * Marks the app as locked when it moves to the background.
      */
+    fun onAppForegrounded() = retryPendingNativeRecovery()
+
     fun onAppBackgrounded() {
         if (securityLevelState.value == AppSecurityLevel.BIOMETRIC) {
             appLockState.value = AppLockState.Locked
         }
+    }
+
+    private class NativeAccountRecoveryRequest(
+        val recoverMissingContent: Boolean,
+        val onAccountResolved: () -> Unit,
+    )
+
+    private companion object {
+        const val RETRY_DELAY_MS = 15_000L
+        const val ATTEMPT_TIMEOUT_MS = 30_000L
     }
 }
 

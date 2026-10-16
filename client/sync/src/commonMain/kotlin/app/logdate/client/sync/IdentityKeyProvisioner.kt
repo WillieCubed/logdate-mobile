@@ -57,6 +57,7 @@ internal class IdentityKeyProvisioner(
                 identityRecoveryNeededStore.setNeeded(true)
                 return
             }
+            manager.ensureExistingIdentityBackup()
             if (identityRecoveryNeededStore.isNeeded()) identityRecoveryNeededStore.setNeeded(false)
             return
         }

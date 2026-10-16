@@ -1,5 +1,6 @@
 package app.logdate.client.device.crypto
 
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
@@ -20,7 +21,17 @@ val cryptoModule: Module =
         // These must be provided by platform-specific modules
 
         // Common crypto services
-        single { IdentityKeyManager(secureStorage = get(), cryptoManager = get(), backupStore = get()) }
+        single {
+            IdentityKeyManager(
+                secureStorage = get(),
+                cryptoManager = get(),
+                backupStore = get(),
+                expectedAccountOwner = {
+                    val owner = get<CanonicalOwnerProvider>()
+                    if (owner.hasBoundOwner()) owner.getCanonicalOwnerId() else null
+                },
+            )
+        }
         singleOf(::KeyDerivation)
         singleOf(::ContentEncryptionService)
     }

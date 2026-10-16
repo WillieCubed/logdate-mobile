@@ -3,6 +3,9 @@ package app.logdate.client.database.encryption
 import android.content.Context
 import io.github.aakira.napier.Napier
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -27,6 +30,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 class PassphraseBackupStore(
     private val context: Context,
 ) {
+    fun hasBackup(): Boolean = backupFile().exists()
+
     /**
      * Reads the backup passphrase, or null if no backup exists or it's unreadable.
      */
@@ -34,11 +39,12 @@ class PassphraseBackupStore(
         runCatching {
             val file = backupFile()
             if (!file.exists()) return null
+            check(file.length() in 1..128) { "Invalid database recovery key size" }
             val encoded = file.readText().trim()
             if (encoded.isEmpty()) return null
             Base64.decode(encoded)
-        }.getOrElse { error ->
-            Napier.w("Failed to read passphrase backup", error)
+        }.getOrElse {
+            Napier.w("Database recovery key could not be read")
             null
         }
 
@@ -46,13 +52,14 @@ class PassphraseBackupStore(
      * Writes the passphrase to the backup file.
      */
     fun write(passphrase: ByteArray) {
-        runCatching {
-            val file = backupFile()
-            file.parentFile?.mkdirs()
-            file.writeText(Base64.encode(passphrase))
-        }.onFailure { error ->
-            Napier.w("Failed to write passphrase backup", error)
+        val file = backupFile()
+        file.parentFile?.mkdirs()
+        val temporary = File(file.parentFile, "${file.name}.part")
+        FileOutputStream(temporary).use {
+            it.write(Base64.encode(passphrase).encodeToByteArray())
+            it.fd.sync()
         }
+        Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
     }
 
     /**

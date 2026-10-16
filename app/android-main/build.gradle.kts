@@ -587,6 +587,7 @@ dependencies {
     androidTestImplementation(libs.ktor.client.core)
     androidTestImplementation(libs.ktor.client.okhttp)
     androidTestImplementation(libs.room.runtime)
+    androidTestImplementation(libs.sqlcipher.android)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)

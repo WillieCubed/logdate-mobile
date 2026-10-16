@@ -14,7 +14,7 @@ import androidx.credentials.exceptions.restorecredential.E2eeUnavailableExceptio
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import io.github.aakira.napier.Napier
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -35,13 +35,19 @@ class AndroidRestoreCredentialManager(
 
     override suspend fun createRestoreKey(options: PasskeyRegistrationOptions): Result<String> =
         try {
-            val request = CreateRestoreCredentialRequest(buildRestoreRegistrationJson(options))
-            val response = credentialManager.createCredential(context, request) as CreateRestoreCredentialResponse
+            val response =
+                createRestoreCredentialWithFallback { cloudBackupEnabled ->
+                    val request =
+                        CreateRestoreCredentialRequest(
+                            buildRestoreRegistrationJson(options),
+                            isCloudBackupEnabled = cloudBackupEnabled,
+                        )
+                    credentialManager.createCredential(context, request) as CreateRestoreCredentialResponse
+                }
             Napier.i("Restore key created successfully")
             Result.success(response.responseJson)
-        } catch (e: E2eeUnavailableException) {
-            Napier.w("E2EE backup unavailable — restore key creation skipped", e)
-            Result.failure(RestoreCredentialError.BackupUnavailable(e))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to create restore key", e)
             Result.failure(RestoreCredentialError.Unknown("Failed to create restore key", e))
@@ -62,6 +68,8 @@ class AndroidRestoreCredentialManager(
                     Result.failure(RestoreCredentialError.Unknown("Unexpected restore credential type"))
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: NoCredentialException) {
             Napier.d("No restore credential on device — proceeding with normal sign-in flow")
             Result.failure(RestoreCredentialError.NoCredential(e))
@@ -84,13 +92,15 @@ class AndroidRestoreCredentialManager(
             credentialManager.clearCredentialState(ClearCredentialStateRequest(ClearCredentialStateRequest.TYPE_CLEAR_RESTORE_CREDENTIAL))
             Napier.i("Restore credential cleared")
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.w("Failed to clear restore credential (non-fatal)", e)
             Result.failure(RestoreCredentialError.Unknown("Failed to clear restore credential", e))
         }
 }
 
-private fun buildRestoreRegistrationJson(options: PasskeyRegistrationOptions): String =
+internal fun buildRestoreRegistrationJson(options: PasskeyRegistrationOptions): String =
     buildJsonObject {
         putJsonObject("rp") {
             put("id", options.rpId)
@@ -118,7 +128,14 @@ private fun buildRestoreRegistrationJson(options: PasskeyRegistrationOptions): S
         }
         put("timeout", options.timeout)
         putJsonArray("excludeCredentials") {
-            options.excludeCredentials.forEach { add(JsonPrimitive(it)) }
+            options.excludeCredentials.forEach { id ->
+                add(
+                    buildJsonObject {
+                        put("type", "public-key")
+                        put("id", id)
+                    },
+                )
+            }
         }
         putJsonObject("authenticatorSelection") {
             put("requireResidentKey", false)
@@ -128,13 +145,28 @@ private fun buildRestoreRegistrationJson(options: PasskeyRegistrationOptions): S
         put("attestation", "none")
     }.toString()
 
-private fun buildRestoreAuthenticationJson(options: PasskeyAuthenticationOptions): String =
+internal fun buildRestoreAuthenticationJson(options: PasskeyAuthenticationOptions): String =
     buildJsonObject {
         put("challenge", options.challenge)
         put("timeout", options.timeout)
         put("rpId", options.rpId)
         putJsonArray("allowCredentials") {
-            options.allowCredentials.forEach { add(JsonPrimitive(it)) }
+            options.allowCredentials.forEach { id ->
+                add(
+                    buildJsonObject {
+                        put("type", "public-key")
+                        put("id", id)
+                    },
+                )
+            }
         }
-        put("userVerification", "preferred")
+        put("userVerification", "discouraged")
     }.toString()
+
+internal suspend fun <T> createRestoreCredentialWithFallback(create: suspend (Boolean) -> T): T =
+    try {
+        create(true)
+    } catch (_: E2eeUnavailableException) {
+        Napier.i("Cloud encryption unavailable; creating a local device-transfer restore credential")
+        create(false)
+    }

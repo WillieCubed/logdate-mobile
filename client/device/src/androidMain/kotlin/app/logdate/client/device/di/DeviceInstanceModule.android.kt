@@ -1,13 +1,12 @@
 package app.logdate.client.device.di
 
-import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AndroidAccountManager
 import app.logdate.client.device.AndroidAppInfoProvider
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.PlatformAccountManager
-import app.logdate.client.device.identity.DefaultDeviceIdProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.storage.AndroidSecureStorage
@@ -56,7 +55,7 @@ actual val deviceInstanceModule: Module =
 
         // New device ID provider using KeyValueStorage
         single(named("modernDeviceIdProvider")) {
-            DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+            get<DeviceIdProvider>()
         }
 
         // Provide the Android-specific app info provider

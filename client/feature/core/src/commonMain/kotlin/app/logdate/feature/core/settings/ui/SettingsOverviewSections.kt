@@ -213,14 +213,13 @@ internal fun SettingsDataSection(
         title = stringResource(Res.string.settings_group_data_storage),
         modifier = Modifier.padding(horizontal = Spacing.lg),
     ) {
-        if (userProfile.isAuthenticated) {
-            SettingsNavigationItem(
-                title = stringResource(Res.string.sync_and_backup),
-                description = stringResource(Res.string.sync_and_backup_description),
-                icon = { Icon(Icons.Default.Sync, contentDescription = null) },
-                onClick = onNavigateToSync,
-            )
-        } else {
+        SettingsNavigationItem(
+            title = stringResource(Res.string.sync_and_backup),
+            description = stringResource(Res.string.sync_and_backup_description),
+            icon = { Icon(Icons.Default.Sync, contentDescription = null) },
+            onClick = onNavigateToSync,
+        )
+        if (!userProfile.isAuthenticated) {
             SyncPromotionCard(
                 onCreateAccount = onNavigateToCloudAccountCreation,
                 onSignIn = onNavigateToSignIn,

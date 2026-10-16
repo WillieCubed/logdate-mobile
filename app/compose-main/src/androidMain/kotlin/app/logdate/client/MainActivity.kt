@@ -71,6 +71,7 @@ import app.logdate.ui.keyboard.appKeyboardShortcutGroups
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -115,7 +116,7 @@ class MainActivity : FragmentActivity() {
     private var appUiState by mutableStateOf<GlobalAppUiState>(GlobalAppUiLoadingState)
     private var pendingNavKey by mutableStateOf<NavKey?>(null)
     private var currentNavKey by mutableStateOf<NavKey?>(null)
-    private var databaseStartupState by mutableStateOf<DatabaseStartupState>(DatabaseStartupState.Ready)
+    private var databaseStartupState by mutableStateOf<DatabaseStartupState>(DatabaseStartupState.Initializing)
     private val launchTracker = LaunchStageTracker()
     private var hasCheckedForAppUpdates by mutableStateOf(false)
     private var hasDetectedPostRestore by mutableStateOf(false)
@@ -259,7 +260,9 @@ class MainActivity : FragmentActivity() {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.uiState
-                        .onEach { state ->
+                        .combine(databaseStartupMonitor.state) { ui, database -> ui to database }
+                        .onEach { (state, database) ->
+                            databaseStartupState = database
                             appUiState = state
                             if (state is GlobalAppUiLoadedState) {
                                 markLaunchStage(LaunchStage.AppUiLoaded)
@@ -343,6 +346,7 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun resumeReadyActivity() {
+        viewModel.onAppForegrounded()
         locationTrackingManager.onActivityResumed()
         activityProvider.currentActivity = this
         lifecycleScope.launch {
@@ -363,31 +367,32 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun detectPostRestoreOnce(state: GlobalAppUiLoadedState) {
-        if (hasDetectedPostRestore) return
+        if (hasDetectedPostRestore || databaseStartupState is DatabaseStartupState.Initializing) return
         hasDetectedPostRestore = true
 
-        var detected = postRestoreDetector.detect(isOnboarded = state.isOnboarded)
-
-        if (detected == PostRestoreType.DEVICE_TRANSFER &&
-            databaseStartupState is DatabaseStartupState.RecoveryRequired
-        ) {
-            Napier.w(
-                "D2D restore detected but database recovery required — " +
-                    "passphrase backup was missing, treating as cloud restore",
-                tag = APP_LAUNCH_TAG,
+        val detected = postRestoreDetector.detect(isOnboarded = state.isOnboarded)
+        if (postRestoreDetector.isAccountRecoveryPending() || detected == PostRestoreType.CONTENT_MISSING) {
+            val accountDelivery = postRestoreDetector.pendingAccountRecoveryId()
+            viewModel.tryRestoreSignInAfterCloudRestore(
+                recoverMissingContent =
+                    detected == PostRestoreType.CONTENT_MISSING &&
+                        databaseStartupState !is DatabaseStartupState.RecoveryRequired,
+                onAccountResolved = { if (accountDelivery != null) postRestoreDetector.acknowledgeAccountRecovery(accountDelivery) },
             )
-            detected = PostRestoreType.CLOUD_RESTORE
         }
 
         when (detected) {
             PostRestoreType.NONE -> postRestoreDetector.markDeviceInitialized()
-            PostRestoreType.DEVICE_TRANSFER -> {
-                Napier.i("D2D restore: database opened successfully, writing sentinel", tag = APP_LAUNCH_TAG)
-                postRestoreDetector.markDeviceInitialized()
+            PostRestoreType.CONTENT_RESTORED -> {
+                if (databaseStartupState !is DatabaseStartupState.RecoveryRequired) {
+                    postRestoreDetector.markDeviceInitialized()
+                }
             }
-            PostRestoreType.CLOUD_RESTORE -> {
-                Napier.i("Cloud restore: showing contextual UI", tag = APP_LAUNCH_TAG)
-                viewModel.tryRestoreSignInAfterCloudRestore()
+            PostRestoreType.RECOVERY_REQUIRED -> {
+                Napier.w("Native restore delivery state needs recovery", tag = APP_LAUNCH_TAG)
+            }
+            PostRestoreType.CONTENT_MISSING -> {
+                Napier.i("Native restore needs journal content recovery", tag = APP_LAUNCH_TAG)
             }
         }
     }

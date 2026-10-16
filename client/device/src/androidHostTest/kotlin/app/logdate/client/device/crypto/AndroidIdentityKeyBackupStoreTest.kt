@@ -5,10 +5,13 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import kotlin.io.encoding.Base64
 import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -28,6 +31,107 @@ class AndroidIdentityKeyBackupStoreTest {
             every { it.filesDir } returns tempDir
         }
     private val store = AndroidIdentityKeyBackupStore(context)
+
+    @Test
+    fun `paired account identity and independent media key survive one portable write`() =
+        runTest {
+            val root = ByteArray(32) { 7 }
+            val media = ByteArray(32) { 8 }
+            store.writeAccountIdentity(AccountIdentityBackup("fixture-account", root, media))
+            val restored = AndroidIdentityKeyBackupStore(context).readAccountIdentity()
+            assertContentEquals(root, restored?.key)
+            assertContentEquals(media, restored?.mediaKey)
+        }
+
+    @Test
+    fun `explicit identity recovery selects its own media key while retaining the earlier key`() =
+        runTest {
+            val first = MediaIdentityBackup(Base64.encode(ByteArray(32) { 6 }), ByteArray(32) { 8 })
+            val second = MediaIdentityBackup(Base64.encode(ByteArray(32) { 7 }), ByteArray(32) { 9 })
+            store.writeMediaIdentity(first)
+            store.writeMediaIdentity(second)
+            val reopened = AndroidIdentityKeyBackupStore(context)
+            assertContentEquals(first.key, reopened.readMediaIdentity(first.identityBinding)?.key)
+            assertContentEquals(second.key, reopened.readMediaIdentity(second.identityBinding)?.key)
+        }
+
+    @Test
+    fun `a different key for the same identity cannot replace retained media material`() =
+        runTest {
+            val first = MediaIdentityBackup(Base64.encode(ByteArray(32) { 6 }), ByteArray(32) { 8 })
+            store.writeMediaIdentity(first)
+            assertFailsWith<IllegalStateException> {
+                store.writeMediaIdentity(MediaIdentityBackup(first.identityBinding, ByteArray(32) { 9 }))
+            }
+            assertContentEquals(first.key, store.readMediaIdentity(first.identityBinding)?.key)
+        }
+
+    @Test
+    fun `independent media key survives native backup store reopening`() =
+        runTest {
+            val identity = MediaIdentityBackup(Base64.encode(ByteArray(32) { 6 }), ByteArray(32) { 8 })
+            store.writeMediaIdentity(identity)
+            val restored = AndroidIdentityKeyBackupStore(context).readMediaIdentity(identity.identityBinding)
+            assertEquals(identity.identityBinding, restored?.identityBinding)
+            assertContentEquals(identity.key, restored?.key)
+        }
+
+    @Test
+    fun `corrupted media recovery key is retained and refused`() =
+        runTest {
+            val file =
+                File(tempDir, "identity_recovery/media_key_backup").apply {
+                    parentFile?.mkdirs()
+                    writeText("truncated")
+                }
+            assertFailsWith<IllegalStateException> { store.readMediaIdentity("binding") }
+            assertEquals("truncated", file.readText())
+        }
+
+    @Test
+    fun `phrase-less account identity survives a new backup store instance`() =
+        runTest {
+            val key = ByteArray(32) { 7 }
+            store.writeAccountIdentity(AccountIdentityBackup("fixture-account", key))
+            val restored = AndroidIdentityKeyBackupStore(context).readAccountIdentity()
+            assertEquals("fixture-account", restored?.accountId)
+            assertContentEquals(key, restored?.key)
+        }
+
+    @Test
+    fun `valid length corrupted account key fails integrity validation and preserves the file`() =
+        runTest {
+            store.writeAccountIdentity(AccountIdentityBackup("fixture-account", ByteArray(32) { 7 }))
+            val file = File(tempDir, "identity_recovery/account_key_backup")
+            val corrupted = file.readText().replace(Base64.encode(ByteArray(32) { 7 }), Base64.encode(ByteArray(32) { 8 }))
+            file.writeText(corrupted)
+
+            assertFailsWith<IllegalStateException> { store.readAccountIdentity() }
+
+            assertEquals(corrupted, file.readText())
+        }
+
+    @Test
+    fun `changing back to a phrase removes the obsolete account key`() =
+        runTest {
+            store.writeAccountIdentity(AccountIdentityBackup("fixture-account", ByteArray(32) { 7 }))
+            store.writePhrase("replacement phrase")
+            assertNull(store.readAccountIdentity())
+            assertEquals("replacement phrase", store.readPhrase())
+        }
+
+    @Test
+    fun `unrecognized account backup versions fail without deleting the recovery file`() =
+        runTest {
+            val file =
+                File(tempDir, "identity_recovery/account_key_backup").apply {
+                    parentFile?.mkdirs()
+                    writeText("""{"version":99,"accountId":"fixture","key":"invalid"}""")
+                }
+            assertFailsWith<IllegalStateException> { store.readAccountIdentity() }
+            assertTrue(file.exists())
+            assertTrue(store.hasBackup())
+        }
 
     @AfterTest
     fun cleanup() {

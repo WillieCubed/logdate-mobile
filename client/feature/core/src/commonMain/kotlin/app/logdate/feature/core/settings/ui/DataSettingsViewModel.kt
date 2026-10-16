@@ -7,6 +7,9 @@ import app.logdate.client.data.maintenance.IntegrityRepairResult
 import app.logdate.client.data.maintenance.IntegrityReport
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.restore.NativeBackupStatus
+import app.logdate.client.device.restore.NativeBackupStatusSource
+import app.logdate.client.device.restore.UnsupportedNativeBackupStatusSource
 import app.logdate.client.domain.quota.ObserveCloudQuotaUseCase
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
@@ -87,7 +90,14 @@ class DataSettingsViewModel(
     private val configRepository: LogDateConfigRepository,
     private val dataIntegrityService: DataIntegrityService,
     private val cloudArchiveStatusSource: CloudArchiveStatusSource = UnavailableCloudArchiveStatusSource,
+    nativeBackupStatusSource: NativeBackupStatusSource = UnsupportedNativeBackupStatusSource,
 ) : ViewModel() {
+    val nativeBackupStatus: StateFlow<NativeBackupStatus> =
+        nativeBackupStatusSource.observe().stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            NativeBackupStatus.Unsupported,
+        )
     private val _integrityState = MutableStateFlow(IntegrityState())
     val integrityState: StateFlow<IntegrityState> = _integrityState.asStateFlow()
 

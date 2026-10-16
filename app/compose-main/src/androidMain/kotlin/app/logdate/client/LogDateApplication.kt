@@ -14,6 +14,7 @@ import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.reminders.ReminderSignalObserver
 import app.logdate.client.events.EventInferenceScheduler
@@ -127,6 +128,10 @@ class LogdateApplication :
      * schedulers. Each part is isolated so one failing to start doesn't stop the others.
      */
     private fun startBackgroundWork() {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { get<IdentityKeyManager>().ensureExistingIdentityBackup() }
+                .onFailure { Napier.w("Native encryption recovery material needs attention", it) }
+        }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             publishWidgetPreviews(this@LogdateApplication)
         }

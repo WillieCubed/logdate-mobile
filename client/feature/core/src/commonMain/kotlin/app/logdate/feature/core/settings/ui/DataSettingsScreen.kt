@@ -37,6 +37,7 @@ fun DataSettingsScreen(
     restoreViewModel: UserDataRestoreViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val nativeBackupStatus by viewModel.nativeBackupStatus.collectAsState()
     val exportState by exportViewModel.exportState.collectAsState()
     val isExportSheetVisible by exportViewModel.isSheetVisible.collectAsState()
     val restoreState by restoreViewModel.restoreState.collectAsState()
@@ -132,6 +133,7 @@ fun DataSettingsScreen(
         snackbarHostState = snackbarHostState,
         syncStatus = uiState.syncStatus,
         cloudArchiveStatus = uiState.cloudArchiveStatus,
+        nativeBackupStatus = nativeBackupStatus,
         isAuthenticated = isAuthenticated,
         onSyncNow = { viewModel.syncNow() },
         onSyncUsingMobileData = { viewModel.syncNow(allowMeteredMedia = true) },

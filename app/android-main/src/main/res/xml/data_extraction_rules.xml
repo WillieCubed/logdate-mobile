@@ -6,23 +6,45 @@
    Cloud backup (Google Drive, 25 MB limit):
      Includes the encrypted database and the recoverable database-passphrase and
      identity-recovery-phrase backups so small databases and the user's identity key
-     survive cloud restore. Android silently drops files that push the total over
-     25 MB, so large databases will be skipped gracefully. EncryptedSharedPreferences
-     are excluded (KeyStore-bound, useless after restore).
+     survive cloud restore. Exceeding the quota prevents a new cloud backup;
+     it does not selectively omit large files. Recovery secrets require an
+     encrypted cloud transport. Original media is covered by direct transfer,
+     LogDate Cloud, or a user-created archive.
 
-   Device-to-device transfer (direct local transfer, 2 GB limit):
-     Transfers everything so the app works on the new device with zero friction.
+   Device-to-device transfer:
+     Includes committed media, but excludes Keystore-bound ciphertext,
+     installation state, incomplete media staging, and cloned background jobs.
 -->
 <data-extraction-rules>
-    <cloud-backup>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <include domain="file" path="logdate.preferences_pb"/>
         <include domain="file" path="datastore/"/>
         <include domain="file" path="db_recovery/"/>
         <include domain="file" path="identity_recovery/"/>
-        <include domain="database" path="."/>
+        <include domain="database" path="logdate"/>
+        <include domain="database" path="logdate-wal"/>
+        <include domain="database" path="logdate-shm"/>
+        <exclude domain="file" path="db_recovery/passphrase_backup.part"/>
+        <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
+        <exclude domain="file" path="identity_recovery/account_key_backup.part"/>
+        <exclude domain="file" path="identity_recovery/media_key_backup.part"/>
     </cloud-backup>
     <device-transfer>
-        <include domain="file" path="."/>
-        <include domain="database" path="."/>
-        <include domain="sharedpref" path="."/>
+        <include domain="file" path="logdate.preferences_pb"/>
+        <include domain="file" path="datastore/"/>
+        <include domain="file" path="db_recovery/"/>
+        <include domain="file" path="identity_recovery/"/>
+        <include domain="file" path="media/"/>
+        <include domain="file" path="user_media/"/>
+        <include domain="file" path="audio_notes/"/>
+        <include domain="file" path="camera-captures/"/>
+        <include domain="database" path="logdate"/>
+        <include domain="database" path="logdate-wal"/>
+        <include domain="database" path="logdate-shm"/>
+        <exclude domain="file" path="media/staging/"/>
+        <exclude domain="file" path="db_recovery/passphrase_backup.part"/>
+        <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
+        <exclude domain="file" path="identity_recovery/account_key_backup.part"/>
+        <exclude domain="file" path="identity_recovery/media_key_backup.part"/>
     </device-transfer>
 </data-extraction-rules>

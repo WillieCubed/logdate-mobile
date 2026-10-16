@@ -8,6 +8,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreOptions
@@ -51,6 +52,7 @@ class RestoreWorker(
 
     private val restoreUserDataUseCase: RestoreUserDataUseCase by inject()
     private val mediaManager: MediaManager by inject()
+    private val sessionStorage: SessionStorage by inject()
     private val restoreLauncher: RestoreLauncher by inject()
     private val diagnosticEvents: RestoreDiagnosticEvents? by lazy { getKoin().getOrNull() }
     private val json = Json { ignoreUnknownKeys = true }
@@ -65,6 +67,8 @@ class RestoreWorker(
     override suspend fun getForegroundInfo(): ForegroundInfo = notificationHelper.createForegroundInfo(RestoreStage.PREPARING)
 
     override suspend fun doWork(): Result {
+        val nativeRecovery = NativeRestoreWorkState(context, inputData, sessionStorage)
+        if (!nativeRecovery.isCurrent()) return Result.success()
         val source = runCatching { diagnosticEvents?.source() }.getOrNull()
         val attemptId = Uuid.random().toString()
         reportDiagnostic(DiagnosticOutcome.STARTED, source, attemptId)
@@ -130,6 +134,7 @@ class RestoreWorker(
                     preservePopulatedLocalProfile = preservePopulatedProfile,
                 )
 
+            if (!nativeRecovery.isCurrent()) return Result.success()
             val result =
                 restoreUserDataUseCase.restore(
                     archive = archive,
@@ -144,6 +149,7 @@ class RestoreWorker(
                     },
                 )
 
+            nativeRecovery.complete()
             val summary = result.toSummary(source = sourceLabel)
 
             trySetForeground(notificationHelper.createCompletionInfo())

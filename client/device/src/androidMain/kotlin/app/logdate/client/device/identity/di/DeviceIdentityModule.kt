@@ -2,9 +2,9 @@ package app.logdate.client.device.identity.di
 
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.device.AppInfoProvider
+import app.logdate.client.device.identity.AndroidInstallationIdProvider
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DefaultCanonicalOwnerProvider
-import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.DeviceRepository
@@ -27,7 +27,7 @@ actual val deviceIdentityModule: Module =
         }
 
         single<DeviceIdProvider> {
-            DefaultDeviceIdProvider(get<KeyValueStorage>(named("deviceKeyValueStorage")))
+            AndroidInstallationIdProvider(androidContext(), get<KeyValueStorage>(named("deviceKeyValueStorage")))
         }
 
         // Repository for device information

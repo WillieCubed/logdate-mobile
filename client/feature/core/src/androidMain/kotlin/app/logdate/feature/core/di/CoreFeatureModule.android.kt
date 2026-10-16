@@ -5,6 +5,7 @@ import app.logdate.client.device.crypto.AndroidDeviceTransferSealer
 import app.logdate.client.device.crypto.DeviceTransferSealer
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
+import app.logdate.client.device.restore.AndroidNativeBackupStatusSource
 import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.EnqueueAllLocalDataUseCase
 import app.logdate.client.domain.account.VerifyEmailUseCase
@@ -79,6 +80,7 @@ import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.shared.config.LogDateConfigRepository
 import org.koin.android.ext.koin.androidContext
+import org.koin.androidx.workmanager.dsl.worker
 import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
@@ -125,7 +127,7 @@ actual val coreFeatureModule: Module =
         single { AndroidRestoreLauncher(androidContext()) }
         single<RestoreLauncher> { get<AndroidRestoreLauncher>() }
         workerOf(::RestoreWorker)
-        workerOf(::CloudRestoreWorker)
+        worker { CloudRestoreWorker(androidContext(), get(), get(), get(), get()) }
         single<RestoreDiagnosticEvents> { DefaultRestoreDiagnosticEvents(get(), get()) }
 
         factory { ServerConfigurationCoordinator(get(), get(), get()) }
@@ -221,6 +223,7 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
+                nativeBackupStatusSource = AndroidNativeBackupStatusSource(androidContext()),
             )
         }
         viewModel { UserDataExportViewModel(get(), get()) }

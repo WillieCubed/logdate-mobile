@@ -11,6 +11,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.domain.export.ExportFormat
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.ZipSignature
@@ -251,6 +252,7 @@ class AndroidRestoreLauncher(
             Data
                 .Builder()
                 .putString(RestoreWorker.SOURCE_URI_KEY, uri.toString())
+                .putString(NativeRestoreWorkState.DELIVERY_KEY, PostRestoreDetector(context).pendingContentRecoveryId())
                 .putBoolean(RestoreWorker.INCLUDE_DRAFTS_KEY, options.includeDrafts)
                 .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, options.includeMedia)
                 .build()

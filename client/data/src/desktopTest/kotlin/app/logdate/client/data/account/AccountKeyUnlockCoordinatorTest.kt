@@ -1,9 +1,12 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.device.crypto.AccountIdentityBackup
 import app.logdate.client.device.crypto.AccountKeyEnvelopeCipher
 import app.logdate.client.device.crypto.DesktopCryptoManager
+import app.logdate.client.device.crypto.IdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
+import app.logdate.client.device.crypto.NoOpIdentityKeyBackupStore
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.networking.AccountKeyEnvelopeApi
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
@@ -20,6 +23,33 @@ import kotlin.test.assertNotNull
 import kotlin.uuid.Uuid
 
 class AccountKeyUnlockCoordinatorTest {
+    @Test
+    fun `account unlock preserves a conflicting root delivered by native restore`() =
+        runTest {
+            val owner = Uuid.random().toString()
+            val retained = AccountIdentityBackup(owner, ByteArray(32) { 7 })
+            var portable = retained
+            val backup =
+                object : IdentityKeyBackupStore by NoOpIdentityKeyBackupStore {
+                    override suspend fun readAccountIdentity() = portable
+
+                    override suspend fun writeAccountIdentity(identity: AccountIdentityBackup) {
+                        portable = identity
+                    }
+                }
+            val local = keys(backup)
+            val secret = ByteArray(32)
+            val sealed =
+                AccountKeyEnvelopeCipher(DesktopCryptoManager())
+                    .seal(owner, "AQ", secret, ByteArray(32) { 8 }, ByteArray(32) { 9 })
+            val remote = EnvelopeRemote().apply { ciphertext = Base64.encode(sealed) }
+            assertFailsWith<IllegalStateException> {
+                coordinator(remote, local).unlockOrProvision("https://server/api/v1", owner, "access", "AQ", secret, false)
+            }
+            assertContentEquals(retained.key, portable.key)
+            assertFalse(local.identity.hasIdentityKey())
+        }
+
     @Test
     fun `native passkey sign-in provisions an envelope from the existing Android identity`() =
         runTest {
@@ -186,10 +216,10 @@ class AccountKeyUnlockCoordinatorTest {
             assertContentEquals(ByteArray(32) { 1 }, local.media.getOrCreateKey())
         }
 
-    private fun keys(): LocalKeys {
+    private fun keys(backup: IdentityKeyBackupStore = NoOpIdentityKeyBackupStore): LocalKeys {
         val storage = UnlockTestStorage()
         val crypto = DesktopCryptoManager()
-        val identity = IdentityKeyManager(storage, crypto)
+        val identity = IdentityKeyManager(storage, crypto, backup)
         return LocalKeys(identity, MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto)))
     }
 

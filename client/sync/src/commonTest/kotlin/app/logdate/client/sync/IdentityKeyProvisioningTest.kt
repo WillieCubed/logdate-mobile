@@ -1,8 +1,10 @@
 package app.logdate.client.sync
 
+import app.logdate.client.device.crypto.AccountIdentityBackup
 import app.logdate.client.device.crypto.IdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
+import app.logdate.client.device.crypto.MediaIdentityBackup
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
 import app.logdate.client.sync.cloud.ContentChangesResponse
@@ -32,6 +34,56 @@ import kotlin.time.Instant
  * became unreadable forever, and everything from then on quietly started a second identity.
  */
 class IdentityKeyProvisioningTest {
+    @Test
+    fun `normal sync cannot mint over media-only native recovery material`() =
+        runTest {
+            val backup = FakeIdentityKeyBackupStore()
+            backup.writeMediaIdentity(MediaIdentityBackup("retained-binding", ByteArray(32) { 8 }))
+            val identity = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager(), backup)
+            val manager = testDefaultSyncManager(identityKeyManager = identity, cloudApiClient = fakeCloudApiClient())
+            manager.uploadPendingChanges()
+            assertFalse(identity.hasIdentityKey())
+            assertTrue(backup.hasMediaBackup())
+        }
+
+    @Test
+    fun `settings recovery selects the recovered identity media keys and can return to the original identity`() =
+        runTest {
+            val storage = InMemorySecureStorage()
+            val crypto = TestCryptoManager()
+            val backup = FakeIdentityKeyBackupStore()
+            val identity = IdentityKeyManager(storage, crypto, backup)
+            val originalPhrase = identity.setupNewIdentity()
+            val media = MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto))
+            val originalMedia = media.getOrCreateKey()
+            val recover =
+                RecoverIdentityUseCase(
+                    identity,
+                    fakeSyncMetadataService(),
+                    media,
+                    InMemoryIdentityRecoveryNeededStore(),
+                    InMemoryUnreadableCloudRecordStore(),
+                )
+            val recoveredPhrase = List(12) { "recovered-$it" }
+            assertTrue(recover(recoveredPhrase).isSuccess)
+            assertFalse(originalMedia.contentEquals(media.getOrCreateKey()))
+            assertTrue(recover(originalPhrase.words).isSuccess)
+            assertTrue(originalMedia.contentEquals(media.getOrCreateKey()))
+        }
+
+    @Test
+    fun `normal sync backfills a retained phrase-less identity on upgrade`() =
+        runTest {
+            val storage = InMemorySecureStorage()
+            val root = ByteArray(32) { 7 }
+            storage.putBytes("identity_key_v1", root)
+            val backup = FakeIdentityKeyBackupStore()
+            val identity = IdentityKeyManager(storage, TestCryptoManager(), backup)
+            val manager = testDefaultSyncManager(identityKeyManager = identity, cloudApiClient = fakeCloudApiClient())
+            manager.uploadPendingChanges()
+            assertTrue(root.contentEquals(backup.readAccountIdentity()?.key))
+        }
+
     @Test
     fun `draft only accounts and failed draft checks never mint a different identity`() =
         runTest {
@@ -231,14 +283,34 @@ private class FakeIdentityKeyBackupStore(
     initialPhrase: String? = null,
 ) : IdentityKeyBackupStore {
     private var phrase: String? = initialPhrase
+    private var account: AccountIdentityBackup? = null
+    private val media = mutableMapOf<String, MediaIdentityBackup>()
+
+    override suspend fun readMediaIdentity(identityBinding: String) = media[identityBinding]
+
+    override suspend fun hasMediaBackup() = media.isNotEmpty()
+
+    override suspend fun writeMediaIdentity(identity: MediaIdentityBackup) {
+        media[identity.identityBinding] = identity
+    }
+
+    override suspend fun readAccountIdentity() = account
+
+    override suspend fun writeAccountIdentity(identity: AccountIdentityBackup) {
+        account = identity
+        phrase = null
+    }
 
     override suspend fun readPhrase(): String? = phrase
 
     override suspend fun writePhrase(phrase: String) {
         this.phrase = phrase
+        account = null
     }
 
     override suspend fun clear() {
         phrase = null
+        account = null
+        media.clear()
     }
 }

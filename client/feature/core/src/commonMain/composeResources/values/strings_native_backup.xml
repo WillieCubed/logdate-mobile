@@ -1,0 +1,6 @@
+<resources>
+    <string name="native_backup_title">Android backup</string>
+    <string name="native_backup_coverage">Android cloud backup covers journal data and settings, up to 25 MB, when encrypted backup is available. Device transfer between Android phones also includes original photos, audio and video.</string>
+    <string name="native_backup_quota_failure">Android reported a backup over its storage limit. That attempt did not save a new backup.</string>
+    <string name="native_backup_export">Export archive</string>
+</resources>

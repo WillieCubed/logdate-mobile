@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.client.device.restore.NativeBackupStatus
 import app.logdate.feature.core.export.ExportBottomSheet
 import app.logdate.feature.core.export.ExportOptions
 import app.logdate.feature.core.export.ExportState
@@ -59,6 +60,7 @@ fun DataSettingsContent(
     snackbarHostState: SnackbarHostState,
     syncStatus: app.logdate.client.sync.SyncStatus? = null,
     cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
+    nativeBackupStatus: NativeBackupStatus = NativeBackupStatus.Unsupported,
     isAuthenticated: Boolean = false,
     onSyncNow: () -> Unit = {},
     onSyncUsingMobileData: () -> Unit = {},
@@ -130,6 +132,7 @@ fun DataSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
+                NativeBackupSettingsSection(nativeBackupStatus, onShowExportOptions, Modifier.padding(horizontal = Spacing.lg))
                 SyncSettingsSection(
                     syncStatus = syncStatus,
                     cloudArchiveStatus = cloudArchiveStatus,
@@ -168,6 +171,11 @@ fun DataSettingsContent(
                     }
                 }
 
+                if (nativeBackupStatus is NativeBackupStatus.Available) {
+                    item {
+                        NativeBackupSettingsSection(nativeBackupStatus, onShowExportOptions, Modifier.padding(horizontal = Spacing.lg))
+                    }
+                }
                 item {
                     SyncSettingsSection(
                         syncStatus = syncStatus,

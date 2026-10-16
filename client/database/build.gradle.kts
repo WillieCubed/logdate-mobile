@@ -65,6 +65,10 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.room.testing)
         }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.mockk)
+        }
         findByName("androidDeviceTest")?.dependencies {
             implementation(libs.kotlin.test.junit)
             implementation(libs.kotlinx.coroutines.test)

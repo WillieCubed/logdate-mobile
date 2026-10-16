@@ -230,6 +230,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
             onNavigateToSignIn = onNavigateToSignIn,
             onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
+            onNavigateToExport = { onNavigateTo(ExportSettingsRoute) },
             onRecoverJournalMerge = { operation ->
                 onNavigateTo(JournalMergeRoute(operation.sourceId.toString(), operation.operationId.toString()))
             },

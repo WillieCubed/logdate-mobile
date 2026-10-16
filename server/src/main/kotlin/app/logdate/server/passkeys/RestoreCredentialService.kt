@@ -300,7 +300,9 @@ class RestoreCredentialService(
             val authenticationData =
                 webAuthnManager.verify(
                     authenticationRequest,
-                    AuthenticationParameters(serverProperty, authenticator, listOf(credentialIdBytes), true, true),
+                    // Restore assertions are passive. Origin, challenge, RP, signature, and
+                    // credential ownership remain verified without a fresh UP/UV ceremony.
+                    AuthenticationParameters(serverProperty, authenticator, listOf(credentialIdBytes), false, false),
                 )
 
             val newSignCount = authenticationData.authenticatorData?.signCount ?: stored.signCount

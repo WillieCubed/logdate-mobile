@@ -3,11 +3,11 @@ package app.logdate.feature.core.restore
 import android.content.Context
 import android.net.Uri
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import androidx.work.workDataOf
 import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.sync.cloud.CloudBackupDataSource
@@ -38,29 +38,10 @@ class CloudRestoreWorker(
     private val cloudBackupDataSource: CloudBackupDataSource,
     private val sessionStorage: SessionStorage,
     private val cloudArchiveCipher: CloudArchiveCipher,
-    private val enqueueRestore: suspend (File) -> Unit = { archive ->
-        val restoreRequest =
-            OneTimeWorkRequestBuilder<RestoreWorker>()
-                .setInputData(
-                    workDataOf(
-                        RestoreWorker.SOURCE_URI_KEY to Uri.fromFile(archive).toString(),
-                        RestoreWorker.DELETE_SOURCE_AFTER_RESTORE_KEY to true,
-                        RestoreWorker.INCLUDE_DRAFTS_KEY to true,
-                        RestoreWorker.INCLUDE_MEDIA_KEY to true,
-                        RestoreWorker.PRESERVE_POPULATED_PROFILE_KEY to true,
-                    ),
-                ).build()
-        WorkManager
-            .getInstance(context)
-            .enqueueUniqueWork(
-                RestoreWorker.WORK_NAME,
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
-                restoreRequest,
-            ).result
-            .awaitResult()
-    },
+    private val enqueueRestore: (suspend (File) -> Unit)? = null,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+        if (!NativeRestoreWorkState(context, inputData, sessionStorage).isCurrent()) return Result.success()
         pruneAbandonedCloudArchives(context)
         var expectedSession =
             sessionStorage.getOriginBoundSession()
@@ -91,7 +72,9 @@ class CloudRestoreWorker(
 
             try {
                 if (sessionStorage.getOriginBoundSession() != expectedSession) return Result.retry()
-                enqueueRestore(archive)
+                if (!NativeRestoreWorkState(context, inputData, sessionStorage).isCurrent()) return Result.success()
+                val custom = enqueueRestore
+                if (custom != null) custom(archive) else enqueueArchive(archive, expectedSession)
                 preserveArchive = true
             } catch (cancellation: CancellationException) {
                 preserveArchive = true
@@ -108,6 +91,31 @@ class CloudRestoreWorker(
             plaintextPart.delete()
             if (!preserveArchive) archive.delete()
         }
+    }
+
+    private suspend fun enqueueArchive(
+        archive: File,
+        session: OriginBoundSession,
+    ) {
+        val data =
+            NativeRestoreWorkState
+                .bind(
+                    Data
+                        .Builder()
+                        .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(archive).toString())
+                        .putBoolean(RestoreWorker.DELETE_SOURCE_AFTER_RESTORE_KEY, true)
+                        .putBoolean(RestoreWorker.INCLUDE_DRAFTS_KEY, true)
+                        .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, true)
+                        .putBoolean(RestoreWorker.PRESERVE_POPULATED_PROFILE_KEY, true),
+                    inputData.getString(NativeRestoreWorkState.DELIVERY_KEY),
+                    session,
+                ).build()
+        val request = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(data).build()
+        WorkManager
+            .getInstance(context)
+            .enqueueUniqueWork(RestoreWorker.WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+            .result
+            .awaitResult()
     }
 
     /**

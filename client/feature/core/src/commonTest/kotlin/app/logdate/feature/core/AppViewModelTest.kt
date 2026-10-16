@@ -52,6 +52,47 @@ class AppViewModelTest {
     }
 
     @Test
+    fun `resuming the app retries pending account recovery without another restore callback`() =
+        runTest {
+            val repository = FakePasskeyAccountRepository()
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = true)),
+                    FakeBiometricGatekeeper(),
+                    FakeNetworkAvailabilityMonitor(true),
+                    FakeSessionStorage(),
+                    TryRestoreSignInUseCase(repository),
+                )
+            viewModel.tryRestoreSignInAfterCloudRestore(recoverMissingContent = false)
+            advanceUntilIdle()
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals(2, repository.restoreSignInAttempts)
+        }
+
+    @Test
+    fun `reconnecting retries a pending account recovery without recreating the activity`() =
+        runTest {
+            val network = FakeNetworkAvailabilityMonitor(true)
+            val repository = FakePasskeyAccountRepository()
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = true)),
+                    FakeBiometricGatekeeper(),
+                    network,
+                    FakeSessionStorage(),
+                    TryRestoreSignInUseCase(repository),
+                )
+            viewModel.tryRestoreSignInAfterCloudRestore(recoverMissingContent = false)
+            advanceUntilIdle()
+            network.setConnected(false)
+            advanceUntilIdle()
+            network.setConnected(true)
+            advanceUntilIdle()
+            assertEquals(2, repository.restoreSignInAttempts)
+        }
+
+    @Test
     fun `ui state becomes loaded with stable initial online network state`() =
         runTest {
             val viewModel =
@@ -123,6 +164,30 @@ class AppViewModelTest {
             advanceUntilIdle()
 
             assertEquals(0, passkeyAccountRepository.restoreSignInAttempts)
+        }
+
+    @Test
+    fun `missing content recovery resumes when account access already exists`() =
+        runTest {
+            var imports = 0
+            var resolved = false
+            val repository = FakePasskeyAccountRepository()
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = true)),
+                    FakeBiometricGatekeeper(),
+                    FakeNetworkAvailabilityMonitor(true),
+                    FakeSessionStorage(hasValidSession = true),
+                    TryRestoreSignInUseCase(repository),
+                    onCloudRestoreSignIn = { imports++ },
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore(recoverMissingContent = true, onAccountResolved = { resolved = true })
+            advanceUntilIdle()
+
+            assertEquals(true, resolved)
+            assertEquals(1, imports)
+            assertEquals(0, repository.restoreSignInAttempts)
         }
 
     @Test
@@ -218,6 +283,74 @@ class AppViewModelTest {
             assertEquals(1, passkeyAccountRepository.restoreSignInAttempts)
         }
 
+    @Test
+    fun `credential-only restore can recover an account before onboarding data arrives`() =
+        runTest {
+            val repository =
+                FakePasskeyAccountRepository(Result.success(LogDateAccount(username = "fixture", displayName = "Fixture account")))
+            var resolved = false
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = false)),
+                    FakeBiometricGatekeeper(),
+                    FakeNetworkAvailabilityMonitor(true),
+                    FakeSessionStorage(),
+                    TryRestoreSignInUseCase(repository),
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore(onAccountResolved = { resolved = true })
+            advanceUntilIdle()
+
+            assertEquals(1, repository.restoreSignInAttempts)
+            assertEquals(true, resolved)
+        }
+
+    @Test
+    fun `an absent credential stays pending for delayed native delivery`() =
+        runTest {
+            val repository = FakePasskeyAccountRepository()
+            var resolved = false
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = false)),
+                    FakeBiometricGatekeeper(),
+                    FakeNetworkAvailabilityMonitor(true),
+                    FakeSessionStorage(),
+                    TryRestoreSignInUseCase(repository),
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore(onAccountResolved = { resolved = true })
+            advanceUntilIdle()
+            viewModel.tryRestoreSignInAfterCloudRestore(onAccountResolved = { resolved = true })
+            advanceUntilIdle()
+
+            assertEquals(false, resolved)
+            assertEquals(2, repository.restoreSignInAttempts)
+        }
+
+    @Test
+    fun `an account recovery error remains retryable in the same application process`() =
+        runTest {
+            val repository = FakePasskeyAccountRepository(Result.failure(IllegalStateException("Server unavailable")))
+            var resolved = false
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = true)),
+                    FakeBiometricGatekeeper(),
+                    FakeNetworkAvailabilityMonitor(true),
+                    FakeSessionStorage(),
+                    TryRestoreSignInUseCase(repository),
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore(onAccountResolved = { resolved = true })
+            advanceUntilIdle()
+            viewModel.tryRestoreSignInAfterCloudRestore(onAccountResolved = { resolved = true })
+            advanceUntilIdle()
+
+            assertEquals(2, repository.restoreSignInAttempts)
+            assertEquals(false, resolved)
+        }
+
     private class FakeUserStateRepository(
         initialValue: UserData,
     ) : UserStateRepository {
@@ -270,7 +403,12 @@ class AppViewModelTest {
                 },
             )
 
-        override fun isNetworkAvailable(): Boolean = isAvailable
+        fun setConnected(connected: Boolean) {
+            networkState.value =
+                if (connected) NetworkState.Connected(Clock.System.now()) else NetworkState.NotConnected(Clock.System.now())
+        }
+
+        override fun isNetworkAvailable(): Boolean = networkState.value is NetworkState.Connected
 
         override fun observeNetwork(): SharedFlow<NetworkState> = networkState
     }
