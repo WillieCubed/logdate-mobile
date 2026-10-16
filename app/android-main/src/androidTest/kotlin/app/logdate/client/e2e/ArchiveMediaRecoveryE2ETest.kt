@@ -82,6 +82,7 @@ class ArchiveMediaRecoveryE2ETest {
                 "seed" -> seed()
                 "repair" -> repair()
                 "automatic" -> automaticRepair()
+                "waiting" -> verifyRetainedWaitingState()
                 "verify" -> verify()
                 "cleanup-rejected-fixture" -> cleanupRejectedFixture()
                 else -> error("Choose seed, repair, or verify for the owned emulator")
@@ -163,6 +164,22 @@ class ArchiveMediaRecoveryE2ETest {
                 .any { it.name.startsWith("${summary.recoveryId}.") },
         )
         archive.delete()
+    }
+
+    private suspend fun verifyRetainedWaitingState() {
+        require(koin.get<app.logdate.client.datastore.SessionStorage>().getSession() == null)
+        val state = JSONObject(fixture.readText())
+        val worker =
+            TestListenableWorkerBuilder<ArchiveMediaRecoveryWorker>(context)
+                .setInputData(Data.Builder().putString(RestoreWorker.RECOVERY_ID_KEY, state.getString("recoveryId")).build())
+                .build()
+        assertIs<ListenableWorker.Result.Success>(worker.doWork())
+        val record = JSONObject(context.filesDir.resolve("archive_recovery/records/${state.getString("recoveryId")}.json").readText())
+        val retained = json.decodeFromString<RestoreSummary>(record.getJSONObject("summary").toString())
+        assertEquals(2, retained.unavailableOriginals)
+        assertFalse(retained.recoveringMedia)
+        assertEquals(2, record.getJSONArray("pending").length())
+        verifyEdits(state)
     }
 
     private suspend fun automaticRepair() {

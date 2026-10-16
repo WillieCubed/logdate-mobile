@@ -9,13 +9,18 @@ import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.io.encoding.Base64
+import kotlin.uuid.Uuid
 
 /** Remembers a consumed restore key until the signed-in installation registers its replacement. */
 class RestoreCredentialRenewal(
     private val storage: SecureStorage,
     private val apiFactory: ((LogDateConfigRepository) -> PasskeyApiClientContract)? = null,
 ) {
+    private val markerMutex = Mutex()
+
     internal fun apiFor(config: LogDateConfigRepository): PasskeyApiClientContract? {
         val origin = config.getCurrentBackendUrl().trimEnd('/')
         require(config.getCurrentApiBaseUrl().startsWith("$origin/"))
@@ -32,14 +37,19 @@ class RestoreCredentialRenewal(
     suspend fun mark(
         origin: String,
         owner: String,
-    ) = storage.putString(key(origin), owner)
+    ) = markerMutex.withLock { storage.putString(key(origin), "$owner\n${Uuid.random()}") }
 
     suspend fun isPending(
         origin: String,
         owner: String,
-    ): Boolean = storage.getString(key(origin)) == owner
+    ): Boolean = storage.getString(key(origin))?.substringBefore('\n') == owner
 
-    suspend fun complete(origin: String) = storage.putString(key(origin), "resolved")
+    private suspend fun complete(
+        origin: String,
+        expected: String,
+    ) = markerMutex.withLock {
+        if (storage.getString(key(origin)) == expected) storage.putString(key(origin), "resolved")
+    }
 
     internal suspend fun renew(
         config: LogDateConfigRepository,
@@ -49,7 +59,8 @@ class RestoreCredentialRenewal(
         isCurrent: () -> Boolean,
     ) {
         val origin = config.getCurrentBackendUrl()
-        if (!isPending(origin, session.accountId)) return
+        val obligation = storage.getString(key(origin)) ?: return
+        if (obligation.substringBefore('\n') != session.accountId) return
         val api = apiFor(config) ?: return
 
         fun checkCurrent() {
@@ -76,7 +87,7 @@ class RestoreCredentialRenewal(
         api.completeRestoreKeyRegistration(session.accessToken, credential, options.challenge).getOrThrow()
         currentCoroutineContext().ensureActive()
         checkCurrent()
-        complete(origin)
+        complete(origin, obligation)
     }
 
     /** Refresh only the captured origin/session; a concurrent switch cannot receive its tokens. */
@@ -89,7 +100,7 @@ class RestoreCredentialRenewal(
         val origin = config.getCurrentBackendUrl()
         val bound = sessions.getOriginBoundSession() ?: return
         if (bound.origin != origin || bound.session != session || !isCurrent()) return
-        val api = apiFactory?.invoke(config) ?: return
+        val api = apiFor(config) ?: return
         val token = api.refreshToken(session.refreshToken).getOrThrow()
         currentCoroutineContext().ensureActive()
         if (!isCurrent()) return

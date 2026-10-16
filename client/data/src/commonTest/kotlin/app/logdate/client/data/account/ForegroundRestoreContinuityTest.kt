@@ -192,7 +192,7 @@ class ForegroundRestoreContinuityTest {
                         value: String,
                     ) {
                         pending.putString(key, value)
-                        if (value == owner) afterMark()
+                        if (value.substringBefore('\n') == owner) afterMark()
                     }
                 },
             ) { api }

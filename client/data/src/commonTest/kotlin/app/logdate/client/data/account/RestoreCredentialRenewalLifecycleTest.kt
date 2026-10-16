@@ -15,6 +15,56 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class RestoreCredentialRenewalLifecycleTest {
     @Test
+    fun `pending renewal adopts a corrected API endpoint without another sign in`() =
+        runTest {
+            val api = DefaultPasskeyAccountRepositoryTest().FakePasskeyApiClient()
+            val config = DefaultPasskeyAccountRepositoryTest.FakeConfigRepository()
+            val owner =
+                api
+                    .getAccountInfo("access")
+                    .getOrThrow()
+                    .id
+                    .toString()
+            val sessions = DefaultPasskeyAccountRepositoryTest.FakeSessionStorage()
+            sessions.saveSession(
+                app.logdate.client.datastore
+                    .UserSession("access", "refresh", owner),
+            )
+            val endpoints = mutableListOf<String>()
+            val renewal =
+                RestoreCredentialRenewal(RenewalStorage()) { pinned ->
+                    endpoints += pinned.getCurrentApiBaseUrl()
+                    check(pinned.apiVersion.value == "v2") { "Old endpoint unavailable" }
+                    api
+                }
+            renewal.mark(config.getCurrentBackendUrl(), owner)
+            DefaultPasskeyAccountRepository(
+                apiClient = api,
+                passkeyManager = DefaultPasskeyAccountRepositoryTest.FakePasskeyManager(),
+                restoreCredentialManager = DefaultPasskeyAccountRepositoryTest.FakeRestoreCredentialManager(),
+                sessionStorage = sessions,
+                platformAccountManager = DefaultPasskeyAccountRepositoryTest.FakePlatformAccountManager(),
+                configRepository = config,
+                canonicalOwnerProvider =
+                    object : CanonicalOwnerProvider {
+                        override suspend fun getCanonicalOwnerId() = owner
+
+                        override suspend fun hasBoundOwner() = true
+                    },
+                hasLocalData = { true },
+                repositoryScope = backgroundScope,
+                restoreCredentialRenewal = renewal,
+            )
+            runCurrent()
+            assertTrue(renewal.isPending(config.getCurrentBackendUrl(), owner))
+            config.updateApiVersion("v2")
+            advanceTimeBy(30_000)
+            runCurrent()
+            assertEquals(listOf("${config.getCurrentBackendUrl()}/api/v1", "${config.getCurrentBackendUrl()}/api/v2"), endpoints)
+            assertFalse(renewal.isPending(config.getCurrentBackendUrl(), owner))
+        }
+
+    @Test
     fun `signed in installation renews after a provider outage without reopening the app`() =
         runTest {
             val fixture = DefaultPasskeyAccountRepositoryTest()

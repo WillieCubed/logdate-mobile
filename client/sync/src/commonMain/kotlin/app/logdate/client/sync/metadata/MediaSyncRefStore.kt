@@ -4,6 +4,11 @@ import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.sync.cloud.CloudRequestBinding
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -35,6 +40,9 @@ data class MediaSyncRef(
  * the current server at another server's copy of the file, which disappears with that server.
  */
 interface MediaSyncRefStore {
+    /** Advances after changed references reach storage, including recovery without cursor movement. */
+    val changes: Flow<Long> get() = flowOf(0L)
+
     /** The note's reference on the current server, or `null` if it has none there. */
     suspend fun get(noteId: Uuid): MediaSyncRef?
 
@@ -90,6 +98,9 @@ class KeyValueMediaSyncRefStore(
     private val currentOwnerId: () -> String = { "" },
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : MediaSyncRefStore {
+    private val revision = MutableStateFlow(0L)
+    override val changes = revision.asStateFlow()
+
     override suspend fun get(noteId: Uuid): MediaSyncRef? = read(noteId.toString(), selectedScope())
 
     override suspend fun getScoped(
@@ -134,22 +145,24 @@ class KeyValueMediaSyncRefStore(
     ) {
         val selected = selectedScope()
         val captured = UploadScope(ref.ownerId ?: selected.ownerId, ref.serverOrigin ?: selected.serverOrigin)
-        storage.putString(
-            scopedKey(identity, captured),
+        val key = scopedKey(identity, captured)
+        val encoded =
             json.encodeToString(
                 ref.copy(
                     serverOrigin = captured.serverOrigin,
                     ownerId = captured.ownerId,
                 ),
-            ),
-        )
+            )
+        if (storage.getStringOrThrow(key) == encoded) return
+        storage.putStringOrThrow(key, encoded)
+        revision.update { it + 1 }
     }
 
     private suspend fun read(
         identity: String,
         selected: UploadScope,
     ): MediaSyncRef? {
-        val value = storage.getString(scopedKey(identity, selected)) ?: storage.getString(key(identity)) ?: return null
+        val value = storage.getStringOrThrow(scopedKey(identity, selected)) ?: storage.getStringOrThrow(key(identity)) ?: return null
         return decodeForScope(value, selected)
     }
 
@@ -180,8 +193,8 @@ class KeyValueMediaSyncRefStore(
      * had used.
      */
     private suspend fun unscopedRefsOrigin(claimingFor: String): String =
-        storage.getString(UNSCOPED_REFS_ORIGIN_KEY)
-            ?: claimingFor.also { storage.putString(UNSCOPED_REFS_ORIGIN_KEY, it) }
+        storage.getStringOrThrow(UNSCOPED_REFS_ORIGIN_KEY)
+            ?: claimingFor.also { storage.putStringOrThrow(UNSCOPED_REFS_ORIGIN_KEY, it) }
 
     override suspend fun delete(noteId: Uuid) = deleteScoped(noteId, selectedScope())
 
@@ -192,7 +205,7 @@ class KeyValueMediaSyncRefStore(
         val captured = scope ?: selectedScope()
         val identity = noteId.toString()
         storage.remove(scopedKey(identity, captured))
-        val legacy = storage.getString(key(identity))
+        val legacy = storage.getStringOrThrow(key(identity))
         if (legacy != null && decodeForScope(legacy, captured) != null) storage.remove(key(identity))
     }
 

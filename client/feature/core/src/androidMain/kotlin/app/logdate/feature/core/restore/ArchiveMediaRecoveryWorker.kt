@@ -4,11 +4,15 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.Operation
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 
 /** Keeps accepted entries usable while their originals recover independently. */
@@ -45,7 +49,7 @@ class ArchiveMediaRecoveryWorker(
                 }
                 val summary = ArchiveMediaRecoveryEngine(context, getKoin()).repair(record)
                 getKoin().get<RestoreLauncher>().updateRecovery(summary)
-                if (summary.unavailableOriginals + summary.unavailablePreviews == 0) Result.success() else Result.retry()
+                if (summary.shouldRetryMediaRecovery()) Result.retry() else Result.success()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -57,6 +61,8 @@ class ArchiveMediaRecoveryWorker(
 }
 
 internal object ArchiveRecoveryScheduler {
+    private val gate = ArchiveRecoveryScheduleGate()
+
     suspend fun enqueueAll(
         context: Context,
         koin: org.koin.core.Koin,
@@ -64,7 +70,23 @@ internal object ArchiveRecoveryScheduler {
         val scope = currentArchiveRecoveryScope(koin)
         val records = context.archiveRecoveryStore().pending(scope)
         if (currentArchiveRecoveryScope(koin) != scope) return
-        records.forEach { enqueue(context, it) }
+        withContext(Dispatchers.IO) {
+            val manager = WorkManager.getInstance(context)
+            records.forEach { record ->
+                gate.enqueue(
+                    hasWaiting = {
+                        manager.getWorkInfosForUniqueWork(workName(record.id, record.metadataApplied)).get().any {
+                            it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED
+                        }
+                    },
+                    enqueueSuccessor = {
+                        if (currentArchiveRecoveryScope(koin) == scope) {
+                            enqueue(context, record, ExistingWorkPolicy.APPEND_OR_REPLACE)?.result?.get()
+                        }
+                    },
+                )
+            }
+        }
     }
 
     fun workName(
@@ -86,14 +108,14 @@ internal object ArchiveRecoveryScheduler {
         context: Context,
         record: ArchiveRecoveryRecord,
         policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP,
-    ) {
+    ): Operation? {
         if (record.pausedByUser ||
             record.requiresSource &&
             !record.metadataApplied ||
             record.metadataApplied &&
             !record.options.includeMedia
         ) {
-            return
+            return null
         }
         val input =
             workDataOf(
@@ -111,6 +133,6 @@ internal object ArchiveRecoveryScheduler {
             } else {
                 OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(input).build()
             }
-        WorkManager.getInstance(context).enqueueUniqueWork(workName(record.id, record.metadataApplied), policy, work)
+        return WorkManager.getInstance(context).enqueueUniqueWork(workName(record.id, record.metadataApplied), policy, work)
     }
 }

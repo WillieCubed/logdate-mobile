@@ -91,6 +91,12 @@ archives must match the expected bytes by SHA-256; a repeated filename is insuff
 recovery refreshes expired credentials and stays bound to the captured owner and server. Temporary
 failures retain their checkpoints and retry without requiring another app launch.
 
+Recovery observes server configuration, encryption-identity changes, authenticated-session
+readiness, and durable media-mapping changes. Scheduling awaits WorkManager's database commit and coalesces changes into one waiting
+successor, so a running job cannot discard a later wakeup. Missing or invalid source bytes retain
+their checkpoints while awaiting a changed source, key, or session; empty sync passes do not
+restart foreground recovery.
+
 Conditional reference patches preserve captions, timestamps, text, block order, and memberships.
 Deleted entries, replaced attachments, and pending deletions take precedence. Notes, journals,
 memberships, places, location samples, drafts, and profile decisions have durable application
@@ -124,6 +130,11 @@ server/account change stops that session's retry loop. Expired access tokens ref
 captured server, and conditional vault writes prevent an old refresh from replacing a new login.
 Foreground registration and background replacement share a lock because the provider holds one
 restore credential per app.
+
+Each pending replacement has its own generation. Completion clears only the generation it
+registered, under the same lock used to persist a new obligation; another restore for the same
+account therefore remains pending. Retries capture current API configuration for their original
+server, allowing corrected discovery or API-version settings to take effect without signing in again.
 
 Foreground restore also records the replacement obligation before publishing the recovered
 session. Its requests use a pinned server configuration, and vault installation compares an

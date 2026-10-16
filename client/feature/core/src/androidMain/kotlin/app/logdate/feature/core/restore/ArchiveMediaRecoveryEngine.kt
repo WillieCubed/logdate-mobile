@@ -75,7 +75,7 @@ internal class ArchiveMediaRecoveryEngine(
                 result.pending.any { asset ->
                     asset.archivePath != null ||
                         asset.recoveredReference != null ||
-                        (session != null && reasons[asset.reference]?.let { it != DiagnosticReason.MISSING_MEDIA } == true)
+                        (reasons[asset.reference]?.shouldRetryArchiveMedia(hasSession = session != null) == true)
                 }
             val summary =
                 requireNotNull(record.summary).copy(

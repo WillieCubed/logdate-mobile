@@ -14,6 +14,9 @@ import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.diagnostics.DiagnosticReason
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -40,19 +43,26 @@ class AutomaticMediaRecovery(
         scope: UploadScope,
     ): AutomaticMediaRecoveryResult {
         if (currentScope() != scope) return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.UNKNOWN)
-        val cached = if (draftId == null) refs.getScoped(entityId, scope) else refs.getDraftAssetScoped(draftId, entityId, kind, scope)
-        if (cached != null &&
-            (
-                cached.remoteUrl == sourceReference ||
-                    transfer.sameLocalFile(cached.localUri, sourceReference) ||
-                    cached.localAliases.any { transfer.sameLocalFile(it, sourceReference) }
-            ) &&
-            !transfer.isRemoteRef(cached.localUri) &&
-            media.exists(cached.localUri)
-        ) {
-            if (currentScope() != scope) return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.UNKNOWN)
-            retainMapping(cached, entityId, draftId, kind, unavailableReference, scope)
-            return AutomaticMediaRecoveryResult.Available(cached.localUri)
+        try {
+            val cached = if (draftId == null) refs.getScoped(entityId, scope) else refs.getDraftAssetScoped(draftId, entityId, kind, scope)
+            if (cached != null &&
+                (
+                    cached.remoteUrl == sourceReference ||
+                        transfer.sameLocalFile(cached.localUri, sourceReference) ||
+                        cached.localAliases.any { transfer.sameLocalFile(it, sourceReference) }
+                ) &&
+                !transfer.isRemoteRef(cached.localUri) &&
+                media.exists(cached.localUri)
+            ) {
+                if (currentScope() != scope) return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.UNKNOWN)
+                retainMapping(cached, entityId, draftId, kind, unavailableReference, scope)
+                return AutomaticMediaRecoveryResult.Available(cached.localUri)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            currentCoroutineContext().ensureActive()
+            return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.LOCAL_STORAGE)
         }
         if (transfer.isRemoteRef(sourceReference) && !sourceReference.startsWith("${scope.serverOrigin.trimEnd('/')}/")) {
             return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.MISSING_MEDIA)

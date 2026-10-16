@@ -1,0 +1,209 @@
+package app.logdate.feature.core.restore
+
+import app.logdate.shared.model.diagnostics.DiagnosticReason
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class ArchiveRecoveryReadinessTest {
+    @Test
+    fun `local persistence retries without requiring Cloud sign in`() {
+        assertTrue(DiagnosticReason.LOCAL_STORAGE.shouldRetryArchiveMedia(hasSession = false))
+        assertTrue(DiagnosticReason.PERSISTENCE_FAILED.shouldRetryArchiveMedia(hasSession = false))
+        assertFalse(DiagnosticReason.UNKNOWN.shouldRetryArchiveMedia(hasSession = false))
+        assertFalse(DiagnosticReason.SIGN_IN_REQUIRED.shouldRetryArchiveMedia(hasSession = false))
+    }
+
+    @Test
+    fun `recovered keys wake retained originals without a new session or media mapping`() =
+        runTest {
+            val keys = MutableSharedFlow<Unit>()
+            var attempts = 0
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(
+                    MutableStateFlow("a"),
+                    MutableStateFlow("same-session"),
+                    identityChanges = keys,
+                ) { attempts++ }
+            }
+            runCurrent()
+            val beforeRecovery = attempts
+            keys.emit(Unit)
+            runCurrent()
+            assertEquals(beforeRecovery + 1, attempts)
+        }
+
+    @Test
+    fun `changed durable mapping wakes recovery without a session or configuration change`() =
+        runTest {
+            val inventory = MutableStateFlow(0L)
+            var attempts = 0
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(
+                    MutableStateFlow("a"),
+                    MutableStateFlow("same-session"),
+                    inventory = inventory,
+                ) { attempts++ }
+            }
+            runCurrent()
+            val beforeRecovery = attempts
+            inventory.value = 2L
+            runCurrent()
+            assertEquals(beforeRecovery + 1, attempts)
+        }
+
+    @Test
+    fun `readiness changes queue only one successor while an enqueue commit is suspended`() =
+        runTest {
+            val gate = ArchiveRecoveryScheduleGate()
+            val release = CompletableDeferred<Unit>()
+            var waiting = false
+            var enqueues = 0
+            val first =
+                launch {
+                    gate.enqueue({ waiting }) {
+                        enqueues++
+                        release.await()
+                        waiting = true
+                    }
+                }
+            runCurrent()
+            val second =
+                launch {
+                    gate.enqueue({ waiting }) {
+                        enqueues++
+                        waiting = true
+                    }
+                }
+            runCurrent()
+            release.complete(Unit)
+            first.join()
+            second.join()
+            assertEquals(1, enqueues)
+            waiting = false
+            gate.enqueue({ waiting }) {
+                enqueues++
+                waiting = true
+            }
+            assertEquals(2, enqueues)
+        }
+
+    @Test
+    fun `unchanged unavailable or corrupt content waits for readiness rather than spinning`() {
+        listOf(
+            DiagnosticReason.MISSING_MEDIA,
+            DiagnosticReason.CORRUPT_PAYLOAD,
+            DiagnosticReason.SIGN_IN_REQUIRED,
+            DiagnosticReason.KEY_RECOVERY_REQUIRED,
+            DiagnosticReason.INCOMPATIBLE_SERVER,
+            DiagnosticReason.UNSUPPORTED_FORMAT,
+        ).forEach {
+            assertFalse(it.shouldRetryArchiveMedia())
+        }
+        listOf(
+            DiagnosticReason.OFFLINE,
+            DiagnosticReason.SERVER_UNAVAILABLE,
+            DiagnosticReason.RATE_LIMITED,
+            DiagnosticReason.LOCAL_STORAGE,
+            DiagnosticReason.PERSISTENCE_FAILED,
+            DiagnosticReason.UNKNOWN,
+        ).forEach {
+            assertTrue(it.shouldRetryArchiveMedia())
+        }
+    }
+
+    @Test
+    fun `a later Cloud inventory resumes recovery after an earlier missing original`() =
+        runTest {
+            val readiness = MutableStateFlow("signed-in-a" to 0)
+            var attempts = 0
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(MutableStateFlow("a"), readiness) { attempts++ }
+            }
+            runCurrent()
+            readiness.value = "signed-in-a" to 1
+            runCurrent()
+            assertEquals(2, attempts)
+        }
+
+    @Test
+    fun `retained work resumes on server return and sign in without opening restore UI`() =
+        runTest {
+            val origin = MutableStateFlow("a")
+            val session = MutableStateFlow<String?>(null)
+            val scheduled = mutableListOf<Pair<String, String?>>()
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(origin, session) { scheduled += origin.value to session.value }
+            }
+            runCurrent()
+            origin.value = "b"
+            runCurrent()
+            origin.value = "a"
+            runCurrent()
+            session.value = "signed-in-a"
+            runCurrent()
+            assertEquals(listOf("a" to null, "b" to null, "a" to null, "a" to "signed-in-a"), scheduled)
+        }
+
+    @Test
+    fun `temporary scheduling failure retries without another readiness change`() =
+        runTest {
+            var attempts = 0
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(MutableStateFlow("a"), MutableStateFlow<String?>(null)) {
+                    attempts++
+                    if (attempts == 1) error("storage temporarily unavailable")
+                }
+            }
+            runCurrent()
+            assertEquals(1, attempts)
+            advanceTimeBy(30_000)
+            runCurrent()
+            assertEquals(2, attempts)
+        }
+
+    @Test
+    fun `a cancelled scheduling attempt is not retried as a storage failure`() =
+        runTest {
+            var attempts = 0
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(MutableStateFlow("a"), MutableStateFlow<String?>(null)) {
+                    attempts++
+                    throw CancellationException("cancelled")
+                }
+            }
+            runCurrent()
+            advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(1, attempts)
+        }
+
+    @Test
+    fun `missing originals without an available source retain state without spinning`() {
+        val summary =
+            RestoreSummary(
+                "archive",
+                journalsImported = 0,
+                notesImported = 1,
+                draftsImported = 0,
+                journalLinksImported = 0,
+                mediaImported = 0,
+                unavailableOriginals = 1,
+            )
+        assertFalse(summary.shouldRetryMediaRecovery())
+        assertTrue(summary.copy(recoveringMedia = true).shouldRetryMediaRecovery())
+        assertFalse(summary.copy(unavailableOriginals = 0, recoveringMedia = true).shouldRetryMediaRecovery())
+        assertTrue(summary.copy(unavailableOriginals = 0, unavailablePreviews = 1, recoveringMedia = true).shouldRetryMediaRecovery())
+    }
+}

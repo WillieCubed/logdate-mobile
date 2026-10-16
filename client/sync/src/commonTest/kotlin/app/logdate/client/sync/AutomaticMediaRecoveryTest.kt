@@ -11,11 +11,13 @@ import app.logdate.client.sync.cloud.MediaFile
 import app.logdate.client.sync.cloud.MediaUploadResult
 import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
 import app.logdate.client.sync.metadata.MediaSyncRef
+import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.test.FakeCloudAccountRepository
 import app.logdate.client.sync.test.FakeSessionStorage
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.diagnostics.DiagnosticReason
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,7 +75,7 @@ class AutomaticMediaRecoveryTest {
         }
     private val scope get() = UploadScope("test-account-id", origin)
 
-    private fun recovery() =
+    private fun recovery(refs: MediaSyncRefStore = this.refs) =
         AutomaticMediaRecovery(
             media,
             refs,
@@ -87,6 +89,26 @@ class AutomaticMediaRecoveryTest {
             },
             DefaultLogDateConfigRepository(initialBackendUrl = origin),
         )
+
+    @Test
+    fun `cached original mapping failure stays retryable without credentials`() =
+        runTest {
+            val local = media.saveMedia(MediaPayload("transferred.png", "image/png", 1, byteArrayOf(1)))
+            refs.upsert(MediaSyncRef(id.toString(), local, "$origin/media/original", "original", 1))
+            sessions.clearSession()
+            val failing =
+                object : MediaSyncRefStore by refs {
+                    override suspend fun upsert(ref: MediaSyncRef) {
+                        error("preferences unavailable")
+                    }
+                }
+            val result =
+                assertIs<AutomaticMediaRecoveryResult.Pending>(
+                    recovery(failing).recover(id, null, "image", "$origin/media/original", "missing", scope),
+                )
+            assertEquals(DiagnosticReason.LOCAL_STORAGE, result.reason)
+            assertEquals(0, downloads)
+        }
 
     @Test
     fun `expired draft credentials refresh automatically before retrying its original`() =

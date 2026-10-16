@@ -182,7 +182,8 @@ class DefaultPasskeyAccountRepository(
     private suspend fun renewBackgroundRestoreKey(session: app.logdate.client.datastore.UserSession) {
         val renewal = restoreCredentialRenewal ?: return
         val origin = configRepository.getCurrentBackendUrl()
-        val pinned =
+
+        fun pinnedConfig() =
             app.logdate.shared.config.PinnedLogDateConfigRepository(
                 origin,
                 configRepository.getCurrentServerDescriptor(),
@@ -194,14 +195,14 @@ class DefaultPasskeyAccountRepository(
             isCurrent = isCurrent,
             renew = {
                 restoreCredentialRegistrationMutex.withLock {
-                    renewal.renew(pinned, session, restoreCredentialManager, platformAccountManager, isCurrent)
+                    renewal.renew(pinnedConfig(), session, restoreCredentialManager, platformAccountManager, isCurrent)
                 }
             },
             onFailure = { error ->
                 if (error is PasskeyApiException &&
                     error.errorCode in setOf(PasskeyApiErrorCodes.INVALID_TOKEN, PasskeyApiErrorCodes.UNAUTHORIZED)
                 ) {
-                    renewal.refreshSession(pinned, session, sessionStorage, isCurrent)
+                    renewal.refreshSession(pinnedConfig(), session, sessionStorage, isCurrent)
                 }
             },
         )

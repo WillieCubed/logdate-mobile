@@ -13,6 +13,13 @@ class PrefixedKeyValueStorage(
 ) : KeyValueStorage {
     override suspend fun getString(key: String): String? = delegate.getString(prefix + key)
 
+    override suspend fun getStringOrThrow(key: String): String? = delegate.getStringOrThrow(prefix + key)
+
+    override suspend fun putStringOrThrow(
+        key: String,
+        value: String,
+    ) = delegate.putStringOrThrow(prefix + key, value)
+
     override fun getStringSync(key: String): String? = delegate.getStringSync(prefix + key)
 
     override suspend fun putString(

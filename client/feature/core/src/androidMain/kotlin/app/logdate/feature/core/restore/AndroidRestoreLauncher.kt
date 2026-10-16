@@ -81,6 +81,7 @@ class AndroidRestoreLauncher(
     @Volatile private var completedWorkId: UUID? = null
     private var enqueueJob: Job? = null
     private var reconnectJob: Job? = null
+    private var recoveryReadinessJob: Job? = null
 
     /** The active metadata extraction job, if any. Cancelled before starting a new one. */
     private var metadataExtractionJob: Job? = null
@@ -116,16 +117,11 @@ class AndroidRestoreLauncher(
      * host activity; typically in `onCreate`.
      */
     fun setupWorkObserver(lifecycleOwner: LifecycleOwner) {
-        launcherScope.launch {
-            try {
-                ArchiveRecoveryScheduler.enqueueAll(context, getKoin())
-            } catch (
-                cancelled: CancellationException,
-            ) {
-                throw cancelled
-            } catch (_: Exception) {
-                Napier.w("Recovery scheduling will resume on the next launch")
-            }
+        if (recoveryReadinessJob?.isActive != true) {
+            recoveryReadinessJob =
+                launcherScope.launch {
+                    observeCurrentArchiveRecovery(context, getKoin())
+                }
         }
         workInfoObserver?.let {
             WorkManager
