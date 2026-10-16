@@ -7,6 +7,8 @@ import app.logdate.client.domain.streak.FireSize
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.sync.SyncPausedReason
+import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.ui.streak.CampfirePhase
 import app.logdate.ui.streak.CampfirePresentation
@@ -60,6 +62,8 @@ class TodayViewModelTest {
     private val phoneLinks = mockk<PhoneLinkRepository>()
     private val watchLinks = mockk<WatchLinkStore>()
     private val phoneHandoff = mockk<PhoneHandoff>()
+    private val syncStatus =
+        MutableStateFlow(SyncStatus(isEnabled = true, lastSyncTime = null, pendingUploads = 0, isSyncing = false, hasErrors = false))
 
     @Before
     fun setUp() {
@@ -197,6 +201,20 @@ class TodayViewModelTest {
         }
 
     @Test
+    fun `a linked watch whose sync needs a device link asks for setup again`() =
+        runTest {
+            every { phoneLinks.observe() } returns flowOf(PhoneLink.Connected(nodeId = "phone-1", phoneName = "Pixel 9"))
+            every { watchLinks.observe() } returns
+                flowOf(WatchLinkRecord(mode = LinkMode.CLOUD, phoneNode = "phone-1", linkedAt = 1L, accountId = "account-1"))
+
+            viewModel().uiState.test {
+                assertEquals(PhoneCard.None, (expectMostRecentItem() as TodayUiState.Ready).phoneCard)
+                syncStatus.value = syncStatus.value.copy(pausedReason = SyncPausedReason.NEEDS_DEVICE_LINK)
+                assertEquals(PhoneCard.SetUp("phone-1"), (awaitItem() as TodayUiState.Ready).phoneCard)
+            }
+        }
+
+    @Test
     fun `setup card leaves Today when phone linking finishes`() =
         runTest {
             val link = MutableStateFlow<WatchLinkRecord?>(null)
@@ -277,6 +295,7 @@ class TodayViewModelTest {
             phoneLinks = phoneLinks,
             watchLinks = watchLinks,
             phoneHandoff = phoneHandoff,
+            syncStatus = syncStatus,
         )
 
     private fun notesFor(

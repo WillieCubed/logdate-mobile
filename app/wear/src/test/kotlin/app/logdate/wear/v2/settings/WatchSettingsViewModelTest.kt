@@ -5,7 +5,10 @@ import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionType
+import app.logdate.client.sync.SyncError
+import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.datalayer.v2.WearFeatures
@@ -110,6 +113,36 @@ class WatchSettingsViewModelTest {
                 assertTrue(expectMostRecentItem().retrying)
                 finish.complete(SyncResult(success = true, uploadedItems = 2))
                 assertEquals(false, expectMostRecentItem().retrying)
+            }
+            coVerify(exactly = 1) { syncManager.fullSync() }
+        }
+
+    @Test
+    fun `a watch whose account link was lost asks to be set up from the phone`() =
+        runTest {
+            viewModel().uiState.test {
+                syncStatus.value = syncStatus.value.copy(pausedReason = SyncPausedReason.NEEDS_DEVICE_LINK)
+
+                assertEquals(WatchStatus.NeedsDeviceLink, expectMostRecentItem().status)
+            }
+        }
+
+    @Test
+    fun `a failing backup can be retried`() =
+        runTest {
+            coEvery { syncManager.fullSync() } returns SyncResult(success = true, uploadedItems = 1)
+            syncStatus.value =
+                syncStatus.value.copy(
+                    pendingUploads = 1,
+                    hasErrors = true,
+                    lastError = SyncError(SyncErrorType.SERVER_ERROR, "The server rejected the capture"),
+                )
+            val viewModel = viewModel()
+
+            viewModel.uiState.test {
+                assertEquals(WatchStatus.BackupFailing(1), expectMostRecentItem().status)
+                viewModel.retrySync()
+                expectMostRecentItem()
             }
             coVerify(exactly = 1) { syncManager.fullSync() }
         }
