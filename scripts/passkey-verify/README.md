@@ -55,7 +55,8 @@ sign-in check with:
 ```bash
 .venv/bin/python sim.py \
   --base https://cloud-staging.logdate.app \
-  --expected-rp-id logdate.app \
+  --origin https://app.logdate-preview.hypertext.studio \
+  --expected-rp-id logdate-preview.hypertext.studio \
   --username verify_… \
   --signin-only
 ```
@@ -65,7 +66,8 @@ For a custom location:
 ```bash
 .venv/bin/python sim.py \
   --base https://cloud-staging.logdate.app \
-  --expected-rp-id logdate.app \
+  --origin https://app.logdate-preview.hypertext.studio \
+  --expected-rp-id logdate-preview.hypertext.studio \
   --username verify_… \
   --credential-file /secure/scratch/logdate-staging-passkey.json
 ```
@@ -73,9 +75,10 @@ For a custom location:
 ## Flags
 
 - `--base` HTTPS base URL (default `https://cloud.logdate.app`)
-- `--origin` clientDataJSON origin (defaults to `--base`)
+- `--origin` clientDataJSON browser origin (defaults to `--base`)
+- `--canonical-origin` API canonical origin recorded in deployment state (defaults to `--base`); keep this distinct from the browser origin when the frontend uses another host.
 - `--expected-rp-id` immutable RP ID from the deployment contract. The
-  canonical origin host must equal this ID or be its subdomain, and both signup
+  browser origin host must equal this ID or be its subdomain, and both signup
   and signin options must return this exact value.
 - `--username` defaults to `verify_<unix_ts>` (must be `[a-zA-Z0-9_]+`, ≥3 chars)
 - `--display-name` defaults to `Deploy Verifier`

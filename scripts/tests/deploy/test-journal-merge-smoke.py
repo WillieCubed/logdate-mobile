@@ -19,6 +19,7 @@ smoke = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(smoke)
 CANDIDATE = "https://candidate.example.test"
 ORIGIN = "https://cloud.example.test"
+WEBAUTHN_ORIGIN = "https://app.example.test"
 ACCOUNT = str(uuid.uuid4())
 ACCESS = "access-token-do-not-log"
 PRIVATE = "private-token-do-not-log"
@@ -93,14 +94,14 @@ class JournalMergeSmokeTest(unittest.TestCase):
         self.private_file.write_text(PRIVATE)
         self.private_file.chmod(0o600)
         credential = {
-            "accountId": ACCOUNT, "username": "smoketest_fixture", "origin": ORIGIN,
+            "accountId": ACCOUNT, "username": "smoketest_fixture", "origin": WEBAUTHN_ORIGIN,
             "expectedRpId": "example.test", "credentialId": "Y3JlZGVudGlhbA", "userHandle": "aGFuZGxl",
         }
         self.credential_file.write_text(json.dumps(credential))
         self.credential_file.chmod(0o600)
         self.state = {
             "format": "logdate-deploy-smoke-v2", "accountId": ACCOUNT, "username": "smoketest_fixture",
-            "accessToken": ACCESS, "refreshToken": "refresh-do-not-log", "canonicalOrigin": ORIGIN,
+            "accessToken": ACCESS, "refreshToken": "refresh-do-not-log", "canonicalOrigin": ORIGIN, "webauthnOrigin": WEBAUTHN_ORIGIN,
             "preparedBaseUrl": CANDIDATE, "expectedRpId": "example.test",
             "credentialFile": str(self.credential_file), "credentialId": "Y3JlZGVudGlhbA", "userHandle": "aGFuZGxl",
             "cleanup": {"accountDeleted": False}, "mediaId": "existing-media",

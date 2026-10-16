@@ -72,8 +72,8 @@ jobs:
           .venv/bin/pip install --quiet -r scripts/passkey-verify/requirements.txt
           .venv/bin/python scripts/passkey-verify/sim.py \
             --base https://cloud-staging.logdate.app \
-            --origin https://cloud-staging.logdate.app \
-            --expected-rp-id cloud-staging.logdate.app
+            --origin "$(jq -r '.env_vars.WEBAUTHN_ORIGIN' infra/terraform/staging-contract-template.json)" \
+            --expected-rp-id "$(jq -r '.env_vars.WEBAUTHN_RP_ID' infra/terraform/staging-contract-template.json)"
 
   deploy:
     name: Deploy production revision

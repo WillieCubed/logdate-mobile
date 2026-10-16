@@ -402,6 +402,7 @@ if ! jq -e '
     (.env_vars.RELEASE_VERSION | type == "string" and length > 0) and
     (.env_vars.ATPROTO_HANDLE_DOMAIN | type == "string" and length > 0) and
     (.env_vars.WEBAUTHN_RP_ID | type == "string" and length > 0) and
+    (.env_vars.WEBAUTHN_ORIGIN | type == "string" and length > 0) and
     (.env_vars.WEBAUTHN_ALLOWED_ORIGINS | type == "string" and length > 0) and
     (.env_vars.ANDROID_CERT_FINGERPRINTS | type == "string" and length > 0) and
     (.android_signing.certificates | type == "object" and length > 0) and
@@ -441,6 +442,11 @@ fi
 
 HANDLE_DOMAIN="$(jq -r '.env_vars.ATPROTO_HANDLE_DOMAIN' "$CONTRACT_FILE")"
 RP_ID="$(jq -r '.env_vars.WEBAUTHN_RP_ID' "$CONTRACT_FILE")"
+WEBAUTHN_ORIGIN="$(jq -r '.env_vars.WEBAUTHN_ORIGIN' "$CONTRACT_FILE")"
+if ! is_https_origin "$WEBAUTHN_ORIGIN"; then
+    fail "contract WEBAUTHN_ORIGIN must be an origin-only HTTPS URL"
+    exit 1
+fi
 if [[ ! "$RP_ID" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ || "$RP_ID" == *..* ]]; then
     fail "contract RP ID is not a valid hostname"
     exit 1
@@ -474,11 +480,17 @@ if ! jq -e --arg canonical "$CANONICAL_ORIGIN" '
     fail "contract certificate set does not match signing certificates"
     exit 1
 fi
-if ! jq -e --arg canonical "$CANONICAL_ORIGIN" '
+if ! jq -e --arg origin "$WEBAUTHN_ORIGIN" --arg rp "$RP_ID" '
     def csv: split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0));
+    def within_rp: test("^https://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$") and
+        (ltrimstr("https://") == $rp or endswith("." + $rp));
     (.webauthn_additional_origins // []) as $browser |
-    ($browser == [] or (.environment == "staging" and $browser == ["https://app." + ($canonical | sub("^https://"; ""))])) and
-    (([.android_signing.certificates[] | .apk_key_hash_origin] + [$canonical] + $browser) as $expected |
+    ($browser | type == "array") and
+    ($origin | within_rp) and all($browser[]; within_rp) and
+    (.environment != "production" or $browser == []) and
+    (.environment != "staging" or ($rp != "logdate.app" and
+        ($rp | endswith(".logdate.app") | not) and ("logdate.app" | endswith("." + $rp) | not))) and
+    (([.android_signing.certificates[] | .apk_key_hash_origin] + [$origin] + $browser) as $expected |
     (.env_vars.WEBAUTHN_ALLOWED_ORIGINS | csv) as $actual |
     ($expected | length) == ($expected | unique | length) and
     ($actual | length) == ($actual | unique | length) and
@@ -699,7 +711,8 @@ invoke_passkey_prepare() {
     local -a args=(
         scripts/passkey-verify/sim.py
         --base "$SERVICE_URL"
-        --origin "$CANONICAL_ORIGIN"
+        --origin "$WEBAUTHN_ORIGIN"
+        --canonical-origin "$CANONICAL_ORIGIN"
         --expected-rp-id "$RP_ID"
         --username "$username"
         --display-name "Deployment Smoke Test"
@@ -718,7 +731,8 @@ invoke_passkey_signin() {
     local -a args=(
         scripts/passkey-verify/sim.py
         --base "$SERVICE_URL"
-        --origin "$CANONICAL_ORIGIN"
+        --origin "$WEBAUTHN_ORIGIN"
+        --canonical-origin "$CANONICAL_ORIGIN"
         --expected-rp-id "$RP_ID"
         --username "$username"
         --credential-file "$CREDENTIAL_FILE"
@@ -735,7 +749,7 @@ invoke_passkey_signin() {
 validate_deploy_state() {
     require_private_file "$STATE_FILE" "state file" || return 1
     require_private_file "$CREDENTIAL_FILE" "credential file" || return 1
-    jq -e --arg credential "$CREDENTIAL_FILE" --arg rp_id "$RP_ID" '
+    jq -e --arg credential "$CREDENTIAL_FILE" --arg rp_id "$RP_ID" --arg webauthn_origin "$WEBAUTHN_ORIGIN" '
         .format == "logdate-deploy-smoke-v2" and
         (.username | type == "string" and length > 0) and
         (.accountId | type == "string" and length > 0) and
@@ -751,6 +765,7 @@ validate_deploy_state() {
         (.userHandle | type == "string" and length > 0) and
         (.preparedBaseUrl | type == "string" and length > 0) and
         (.canonicalOrigin | type == "string" and length > 0) and
+        (.webauthnOrigin // .canonicalOrigin) == $webauthn_origin and
         .expectedRpId == $rp_id and
         (.cleanup | type == "object") and
         (.cleanup.identityVerified | type == "boolean") and
@@ -928,7 +943,8 @@ validate_prepared_endpoint_binding() {
         fail "prepared candidate origin does not match credential state"
         return 1
     fi
-    if [[ "$credential_origin" != "$CANONICAL_ORIGIN" ||
+    if [[ "$credential_origin" != "$WEBAUTHN_ORIGIN" ||
+        "$(jq -r '.webauthnOrigin // .canonicalOrigin' "$STATE_FILE")" != "$WEBAUTHN_ORIGIN" ||
         "$credential_username" != "$(jq -r '.username' "$STATE_FILE")" ||
         "$credential_account" != "$(jq -r '.accountId' "$STATE_FILE")" ||
         "$credential_id" != "$(jq -r '.credentialId' "$STATE_FILE")" ||
@@ -943,9 +959,11 @@ validate_prepared_state_binding() {
     jq -e \
         --arg release "$EXPECTED_RELEASE" \
         --arg canonical "$CANONICAL_ORIGIN" \
+        --arg webauthn_origin "$WEBAUTHN_ORIGIN" \
         --arg contract_sha "$CONTRACT_SHA256" '
             .expectedRelease == $release and
             .canonicalOrigin == $canonical and
+            (.webauthnOrigin // .canonicalOrigin) == $webauthn_origin and
             .contractSha256 == $contract_sha
         ' "$STATE_FILE" >/dev/null 2>&1 || {
         fail "prepared state does not match the current contract and release"
@@ -984,6 +1002,7 @@ upload_media_fixture() {
         --argjson media_size "$media_size" \
         --arg release "$EXPECTED_RELEASE" \
         --arg canonical "$CANONICAL_ORIGIN" \
+        --arg webauthn_origin "$WEBAUTHN_ORIGIN" \
         --arg contract_sha "$CONTRACT_SHA256" \
         '. + {
             mediaId:$media_id,
@@ -991,6 +1010,7 @@ upload_media_fixture() {
             mediaSizeBytes:$media_size,
             expectedRelease:$release,
             canonicalOrigin:$canonical,
+            webauthnOrigin:$webauthn_origin,
             contractSha256:$contract_sha
         }' \
         "$STATE_FILE" >"$updated_state"

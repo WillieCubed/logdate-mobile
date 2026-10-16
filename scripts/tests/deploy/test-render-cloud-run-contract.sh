@@ -158,7 +158,7 @@ cat >"$FIXTURE_DIR/staging-source.json" <<'EOF'
   "artifact_registry_image_name": "logdate-server",
   "domains": ["cloud-staging.logdate.app"],
   "domain": "",
-  "webauthn_additional_origins": ["https://app.cloud-staging.logdate.app"],
+  "webauthn_additional_origins": ["https://logdate-preview.hypertext.studio"],
   "android_signing_certificates": {
     "staging": {
       "fingerprint": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A",
@@ -180,8 +180,8 @@ cat >"$FIXTURE_DIR/staging-source.json" <<'EOF'
     "LOGDATE_PUBLIC_ORIGIN": "https://cloud-staging.logdate.app",
     "ATPROTO_PDS_SERVICE_URL": "https://cloud-staging.logdate.app",
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
-    "WEBAUTHN_RP_ID": "cloud-staging.logdate.app",
-    "WEBAUTHN_ORIGIN": "https://cloud-staging.logdate.app",
+    "WEBAUTHN_RP_ID": "logdate-preview.hypertext.studio",
+    "WEBAUTHN_ORIGIN": "https://app.logdate-preview.hypertext.studio",
     "BILLING_PROVIDER": "play",
     "SERVER_ENCRYPTION_ENABLED": "true",
     "SYNC_MEDIA_SIGNED_URLS": "true",
@@ -349,9 +349,9 @@ artifact_registry_image_name = "logdate-server"
 cloud_run_image             = "mutable-placeholder"
 domains                     = ["cloud-staging.logdate.app"]
 domain                      = ""
-webauthn_rp_id              = "cloud-staging.logdate.app"
-webauthn_origin             = "https://cloud-staging.logdate.app"
-webauthn_additional_origins = ["https://app.cloud-staging.logdate.app"]
+webauthn_rp_id              = "logdate-preview.hypertext.studio"
+webauthn_origin             = "https://app.logdate-preview.hypertext.studio"
+webauthn_additional_origins = ["https://logdate-preview.hypertext.studio"]
 gcs_bucket_name             = "logdate-media-staging"
 request_concurrency         = 16
 android_signing_certificates = {
@@ -665,7 +665,7 @@ cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
     "expected_build_signer_role": "staging"
   },
   "canonical_origin": "https://cloud-staging.logdate.app",
-  "webauthn_additional_origins": ["https://app.cloud-staging.logdate.app"],
+  "webauthn_additional_origins": ["https://logdate-preview.hypertext.studio"],
   "env_vars": {
     "ANDROID_CERT_FINGERPRINTS": "E1:6A:82:07:74:DE:F6:29:24:EB:E1:48:67:47:8C:72:9C:69:A0:CB:9D:01:8A:8C:E4:49:44:DA:00:15:E9:5A,F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F",
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
@@ -684,9 +684,9 @@ cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
     "SERVER_ENCRYPTION_ENABLED": "true",
     "SYNC_MEDIA_SIGNED_URLS": "true",
     "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
-    "WEBAUTHN_ALLOWED_ORIGINS": "https://cloud-staging.logdate.app,android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo,android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8,https://app.cloud-staging.logdate.app",
-    "WEBAUTHN_ORIGIN": "https://cloud-staging.logdate.app",
-    "WEBAUTHN_RP_ID": "cloud-staging.logdate.app"
+    "WEBAUTHN_ALLOWED_ORIGINS": "https://app.logdate-preview.hypertext.studio,android:apk-key-hash:4WqCB3Te9ikk6-FIZ0eMcpxpoMudAYqM5ElE2gAV6Vo,android:apk-key-hash:8T710OyT7bCMbPIdihKEmULCktjt7CbA5EYMPHG8bl8,https://logdate-preview.hypertext.studio",
+    "WEBAUTHN_ORIGIN": "https://app.logdate-preview.hypertext.studio",
+    "WEBAUTHN_RP_ID": "logdate-preview.hypertext.studio"
   },
   "environment": "staging",
   "image": "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:$RELEASE_SHA",
@@ -935,7 +935,7 @@ assert_exit_code 0 "$staging_only_status"
 assert_zero_bytes "$STAGING_ONLY_ERR"
 assert_equals "staging" "$(jq -r '.android_signing.certificates | keys | join(",")' "$STAGING_ONLY_OUT")"
 assert_equals \
-    "$(jq -r '([.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin] + (.webauthn_additional_origins // [])) | join(",")' "$STAGING_ONLY_OUT")" \
+    "$(jq -r '([.env_vars.WEBAUTHN_ORIGIN, .android_signing.certificates.staging.apk_key_hash_origin] + (.webauthn_additional_origins // [])) | join(",")' "$STAGING_ONLY_OUT")" \
     "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$STAGING_ONLY_OUT")"
 
 # Production before the application exists in Play Console. Play issues the
@@ -954,7 +954,7 @@ assert_exit_code 0 "$production_only_status"
 assert_zero_bytes "$PRODUCTION_ONLY_ERR"
 assert_equals "upload" "$(jq -r '.android_signing.certificates | keys | join(",")' "$PRODUCTION_ONLY_OUT")"
 assert_equals \
-    "$(jq -r '[.canonical_origin, .android_signing.certificates.upload.apk_key_hash_origin] | join(",")' "$PRODUCTION_ONLY_OUT")" \
+    "$(jq -r '[.env_vars.WEBAUTHN_ORIGIN, .android_signing.certificates.upload.apk_key_hash_origin] | join(",")' "$PRODUCTION_ONLY_OUT")" \
     "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$PRODUCTION_ONLY_OUT")"
 
 jq '(.android_signing_certificates[].fingerprint) |= ascii_downcase' \
@@ -971,7 +971,7 @@ assert_equals \
     "$(jq -r '[.android_signing.certificates.staging.fingerprint, .android_signing.certificates.play_app_signing.fingerprint] | join(",")' "$LOWERCASE_STAGING_OUT")" \
     "$(jq -r '.env_vars.ANDROID_CERT_FINGERPRINTS' "$LOWERCASE_STAGING_OUT")"
 assert_equals \
-    "$(jq -r '([.canonical_origin, .android_signing.certificates.staging.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] + (.webauthn_additional_origins // [])) | join(",")' "$LOWERCASE_STAGING_OUT")" \
+    "$(jq -r '([.env_vars.WEBAUTHN_ORIGIN, .android_signing.certificates.staging.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] + (.webauthn_additional_origins // [])) | join(",")' "$LOWERCASE_STAGING_OUT")" \
     "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$LOWERCASE_STAGING_OUT")"
 assert_equals \
     "$(jq -r '.android_signing.certificates[.android_signing.expected_build_signer_role].fingerprint' "$LOWERCASE_STAGING_OUT")" \
@@ -991,7 +991,7 @@ assert_equals \
     "$(jq -r '[.android_signing.certificates.upload.fingerprint, .android_signing.certificates.play_app_signing.fingerprint] | join(",")' "$LOWERCASE_PRODUCTION_OUT")" \
     "$(jq -r '.env_vars.ANDROID_CERT_FINGERPRINTS' "$LOWERCASE_PRODUCTION_OUT")"
 assert_equals \
-    "$(jq -r '[.canonical_origin, .android_signing.certificates.upload.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] | join(",")' "$LOWERCASE_PRODUCTION_OUT")" \
+    "$(jq -r '[.env_vars.WEBAUTHN_ORIGIN, .android_signing.certificates.upload.apk_key_hash_origin, .android_signing.certificates.play_app_signing.apk_key_hash_origin] | join(",")' "$LOWERCASE_PRODUCTION_OUT")" \
     "$(jq -r '.env_vars.WEBAUTHN_ALLOWED_ORIGINS' "$LOWERCASE_PRODUCTION_OUT")"
 assert_equals \
     "$(jq -r '.android_signing.certificates[.android_signing.expected_build_signer_role].fingerprint' "$LOWERCASE_PRODUCTION_OUT")" \
@@ -1035,25 +1035,25 @@ expect_failure wrong-image-name staging "$RELEASE_SHA" wrong-image-name.json "ar
 # Additional browser origins are explicit, exact and isolated to staging.
 origin_case=0
 for origins in \
-    '["https://app.cloud-staging.logdate.app/"]' \
-    '["https://app.cloud-staging.logdate.app:443"]' \
+    '["https://logdate-preview.hypertext.studio/"]' \
+    '["https://logdate-preview.hypertext.studio:443"]' \
     '["https://user@app.cloud-staging.logdate.app"]' \
-    '["https://app.cloud-staging.logdate.app?query=1"]' \
-    '["https://app.cloud-staging.logdate.app#fragment"]' \
+    '["https://logdate-preview.hypertext.studio?query=1"]' \
+    '["https://logdate-preview.hypertext.studio#fragment"]' \
     '["https://*.cloud-staging.logdate.app"]' \
     '["https://unapproved.example.test"]' \
-    '["https://app.cloud-staging.logdate.app","https://app.cloud-staging.logdate.app"]'; do
+    '["https://logdate-preview.hypertext.studio","https://logdate-preview.hypertext.studio"]'; do
     origin_case=$((origin_case + 1))
     jq --argjson origins "$origins" '.webauthn_additional_origins = $origins' \
         "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/bad-browser-origin-$origin_case.json"
     expect_failure "bad-browser-origin-$origin_case" staging "$RELEASE_SHA" \
         "bad-browser-origin-$origin_case.json" \
-        "additional WebAuthn origins must be empty or contain only the approved staging frontend"
+        "WebAuthn browser origins must be unique origin-only HTTPS URLs within the relying party"
 done
-jq '.webauthn_additional_origins = ["https://app.cloud-staging.logdate.app"]' \
+jq '.webauthn_additional_origins = ["https://logdate-preview.hypertext.studio"]' \
     "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/production-browser-origin.json"
 expect_failure production-browser-origin production "$RELEASE_SHA" production-browser-origin.json \
-    "additional WebAuthn origins must be empty or contain only the approved staging frontend"
+    "production does not declare additional WebAuthn browser origins"
 
 jq '.domains += ["extra.logdate.app"]' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/extra-domain.json"
 expect_failure extra-domain staging "$RELEASE_SHA" extra-domain.json "environment domains must contain exactly cloud-staging.logdate.app"

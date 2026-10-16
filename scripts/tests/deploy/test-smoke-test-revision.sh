@@ -10,6 +10,7 @@ SCRIPT="scripts/smoke-test-revision.sh"
 RELEASE_SHA="09aa934a2605f1bb82adcf8b81ed96e7037e2010"
 EXPECTED_RELEASE="logdate-server@$RELEASE_SHA"
 CANONICAL_ORIGIN="https://cloud-staging.example.test"
+WEBAUTHN_ORIGIN="https://app.example.test"
 CANDIDATE_ORIGIN="https://candidate.example.test"
 HANDLE_DOMAIN="example.test"
 RP_ID="example.test"
@@ -46,7 +47,8 @@ cat >"$tmp_dir/contract.unsorted.json" <<EOF
     "RELEASE_VERSION": "$EXPECTED_RELEASE",
     "ATPROTO_HANDLE_DOMAIN": "$HANDLE_DOMAIN",
     "WEBAUTHN_RP_ID": "$RP_ID",
-    "WEBAUTHN_ALLOWED_ORIGINS": "$CANONICAL_ORIGIN,$APK_ORIGIN_ONE,$APK_ORIGIN_TWO,https://app.cloud-staging.example.test",
+    "WEBAUTHN_ORIGIN": "$WEBAUTHN_ORIGIN",
+    "WEBAUTHN_ALLOWED_ORIGINS": "$WEBAUTHN_ORIGIN,$APK_ORIGIN_ONE,$APK_ORIGIN_TWO,https://app.cloud-staging.example.test",
     "ANDROID_CERT_FINGERPRINTS": "$CERT_ONE,$CERT_TWO"
   },
   "android_signing": {
@@ -500,6 +502,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --base) base="$2"; shift 2 ;;
         --origin) origin="$2"; shift 2 ;;
+        --canonical-origin) [[ "$2" == "${FAKE_CANONICAL_ORIGIN:?}" ]] || exit 82; shift 2 ;;
         --expected-rp-id) [[ "$2" == "${FAKE_RP_ID:?}" ]] || exit 81; shift 2 ;;
         --username) username="$2"; shift 2 ;;
         --display-name) shift 2 ;;
@@ -512,7 +515,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ "$origin" == "${FAKE_CANONICAL_ORIGIN:?}" ]] || { echo "wrong WebAuthn origin" >&2; exit 87; }
+[[ "$origin" == "${FAKE_WEBAUTHN_ORIGIN:?}" ]] || { echo "wrong WebAuthn origin" >&2; exit 87; }
 [[ -n "$state_file" && -n "$credential_file" ]] || { echo "missing verifier state paths" >&2; exit 86; }
 
 header_file="$(mktemp "${TMPDIR:-/tmp}/fake-passkey-header.XXXXXX")"
@@ -536,9 +539,10 @@ write_state() {
         --arg credential_file "$credential_file" \
         --arg credential_id "Y3JlZGVudGlhbA" \
         --arg base "$base" \
-        --arg origin "${FAKE_CANONICAL_ORIGIN:?}" \
+        --arg canonical "${FAKE_CANONICAL_ORIGIN:?}" \
+        --arg origin "${FAKE_WEBAUTHN_ORIGIN:?}" \
         --arg user_handle "${FAKE_USER_HANDLE:?}" \
-        '$existing + {format:"logdate-deploy-smoke-v2", username:$username, accountId:$account_id, accessToken:$access_token, refreshToken:$refresh_token, credentialFile:$credential_file, credentialId:$credential_id, userHandle:$user_handle, preparedBaseUrl:($existing.preparedBaseUrl // $base), canonicalOrigin:$origin, expectedRpId:env.FAKE_RP_ID, lastAuthenticatedBaseUrl:$base, recoveryMode:false, cleanup:{identityVerified:false,mediaDeleted:($existing.cleanup.mediaDeleted // false),refreshRevocationStarted:false,refreshRevoked:false,accountDeletionStarted:($existing.cleanup.accountDeletionStarted // false),accountDeleted:($existing.cleanup.accountDeleted // false)}}' \
+        '$existing + {format:"logdate-deploy-smoke-v2", username:$username, accountId:$account_id, accessToken:$access_token, refreshToken:$refresh_token, credentialFile:$credential_file, credentialId:$credential_id, userHandle:$user_handle, preparedBaseUrl:($existing.preparedBaseUrl // $base), canonicalOrigin:$canonical, webauthnOrigin:$origin, expectedRpId:env.FAKE_RP_ID, lastAuthenticatedBaseUrl:$base, recoveryMode:false, cleanup:{identityVerified:false,mediaDeleted:($existing.cleanup.mediaDeleted // false),refreshRevocationStarted:false,refreshRevoked:false,accountDeletionStarted:($existing.cleanup.accountDeletionStarted // false),accountDeleted:($existing.cleanup.accountDeleted // false)}}' \
         >"$state_file"
     chmod 600 "$state_file"
 }
@@ -548,7 +552,8 @@ if [[ "$signin_only" == "0" ]]; then
     curl --silent --show-error --output /dev/null --header "@$header_file" --request POST --data '{}' "$base/api/v1/auth/signup/passkey/complete"
     jq -n -S \
         --arg base "$base" \
-        --arg origin "${FAKE_CANONICAL_ORIGIN:?}" \
+        --arg canonical "${FAKE_CANONICAL_ORIGIN:?}" \
+        --arg origin "${FAKE_WEBAUTHN_ORIGIN:?}" \
         --arg username "$username" \
         --arg account_id "${FAKE_ACCOUNT_ID:?}" \
         --arg user_handle "${FAKE_USER_HANDLE:?}" \
@@ -666,6 +671,7 @@ run_smoke() {
     FAKE_USER_HANDLE="$USER_HANDLE" \
     FAKE_EXPECTED_RELEASE="$EXPECTED_RELEASE" \
     FAKE_CANONICAL_ORIGIN="$CANONICAL_ORIGIN" \
+    FAKE_WEBAUTHN_ORIGIN="$WEBAUTHN_ORIGIN" \
     FAKE_HANDLE_DOMAIN="$HANDLE_DOMAIN" \
     FAKE_RP_ID="$RP_ID" \
     FAKE_EXPECT_ASSET_ORIGIN="$expected_asset_origin" \
@@ -769,6 +775,7 @@ legacy_output="$(
     FAKE_CHALLENGE_SECRET="$CHALLENGE_SECRET" \
     FAKE_EXPECTED_RELEASE="$EXPECTED_RELEASE" \
     FAKE_CANONICAL_ORIGIN="$CANONICAL_ORIGIN" \
+    FAKE_WEBAUTHN_ORIGIN="$WEBAUTHN_ORIGIN" \
     FAKE_PACKAGE_NAME="$PACKAGE_NAME" \
     FAKE_CERT_ONE="$CERT_ONE" \
     FAKE_CERT_TWO="$CERT_TWO" \

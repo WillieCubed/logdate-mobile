@@ -33,7 +33,7 @@ locals {
     WEBAUTHN_ORIGIN = var.webauthn_origin
   } : {}
 
-  webauthn_additional_origins_env = length(var.webauthn_additional_origins) > 0 ? {
+  webauthn_allowed_origins_env = (length(var.webauthn_additional_origins) > 0 || anytrue([for certificate in values(var.android_signing_certificates) : certificate != null])) ? {
     WEBAUTHN_ALLOWED_ORIGINS = join(",", concat(
       [var.webauthn_origin],
       [for role in ["staging", "upload", "play_app_signing"] : var.android_signing_certificates[role].apk_key_hash_origin if try(var.android_signing_certificates[role], null) != null],
@@ -48,7 +48,7 @@ locals {
     local.webauthn_env,
     local.webauthn_origin_env,
     var.cloud_run_env,
-    local.webauthn_additional_origins_env
+    local.webauthn_allowed_origins_env
   )
 
   secret_ids = toset(concat(
@@ -380,11 +380,29 @@ resource "google_cloud_run_v2_service" "server" {
     precondition {
       condition = length(var.webauthn_additional_origins) == 0 || (
         var.project_id == "logdate-dev" &&
-        var.service_name == "logdate-server-staging" &&
-        var.webauthn_rp_id == "cloud-staging.logdate.app" &&
-        var.webauthn_origin == "https://cloud-staging.logdate.app"
+        var.service_name == "logdate-server-staging"
       )
       error_message = "Additional passkey browser origins require the isolated LogDate staging service and relying party."
+    }
+
+    precondition {
+      condition = (var.webauthn_rp_id == "" && var.webauthn_origin == "" && length(var.webauthn_additional_origins) == 0) || (
+        var.webauthn_rp_id != "" &&
+        alltrue([for origin in concat([var.webauthn_origin], var.webauthn_additional_origins) :
+          can(regex("^https://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$", origin)) &&
+          (origin == "https://${var.webauthn_rp_id}" || endswith(origin, ".${var.webauthn_rp_id}"))
+        ])
+      )
+      error_message = "Passkey browser origins must use HTTPS within the configured relying party."
+    }
+
+    precondition {
+      condition = var.service_name != "logdate-server-staging" || (
+        var.webauthn_rp_id != "logdate.app" &&
+        !endswith(var.webauthn_rp_id, ".logdate.app") &&
+        !endswith("logdate.app", ".${var.webauthn_rp_id}")
+      )
+      error_message = "Staging passkeys must use a relying party outside the production cookie domain."
     }
   }
 

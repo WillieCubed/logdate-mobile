@@ -93,7 +93,7 @@ def load_bound_state(base, state_file, phase):
     for key in ("accountId", "username", "expectedRpId", "credentialId", "userHandle"):
         if not state.get(key) or credential.get(key) != state[key]:
             raise SmokeError("Passkey identity does not match deployment state")
-    if credential.get("origin") != state["canonicalOrigin"]:
+    if credential.get("origin") != state.get("webauthnOrigin", state["canonicalOrigin"]):
         raise SmokeError("Passkey origin does not match deployment state")
     return state
 

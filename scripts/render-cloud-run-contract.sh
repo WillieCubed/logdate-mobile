@@ -527,9 +527,10 @@ try:
     canonical_origin = f"https://{canonical_domain}"
 
     additional_origins = source["webauthn_additional_origins"]
-    approved_origins = ["https://app.cloud-staging.logdate.app"] if environment == "staging" else []
-    if additional_origins not in ([], approved_origins):
-        fail("additional WebAuthn origins must be empty or contain only the approved staging frontend")
+    if not isinstance(additional_origins, list) or not all(isinstance(value, str) for value in additional_origins):
+        fail("additional WebAuthn origins must be an array of HTTPS origins")
+    if environment == "production" and additional_origins:
+        fail("production does not declare additional WebAuthn browser origins")
 
     signing = source["android_signing_certificates"]
     if not isinstance(signing, dict):
@@ -628,14 +629,15 @@ try:
         "LOGDATE_PUBLIC_ORIGIN": canonical_origin,
         "ATPROTO_PDS_SERVICE_URL": canonical_origin,
         "ATPROTO_HANDLE_DOMAIN": canonical_domain if environment == "staging" else "logdate.app",
-        "WEBAUTHN_RP_ID": canonical_domain if environment == "staging" else "logdate.app",
-        "WEBAUTHN_ORIGIN": canonical_origin,
         "BILLING_PROVIDER": "play",
         "SERVER_ENCRYPTION_ENABLED": "true",
         "SYNC_MEDIA_SIGNED_URLS": "true",
         "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
         "AUTO_MIGRATE": "false",
     }
+    if environment == "production":
+        expected_values.update(WEBAUTHN_RP_ID="logdate.app", WEBAUTHN_ORIGIN=canonical_origin)
+
     for key, expected in expected_values.items():
         if env_vars[key] != expected:
             if key == "LOGDATE_PUBLIC_ORIGIN":
@@ -643,6 +645,30 @@ try:
             if key == "AUTO_MIGRATE":
                 fail("AUTO_MIGRATE must be false")
             fail(f"{key} does not match the first-party contract")
+
+    relying_party = env_vars["WEBAUTHN_RP_ID"]
+    dns_label = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+    if len(relying_party) > 253 or not re.fullmatch(rf"{dns_label}(?:\.{dns_label})+", relying_party):
+        fail("WEBAUTHN_RP_ID must be a DNS hostname")
+    if environment == "staging" and (
+        relying_party == "logdate.app" or relying_party.endswith(".logdate.app") or
+        "logdate.app".endswith("." + relying_party)
+    ):
+        fail("staging relying party must be outside the production cookie domain")
+    browser_origins = [env_vars["WEBAUTHN_ORIGIN"], *additional_origins]
+    if len(browser_origins) != len(set(browser_origins)):
+        fail("WebAuthn browser origins must be unique origin-only HTTPS URLs within the relying party")
+    for browser_origin in browser_origins:
+        parsed = urlparse(browser_origin)
+        if (
+            parsed.scheme != "https" or not parsed.hostname or
+            not re.fullmatch(rf"{dns_label}(?:\.{dns_label})+", parsed.hostname) or
+            browser_origin != f"https://{parsed.hostname}" or
+            parsed.username or parsed.password or parsed.port is not None or
+            parsed.path or parsed.query or parsed.fragment or
+            not (parsed.hostname == relying_party or parsed.hostname.endswith("." + relying_party))
+        ):
+            fail("WebAuthn browser origins must be unique origin-only HTTPS URLs within the relying party")
 
     parsed_origin = urlparse(env_vars["LOGDATE_PUBLIC_ORIGIN"])
     if parsed_origin.scheme != "https" or parsed_origin.hostname != canonical_domain or any(
@@ -751,7 +777,7 @@ try:
             positive_integer(probe[key], f"runtime probe {key}")
 
     rendered_env = dict(env_vars)
-    rendered_env["WEBAUTHN_ALLOWED_ORIGINS"] = ",".join([canonical_origin, *android_origins, *additional_origins])
+    rendered_env["WEBAUTHN_ALLOWED_ORIGINS"] = ",".join([env_vars["WEBAUTHN_ORIGIN"], *android_origins, *additional_origins])
     rendered_env["ANDROID_CERT_FINGERPRINTS"] = ",".join(fingerprints)
     rendered_env["RELEASE_VERSION"] = f"logdate-server@{release_sha}"
     expected_build_signer = normalized_certificates[expected_build_signer_role]

@@ -5,7 +5,7 @@
   "artifact_registry_image_name": "logdate-server",
   "domains": ["cloud-staging.logdate.app"],
   "domain": "",
-  "webauthn_additional_origins": ["https://app.cloud-staging.logdate.app"],
+  "webauthn_additional_origins": [],
   "env_vars": {
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
     "ATPROTO_PDS_SERVICE_URL": "https://cloud-staging.logdate.app",
@@ -23,8 +23,8 @@
     "SERVER_ENCRYPTION_ENABLED": "true",
     "SYNC_MEDIA_SIGNED_URLS": "true",
     "SYNC_MEDIA_SIGNED_URL_TTL_HOURS": "1",
-    "WEBAUTHN_ORIGIN": "https://cloud-staging.logdate.app",
-    "WEBAUTHN_RP_ID": "cloud-staging.logdate.app"
+    "WEBAUTHN_ORIGIN": "https://app.logdate-preview.hypertext.studio",
+    "WEBAUTHN_RP_ID": "logdate-preview.hypertext.studio"
   },
   "project_id": "logdate-dev",
   "region": "us-central1",

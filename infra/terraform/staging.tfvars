@@ -4,14 +4,11 @@ service_name = "logdate-server-staging"
 # Placeholder image only used for the initial terraform apply. Real images get
 # pushed by the Deploy Server Staging workflow (in repo_vars mode for this env).
 cloud_run_image = "us-central1-docker.pkg.dev/logdate-dev/logdate/logdate-server:latest"
-# WebAuthn rpId is intentionally bound to the staging subdomain rather than the
-# registrable apex `logdate.app`. Production uses the apex so passkeys work
-# across `*.logdate.app`; if staging used the apex too, a passkey created here
-# would also unlock prod (`cloud.logdate.app`). Subdomain-bound rpId keeps the
-# two environments isolated.
-webauthn_rp_id              = "cloud-staging.logdate.app"
-webauthn_origin             = "https://cloud-staging.logdate.app"
-webauthn_additional_origins = ["https://app.cloud-staging.logdate.app"]
+# Browser passkeys use the isolated frontend namespace, independently of API
+# identity handles and the backend canonical hostname. Production RP is unchanged.
+webauthn_rp_id              = "logdate-preview.hypertext.studio"
+webauthn_origin             = "https://app.logdate-preview.hypertext.studio"
+webauthn_additional_origins = []
 
 enable_github_oidc = true
 github_repo        = "WillieCubed/logdate-mobile"

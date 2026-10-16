@@ -577,6 +577,7 @@ def deploy_state_from_auth(
     existing: dict,
     base_url: str,
     origin: str,
+    canonical_origin: str | None = None,
 ) -> dict:
     access_token, refresh_token, account_id, _account_username = bound_auth_values(auth, state)
 
@@ -614,7 +615,8 @@ def deploy_state_from_auth(
             "credentialId": credential_id,
             "userHandle": b64u(state["user_handle"]),
             "preparedBaseUrl": existing.get("preparedBaseUrl", base_url),
-            "canonicalOrigin": origin,
+            "canonicalOrigin": canonical_origin or existing.get("canonicalOrigin", base_url),
+            "webauthnOrigin": origin,
             "expectedRpId": state["expected_rp_id"],
             "lastAuthenticatedBaseUrl": base_url,
             "recoveryMode": False,
@@ -632,6 +634,7 @@ def retain_recovery_state(
     base_url: str,
     origin: str,
     expected_rp_id: str,
+    canonical_origin: str | None = None,
 ) -> None:
     if state_path is None:
         return
@@ -645,7 +648,8 @@ def retain_recovery_state(
         "credentialFile": str(credential_path.resolve()),
         "credentialId": b64u(state["credential_id"]),
         "preparedBaseUrl": base_url,
-        "canonicalOrigin": origin,
+        "canonicalOrigin": canonical_origin or base_url,
+        "webauthnOrigin": origin,
         "expectedRpId": expected_rp_id,
         "cleanup": {
             "identityVerified": False,
@@ -668,6 +672,8 @@ def main() -> None:
     p.add_argument("--base", default="https://cloud.logdate.app")
     p.add_argument("--origin", default=None,
                    help="Origin in clientDataJSON; defaults to --base")
+    p.add_argument("--canonical-origin", default=None,
+                   help="Canonical API origin recorded in deployment state; defaults to --base")
     p.add_argument("--expected-rp-id", default=None,
                    help="Immutable RP ID from the deployment contract")
     p.add_argument("--username", default=f"verify_{int(time.time())}")
@@ -717,6 +723,8 @@ def main() -> None:
         atomic_write_private_json(output_path, payload)
         return
     origin = args.origin or args.base
+    canonical_origin = args.canonical_origin or args.base
+    require_https_origin(canonical_origin, "--canonical-origin")
     require_https_origin(args.base, "--base")
     require_https_origin(origin, "--origin")
     if not args.expected_rp_id:
@@ -793,6 +801,7 @@ def main() -> None:
                 args.base,
                 origin,
                 expected_rp_id,
+                canonical_origin,
             )
             raise VerifierError(
                 "signup completed but returned unusable auth; recovery material retained"
@@ -800,7 +809,7 @@ def main() -> None:
         try:
             save_credential(credential_path, args.base, origin, expected_rp_id, state)
             provisional_state = deploy_state_from_auth(
-                state["auth"], state, credential_path, existing_deploy_state, args.base, origin
+                state["auth"], state, credential_path, existing_deploy_state, args.base, origin, canonical_origin
             )
             if state_path is not None:
                 atomic_write_private_json(state_path, provisional_state)
@@ -814,6 +823,7 @@ def main() -> None:
                 args.base,
                 origin,
                 expected_rp_id,
+                canonical_origin,
             )
             raise VerifierError("failed to persist disposable-account cleanup state") from error
 
@@ -821,7 +831,7 @@ def main() -> None:
     try:
         save_credential(credential_path, args.base, origin, expected_rp_id, state)
         deploy_state = deploy_state_from_auth(
-            auth, state, credential_path, existing_deploy_state, args.base, origin
+            auth, state, credential_path, existing_deploy_state, args.base, origin, canonical_origin
         )
         if state_path is not None:
             atomic_write_private_json(state_path, deploy_state)
@@ -833,6 +843,7 @@ def main() -> None:
             args.base,
             origin,
             expected_rp_id,
+            canonical_origin,
         )
         raise VerifierError("failed to persist refreshed disposable-account cleanup state") from error
     print("\n=== END-TO-END PASSKEY VERIFICATION SUCCEEDED ===")
