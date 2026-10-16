@@ -1,5 +1,6 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
@@ -54,6 +55,9 @@ internal class PasskeyRegistrationCoordinator(
     suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
         return try {
             val origin = configRepository.getCurrentBackendUrl()
+            val authenticationGuard = sessionStorage.captureAuthenticationGuard()
+            check(!sessionStorage.supportsGuardedAuthentication || authenticationGuard != null) { "Account access is not ready" }
+            check(authenticationGuard == null || authenticationGuard.origin == origin) { "Authentication server changed" }
             bindingGuard.requireCanonicalOwnerBinding()
             // Step 1: Begin account creation
             val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
@@ -66,20 +70,10 @@ internal class PasskeyRegistrationCoordinator(
                     requestedOwnerId = canonicalOwnerId,
                 )
 
-            val beginResult = apiClient.beginAccountCreation(beginRequest)
-            if (beginResult.isFailure) {
-                return Result.failure(beginResult.exceptionOrNull()!!)
-            }
-
-            val beginData = beginResult.getOrThrow()
+            val beginData = apiClient.beginAccountCreation(beginRequest).getOrThrow()
 
             // Step 2: Create passkey using platform authenticator
-            val registrationResult = passkeyManager.registerPasskey(beginData.registrationOptions)
-            if (registrationResult.isFailure) {
-                return Result.failure(registrationResult.exceptionOrNull()!!)
-            }
-
-            val credentialJson = registrationResult.getOrThrow()
+            val credentialJson = passkeyManager.registerPasskey(beginData.registrationOptions).getOrThrow()
             val credential = credentialCodec.parseCredentialResponse(credentialJson)
 
             // Step 3: Complete account creation
@@ -90,12 +84,7 @@ internal class PasskeyRegistrationCoordinator(
                     nickname = deviceName(),
                 )
 
-            val completeResult = apiClient.completeAccountCreation(completeRequest)
-            if (completeResult.isFailure) {
-                return Result.failure(completeResult.exceptionOrNull()!!)
-            }
-
-            val completeData = completeResult.getOrThrow()
+            val completeData = apiClient.completeAccountCreation(completeRequest).getOrThrow()
             if (completeData.account.id.toString() != canonicalOwnerId) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
@@ -106,6 +95,7 @@ internal class PasskeyRegistrationCoordinator(
                 refreshToken = completeData.tokens.refreshToken,
                 accountId = completeData.account.id.toString(),
                 origin = origin,
+                authenticationGuard = authenticationGuard,
             )
 
             // Step 5: Add account to platform account manager
@@ -139,18 +129,15 @@ internal class PasskeyRegistrationCoordinator(
         var unlockSecret: ByteArray? = null
         return try {
             val origin = configRepository.getCurrentBackendUrl()
+            val authenticationGuard = sessionStorage.captureAuthenticationGuard()
+            check(!sessionStorage.supportsGuardedAuthentication || authenticationGuard != null) { "Account access is not ready" }
+            check(authenticationGuard == null || authenticationGuard.origin == origin) { "Authentication server changed" }
             bindingGuard.requireCanonicalOwnerBinding()
             val originalOwner = canonicalOwnerProvider.getCanonicalOwnerId()
             val apiBaseUrl = configRepository.apiBaseUrl.first()
             // Step 1: Begin authentication
             val beginRequest = BeginAuthenticationRequest(username = username)
-            val beginResult = apiClient.beginAuthentication(beginRequest)
-
-            if (beginResult.isFailure) {
-                return Result.failure(beginResult.exceptionOrNull()!!)
-            }
-
-            val beginData = beginResult.getOrThrow()
+            val beginData = apiClient.beginAuthentication(beginRequest).getOrThrow()
 
             // Step 2: Convert to PasskeyAuthenticationOptions
             val authOptions =
@@ -162,22 +149,12 @@ internal class PasskeyRegistrationCoordinator(
                 )
 
             // Step 3: Authenticate with passkey
-            val authResult = passkeyManager.authenticateWithUnlock(authOptions)
-            if (authResult.isFailure) {
-                return Result.failure(authResult.exceptionOrNull()!!)
-            }
-
-            val localAssertion = authResult.getOrThrow()
+            val localAssertion = passkeyManager.authenticateWithUnlock(authOptions).getOrThrow()
             unlockSecret = localAssertion.unlockSecret
             val assertion = credentialCodec.parseAssertionResponse(localAssertion.credentialJson)
 
             // Step 4: Complete authentication
-            val completeResult = apiClient.completeAuthentication(CompleteAuthenticationRequest(assertion, beginData.challenge))
-            if (completeResult.isFailure) {
-                return Result.failure(completeResult.exceptionOrNull()!!)
-            }
-
-            val completeData = completeResult.getOrThrow()
+            val completeData = apiClient.completeAuthentication(CompleteAuthenticationRequest(assertion, beginData.challenge)).getOrThrow()
             when (bindingGuard.ownerBindingFor(completeData.account, adoptLocalData)) {
                 CanonicalOwnerBindingGuard.OwnerBinding.ALLOWED -> Unit
                 CanonicalOwnerBindingGuard.OwnerBinding.NEEDS_LOCAL_DATA_CONSENT ->
@@ -194,6 +171,7 @@ internal class PasskeyRegistrationCoordinator(
                 refreshToken = completeData.tokens.refreshToken,
                 accountId = completeData.account.id.toString(),
                 origin = origin,
+                authenticationGuard = authenticationGuard,
             )
 
             // Step 6: Update tokens in platform account manager (or register it, if this
@@ -263,18 +241,18 @@ internal class PasskeyRegistrationCoordinator(
         refreshToken: String,
         accountId: String,
         origin: String,
+        authenticationGuard: SessionInstallationGuard?,
     ) {
         check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
         beforeSessionPersist(origin, accountId)
         currentCoroutineContext().ensureActive()
         check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
-        sessionStorage.saveSession(
-            UserSession(
-                accessToken = accessToken,
-                refreshToken = refreshToken,
-                accountId = accountId,
-            ),
-        )
+        val session = UserSession(accessToken, refreshToken, accountId)
+        if (authenticationGuard == null) {
+            sessionStorage.saveExplicitSession(session)
+        } else {
+            check(sessionStorage.installExplicitSessionIfCurrent(authenticationGuard, session)) { "Account access changed" }
+        }
         onSessionPersisted()
         currentCoroutineContext().ensureActive()
     }

@@ -38,12 +38,26 @@ data class OriginBoundSession(
 data class SessionInstallationGuard(
     val origin: String,
     val revision: Long,
+    val token: String? = null,
 )
 
 /**
  * Interface for session storage
  */
 interface SessionStorage {
+    val supportsGuardedAuthentication: Boolean get() = false
+
+    suspend fun captureAuthenticationGuard(): SessionInstallationGuard? = null
+
+    suspend fun installExplicitSessionIfCurrent(
+        expected: SessionInstallationGuard,
+        session: UserSession,
+    ): Boolean = false
+
+    suspend fun saveExplicitSession(session: UserSession) = saveSession(session)
+
+    suspend fun clearSessionIfCurrent(expected: OriginBoundSession): Boolean = false
+
     suspend fun captureInstallationGuard(): SessionInstallationGuard? = null
 
     suspend fun installSessionIfCurrent(

@@ -1,5 +1,6 @@
 package app.logdate.client.device.storage
 
+import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionInstallationGuard
@@ -24,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.text.encodeToByteArray
+import kotlin.uuid.Uuid
 
 /**
  * SessionStorage backed by SecureStorage for token persistence.
@@ -33,6 +35,8 @@ class SecureSessionStorage(
     private val configRepository: LogDateConfigRepository,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val privacyEpoch: app.logdate.shared.config.PrivacyScopeEpoch? = null,
+    private val nativeRestorePolicy: app.logdate.client.datastore.NativeRestorePolicy? = null,
+    private val connectedVault: SecureSessionStorage? = null,
 ) : SessionStorage,
     OriginSessionVault {
     @Serializable
@@ -57,6 +61,14 @@ class SecureSessionStorage(
 
     private val sessionState = MutableStateFlow(CachedSession(null, null, 0))
 
+    private data class GuardSnapshot(
+        val record: String?,
+        val decision: String?,
+    )
+
+    private val guards = linkedMapOf<String, GuardSnapshot>()
+    override val supportsGuardedAuthentication = true
+
     private companion object {
         // Native backup callbacks construct a separate vault over the same secure store.
         val identityMutex = kotlinx.coroutines.sync.Mutex()
@@ -76,24 +88,49 @@ class SecureSessionStorage(
 
     override fun getSession(): UserSession? = getOriginBoundSession()?.session
 
-    override suspend fun captureInstallationGuard(): SessionInstallationGuard? {
+    override suspend fun captureInstallationGuard(): SessionInstallationGuard? = captureGuard(false)
+
+    override suspend fun captureAuthenticationGuard(): SessionInstallationGuard? = captureGuard(true)
+
+    private suspend fun captureGuard(explicit: Boolean): SessionInstallationGuard? {
         val origin = configRepository.getCurrentBackendUrl()
         if (sessionState.value.origin != origin) loadCurrentSession(origin)
         return identityMutex.withLock {
-            // The existing sign-out tombstone also prevents provider credentials from reviving
-            // this session after a restart, even when the provider could not clear its key.
-            if (secureStorage.getString(scopedKey(StorageKeys.RECORD, origin)) == "null") return@withLock null
+            val decision = nativeRestorePolicy?.decision(origin)
+            val record = secureStorage.getString(scopedKey(StorageKeys.RECORD, origin))
+            if (!explicit && (!NativeRestorePolicy.allows(decision) || record == "null")) return@withLock null
             val cached = sessionState.value
             if (cached.origin != origin || configRepository.getCurrentBackendUrl() != origin) return@withLock null
-            SessionInstallationGuard(origin, cached.revision)
+            val expected = cached.session?.let { encodeSession(it) }
+            val hiddenSignedOutRecord = cached.session == null && (record == "null" || !NativeRestorePolicy.allows(decision))
+            if (record != expected && !hiddenSignedOutRecord) {
+                sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
+                return@withLock null
+            }
+            val token = Uuid.random().toString()
+            if (guards.size >= 64) guards.remove(guards.keys.first())
+            guards[token] = GuardSnapshot(record, decision)
+            SessionInstallationGuard(origin, cached.revision, token)
         }
     }
 
     override suspend fun installSessionIfCurrent(
         expected: SessionInstallationGuard,
         session: UserSession,
+    ): Boolean = install(expected, session, false)
+
+    override suspend fun installExplicitSessionIfCurrent(
+        expected: SessionInstallationGuard,
+        session: UserSession,
+    ): Boolean = install(expected, session, true)
+
+    private suspend fun install(
+        expected: SessionInstallationGuard,
+        session: UserSession,
+        explicit: Boolean,
     ): Boolean =
         mutateIdentity({ getSession()?.accountId != session.accountId }) {
+            val snapshot = guards.remove(expected.token) ?: return@mutateIdentity false
             val cached = sessionState.value
             if (cached.origin != expected.origin ||
                 cached.revision != expected.revision ||
@@ -101,17 +138,18 @@ class SecureSessionStorage(
             ) {
                 return@mutateIdentity false
             }
+            val decision = nativeRestorePolicy?.decision(expected.origin)
             val persisted = secureStorage.getString(scopedKey(StorageKeys.RECORD, expected.origin))
-            val expectedRecord = cached.session?.let { encodeSession(it) }
-            if (persisted != expectedRecord) {
+            if (persisted != snapshot.record || decision != snapshot.decision || (!explicit && !NativeRestorePolicy.allows(decision))) {
                 sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
                 return@mutateIdentity false
             }
             try {
                 persistSession(expected.origin, session)
+                if (explicit) nativeRestorePolicy?.setAllowed(expected.origin, true)
             } catch (error: Exception) {
-                // A storage adapter can commit before reporting interruption. Force reconciliation.
                 sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
+                invalidateConnectedCache(expected.origin)
                 throw error
             }
             if (configRepository.getCurrentBackendUrl() != expected.origin) return@mutateIdentity false
@@ -130,6 +168,11 @@ class SecureSessionStorage(
                 cached.session != expected.session ||
                 configRepository.getCurrentBackendUrl() != expected.origin ||
                 updated.accountId != expected.session.accountId
+            ) {
+                return@mutateIdentity false
+            }
+            if (nativeRestorePolicy?.canRestore(expected.origin) == false ||
+                secureStorage.getString(scopedKey(StorageKeys.RECORD, expected.origin)) != encodeSession(expected.session)
             ) {
                 return@mutateIdentity false
             }
@@ -164,8 +207,10 @@ class SecureSessionStorage(
 
     override suspend fun saveSession(session: UserSession) {
         val origin = configRepository.getCurrentBackendUrl()
-        write(origin, session)
+        writeSession(origin, session, false)
     }
+
+    override suspend fun saveExplicitSession(session: UserSession) = writeSession(configRepository.getCurrentBackendUrl(), session, true)
 
     private suspend fun persistSession(
         origin: String,
@@ -184,23 +229,72 @@ class SecureSessionStorage(
 
     override suspend fun read(origin: String): UserSession? = loadSession(origin)
 
+    override suspend fun openSessionStorage(
+        origin: String,
+        scope: CoroutineScope,
+    ): SessionStorage =
+        SecureSessionStorage(
+            secureStorage,
+            app.logdate.shared.config
+                .PinnedLogDateConfigRepository(origin, null),
+            scope,
+            nativeRestorePolicy = nativeRestorePolicy,
+            connectedVault = connectedVault ?: this,
+        ).also { it.hasValidSession() }
+
     override suspend fun write(
         origin: String,
         session: UserSession,
+    ) = writeSession(origin, session, true)
+
+    private suspend fun writeSession(
+        origin: String,
+        session: UserSession,
+        explicit: Boolean,
     ) {
-        mutateIdentity({
-            origin == configRepository.getCurrentBackendUrl() && getSession()?.accountId != session.accountId
-        }) {
-            persistSession(origin, session)
+        mutateIdentity({ origin == configRepository.getCurrentBackendUrl() && getSession()?.accountId != session.accountId }) {
+            try {
+                check(explicit || nativeRestorePolicy?.canRestore(origin) != false) { "Session authorization changed" }
+                persistSession(origin, session)
+                if (explicit) nativeRestorePolicy?.setAllowed(origin, true)
+            } catch (error: Exception) {
+                if (origin == configRepository.getCurrentBackendUrl()) sessionState.update { CachedSession(null, null, it.revision + 1) }
+                invalidateConnectedCache(origin)
+                throw error
+            }
             if (origin == configRepository.getCurrentBackendUrl()) cache(origin, session)
         }
     }
 
     override suspend fun clear(origin: String) {
-        mutateIdentity({ origin == configRepository.getCurrentBackendUrl() }) {
-            // A tombstone prevents fallback to legacy credentials if their cleanup is interrupted.
+        mutateIdentity({ origin == configRepository.getCurrentBackendUrl() }) { clearLocked(origin) }
+    }
+
+    override suspend fun clearSessionIfCurrent(expected: OriginBoundSession): Boolean =
+        mutateIdentity({ true }) {
+            if (getOriginBoundSession() != expected ||
+                secureStorage.getString(scopedKey(StorageKeys.RECORD, expected.origin)) != encodeSession(expected.session)
+            ) {
+                return@mutateIdentity false
+            }
+            clearLocked(expected.origin)
+            true
+        }
+
+    private suspend fun clearLocked(origin: String) {
+        try {
+            nativeRestorePolicy?.setAllowed(origin, false)
+            // The secure tombstone also prevents legacy-token fallback after interrupted cleanup.
             secureStorage.putString(scopedKey(StorageKeys.RECORD, origin), "null")
+        } finally {
             if (origin == configRepository.getCurrentBackendUrl()) cache(origin, null)
+        }
+    }
+
+    private fun invalidateConnectedCache(origin: String) {
+        val host = connectedVault ?: return
+        if (host.configRepository.getCurrentBackendUrl() == origin) {
+            host.sessionState.update { CachedSession(null, null, it.revision + 1) }
         }
     }
 
@@ -209,13 +303,40 @@ class SecureSessionStorage(
         publish: suspend () -> T,
     ): T =
         identityMutex.withLock {
-            val epoch = privacyEpoch
-            if (epoch == null) publish() else epoch.transition(changed, publish)
+            val host = connectedVault ?: this
+            val origin = configRepository.getCurrentBackendUrl()
+            val before = sessionState.value
+            val transition =
+                suspend {
+                    try {
+                        publish()
+                    } finally {
+                        val after = sessionState.value
+                        if (host !== this && after != before && host.configRepository.getCurrentBackendUrl() == origin) {
+                            if (after.origin == origin) {
+                                host.cache(origin, after.session)
+                            }
+                        }
+                    }
+                }
+            val epoch = host.privacyEpoch
+            if (epoch == null) {
+                transition()
+            } else {
+                epoch.transition(
+                    {
+                        host.configRepository.getCurrentBackendUrl() == origin &&
+                            (changed() || host.getSession()?.accountId != getSession()?.accountId)
+                    },
+                    transition,
+                )
+            }
         }
 
     private suspend fun loadSession(backendUrl: String): UserSession? =
         identityMutex.withLock {
             try {
+                if (nativeRestorePolicy?.canRestore(backendUrl) == false) return@withLock null
                 val record = secureStorage.getString(scopedKey(StorageKeys.RECORD, backendUrl))
                 if (record != null) {
                     if (record == "null") return@withLock null

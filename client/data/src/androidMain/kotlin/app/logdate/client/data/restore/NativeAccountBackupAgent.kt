@@ -8,6 +8,8 @@ import app.logdate.client.data.account.BackgroundRestoreCredentialRecovery
 import app.logdate.client.data.account.NativeRestoreAccountPolicy
 import app.logdate.client.data.account.RestoreCredentialExchange
 import app.logdate.client.data.account.RestoreCredentialRenewal
+import app.logdate.client.datastore.DataStoreKeyValueStorage
+import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
@@ -24,21 +26,36 @@ import kotlinx.coroutines.flow.first
 
 /** Uses only restore-safe dependencies; no Koin, Room, application services, or archive import. */
 class NativeAccountBackupAgent : NativeBackupAgent() {
+    private val ownerKey = stringPreferencesKey("identity.canonical_owner_id")
+    private val boundKey = stringPreferencesKey("identity.canonical_owner_bound")
+
+    private fun accountPolicy(snapshot: Preferences) =
+        NativeRestoreAccountPolicy(
+            snapshot[ownerKey],
+            snapshot[boundKey],
+            hasRetainedNativeContent(filesDir, getDatabasePath("logdate"), snapshot),
+        )
+
     override suspend fun restoreAccount(preferences: DataStore<Preferences>) =
         coroutineScope {
             val detector = PostRestoreDetector(this@NativeAccountBackupAgent)
             val delivery = detector.pendingAccountRecoveryId() ?: return@coroutineScope
             val snapshot = preferences.data.first()
             val config = nativeRestoreConfiguration(snapshot) ?: return@coroutineScope
-            val ownerKey = stringPreferencesKey("identity.canonical_owner_id")
-            val boundKey = stringPreferencesKey("identity.canonical_owner_bound")
-            val hasLocalData = hasRetainedNativeContent(filesDir, getDatabasePath("logdate"), snapshot)
-            val policy = NativeRestoreAccountPolicy(snapshot[ownerKey], snapshot[boundKey], hasLocalData)
+            val policy = accountPolicy(snapshot)
             if (!policy.canAttempt) return@coroutineScope
+            val restorePolicy = NativeRestorePolicy(DataStoreKeyValueStorage(preferences))
+            if (!restorePolicy.canRestore(config.getCurrentBackendUrl())) return@coroutineScope
             val secure = AndroidSecureStorage(this@NativeAccountBackupAgent)
             val observerJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
             try {
-                val vault = SecureSessionStorage(secure, config, CoroutineScope(coroutineContext + observerJob))
+                val vault =
+                    SecureSessionStorage(
+                        secure,
+                        config,
+                        CoroutineScope(coroutineContext + observerJob),
+                        nativeRestorePolicy = restorePolicy,
+                    )
                 val origin = config.getCurrentBackendUrl()
                 val guard = vault.captureInstallationGuard() ?: return@coroutineScope
                 val existing = vault.getSession()

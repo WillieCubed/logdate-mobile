@@ -165,10 +165,20 @@ remains enabled for compatibility with older servers that consumed keys; it is n
 the corrected server key usable again. Retained historical server keys require explicit revocation;
 local sign-out clears the provider credential rather than revoking every device's keys.
 
-The secure session's durable sign-out tombstone prevents both application recovery and the native
-backup callback from signing in again after provider clearing fails or the process restarts. Explicit
-sign-in replaces that tombstone. In-flight recovery must install through the same conditional vault
-operation, so a later sign-out wins. Failure to read the tombstone cannot authorize restoration.
+Sign-out persists a server-scoped authorization decision in the backed-up main preferences before
+writing the secure session tombstone. A replacement device therefore retains sign-out intent even
+though Keystore-bound session records are excluded from transfer. Missing decisions preserve
+compatibility with older backups; malformed decisions and storage-read failures cannot authorize
+restoration. This protects snapshots containing the decision; it cannot change older provider backups.
+Provider credential clearing remains best effort.
+
+Explicit authentication captures an opaque guard before its ceremony and enables restoration only
+after securely persisting the resulting session. Installation compares the durable session record
+and authorization generation under a shared vault lock, so later sign-out or login wins across
+foreground, native-callback, and server-pinned vaults. An interrupted authorization write keeps
+persisted tokens inaccessible until explicit authentication repairs it. Refresh captures one
+origin-bound session, conditionally replaces or clears only that session, and cannot enable
+restoration. Server-scoped accounts use the same guarded storage rather than ordinary vault writes.
 
 ## Emulator acceptance
 

@@ -10,6 +10,9 @@ import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Keeps the LogDate Cloud session alive and serves the authenticated passkey endpoints.
@@ -113,16 +116,33 @@ internal class AccountSessionRefreshCoordinator(
 
     suspend fun refreshAuthentication(): Result<Unit> {
         return try {
+            val binding = sessionStorage.getOriginBoundSession()
+            if (binding == null && sessionStorage.supportsGuardedAuthentication) {
+                return Result.failure(NotSignedInException())
+            }
             val session =
-                sessionStorage.getSession()
-                    ?: return Result.failure(Exception("No active session"))
-
+                binding?.session ?: sessionStorage.getSession()
+                    ?: return Result.failure(NotSignedInException())
+            val origin = binding?.origin ?: configRepository.getCurrentBackendUrl()
             val refreshResult = apiClient.refreshToken(session.refreshToken)
             if (refreshResult.isFailure) {
                 val error = refreshResult.exceptionOrNull()!!
                 // Only a server that refuses the refresh token ends the session. A network error
                 // or an outage leaves it in place for the next attempt.
-                if (error.isRejected(REJECTED_REFRESH_TOKEN_CODES)) signOut()
+                if (error.isRejected(REJECTED_REFRESH_TOKEN_CODES)) {
+                    if (binding != null) {
+                        // End only the rejected session. A later login owns its platform account
+                        // and provider key, so this stale request cannot run global sign-out.
+                        if (sessionStorage.clearSessionIfCurrent(binding) &&
+                            configRepository.getCurrentBackendUrl() == origin &&
+                            sessionStorage.getSession() == null
+                        ) {
+                            sessionState.clear()
+                        }
+                    } else if (configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session) {
+                        signOut()
+                    }
+                }
                 return Result.failure(error)
             }
 
@@ -130,7 +150,18 @@ internal class AccountSessionRefreshCoordinator(
 
             // Update session with new access token
             val updatedSession = session.copy(accessToken = newAccessToken)
-            sessionStorage.saveSession(updatedSession)
+            if (binding != null) {
+                check(sessionStorage.replaceSessionIfCurrent(binding, updatedSession)) { "Authentication changed during refresh" }
+            } else {
+                check(configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session) {
+                    "Authentication changed during refresh"
+                }
+                sessionStorage.saveSession(updatedSession)
+            }
+            currentCoroutineContext().ensureActive()
+            check(configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == updatedSession) {
+                "Authentication changed during refresh"
+            }
 
             // Update access token in platform account manager (or register it, if this
             // device signed in to an existing LogDate Cloud account without ever running
@@ -141,12 +172,14 @@ internal class AccountSessionRefreshCoordinator(
                     account = currentAccountValue,
                     accessToken = newAccessToken,
                     refreshToken = session.refreshToken,
-                    backendUrl = configRepository.getCurrentBackendUrl(),
+                    backendUrl = origin,
                 )
             }
 
             Napier.i("Authentication refreshed successfully")
             Result.success(Unit)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.w("Failed to refresh authentication", e)
             Result.failure(e)

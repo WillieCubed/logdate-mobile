@@ -54,7 +54,7 @@ class RestoreCredentialEnrollmentTest {
             var markedBeforeSession = false
             val sessions =
                 object : SessionStorage by fixture.sessions {
-                    override suspend fun saveSession(session: UserSession) {
+                    override suspend fun saveExplicitSession(session: UserSession) {
                         markedBeforeSession = fixture.renewal.isPending(fixture.origin, fixture.owner)
                         fixture.sessions.saveSession(session)
                     }
@@ -84,7 +84,7 @@ class RestoreCredentialEnrollmentTest {
             var marked = false
             val sessions =
                 object : SessionStorage by fixture.sessions {
-                    override suspend fun saveSession(session: UserSession) {
+                    override suspend fun saveExplicitSession(session: UserSession) {
                         marked = fixture.renewal.isPending(fixture.origin, fixture.owner)
                         fixture.sessions.saveSession(session)
                     }

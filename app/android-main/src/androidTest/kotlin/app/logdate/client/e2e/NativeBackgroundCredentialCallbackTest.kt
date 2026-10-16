@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.data.restore.NativeAccountBackupAgent
+import app.logdate.client.datastore.DataStoreKeyValueStorage
+import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
@@ -94,6 +96,32 @@ class NativeBackgroundCredentialCallbackTest {
         assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(context).detect(true))
         assertEquals(listOf<Byte>(1), context.getDatabasePath("logdate").readBytes().toList())
         withPreferences { assertEquals(owner, it.data.first()[stringPreferencesKey("identity.canonical_owner_id")]) }
+    }
+
+    @Test
+    fun `transferred sign out preference prevents background account recovery without changing content`() {
+        val owner = Uuid.random().toString()
+        withPreferences { preferences ->
+            preferences.edit { values ->
+                values[stringPreferencesKey("backend_url")] = "https://restore.example"
+                values[stringPreferencesKey("identity.canonical_owner_id")] = owner
+                values[stringPreferencesKey("identity.canonical_owner_bound")] = "true"
+            }
+            NativeRestorePolicy(DataStoreKeyValueStorage(preferences)).setAllowed("https://restore.example", false)
+        }
+        context.getDatabasePath("logdate").apply {
+            parentFile?.mkdirs()
+            writeBytes(byteArrayOf(2, 3))
+        }
+        val agent = NativeAccountBackupAgent()
+        agent.initialize(context)
+        agent.onRestoreFinished()
+        assertTrue(PostRestoreDetector(context).isAccountRecoveryPending())
+        assertEquals(listOf<Byte>(2, 3), context.getDatabasePath("logdate").readBytes().toList())
+        withPreferences { preferences ->
+            assertEquals(owner, preferences.data.first()[stringPreferencesKey("identity.canonical_owner_id")])
+            assertEquals(false, NativeRestorePolicy(DataStoreKeyValueStorage(preferences)).canRestore("https://restore.example"))
+        }
     }
 
     private fun NativeBackupAgent.initialize(context: Context) {

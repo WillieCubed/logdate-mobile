@@ -1,5 +1,6 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
@@ -38,6 +39,9 @@ internal class GoogleSignInCoordinator(
     ): Result<LogDateAccount> {
         return try {
             val origin = configRepository.getCurrentBackendUrl()
+            val authenticationGuard = sessionStorage.captureAuthenticationGuard()
+            check(!sessionStorage.supportsGuardedAuthentication || authenticationGuard != null) { "Account access is not ready" }
+            check(authenticationGuard == null || authenticationGuard.origin == origin) { "Authentication server changed" }
             bindingGuard.requireCanonicalOwnerBinding()
             val canonicalOwnerId = canonicalOwnerProvider.getCanonicalOwnerId()
             val tokenResult = googleSignInManager.getGoogleIdToken(serverClientId)
@@ -60,7 +64,13 @@ internal class GoogleSignInCoordinator(
             if (data.account.id.toString() != canonicalOwnerId) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
-            persistAuthenticatedSession(data.account, data.tokens, isNewAccount = true, origin = origin)
+            persistAuthenticatedSession(
+                data.account,
+                data.tokens,
+                isNewAccount = true,
+                origin = origin,
+                authenticationGuard = authenticationGuard,
+            )
 
             createRestoreKey().onFailure { error ->
                 Napier.w("Google account created but restore key registration failed — user has no recovery path", error)
@@ -79,6 +89,9 @@ internal class GoogleSignInCoordinator(
     suspend fun signInWithGoogle(): Result<LogDateAccount> {
         return try {
             val origin = configRepository.getCurrentBackendUrl()
+            val authenticationGuard = sessionStorage.captureAuthenticationGuard()
+            check(!sessionStorage.supportsGuardedAuthentication || authenticationGuard != null) { "Account access is not ready" }
+            check(authenticationGuard == null || authenticationGuard.origin == origin) { "Authentication server changed" }
             bindingGuard.requireCanonicalOwnerBinding()
             val tokenResult = googleSignInManager.getGoogleIdToken(serverClientId)
             if (tokenResult.isFailure) {
@@ -94,7 +107,13 @@ internal class GoogleSignInCoordinator(
             if (!bindingGuard.belongsToCanonicalOwner(data.account)) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
-            persistAuthenticatedSession(data.account, data.tokens, isNewAccount = false, origin = origin)
+            persistAuthenticatedSession(
+                data.account,
+                data.tokens,
+                isNewAccount = false,
+                origin = origin,
+                authenticationGuard = authenticationGuard,
+            )
 
             Napier.i("Authentication with Google successful for user: ${data.account.username}")
             Result.success(data.account)
@@ -116,18 +135,18 @@ internal class GoogleSignInCoordinator(
         tokens: AccountTokens,
         isNewAccount: Boolean,
         origin: String,
+        authenticationGuard: SessionInstallationGuard?,
     ) {
         check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
         beforeSessionPersist(origin, account.id.toString())
         currentCoroutineContext().ensureActive()
         check(configRepository.getCurrentBackendUrl() == origin) { "Authentication server changed" }
-        sessionStorage.saveSession(
-            UserSession(
-                accessToken = tokens.accessToken,
-                refreshToken = tokens.refreshToken,
-                accountId = account.id.toString(),
-            ),
-        )
+        val session = UserSession(tokens.accessToken, tokens.refreshToken, account.id.toString())
+        if (authenticationGuard == null) {
+            sessionStorage.saveExplicitSession(session)
+        } else {
+            check(sessionStorage.installExplicitSessionIfCurrent(authenticationGuard, session)) { "Account access changed" }
+        }
 
         onSessionPersisted()
         currentCoroutineContext().ensureActive()

@@ -10,6 +10,12 @@ package app.logdate.client.datastore
  * when the app switches servers.
  */
 interface OriginSessionVault {
+    /** Opens an origin-pinned view with the vault's atomic authentication and refresh guarantees. */
+    suspend fun openSessionStorage(
+        origin: String,
+        scope: kotlinx.coroutines.CoroutineScope,
+    ): SessionStorage? = null
+
     suspend fun read(origin: String): UserSession?
 
     suspend fun write(

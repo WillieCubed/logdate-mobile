@@ -74,7 +74,8 @@ class DefaultServerScopedAccounts(
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val config = PinnedLogDateConfigRepository(origin, descriptor)
         val sessionStorage =
-            OriginPinnedSessionStorage(vault, config.getCurrentBackendUrl(), vault.read(config.getCurrentBackendUrl()), scope)
+            vault.openSessionStorage(config.getCurrentBackendUrl(), scope)
+                ?: OriginPinnedSessionStorage(vault, config.getCurrentBackendUrl(), vault.read(config.getCurrentBackendUrl()), scope)
         val repository =
             DefaultPasskeyAccountRepository(
                 apiClient = PasskeyApiClient(httpClient, config),

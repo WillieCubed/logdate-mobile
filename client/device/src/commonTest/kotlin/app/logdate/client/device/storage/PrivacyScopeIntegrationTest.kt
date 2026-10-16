@@ -25,6 +25,26 @@ class PrivacyScopeIntegrationTest {
     }
 
     @Test
+    fun `pinned mutations preserve alternate consent and revoke connected consent`() =
+        runTest {
+            val epoch = PrivacyScopeEpoch(EpochStorage())
+            epoch.initialize()
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://a.invalid", privacyEpoch = epoch)
+            val root = SecureSessionStorage(FakeSecureStorage(), config, backgroundScope, privacyEpoch = epoch)
+            val pinned = root.openSessionStorage("https://b.invalid", backgroundScope)
+            val original = epoch.value.value
+            pinned.saveExplicitSession(UserSession("b", "r", "owner-b"))
+            assertEquals(original, epoch.value.value)
+            config.updateBackendUrl("https://b.invalid")
+            assertTrue(root.hasValidSession())
+            val connected = epoch.value.value
+            pinned.clearSession()
+            assertNotEquals(connected, epoch.value.value)
+            assertNull(root.getSession())
+            assertTrue(!root.hasValidSession())
+        }
+
+    @Test
     fun `backend changes rotate durable consent before observers can conflate them`() =
         runTest {
             val storage = EpochStorage()

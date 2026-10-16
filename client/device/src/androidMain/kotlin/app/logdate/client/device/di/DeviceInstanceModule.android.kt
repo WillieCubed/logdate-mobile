@@ -1,5 +1,7 @@
 package app.logdate.client.device.di
 
+import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AndroidAccountManager
@@ -48,6 +50,7 @@ actual val deviceInstanceModule: Module =
                 configRepository = get<LogDateConfigRepository>(),
                 privacyEpoch = get(),
                 scope = get<CoroutineScope>(),
+                nativeRestorePolicy = NativeRestorePolicy(get<KeyValueStorage>()),
             )
         }
         single<SessionStorage> { get<SecureSessionStorage>() }
