@@ -9,6 +9,9 @@
     <string name="wear_settings_send_failing">Some moments couldn’t reach your phone</string>
     <string name="wear_settings_send_retry">Tap to try again</string>
     <string name="wear_settings_send_retrying">Trying again…</string>
+    <string name="wear_settings_backup_failing">Some moments couldn’t back up</string>
+    <string name="wear_settings_needs_link">Set up this watch from your phone</string>
+    <string name="wear_settings_needs_link_body">This watch can’t sync until LogDate on your phone sets it up again</string>
     <string name="wear_settings_haptics_all">All haptics</string>
     <string name="wear_settings_haptics_all_body">Crown ticks and saves too</string>
     <string name="wear_settings_haptics_essential">Essential haptics</string>

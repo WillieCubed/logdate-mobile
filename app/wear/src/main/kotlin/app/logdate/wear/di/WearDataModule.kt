@@ -30,6 +30,7 @@ import app.logdate.client.repository.moments.MarkedMomentRepository
 import app.logdate.client.repository.moments.SyncableMarkedMomentRepository
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.datalayer.AssociationDataMapper
@@ -64,6 +65,7 @@ import app.logdate.wear.sync.CapabilityPhoneReachability
 import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
 import app.logdate.wear.sync.PhoneReachability
+import app.logdate.wear.sync.WatchSyncFacade
 import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WatchSyncWork
 import app.logdate.wear.sync.WearDataLayerClient
@@ -76,14 +78,18 @@ import app.logdate.wear.sync.WorkManagerWatchSyncWork
 import app.logdate.wear.sync.v2.WatchOwnState
 import app.logdate.wear.sync.v2.WatchPeerLink
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.sync.v2.cloud.watchCloudPathOf
+import app.logdate.wear.sync.v2.cloud.watchCloudStatus
 import app.logdate.wear.sync.v2.delivery.WatchCaptureDelivery
 import app.logdate.wear.sync.v2.delivery.WatchCaptureProtocol
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
+import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.sync.v2.window.WindowReconciler
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import org.koin.dsl.binds
@@ -146,7 +152,24 @@ val wearDataModule =
                 scope = get(),
                 notesV2 = get<WatchNotesV2>(),
             )
-        } binds arrayOf(SyncManager::class, WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
+        } binds arrayOf(WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
+        single<SyncManager> {
+            val koin = getKoin()
+            WatchSyncFacade(
+                phone = get<WearDataLayerSyncManager>(),
+                cloudStatus =
+                    watchCloudStatus(
+                        path =
+                            combine(
+                                get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+                                get<WatchLinkStore>().observe(),
+                                ::watchCloudPathOf,
+                            ),
+                        engine = { koin.get<DefaultSyncManager>(WatchCloud) },
+                    ),
+                scope = get(),
+            )
+        }
         single {
             val receipts = get<WatchReceiptApplier>()
             val protocol = get<WatchCaptureProtocol>()

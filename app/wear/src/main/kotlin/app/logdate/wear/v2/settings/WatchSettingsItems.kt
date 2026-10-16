@@ -1,5 +1,6 @@
 package app.logdate.wear.v2.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -99,9 +100,21 @@ private fun TransformingLazyColumnScope.statusItem(
     when (val status = state.status) {
         WatchStatus.Healthy -> Unit
         is WatchStatus.WaitingForPhone -> item { WaitingForPhone(status.pending) }
+        WatchStatus.NeedsDeviceLink -> item { NeedsDeviceLink() }
         is WatchStatus.SendFailing ->
             item {
-                SendFailingCard(
+                RetryCard(
+                    R.string.wear_settings_send_failing,
+                    state.retrying,
+                    actions.onRetrySync,
+                    Modifier.transformedHeight(this, spec),
+                    SurfaceTransformation(spec),
+                )
+            }
+        is WatchStatus.BackupFailing ->
+            item {
+                RetryCard(
+                    R.string.wear_settings_backup_failing,
                     state.retrying,
                     actions.onRetrySync,
                     Modifier.transformedHeight(this, spec),
@@ -132,7 +145,28 @@ private fun WaitingForPhone(pending: Int) {
 }
 
 @Composable
-private fun SendFailingCard(
+private fun NeedsDeviceLink() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag(WatchSettingsTags.STATUS),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.wear_settings_needs_link),
+            style = MaterialTheme.typography.titleSmall,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = stringResource(R.string.wear_settings_needs_link_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun RetryCard(
+    @StringRes title: Int,
     retrying: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier,
@@ -140,7 +174,7 @@ private fun SendFailingCard(
 ) {
     TitleCard(
         onClick = onRetry,
-        title = { Text(stringResource(R.string.wear_settings_send_failing)) },
+        title = { Text(stringResource(title)) },
         modifier = modifier.fillMaxWidth().testTag(WatchSettingsTags.STATUS),
         enabled = !retrying,
         transformation = transformation,

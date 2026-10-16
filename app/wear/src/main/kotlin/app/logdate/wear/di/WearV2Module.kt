@@ -18,6 +18,7 @@ import app.logdate.client.domain.streak.toStreakDay
 import app.logdate.client.domain.watch.StampedPreferenceStore
 import app.logdate.client.domain.watch.WatchWindowPreferences
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WindowReason
@@ -239,6 +240,7 @@ val wearV2Module =
                 phoneLinks = get(),
                 watchLinks = get(),
                 phoneHandoff = get(),
+                syncStatus = get<SyncManager>().syncStatusFlow,
             )
         }
         single {
