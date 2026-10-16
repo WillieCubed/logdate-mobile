@@ -29,6 +29,15 @@ interface KeyValueStorage {
      */
     suspend fun getString(key: String): String?
 
+    /** Read durable content without converting storage failures into an absent value. */
+    suspend fun getStringOrThrow(key: String): String? = getString(key)
+
+    /** Persist durable content without hiding write failures. */
+    suspend fun putStringOrThrow(
+        key: String,
+        value: String,
+    ) = putString(key, value)
+
     /**
      * Retrieves a string value for the given key synchronously.
      * This is a convenience method for platforms that don't support coroutines well.

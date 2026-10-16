@@ -78,6 +78,25 @@ interface SyncMetadataService {
         operation: PendingOperation,
     )
 
+    /** Queue only under the captured owner/server, even when the active session changes while waiting. */
+    suspend fun enqueuePendingForScope(
+        entityId: String,
+        entityType: EntityType,
+        operation: PendingOperation,
+        scope: UploadScope,
+    ) {
+        error("Scoped recovery mutations require a scope-aware metadata store")
+    }
+
+    /** Repair a captured scope without replacing an existing pending mutation. */
+    suspend fun enqueueRepairForScopeIfAbsent(
+        entityId: String,
+        entityType: EntityType,
+        scope: UploadScope,
+    ) {
+        error("Scoped recovery repair requires a scope-aware metadata store")
+    }
+
     /** Queue a fresh transcript mutation; durable stores must join the caller's data transaction. */
     suspend fun enqueueTranscriptMutation(noteId: String): Boolean {
         if (getPendingUploads(EntityType.NOTE).any { it.entityId == noteId && it.operation == PendingOperation.DELETE }) return false

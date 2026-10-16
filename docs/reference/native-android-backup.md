@@ -43,6 +43,13 @@ Archive workers carry the native delivery ID and authenticated account/origin. O
 that delivery can acknowledge missing content, and stale work cannot acknowledge a later delivery.
 Pending sign-in recovery can retry when the app resumes or networking reconnects.
 
+Archive retries preserve drafts with newer or equal saved modification times. Recovery reads and
+writes propagate storage failures, retain archive timestamps, and stay bound to the account and
+server selected at the start. Conditional writes and rollback preserve later editor saves;
+duplicate records share their original undo snapshot, and invalid draft IDs are skipped. A retry
+repairs a missing upload request after an interrupted persistence/enqueue boundary without
+replacing a later pending mutation.
+
 Android Keystore ciphertext is not portable. The database passphrase has a recoverable copy under
 `db_recovery/`. Phrase-derived content identities retain their recovery phrase under
 `identity_recovery/`; phrase-less account identities retain a versioned, account-bound key there.

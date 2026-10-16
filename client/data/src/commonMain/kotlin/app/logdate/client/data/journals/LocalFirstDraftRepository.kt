@@ -2,6 +2,7 @@ package app.logdate.client.data.journals
 
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.repository.journals.DraftRecoveryScope
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.EditorDraft
@@ -75,26 +76,26 @@ class LocalFirstDraftRepository(
     private suspend fun migrateLegacy(scope: DraftStorageScope?) {
         if (currentScope == null || scope == null) return
         require(scope.ownerId.isNotBlank() && scope.serverOrigin.isNotBlank())
-        val legacy = keyValueStorage.getString(LEGACY_KEY)?.takeIf { it.isNotEmpty() } ?: return
+        val legacy = keyValueStorage.getStringOrThrow(LEGACY_KEY)?.takeIf { it.isNotEmpty() } ?: return
         val expectedOwner = ownerMarker(scope)
-        val owner = keyValueStorage.getString(LEGACY_OWNER_KEY)
+        val owner = keyValueStorage.getStringOrThrow(LEGACY_OWNER_KEY)
         if (owner == null) {
-            keyValueStorage.putString(LEGACY_OWNER_KEY, expectedOwner)
+            keyValueStorage.putStringOrThrow(LEGACY_OWNER_KEY, expectedOwner)
         } else if (owner != expectedOwner) {
             return
         }
         val doneKey = "${scopedKey(scope)}_legacy_copied"
         if (keyValueStorage.getBoolean(doneKey, false)) return
-        val scoped = decode(keyValueStorage.getString(scopedKey(scope)))
+        val scoped = decode(keyValueStorage.getStringOrThrow(scopedKey(scope)))
         val existingIds = scoped.map { it.id }.toSet()
         val merged = decode(legacy).filterNot { it.id in existingIds } + scoped
-        keyValueStorage.putString(scopedKey(scope), json.encodeToString(merged))
+        keyValueStorage.putStringOrThrow(scopedKey(scope), json.encodeToString(merged))
         keyValueStorage.putBoolean(doneKey, true)
     }
 
     private suspend fun read(scope: DraftStorageScope?): List<EditorDraft> {
         migrateLegacy(scope)
-        val drafts = decode(keyValueStorage.getString(storageKey(scope)))
+        val drafts = decode(keyValueStorage.getStringOrThrow(storageKey(scope)))
         check(currentScope?.invoke() == scope) { "Draft account changed during read" }
         return drafts
     }
@@ -104,7 +105,7 @@ class LocalFirstDraftRepository(
         drafts: List<EditorDraft>,
     ) {
         check(currentScope?.invoke() == scope) { "Draft account changed during write" }
-        keyValueStorage.putString(storageKey(scope), json.encodeToString(drafts))
+        keyValueStorage.putStringOrThrow(storageKey(scope), json.encodeToString(drafts))
         check(currentScope?.invoke() == scope) { "Draft account changed during write" }
     }
 
@@ -180,6 +181,37 @@ class LocalFirstDraftRepository(
         }
 
     override suspend fun getDraft(id: Uuid): EditorDraft? = getAllDrafts().find { it.id == id }
+
+    override suspend fun getDraftForRestore(id: Uuid): EditorDraft? =
+        storageMutex.withLock {
+            read(currentScope?.invoke()).find {
+                it.id ==
+                    id
+            }
+        }
+
+    override suspend fun getDraftRecoveryScope(): DraftRecoveryScope =
+        currentScope?.invoke()?.let { DraftRecoveryScope(it.ownerId, it.serverOrigin) } ?: DraftRecoveryScope(null, null)
+
+    override suspend fun compareAndSetDraftForRestore(
+        id: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope?,
+    ): Boolean =
+        storageMutex.withLock {
+            require(expected == null || expected.id == id)
+            require(replacement == null || replacement.id == id)
+            val scope = currentScope?.invoke()
+            check(recoveryScope == null || scope?.ownerId == recoveryScope.ownerId && scope?.serverOrigin == recoveryScope.serverOrigin) {
+                "Draft recovery account changed"
+            }
+            val drafts = read(scope)
+            if (drafts.find { it.id == id } != expected) return@withLock false
+            val updated = drafts.filterNot { it.id == id } + listOfNotNull(replacement)
+            write(scope, updated)
+            true
+        }
 
     override suspend fun deleteDraft(id: Uuid) {
         try {

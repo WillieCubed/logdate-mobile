@@ -23,6 +23,15 @@ import kotlinx.coroutines.flow.map
 class DataStoreKeyValueStorage(
     private val dataStore: DataStore<Preferences>,
 ) : KeyValueStorage {
+    override suspend fun getStringOrThrow(key: String): String? = dataStore.data.first()[stringPreferencesKey(key)]
+
+    override suspend fun putStringOrThrow(
+        key: String,
+        value: String,
+    ) {
+        dataStore.edit { it[stringPreferencesKey(key)] = value }
+    }
+
     override suspend fun getString(key: String): String? {
         val prefKey = stringPreferencesKey(key)
         return try {

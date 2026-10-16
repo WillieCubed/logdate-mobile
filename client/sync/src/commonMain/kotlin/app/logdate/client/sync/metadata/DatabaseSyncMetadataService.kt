@@ -151,6 +151,53 @@ class DatabaseSyncMetadataService(
         )
     }
 
+    override suspend fun enqueuePendingForScope(
+        entityId: String,
+        entityType: EntityType,
+        operation: PendingOperation,
+        scope: UploadScope,
+    ) {
+        enqueueScopedPending(entityId, entityType, operation, scope)
+    }
+
+    override suspend fun enqueueRepairForScopeIfAbsent(
+        entityId: String,
+        entityType: EntityType,
+        scope: UploadScope,
+    ) {
+        require(scope.ownerId.isNotBlank() && scope.serverOrigin.isNotBlank())
+        dao.insertRepairIfAbsent(
+            scope.ownerId,
+            scope.serverOrigin,
+            entityType.name,
+            entityId,
+            Clock.System.now().toEpochMilliseconds(),
+            null,
+        )
+    }
+
+    private suspend fun enqueueScopedPending(
+        entityId: String,
+        entityType: EntityType,
+        operation: PendingOperation,
+        scope: UploadScope,
+    ) {
+        require(scope.ownerId.isNotBlank() && scope.serverOrigin.isNotBlank())
+        val ownerId = scope.ownerId
+        val serverOrigin = scope.serverOrigin
+        dao.enqueueMutation(
+            PendingUploadEntity(
+                ownerId = ownerId,
+                serverOrigin = serverOrigin,
+                entityType = entityType.name,
+                entityId = entityId,
+                operation = operation.name,
+                createdAt = Clock.System.now().toEpochMilliseconds(),
+                retryCount = 0,
+            ),
+        )
+    }
+
     override suspend fun enqueueCreateIfAbsent(
         entityId: String,
         entityType: EntityType,

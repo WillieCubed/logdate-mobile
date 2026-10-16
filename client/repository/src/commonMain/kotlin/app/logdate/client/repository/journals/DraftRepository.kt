@@ -42,6 +42,25 @@ interface DraftRepository {
      */
     suspend fun getDraft(id: Uuid): EditorDraft?
 
+    /** Recovery reads must distinguish absent drafts from unavailable storage. */
+    suspend fun getDraftForRestore(id: Uuid): EditorDraft? = getAllDraftsForSync().find { it.id == id }
+
+    /** Capture before reading recovery snapshots and retain for later writes and undo. */
+    suspend fun getDraftRecoveryScope(): DraftRecoveryScope? = null
+
+    /** Concurrent stores must compare and persist atomically, preserving timestamps and the captured scope. */
+    suspend fun compareAndSetDraftForRestore(
+        id: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope? = null,
+    ): Boolean {
+        check(recoveryScope == null || getDraftRecoveryScope() == recoveryScope) { "Draft recovery account changed" }
+        if (getDraftForRestore(id) != expected) return false
+        if (replacement == null) deleteDraft(id) else saveDraftFromSync(replacement)
+        return true
+    }
+
     /**
      * Delete a draft
      */

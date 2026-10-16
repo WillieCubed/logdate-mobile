@@ -5,6 +5,7 @@ import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.database.entities.journals.JournalMergeEntity
 import app.logdate.client.database.entities.sync.PendingUploadEntity
+import app.logdate.client.repository.journals.DraftRecoveryScope
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalMergeOperation
 import app.logdate.client.repository.journals.JournalMergePreview
@@ -120,16 +121,26 @@ class OfflineFirstJournalRepository(
     private suspend fun <T> withJournalTransaction(block: suspend () -> T): T =
         if (database == null) block() else transactionManager.withTransaction(block)
 
-    override suspend fun saveDraft(draft: EditorDraft) =
-        withContext(dispatcher) {
-            draftRepository.saveDraft(resolveDraft(draft))
-            syncMetadataService.enqueuePending(
-                entityId = draft.id.toString(),
-                entityType = EntityType.DRAFT,
-                operation = PendingOperation.UPDATE,
-            )
-            draftSyncDebouncer.trigger()
-        }
+    private val draftPersistence =
+        JournalDraftPersistence(draftRepository, syncMetadataService, ::resolveDraft, draftSyncDebouncer::trigger)
+
+    override suspend fun saveDraft(draft: EditorDraft) = withContext(dispatcher) { draftPersistence.save(draft) }
+
+    override suspend fun getDraftForRestore(id: Uuid): EditorDraft? = withContext(dispatcher) { draftPersistence.getForRestore(id) }
+
+    override suspend fun getDraftRecoveryScope(): DraftRecoveryScope? = draftPersistence.captureScope(currentScope)
+
+    override suspend fun ensureDraftRecoveryQueued(
+        id: Uuid,
+        recoveryScope: DraftRecoveryScope?,
+    ) = withContext(dispatcher) { draftPersistence.ensureRecoveryQueued(id, recoveryScope) }
+
+    override suspend fun compareAndSetDraftForRestore(
+        id: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope?,
+    ): Boolean = withContext(dispatcher) { draftPersistence.compareAndSet(id, expected, replacement, recoveryScope) }
 
     override suspend fun getLatestDraft(): EditorDraft? =
         withContext(dispatcher) { draftRepository.getLatestDraft()?.let { resolveDraft(it) } }
@@ -143,16 +154,7 @@ class OfflineFirstJournalRepository(
     override suspend fun getDraft(id: Uuid): EditorDraft? =
         withContext(dispatcher) { draftRepository.getDraft(id)?.let { resolveDraft(it) } }
 
-    override suspend fun deleteDraft(id: Uuid) =
-        withContext(dispatcher) {
-            draftRepository.deleteDraft(id)
-            syncMetadataService.enqueuePending(
-                entityId = id.toString(),
-                entityType = EntityType.DRAFT,
-                operation = PendingOperation.DELETE,
-            )
-            draftSyncDebouncer.trigger()
-        }
+    override suspend fun deleteDraft(id: Uuid) = withContext(dispatcher) { draftPersistence.delete(id) }
 
     override suspend fun saveDraftFromSync(draft: EditorDraft) =
         withContext(dispatcher) {
@@ -286,7 +288,7 @@ class OfflineFirstJournalRepository(
             val superseded = existing?.pending == true && oldDestination != destination
             val oldDestinationMissing = oldDestination?.let { journalDao.getJournalById(it) == null } == true
             val retained =
-                if (superseded) recoveryContents(scope, existing!!) else existing?.takeUnless { it.pending }?.recoveryContents().orEmpty()
+                if (superseded) recoveryContents(scope, existing) else existing?.takeUnless { it.pending }?.recoveryContents().orEmpty()
             val row =
                 existing?.redirected(destination, retained, superseded) ?: journalRedirectEntity(
                     scope,

@@ -2,8 +2,6 @@ package app.logdate.client.domain.restore
 
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
-import app.logdate.client.domain.export.ExportDraft
-import app.logdate.client.domain.export.ExportJournalNoteRelation
 import app.logdate.client.domain.export.ExportLocationHistoryItem
 import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportMediaManifest
@@ -24,28 +22,13 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.withTimeZoneId
-import app.logdate.client.repository.location.LocationCapturePipeline
-import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryRepository
-import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
-import app.logdate.shared.model.AltitudeUnit
-import app.logdate.shared.model.EditorDraft
-import app.logdate.shared.model.Journal
-import app.logdate.shared.model.Location
-import app.logdate.shared.model.LocationAltitude
 import app.logdate.shared.model.PhotoPresentation
-import app.logdate.shared.model.Place
-import app.logdate.shared.model.SerializableAudioBlock
-import app.logdate.shared.model.SerializableCameraBlock
-import app.logdate.shared.model.SerializableEntryBlock
-import app.logdate.shared.model.SerializableImageBlock
-import app.logdate.shared.model.SerializableTextBlock
-import app.logdate.shared.model.SerializableVideoBlock
 import io.github.aakira.napier.Napier
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlin.uuid.Uuid
@@ -154,7 +137,14 @@ class RestoreUserDataUseCase(
         val createdJournalIds = mutableListOf<Uuid>()
         val createdNoteIds = mutableListOf<Uuid>()
         val createdLinks = mutableListOf<Pair<Uuid, Uuid>>()
-        val createdDraftIds = mutableListOf<Uuid>()
+        val draftRestorer =
+            RestoreDraftReconciler(
+                journalRepository,
+                warnings,
+                RestoreDraftDecoder({ resolveMediaReference(it, manifestIndex, mediaImporter) }, warnings) { imported ->
+                    if (imported) mediaImported++
+                },
+            )
         val availableNoteIds = mutableSetOf<Uuid>()
 
         try {
@@ -237,17 +227,7 @@ class RestoreUserDataUseCase(
             if (options.includeDrafts) {
                 onProgress?.invoke(RestoreProgressPhase.RESTORING_DRAFTS)
                 Napier.i("Restore: importing ${migrated.drafts.size} drafts")
-                for (draft in migrated.drafts) {
-                    val restored =
-                        restoreDraft(draft, manifestIndex, mediaImporter, warnings) { imported ->
-                            if (imported) {
-                                mediaImported++
-                            }
-                        }
-                    journalRepository.saveDraft(restored)
-                    createdDraftIds.add(restored.id)
-                    draftsImported++
-                }
+                draftsImported = draftRestorer.restore(migrated.drafts, options.strategy)
             }
 
             profileRestorer.restore(profilePayload?.profile, options, warnings, onProgress)
@@ -267,7 +247,10 @@ class RestoreUserDataUseCase(
                 integrityMismatches = integrityMismatches,
             )
         } catch (e: Exception) {
-            rollback(createdLinks, createdNoteIds, createdJournalIds, createdDraftIds)
+            withContext(NonCancellable) {
+                draftRestorer.rollback()
+                rollback(createdLinks, createdNoteIds, createdJournalIds)
+            }
             throw e
         }
     }
@@ -276,10 +259,9 @@ class RestoreUserDataUseCase(
         links: List<Pair<Uuid, Uuid>>,
         noteIds: List<Uuid>,
         journalIds: List<Uuid>,
-        draftIds: List<Uuid>,
     ) {
         Napier.w(
-            "Restore failed, rolling back ${links.size} links, ${noteIds.size} notes, ${journalIds.size} journals, ${draftIds.size} drafts",
+            "Restore failed, rolling back ${links.size} links, ${noteIds.size} notes, ${journalIds.size} journals",
         )
         for ((contentId, journalId) in links) {
             runCatching { journalContentRepository.removeContentFromJournal(contentId, journalId) }
@@ -292,10 +274,6 @@ class RestoreUserDataUseCase(
         for (journalId in journalIds) {
             runCatching { journalRepository.delete(journalId) }
                 .onFailure { Napier.e("Rollback: failed to delete journal $journalId", it) }
-        }
-        for (draftId in draftIds) {
-            runCatching { journalRepository.deleteDraft(draftId) }
-                .onFailure { Napier.e("Rollback: failed to delete draft $draftId", it) }
         }
     }
 
@@ -418,70 +396,6 @@ class RestoreUserDataUseCase(
         }
     }
 
-    private suspend fun restoreDraft(
-        draft: ExportDraft,
-        manifestIndex: Map<String, ExportMediaFile>?,
-        mediaImporter: MediaImporter?,
-        warnings: MutableList<String>,
-        onMediaImported: (Boolean) -> Unit,
-    ): EditorDraft {
-        val restoredBlocks =
-            if (draft.blocks.isNotEmpty()) {
-                draft.blocks.mapNotNull { block ->
-                    restoreDraftBlock(block, manifestIndex, mediaImporter, warnings, onMediaImported)
-                }
-            } else {
-                emptyList()
-            }
-
-        if (restoredBlocks.isNotEmpty()) {
-            return EditorDraft(
-                id = runCatching { Uuid.parse(draft.id) }.getOrDefault(Uuid.random()),
-                blocks = restoredBlocks,
-                selectedJournalIds = draft.parseSelectedJournalIds(),
-                createdAt = draft.createdAt,
-                lastModifiedAt = draft.updatedAt,
-            )
-        }
-
-        val blocks = mutableListOf<SerializableEntryBlock>()
-        if (draft.content.isNotBlank()) {
-            blocks.add(
-                SerializableTextBlock(
-                    id = Uuid.random(),
-                    timestamp = draft.createdAt,
-                    locationLat = draft.location?.latitude,
-                    locationLng = draft.location?.longitude,
-                    content = draft.content,
-                ),
-            )
-        }
-
-        draft.mediaReferences.forEach { reference ->
-            val resolution = resolveMediaReference(reference, manifestIndex, mediaImporter)
-            onMediaImported(resolution.imported)
-            val uri = resolution.uri ?: return@forEach
-            blocks.add(
-                SerializableCameraBlock(
-                    id = Uuid.random(),
-                    timestamp = draft.updatedAt,
-                    uri = uri,
-                ),
-            )
-        }
-
-        val selectedJournalIds =
-            draft.parseSelectedJournalIds()
-
-        return EditorDraft(
-            id = runCatching { Uuid.parse(draft.id) }.getOrDefault(Uuid.random()),
-            blocks = blocks,
-            selectedJournalIds = selectedJournalIds,
-            createdAt = draft.createdAt,
-            lastModifiedAt = draft.updatedAt,
-        )
-    }
-
     private fun ExportNote.toJournalNote(
         id: Uuid,
         mediaResolution: MediaResolution,
@@ -544,87 +458,6 @@ class RestoreUserDataUseCase(
         }
     }
 
-    private suspend fun restoreDraftBlock(
-        block: SerializableEntryBlock,
-        manifestIndex: Map<String, ExportMediaFile>?,
-        mediaImporter: MediaImporter?,
-        warnings: MutableList<String>,
-        onMediaImported: (Boolean) -> Unit,
-    ): SerializableEntryBlock? =
-        when (block) {
-            is SerializableTextBlock -> block
-            is SerializableImageBlock ->
-                resolveSimpleBlock(block.uri, block.id, manifestIndex, mediaImporter, warnings, onMediaImported) {
-                    block.copy(uri = it)
-                }
-            is SerializableVideoBlock -> {
-                val mediaResolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter)
-                onMediaImported(mediaResolution.imported)
-                val thumbnailResolution = resolveMediaReference(block.thumbnailUri, manifestIndex, mediaImporter)
-                onMediaImported(thumbnailResolution.imported)
-                resolvedDraftBlockOrDropped(block.uri, mediaResolution, block.id, warnings) {
-                    block.copy(uri = it, thumbnailUri = thumbnailResolution.uri)
-                }
-            }
-            is SerializableAudioBlock ->
-                resolveSimpleBlock(block.uri, block.id, manifestIndex, mediaImporter, warnings, onMediaImported) {
-                    block.copy(uri = it)
-                }
-            is SerializableCameraBlock ->
-                resolveSimpleBlock(block.uri, block.id, manifestIndex, mediaImporter, warnings, onMediaImported) {
-                    block.copy(uri = it)
-                }
-        }
-
-    /**
-     * Shared resolution path for the draft block types that only carry a single media
-     * reference (image, audio, camera). [SerializableVideoBlock] resolves a second
-     * reference (its thumbnail) and so is handled separately in [restoreDraftBlock].
-     */
-    private suspend fun resolveSimpleBlock(
-        uri: String?,
-        blockId: Uuid,
-        manifestIndex: Map<String, ExportMediaFile>?,
-        mediaImporter: MediaImporter?,
-        warnings: MutableList<String>,
-        onMediaImported: (Boolean) -> Unit,
-        copy: (String?) -> SerializableEntryBlock,
-    ): SerializableEntryBlock? {
-        val resolution = resolveMediaReference(uri, manifestIndex, mediaImporter)
-        onMediaImported(resolution.imported)
-        return resolvedDraftBlockOrDropped(uri, resolution, blockId, warnings, copy)
-    }
-
-    /**
-     * Drops a draft media block when it had a real reference that couldn't be resolved, rather
-     * than silently keeping it with a dead `uri = null`. A block that never had media to begin
-     * with (blank/null [originalUri]) is left alone -- there was nothing to resolve.
-     */
-    private fun resolvedDraftBlockOrDropped(
-        originalUri: String?,
-        resolution: MediaResolution,
-        blockId: Uuid,
-        warnings: MutableList<String>,
-        copy: (String?) -> SerializableEntryBlock,
-    ): SerializableEntryBlock? {
-        if (resolution.uri == null && !originalUri.isNullOrBlank()) {
-            val message = "Skipped draft media block (ID: $blockId) - media file not found in archive"
-            Napier.w(message)
-            warnings.add(message)
-            return null
-        }
-        return copy(resolution.uri)
-    }
-
-    private fun ExportDraft.parseSelectedJournalIds(): List<Uuid> =
-        if (journalIds.isNotEmpty()) {
-            journalIds.mapNotNull { runCatching { Uuid.parse(it) }.getOrNull() }
-        } else {
-            journalId?.let { value ->
-                runCatching { listOf(Uuid.parse(value)) }.getOrNull() ?: emptyList()
-            } ?: emptyList()
-        }
-
     private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation {
         val coords =
             NoteCoordinates(
@@ -645,127 +478,3 @@ class RestoreUserDataUseCase(
         return NoteLocation(coordinates = coords, place = place)
     }
 }
-
-interface MediaImporter {
-    suspend fun importMedia(exportPath: String): String?
-}
-
-data class RestoreBundle(
-    val metadataJson: String,
-    val journalsJson: String,
-    val notesJson: String,
-    val journalNotesJson: String,
-    val draftsJson: String,
-    val profileJson: String? = null,
-    val placesJson: String? = null,
-    val locationHistoryJson: String? = null,
-    val mediaManifestJson: String? = null,
-)
-
-data class RestoreOptions(
-    val strategy: RestoreStrategy = RestoreStrategy.MERGE_KEEP_NEWEST,
-    val includeDrafts: Boolean = true,
-    val includeMedia: Boolean = true,
-    val preservePopulatedLocalProfile: Boolean = false,
-)
-
-enum class RestoreStrategy {
-    MERGE_KEEP_NEWEST,
-    REPLACE_EXISTING,
-}
-
-data class RestoreResult(
-    val metadata: ExportMetadata,
-    val journalsImported: Int,
-    val notesImported: Int,
-    val draftsImported: Int,
-    val journalLinksImported: Int,
-    val mediaImported: Int,
-    val warnings: List<String>,
-    val integrityMismatches: List<IntegrityMismatch> = emptyList(),
-)
-
-/**
- * A discrepancy between metadata.json stats and actual archive contents.
- */
-@Serializable
-data class IntegrityMismatch(
-    val category: IntegrityCategory,
-    val expected: Int,
-    val actual: Int,
-)
-
-@Serializable
-enum class IntegrityCategory {
-    JOURNALS,
-    NOTES,
-    DRAFTS,
-    MEDIA,
-    PROFILE,
-    PLACES,
-    LOCATION_HISTORY,
-}
-
-private data class MediaResolution(
-    val uri: String?,
-    val imported: Boolean,
-    val allowSourceFallback: Boolean,
-)
-
-@Serializable
-private data class JournalsPayload(
-    val journals: List<Journal>,
-)
-
-@Serializable
-private data class NotesPayload(
-    val notes: List<ExportNote>,
-)
-
-@Serializable
-private data class DraftsPayload(
-    val drafts: List<ExportDraft>,
-)
-
-@Serializable
-private data class JournalNotesPayload(
-    @SerialName("journal_notes")
-    val journalNotes: List<ExportJournalNoteRelation>,
-)
-
-private fun ExportPlace.toPlace(): Place.UserDefined =
-    Place.UserDefined(
-        id = Uuid.parse(id),
-        displayName = displayName,
-        lat = latitude,
-        lng = longitude,
-        radiusMeters = radiusMeters,
-        description = description,
-    )
-
-private fun ExportLocationHistoryItem.toLocationLogRecord(): LocationLogRecord =
-    LocationLogRecord(
-        sampleId = sampleId,
-        userId = userId,
-        deviceId = deviceId,
-        timestamp = timestamp,
-        loggedAt = loggedAt,
-        location =
-            Location(
-                latitude = latitude,
-                longitude = longitude,
-                altitude = LocationAltitude(altitudeMeters, AltitudeUnit.METERS),
-            ),
-        confidence = confidence,
-        isGenuine = isGenuine,
-        capturePipeline =
-            runCatching { LocationCapturePipeline.valueOf(capturePipeline) }
-                .getOrDefault(LocationCapturePipeline.LEGACY),
-        captureSource =
-            runCatching { LocationCaptureSource.valueOf(captureSource) }
-                .getOrDefault(LocationCaptureSource.BACKGROUND_PERIODIC),
-        accuracyMeters = accuracyMeters,
-        speedMetersPerSecond = speedMetersPerSecond,
-        bearingDegrees = bearingDegrees,
-        isMock = isMock,
-    )

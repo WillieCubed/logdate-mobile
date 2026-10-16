@@ -105,6 +105,31 @@ interface JournalRepository {
      */
     suspend fun getDraft(id: Uuid): EditorDraft?
 
+    /** Recovery reads must distinguish absent drafts from unavailable storage. */
+    suspend fun getDraftForRestore(id: Uuid): EditorDraft? = getDraft(id)
+
+    /** Capture before reading recovery snapshots and retain for later writes and undo. */
+    suspend fun getDraftRecoveryScope(): DraftRecoveryScope? = null
+
+    /** Repair an interrupted upload enqueue without replacing a later pending mutation. */
+    suspend fun ensureDraftRecoveryQueued(
+        id: Uuid,
+        recoveryScope: DraftRecoveryScope?,
+    ) = Unit
+
+    /** Replace a captured draft only while it is unchanged and queue the resulting local mutation. */
+    suspend fun compareAndSetDraftForRestore(
+        id: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope? = null,
+    ): Boolean {
+        check(recoveryScope == null || getDraftRecoveryScope() == recoveryScope) { "Draft recovery account changed" }
+        if (getDraftForRestore(id) != expected) return false
+        if (replacement == null) deleteDraft(id) else saveDraft(replacement)
+        return true
+    }
+
     /**
      * Deletes a draft
      */
