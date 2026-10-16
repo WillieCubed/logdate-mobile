@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import app.logdate.client.location.R
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import io.github.aakira.napier.Napier
@@ -65,12 +66,15 @@ class LocationRecordingActionReceiver :
         val notification =
             NotificationCompat
                 .Builder(context, LogDateNotificationChannelKey.LOCATION_HISTORY.id)
-                .setContentTitle("Location recording paused")
-                .setContentText("Resume when you want to record your day again.")
+                .setContentTitle(context.getString(R.string.location_recording_paused_title))
+                .setContentText(context.getString(R.string.location_recording_paused_text))
                 .setSmallIcon(android.R.drawable.ic_menu_mylocation)
                 .setContentIntent(open)
-                .addAction(android.R.drawable.ic_media_play, "Resume", actionIntent(context, ACTION_RESUME))
-                .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+                .addAction(
+                    android.R.drawable.ic_media_play,
+                    context.getString(R.string.location_recording_action_resume),
+                    actionIntent(context, ACTION_RESUME),
+                ).setVisibility(NotificationCompat.VISIBILITY_SECRET)
                 .setSilent(true)
                 .setAutoCancel(true)
                 .build()

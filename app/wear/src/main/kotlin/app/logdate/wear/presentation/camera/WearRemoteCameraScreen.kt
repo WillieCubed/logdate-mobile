@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -37,6 +38,7 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.wear.R
 
 @Composable
 fun WearRemoteCameraScreen(
@@ -90,10 +92,10 @@ private fun IdleContent(onRequest: () -> Unit) {
         Button(onClick = onRequest) {
             Icon(
                 imageVector = Icons.Default.CameraAlt,
-                contentDescription = "Open camera",
+                contentDescription = stringResource(R.string.wear_camera_open),
                 modifier = Modifier.size(24.dp),
             )
-            Text("Camera")
+            Text(stringResource(R.string.wear_camera_label))
         }
     }
 }
@@ -108,7 +110,7 @@ private fun RequestingContent() {
         CircularProgressIndicator(modifier = Modifier.size(32.dp))
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Opening camera\non your phone...",
+            text = stringResource(R.string.wear_camera_opening),
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
         )
@@ -152,7 +154,7 @@ private fun ReadyContent(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "Take photo",
+                        contentDescription = stringResource(R.string.wear_camera_take_photo),
                         modifier = Modifier.size(32.dp),
                     )
                 }
@@ -165,7 +167,7 @@ private fun ReadyContent(
                     ) {
                         Icon(
                             imageVector = Icons.Default.CameraRear,
-                            contentDescription = "Back camera",
+                            contentDescription = stringResource(R.string.wear_camera_select_back),
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -175,7 +177,7 @@ private fun ReadyContent(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Cameraswitch,
-                            contentDescription = "Switch camera",
+                            contentDescription = stringResource(R.string.wear_camera_switch),
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -185,7 +187,7 @@ private fun ReadyContent(
                     ) {
                         Icon(
                             imageVector = Icons.Default.CameraFront,
-                            contentDescription = "Front camera",
+                            contentDescription = stringResource(R.string.wear_camera_select_front),
                             modifier = Modifier.size(22.dp),
                         )
                     }
@@ -202,7 +204,7 @@ private fun ReadyContent(
             }
             item(key = "close") {
                 Button(onClick = onCancel) {
-                    Text("Close")
+                    Text(stringResource(R.string.wear_camera_close))
                 }
             }
         }
@@ -234,7 +236,7 @@ private fun CameraDeviceButton(
         if (isSelected) {
             Icon(
                 imageVector = Icons.Default.Check,
-                contentDescription = "Selected",
+                contentDescription = stringResource(R.string.wear_camera_selected),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -262,7 +264,7 @@ private fun CapturingContent() {
         CircularProgressIndicator(modifier = Modifier.size(32.dp))
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Capturing...",
+            text = stringResource(R.string.wear_camera_capturing),
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -287,22 +289,22 @@ private fun PreviewContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = message ?: "Photo captured",
+            text = message ?: stringResource(R.string.wear_camera_photo_captured),
             style = MaterialTheme.typography.titleSmall,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = onSave) {
-                Text("Done")
+                Text(stringResource(R.string.wear_camera_done))
             }
             Button(onClick = onMore) {
                 Icon(
                     imageVector = Icons.Default.CameraAlt,
-                    contentDescription = "Take another",
+                    contentDescription = stringResource(R.string.wear_camera_take_another),
                     modifier = Modifier.size(16.dp),
                 )
-                Text("More")
+                Text(stringResource(R.string.wear_home_more))
             }
         }
     }
@@ -326,13 +328,13 @@ private fun ErrorContent(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = message ?: "Something went wrong",
+            text = message ?: stringResource(R.string.wear_recording_error),
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = onDismiss) {
-            Text("Back")
+            Text(stringResource(R.string.wear_camera_error_back))
         }
     }
 }

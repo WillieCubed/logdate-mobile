@@ -51,6 +51,12 @@ import app.logdate.ui.common.rememberMultiSelectState
 import app.logdate.ui.common.verticalScrollbar
 import coil3.compose.AsyncImage
 import io.github.aakira.napier.Napier
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.postcards_clear_selection
+import logdate.client.feature.postcards.generated.resources.postcards_delete_selected
+import logdate.client.feature.postcards.generated.resources.postcards_new
+import logdate.client.feature.postcards.generated.resources.postcards_title
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import kotlin.uuid.Uuid
@@ -90,7 +96,7 @@ fun PostcardsCollectionScreen(
                     title = { Text("${multiSelect.selectionCount} selected") },
                     navigationIcon = {
                         IconButton(onClick = { multiSelect.clear() }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Clear selection")
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(Res.string.postcards_clear_selection))
                         }
                     },
                     actions = {
@@ -100,17 +106,17 @@ fun PostcardsCollectionScreen(
                             }
                             multiSelect.clear()
                         }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Delete selected")
+                            Icon(Icons.Filled.Delete, contentDescription = stringResource(Res.string.postcards_delete_selected))
                         }
                     },
                 )
             } else {
-                TopAppBar(title = { Text("Postcards") })
+                TopAppBar(title = { Text(stringResource(Res.string.postcards_title)) })
             }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onCreateNew) {
-                Icon(Icons.Filled.Add, contentDescription = "New Postcard")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(Res.string.postcards_new))
             }
         },
     ) { paddingValues ->

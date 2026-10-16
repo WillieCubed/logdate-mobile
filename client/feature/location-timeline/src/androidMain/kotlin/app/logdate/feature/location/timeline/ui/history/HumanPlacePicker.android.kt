@@ -16,6 +16,9 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_place_picker_map_unavailable
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal actual fun HumanPlacePicker(
@@ -24,7 +27,7 @@ internal actual fun HumanPlacePicker(
     modifier: Modifier,
 ) {
     if (!rememberGoogleMapsEnabled()) {
-        Box(modifier, contentAlignment = Alignment.Center) { Text("The map is unavailable. Choose a saved place, or try again later.") }
+        Box(modifier, contentAlignment = Alignment.Center) { Text(stringResource(Res.string.history_place_picker_map_unavailable)) }
         return
     }
     val camera =

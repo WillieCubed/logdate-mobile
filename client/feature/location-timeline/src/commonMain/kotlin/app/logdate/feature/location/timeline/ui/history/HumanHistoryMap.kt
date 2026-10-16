@@ -27,6 +27,10 @@ import app.logdate.shared.model.location.JourneyLeg
 import app.logdate.shared.model.location.LocationDayItem
 import app.logdate.shared.model.location.PlaceVisit
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_map_empty
+import logdate.client.feature.location.timeline.generated.resources.history_map_overview_description
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -137,15 +141,16 @@ fun HumanHistoryMap(
     }
     val geometry = remember(items) { historyMapGeometry(items) }
     val colors = MaterialTheme.colorScheme
+    val mapDescription = stringResource(Res.string.history_map_overview_description)
     BoxWithConstraints(
         modifier
             .background(colors.surfaceContainerLow, RoundedCornerShape(16.dp))
-            .semantics { contentDescription = "Map overview of recorded places and paths" },
+            .semantics { contentDescription = mapDescription },
     ) {
         val coordinates = geometry.coordinates
         if (coordinates.isEmpty()) {
             Text(
-                "No locations to show on the map",
+                stringResource(Res.string.history_map_empty),
                 Modifier.align(Alignment.Center).padding(16.dp),
                 color = colors.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,

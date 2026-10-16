@@ -30,6 +30,7 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.cd_event_linked_note_detach
 import logdate.client.feature.events.generated.resources.cd_event_linked_photo
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
@@ -116,7 +117,7 @@ private fun LinkedNoteCard(
                 )
             }
             IconButton(onClick = onUnlink) {
-                Icon(painter = PlatformIcons.close(), contentDescription = "Detach")
+                Icon(painter = PlatformIcons.close(), contentDescription = stringResource(Res.string.cd_event_linked_note_detach))
             }
         }
     }

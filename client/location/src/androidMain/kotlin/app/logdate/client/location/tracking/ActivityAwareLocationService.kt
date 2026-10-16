@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import app.logdate.client.location.R
 import app.logdate.client.location.history.LocationTracker
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.notifications.LogDateNotificationChannelKey
@@ -425,10 +426,10 @@ class ActivityAwareLocationService :
 
         return NotificationCompat
             .Builder(this, CHANNEL_ID)
-            .setContentTitle("Recording your day")
+            .setContentTitle(getString(R.string.location_recording_notification_title))
             .addAction(
                 android.R.drawable.ic_media_pause,
-                "Pause",
+                getString(R.string.location_recording_action_pause),
                 LocationRecordingActionReceiver.actionIntent(this, LocationRecordingActionReceiver.ACTION_PAUSE),
             ).setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pendingIntent)

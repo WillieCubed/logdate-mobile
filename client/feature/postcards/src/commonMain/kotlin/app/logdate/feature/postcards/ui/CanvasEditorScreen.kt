@@ -71,7 +71,20 @@ import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.common.CursorType
 import app.logdate.ui.common.cursorIcon
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.postcards_delete_shortcut
+import logdate.client.feature.postcards.generated.resources.postcards_fullscreen
+import logdate.client.feature.postcards.generated.resources.postcards_redo
+import logdate.client.feature.postcards.generated.resources.postcards_redo_shortcut
+import logdate.client.feature.postcards.generated.resources.postcards_save_shortcut
+import logdate.client.feature.postcards.generated.resources.postcards_undo
+import logdate.client.feature.postcards.generated.resources.postcards_undo_shortcut
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_delete
+import logdate.client.ui.generated.resources.common_save
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Full-screen immersive canvas editor for creating and editing Postcards.
@@ -573,53 +586,53 @@ private fun EditorTopBar(
         },
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
             }
         },
         actions = {
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text("Undo (Ctrl+Z)") } },
+                tooltip = { PlainTooltip { Text(stringResource(Res.string.postcards_undo_shortcut)) } },
                 state = rememberTooltipState(),
             ) {
                 IconButton(onClick = onUndo, enabled = canUndo) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = stringResource(Res.string.postcards_undo))
                 }
             }
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text("Redo (Ctrl+Shift+Z)") } },
+                tooltip = { PlainTooltip { Text(stringResource(Res.string.postcards_redo_shortcut)) } },
                 state = rememberTooltipState(),
             ) {
                 IconButton(onClick = onRedo, enabled = canRedo) {
-                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+                    Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = stringResource(Res.string.postcards_redo))
                 }
             }
             if (hasSelection) {
                 TooltipBox(
                     positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                    tooltip = { PlainTooltip { Text("Delete (Del)") } },
+                    tooltip = { PlainTooltip { Text(stringResource(Res.string.postcards_delete_shortcut)) } },
                     state = rememberTooltipState(),
                 ) {
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Delete")
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(UiRes.string.common_delete))
                     }
                 }
             }
             if (onToggleFullscreen != null) {
                 TooltipBox(
                     positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                    tooltip = { PlainTooltip { Text("Fullscreen") } },
+                    tooltip = { PlainTooltip { Text(stringResource(Res.string.postcards_fullscreen)) } },
                     state = rememberTooltipState(),
                 ) {
                     IconButton(onClick = onToggleFullscreen) {
-                        Icon(Icons.Filled.Fullscreen, contentDescription = "Fullscreen")
+                        Icon(Icons.Filled.Fullscreen, contentDescription = stringResource(Res.string.postcards_fullscreen))
                     }
                 }
             }
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text("Save (Ctrl+S)") } },
+                tooltip = { PlainTooltip { Text(stringResource(Res.string.postcards_save_shortcut)) } },
                 state = rememberTooltipState(),
             ) {
                 IconButton(onClick = {
@@ -629,7 +642,7 @@ private fun EditorTopBar(
                     }
                     onSave()
                 }) {
-                    Icon(Icons.Filled.Check, contentDescription = "Save")
+                    Icon(Icons.Filled.Check, contentDescription = stringResource(UiRes.string.common_save))
                 }
             }
         },

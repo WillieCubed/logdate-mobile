@@ -35,6 +35,7 @@ import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.ui.workspace.WorkspaceSearchActionScope
 import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.library_postcards
 import logdate.client.feature.library.generated.resources.search_library
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -105,7 +106,7 @@ fun LibraryScreenContent(
                 if (onOpenPostcards != null) {
                     AssistChip(
                         onClick = onOpenPostcards,
-                        label = { Text("Postcards") },
+                        label = { Text(stringResource(Res.string.library_postcards)) },
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -141,7 +142,7 @@ fun LibraryScreenContent(
                 ) {
                     AssistChip(
                         onClick = onOpenPostcards,
-                        label = { Text("Postcards") },
+                        label = { Text(stringResource(Res.string.library_postcards)) },
                         trailingIcon = {
                             Icon(
                                 painter = PlatformIcons.forward(),

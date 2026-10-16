@@ -44,9 +44,15 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.launch
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.close
+import logdate.client.feature.editor.generated.resources.switch_camera_short
+import logdate.client.ui.generated.resources.common_dismiss
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import platform.CoreGraphics.CGRectMake
 import platform.UIKit.UIView
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * iOS camera UI for the entry editor. Hosts the live `AVCaptureVideoPreviewLayer` from
@@ -106,7 +112,7 @@ actual fun CameraCaptureContent(
         ) {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.close), tint = Color.White)
                 }
             }
             Spacer(Modifier.height(0.dp))
@@ -116,7 +122,11 @@ actual fun CameraCaptureContent(
                         onClick = { scope.launch { manager.switchCamera() } },
                         modifier = Modifier.align(Alignment.CenterStart),
                     ) {
-                        Icon(Icons.Default.Cameraswitch, contentDescription = "Switch", tint = Color.White)
+                        Icon(
+                            Icons.Default.Cameraswitch,
+                            contentDescription = stringResource(Res.string.switch_camera_short),
+                            tint = Color.White,
+                        )
                     }
                     val isVideo = state.captureMode == CaptureMode.VIDEO
                     val isRecording = state.isRecording
@@ -203,7 +213,7 @@ private fun UnavailableCameraCard(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 androidx.compose.material3.TextButton(onClick = onClose) {
-                    Text("Dismiss")
+                    Text(stringResource(UiRes.string.common_dismiss))
                 }
             }
         }

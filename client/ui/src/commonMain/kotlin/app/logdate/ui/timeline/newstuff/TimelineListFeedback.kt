@@ -35,6 +35,7 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineDayCardLayout
 import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.common_retry
 import logdate.client.ui.generated.resources.post_restore_import_action
 import logdate.client.ui.generated.resources.post_restore_import_message
 import logdate.client.ui.generated.resources.post_restore_start_fresh
@@ -93,7 +94,7 @@ internal fun TimelineAppendErrorItem(
                 contentDescription = null,
                 modifier = Modifier.padding(end = Spacing.xs),
             )
-            Text("Retry")
+            Text(stringResource(Res.string.common_retry))
         }
     }
 }

@@ -46,8 +46,10 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.library.generated.resources.Res
 import logdate.client.feature.library.generated.resources.cd_library_audio
+import logdate.client.feature.library.generated.resources.cd_library_audio_badge
 import logdate.client.feature.library.generated.resources.cd_library_photo
 import logdate.client.feature.library.generated.resources.cd_library_video
+import logdate.client.feature.library.generated.resources.cd_library_video_badge
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
@@ -159,7 +161,7 @@ fun MediaThumbnailItem(
             if (item.isVideo) {
                 Icon(
                     painter = PlatformIcons.playCircle(),
-                    contentDescription = "Video",
+                    contentDescription = stringResource(Res.string.cd_library_video_badge),
                     tint = Color.White,
                     modifier =
                         Modifier
@@ -171,7 +173,7 @@ fun MediaThumbnailItem(
             if (item.isAudio) {
                 Icon(
                     painter = PlatformIcons.audioFile(),
-                    contentDescription = "Audio",
+                    contentDescription = stringResource(Res.string.cd_library_audio_badge),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier =
                         Modifier
