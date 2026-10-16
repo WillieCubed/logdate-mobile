@@ -14,6 +14,7 @@ class SettingsUiPlugin : Plugin<Project> {
             sources.from(
                 project.rootProject.fileTree("client") {
                     include("**/src/commonMain/**/*.kt")
+                    exclude("**/build/**")
                 },
             )
         }
