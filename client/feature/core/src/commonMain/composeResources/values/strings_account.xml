@@ -323,7 +323,6 @@
     <string name="account_bio_community_placeholder">Share something about yourself with the LogDate community</string>
     <string name="tell_others_about_yourself">Tell others about yourself...</string>
     <string name="tell_others_about_yourself_2">Tell others about yourself</string>
-    <string name="this_helps_us_personalize_your_experience">This helps us personalize your experience</string>
 
     <!-- Biometric lock -->
     <string name="disable_biometric_lock_title">Disable biometric lock?</string>
