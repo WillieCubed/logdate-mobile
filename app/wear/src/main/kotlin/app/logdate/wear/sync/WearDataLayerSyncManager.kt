@@ -50,7 +50,8 @@ import kotlin.uuid.Uuid
  * - Audio notes stay pending until the phone acknowledges them, and are resent after
  *   [ACK_TIMEOUT_MS] without one
  *
- * Incoming data from the phone is handled by [WearDataLayerListenerService].
+ * Incoming data from the phone is handled by [WearDataLayerListenerService]. The rest of the watch
+ * reads sync through [WatchSyncFacade], which adds the watch's own cloud engine to this status.
  */
 class WearDataLayerSyncManager(
     private val dataLayerClient: WearDataLayerClient,
