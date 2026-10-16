@@ -4,9 +4,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import app.logdate.client.device.restore.NativeBackupQuotaFailure
@@ -60,7 +64,43 @@ class NativeBackupSettingsTest {
                     }
                 }
             }
-            onNodeWithText("Export archive").performScrollTo().performClick()
+            onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Export archive"))
+            onNodeWithText("Export archive").performClick()
+            assertEquals(1, exports)
+        }
+
+    @Test
+    fun signedOutBackupKeepsCloudSetupAndArchiveActionsDistinct() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            var accounts = 0
+            var signIns = 0
+            var exports = 0
+            setContent {
+                LogDateTheme {
+                    SyncSettingsContent(
+                        onBack = {},
+                        syncStatus = null,
+                        isAuthenticated = false,
+                        onSyncNow = {},
+                        onNavigateToCloudAccountCreation = { accounts++ },
+                        onNavigateToSignIn = { signIns++ },
+                        quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 B", formattedUsed = "0 B"),
+                        isQuotaAvailable = false,
+                        snackbarHostState = SnackbarHostState(),
+                        nativeBackupStatus = NativeBackupStatus.Available(),
+                        onExportArchive = { exports++ },
+                    )
+                }
+            }
+            onNodeWithText("LogDate Cloud").assertExists()
+            onNodeWithText("Your signed-in devices stay in sync").assertDoesNotExist()
+            onNodeWithText("Create Account").performClick()
+            onNodeWithText("Sign in").performClick()
+            onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Export archive"))
+            onNodeWithText("Export archive").performClick()
+            onAllNodesWithText("Export archive").assertCountEquals(1)
+            assertEquals(1, accounts)
+            assertEquals(1, signIns)
             assertEquals(1, exports)
         }
 
