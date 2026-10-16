@@ -85,6 +85,24 @@ class PostgreSQLRestoreCredentialRepository : RestoreCredentialRepository {
             } > 0
         }
 
+    override suspend fun consume(
+        expected: StoredRestoreCredentialData,
+        newSignCount: Long,
+    ): Boolean =
+        transaction {
+            RestoreCredentialsTable.update({
+                (RestoreCredentialsTable.credentialId eq expected.credentialId) and
+                    (RestoreCredentialsTable.isActive eq true) and
+                    (RestoreCredentialsTable.accountId eq expected.userId.toJavaUUID()) and
+                    (RestoreCredentialsTable.publicKey eq encodePublicKey(expected.publicKey)) and
+                    (RestoreCredentialsTable.signCount eq expected.signCount)
+            }) {
+                it[signCount] = newSignCount
+                it[isActive] = false
+                it[lastUsedAt] = Clock.System.now()
+            } == 1
+        }
+
     override suspend fun deactivateAllForUser(userId: Uuid): Boolean =
         transaction {
             RestoreCredentialsTable.update({ RestoreCredentialsTable.accountId eq userId.toJavaUUID() }) {

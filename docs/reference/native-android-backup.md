@@ -136,6 +136,9 @@ without delaying access to the recovered journal.
 Restore assertions have a passive authentication contract. The dedicated server restore verifier
 validates origin, RP, challenge, registered-key signature, ownership, and replay without requiring
 a fresh user-presence or biometric ceremony. Ordinary passkey verification is a separate path.
+The server consumes the exact verified active credential and records its counter in one
+conditional mutation. Concurrent assertions cannot both spend it, and revocation or replacement
+after lookup prevents authentication.
 
 ## Emulator acceptance
 

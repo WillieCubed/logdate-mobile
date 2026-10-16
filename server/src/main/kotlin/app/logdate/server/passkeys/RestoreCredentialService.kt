@@ -238,7 +238,9 @@ class RestoreCredentialService(
                         }
                 } ?: return AuthenticationResult(success = false, error = "Restore credential not found")
 
-            runBlocking { restoreCredentialRepository.deactivate(stored.credentialId) }
+            if (!runBlocking { restoreCredentialRepository.consume(stored, stored.signCount) }) {
+                return AuthenticationResult(success = false, error = "Restore credential is no longer available")
+            }
 
             AuthenticationResult(success = true, userId = stored.userId, credentialId = stored.credentialId)
         } catch (e: Exception) {
@@ -306,9 +308,8 @@ class RestoreCredentialService(
                 )
 
             val newSignCount = authenticationData.authenticatorData?.signCount ?: stored.signCount
-            runBlocking {
-                restoreCredentialRepository.updateSignCount(canonicalCredentialId, newSignCount)
-                restoreCredentialRepository.deactivate(canonicalCredentialId)
+            if (!runBlocking { restoreCredentialRepository.consume(stored, newSignCount) }) {
+                return AuthenticationResult(success = false, error = "Restore credential is no longer available")
             }
 
             AuthenticationResult(success = true, userId = stored.userId, credentialId = canonicalCredentialId)

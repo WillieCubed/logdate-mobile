@@ -1,6 +1,5 @@
 package app.logdate.server.passkeys
 
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -23,6 +22,12 @@ interface RestoreCredentialRepository {
     ): Boolean
 
     suspend fun deactivate(credentialId: String): Boolean
+
+    /** Atomically spend the exact verified active record; concurrent use or revocation wins. */
+    suspend fun consume(
+        expected: StoredRestoreCredentialData,
+        newSignCount: Long,
+    ): Boolean
 
     suspend fun deactivateAllForUser(userId: Uuid): Boolean
 }
@@ -56,52 +61,65 @@ data class StoredRestoreCredentialData(
 
 @OptIn(ExperimentalUuidApi::class)
 class InMemoryRestoreCredentialRepository : RestoreCredentialRepository {
-    private val credentials = ConcurrentHashMap<String, Pair<Uuid, StoredRestoreCredentialData>>()
-    private val activeFlags = ConcurrentHashMap<String, Boolean>()
+    private val lock = Any()
+    private val credentials = mutableMapOf<String, StoredRestoreCredentialData>()
+    private val activeFlags = mutableMapOf<String, Boolean>()
 
     override suspend fun store(
         userId: Uuid,
         credentialId: String,
         publicKey: ByteArray,
         signCount: Long,
-    ): Boolean {
-        val data = StoredRestoreCredentialData(credentialId, publicKey, signCount, userId)
-        credentials[credentialId] = userId to data
-        activeFlags[credentialId] = true
-        return true
-    }
+    ): Boolean =
+        synchronized(lock) {
+            if (credentials.containsKey(credentialId)) return@synchronized false
+            credentials[credentialId] = StoredRestoreCredentialData(credentialId, publicKey.copyOf(), signCount, userId)
+            activeFlags[credentialId] = true
+            true
+        }
 
-    override suspend fun findByCredentialId(credentialId: String): StoredRestoreCredentialData? {
-        if (activeFlags[credentialId] != true) return null
-        return credentials[credentialId]?.second
-    }
+    override suspend fun findByCredentialId(credentialId: String): StoredRestoreCredentialData? =
+        synchronized(lock) {
+            if (activeFlags[credentialId] != true) return@synchronized null
+            credentials[credentialId]?.let { it.copy(publicKey = it.publicKey.copyOf()) }
+        }
 
     override suspend fun getCredentialIdsForUser(userId: Uuid): List<String> =
-        credentials
-            .filter { (id, pair) -> pair.first == userId && activeFlags[id] == true }
-            .keys
-            .toList()
+        synchronized(lock) {
+            credentials.filter { (id, data) -> data.userId == userId && activeFlags[id] == true }.keys.toList()
+        }
 
     override suspend fun updateSignCount(
         credentialId: String,
         newSignCount: Long,
-    ): Boolean {
-        val (userId, data) = credentials[credentialId] ?: return false
-        credentials[credentialId] = userId to data.copy(signCount = newSignCount)
-        return true
-    }
+    ): Boolean =
+        synchronized(lock) {
+            val data = credentials[credentialId] ?: return@synchronized false
+            credentials[credentialId] = data.copy(signCount = newSignCount)
+            true
+        }
 
-    override suspend fun deactivate(credentialId: String): Boolean {
-        if (!credentials.containsKey(credentialId)) return false
-        activeFlags[credentialId] = false
-        return true
-    }
+    override suspend fun deactivate(credentialId: String): Boolean =
+        synchronized(lock) {
+            if (!credentials.containsKey(credentialId)) return@synchronized false
+            activeFlags[credentialId] = false
+            true
+        }
 
-    override suspend fun deactivateAllForUser(userId: Uuid): Boolean {
-        credentials
-            .filter { (_, pair) -> pair.first == userId }
-            .keys
-            .forEach { activeFlags[it] = false }
-        return true
-    }
+    override suspend fun consume(
+        expected: StoredRestoreCredentialData,
+        newSignCount: Long,
+    ): Boolean =
+        synchronized(lock) {
+            if (activeFlags[expected.credentialId] != true || credentials[expected.credentialId] != expected) return@synchronized false
+            credentials[expected.credentialId] = expected.copy(publicKey = expected.publicKey.copyOf(), signCount = newSignCount)
+            activeFlags[expected.credentialId] = false
+            true
+        }
+
+    override suspend fun deactivateAllForUser(userId: Uuid): Boolean =
+        synchronized(lock) {
+            credentials.filter { (_, data) -> data.userId == userId }.keys.forEach { activeFlags[it] = false }
+            true
+        }
 }

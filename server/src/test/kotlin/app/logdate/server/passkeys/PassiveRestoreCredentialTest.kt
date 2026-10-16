@@ -81,7 +81,7 @@ class PassiveRestoreCredentialTest {
     }
 }
 
-private class PassiveRestoreAuthenticator {
+internal class PassiveRestoreAuthenticator {
     private val key = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
     private val credentialId = ByteArray(32) { (it + 1).toByte() }
 
