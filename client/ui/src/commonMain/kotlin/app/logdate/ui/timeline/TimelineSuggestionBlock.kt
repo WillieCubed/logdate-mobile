@@ -37,8 +37,17 @@ import app.logdate.ui.common.PeopleMetadataChip
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 import kotlinx.datetime.LocalDate
-import logdate.client.ui.generated.resources.*
 import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.finish_draft
+import logdate.client.ui.generated.resources.share_link
+import logdate.client.ui.generated.resources.start_writing
+import logdate.client.ui.generated.resources.suggestion_capture_for_event
+import logdate.client.ui.generated.resources.suggestion_label_draft
+import logdate.client.ui.generated.resources.suggestion_label_memory
+import logdate.client.ui.generated.resources.suggestion_label_today
+import logdate.client.ui.generated.resources.suggestion_media_item
+import logdate.client.ui.generated.resources.suggestion_near_location
+import logdate.client.ui.generated.resources.view_memory
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 
@@ -352,7 +361,7 @@ private fun SuggestionActions(
             TimelineSuggestionBlockType.UPCOMING_EVENT -> {
                 AssistChip(
                     onClick = onStartWriting,
-                    label = { Text("Capture for this") },
+                    label = { Text(stringResource(Res.string.suggestion_capture_for_event)) },
                     leadingIcon = {
                         Icon(
                             Icons.Default.EditNote,

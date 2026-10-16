@@ -25,7 +25,13 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_L
 import app.logdate.shared.model.Place
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.event_detail_choose_place
+import logdate.client.feature.events.generated.resources.event_place_picker_no_place
+import logdate.client.ui.generated.resources.common_done
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Adaptive picker for choosing the place attached to an event.
@@ -56,7 +62,7 @@ internal fun EventPlacePicker(
     if (isExpanded) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Choose a place") },
+            title = { Text(stringResource(Res.string.event_detail_choose_place)) },
             text = {
                 PlacePickerContent(
                     availablePlaces = availablePlaces,
@@ -68,7 +74,7 @@ internal fun EventPlacePicker(
                 )
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) { Text("Done") }
+                TextButton(onClick = onDismiss) { Text(stringResource(UiRes.string.common_done)) }
             },
         )
     } else {
@@ -79,7 +85,7 @@ internal fun EventPlacePicker(
         ) {
             Column(modifier = Modifier.padding(bottom = Spacing.lg)) {
                 Text(
-                    text = "Choose a place",
+                    text = stringResource(Res.string.event_detail_choose_place),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                 )
@@ -118,7 +124,7 @@ private fun PlacePickerContent(
     ) {
         item("none") {
             ListItem(
-                headlineContent = { Text("No place") },
+                headlineContent = { Text(stringResource(Res.string.event_place_picker_no_place)) },
                 leadingContent = {
                     RadioButton(
                         selected = selectedPlaceId == null,

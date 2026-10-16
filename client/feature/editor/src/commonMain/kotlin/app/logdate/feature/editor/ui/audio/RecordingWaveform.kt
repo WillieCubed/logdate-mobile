@@ -15,6 +15,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.audio_waveform
+import org.jetbrains.compose.resources.stringResource
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -34,7 +37,8 @@ internal fun RecordingWaveform(
         }
     }
     val color = MaterialTheme.colorScheme.primary
-    Canvas(modifier.clipToBounds().semantics { contentDescription = "Audio waveform" }) {
+    val waveformDescription = stringResource(Res.string.audio_waveform)
+    Canvas(modifier.clipToBounds().semantics { contentDescription = waveformDescription }) {
         val pitch = 10.dp.toPx()
         val stroke = (if (focused) 4.dp else 3.dp).toPx()
         val visible = recordingWaveformWindow(levels, (size.width / pitch).toInt() + 1)

@@ -51,7 +51,10 @@ import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.WorkspacePanel
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.journal_add_to_home_screen
+import logdate.client.feature.journal.generated.resources.journal_change_order
 import logdate.client.feature.journal.generated.resources.journal_delete_label
+import logdate.client.feature.journal.generated.resources.journal_detail_back_to_journals
+import logdate.client.feature.journal.generated.resources.journal_detail_load_error
 import logdate.client.feature.journal.generated.resources.journal_merge_action
 import logdate.client.feature.journal.generated.resources.journal_merge_success
 import logdate.client.feature.journal.generated.resources.journal_settings_label
@@ -163,8 +166,8 @@ fun JournalDetailScreenContent(
         is JournalDetailUiState.Error -> {
             WorkspacePanel(modifier) {
                 Column(Modifier.padding(Spacing.lg)) {
-                    Text("This journal couldn't load. Your memories are still saved.")
-                    TextButton(onClick = onGoBack) { Text("Back to journals") }
+                    Text(stringResource(Res.string.journal_detail_load_error))
+                    TextButton(onClick = onGoBack) { Text(stringResource(Res.string.journal_detail_back_to_journals)) }
                 }
             }
             return
@@ -197,15 +200,15 @@ fun JournalDetailScreenContent(
                                 Box {
                                     IconButton(onClick = { showOverflowMenu = true }) { Icon(Icons.Rounded.MoreVert, "Journal options") }
                                     DropdownMenu(showOverflowMenu, { showOverflowMenu = false }) {
-                                        DropdownMenuItem(text = { Text("Change order") }, onClick = {
+                                        DropdownMenuItem(text = { Text(stringResource(Res.string.journal_change_order)) }, onClick = {
                                             showOverflowMenu = false
                                             onToggleSortOrder()
                                         })
-                                        DropdownMenuItem(text = { Text("Share journal") }, onClick = {
+                                        DropdownMenuItem(text = { Text(stringResource(Res.string.journal_share_label)) }, onClick = {
                                             showOverflowMenu = false
                                             onNavigateToShare(uiState.journalId)
                                         })
-                                        DropdownMenuItem(text = { Text("Journal settings") }, onClick = {
+                                        DropdownMenuItem(text = { Text(stringResource(Res.string.journal_settings_label)) }, onClick = {
                                             showOverflowMenu = false
                                             onNavigateToSettings(uiState.journalId)
                                         })
@@ -216,7 +219,7 @@ fun JournalDetailScreenContent(
                                                 onNavigateToMerge(uiState.journalId)
                                             })
                                         }
-                                        DropdownMenuItem(text = { Text("Delete journal") }, onClick = {
+                                        DropdownMenuItem(text = { Text(stringResource(Res.string.journal_delete_label)) }, onClick = {
                                             showOverflowMenu = false
                                             onRequestDelete()
                                         })

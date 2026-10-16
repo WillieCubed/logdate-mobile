@@ -29,6 +29,17 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.PanelHeader
 import app.logdate.util.toReadableDateShort
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_cancel
+import logdate.client.feature.location.timeline.generated.resources.history_merge_confirm
+import logdate.client.feature.location.timeline.generated.resources.history_merge_title
+import logdate.client.feature.location.timeline.generated.resources.history_merge_with_another_place
+import logdate.client.feature.location.timeline.generated.resources.history_place_memories
+import logdate.client.feature.location.timeline.generated.resources.history_place_no_visits
+import logdate.client.feature.location.timeline.generated.resources.history_place_visits
+import logdate.client.ui.generated.resources.common_done
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,24 +65,24 @@ internal fun HumanPlaceDetail(
                 IconButton(onClick = onDismiss) { Icon(PlatformIcons.close(), "Close place") }
             })
             Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Text("Visits", style = MaterialTheme.typography.titleMedium)
-                if (visits.isEmpty()) Text("There are memories here, but no recorded visits in this date range.")
+                Text(stringResource(Res.string.history_place_visits), style = MaterialTheme.typography.titleMedium)
+                if (visits.isEmpty()) Text(stringResource(Res.string.history_place_no_visits))
                 visits.forEach { visit ->
                     TextButton(
                         onClick = { onVisit(visit) },
                     ) { Text("${visit.start.toReadableDateShort()} · ${visit.toHistoryUi(emptyList()).timeLabel}") }
                 }
-                Text("Memories", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(Res.string.history_place_memories), style = MaterialTheme.typography.titleMedium)
                 row?.memories?.forEach { HistoryMemoryPreview(it, onMemory) }
                 if (snapshot.places.any { it.id == placeId }) {
-                    TextButton(onClick = { merging = !merging }) { Text("Merge with another place") }
+                    TextButton(onClick = { merging = !merging }) { Text(stringResource(Res.string.history_merge_with_another_place)) }
                     if (merging) {
                         snapshot.collectionPlaces().filter { it.id != placeId }.forEach { place ->
                             TextButton(onClick = { target = place }) { Text(place.name) }
                         }
                     }
                 }
-                TextButton(onClick = onDismiss) { Text("Done") }
+                TextButton(onClick = onDismiss) { Text(stringResource(UiRes.string.common_done)) }
             }
         }
     }
@@ -79,16 +90,16 @@ internal fun HumanPlaceDetail(
     target?.let { place ->
         AlertDialog(
             onDismissRequest = { target = null },
-            title = { Text("Merge these places?") },
+            title = { Text(stringResource(Res.string.history_merge_title)) },
             text = { Text("Visits will stay separate and appear under ${place.name}. Your journal memories will be kept.") },
             confirmButton = {
                 TextButton(onClick = {
                     onMerge(placeId, place)
                     target = null
                     onDismiss()
-                }) { Text("Merge places") }
+                }) { Text(stringResource(Res.string.history_merge_confirm)) }
             },
-            dismissButton = { TextButton(onClick = { target = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { target = null }) { Text(stringResource(Res.string.history_cancel)) } },
         )
     }
 }

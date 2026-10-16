@@ -56,6 +56,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.device_name
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.devices_connected
+import logdate.client.feature.core.generated.resources.devices_wear_os
 import logdate.client.feature.core.generated.resources.enter_a_new_name_for_this_device
 import logdate.client.feature.core.generated.resources.last_active_label
 import logdate.client.feature.core.generated.resources.loading_devices
@@ -245,7 +246,7 @@ private fun CompanionDeviceInDevices(
         }
     if (uiState.devices.any { it.platformName == "Wear OS" && it.name == name }) return
     Column(Modifier.padding(horizontal = Spacing.lg)) {
-        Text("Wear OS", style = MaterialTheme.typography.labelMedium)
+        Text(stringResource(Res.string.devices_wear_os), style = MaterialTheme.typography.labelMedium)
         WatchDeviceCard(status, onClick)
     }
 }

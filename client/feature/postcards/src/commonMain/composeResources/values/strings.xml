@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="postcards_title">Postcards</string>
+    <string name="postcards_new">New Postcard</string>
+    <string name="postcards_clear_selection">Clear selection</string>
+    <string name="postcards_delete_selected">Delete selected</string>
+    <string name="postcards_viewer_load_error">Could not load Postcard</string>
+    <string name="postcards_undo">Undo</string>
+    <string name="postcards_undo_shortcut">Undo (Ctrl+Z)</string>
+    <string name="postcards_redo">Redo</string>
+    <string name="postcards_redo_shortcut">Redo (Ctrl+Shift+Z)</string>
+    <string name="postcards_delete_shortcut">Delete (Del)</string>
+    <string name="postcards_fullscreen">Fullscreen</string>
+    <string name="postcards_save_shortcut">Save (Ctrl+S)</string>
+    <string name="postcards_shelf_photos">Photos</string>
+    <string name="postcards_shelf_stickers">Stickers</string>
+    <string name="postcards_shelf_browse">Browse</string>
+    <string name="postcards_export_title">Export Postcard</string>
+    <string name="postcards_export_and_share">Export &amp; Share</string>
+    <string name="postcards_export_rendering">Rendering...</string>
+    <string name="postcards_export_ready">Ready to share</string>
+    <string name="postcards_export_save_to_files">Save to Files</string>
+    <string name="postcards_export_print">Print</string>
+</resources>

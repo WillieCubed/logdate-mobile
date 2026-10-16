@@ -46,6 +46,9 @@ import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.workspace_sheet_expand
+import org.jetbrains.compose.resources.stringResource
 
 val LocalSupportingOverlap = staticCompositionLocalOf { 0.dp }
 
@@ -246,7 +249,9 @@ fun WorkspaceSupportingSheet(
                                 if (extent ==
                                     SupportingExtent.Browsing
                                 ) {
-                                    TextButton(onClick = { extent = SupportingExtent.Expanded }) { Text("Expand") }
+                                    TextButton(onClick = { extent = SupportingExtent.Expanded }) {
+                                        Text(stringResource(Res.string.workspace_sheet_expand))
+                                    }
                                 }
                                 TextButton(onClick = {
                                     extent =

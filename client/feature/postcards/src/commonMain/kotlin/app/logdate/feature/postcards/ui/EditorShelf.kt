@@ -33,6 +33,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.focusableWithRing
 import coil3.compose.AsyncImage
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.postcards_shelf_browse
+import logdate.client.feature.postcards.generated.resources.postcards_shelf_photos
+import logdate.client.feature.postcards.generated.resources.postcards_shelf_stickers
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Content staging shelf with collapsible photo/sticker strips.
@@ -77,17 +82,17 @@ internal fun EditorShelf(
             FilterChip(
                 selected = mode is ShelfMode.Photos,
                 onClick = { onModeChange(ShelfMode.Photos) },
-                label = { Text("Photos") },
+                label = { Text(stringResource(Res.string.postcards_shelf_photos)) },
             )
             FilterChip(
                 selected = mode is ShelfMode.Stickers,
                 onClick = { onModeChange(ShelfMode.Stickers) },
-                label = { Text("Stickers") },
+                label = { Text(stringResource(Res.string.postcards_shelf_stickers)) },
             )
             FilterChip(
                 selected = mode is ShelfMode.Browse,
                 onClick = { onModeChange(ShelfMode.Browse) },
-                label = { Text("Browse") },
+                label = { Text(stringResource(Res.string.postcards_shelf_browse)) },
             )
         }
 

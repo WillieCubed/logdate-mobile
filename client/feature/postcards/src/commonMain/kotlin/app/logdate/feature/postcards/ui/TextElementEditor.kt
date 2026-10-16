@@ -27,6 +27,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_confirm
+import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Available font choices for text elements.
@@ -83,7 +87,7 @@ fun TextElementEditor(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onDismiss) {
-                Icon(Icons.Filled.Close, contentDescription = "Cancel")
+                Icon(Icons.Filled.Close, contentDescription = stringResource(UiRes.string.common_cancel))
             }
             IconButton(
                 onClick = {
@@ -93,7 +97,7 @@ fun TextElementEditor(
                 },
                 enabled = text.isNotBlank(),
             ) {
-                Icon(Icons.Filled.Check, contentDescription = "Confirm")
+                Icon(Icons.Filled.Check, contentDescription = stringResource(UiRes.string.common_confirm))
             }
         }
 

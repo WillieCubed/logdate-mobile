@@ -43,8 +43,10 @@ import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import logdate.client.feature.timeline.generated.resources.close
+import logdate.client.feature.timeline.generated.resources.decorate
+import logdate.client.feature.timeline.generated.resources.rewind
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -146,7 +148,7 @@ fun TimelineDayDetailPanel(
                 actions = {
                     if (onDecorate != null) {
                         IconButton(onClick = onDecorate) {
-                            Icon(painter = PlatformIcons.brush(), contentDescription = "Decorate")
+                            Icon(painter = PlatformIcons.brush(), contentDescription = stringResource(Res.string.decorate))
                         }
                     }
                     if (onOpenRewind != null) {

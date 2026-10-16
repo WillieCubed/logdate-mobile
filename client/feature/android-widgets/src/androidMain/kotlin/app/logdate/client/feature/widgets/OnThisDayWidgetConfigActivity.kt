@@ -163,18 +163,22 @@ private fun WidgetConfigScreen(
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Scaffold(
             modifier = Modifier.widthIn(max = 600.dp).fillMaxHeight().fillMaxWidth(),
-            topBar = { TopAppBar(title = { Text("Memories") }) },
+            topBar = { TopAppBar(title = { Text(stringResource(R.string.widget_name_on_this_day)) }) },
         ) { innerPadding ->
             Column(Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp)) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     WidgetSetupPreview(OnThisDayWidget(displayPreview), displayPreview)
                 }
-                Text("Find memories", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 4.dp))
+                Text(
+                    stringResource(R.string.widget_config_find_memories),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     for ((mode, label, icon) in listOf(
-                        Triple(RecallMode.ON_THIS_DAY, "On this day", Icons.Rounded.AutoAwesome),
-                        Triple(RecallMode.REDISCOVER, "Archive", Icons.Rounded.History),
+                        Triple(RecallMode.ON_THIS_DAY, stringResource(R.string.widget_config_find_on_this_day), Icons.Rounded.AutoAwesome),
+                        Triple(RecallMode.REDISCOVER, stringResource(R.string.widget_config_find_archive), Icons.Rounded.History),
                     )) {
                         WidgetSetupChoice(
                             selected = recallMode == mode,
@@ -193,13 +197,17 @@ private fun WidgetConfigScreen(
                     }
                 }
                 Spacer(Modifier.height(20.dp))
-                Text("Show", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 4.dp))
+                Text(
+                    stringResource(R.string.widget_config_show),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     for ((type, label, icon) in listOf(
-                        Triple(WidgetContentType.TEXT, "Text", Icons.Rounded.Notes),
-                        Triple(WidgetContentType.PHOTOS, "Photos", Icons.Rounded.PhotoLibrary),
-                        Triple(WidgetContentType.AUDIO, "Audio", Icons.Rounded.Mic),
+                        Triple(WidgetContentType.TEXT, stringResource(R.string.widget_config_show_text), Icons.Rounded.Notes),
+                        Triple(WidgetContentType.PHOTOS, stringResource(R.string.widget_config_content_photos), Icons.Rounded.PhotoLibrary),
+                        Triple(WidgetContentType.AUDIO, stringResource(R.string.widget_config_show_audio), Icons.Rounded.Mic),
                     )) {
                         WidgetSetupChoice(
                             selected = type in contentTypes,

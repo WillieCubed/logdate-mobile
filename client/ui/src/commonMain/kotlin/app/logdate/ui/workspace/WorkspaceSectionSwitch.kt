@@ -19,6 +19,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.ui.platform.PlatformIcons
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.workspace_section_switch_label
+import org.jetbrains.compose.resources.stringResource
 
 /** A compact section selector for a panel header; the panel owns its framing. */
 @Composable
@@ -30,12 +33,13 @@ fun WorkspaceSectionSwitch(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selected = labels.getOrNull(selectedIndex) ?: return
+    val chooseSectionDescription = stringResource(Res.string.workspace_section_switch_label)
     Box(modifier) {
         TextButton(
             onClick = { expanded = true },
             modifier =
                 Modifier.semantics {
-                    contentDescription = "Choose section"
+                    contentDescription = chooseSectionDescription
                     stateDescription = selected
                 },
         ) {

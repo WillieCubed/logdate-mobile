@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.common_dismiss
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * What a [MessageBanner] shows. Kept nullable at the call site (rather than a separate
@@ -107,7 +110,7 @@ fun MessageBanner(
                 }
                 if (content.dismissible) {
                     TextButton(onClick = onDismiss) {
-                        Text("Dismiss")
+                        Text(stringResource(Res.string.common_dismiss))
                     }
                 }
             }

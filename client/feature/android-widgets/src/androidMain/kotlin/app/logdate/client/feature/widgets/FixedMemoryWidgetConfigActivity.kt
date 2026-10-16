@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.repository.journals.JournalNote
@@ -128,7 +129,7 @@ private fun FixedMemorySetup(
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Scaffold(
             modifier = Modifier.widthIn(max = 600.dp).fillMaxHeight().fillMaxWidth(),
-            topBar = { TopAppBar(title = { Text("Pinned memory") }) },
+            topBar = { TopAppBar(title = { Text(stringResource(R.string.widget_config_fixed_memory_title)) }) },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
                 if (notes.isEmpty()) {
@@ -140,7 +141,7 @@ private fun FixedMemorySetup(
                         shape = RoundedCornerShape(28.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                     ) {
-                        Text("Add an entry to pin it here.", modifier = Modifier.padding(16.dp))
+                        Text(stringResource(R.string.widget_config_fixed_memory_empty), modifier = Modifier.padding(16.dp))
                     }
                 } else {
                     WidgetSetupPreview(FixedMemoryWidget(displayPreview), displayPreview)
@@ -149,7 +150,7 @@ private fun FixedMemorySetup(
                         TextField(
                             value = query,
                             onValueChange = { query = it },
-                            placeholder = { Text("Search entries") },
+                            placeholder = { Text(stringResource(R.string.widget_config_fixed_memory_search)) },
                             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                             singleLine = true,
                             shape = RoundedCornerShape(28.dp),
@@ -169,7 +170,12 @@ private fun FixedMemorySetup(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         if (visibleNotes.isEmpty()) {
-                            item { Text("No matching entries", modifier = Modifier.padding(16.dp)) }
+                            item {
+                                Text(
+                                    stringResource(R.string.widget_config_fixed_memory_no_matches),
+                                    modifier = Modifier.padding(16.dp),
+                                )
+                            }
                         }
                         items(visibleNotes, key = { it.uid.toString() }) { note ->
                             val content = note.toChosenEntryContent()
@@ -223,7 +229,7 @@ private fun FixedMemorySetup(
                 }
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { selected?.let(onDone) }, enabled = selected != null, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                    Text("Add widget")
+                    Text(stringResource(R.string.widget_config_add_widget))
                 }
                 Spacer(Modifier.height(12.dp))
             }

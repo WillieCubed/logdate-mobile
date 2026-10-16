@@ -29,8 +29,15 @@ import androidx.compose.ui.graphics.Color
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.PostcardDocument
 import app.logdate.ui.adaptive.HingeAwareOverlay
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.postcards_viewer_load_error
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_edit
+import logdate.client.ui.generated.resources.common_share
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Full-screen viewer for a saved Postcard.
@@ -64,20 +71,20 @@ fun PostcardViewerScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
                 actions = {
                     val loaded = uiState as? PostcardViewerUiState.Loaded
                     if (loaded != null) {
                         IconButton(onClick = { onEditPostcard(loaded.document.id) }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Edit")
+                            Icon(Icons.Filled.Edit, contentDescription = stringResource(UiRes.string.common_edit))
                         }
                         IconButton(onClick = {
                             exportViewModel.startExport()
                             showExportSheet = true
                         }) {
-                            Icon(Icons.Filled.Share, contentDescription = "Share")
+                            Icon(Icons.Filled.Share, contentDescription = stringResource(UiRes.string.common_share))
                         }
                     }
                 },
@@ -140,7 +147,7 @@ fun PostcardViewerScreen(
                     }
                 }
                 is PostcardViewerUiState.Error -> {
-                    Text("Could not load Postcard")
+                    Text(stringResource(Res.string.postcards_viewer_load_error))
                 }
             }
         }

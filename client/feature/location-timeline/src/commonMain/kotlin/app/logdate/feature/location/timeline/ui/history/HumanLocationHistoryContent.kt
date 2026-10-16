@@ -86,8 +86,11 @@ import logdate.client.feature.location.timeline.generated.resources.history_prev
 import logdate.client.feature.location.timeline.generated.resources.history_recover
 import logdate.client.feature.location.timeline.generated.resources.history_replay
 import logdate.client.feature.location.timeline.generated.resources.history_search
+import logdate.client.feature.location.timeline.generated.resources.history_visits_and_journeys
 import logdate.client.feature.location.timeline.generated.resources.history_your_day
 import logdate.client.feature.location.timeline.generated.resources.history_your_places
+import logdate.client.feature.location.timeline.generated.resources.history_your_route
+import logdate.client.feature.location.timeline.generated.resources.location_timeline
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -117,7 +120,7 @@ fun HumanLocationHistoryContent(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (showTitle) {
-                            Text("Places", style = MaterialTheme.typography.titleLarge)
+                            Text(stringResource(Res.string.location_timeline), style = MaterialTheme.typography.titleLarge)
                         }
                         if (tabsInAppBar) {
                             if (showTitle) {
@@ -226,7 +229,7 @@ private fun HistoryDay(
                 if (state.items.isNotEmpty()) {
                     HistoryDayPane {
                         Text(
-                            "Visits and journeys",
+                            stringResource(Res.string.history_visits_and_journeys),
                             Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
@@ -257,7 +260,12 @@ private fun HistoryWideMap(
             Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Your route", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(Res.string.history_your_route),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
             TextButton(onClick = {
                 if (replayVisible) actions.onReplayPlaying?.invoke(false)
                 replayVisible = !replayVisible

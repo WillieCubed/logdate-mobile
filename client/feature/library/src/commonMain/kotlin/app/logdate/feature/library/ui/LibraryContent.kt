@@ -30,7 +30,10 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
+import logdate.client.ui.generated.resources.common_try_again
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * The main content surface for the library.
@@ -172,7 +175,7 @@ private fun LibraryEmptyState(
         )
         if (onRetry != null) {
             Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onRetry) { Text("Try again") }
+            Button(onClick = onRetry) { Text(stringResource(UiRes.string.common_try_again)) }
         }
     }
 }

@@ -67,9 +67,15 @@ import app.logdate.ui.workspace.WorkspaceSearchField
 import app.logdate.ui.workspace.WorkspaceSearchScope
 import app.logdate.util.formatDateLocalized
 import coil3.compose.AsyncImage
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.cd_back_to_journal
+import logdate.client.feature.journal.generated.resources.cd_search_existing_content
+import logdate.client.ui.generated.resources.common_retry
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 import androidx.compose.foundation.lazy.items as lazyItems
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 fun JournalContentPickerScreen(
@@ -126,18 +132,22 @@ fun JournalContentPickerScreenContent(
                         subtitle = "Pick anything already in your LogDate. It stays where it is.",
                         actions = {
                             IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back to journal")
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.ArrowBack,
+                                    contentDescription = stringResource(Res.string.cd_back_to_journal),
+                                )
                             }
                         },
                     )
                 }
                 if (!workspaceEnabled) {
+                    val searchDescription = stringResource(Res.string.cd_search_existing_content)
                     Box(Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
                         WorkspaceSearchField(
                             query = state.query,
                             hint = "Search content",
                             onQueryChange = onQueryChange,
-                            modifier = Modifier.semantics { contentDescription = "Search existing content" },
+                            modifier = Modifier.semantics { contentDescription = searchDescription },
                         )
                     }
                 }
@@ -168,7 +178,7 @@ fun JournalContentPickerScreenContent(
                     title = { Text(if (state.journalTitle.isBlank()) "Add existing content" else "Add to ${state.journalTitle}") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back to journal")
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.cd_back_to_journal))
                         }
                     },
                 )
@@ -434,7 +444,7 @@ private fun SelectionReview(
                 error?.let {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(it, Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = onAddSelected) { Text("Retry") }
+                        TextButton(onClick = onAddSelected) { Text(stringResource(UiRes.string.common_retry)) }
                     }
                 }
                 Row(

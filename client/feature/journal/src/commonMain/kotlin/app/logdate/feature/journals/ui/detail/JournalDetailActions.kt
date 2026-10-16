@@ -48,6 +48,8 @@ import logdate.client.feature.journal.generated.resources.action_delete
 import logdate.client.feature.journal.generated.resources.action_remove
 import logdate.client.feature.journal.generated.resources.delete_journal_description
 import logdate.client.feature.journal.generated.resources.delete_journal_title
+import logdate.client.feature.journal.generated.resources.journal_add_menu_add_existing_content
+import logdate.client.feature.journal.generated.resources.journal_add_menu_create_entry
 import logdate.client.feature.journal.generated.resources.journal_add_to_home_screen
 import logdate.client.feature.journal.generated.resources.journal_delete_label
 import logdate.client.feature.journal.generated.resources.journal_merge_action
@@ -71,7 +73,7 @@ internal fun JournalAddMenu(
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         DropdownMenuItem(
-            text = { Text("Create entry") },
+            text = { Text(stringResource(Res.string.journal_add_menu_create_entry)) },
             onClick = {
                 onDismiss()
                 onCreateEntry()
@@ -79,7 +81,7 @@ internal fun JournalAddMenu(
             leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
         )
         DropdownMenuItem(
-            text = { Text("Add existing content") },
+            text = { Text(stringResource(Res.string.journal_add_menu_add_existing_content)) },
             onClick = {
                 onDismiss()
                 onAddExistingContent()

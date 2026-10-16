@@ -50,6 +50,9 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.theme.WorkspaceSurface
 import app.logdate.ui.theme.workspaceContainer
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.app_name
+import org.jetbrains.compose.resources.stringResource
 
 data class WorkspaceDestination(
     val key: String,
@@ -135,7 +138,11 @@ fun WorkspaceScaffold(
                             ) {
                                 // A desktop window's caption bar already names the app.
                                 if (appBarInCaption == null) {
-                                    Text("LogDate", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(Spacing.lg))
+                                    Text(
+                                        stringResource(Res.string.app_name),
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        modifier = Modifier.padding(Spacing.lg),
+                                    )
                                 }
                                 onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) }
                                 destinations.forEach { destination ->
