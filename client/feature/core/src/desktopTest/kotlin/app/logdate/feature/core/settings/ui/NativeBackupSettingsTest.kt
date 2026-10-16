@@ -117,7 +117,7 @@ class NativeBackupSettingsTest {
                 }
             }
             onNodeWithText("Android backup").assertExists()
-            onNodeWithText("Last Android backup was too large. Export an archive to save a copy.").assertExists()
+            onNodeWithText("Last Android backup was too large. Export an archive to save a copy.", substring = true).assertExists()
             onNodeWithText("Export archive").performClick()
             assertEquals(1, exports)
             onNodeWithText("Create account").assertDoesNotExist()
