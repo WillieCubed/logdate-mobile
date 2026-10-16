@@ -56,12 +56,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
 
-/**
- * Default implementation of SyncManager that coordinates synchronization
- * across all data sources using the LogDate Cloud API.
- *
- * This class acts as an orchestrator, delegating work to injected dependencies.
- */
+/** Coordinates Cloud sync through the upload, download, and recovery services. */
 class DefaultSyncManager(
     private val cloudContentDataSource: CloudContentDataSource,
     private val cloudJournalDataSource: CloudJournalDataSource,
@@ -355,9 +350,6 @@ class DefaultSyncManager(
      */
     fun getLastSyncError(): SyncError? = lastErrorFlow.value
 
-    /**
-     * Helper to create authentication error result.
-     */
     internal fun authError() =
         SyncResult(
             success = false,

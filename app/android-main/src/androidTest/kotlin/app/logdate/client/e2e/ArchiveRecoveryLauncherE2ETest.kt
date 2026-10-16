@@ -32,7 +32,9 @@ class ArchiveRecoveryLauncherE2ETest {
             require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish")
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             require(context.packageName.endsWith(".debug"))
-            val fixture = JSONObject(context.noBackupFilesDir.resolve("archive-media-recovery-transfer.json").readText())
+            val label = InstrumentationRegistry.getArguments().getString("archiveRecoveryFixtureLabel") ?: "acceptance"
+            require(label.matches(Regex("[a-z0-9-]+")))
+            val fixture = JSONObject(context.noBackupFilesDir.resolve("archive-media-recovery-$label.json").readText())
             val record = JSONObject(context.filesDir.resolve("archive_recovery/records/${fixture.getString("recoveryId")}.json").readText())
             val summary = Json.decodeFromString<RestoreSummary>(record.getJSONObject("summary").toString())
             val launcher = GlobalContext.get().get<RestoreLauncher>() as AndroidRestoreLauncher
