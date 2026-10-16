@@ -285,6 +285,11 @@ docker build --target production -t logdate-server .
 docker-compose down -v
 ```
 
+The Docker server build includes `build-logic`, whose plugin repositories are declared in
+`build-logic/settings.gradle.kts`. Maven Central resolves Kotlin plugin dependencies directly;
+the Gradle Plugin Portal remains available for plugin markers. Root plugin repository settings
+do not apply to this included build.
+
 ## 📖 Documentation
 
 ### Testing
