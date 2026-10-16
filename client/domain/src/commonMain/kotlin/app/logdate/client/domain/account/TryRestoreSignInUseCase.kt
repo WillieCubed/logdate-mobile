@@ -4,6 +4,9 @@ import app.logdate.client.permissions.RestoreCredentialError
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Attempts to silently sign in using a restore credential from the device's cloud backup.
@@ -33,6 +36,8 @@ class TryRestoreSignInUseCase(
     suspend operator fun invoke(): Result =
         try {
             val result = passkeyAccountRepository.signInWithRestoreKey()
+            currentCoroutineContext().ensureActive()
+            (result.exceptionOrNull() as? CancellationException)?.let { throw it }
             if (result.isSuccess) {
                 Napier.i("Restore sign-in succeeded")
                 Result.Success(result.getOrThrow())
@@ -46,6 +51,8 @@ class TryRestoreSignInUseCase(
                     Result.Error(cause?.message ?: "Restore sign-in failed")
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.i("Restore sign-in fell back after unexpected error: ${e.message ?: "unknown error"}")
             Result.Error(e.message ?: "Unexpected error")

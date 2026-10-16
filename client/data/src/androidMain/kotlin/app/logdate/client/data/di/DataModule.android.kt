@@ -7,6 +7,7 @@ import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.account.DefaultServerScopedAccounts
 import app.logdate.client.data.account.HistoryOwnerAdoption
+import app.logdate.client.data.account.RestoreCredentialRenewal
 import app.logdate.client.data.account.ServerScopedAccounts
 import app.logdate.client.data.account.historyOwnerAdoptionModule
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
@@ -303,6 +304,7 @@ actual val dataModule: Module =
                 deviceName = { context.userVisibleDeviceName() },
                 accountKeyUnlockCoordinator = get(),
                 beforeSignOut = { getOrNull<app.logdate.client.sync.peer.removal.WatchRemovalAccess>()?.removeAll() ?: true },
+                restoreCredentialRenewal = RestoreCredentialRenewal(get()) { pinned -> PasskeyApiClient(httpClient, pinned) },
             )
         }
         single<ServerScopedAccounts> {

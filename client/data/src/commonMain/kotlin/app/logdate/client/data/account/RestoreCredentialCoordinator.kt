@@ -8,11 +8,10 @@ import app.logdate.client.permissions.RestoreCredentialError
 import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
-import app.logdate.shared.model.CompleteAuthenticationRequest
 import app.logdate.shared.model.LogDateAccount
-import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.ServerCapability
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 
 /**
  * Registers, clears, and signs in with restore credentials backed by the device's encrypted
@@ -26,7 +25,6 @@ internal class RestoreCredentialCoordinator(
     private val platformAccountManager: PlatformAccountManager,
     private val configRepository: LogDateConfigRepository,
     private val bindingGuard: CanonicalOwnerBindingGuard,
-    private val credentialCodec: PasskeyCredentialCodec,
     private val sessionState: PasskeyAccountSessionState,
     private val sessionRefreshCoordinator: AccountSessionRefreshCoordinator,
 ) {
@@ -80,6 +78,8 @@ internal class RestoreCredentialCoordinator(
             }
             Napier.i("Restore key registered successfully")
             Result.success(Unit)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.w("Restore key creation encountered an unexpected error", e)
             Result.failure(e)
@@ -102,38 +102,7 @@ internal class RestoreCredentialCoordinator(
         }
 
         return try {
-            val beginResult = apiClient.beginRestoreSignIn()
-            if (beginResult.isFailure) {
-                return Result.failure(beginResult.exceptionOrNull()!!)
-            }
-            val beginData = beginResult.getOrThrow()
-
-            val authOptions =
-                PasskeyAuthenticationOptions(
-                    challenge = beginData.challenge,
-                    rpId = beginData.rpId,
-                    allowCredentials = beginData.allowCredentials.map { it.id },
-                    timeout = beginData.timeout,
-                )
-
-            val credentialResult = restoreCredentialManager.getRestoreCredential(authOptions)
-            if (credentialResult.isFailure) {
-                return Result.failure(credentialResult.exceptionOrNull()!!)
-            }
-
-            val assertion = credentialCodec.parseAssertionResponse(credentialResult.getOrThrow())
-            val completeRequest =
-                CompleteAuthenticationRequest(
-                    credential = assertion,
-                    challenge = beginData.challenge,
-                )
-
-            val completeResult = apiClient.completeRestoreSignIn(completeRequest)
-            if (completeResult.isFailure) {
-                return Result.failure(completeResult.exceptionOrNull()!!)
-            }
-
-            val completeData = completeResult.getOrThrow()
+            val completeData = RestoreCredentialExchange(apiClient, restoreCredentialManager)().getOrThrow()
             if (!bindingGuard.belongsToCanonicalOwner(completeData.account)) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
@@ -153,10 +122,12 @@ internal class RestoreCredentialCoordinator(
                 Napier.w("Restore sign-in succeeded but re-registering restore key failed — next restore won't work", error)
             }
 
-            Napier.i("Restore sign-in successful for user: ${completeData.account.username}")
+            Napier.i("Restore sign-in succeeded")
             Result.success(completeData.account)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
-            Napier.i("Restore sign-in failed: ${e.message ?: "unknown error"}")
+            Napier.i("Restore sign-in remains pending")
             Result.failure(e)
         }
     }

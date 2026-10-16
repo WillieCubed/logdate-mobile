@@ -23,7 +23,7 @@
     <application
         android:name="app.logdate.client.LogdateApplication"
         android:allowBackup="true"
-        android:backupAgent="app.logdate.client.device.restore.NativeBackupAgent"
+        android:backupAgent="app.logdate.client.data.restore.NativeAccountBackupAgent"
         android:fullBackupOnly="true"
         android:appCategory="productivity"
         android:dataExtractionRules="@xml/data_extraction_rules"

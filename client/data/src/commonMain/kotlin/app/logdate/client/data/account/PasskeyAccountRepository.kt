@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -62,6 +63,7 @@ class DefaultPasskeyAccountRepository(
     private val adoptCanonicalOwner: (suspend (String) -> Boolean)? = null,
     private val accountKeyUnlockCoordinator: AccountKeyUnlockCoordinator? = null,
     private val beforeSignOut: suspend () -> Boolean = { true },
+    private val restoreCredentialRenewal: RestoreCredentialRenewal? = null,
 ) : PasskeyAccountRepository {
     private val sessionState = PasskeyAccountSessionState()
     override val currentAccount: StateFlow<LogDateAccount?> = sessionState.currentAccount
@@ -95,7 +97,6 @@ class DefaultPasskeyAccountRepository(
             platformAccountManager = platformAccountManager,
             configRepository = configRepository,
             bindingGuard = bindingGuard,
-            credentialCodec = credentialCodec,
             sessionState = sessionState,
             sessionRefreshCoordinator = sessionRefreshCoordinator,
         )
@@ -142,7 +143,7 @@ class DefaultPasskeyAccountRepository(
 
     init {
         repositoryScope.launch {
-            sessionStorage.getSessionFlow().collect { session ->
+            sessionStorage.getSessionFlow().collectLatest { session ->
                 if (session != null && !bindingGuard.sessionBelongsToCanonicalOwner(session)) {
                     Napier.w("Discarding credentials for a different LogDate identity")
                     sessionStorage.clearSession()
@@ -151,6 +152,8 @@ class DefaultPasskeyAccountRepository(
                     sessionState.setAuthenticated(session != null)
                     if (session == null) {
                         sessionState.clearAccount()
+                    } else {
+                        renewBackgroundRestoreKey(session)
                     }
                 }
             }
@@ -162,6 +165,26 @@ class DefaultPasskeyAccountRepository(
                 val session = sessionStorage.getSession()
                 sessionState.setAuthenticated(session != null && bindingGuard.sessionBelongsToCanonicalOwner(session))
             }
+        }
+    }
+
+    private suspend fun renewBackgroundRestoreKey(session: app.logdate.client.datastore.UserSession) {
+        val renewal = restoreCredentialRenewal ?: return
+        val origin = configRepository.getCurrentBackendUrl()
+        try {
+            val pinned =
+                app.logdate.shared.config.PinnedLogDateConfigRepository(
+                    origin,
+                    configRepository.getCurrentServerDescriptor(),
+                    configRepository.apiVersion.value,
+                )
+            renewal.renew(pinned, session, restoreCredentialManager, platformAccountManager) {
+                configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            Napier.w("Restore key renewal remains pending")
         }
     }
 

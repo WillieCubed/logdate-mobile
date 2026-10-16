@@ -3,7 +3,10 @@ package app.logdate.client.device.storage
 import android.content.SharedPreferences
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.KeyStoreException
 import kotlin.test.Test
@@ -146,6 +149,38 @@ class AndroidSecureStorageTest {
             val storage = AndroidSecureStorage(encryptedPrefsFactory = { prefs })
 
             assertEquals("existing-identity-key", storage.getString(IDENTITY_KEY_PREF))
+        }
+
+    @Test
+    fun `a write waits for the encrypted preferences commit`() =
+        runTest {
+            val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+            every { editor.putString("session", "token") } returns editor
+            every { editor.commit() } returns true
+            val prefs =
+                mockk<SharedPreferences> {
+                    every { all } returns emptyMap<String, String>()
+                    every { edit() } returns editor
+                }
+            AndroidSecureStorage { prefs }.putString("session", "token")
+            verify(exactly = 1) { editor.commit() }
+            verify(exactly = 0) { editor.apply() }
+        }
+
+    @Test
+    fun `a failed encrypted write does not publish the session`() =
+        runTest {
+            val editor = mockk<SharedPreferences.Editor>(relaxed = true)
+            every { editor.putString("session", "token") } returns editor
+            every { editor.commit() } returns false
+            val prefs =
+                mockk<SharedPreferences> {
+                    every { all } returns emptyMap<String, String>()
+                    every { edit() } returns editor
+                }
+            val storage = AndroidSecureStorage { prefs }
+            assertFailsWith<IOException> { storage.putString("session", "token") }
+            assertEquals(emptyMap(), storage.observeAll().first())
         }
 
     /**

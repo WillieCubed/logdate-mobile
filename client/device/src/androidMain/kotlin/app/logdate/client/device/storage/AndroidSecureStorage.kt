@@ -10,6 +10,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.security.KeyStoreException
@@ -71,7 +72,9 @@ class AndroidSecureStorage
             key: String,
             value: String,
         ) {
-            prefs.edit().putString(key, value).apply()
+            if (!prefs.edit().putString(key, value).commit()) {
+                throw IOException("Encrypted secure storage write could not be committed")
+            }
             valueCache[key] = value
             valueCacheFlow.value = valueCache.toMap()
         }

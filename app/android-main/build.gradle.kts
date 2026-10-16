@@ -582,6 +582,7 @@ dependencies {
     androidTestImplementation(libs.kotlin.test.junit)
     androidTestImplementation(libs.play.services.wearable)
     androidTestImplementation(libs.play.services.location)
+    androidTestImplementation(libs.androidx.datastore.preferences)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.kotlinx.datetime)
     androidTestImplementation(libs.ktor.client.core)
