@@ -528,6 +528,8 @@ class AtprotoIdentityServiceTest {
 
             assertEquals("profile-user.logdate.app", service.defaultHandleFor("profile_user"))
             assertEquals("user.logdate.app", service.defaultHandleFor("!!!"))
+            assertEquals("user.logdate.app", service.defaultHandleFor("staging"))
+            assertEquals("user.logdate.app", service.defaultHandleFor("Staging"))
 
             val serverDocument = service.serverDocument()
             assertEquals("did:web:logdate.app", serverDocument.id.toString())

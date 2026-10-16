@@ -56,6 +56,12 @@ class AuthV1RoutesEdgeCasesTest {
             val reserved = client.get("/api/v1/auth/signup/username/app/available")
             assertEquals(HttpStatusCode.BadRequest, reserved.status)
 
+            val staging = client.get("/api/v1/auth/signup/username/staging/available")
+            assertEquals(HttpStatusCode.BadRequest, staging.status)
+
+            val mixedCaseStaging = client.get("/api/v1/auth/signup/username/Staging/available")
+            assertEquals(HttpStatusCode.BadRequest, mixedCaseStaging.status)
+
             val available = client.get("/api/v1/auth/signup/username/free_user/available")
             assertEquals(HttpStatusCode.OK, available.status)
 

@@ -10,10 +10,10 @@ SCRIPT="scripts/smoke-test-revision.sh"
 RELEASE_SHA="09aa934a2605f1bb82adcf8b81ed96e7037e2010"
 EXPECTED_RELEASE="logdate-server@$RELEASE_SHA"
 CANONICAL_ORIGIN="https://cloud-staging.example.test"
-WEBAUTHN_ORIGIN="https://app.example.test"
+WEBAUTHN_ORIGIN="https://app.staging.logdate.app"
 CANDIDATE_ORIGIN="https://candidate.example.test"
 HANDLE_DOMAIN="example.test"
-RP_ID="example.test"
+RP_ID="staging.logdate.app"
 PACKAGE_NAME="studio.hypertext.logdate"
 CERT_ONE="11:98:70:B8:78:F3:AB:5F:55:C0:DF:65:C7:87:89:C0:24:59:CA:9F:F3:22:A0:89:40:AE:43:A2:9D:1D:D5:AB"
 CERT_TWO="F1:3E:F5:D0:EC:93:ED:B0:8C:6C:F2:1D:8A:12:84:99:42:C2:92:D8:ED:EC:26:C0:E4:46:0C:3C:71:BC:6E:5F"
@@ -41,14 +41,14 @@ cat >"$tmp_dir/contract.unsorted.json" <<EOF
   "release_sha": "$RELEASE_SHA",
   "canonical_origin": "$CANONICAL_ORIGIN",
   "environment": "staging",
-  "webauthn_additional_origins": ["https://app.cloud-staging.example.test"],
+  "webauthn_additional_origins": ["https://staging.logdate.app"],
   "android_package_name": "$PACKAGE_NAME",
   "env_vars": {
     "RELEASE_VERSION": "$EXPECTED_RELEASE",
     "ATPROTO_HANDLE_DOMAIN": "$HANDLE_DOMAIN",
     "WEBAUTHN_RP_ID": "$RP_ID",
     "WEBAUTHN_ORIGIN": "$WEBAUTHN_ORIGIN",
-    "WEBAUTHN_ALLOWED_ORIGINS": "$WEBAUTHN_ORIGIN,$APK_ORIGIN_ONE,$APK_ORIGIN_TWO,https://app.cloud-staging.example.test",
+    "WEBAUTHN_ALLOWED_ORIGINS": "$WEBAUTHN_ORIGIN,$APK_ORIGIN_ONE,$APK_ORIGIN_TWO,https://staging.logdate.app",
     "ANDROID_CERT_FINGERPRINTS": "$CERT_ONE,$CERT_TWO"
   },
   "android_signing": {
@@ -875,8 +875,32 @@ for browser_mutation in \
     '.webauthn_additional_origins = ["https://unapproved.example.test"]' \
     '.webauthn_additional_origins += .webauthn_additional_origins' \
     'del(.webauthn_additional_origins)' \
+    '.env_vars.WEBAUTHN_RP_ID = "logdate.app"' \
     '.environment = "production"'; do
     jq "$browser_mutation" "$contract" | jq -S . >"$bad_contract"
+    chmod 600 "$bad_contract"
+    set +e
+    browser_contract_output="$(
+        SMOKE_SCENARIO=ok HEALTH_INTERNAL_TOKEN="$HEALTH_TOKEN" \
+        PASSKEY_VERIFY_PYTHON="$tmp_dir/bin/passkey-python" \
+        "$SCRIPT" --service-url "$CANDIDATE_ORIGIN" --contract-file "$bad_contract" \
+            --expected-release "$EXPECTED_RELEASE" --invoker-token-file "$invoker_token_file" \
+            --phase health-only --state-file "$state_file" 2>&1
+    )"
+    browser_contract_status=$?
+    set -e
+    assert_exit_code 1 "$browser_contract_status"
+    assert_contains "contract WebAuthn origin set does not match declared browser and signing origins" "$browser_contract_output"
+done
+
+# Staging must reject production browser origins even when the aggregate agrees.
+for production_host in app.logdate.app cloud.logdate.app; do
+    jq --arg host "$production_host" --arg one "$APK_ORIGIN_ONE" --arg two "$APK_ORIGIN_TWO" '
+        .env_vars.WEBAUTHN_RP_ID = $host |
+        .env_vars.WEBAUTHN_ORIGIN = ("https://" + $host) |
+        .webauthn_additional_origins = [] |
+        .env_vars.WEBAUTHN_ALLOWED_ORIGINS = ([.env_vars.WEBAUTHN_ORIGIN, $one, $two] | join(","))
+    ' "$contract" | jq -S . >"$bad_contract"
     chmod 600 "$bad_contract"
     set +e
     browser_contract_output="$(

@@ -489,7 +489,8 @@ if ! jq -e --arg origin "$WEBAUTHN_ORIGIN" --arg rp "$RP_ID" '
     ($origin | within_rp) and all($browser[]; within_rp) and
     (.environment != "production" or $browser == []) and
     (.environment != "staging" or ($rp != "logdate.app" and
-        ($rp | endswith(".logdate.app") | not) and ("logdate.app" | endswith("." + $rp) | not))) and
+        ("logdate.app" | endswith("." + $rp) | not) and
+        all(([$origin] + $browser)[]; . != "https://app.logdate.app" and . != "https://cloud.logdate.app"))) and
     (([.android_signing.certificates[] | .apk_key_hash_origin] + [$origin] + $browser) as $expected |
     (.env_vars.WEBAUTHN_ALLOWED_ORIGINS | csv) as $actual |
     ($expected | length) == ($expected | unique | length) and

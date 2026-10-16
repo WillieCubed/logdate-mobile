@@ -102,6 +102,7 @@ private val RESERVED_USERNAME_LABELS =
         "blog",
         "docs",
         "status",
+        "staging",
     )
 private const val EMAIL_BINDING_SOURCE_GOOGLE = "google_id_token"
 internal val SIGNUP_RATE_LIMIT = RateLimitPolicy(maxRequests = 5, windowSeconds = 60 * 60)

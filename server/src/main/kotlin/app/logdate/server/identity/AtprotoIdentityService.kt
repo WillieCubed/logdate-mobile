@@ -578,6 +578,7 @@ class AtprotoIdentityService(
                 "blog",
                 "docs",
                 "status",
+                "staging",
             )
     }
 }
