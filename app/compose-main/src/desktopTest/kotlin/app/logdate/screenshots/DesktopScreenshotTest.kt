@@ -209,6 +209,10 @@ private fun assertMatchesBaseline(
     ImageIO.write(rendered, "png", actualFile)
 
     if (updateDesktopScreenshots) {
+        // Text antialiasing differs slightly between runs, so a full update keeps every reference the
+        // comparison below already accepts. A filtered update records exactly what it rendered.
+        val existing = if (referenceFile.exists()) ImageIO.read(referenceFile) else null
+        if (desktopScreenshotSceneFilter == null && existing != null && compareImages(existing, rendered) == null) return
         referenceFile.parentFile.mkdirs()
         ImageIO.write(rendered, "png", referenceFile)
         return
