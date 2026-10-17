@@ -90,7 +90,7 @@ class ActivityPresenter(
 
 ### Task 3: Home on the phone
 
-- [ ] **Step 1: Write the failing tests**: the Home recommendation use case returns `HomeRecommendation.ActivityEnded` ahead of the others while the presenter has a suggestion, and `MorningStart` while it shows the morning start; `toTimelineSuggestionBlock` maps both; tapping Add opens the editor with the activity's start time as the entry time and calls `actedOn`; tapping Dismiss calls `dismiss`.
+- [ ] **Step 1: Write the failing tests**: the Home recommendation use case returns `HomeRecommendation.ActivityEnded` ahead of the others while the presenter has a suggestion, and `MorningStart` while it shows the morning start; `toTimelineSuggestionBlock` maps both; tapping Add a moment calls `actedOn` and opens the editor; tapping Dismiss calls `dismiss`. The editor has no entry-time control, so the moment is timed when it is written, right after the activity; step 2 attaches the activity itself.
 - [ ] **Step 2: Run and confirm failure.** `./gradlew :client:domain:jvmTest :client:feature:core:desktopTest :client:feature:timeline:desktopTest`
 - [ ] **Step 3: Implement** the two recommendations and blocks, reusing `TimelineSuggestionBlock`'s card, typography and actions.
 - [ ] **Step 4: Add populated screenshot scenes** for both blocks in the Home timeline. Inspect them at compact phone, landscape, tablet, book and tabletop postures, dark mode, RTL, 200% text and reduced motion, as the Home workspace contract requires. CI records the references (`render-host.txt`).

@@ -1,6 +1,6 @@
 # Activity awareness on the phone and the watch
 
-Status: step 1 (tracking and reminders) is built; steps 2 and 3 are not. Everything ships behind a new `ACTIVITY_AWARENESS` flag.
+Status: step 1 (tracking and reminders) and step 3 (suggestions on Home and Today) are built; step 2 is not. Everything ships behind a new `ACTIVITY_AWARENESS` flag.
 
 ## Why this exists
 
@@ -252,7 +252,8 @@ whether a suggestion was already shown for an activity, which enforces one sugge
    see `docs/superpowers/plans/2026-10-16-activity-awareness-step-1-reminders.md`.
 2. `capturedDuring`: stamping, storage, sync and display.
 3. `ActivityPresenter` and `SuggestionOutcomes`: voice first, the suggestion card and the morning
-   start on both devices.
+   start on both devices. Built; see
+   `docs/superpowers/plans/2026-10-16-activity-awareness-step-3-suggestions.md`.
 
 ## Later: a decision model
 
