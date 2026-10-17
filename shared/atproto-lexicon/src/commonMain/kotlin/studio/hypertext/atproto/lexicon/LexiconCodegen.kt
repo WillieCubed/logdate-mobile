@@ -138,7 +138,7 @@ public object LexiconCodegen {
             LexiconType.ARRAY -> "List<${arrayElementType(requireNotNull(field.items))}>"
             LexiconType.BLOB -> "JsonElement"
             LexiconType.REF -> className(requireNotNull(field.reference).documentId, requireNotNull(field.reference).definitionName)
-            LexiconType.OBJECT, LexiconType.PARAMS, LexiconType.QUERY, LexiconType.PROCEDURE, LexiconType.UNKNOWN -> "JsonElement"
+            else -> "JsonElement"
         }
 
     private fun arrayElementType(field: LexiconField): String {

@@ -28,7 +28,20 @@ public data class LexiconDefinition(
     val input: LexiconBody? = null,
     val output: LexiconBody? = null,
     val errors: List<LexiconError> = emptyList(),
-)
+    val keyRule: String? = null,
+    val record: LexiconField? = null,
+    val refs: List<LexiconReference> = emptyList(),
+    val closed: Boolean = false,
+    val accept: List<String> = emptyList(),
+    val maxSize: Long? = null,
+    val minLength: Long? = null,
+    val maxLength: Long? = null,
+    val unsupportedType: String? = null,
+) {
+    /** The record-key rule of a `record` definition, or null when it's missing or malformed. */
+    val recordKey: LexiconRecordKey?
+        get() = keyRule?.let(LexiconRecordKey::parse)
+}
 
 /**
  * Parsed field inside a lexicon object or array definition.
@@ -42,6 +55,13 @@ public data class LexiconField(
     val items: LexiconField? = null,
     val reference: LexiconReference? = null,
     val knownValues: List<String> = emptyList(),
+    val refs: List<LexiconReference> = emptyList(),
+    val closed: Boolean = false,
+    val accept: List<String> = emptyList(),
+    val maxSize: Long? = null,
+    val minLength: Long? = null,
+    val maxLength: Long? = null,
+    val unsupportedType: String? = null,
 )
 
 /**
@@ -61,7 +81,7 @@ public data class LexiconError(
 )
 
 /**
- * Supported lexicon value types used by the current runtime and codegen.
+ * Lexicon definition and field types.
  */
 public enum class LexiconType {
     OBJECT,
@@ -73,9 +93,58 @@ public enum class LexiconType {
     INTEGER,
     ARRAY,
     BLOB,
+    BYTES,
+    CID_LINK,
     TOKEN,
     REF,
+    UNION,
     UNKNOWN,
+    RECORD,
+    SUBSCRIPTION,
+    PERMISSION_SET,
+    PERMISSION,
+
+    /** A type name the Lexicon specification doesn't define. */
+    UNSUPPORTED,
+    ;
+
+    /** Whether this is a primary type, which may only be the `main` definition of a document. */
+    public val isPrimary: Boolean
+        get() = this == RECORD || this == QUERY || this == PROCEDURE || this == SUBSCRIPTION || this == PERMISSION_SET
+}
+
+/**
+ * The rule a `record` definition sets for the keys of records in its collection.
+ */
+public sealed interface LexiconRecordKey {
+    /** A timestamp identifier, the usual key for records someone creates over time. */
+    public data object Tid : LexiconRecordKey
+
+    /** A key that is itself a valid NSID. */
+    public data object Nsid : LexiconRecordKey
+
+    /** Any valid record key. */
+    public data object Any : LexiconRecordKey
+
+    /** Exactly one fixed key, such as `self` for a single profile record. */
+    public data class Literal(
+        val value: String,
+    ) : LexiconRecordKey
+
+    public companion object {
+        /** Parses a schema's `key` value, or returns null when it isn't a known rule. */
+        public fun parse(value: String): LexiconRecordKey? =
+            when {
+                value == "tid" -> Tid
+                value == "nsid" -> Nsid
+                value == "any" -> Any
+                value.startsWith(LITERAL_PREFIX) ->
+                    value.removePrefix(LITERAL_PREFIX).takeIf { it.isNotEmpty() }?.let(::Literal)
+                else -> null
+            }
+
+        private const val LITERAL_PREFIX = "literal:"
+    }
 }
 
 /**
