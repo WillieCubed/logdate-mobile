@@ -221,6 +221,12 @@ issuing vault and origin, and never grants permission to install a session using
 
 ## Emulator acceptance
 
+Worker tests use real `androidx.work.Data`: `Data.EMPTY` for ordinary requests and
+`NativeRestoreWorkState.bind` for delivery- and owner-bound recovery. Relaxed data mocks can return
+synthetic strings for absent inputs, making valid recovery look obsolete. Assert network calls,
+archive handoff, and retained state as well as worker results: success can mean stale work was
+correctly skipped. Stale-delivery and changed-owner tests assert that no backup listing occurs.
+
 `tests/e2e/native-backup-acceptance.py` exercises Android's local debug transport on two fresh,
 rootable Google APIs emulators. It invokes the source backup service, moves that transport's
 payload, and invokes the destination restore service. The harness requires fresh installations and preserves existing app data.

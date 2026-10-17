@@ -1,6 +1,7 @@
 package app.logdate.client.e2e
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Data
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.sync.cloud.BackupFile
@@ -10,6 +11,7 @@ import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.feature.core.export.CloudArchiveCipher
 import app.logdate.feature.core.export.CloudBackupWorker
 import app.logdate.feature.core.restore.CloudRestoreWorker
+import app.logdate.feature.core.restore.NativeRestoreWorkState
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -27,6 +29,44 @@ import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
 class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
+    private fun workerParameters(requestId: UUID = UUID.randomUUID()): WorkerParameters =
+        mockk(relaxed = true) {
+            every { id } returns requestId
+            every { inputData } returns Data.EMPTY
+        }
+
+    @Test
+    fun `cloud restore ignores an obsolete delivery before network access`() =
+        verifyObsoleteWork(Data.Builder().putString(NativeRestoreWorkState.DELIVERY_KEY, "obsolete-delivery").build())
+
+    @Test
+    fun `cloud restore ignores a queued request for a different owner`() =
+        verifyObsoleteWork(
+            Data
+                .Builder()
+                .putString(NativeRestoreWorkState.OWNER_KEY, "previous-owner")
+                .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://sync.example")
+                .build(),
+        )
+
+    private fun verifyObsoleteWork(input: Data) =
+        runTest {
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val params = workerParameters()
+            every { params.inputData } returns input
+            val worker =
+                CloudRestoreWorker(
+                    context,
+                    params,
+                    cloud,
+                    FakeSessionStorage(UserSession("access", "refresh", "account")),
+                    archiveCipher,
+                ) { error("Obsolete recovery must not hand off an archive") }
+            assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+            assertTrue(cloud.listAccessTokens.isEmpty())
+            assertEquals(0, cloud.fileDownloadCalls)
+        }
+
     @Test
     fun `downloads and authenticates a one gibibyte archive through the Android restore worker`() =
         runTest {
@@ -54,8 +94,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                     backups = listOf(backup)
                     downloadedFile = encrypted
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns UUID.randomUUID()
+            val params = workerParameters()
             var restored: File? = null
             val worker =
                 CloudRestoreWorker(
@@ -98,8 +137,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                         Result.failure(IOException("No space left on device"))
                     }
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns workId
+            val params = workerParameters(workId)
             var handoffCalled = false
             val worker =
                 CloudRestoreWorker(
@@ -129,8 +167,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                         throw CancellationException("download cancelled after a partial write")
                     }
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns workId
+            val params = workerParameters(workId)
             var handoffCalled = false
             val worker =
                 CloudRestoreWorker(
@@ -170,8 +207,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                 }
             val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
             var enqueued: File? = null
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns UUID.randomUUID()
+            val params = workerParameters()
             val worker =
                 CloudRestoreWorker(
                     context,
@@ -200,8 +236,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                 }
             val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
             cloud.onRefresh = { session.changeSession(UserSession("other-access", "other-refresh", "other-account")) }
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns UUID.randomUUID()
+            val params = workerParameters()
             val worker =
                 CloudBackupWorker(
                     context,
@@ -248,8 +283,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                     downloaded = BackupFile("device", CloudArchiveCipher.MANIFEST, encryptedArchive)
                 }
             var enqueued: File? = null
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns UUID.randomUUID()
+            val params = workerParameters()
             val worker =
                 CloudRestoreWorker(
                     context,
@@ -290,8 +324,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                     backups = listOf(backup)
                     downloaded = BackupFile("device", CloudArchiveCipher.MANIFEST, encryptedArchive)
                 }
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns UUID.randomUUID()
+            val params = workerParameters()
             var decryptedArchive: File? = null
             val worker =
                 CloudRestoreWorker(
@@ -320,8 +353,7 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                     downloaded = BackupFile("device", "legacy-manifest", legacyZip)
                 }
             var enqueued: File? = null
-            val params = mockk<WorkerParameters>(relaxed = true)
-            every { params.id } returns UUID.randomUUID()
+            val params = workerParameters()
             val worker =
                 CloudRestoreWorker(
                     context,
