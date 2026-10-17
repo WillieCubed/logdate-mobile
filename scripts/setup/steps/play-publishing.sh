@@ -5,9 +5,9 @@
 
 play_publishing_describe() {
     if [[ "$ENABLE_PLAY_PRODUCTION" == "true" ]]; then
-        printf 'Every push to main publishes to Play internal; android-v* tags promote to production'
+        printf 'Manual Play publish runs can upload to internal and promote tested android-v* tags to production'
     else
-        printf 'Every push to main publishes to the Play internal track'
+        printf 'Manual Play publish runs can upload to the internal track'
     fi
 }
 
