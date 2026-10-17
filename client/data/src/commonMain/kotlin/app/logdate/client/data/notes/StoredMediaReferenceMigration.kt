@@ -7,6 +7,7 @@ import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.transcription.TranscriptionRepository
+import app.logdate.client.sync.SyncTransactionManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -30,7 +31,9 @@ import kotlin.uuid.Uuid
  *
  * A transcript is bound to the media reference of its audio note, so rewriting an audio note's
  * reference rebinds its transcript through [transcriptions]; otherwise the transcript would no
- * longer match its note and be discarded.
+ * longer match its note and be discarded. Both writes share one transaction from [transactions]:
+ * automatic transcription watches notes and transcripts, and a note seen with its new reference
+ * before its transcript is rebound would be transcribed again, replacing the transcript it has.
  *
  * It only reads rows that still hold a local path, so running it at every launch costs almost
  * nothing once it has finished. See `docs/reference/media-references.md`.
@@ -43,20 +46,25 @@ class StoredMediaReferenceMigration(
     private val mediaReferences: StoredMediaReferences,
     private val rescuer: MediaRescuer = MediaRescuer.None,
     private val transcriptions: TranscriptionRepository? = null,
+    private val transactions: SyncTransactionManager? = null,
 ) {
     /** Rewrites what it can and returns how many notes and journals changed. */
     suspend fun run(): Int {
         val rewritten =
             rewrite(imageNoteDao.localFileContentUris().map { it.uid to it.contentUri }, imageNoteDao::updateContentUriIfUnchanged) +
                 rewrite(audioNoteDao.localFileContentUris().map { it.uid to it.contentUri }) { uid, previous, stored ->
-                    audioNoteDao.updateContentUriIfUnchanged(uid, previous, stored)
-                    transcriptions?.rebindMediaReference(uid, previous, stored)
+                    inTransaction {
+                        audioNoteDao.updateContentUriIfUnchanged(uid, previous, stored)
+                        transcriptions?.rebindMediaReference(uid, previous, stored)
+                    }
                 } +
                 rewrite(videoNoteDao.localFileContentUris().map { it.uid to it.contentUri }, videoNoteDao::updateContentUriIfUnchanged) +
                 rewrite(journalDao.localFileCovers().map { it.id to it.coverImageUri }, journalDao::updateCoverImageUriIfUnchanged)
         if (rewritten > 0) Napier.i("Stored $rewritten media references as LogDate media references")
         return rewritten
     }
+
+    private suspend fun inTransaction(block: suspend () -> Unit) = transactions?.withTransaction(block) ?: block()
 
     private suspend fun rewrite(
         rows: List<Pair<Uuid, String>>,

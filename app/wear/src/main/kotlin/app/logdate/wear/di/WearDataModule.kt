@@ -289,6 +289,7 @@ val wearDataModule =
                 mediaReferences = get(),
                 rescuer = getOrNull<MediaRescuer>() ?: MediaRescuer.None,
                 transcriptions = getOrNull<TranscriptionRepository>(),
+                transactions = get<SyncTransactionManager>(WatchCloud),
             )
         }
         single { StoredMediaReferenceMigrationLauncher { get() } }
