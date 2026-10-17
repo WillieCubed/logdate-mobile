@@ -36,6 +36,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * Automated visual regression suite for the LogDate Desktop application.
@@ -51,18 +52,26 @@ import kotlin.test.assertTrue
  * - Support for dark/light theme, right-to-left, font scale, and custom viewport variants.
  */
 class DesktopScreenshotTest {
+    /** Checks every scene before failing, so one run reports, and saves the actual render of, each mismatch. */
     @Test
     fun `shared catalog matches baselines`() {
         if (skipWithoutDisplay()) return
         val sceneFilter = desktopScreenshotSceneFilter
+        val mismatches = mutableListOf<String>()
         SharedScreenshotCatalog.allScenes
             .filter { scene -> sceneFilter == null || scene.id.value.contains(sceneFilter) }
             .filter { scene -> nonDeterministicScenePrefixes.none(scene.id.value::startsWith) }
             .forEach { scene ->
                 scene.variants.forEach { variant ->
-                    assertMatchesBaseline(scene = scene, variant = variant)
+                    try {
+                        assertMatchesBaseline(scene = scene, variant = variant)
+                    } catch (mismatch: AssertionError) {
+                        mismatches += mismatch.message.orEmpty()
+                    }
                 }
             }
+        if (mismatches.isEmpty()) return
+        fail("${mismatches.size} Desktop screenshots differ from their baselines.\n\n${mismatches.joinToString("\n\n")}")
     }
 
     /** Scene-id prefixes whose rendering still drifts run-to-run even with the strict-stability
