@@ -14,6 +14,8 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncTransactionManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -126,7 +128,9 @@ class StoredMediaReferenceTranscriptTest {
 
             verify(database, notes, note, document, rewritten, rebindsInsideTransaction)
         } finally {
-            backgroundScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+            // Automatic transcription may be mid-query on another thread; closing the database
+            // before it stops would fail that query with a closed connection pool.
+            backgroundScope.coroutineContext[Job]?.cancelAndJoin()
             database.close()
             Files.deleteIfExists(file)
             Files.deleteIfExists(file.resolveSibling("${file.fileName}-wal"))
