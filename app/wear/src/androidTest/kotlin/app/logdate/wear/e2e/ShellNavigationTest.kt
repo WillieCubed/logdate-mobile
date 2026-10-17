@@ -2,16 +2,19 @@ package app.logdate.wear.e2e
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -98,7 +101,8 @@ class ShellNavigationTest {
     @Test
     fun moments_and_settings_open_as_separate_screens() {
         scenario = ActivityScenario.launch(MainActivity::class.java)
-        waitFor { composeRule.onAllNodesWithTag(TodayTags.MOMENTS) }
+        // Moments other tests saved can push the button below the composed items, so scroll to it.
+        waitFor { composeRule.onAllNodesWithTag(TodayTags.SUMMARY) }
 
         composeRule.onNodeWithTag(TodayTags.PAGE).performScrollToNode(hasTestTag(TodayTags.MOMENTS))
         composeRule.onNodeWithTag(TodayTags.MOMENTS).performClick()
@@ -141,8 +145,16 @@ class ShellNavigationTest {
             KoinJavaComponent.getKoin().get<FeatureFlagStore>().setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled)
         }
 
+    /** Waits for [nodes]; a timeout reports what the screen showed instead, so a failure says where the app was. */
     private fun waitFor(nodes: () -> SemanticsNodeInteractionCollection) {
-        composeRule.waitUntil(TIMEOUT_MS) { nodes().fetchSemanticsNodes().isNotEmpty() }
+        try {
+            composeRule.waitUntil(TIMEOUT_MS) { nodes().fetchSemanticsNodes().isNotEmpty() }
+        } catch (timeout: ComposeTimeoutException) {
+            throw AssertionError(
+                "The screen showed instead:\n${composeRule.onAllNodes(isRoot()).printToString(maxDepth = Int.MAX_VALUE)}",
+                timeout,
+            )
+        }
     }
 
     private companion object {
