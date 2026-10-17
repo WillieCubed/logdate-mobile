@@ -3,6 +3,7 @@ package app.logdate.client.media.storage
 import android.system.Os
 import android.system.OsConstants
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -34,6 +35,7 @@ class AndroidCanonicalMediaStore(
         input: InputStream,
         mimeType: String,
         expectedSizeBytes: Long,
+        canCommit: () -> Boolean = { true },
     ): String {
         require(expectedSizeBytes >= 0) { "Expected media size cannot be negative" }
         val extension = extensionFor(mimeType)
@@ -70,6 +72,7 @@ class AndroidCanonicalMediaStore(
             val destination = File(destinationDirectory, "$hexDigest.$extension")
             return finalizeLock.withLock {
                 currentCoroutineContext().ensureActive()
+                if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
                 if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
                     syncDirectory(destinationDirectory)
                     currentCoroutineContext().ensureActive()

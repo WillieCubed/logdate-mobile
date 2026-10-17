@@ -146,8 +146,8 @@ def run(args, serial):
             result = adb(serial, "shell", "pm", "revoke", PACKAGE, "android.permission." + permission, check=False)
             if result.returncode and b"has not requested permission" not in result.stderr + result.stdout:
                 raise RuntimeError("Could not revoke a fixture permission")
-        for method in ["seedProviderCollisionForColdRestore", "quarantinedOriginalSurvivesProcessRestart", "privateOriginalWorksWithoutLibraryOrNotificationPermission"]:
-            if method == "quarantinedOriginalSurvivesProcessRestart":
+        for method in ["aSeedProviderCollisionForColdRestore", "bQuarantinedOriginalSurvivesProcessRestart", "cPrivateOriginalWorksWithoutLibraryOrNotificationPermission"]:
+            if method == "bQuarantinedOriginalSurvivesProcessRestart":
                 safe_target(serial)
                 adb(serial, "shell", "am", "force-stop", PACKAGE)
             instrument(serial, TEST + "#" + method, directory / (method + ".log"))
@@ -157,7 +157,7 @@ def run(args, serial):
             def release_network():
                 adb(serial, "shell", "cmd", "netpolicy", "set", "restrict-background", "false")
                 set_metered(serial, args.wifi_network, "false")
-            instrument(serial, TEST + "#meteredRecoveryResumesWhenPlatformAllowsMedia",
+            instrument(serial, TEST + "#dMeteredRecoveryResumesWhenPlatformAllowsMedia",
                        directory / ("data-saver-recovery.log" if saver else "metered-recovery.log"),
                        extras=["-e", "restoreNetworkPolicyExpected", "restricted" if saver else "metered"],
                        release_network=release_network)

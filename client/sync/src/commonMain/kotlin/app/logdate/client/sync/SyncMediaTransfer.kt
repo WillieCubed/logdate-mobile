@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.device.crypto.IdentityKeyNotFoundException
+import app.logdate.client.media.ConditionalMediaSaver
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
@@ -358,6 +359,7 @@ internal class SyncMediaTransfer(
     suspend fun hydrate(
         accessToken: String,
         note: JournalNote,
+        isStillCurrent: (() -> Boolean)? = null,
     ): MediaHydrationResult {
         val mediaRef = note.mediaRefOrNull() ?: return MediaHydrationResult.Available(note)
         if (originalAvailable(mediaRef)) return MediaHydrationResult.Available(note)
@@ -389,16 +391,23 @@ internal class SyncMediaTransfer(
                 return MediaHydrationResult.Pending(reason)
             }
         if (downloaded.contentId != note.uid) return MediaHydrationResult.Pending(DiagnosticReason.CORRUPT_PAYLOAD)
+        if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
         return try {
-            val localUri =
-                mediaManager.saveMedia(
-                    MediaPayload(
-                        fileName = downloaded.fileName,
-                        mimeType = downloaded.mimeType,
-                        sizeBytes = downloaded.data.size.toLong(),
-                        data = downloaded.data,
-                    ),
+            val payload =
+                MediaPayload(
+                    fileName = downloaded.fileName,
+                    mimeType = downloaded.mimeType,
+                    sizeBytes = downloaded.data.size.toLong(),
+                    data = downloaded.data,
                 )
+            if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
+            val localUri =
+                if (isStillCurrent == null) {
+                    mediaManager.saveMedia(payload)
+                } else {
+                    val conditionalSaver = mediaManager as? ConditionalMediaSaver ?: error("Conditional media saver unavailable")
+                    conditionalSaver.saveMedia(payload) { isStillCurrent() }
+                }
             check(originalAvailable(localUri))
             MediaHydrationResult.Available(
                 note.withMediaRef(localUri),

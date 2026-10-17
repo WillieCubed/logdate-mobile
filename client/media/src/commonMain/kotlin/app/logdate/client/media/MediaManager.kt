@@ -133,6 +133,19 @@ interface MediaManager {
     ): String
 }
 
+/**
+ * Optional media-store capability for callers that must bind durable media writes to live state.
+ * Implementations must not leave an unreferenced durable object when [canCommit] becomes false.
+ * Stores with an atomic finalization boundary should check there; stores that write uniquely named
+ * objects may check after writing and remove that object before returning.
+ */
+interface ConditionalMediaSaver {
+    suspend fun saveMedia(
+        payload: MediaPayload,
+        canCommit: () -> Boolean,
+    ): String
+}
+
 const val DEFAULT_RECENT_MEDIA_LIMIT: Int = 100
 
 data class MediaPayload(

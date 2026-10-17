@@ -48,7 +48,8 @@ class AndroidMediaManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val canonicalMediaStore: AndroidCanonicalMediaStore = AndroidCanonicalMediaStore(context.filesDir),
     private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
-) : MediaManager {
+) : MediaManager,
+    ConditionalMediaSaver {
     private val filesDir = context.filesDir
     private val legacyBackfillMutex = Mutex()
     private val recoveryGateway: MediaRecoveryGateway =
@@ -561,7 +562,12 @@ class AndroidMediaManager(
         return file.length()
     }
 
-    override suspend fun saveMedia(payload: MediaPayload): String {
+    override suspend fun saveMedia(payload: MediaPayload): String = saveMedia(payload) { true }
+
+    override suspend fun saveMedia(
+        payload: MediaPayload,
+        canCommit: () -> Boolean,
+    ): String {
         val mimeType =
             requireSupportedMediaMimeType(
                 payload.mimeType.ifBlank {
@@ -578,6 +584,7 @@ class AndroidMediaManager(
                     input = payload.data.inputStream(),
                     mimeType = mimeType,
                     expectedSizeBytes = payload.sizeBytes,
+                    canCommit = canCommit,
                 )
             }
         } catch (cancellation: CancellationException) {
