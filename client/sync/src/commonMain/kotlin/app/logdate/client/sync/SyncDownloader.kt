@@ -346,8 +346,8 @@ private fun JournalNote.withVersion(version: Long): JournalNote =
 
 /**
  * Compare only the fields the content contract sends, after resolving cached media. The capture time
- * zone and device are left out: a server that predates them returns none, and neither changes after
- * capture.
+ * zone, device and activity are left out: a server that predates them returns none, and none of them
+ * changes after capture.
  */
 private fun JournalNote.uploadedFields(
     version: Long,
@@ -365,6 +365,7 @@ private fun JournalNote.uploadedFields(
                 location = uploadedLocation,
                 timeZoneId = null,
                 capturedOn = null,
+                capturedDuring = null,
             )
         is JournalNote.Image ->
             copy(
@@ -375,6 +376,7 @@ private fun JournalNote.uploadedFields(
                 location = uploadedLocation,
                 timeZoneId = null,
                 capturedOn = null,
+                capturedDuring = null,
             )
         is JournalNote.Video ->
             copy(
@@ -385,6 +387,7 @@ private fun JournalNote.uploadedFields(
                 location = uploadedLocation,
                 timeZoneId = null,
                 capturedOn = null,
+                capturedDuring = null,
             )
         is JournalNote.Audio ->
             copy(
@@ -395,6 +398,7 @@ private fun JournalNote.uploadedFields(
                 location = uploadedLocation,
                 timeZoneId = null,
                 capturedOn = null,
+                capturedDuring = null,
             )
     }
 }

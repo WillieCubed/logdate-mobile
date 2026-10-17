@@ -1,8 +1,10 @@
 package app.logdate.client.sync.conflict
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.withCapturedDuring
 import app.logdate.client.repository.journals.withCapturedOn
 import app.logdate.client.repository.journals.withTimeZoneId
 import kotlin.time.Clock
@@ -11,8 +13,8 @@ import kotlin.time.Instant
 /**
  * Conflict resolver for notes that attempts content-safe merges before deferring to manual review.
  *
- * A note's capture time zone and capture device are set once, where the note was captured, and never
- * edited. Whichever copy wins, the resolved note records each of them from either copy: a copy from
+ * A note's capture time zone, capture device and capture activity are set once, where the note was
+ * captured, and never edited. Whichever copy wins, the resolved note records each of them from either copy: a copy from
  * an app version or server that predates a field must not erase it.
  */
 class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
@@ -26,8 +28,9 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
             CaptureFacts(
                 timeZoneId = local.timeZoneId ?: remote.timeZoneId,
                 capturedOn = local.capturedOn ?: remote.capturedOn,
+                capturedDuring = local.capturedDuring ?: remote.capturedDuring,
             )
-        val localFacts = CaptureFacts(timeZoneId = local.timeZoneId, capturedOn = local.capturedOn)
+        val localFacts = CaptureFacts(timeZoneId = local.timeZoneId, capturedOn = local.capturedOn, capturedDuring = local.capturedDuring)
         val resolution = resolveContent(local, remote.withCaptureFactsIfMissing(localFacts), localTimestamp, remoteTimestamp)
         return resolution.withCaptureFactsFallback(either)
     }
@@ -36,12 +39,21 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
     private data class CaptureFacts(
         val timeZoneId: String?,
         val capturedOn: CaptureDevice?,
+        val capturedDuring: CaptureActivity?,
     )
 
     private fun JournalNote.withCaptureFactsIfMissing(facts: CaptureFacts): JournalNote {
         val withZone = if (timeZoneId == null && facts.timeZoneId != null) withTimeZoneId(facts.timeZoneId) else this
-        if (withZone.capturedOn != null || facts.capturedOn == null) return withZone
-        return withZone.withCapturedOn(facts.capturedOn)
+        val withDevice =
+            if (withZone.capturedOn == null &&
+                facts.capturedOn != null
+            ) {
+                withZone.withCapturedOn(facts.capturedOn)
+            } else {
+                withZone
+            }
+        if (withDevice.capturedDuring != null || facts.capturedDuring == null) return withDevice
+        return withDevice.withCapturedDuring(facts.capturedDuring)
     }
 
     private fun ConflictResolution<JournalNote>.withCaptureFactsFallback(facts: CaptureFacts): ConflictResolution<JournalNote> =
