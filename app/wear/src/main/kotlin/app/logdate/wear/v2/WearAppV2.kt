@@ -208,6 +208,11 @@ private fun TodayEntry(controls: TodayControls) {
         onSetUpPhone = viewModel::setUpPhone,
         onHandoffDismissed = viewModel::dismissHandoff,
         controls = controls,
+        onUseActivity = {
+            controls.recorder?.gesture?.startLocked()
+            viewModel.usedActivity()
+        },
+        onDismissActivity = viewModel::dismissActivity,
     )
 }
 

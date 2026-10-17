@@ -1,6 +1,11 @@
 package app.logdate.wear.v2.today
 
 import app.cash.turbine.test
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.ActivityPresenter
+import app.logdate.client.domain.activity.ActivitySuggestion
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.streak.CampfireState
 import app.logdate.client.domain.streak.FirePhase
 import app.logdate.client.domain.streak.FireSize
@@ -48,6 +53,7 @@ import java.io.IOException
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -101,6 +107,32 @@ class TodayViewModelTest {
                 assertEquals(2, today.summary.momentCount)
                 assertEquals(252.seconds, today.summary.voiceDuration)
                 assertEquals(Feeling.GOOD, today.feeling)
+            }
+        }
+
+    @Test
+    fun `a walk that just ended is offered on today`() =
+        runTest {
+            notesFor(saturday)
+            val walk = Activity(ActivityKind.MOVING, at(saturday, 9), at(saturday, 9) + 40.minutes)
+            val presenter = mockk<ActivityPresenter>()
+            every { presenter.state } returns flowOf(ActivityUiState(suggestion = ActivitySuggestion(walk, minutes = 40)))
+
+            viewModel(presenter).uiState.test {
+                val today = expectMostRecentItem() as TodayUiState.Ready
+                assertEquals(ActivitySuggestion(walk, minutes = 40), today.activity.suggestion)
+            }
+        }
+
+    @Test
+    fun `today does not wait for the activity to load`() =
+        runTest {
+            notesFor(saturday)
+            val presenter = mockk<ActivityPresenter>()
+            every { presenter.state } returns kotlinx.coroutines.flow.emptyFlow()
+
+            viewModel(presenter).uiState.test {
+                assertEquals(ActivityUiState(), (expectMostRecentItem() as TodayUiState.Ready).activity)
             }
         }
 
@@ -287,7 +319,7 @@ class TodayViewModelTest {
             }
         }
 
-    private fun viewModel() =
+    private fun viewModel(activity: ActivityPresenter? = null) =
         TodayViewModel(
             dayClock = dayClock,
             notesRepository = notesRepository,
@@ -296,6 +328,7 @@ class TodayViewModelTest {
             watchLinks = watchLinks,
             phoneHandoff = phoneHandoff,
             syncStatus = syncStatus,
+            activity = activity,
         )
 
     private fun notesFor(

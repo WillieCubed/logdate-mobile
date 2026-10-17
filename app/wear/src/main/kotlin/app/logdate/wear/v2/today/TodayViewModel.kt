@@ -2,6 +2,8 @@ package app.logdate.wear.v2.today
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.activity.ActivityPresenter
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.streak.CampfireState
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.domain.today.TodaySummaryCalculator
@@ -30,7 +32,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -48,6 +52,7 @@ class TodayViewModel(
     watchLinks: WatchLinkStore,
     private val phoneHandoff: PhoneHandoff,
     syncStatus: Flow<SyncStatus>,
+    private val activity: ActivityPresenter? = null,
 ) : ViewModel() {
     private val mutableHandoff = MutableStateFlow(HandoffState.IDLE)
 
@@ -62,6 +67,8 @@ class TodayViewModel(
             syncStatus.map { it.pausedReason == SyncPausedReason.NEEDS_DEVICE_LINK }.distinctUntilChanged(),
         ) { day, campfire, phone, link, needsLink ->
             readyState(day, campfire, phone, link, needsLink)
+        }.combine((activity?.state ?: flowOf()).onStart { emit(ActivityUiState()) }) { state, doing ->
+            if (state is TodayUiState.Ready) state.copy(activity = doing) else state
         }.catch { error ->
             Napier.e("Couldn't load today on the watch", error)
             emit(TodayUiState.Failed)
@@ -93,6 +100,18 @@ class TodayViewModel(
                     HandoffResult.FAILED -> HandoffState.FAILED
                 }
         }
+    }
+
+    /** The person dismissed the suggestion or the morning start. */
+    fun dismissActivity() {
+        val presenter = activity ?: return
+        viewModelScope.launch { presenter.dismiss() }
+    }
+
+    /** The person started a recording from the suggestion or the morning start. */
+    fun usedActivity() {
+        val presenter = activity ?: return
+        viewModelScope.launch { presenter.actedOn() }
     }
 
     fun dismissHandoff() {
