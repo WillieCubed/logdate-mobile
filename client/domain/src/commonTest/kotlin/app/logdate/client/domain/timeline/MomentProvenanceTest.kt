@@ -1,9 +1,12 @@
 package app.logdate.client.domain.timeline
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -30,6 +33,16 @@ class MomentProvenanceTest {
     @Test
     fun `a moment without notes was not`() {
         assertFalse(moment().capturedOnWatch())
+    }
+
+    @Test
+    fun `a moment records the activity its notes share and none when they differ`() {
+        val walking = fromPhone.copy(capturedDuring = CaptureActivity.MOVING)
+
+        assertEquals(CaptureActivity.MOVING, moment(walking, walking.copy(uid = Uuid.random())).capturedDuring())
+        assertNull(moment(walking, unrecorded).capturedDuring())
+        assertNull(moment(walking, walking.copy(uid = Uuid.random(), capturedDuring = CaptureActivity.IN_VEHICLE)).capturedDuring())
+        assertNull(moment().capturedDuring())
     }
 
     private fun moment(vararg notes: JournalNote) =

@@ -7,6 +7,7 @@ import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
+import app.logdate.client.domain.timeline.capturedDuring
 import app.logdate.client.domain.timeline.capturedOnWatch
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.isCapturedOnWatch
@@ -110,6 +111,7 @@ private fun Moment.toMomentUiState(
         people = resolvedPeople,
         isHero = isHero,
         capturedOnWatch = capturedOnWatch(),
+        capturedDuring = capturedDuring(),
     )
 }
 
@@ -127,6 +129,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     timestamp = note.creationTimestamp,
                     journals = noteJournals,
                     capturedOnWatch = note.isCapturedOnWatch,
+                    capturedDuring = note.capturedDuring,
                 )
             is JournalNote.Image ->
                 ImageNoteUiState(
@@ -137,6 +140,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     presentation = note.presentation,
                     journals = noteJournals,
                     capturedOnWatch = note.isCapturedOnWatch,
+                    capturedDuring = note.capturedDuring,
                 )
             is JournalNote.Audio ->
                 AudioNoteUiState(
@@ -146,6 +150,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     duration = note.durationMs,
                     journals = noteJournals,
                     capturedOnWatch = note.isCapturedOnWatch,
+                    capturedDuring = note.capturedDuring,
                 )
             is JournalNote.Video ->
                 VideoNoteUiState(
@@ -155,6 +160,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     caption = note.caption,
                     journals = noteJournals,
                     capturedOnWatch = note.isCapturedOnWatch,
+                    capturedDuring = note.capturedDuring,
                 )
         }
     }

@@ -104,6 +104,7 @@ import app.logdate.ui.platform.LocalPlatformHaptics
 import app.logdate.ui.platform.iosEdgeSwipeBack
 import app.logdate.ui.platform.rememberPlatformHapticsController
 import app.logdate.ui.platform.rememberSystemReduceMotion
+import app.logdate.ui.provenance.LocalActivityContextVisible
 import app.logdate.ui.provenance.LocalWatchProvenanceVisible
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
@@ -141,6 +142,8 @@ fun LogDateNavDisplay(
         .collectAsState(initial = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
     val watchExperienceEnabled by remember(workspaceFlags) { workspaceFlags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) }
         .collectAsState(initial = FeatureFlag.WATCH_EXPERIENCE_V2.defaultEnabled)
+    val activityAwarenessEnabled by remember(workspaceFlags) { workspaceFlags.observe(FeatureFlag.ACTIVITY_AWARENESS) }
+        .collectAsState(initial = FeatureFlag.ACTIVITY_AWARENESS.defaultEnabled)
     val backStack = rememberNavBackStack(appNavSavedStateConfiguration, BaseRoute)
     var hasRequestedUnlock by remember { mutableStateOf(false) }
 
@@ -220,6 +223,7 @@ fun LogDateNavDisplay(
                 LocalSharedTransitionScope provides this,
                 LocalWorkspaceEnabled provides workspaceEnabled,
                 LocalWatchProvenanceVisible provides watchExperienceEnabled,
+                LocalActivityContextVisible provides activityAwarenessEnabled,
                 app.logdate.ui.workspace.LocalWorkspaceSearchAction provides { backStack.add(SearchRoute()) },
                 LocalPlatformHaptics provides haptics,
                 LocalLogDateHaptics provides logDateHaptics,

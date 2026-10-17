@@ -100,6 +100,7 @@ private fun TextNoteSnippet(uiState: TextNoteUiState) {
         CaptureTimeLabel(
             text = uiState.timestamp.toReadableDateTimeShort(),
             capturedOnWatch = uiState.capturedOnWatch,
+            capturedDuring = uiState.capturedDuring,
         )
 
         Surface(
@@ -129,6 +130,7 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
         CaptureTimeLabel(
             text = uiState.timestamp.toReadableDateTimeShort(),
             capturedOnWatch = uiState.capturedOnWatch,
+            capturedDuring = uiState.capturedDuring,
         )
 
         Surface(
@@ -201,6 +203,7 @@ private fun VideoNoteSnippet(uiState: VideoNoteUiState) {
         CaptureTimeLabel(
             text = uiState.timestamp.toReadableDateTimeShort(),
             capturedOnWatch = uiState.capturedOnWatch,
+            capturedDuring = uiState.capturedDuring,
         )
 
         Surface(
