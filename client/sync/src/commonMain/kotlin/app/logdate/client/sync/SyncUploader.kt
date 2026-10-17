@@ -312,8 +312,6 @@ internal class SyncUploader(
                                     retryCoordinator.handleUploadConflict(
                                         entityType = EntityType.NOTE,
                                         pending = pending,
-                                        itemLabel = "content ${note.uid}",
-                                        conflictLabel = "Content",
                                         error = error,
                                         localVersion = note.syncVersion,
                                         localUpdatedAt = note.lastUpdated,
