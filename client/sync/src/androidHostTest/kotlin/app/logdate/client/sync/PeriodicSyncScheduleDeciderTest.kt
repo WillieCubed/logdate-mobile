@@ -6,6 +6,14 @@ import kotlin.test.assertEquals
 
 class PeriodicSyncScheduleDeciderTest {
     @Test
+    fun `returning from metered to unrestricted wakes recovery immediately`() {
+        val decider = PeriodicSyncScheduleDecider()
+        decider.next(true, DataUsageMode.Conservative)
+        kotlin.test.assertTrue(decider.next(true, DataUsageMode.Unrestricted) != PeriodicSyncScheduleChange.Unchanged)
+        kotlin.test.assertEquals(PeriodicSyncScheduleChange.Unchanged, decider.next(true, DataUsageMode.Unrestricted))
+    }
+
+    @Test
     fun `sign in schedules once and unchanged network policy leaves it running`() {
         val decider = PeriodicSyncScheduleDecider()
 

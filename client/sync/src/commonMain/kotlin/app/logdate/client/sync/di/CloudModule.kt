@@ -145,6 +145,7 @@ val cloudModule =
                 get(),
                 get(),
                 get(),
+                dataUsagePolicy = get(),
                 references = getOrNull<StoredMediaReferences>() ?: StoredMediaReferences.Unchanged,
                 owner = get(),
                 config = get(),

@@ -23,6 +23,9 @@ interface TextNoteDao {
     @Query("SELECT * FROM text_notes WHERE uid = :uid")
     suspend fun getNoteOneOff(uid: Uuid): TextNoteEntity
 
+    @Query("SELECT * FROM text_notes WHERE uid = :uid")
+    suspend fun findNoteOneOff(uid: Uuid): TextNoteEntity?
+
     /**
      * Returns a flow of all [TextNoteEntity]s optimized for timeline display.
      */

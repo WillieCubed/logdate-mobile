@@ -75,20 +75,68 @@ class AutomaticMediaRecoveryTest {
         }
     private val scope get() = UploadScope("test-account-id", origin)
 
-    private fun recovery(refs: MediaSyncRefStore = this.refs) =
-        AutomaticMediaRecovery(
-            media,
-            refs,
-            cloud,
-            sessions,
-            accounts,
-            object : CanonicalOwnerProvider {
-                override suspend fun getCanonicalOwnerId() = "test-account-id"
+    private fun recovery(
+        refs: MediaSyncRefStore = this.refs,
+        localMedia: InMemoryMediaManager = media,
+        policy: app.logdate.client.networking.DataUsagePolicy? = null,
+    ) = AutomaticMediaRecovery(
+        localMedia,
+        refs,
+        cloud,
+        sessions,
+        accounts,
+        object : CanonicalOwnerProvider {
+            override suspend fun getCanonicalOwnerId() = "test-account-id"
 
-                override suspend fun hasBoundOwner() = true
-            },
-            DefaultLogDateConfigRepository(initialBackendUrl = origin),
-        )
+            override suspend fun hasBoundOwner() = true
+        },
+        DefaultLogDateConfigRepository(initialBackendUrl = origin),
+        dataUsagePolicy = policy,
+    )
+
+    @Test
+    fun `archive recovery cannot reuse an accessible destination provider identity`() =
+        runTest {
+            val source = "content://media/external/images/media/123"
+            val reused =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String) = mediaId == source || super.exists(mediaId)
+                }
+            refs.upsert(MediaSyncRef(id.toString(), source, "$origin/media/original", "original", 1))
+            val result =
+                assertIs<AutomaticMediaRecoveryResult.Available>(
+                    recovery(localMedia = reused).recover(id, null, "image", source, "missing", scope),
+                )
+            assertTrue(result.reference != source)
+            assertEquals(1, downloads)
+        }
+
+    @Test
+    fun `metered recovery waits automatically but explicit scoped consent permits a download`() =
+        runTest {
+            val mode =
+                kotlinx.coroutines.flow.MutableStateFlow<app.logdate.client.networking.DataUsageMode>(
+                    app.logdate.client.networking.DataUsageMode.Conservative,
+                )
+            val policy =
+                object : app.logdate.client.networking.DataUsagePolicy {
+                    override val policy = mode
+
+                    override suspend fun currentMode() = mode.value
+
+                    override suspend fun currentRestriction() = app.logdate.client.networking.DataRestriction.NONE
+                }
+            val repair = recovery(policy = policy)
+            val source = "$origin/media/original"
+            assertIs<AutomaticMediaRecoveryResult.Pending>(repair.recover(id, null, "image", source, "missing", scope))
+            assertEquals(0, downloads)
+            withMobileDataConsent(scope) {
+                assertIs<AutomaticMediaRecoveryResult.Available>(repair.recover(id, null, "image", source, "missing", scope))
+            }
+            assertEquals(1, downloads)
+            assertIs<AutomaticMediaRecoveryResult.Available>(repair.recover(id, null, "image", source, "missing", scope))
+            assertEquals(1, downloads)
+        }
 
     @Test
     fun `cached original mapping failure stays retryable without credentials`() =

@@ -1,10 +1,13 @@
 package app.logdate.client.location.tracking
 
 import android.content.Context
+import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.permissions.PermissionManager
+import app.logdate.client.permissions.PermissionType
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -29,28 +32,31 @@ class LocationTrackingManager(
     private val optimizedBackgroundLocationRegistrar: OptimizedBackgroundLocationRegistrar,
     private val locationTrackingSettingsRepository: LocationTrackingSettingsRepository,
     private val permissionManager: PermissionManager,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private var latestSettings: LocationTrackingSettings? = null
+    private var appliedSettings: LocationTrackingSettings? = null
+    private var locationPermissionGranted: Boolean? = null
 
     init {
         scope.launch {
-            locationTrackingSettingsRepository.observeSettings().debounce(1000).collectLatest { settings ->
-                latestSettings = settings
-                applyTrackingSettings(settings)
+            locationTrackingSettingsRepository.observeSettings().debounce(1000).collectLatest {
+                reconcileTrackingSettings()
             }
         }
 
         scope.launch {
-            val settings = locationTrackingSettingsRepository.getSettings()
-            latestSettings = settings
-            applyTrackingSettings(settings)
+            reconcileTrackingSettings()
         }
     }
 
     private fun applyTrackingSettings(settings: LocationTrackingSettings) {
+        val granted = permissionManager.isPermissionGranted(PermissionType.LOCATION)
+        if (appliedSettings == settings && locationPermissionGranted == granted) return
         Napier.i("Applying location tracking settings: $settings")
-        val decision = computeLocationTrackingExecutionDecision(settings = settings)
+        val decision =
+            computeLocationTrackingExecutionDecision(
+                settings = settings.copy(backgroundTrackingEnabled = settings.backgroundTrackingEnabled && granted),
+            )
 
         if (decision.shouldStopScheduledTracking) {
             scheduledLocationTrackingService.stopScheduledTracking()
@@ -78,6 +84,8 @@ class LocationTrackingManager(
         if (decision.shouldStopActivityAwareTracking) {
             context.stopActivityAwareLocationService()
         }
+        appliedSettings = settings
+        locationPermissionGranted = granted
     }
 
     /**
@@ -85,14 +93,36 @@ class LocationTrackingManager(
      */
     fun startTracking() {
         scope.launch {
-            val settings = locationTrackingSettingsRepository.getSettings()
-            latestSettings = settings
-            applyTrackingSettings(settings)
+            reconcileTrackingSettings()
         }
     }
 
-    /** No-op — activity-aware tracking no longer depends on foreground activity state. */
-    fun onActivityResumed() = Unit
+    /** Reconciles grants changed outside the app while retaining the user's tracking preference. */
+    fun onActivityResumed() {
+        scope.launch { reconcileTrackingSettings(retryForeground = true) }
+    }
+
+    private suspend fun reconcileTrackingSettings(retryForeground: Boolean = false) {
+        try {
+            val settings = locationTrackingSettingsRepository.getSettings()
+            val granted = permissionManager.isPermissionGranted(PermissionType.LOCATION)
+            val unchanged = appliedSettings == settings && locationPermissionGranted == granted
+            applyTrackingSettings(settings)
+            if (retryForeground &&
+                unchanged &&
+                granted &&
+                settings.backgroundTrackingEnabled &&
+                settings.captureMode == LocationCaptureMode.ACTIVE
+            ) {
+                // A background launch may have been denied before the activity became visible.
+                context.startActivityAwareLocationService(permissionManager)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.w("Location tracking reconciliation will retry when the app resumes", error)
+        }
+    }
 
     /** No-op — activity-aware tracking no longer depends on foreground activity state. */
     fun onActivityPaused() = Unit
@@ -101,8 +131,11 @@ class LocationTrackingManager(
      * Explicitly stop location tracking (usually called when the app is being destroyed).
      */
     fun stopTracking() {
-        scheduledLocationTrackingService.stopScheduledTracking()
-        optimizedBackgroundLocationRegistrar.stop()
-        context.stopActivityAwareLocationService()
+        scope.launch {
+            appliedSettings = null
+            scheduledLocationTrackingService.stopScheduledTracking()
+            optimizedBackgroundLocationRegistrar.stop()
+            context.stopActivityAwareLocationService()
+        }
     }
 }

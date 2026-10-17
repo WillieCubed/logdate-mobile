@@ -5,6 +5,8 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.isRecoveredOriginal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import java.io.File
@@ -16,8 +18,9 @@ internal class AndroidArchiveMediaImporter(
     private val mediaManager: MediaManager,
     private val zipFile: ZipFile,
     private val root: String,
+    private val references: StoredMediaReferences,
 ) : MediaImporter {
-    override suspend fun isAvailable(reference: String): Boolean = mediaManager.exists(reference)
+    override suspend fun isAvailable(reference: String): Boolean = mediaManager.isRecoveredOriginal(reference, references)
 
     override fun containsMedia(exportPath: String): Boolean = zipFile.getEntry(root + exportPath.trimStart('/'))?.isDirectory == false
 

@@ -2,6 +2,7 @@ package app.logdate.client.domain.timeline
 
 import app.logdate.client.domain.entities.ExtractPeopleUseCase
 import app.logdate.client.intelligence.AIResult
+import app.logdate.client.intelligence.MAX_AI_INPUT_CHARACTERS
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -188,20 +189,23 @@ class GetTimelineDayUseCase(
                 SummarizeJournalEntriesResult.SummaryUnavailable -> "No summary available."
             }
 
+        val textEntries = entries.filterIsInstance<JournalNote.Text>()
+        val inputLength = textEntries.sumOf { it.content.length.toLong() } + (textEntries.size - 1).coerceAtLeast(0)
         val people =
-            when (
-                val peopleResult =
-                    extractPeopleUseCase(
-                        documentId = "people_summary_" + date.toEpochDays().toString(),
-                        text =
-                            entries
-                                .filterIsInstance<JournalNote.Text>()
-                                .joinToString("\n") { note -> note.content },
-                    )
-            ) {
-                is AIResult.Success -> peopleResult.value
-                is AIResult.Unavailable -> emptyList()
-                is AIResult.Error -> emptyList()
+            if (inputLength > MAX_AI_INPUT_CHARACTERS) {
+                emptyList()
+            } else {
+                when (
+                    val peopleResult =
+                        extractPeopleUseCase(
+                            documentId = "people_summary_" + date.toEpochDays().toString(),
+                            text = textEntries.joinToString("\n") { it.content },
+                        )
+                ) {
+                    is AIResult.Success -> peopleResult.value
+                    is AIResult.Unavailable -> emptyList()
+                    is AIResult.Error -> emptyList()
+                }
             }
 
         // Keep the media lookup warm for downstream screens even though the list cards rely on raw notes.
@@ -261,8 +265,7 @@ internal fun extractDayParts(entries: List<JournalNote>): List<DayPart> {
                     .filterIsInstance<JournalNote.Text>()
                     .firstOrNull()
                     ?.content
-                    ?.trim()
-                    ?.take(120)
+                    ?.boundedDayPreview()
             val locationPreview =
                 bucketEntries
                     .mapNotNull { entry -> entry.location?.displayName }
@@ -325,3 +328,10 @@ private fun List<JournalNote>.firstVisualUri(): String? =
             is JournalNote.Text -> null
         }
     }
+
+private fun String.boundedDayPreview(): String {
+    val start = indexOfFirst { !it.isWhitespace() }
+    if (start == -1) return ""
+    val end = indexOfLast { !it.isWhitespace() }
+    return substring(start, start + minOf(120, end - start + 1))
+}

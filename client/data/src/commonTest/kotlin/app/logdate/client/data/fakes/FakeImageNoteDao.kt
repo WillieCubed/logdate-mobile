@@ -23,6 +23,8 @@ class FakeImageNoteDao : ImageNoteDao {
     override suspend fun getNoteOneOff(uid: Uuid): ImageNoteEntity =
         notes[uid] ?: throw NoSuchElementException("Image note with ID $uid not found")
 
+    override suspend fun findNoteOneOff(uid: Uuid): ImageNoteEntity? = notes[uid]
+
     override fun getAllNotes(): Flow<List<ImageNoteEntity>> = notesFlow
 
     override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }

@@ -20,7 +20,8 @@ internal class NoteMediaUpload(
         note: JournalNote,
         errors: MutableList<SyncError>,
     ): JournalNote? {
-        val mediaRef = note.mediaRefOrNull()
+        val remoteReady = mediaTransfer.resolveNativeNote(note) ?: return null
+        val mediaRef = remoteReady.mediaRefOrNull()
         val needsMediaUpload = mediaRef != null && mediaTransfer.requiresUpload(mediaRef)
         if (needsMediaUpload && !mediaSyncAllowed(dataUsagePolicy.currentMode(), tokenRefresher.currentUploadScope())) {
             setMediaDeferredForNetwork(true)
@@ -32,7 +33,7 @@ internal class NoteMediaUpload(
         return if (needsMediaUpload) {
             val mediaUpload =
                 tokenRefresher.withFreshToken(
-                    { token -> mediaTransfer.uploadIfNeeded(token, note) },
+                    { token -> mediaTransfer.uploadIfNeeded(token, remoteReady) },
                     "uploadNoteMedia",
                     expectedScope = pending.scope,
                 )
@@ -93,7 +94,7 @@ internal class NoteMediaUpload(
             }
             mediaUpload.getOrThrow()
         } else {
-            note
+            remoteReady
         }
     }
 }

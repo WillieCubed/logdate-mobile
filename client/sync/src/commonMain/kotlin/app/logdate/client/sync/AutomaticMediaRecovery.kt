@@ -4,6 +4,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudApiException
@@ -30,8 +31,12 @@ class AutomaticMediaRecovery(
     private val owner: CanonicalOwnerProvider,
     private val config: LogDateConfigRepository,
     references: StoredMediaReferences = StoredMediaReferences.Unchanged,
+    private val dataUsagePolicy: app.logdate.client.networking.DataUsagePolicy? = null,
 ) {
-    private val transfer = SyncMediaTransfer(media, refs, cloud, references)
+    private val transfer =
+        SyncMediaTransfer(media, refs, cloud, references) {
+            dataUsagePolicy?.let { mediaSyncAllowed(it.currentMode(), currentScope()) } ?: true
+        }
     private val tokens = SyncTokenRefresher(sessions, accounts)
 
     suspend fun recover(
@@ -42,17 +47,25 @@ class AutomaticMediaRecovery(
         unavailableReference: String,
         scope: UploadScope,
     ): AutomaticMediaRecoveryResult {
+        val recoverySource =
+            if (UnavailableMediaReferences.requiresNativeQuarantine(
+                    sourceReference,
+                )
+            ) {
+                UnavailableMediaReferences.nativeRestore(sourceReference)
+            } else {
+                sourceReference
+            }
         if (currentScope() != scope) return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.UNKNOWN)
         try {
             val cached = if (draftId == null) refs.getScoped(entityId, scope) else refs.getDraftAssetScoped(draftId, entityId, kind, scope)
             if (cached != null &&
                 (
-                    cached.remoteUrl == sourceReference ||
-                        transfer.sameLocalFile(cached.localUri, sourceReference) ||
-                        cached.localAliases.any { transfer.sameLocalFile(it, sourceReference) }
+                    cached.remoteUrl == recoverySource ||
+                        transfer.sameLocalFile(cached.localUri, recoverySource) ||
+                        cached.localAliases.any { transfer.sameLocalFile(it, recoverySource) }
                 ) &&
-                !transfer.isRemoteRef(cached.localUri) &&
-                media.exists(cached.localUri)
+                transfer.originalAvailable(cached.localUri, recoverySource)
             ) {
                 if (currentScope() != scope) return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.UNKNOWN)
                 retainMapping(cached, entityId, draftId, kind, unavailableReference, scope)
@@ -64,13 +77,13 @@ class AutomaticMediaRecovery(
             currentCoroutineContext().ensureActive()
             return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.LOCAL_STORAGE)
         }
-        if (transfer.isRemoteRef(sourceReference) && !sourceReference.startsWith("${scope.serverOrigin.trimEnd('/')}/")) {
+        if (transfer.isRemoteRef(recoverySource) && !recoverySource.startsWith("${scope.serverOrigin.trimEnd('/')}/")) {
             return AutomaticMediaRecoveryResult.Pending(DiagnosticReason.MISSING_MEDIA)
         }
         val attempt =
             tokens.withFreshToken({ token ->
                 runCatching {
-                    val candidate = download(token, entityId, draftId, kind, sourceReference)
+                    val candidate = download(token, entityId, draftId, kind, recoverySource)
                     candidate.second?.let { mapping -> retainMapping(mapping, entityId, draftId, kind, unavailableReference, scope) }
                     candidate.first
                 }

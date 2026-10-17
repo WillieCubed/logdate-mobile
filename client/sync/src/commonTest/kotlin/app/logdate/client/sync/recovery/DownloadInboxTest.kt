@@ -16,6 +16,21 @@ import kotlin.test.assertTrue
 
 class DownloadInboxTest {
     @Test
+    fun `network policy deferral does not accumulate failure backoff`() =
+        runTest {
+            val db = Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { 1L })
+            inbox.stage("MEDIA_NATIVE_NOTE", 1, listOf(WireDownload("original", 1, false, "missing")))
+            repeat(12) { inbox.failed("MEDIA_NATIVE_NOTE", "original", "NETWORK_POLICY") }
+            val retained = db.rows.single()
+            assertEquals(0, retained.attempts)
+            assertEquals(30_001L, retained.nextAttemptAt)
+            assertEquals("WAITING", retained.state)
+            inbox.release()
+            assertEquals(1, inbox.pending("MEDIA_NATIVE_NOTE").size)
+        }
+
+    @Test
     fun `a legacy wire record can be reconsidered after an earlier applied checkpoint`() =
         runTest {
             val db = Database()

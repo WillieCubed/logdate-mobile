@@ -24,6 +24,21 @@ class PostRestoreDetectorTest {
         }
     private val detector = PostRestoreDetector(context)
 
+    @Test
+    fun `media quarantine survives content and account acknowledgement and rejects older delivery`() {
+        detector.recordRestoreCompleted()
+        val first = assertNotNull(detector.pendingMediaQuarantineId())
+        detector.markDeviceInitialized()
+        detector.acknowledgeAccountRecovery()
+        assertEquals(first, PostRestoreDetector(context).pendingMediaQuarantineId())
+        detector.recordRestoreCompleted()
+        val second = assertNotNull(detector.pendingMediaQuarantineId())
+        assertFalse(detector.acknowledgeMediaQuarantine(first))
+        assertEquals(second, detector.pendingMediaQuarantineId())
+        assertTrue(detector.acknowledgeMediaQuarantine(second))
+        assertEquals(null, detector.pendingMediaQuarantineId())
+    }
+
     @AfterTest
     fun cleanup() {
         directory.deleteRecursively()

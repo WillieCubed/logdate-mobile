@@ -23,6 +23,8 @@ class FakeVideoNoteDao : VideoNoteDao {
     override suspend fun getNoteOneOff(uid: Uuid): VideoNoteEntity =
         notes[uid] ?: throw NoSuchElementException("Video note with ID $uid not found")
 
+    override suspend fun findNoteOneOff(uid: Uuid): VideoNoteEntity? = notes[uid]
+
     override fun getAllNotes(): Flow<List<VideoNoteEntity>> = notesFlow
 
     override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }

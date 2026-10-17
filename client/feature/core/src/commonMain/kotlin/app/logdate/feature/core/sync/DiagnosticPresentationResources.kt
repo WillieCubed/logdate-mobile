@@ -17,6 +17,7 @@ import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_in
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_key_recovery_required
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_local_storage
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_missing_media
+import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_network_policy
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_none
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_offline
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_persistence_failed
@@ -53,6 +54,7 @@ internal fun DiagnosticOutcome.outcomeResource(): StringResource =
 internal fun DiagnosticReason.reasonResource(): StringResource =
     when (this) {
         DiagnosticReason.NONE -> Res.string.sync_diagnostic_reason_none
+        DiagnosticReason.NETWORK_POLICY -> Res.string.sync_diagnostic_reason_network_policy
         DiagnosticReason.OFFLINE -> Res.string.sync_diagnostic_reason_offline
         DiagnosticReason.SIGN_IN_REQUIRED -> Res.string.sync_diagnostic_reason_sign_in_required
         DiagnosticReason.SERVER_UNAVAILABLE -> Res.string.sync_diagnostic_reason_server_unavailable

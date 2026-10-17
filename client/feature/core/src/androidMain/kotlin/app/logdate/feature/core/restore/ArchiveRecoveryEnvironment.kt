@@ -34,6 +34,7 @@ internal suspend fun observeCurrentArchiveRecovery(
         koin.get<SessionStorage>().getSessionFlow(),
         inventory = koin.get<MediaSyncRefStore>().changes,
         identityChanges = koin.get<IdentityKeyManager>().observeIdentityChanges(),
+        networkChanges = koin.get<app.logdate.client.networking.DataUsagePolicy>().policy,
     ) {
         ArchiveRecoveryScheduler.enqueueAll(context, koin)
     }

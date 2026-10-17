@@ -2,9 +2,13 @@ package app.logdate.client.domain.restore
 
 import app.logdate.client.domain.restore.RestoreArchiveTestFixtures.FakeMediaImporter
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +16,30 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 internal class ArchiveMediaRepairTest : RestoreArchiveTestFixture() {
+    @Test
+    fun `cancelled lookup cannot discard an attachment recovery checkpoint`() =
+        runTest {
+            val note = JournalNote.Image(creationTimestamp = now, lastUpdated = now, mediaRef = unavailableArchiveReference("original"))
+            val pending =
+                UnavailableMediaAsset(note.uid.toString(), reference = note.mediaRef, reason = UnavailableMediaReason.NOT_IN_ARCHIVE)
+            var checkpointChanged = false
+            val cancelledNotes =
+                object : JournalNotesRepository by notesRepo {
+                    override suspend fun getNoteById(noteId: Uuid): JournalNote? {
+                        currentCoroutineContext().cancel()
+                        return null
+                    }
+                }
+            launch {
+                RepairArchiveMediaUseCase(cancelledNotes, journalRepo).repair(
+                    listOf(pending),
+                    FakeMediaImporter(emptyMap()),
+                    onPendingChanged = { checkpointChanged = true },
+                )
+            }.join()
+            assertTrue(!checkpointChanged, "Cancellation must retain the original recovery checkpoint")
+        }
+
     @Test
     fun `a transferred original repairs its placeholder without reopening an archive`() =
         runTest {

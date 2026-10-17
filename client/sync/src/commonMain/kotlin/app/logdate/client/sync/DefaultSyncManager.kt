@@ -380,7 +380,6 @@ class DefaultSyncManager(
         accessToken: String,
         entityType: EntityType,
     ) {
-        if (!profile.downloadsMedia) return
         val inbox = downloadInbox ?: return
         when (entityType) {
             EntityType.NOTE ->
@@ -421,6 +420,7 @@ class DefaultSyncManager(
             mediaSyncRefStore = mediaSyncRefStore,
             cloudMediaDataSource = cloudMediaDataSource,
             mediaReferences = mediaReferences,
+            mayDownload = { mediaDownloadAllowed(profile.downloadsMedia, dataUsagePolicy, downloadInbox?.currentScope()) },
         )
 
     internal val retryCoordinator =

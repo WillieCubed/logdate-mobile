@@ -64,6 +64,9 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+        getByName("androidHostTest").dependencies {
+            implementation(libs.mockk)
+        }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.kotlinx.coroutines.play.services)

@@ -184,23 +184,23 @@ class ArchiveMediaRecoveryE2ETest {
 
     private suspend fun automaticRepair() {
         val state = JSONObject(fixture.readText())
-        val record = JSONObject(context.filesDir.resolve("archive_recovery/records/${state.getString("recoveryId")}.json").readText())
-        val source =
-            context.filesDir.resolve(
-                "archive_recovery/sources/${state.getString("recoveryId")}.${record.getString("sourceGeneration")}.zip",
-            )
         val complete = archive(state, complete = true)
         try {
-            complete.copyTo(source, overwrite = true)
             val work =
                 androidx.work
-                    .OneTimeWorkRequestBuilder<ArchiveMediaRecoveryWorker>()
-                    .setInputData(Data.Builder().putString(RestoreWorker.RECOVERY_ID_KEY, state.getString("recoveryId")).build())
-                    .build()
+                    .OneTimeWorkRequestBuilder<RestoreWorker>()
+                    .setInputData(
+                        Data
+                            .Builder()
+                            .putString(RestoreWorker.RECOVERY_ID_KEY, state.getString("recoveryId"))
+                            .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(complete).toString())
+                            .putBoolean(RestoreWorker.REPLACEMENT_SOURCE_KEY, true)
+                            .build(),
+                    ).build()
             val manager = androidx.work.WorkManager.getInstance(context)
             manager
                 .enqueueUniqueWork(
-                    "archive_media_recovery_${state.getString("recoveryId")}",
+                    "archive_metadata_recovery_${state.getString("recoveryId")}",
                     androidx.work.ExistingWorkPolicy.REPLACE,
                     work,
                 ).result

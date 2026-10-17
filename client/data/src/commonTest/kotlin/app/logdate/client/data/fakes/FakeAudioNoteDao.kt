@@ -24,6 +24,8 @@ class FakeAudioNoteDao : AudioNoteDao {
     override suspend fun getNoteOneOff(uid: Uuid): AudioNoteEntity =
         notes[uid] ?: throw NoSuchElementException("Audio note with ID $uid not found")
 
+    override suspend fun findNoteOneOff(uid: Uuid): AudioNoteEntity? = notes[uid]
+
     override fun getAllNotes(): Flow<List<AudioNoteEntity>> = notesFlow
 
     override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }

@@ -17,6 +17,7 @@
 -->
 <data-extraction-rules>
     <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <include domain="sharedpref" path="logdate_widget_instances.xml"/>
         <include domain="file" path="logdate.preferences_pb"/>
         <include domain="file" path="datastore/"/>
         <include domain="file" path="archive_recovery/records/"/>
@@ -31,6 +32,7 @@
         <exclude domain="file" path="identity_recovery/media_key_backup.part"/>
     </cloud-backup>
     <device-transfer>
+        <include domain="sharedpref" path="logdate_widget_instances.xml"/>
         <include domain="file" path="logdate.preferences_pb"/>
         <include domain="file" path="datastore/"/>
         <include domain="file" path="archive_recovery/records/"/>
