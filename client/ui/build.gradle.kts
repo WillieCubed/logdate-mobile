@@ -57,6 +57,7 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             api(projects.client.theme)
+            api(projects.client.text)
             implementation(projects.client.media)
             implementation(projects.client.repository)
             implementation(projects.client.awareness)
