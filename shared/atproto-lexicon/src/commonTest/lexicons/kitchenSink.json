@@ -8,27 +8,74 @@
       "key": "literal:self",
       "record": {
         "type": "object",
-        "required": ["pick", "attachment", "label"],
-        "nullable": ["label"],
+        "required": [
+          "pick",
+          "attachment",
+          "label"
+        ],
+        "nullable": [
+          "label"
+        ],
         "properties": {
           "pick": {
             "type": "union",
             "closed": true,
-            "refs": ["#location", "app.logdate.defs#location", "app.logdate.journal.entry"],
+            "refs": [
+              "#location",
+              "app.logdate.defs#location",
+              "app.logdate.journal.entry"
+            ],
             "description": "A closed union with a record member and two members both called location."
           },
-          "attachment": {"type": "cid-link"},
-          "label": {"type": "string", "description": "Required, but may be null."},
-          "object": {"type": "string", "description": "A property named with a Kotlin keyword."},
-          "digest": {"type": "bytes", "maxLength": 32},
-          "extra": {"type": "unknown"}
+          "attachment": {
+            "type": "cid-link"
+          },
+          "label": {
+            "type": "string",
+            "description": "Required, but may be null."
+          },
+          "object": {
+            "type": "string",
+            "description": "A property named with a Kotlin keyword."
+          },
+          "digest": {
+            "type": "bytes",
+            "maxLength": 32
+          },
+          "extra": {
+            "type": "unknown"
+          },
+          "mode": {
+            "type": "ref",
+            "ref": "#mode",
+            "description": "A reference to a named string definition."
+          }
         }
       }
     },
     "location": {
       "type": "object",
-      "required": ["name"],
-      "properties": {"name": {"type": "string"}}
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "mode": {
+      "type": "string",
+      "knownValues": [
+        "com.example.kitchenSink#calm",
+        "com.example.kitchenSink#busy"
+      ]
+    },
+    "calm": {
+      "type": "token"
+    },
+    "busy": {
+      "type": "token"
     }
   }
 }
