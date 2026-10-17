@@ -1,5 +1,6 @@
 package app.logdate.client.sync.crypto
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -30,6 +31,7 @@ class MarkedMomentPayloadCodec(
                     resolvedNoteIds = moment.resolvedNoteIds.map { it.toString() }.sorted(),
                     originDeviceId = moment.originDeviceId,
                     lastUpdated = moment.lastUpdated.toString(),
+                    capturedDuring = moment.capturedDuring?.wireName,
                 ),
             ),
         )
@@ -57,6 +59,7 @@ class MarkedMomentPayloadCodec(
             originDeviceId = decoded.originDeviceId,
             lastUpdated = Instant.parse(decoded.lastUpdated),
             syncVersion = serverVersion,
+            capturedDuring = CaptureActivity.fromWireName(decoded.capturedDuring),
         )
     }
 
@@ -74,6 +77,8 @@ class MarkedMomentPayloadCodec(
         val resolvedNoteIds: List<String>,
         val originDeviceId: String,
         val lastUpdated: String,
+        /** Left out while null, so older payloads and older readers are unchanged. */
+        val capturedDuring: String? = null,
     )
 
     @Serializable

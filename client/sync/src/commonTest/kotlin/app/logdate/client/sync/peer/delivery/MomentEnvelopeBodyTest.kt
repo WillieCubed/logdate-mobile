@@ -1,5 +1,6 @@
 package app.logdate.client.sync.peer.delivery
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -11,6 +12,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -38,6 +40,17 @@ class MomentEnvelopeBodyTest {
         assertEquals(8L, envelope.syncVersion)
         assertEquals(moment, MomentEnvelopeBody.decode(envelope))
         RecordEnvelopeCodec.encode(envelope)
+    }
+
+    @Test fun theActivityRecordedWithAMarkTravelsAndIsLeftOutWhileNull() {
+        val inVehicle = moment.copy(capturedDuring = CaptureActivity.IN_VEHICLE)
+        assertEquals(inVehicle, MomentEnvelopeBody.decode(MomentEnvelopeBody.envelope(inVehicle, RecordOrigin.WATCH)))
+        val body =
+            WearJson.json.encodeToString(
+                JsonElement.serializer(),
+                requireNotNull(MomentEnvelopeBody.envelope(moment, RecordOrigin.WATCH).body),
+            )
+        assertFalse("capturedDuring" in body)
     }
 
     @Test fun preciseClocksKeepTheirBodyWhileVersionUsesMilliseconds() {

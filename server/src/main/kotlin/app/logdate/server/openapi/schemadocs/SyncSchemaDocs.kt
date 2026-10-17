@@ -95,6 +95,8 @@ internal object SyncSchemaDocs {
                         "transcript" to
                             "Structured audio transcript encrypted by the app; omitted values survive only while media is unchanged. $ENCRYPTED_BY_APPS",
                         "capturedOn" to "The device that captured the entry, or `null` when not recorded. $ENCRYPTED_BY_APPS",
+                        "capturedDuring" to
+                            "What the person was doing at capture, or `null` when not recorded. $ENCRYPTED_BY_APPS",
                     ),
                 ),
             "ContentUploadResponse" to
@@ -122,6 +124,7 @@ internal object SyncSchemaDocs {
                         "location" to "New location, or omit to keep the current one. $ENCRYPTED_BY_APPS",
                         "transcript" to "Encrypted audio transcript; omit to preserve it while media is unchanged. $ENCRYPTED_BY_APPS",
                         "capturedOn" to "The device that captured the entry; omit it to leave it unchanged. $ENCRYPTED_BY_APPS",
+                        "capturedDuring" to "What the person was doing at capture; omit it to leave it unchanged. $ENCRYPTED_BY_APPS",
                     ),
                 ),
             "ContentUpdateResponse" to
@@ -162,6 +165,8 @@ internal object SyncSchemaDocs {
                         "transcript" to
                             "Structured audio transcript encrypted by the app; omitted values survive only while media is unchanged. $ENCRYPTED_BY_APPS",
                         "capturedOn" to "The device that captured the entry, or `null` when not recorded. $ENCRYPTED_BY_APPS",
+                        "capturedDuring" to
+                            "What the person was doing at capture, or `null` when not recorded. $ENCRYPTED_BY_APPS",
                     ),
                 ),
             "ContentDeletion" to
