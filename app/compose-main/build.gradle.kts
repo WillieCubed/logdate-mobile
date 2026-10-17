@@ -287,7 +287,7 @@ tasks.register("validateDesktopScreenshotTest") {
 
 tasks.register<Test>("updateDesktopScreenshotTest") {
     group = "verification"
-    description = "Update committed Desktop screenshot baselines for app/compose-main."
+    description = "Update Desktop screenshot baselines for app/compose-main. Without a scene filter, baselines that still pass are kept."
 
     val desktopTest = tasks.named<Test>("desktopTest").get()
     testClassesDirs = desktopTest.testClassesDirs
