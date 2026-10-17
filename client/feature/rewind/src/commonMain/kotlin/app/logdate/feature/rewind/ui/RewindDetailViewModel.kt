@@ -16,6 +16,8 @@ import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.RewindStatsSummary
 import app.logdate.client.sharing.RewindStatsSummaryRenderer
 import app.logdate.client.sharing.SharingLauncher
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.feature.rewind.ui.detail.ReflectionReplySheetState
 import app.logdate.feature.rewind.ui.detail.RewindShareRequest
 import app.logdate.feature.rewind.ui.detail.RewindShareVisual
@@ -49,6 +51,47 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Month
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.rewind.generated.resources.Res
+import logdate.client.feature.rewind.generated.resources.rewind_state_captured_this_week
+import logdate.client.feature.rewind.generated.resources.rewind_state_count_entries
+import logdate.client.feature.rewind.generated.resources.rewind_state_count_people
+import logdate.client.feature.rewind.generated.resources.rewind_state_count_photos
+import logdate.client.feature.rewind.generated.resources.rewind_state_counts_three
+import logdate.client.feature.rewind.generated.resources.rewind_state_counts_two
+import logdate.client.feature.rewind.generated.resources.rewind_state_date
+import logdate.client.feature.rewind.generated.resources.rewind_state_date_range
+import logdate.client.feature.rewind.generated.resources.rewind_state_date_range_same_month
+import logdate.client.feature.rewind.generated.resources.rewind_state_map_places
+import logdate.client.feature.rewind.generated.resources.rewind_state_map_title
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_april
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_august
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_december
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_february
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_january
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_july
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_june
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_march
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_may
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_november
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_october
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_september
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_april
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_august
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_december
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_february
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_january
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_july
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_june
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_march
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_may
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_november
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_october
+import logdate.client.feature.rewind.generated.resources.rewind_state_month_short_september
+import logdate.client.feature.rewind.generated.resources.rewind_state_title_subtitle
+import logdate.client.feature.rewind.generated.resources.rewind_state_units_entries
+import logdate.client.feature.rewind.generated.resources.rewind_state_units_photos
+import logdate.client.feature.rewind.generated.resources.rewind_state_wrote_this_week
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -375,41 +418,34 @@ class RewindDetailViewModel(
         val textCount = rewind.content.count { it is RewindContent.TextNote }
         val photoCount = rewind.content.count { it is RewindContent.Image || it is RewindContent.Video }
         val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
-        val subtitleParts =
+        val counts =
             buildList {
-                add(dateRange)
-                val statParts =
-                    buildList {
-                        if (textCount > 0) add("$textCount entries")
-                        if (photoCount > 0) add("$photoCount photos")
-                        if (peopleCount > 0) add("$peopleCount people")
-                    }
-                if (statParts.isNotEmpty()) add(statParts.joinToString(" · "))
+                if (textCount > 0) add(Res.plurals.rewind_state_count_entries.toUiText(textCount, textCount))
+                if (photoCount > 0) add(Res.plurals.rewind_state_count_photos.toUiText(photoCount, photoCount))
+                if (peopleCount > 0) add(Res.plurals.rewind_state_count_people.toUiText(peopleCount, peopleCount))
             }
         panels.add(
             SubtitledRewindPanelUiState(
                 title = rewind.title,
-                subtitle = subtitleParts.joinToString("\n"),
+                subtitle = titleSubtitle(dateRange, counts),
                 backgroundUri = null,
                 weatherChip = rewind.metadata?.weatherContext?.toChipUiState(),
             ),
         )
 
         // 1b. Optional map panel — only when the rewind's path is geographically meaningful.
-        // Title strings are placeholders for now; the composable layer will resolve via
-        // compose-resources once translations land. Bare-string placeholders match the
-        // existing pattern used by the title panel above.
         val mapPoints =
             rewind.metadata
                 ?.locationPath
                 .orEmpty()
                 .map { it.toPanelPoint() }
         if (mapPoints.qualifiesForMapPanel()) {
+            val placeCount = rewind.metadata?.locationSummary?.distinctLocations ?: mapPoints.size
             panels.add(
                 LocationMapRewindPanelUiState(
                     points = mapPoints,
-                    title = "Where your week was",
-                    subtitle = "${rewind.metadata?.locationSummary?.distinctLocations ?: mapPoints.size} places",
+                    title = Res.string.rewind_state_map_title.toUiText(),
+                    subtitle = Res.plurals.rewind_state_map_places.toUiText(placeCount, placeCount),
                     accentSeed = rewind.uid.hashCode() xor MAP_SEED_OFFSET,
                 ),
             )
@@ -480,8 +516,8 @@ class RewindDetailViewModel(
                         if (points.qualifiesForMapPanel()) {
                             LocationMapRewindPanelUiState(
                                 points = points,
-                                title = rewind.title,
-                                subtitle = "",
+                                title = rewind.title.toUiText(),
+                                subtitle = "".toUiText(),
                                 accentSeed = content.sourceId.hashCode() xor MAP_SEED_OFFSET,
                             )
                         } else {
@@ -492,7 +528,7 @@ class RewindDetailViewModel(
                     is RewindContent.WeatherPanel -> {
                         SubtitledRewindPanelUiState(
                             title = rewind.title,
-                            subtitle = "",
+                            subtitle = "".toUiText(),
                             weatherChip = content.weather.toChipUiState(),
                         )
                     }
@@ -501,8 +537,8 @@ class RewindDetailViewModel(
                         BigStatisticRewindPanelUiState(
                             title = rewind.title,
                             statistic = content.stats.totalCount.toString(),
-                            units = "",
-                            description = "",
+                            units = "".toUiText(),
+                            description = "".toUiText(),
                             background =
                                 RewindPanelBackgroundSpec(
                                     color = 0xFF4CAF50, // Green
@@ -530,8 +566,8 @@ class RewindDetailViewModel(
                 BigStatisticRewindPanelUiState(
                     title = rewind.title,
                     statistic = textCount.toString(),
-                    units = if (textCount == 1) "entry" else "entries",
-                    description = "You wrote $textCount times this week.",
+                    units = Res.plurals.rewind_state_units_entries.toUiText(textCount),
+                    description = Res.plurals.rewind_state_wrote_this_week.toUiText(textCount, textCount),
                     background =
                         RewindPanelBackgroundSpec(
                             color = 0xFF9C27B0, // Purple
@@ -544,8 +580,8 @@ class RewindDetailViewModel(
                 BigStatisticRewindPanelUiState(
                     title = rewind.title,
                     statistic = photoCount.toString(),
-                    units = if (photoCount == 1) "photo" else "photos",
-                    description = "You captured $photoCount visual memories this week.",
+                    units = Res.plurals.rewind_state_units_photos.toUiText(photoCount),
+                    description = Res.plurals.rewind_state_captured_this_week.toUiText(photoCount, photoCount),
                     background =
                         RewindPanelBackgroundSpec(
                             color = 0xFF2196F3, // Blue
@@ -604,86 +640,101 @@ class RewindDetailViewModel(
     }
 
     /**
-     * Formats a timestamp into a human-readable date string.
+     * Describes when a panel's content was captured, such as "Nov 19, 2024".
      *
-     * @param timestamp The timestamp to format
-     * @return Formatted date string (e.g., "Tuesday, Nov 19")
+     * @param timestamp The timestamp to describe
      */
-    private fun formatTimestamp(timestamp: Instant): String {
+    private fun formatTimestamp(timestamp: Instant): UiText {
         val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-        val month =
-            when (localDateTime.month) {
-                Month.JANUARY -> "Jan"
-                Month.FEBRUARY -> "Feb"
-                Month.MARCH -> "Mar"
-                Month.APRIL -> "Apr"
-                Month.MAY -> "May"
-                Month.JUNE -> "Jun"
-                Month.JULY -> "Jul"
-                Month.AUGUST -> "Aug"
-                Month.SEPTEMBER -> "Sep"
-                Month.OCTOBER -> "Oct"
-                Month.NOVEMBER -> "Nov"
-                Month.DECEMBER -> "Dec"
-            }
-
-        return "$month ${localDateTime.day}, ${localDateTime.year}"
+        return Res.string.rewind_state_date.toUiText(
+            localDateTime.month.shortName.toUiText(),
+            localDateTime.day,
+            localDateTime.year,
+        )
     }
 
     /**
-     * Formats a date range into a human-readable string.
+     * Describes the period a rewind covers, such as "November 18-24, 2024" or
+     * "November 30 - December 6, 2024".
      *
      * @param startDate Start of the date range
      * @param endDate End of the date range
-     * @return Formatted date range string (e.g., "November 18-24, 2024")
      */
     private fun formatDateRange(
         startDate: Instant,
         endDate: Instant,
-    ): String {
+    ): UiText {
         val startLocal = startDate.toLocalDateTime(TimeZone.currentSystemDefault())
         val endLocal = endDate.toLocalDateTime(TimeZone.currentSystemDefault())
 
-        val startMonth =
-            when (startLocal.month) {
-                Month.JANUARY -> "January"
-                Month.FEBRUARY -> "February"
-                Month.MARCH -> "March"
-                Month.APRIL -> "April"
-                Month.MAY -> "May"
-                Month.JUNE -> "June"
-                Month.JULY -> "July"
-                Month.AUGUST -> "August"
-                Month.SEPTEMBER -> "September"
-                Month.OCTOBER -> "October"
-                Month.NOVEMBER -> "November"
-                Month.DECEMBER -> "December"
-            }
-
-        // If same month
         if (startLocal.month == endLocal.month && startLocal.year == endLocal.year) {
-            return "$startMonth ${startLocal.day}-${endLocal.day}, ${startLocal.year}"
+            return Res.string.rewind_state_date_range_same_month.toUiText(
+                startLocal.month.fullName.toUiText(),
+                startLocal.day,
+                endLocal.day,
+                startLocal.year,
+            )
         }
 
-        // Different months
-        val endMonth =
-            when (endLocal.month) {
-                Month.JANUARY -> "January"
-                Month.FEBRUARY -> "February"
-                Month.MARCH -> "March"
-                Month.APRIL -> "April"
-                Month.MAY -> "May"
-                Month.JUNE -> "June"
-                Month.JULY -> "July"
-                Month.AUGUST -> "August"
-                Month.SEPTEMBER -> "September"
-                Month.OCTOBER -> "October"
-                Month.NOVEMBER -> "November"
-                Month.DECEMBER -> "December"
+        return Res.string.rewind_state_date_range.toUiText(
+            startLocal.month.fullName.toUiText(),
+            startLocal.day,
+            endLocal.month.fullName.toUiText(),
+            endLocal.day,
+            endLocal.year,
+        )
+    }
+
+    /**
+     * The title panel's subtitle: the date range, then the week's counts on the next line.
+     */
+    private fun titleSubtitle(
+        dateRange: UiText,
+        counts: List<UiText>,
+    ): UiText {
+        val countLine =
+            when (counts.size) {
+                0 -> return dateRange
+                1 -> counts[0]
+                2 -> Res.string.rewind_state_counts_two.toUiText(counts[0], counts[1])
+                else -> Res.string.rewind_state_counts_three.toUiText(counts[0], counts[1], counts[2])
+            }
+        return Res.string.rewind_state_title_subtitle.toUiText(dateRange, countLine)
+    }
+
+    private val Month.fullName: StringResource
+        get() =
+            when (this) {
+                Month.JANUARY -> Res.string.rewind_state_month_january
+                Month.FEBRUARY -> Res.string.rewind_state_month_february
+                Month.MARCH -> Res.string.rewind_state_month_march
+                Month.APRIL -> Res.string.rewind_state_month_april
+                Month.MAY -> Res.string.rewind_state_month_may
+                Month.JUNE -> Res.string.rewind_state_month_june
+                Month.JULY -> Res.string.rewind_state_month_july
+                Month.AUGUST -> Res.string.rewind_state_month_august
+                Month.SEPTEMBER -> Res.string.rewind_state_month_september
+                Month.OCTOBER -> Res.string.rewind_state_month_october
+                Month.NOVEMBER -> Res.string.rewind_state_month_november
+                Month.DECEMBER -> Res.string.rewind_state_month_december
             }
 
-        return "$startMonth ${startLocal.day} - $endMonth ${endLocal.day}, ${endLocal.year}"
-    }
+    private val Month.shortName: StringResource
+        get() =
+            when (this) {
+                Month.JANUARY -> Res.string.rewind_state_month_short_january
+                Month.FEBRUARY -> Res.string.rewind_state_month_short_february
+                Month.MARCH -> Res.string.rewind_state_month_short_march
+                Month.APRIL -> Res.string.rewind_state_month_short_april
+                Month.MAY -> Res.string.rewind_state_month_short_may
+                Month.JUNE -> Res.string.rewind_state_month_short_june
+                Month.JULY -> Res.string.rewind_state_month_short_july
+                Month.AUGUST -> Res.string.rewind_state_month_short_august
+                Month.SEPTEMBER -> Res.string.rewind_state_month_short_september
+                Month.OCTOBER -> Res.string.rewind_state_month_short_october
+                Month.NOVEMBER -> Res.string.rewind_state_month_short_november
+                Month.DECEMBER -> Res.string.rewind_state_month_short_december
+            }
 
     /**
      * Opens the reply sheet for [panel] so the user can type a response.
@@ -757,59 +808,6 @@ class RewindDetailViewModel(
             }
         }
     }
-
-    /**
-     * Creates sample story panels for demonstration purposes.
-     *
-     * @return List of sample rewind panels
-     */
-    private fun createSamplePanels(): List<RewindPanelUiState> =
-        listOf(
-            SubtitledRewindPanelUiState(
-                title = "A Week to Remember",
-                subtitle = "From November 18-24, 2024\nYour journey through time and memories",
-                backgroundUri = null,
-            ),
-            BigStatisticRewindPanelUiState(
-                title = "Steps Taken",
-                statistic = "47,832",
-                units = "steps",
-                description = "You walked the equivalent of 22 miles this week - that's impressive dedication to staying active!",
-                background =
-                    RewindPanelBackgroundSpec(
-                        color = 0xFF4CAF50, // Green
-                    ),
-            ),
-            BasicTextRewindPanelUiState(
-                text = "You visited 3 new coffee shops this week and tried 2 new types of pastries. Your adventurous spirit is inspiring!",
-                background =
-                    RewindPanelBackgroundSpec(
-                        color = 0xFF2196F3, // Blue
-                    ),
-            ),
-            BigStatisticRewindPanelUiState(
-                title = "Journal Entries",
-                statistic = "5",
-                units = "entries",
-                description = "You captured thoughts and memories 5 times this week. Each entry is a window into this moment in your life.",
-                background =
-                    RewindPanelBackgroundSpec(
-                        color = 0xFF9C27B0, // Purple
-                    ),
-            ),
-            SubtitledRewindPanelUiState(
-                title = "Most Active Day",
-                subtitle = "Thursday was your busiest day with 12,847 steps and 3 journal entries. You were unstoppable!",
-                backgroundUri = null,
-            ),
-            BasicTextRewindPanelUiState(
-                text = "This week brought new experiences, personal growth, and countless small moments that make life beautiful. Here's to next week's adventures!",
-                background =
-                    RewindPanelBackgroundSpec(
-                        color = 0xFFFF9800, // Orange
-                    ),
-            ),
-        )
 
     private fun MapPoint.toPanelPoint(): MapPanelPoint = MapPanelPoint(latitude = latitude, longitude = longitude)
 

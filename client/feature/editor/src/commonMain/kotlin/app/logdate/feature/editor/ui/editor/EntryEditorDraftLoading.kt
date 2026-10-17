@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor
 
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel.LoadRequest
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import io.github.aakira.napier.Napier
@@ -9,6 +10,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_delete_draft_failed
+import logdate.client.feature.editor.generated.resources.editor_error_delete_drafts_failed
+import logdate.client.feature.editor.generated.resources.editor_error_load_draft_failed
 import kotlin.uuid.Uuid
 
 /**
@@ -147,7 +152,7 @@ internal fun EntryEditorViewModel.loadDraftImpl(draftId: Uuid) {
                     if (activeLoadRequest == request) activeLoadRequest = null
                     Napier.e("Failed to load draft: ${e.message}", e)
                     mutableEditorState.update {
-                        it.copy(errorMessage = "Failed to load draft: ${e.message}")
+                        it.copy(errorMessage = Res.string.editor_error_load_draft_failed.toUiText(e.message.toString()))
                     }
                 },
             )
@@ -213,7 +218,7 @@ internal fun EntryEditorViewModel.deleteDraftImpl(draftId: Uuid) {
                 onFailure = { e ->
                     Napier.e("Failed to delete draft: ${e.message}", e)
                     mutableEditorState.update {
-                        it.copy(errorMessage = "Failed to delete draft: ${e.message}")
+                        it.copy(errorMessage = Res.string.editor_error_delete_draft_failed.toUiText(e.message.toString()))
                     }
                 },
             )
@@ -257,7 +262,7 @@ internal fun EntryEditorViewModel.deleteAllDraftsImpl() {
                 onFailure = { e ->
                     Napier.e("Failed to delete all drafts: ${e.message}", e)
                     mutableEditorState.update {
-                        it.copy(errorMessage = "Failed to delete drafts: ${e.message}")
+                        it.copy(errorMessage = Res.string.editor_error_delete_drafts_failed.toUiText(e.message.toString()))
                     }
                 },
             )

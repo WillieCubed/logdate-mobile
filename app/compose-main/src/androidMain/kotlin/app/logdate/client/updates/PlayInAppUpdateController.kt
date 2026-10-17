@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import app.logdate.client.device.AppInfoProvider
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
@@ -27,6 +29,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.app_update_check_failed
+import logdate.client.feature.core.generated.resources.app_update_downloading
+import logdate.client.feature.core.generated.resources.app_update_immediate_required
+import logdate.client.feature.core.generated.resources.app_update_prompt_available
+import logdate.client.feature.core.generated.resources.app_update_status_canceled
+import logdate.client.feature.core.generated.resources.app_update_status_checking
+import logdate.client.feature.core.generated.resources.app_update_status_finish_failed
+import logdate.client.feature.core.generated.resources.app_update_status_finishing
+import logdate.client.feature.core.generated.resources.app_update_status_flow_not_ready
+import logdate.client.feature.core.generated.resources.app_update_status_launch_failed
+import logdate.client.feature.core.generated.resources.app_update_status_ready_to_install
+import logdate.client.feature.core.generated.resources.app_update_unsupported
+import logdate.client.feature.core.generated.resources.app_update_up_to_date
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -61,14 +77,14 @@ class PlayInAppUpdateController(
                 InstallStatus.DOWNLOADED -> {
                     updateUiState(
                         status = AppUpdateStatus.Downloaded,
-                        message = "Update ready to install.",
+                        message = Res.string.app_update_status_ready_to_install.toUiText(),
                     )
                 }
 
                 InstallStatus.DOWNLOADING -> {
                     updateUiState(
                         status = AppUpdateStatus.Downloading,
-                        message = "Update downloading in the background.",
+                        message = Res.string.app_update_downloading.toUiText(),
                     )
                 }
 
@@ -76,7 +92,7 @@ class PlayInAppUpdateController(
                     clearDeferredFlexiblePrompt()
                     updateUiState(
                         status = AppUpdateStatus.UpToDate,
-                        message = "App is up to date.",
+                        message = Res.string.app_update_up_to_date.toUiText(),
                     )
                 }
 
@@ -132,7 +148,7 @@ class PlayInAppUpdateController(
             if (flowType == AppUpdateFlowType.Flexible) {
                 updateUiState(
                     status = AppUpdateStatus.Downloading,
-                    message = "Update downloading in the background.",
+                    message = Res.string.app_update_downloading.toUiText(),
                 )
             }
             return
@@ -145,7 +161,7 @@ class PlayInAppUpdateController(
         if (trigger == AppUpdateCheckTrigger.Manual) {
             updateUiState(
                 status = AppUpdateStatus.Error,
-                message = "Update was canceled before it started.",
+                message = Res.string.app_update_status_canceled.toUiText(),
             )
         } else {
             Napier.i("Play in-app update flow canceled for $flowType")
@@ -165,7 +181,7 @@ class PlayInAppUpdateController(
                 if (appUpdateInfo.installStatus() == InstallStatus.DOWNLOADED) {
                     updateUiState(
                         status = AppUpdateStatus.Downloaded,
-                        message = "Update ready to install.",
+                        message = Res.string.app_update_status_ready_to_install.toUiText(),
                     )
                     return
                 }
@@ -189,7 +205,7 @@ class PlayInAppUpdateController(
     override suspend fun checkForUpdates(trigger: AppUpdateCheckTrigger) {
         checkMutex.withLock {
             lastCheckTrigger = trigger
-            updateUiState(status = AppUpdateStatus.Checking, message = "Checking for updates…")
+            updateUiState(status = AppUpdateStatus.Checking, message = Res.string.app_update_status_checking.toUiText())
 
             try {
                 val appUpdateInfo = appUpdateManager.appUpdateInfo.await()
@@ -198,7 +214,7 @@ class PlayInAppUpdateController(
                 if (appUpdateInfo.installStatus() == InstallStatus.DOWNLOADED) {
                     updateUiState(
                         status = AppUpdateStatus.Downloaded,
-                        message = "Update ready to install.",
+                        message = Res.string.app_update_status_ready_to_install.toUiText(),
                         lastCheckedAt = now,
                     )
                     return
@@ -216,7 +232,7 @@ class PlayInAppUpdateController(
                 if (appUpdateInfo.updateAvailability() != UpdateAvailability.UPDATE_AVAILABLE) {
                     updateUiState(
                         status = AppUpdateStatus.UpToDate,
-                        message = "App is up to date.",
+                        message = Res.string.app_update_up_to_date.toUiText(),
                         lastCheckedAt = now,
                     )
                     return
@@ -240,7 +256,7 @@ class PlayInAppUpdateController(
                 if (flowType == null) {
                     updateUiState(
                         status = AppUpdateStatus.UpToDate,
-                        message = "App is up to date.",
+                        message = Res.string.app_update_up_to_date.toUiText(),
                         lastCheckedAt = now,
                     )
                     return
@@ -258,7 +274,7 @@ class PlayInAppUpdateController(
                 if (trigger == AppUpdateCheckTrigger.Manual) {
                     updateUiState(
                         status = AppUpdateStatus.Error,
-                        message = "Unable to check for updates right now.",
+                        message = Res.string.app_update_check_failed.toUiText(),
                     )
                 } else {
                     updateUiState(status = AppUpdateStatus.Idle)
@@ -276,14 +292,14 @@ class PlayInAppUpdateController(
         try {
             updateUiState(
                 status = AppUpdateStatus.Downloading,
-                message = "Finishing update…",
+                message = Res.string.app_update_status_finishing.toUiText(),
             )
             appUpdateManager.completeUpdate().await()
         } catch (exception: Exception) {
             Napier.e("Failed to complete Play in-app update", exception)
             updateUiState(
                 status = AppUpdateStatus.Error,
-                message = "Unable to restart and finish the update.",
+                message = Res.string.app_update_status_finish_failed.toUiText(),
             )
         }
     }
@@ -300,7 +316,7 @@ class PlayInAppUpdateController(
         if (exception.errorCode in unsupportedErrorCodes()) {
             updateUiState(
                 status = AppUpdateStatus.Unsupported,
-                message = "In-app updates require a Google Play installed build.",
+                message = Res.string.app_update_unsupported.toUiText(),
             )
             return
         }
@@ -308,7 +324,7 @@ class PlayInAppUpdateController(
         if (trigger == AppUpdateCheckTrigger.Manual) {
             updateUiState(
                 status = AppUpdateStatus.Error,
-                message = "Unable to check for updates right now.",
+                message = Res.string.app_update_check_failed.toUiText(),
             )
         } else {
             updateUiState(status = AppUpdateStatus.Idle)
@@ -329,7 +345,7 @@ class PlayInAppUpdateController(
             if (trigger == AppUpdateCheckTrigger.Manual) {
                 updateUiState(
                     status = AppUpdateStatus.Error,
-                    message = "Update flow is not ready yet. Try again in a moment.",
+                    message = Res.string.app_update_status_flow_not_ready.toUiText(),
                 )
             } else {
                 updateUiState(status = AppUpdateStatus.Idle)
@@ -345,8 +361,8 @@ class PlayInAppUpdateController(
             flowType = flowType,
             message =
                 when (flowType) {
-                    AppUpdateFlowType.Flexible -> "An update is available."
-                    AppUpdateFlowType.Immediate -> "A required update is available."
+                    AppUpdateFlowType.Flexible -> Res.string.app_update_prompt_available.toUiText()
+                    AppUpdateFlowType.Immediate -> Res.string.app_update_immediate_required.toUiText()
                 },
         )
 
@@ -368,7 +384,7 @@ class PlayInAppUpdateController(
             }
             updateUiState(
                 status = AppUpdateStatus.Error,
-                message = "Unable to launch the update flow.",
+                message = Res.string.app_update_status_launch_failed.toUiText(),
             )
         }
     }
@@ -380,7 +396,7 @@ class PlayInAppUpdateController(
         status: AppUpdateStatus,
         availableVersionCode: Int? = _uiState.value.availableVersionCode,
         flowType: AppUpdateFlowType? = _uiState.value.flowType,
-        message: String? = _uiState.value.message,
+        message: UiText? = _uiState.value.message,
         lastCheckedAt: Instant? = _uiState.value.lastCheckedAt,
     ) {
         _uiState.value =

@@ -1,0 +1,7 @@
+<resources>
+    <!-- Empty-day suggestion card -->
+    <string name="suggestion_empty_day_prompt">What's going on?</string>
+
+    <!-- Label for a moment grouped by the place it happened at -->
+    <string name="timeline_moment_at_place">At %1$s</string>
+</resources>

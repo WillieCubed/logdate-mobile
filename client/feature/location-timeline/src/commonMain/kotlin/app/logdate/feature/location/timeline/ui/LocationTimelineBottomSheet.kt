@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.client.text.asString
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationTimelineErrorUiState
@@ -249,7 +250,7 @@ private fun QuickPeekCurrentLocationCard(currentLocation: CurrentLocationUiModel
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = currentLocation.title,
+                text = currentLocation.title.asString(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -287,7 +288,7 @@ private fun QuickPeekPlaceCard(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = place.title,
+                text = place.title.asString(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )

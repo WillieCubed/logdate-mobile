@@ -40,16 +40,19 @@ class FixedMemoryWidget(
 internal fun sampleFixedMemory(context: Context): OnThisDayWidgetState.FixedMemory =
     OnThisDayWidgetState.FixedMemory(
         noteId = "00000000-0000-4000-8000-000000000000",
-        dateFormatted = "September 30, 2025",
+        dateFormatted = LocalDate(2025, 9, 30).formatForDisplay(context),
         summary = "Milo after the rain",
         thumbnailUri = "android.resource://${context.packageName}/drawable/widget_photo_sample",
     )
 
-internal fun JournalNote.toFixedWidgetState(transcript: String? = null): OnThisDayWidgetState.FixedMemory {
+internal fun JournalNote.toFixedWidgetState(
+    context: Context,
+    transcript: String? = null,
+): OnThisDayWidgetState.FixedMemory {
     val chosen = toChosenEntryContent(transcript)
     return OnThisDayWidgetState.FixedMemory(
         noteId = chosen.noteId,
-        dateFormatted = LocalDate.parse(chosen.dateIso).formatForDisplay(),
+        dateFormatted = LocalDate.parse(chosen.dateIso).formatForDisplay(context),
         summary = chosen.summary,
         thumbnailUri = chosen.imageUri,
         audioUri = (this as? JournalNote.Audio)?.mediaRef,

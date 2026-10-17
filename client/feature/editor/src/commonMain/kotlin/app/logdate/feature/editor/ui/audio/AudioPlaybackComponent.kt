@@ -151,7 +151,7 @@ fun AudioPlaybackComponent(
 
     // Handle errors from the view model
     LaunchedEffect(uiState.error) {
-        if (!uiState.error.isNullOrBlank()) {
+        if (uiState.error != null) {
             playbackState.setError(true)
         }
     }

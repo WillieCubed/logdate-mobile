@@ -54,6 +54,8 @@ import kotlinx.coroutines.delay
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_continue
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -82,7 +84,7 @@ fun PersonalIntroScreen(
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
-            snackbarHostState.showSnackbar(message)
+            snackbarHostState.showSnackbar(getString(message))
             viewModel.clearError()
         }
     }
@@ -180,7 +182,7 @@ fun PersonalIntroContent(
 @Composable
 private fun NameStep(
     name: String,
-    nameError: String?,
+    nameError: StringResource?,
     canContinue: Boolean,
     onNameChanged: (String) -> Unit,
     onContinue: () -> Unit,
@@ -219,7 +221,7 @@ private fun NameStep(
             label = { Text(stringResource(Res.string.your_name)) },
             placeholder = { Text(stringResource(Res.string.account_username_display_name_prompt)) },
             isError = nameError != null,
-            supportingText = nameError?.let { { Text(it) } },
+            supportingText = nameError?.let { { Text(stringResource(it)) } },
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -245,7 +247,7 @@ private fun NameStep(
 @Composable
 private fun BioStep(
     bio: String,
-    bioError: String?,
+    bioError: StringResource?,
     canContinue: Boolean,
     isProcessing: Boolean,
     onBioChanged: (String) -> Unit,
@@ -284,7 +286,7 @@ private fun BioStep(
             label = { Text(stringResource(Res.string.about_you)) },
             placeholder = { Text(stringResource(Res.string.i_love_coffee_hiking_and_terrible_movies)) },
             isError = bioError != null,
-            supportingText = bioError?.let { { Text(it) } },
+            supportingText = bioError?.let { { Text(stringResource(it)) } },
             modifier =
                 Modifier
                     .fillMaxWidth()

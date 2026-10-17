@@ -1,11 +1,20 @@
 package app.logdate.client.media.device
 
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_back_camera
+import logdate.client.media.generated.resources.media_device_front_camera
+import logdate.client.media.generated.resources.media_device_system_microphone
+import logdate.client.media.generated.resources.media_device_system_output
+
 /**
  * User-facing media device state shared by camera, recording, and playback UI.
  */
 data class MediaDeviceUiState(
     val id: String,
-    val label: String,
+    /** The name the platform reports for the device, or LogDate's own name when it reports none. */
+    val label: UiText,
     val kind: MediaDeviceKind,
     val category: MediaDeviceCategory,
     val isAvailable: Boolean = true,
@@ -54,7 +63,7 @@ data class MediaDeviceSelectionUiState(
     val devices: List<MediaDeviceUiState>,
     val selectedDeviceId: String?,
     val isSelectionControllable: Boolean = true,
-    val routeControlMessage: String? = null,
+    val routeControlMessage: UiText? = null,
     val isSelectionConfirmed: Boolean = true,
 ) {
     val selectedDevice: MediaDeviceUiState?
@@ -72,7 +81,7 @@ object DefaultMediaDevices {
     val backCamera =
         MediaDeviceUiState(
             id = "camera-back",
-            label = "Back camera",
+            label = Res.string.media_device_back_camera.toUiText(),
             kind = MediaDeviceKind.CAMERA,
             category = MediaDeviceCategory.BACK_CAMERA,
         )
@@ -80,7 +89,7 @@ object DefaultMediaDevices {
     val frontCamera =
         MediaDeviceUiState(
             id = "camera-front",
-            label = "Front camera",
+            label = Res.string.media_device_front_camera.toUiText(),
             kind = MediaDeviceKind.CAMERA,
             category = MediaDeviceCategory.FRONT_CAMERA,
         )
@@ -88,7 +97,7 @@ object DefaultMediaDevices {
     val systemMicrophone =
         MediaDeviceUiState(
             id = "audio-input-system",
-            label = "System microphone",
+            label = Res.string.media_device_system_microphone.toUiText(),
             kind = MediaDeviceKind.AUDIO_INPUT,
             category = MediaDeviceCategory.SYSTEM_DEFAULT,
         )
@@ -96,7 +105,7 @@ object DefaultMediaDevices {
     val systemOutput =
         MediaDeviceUiState(
             id = "audio-output-system",
-            label = "System output",
+            label = Res.string.media_device_system_output.toUiText(),
             kind = MediaDeviceKind.AUDIO_OUTPUT,
             category = MediaDeviceCategory.SYSTEM_DEFAULT,
         )

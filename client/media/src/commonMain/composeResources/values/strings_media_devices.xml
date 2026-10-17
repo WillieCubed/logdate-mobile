@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Devices LogDate lists when the platform reports none of its own. -->
+    <string name="media_device_back_camera">Back camera</string>
+    <string name="media_device_front_camera">Front camera</string>
+    <string name="media_device_system_microphone">System microphone</string>
+    <string name="media_device_system_output">System output</string>
+
+    <!-- Explanations under a device picker the platform controls. -->
+    <string name="media_device_camera_system_controlled">Camera selection is currently controlled by the system.</string>
+    <string name="media_device_microphone_system_controlled">Microphone selection is currently controlled by the system.</string>
+    <string name="media_device_output_system_controlled">Use Android's output switcher to route playback.</string>
+
+    <!-- The chosen device was disconnected. %1$s is the name of the device used instead. -->
+    <string name="media_device_camera_unavailable">Selected camera is unavailable. LogDate will use %1$s.</string>
+    <string name="media_device_microphone_unavailable">Selected microphone is unavailable. LogDate will use %1$s.</string>
+    <string name="media_device_output_unavailable">Selected output is unavailable. LogDate will use %1$s.</string>
+
+    <!-- The microphone a recording uses while it is running. %1$s is the name of the microphone Android chose. -->
+    <string name="media_device_microphone_checking">Checking active microphone…</string>
+    <string name="media_device_microphone_not_active">Android is using %1$s. The selected microphone is not active yet.</string>
+    <string name="media_device_microphone_switch_failed">Could not switch microphone. Recording continues on the current input.</string>
+
+    <!-- Names for Android audio devices that report no product name of their own. -->
+    <string name="media_device_route_built_in_microphone">Built-in microphone</string>
+    <string name="media_device_route_this_phone">This phone</string>
+    <string name="media_device_route_headset_microphone">Headset microphone</string>
+    <string name="media_device_route_wired_headset">Wired headset</string>
+    <string name="media_device_route_wired_headphones">Wired headphones</string>
+    <string name="media_device_route_usb_audio_device">USB audio device</string>
+    <string name="media_device_route_usb_microphone">USB microphone</string>
+    <string name="media_device_route_usb_headset">USB headset</string>
+    <string name="media_device_route_bluetooth_headset">Bluetooth headset</string>
+    <string name="media_device_route_bluetooth_audio">Bluetooth audio</string>
+    <string name="media_device_route_bluetooth_le_headset">Bluetooth LE headset</string>
+    <string name="media_device_route_bluetooth_le_speaker">Bluetooth LE speaker</string>
+    <string name="media_device_route_bluetooth_broadcast">Bluetooth broadcast</string>
+    <string name="media_device_route_external_microphone">External microphone</string>
+    <string name="media_device_route_audio_output">Audio output</string>
+</resources>

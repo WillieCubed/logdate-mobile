@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Choosing a server while signing in or creating an account -->
+    <string name="account_failure_server_needs_update">That server needs an update before LogDate can use it. Ask whoever runs it to update it.</string>
+    <string name="account_failure_cloud_unreachable">Can’t reach LogDate Cloud. Check your internet connection, then try again.</string>
+    <string name="account_failure_custom_unreachable">Can’t reach that server. Check the address and your internet connection, then try again.</string>
+    <string name="account_failure_cloud_not_responding">LogDate Cloud isn’t responding right now. Try again in a few minutes.</string>
+    <string name="account_failure_custom_not_responding">That server isn’t responding right now. Try again in a few minutes.</string>
+    <string name="account_failure_cloud_unreadable">LogDate Cloud answered with something this version of LogDate can’t read. Update LogDate, then try again.</string>
+    <string name="account_failure_custom_unreadable">That address didn’t answer like a LogDate server. Check the address, then try again.</string>
+    <string name="account_failure_server_url_empty">Server URL cannot be empty</string>
+
+    <!-- Signing in -->
+    <string name="account_failure_passkey_not_supported">Passkeys are not supported on this device.</string>
+    <string name="account_failure_sign_in_cancelled">Authentication was cancelled. Please try again.</string>
+    <string name="account_failure_sign_in_passkey_failed">Failed to authenticate with passkey. Please try again.</string>
+    <string name="account_failure_no_passkey_found">No passkey found for this account. Please check your username or create a new account.</string>
+    <string name="account_failure_account_not_found">Account not found. Please check your username or create a new account.</string>
+    <string name="account_failure_server_unreachable">Can’t reach the server. Check your internet connection, then try again.</string>
+    <string name="account_failure_server_not_responding">The server isn’t responding right now. Try again in a few minutes.</string>
+    <string name="account_failure_local_data_needs_adoption">This device has entries that aren't in an account yet.</string>
+    <string name="account_failure_unknown">Something went wrong. Please try again.</string>
+
+    <!-- Creating an account -->
+    <string name="account_failure_username_taken">Username is already taken. Please choose a different one.</string>
+    <string name="account_failure_username_invalid">Username is invalid. Use only letters, numbers, and underscores.</string>
+    <string name="account_failure_display_name_invalid">Display name is invalid. Please enter a valid name.</string>
+    <string name="account_failure_passkey_creation_cancelled">Passkey creation was cancelled. Please try again.</string>
+    <string name="account_failure_passkey_creation_failed">Failed to create passkey. Please check your device security settings.</string>
+    <string name="account_failure_rate_limited">Too many attempts. Please wait a moment before trying again.</string>
+    <string name="account_validation_display_name_required">Display name is required</string>
+    <string name="account_validation_display_name_too_long">Display name must be less than 100 characters</string>
+    <string name="account_validation_username_too_short">Username must be at least 3 characters</string>
+    <string name="account_validation_username_characters">Username can only contain letters, numbers, and underscores</string>
+
+    <!-- Home navigation -->
+    <string name="home_destination_timeline">Timeline</string>
+    <string name="home_destination_places">Places</string>
+    <string name="home_destination_journals">Journals</string>
+    <string name="home_destination_library">Library</string>
+    <string name="home_destination_rewind">Rewind</string>
+
+    <!-- Devices -->
+    <string name="devices_error_load">Failed to load devices: %1$s</string>
+    <string name="devices_error_rename">Failed to rename device: %1$s</string>
+    <string name="devices_error_remove">Failed to remove device: %1$s</string>
+    <string name="devices_error_reset_id">Failed to reset device ID: %1$s</string>
+    <string name="devices_error_unknown">Unknown error</string>
+    <string name="devices_fallback_name">%1$s device</string>
+    <string name="devices_last_active_unknown">Unknown</string>
+    <string name="devices_platform_android">Android</string>
+    <string name="devices_platform_wear_os">Wear OS</string>
+    <string name="devices_platform_ios">iOS</string>
+    <string name="devices_platform_macos">macOS</string>
+    <string name="devices_platform_windows">Windows</string>
+    <string name="devices_platform_linux">Linux</string>
+    <string name="devices_platform_web">Web</string>
+    <string name="devices_platform_unknown">Unknown</string>
+
+    <!-- Biometric prompts -->
+    <string name="biometric_prompt_default_title">Making sure it's you</string>
+    <string name="biometric_prompt_default_subtitle">Use your fingerprint or screen lock to continue</string>
+    <string name="privacy_biometric_enable_title">Enable biometric lock</string>
+    <string name="privacy_biometric_enable_subtitle">Authenticate to turn on biometric lock</string>
+    <string name="privacy_biometric_enable_description">LogDate will require biometrics or your device passcode to unlock.</string>
+
+    <!-- Profile -->
+    <string name="profile_error_load">Failed to load profile: %1$s</string>
+    <string name="profile_error_refresh">Failed to refresh profile: %1$s</string>
+    <string name="profile_error_unexpected">Unexpected error: %1$s</string>
+    <string name="profile_error_display_name_empty">Display name cannot be empty</string>
+    <string name="profile_error_save_locally">Failed to save locally: %1$s</string>
+    <string name="profile_error_save_bio">Failed to save bio</string>
+    <string name="profile_error_bio_cloud_update">Bio saved on this device. Cloud could not update; try again when connected.</string>
+    <string name="profile_error_save_birthday">Failed to save birthday</string>
+</resources>

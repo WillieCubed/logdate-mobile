@@ -20,6 +20,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.event_detail_error_attach_capture
+import logdate.client.feature.events.generated.resources.event_detail_error_delete
+import logdate.client.feature.events.generated.resources.event_detail_error_detach_capture
+import logdate.client.feature.events.generated.resources.event_detail_error_save
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -78,7 +84,7 @@ sealed interface EventDetailUiState {
         val isPlacePickerOpen: Boolean = false,
         val isAttachSheetOpen: Boolean = false,
         val isSaving: Boolean = false,
-        val errorMessage: String? = null,
+        val errorMessage: StringResource? = null,
     ) : EventDetailUiState {
         /**
          * Resolved [Place.UserDefined] for the current draft, or `null` when the event has no
@@ -288,7 +294,7 @@ class EventDetailViewModel(
         viewModelScope.launch {
             linkNoteToEvent(current.event.id, noteId).onFailure { error ->
                 Napier.e("Failed to link note $noteId to event ${current.event.id}", error)
-                updateLoaded { it.copy(errorMessage = "Couldn't attach that capture") }
+                updateLoaded { it.copy(errorMessage = Res.string.event_detail_error_attach_capture) }
             }
         }
     }
@@ -302,7 +308,7 @@ class EventDetailViewModel(
         viewModelScope.launch {
             unlinkNoteFromEvent(current.event.id, noteId).onFailure { error ->
                 Napier.e("Failed to unlink note $noteId from event ${current.event.id}", error)
-                updateLoaded { it.copy(errorMessage = "Couldn't detach that capture") }
+                updateLoaded { it.copy(errorMessage = Res.string.event_detail_error_detach_capture) }
             }
         }
     }
@@ -322,7 +328,7 @@ class EventDetailViewModel(
             updateEvent(current.event)
                 .onFailure { error ->
                     Napier.e("Failed to save event ${current.event.id}", error)
-                    updateLoaded { it.copy(isSaving = false, errorMessage = "Couldn't save event") }
+                    updateLoaded { it.copy(isSaving = false, errorMessage = Res.string.event_detail_error_save) }
                 }.onSuccess {
                     updateLoaded { it.copy(isSaving = false) }
                 }
@@ -344,7 +350,7 @@ class EventDetailViewModel(
                 .onSuccess { onDeleted() }
                 .onFailure { error ->
                     Napier.e("Failed to delete event ${current.event.id}", error)
-                    updateLoaded { it.copy(errorMessage = "Couldn't delete event") }
+                    updateLoaded { it.copy(errorMessage = Res.string.event_detail_error_delete) }
                 }
         }
     }

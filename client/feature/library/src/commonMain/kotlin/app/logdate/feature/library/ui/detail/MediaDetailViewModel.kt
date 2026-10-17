@@ -28,6 +28,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.library_media_detail_error_load_failed
+import logdate.client.feature.library.generated.resources.library_media_detail_error_not_found
 import kotlin.uuid.Uuid
 
 /**
@@ -130,7 +133,7 @@ class MediaDetailViewModel(
                 Triple(mediaItems, notes, selectedMediaId)
             }.catch { error ->
                 Napier.e("Failed to load media detail", error)
-                _uiState.value = MediaDetailUiState.Error("Could not load this photo or video.")
+                _uiState.value = MediaDetailUiState.Error(Res.string.library_media_detail_error_load_failed)
             }.collect { (mediaItems, notes, selectedMediaId) ->
                 val libraryMedia = buildLibraryMediaSources(mediaItems, notes)
                 allMediaItems.value = libraryMedia
@@ -139,7 +142,7 @@ class MediaDetailViewModel(
                     libraryMedia.find { it.id == selectedMediaId || it.matchingNotes.any { note -> note.uid == selectedMediaId } }
                 if (media == null) {
                     _viewerState.value = MediaViewerState()
-                    _uiState.value = MediaDetailUiState.Error("Media not found.")
+                    _uiState.value = MediaDetailUiState.Error(Res.string.library_media_detail_error_not_found)
                 } else {
                     updateViewerState(libraryMedia, media.id)
                     if (media.id != selectedMediaId) {

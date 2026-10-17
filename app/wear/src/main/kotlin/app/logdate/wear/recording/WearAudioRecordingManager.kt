@@ -156,7 +156,7 @@ class WearAudioRecordingManager(
             withTimeoutOrNull(startTimeout) {
                 serviceController.serviceState
                     .filterNotNull()
-                    .first { it.isRecording || it.error != null }
+                    .first { it.isRecording || it.failureMessage != null }
             }
         return when {
             state == null -> {
@@ -164,7 +164,7 @@ class WearAudioRecordingManager(
                 null
             }
             !state.isRecording -> {
-                Napier.e("Recording service failed to start: ${state.error}")
+                Napier.e("Recording service failed to start: ${state.failureMessage}")
                 null
             }
             else -> state
@@ -197,7 +197,7 @@ class WearAudioRecordingManager(
         interruptedFlow.value = state.pausedByInterruption
         pausedFlow.value = state.isPaused
         if (!state.isRecording && recordingStateFlow.value) {
-            Napier.d("Recording service stopped on its own; file=${state.recordedFilePath} error=${state.error}")
+            Napier.d("Recording service stopped on its own; file=${state.recordedFilePath} error=${state.failureMessage}")
             externallyRecordedPath = state.recordedFilePath
             recordingStateFlow.value = false
             pausedFlow.value = false
@@ -253,7 +253,7 @@ class WearAudioRecordingManager(
         if (stopped != null) return stopped
         val snapshot = serviceController.serviceState.value
         val reported = snapshot?.recordedFilePath ?: externallyRecordedPath
-        if (reported == null) Napier.e("Recording produced no file: ${snapshot?.error ?: "service not bound"}")
+        if (reported == null) Napier.e("Recording produced no file: ${snapshot?.failureMessage ?: "service not bound"}")
         return reported
     }
 

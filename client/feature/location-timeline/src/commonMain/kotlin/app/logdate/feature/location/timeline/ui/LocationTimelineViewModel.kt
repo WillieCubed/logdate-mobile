@@ -15,6 +15,8 @@ import app.logdate.client.domain.places.PlaceResolutionResult
 import app.logdate.client.domain.world.ObserveLocationUseCase
 import app.logdate.client.location.places.GeocodedAddress
 import app.logdate.client.repository.journals.NoteType
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationLabelSource
 import app.logdate.feature.location.timeline.ui.model.LocationMemoryKind
@@ -43,6 +45,23 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.pinned_memory
+import logdate.client.feature.location.timeline.generated.resources.places_current_location
+import logdate.client.feature.location.timeline.generated.resources.places_near_street
+import logdate.client.feature.location.timeline.generated.resources.places_observed_here
+import logdate.client.feature.location.timeline.generated.resources.places_pinned_location
+import logdate.client.feature.location.timeline.generated.resources.places_somewhere_in
+import logdate.client.feature.location.timeline.generated.resources.places_source_coordinates
+import logdate.client.feature.location.timeline.generated.resources.places_source_google_places
+import logdate.client.feature.location.timeline.generated.resources.places_source_location
+import logdate.client.feature.location.timeline.generated.resources.places_source_nearby_place
+import logdate.client.feature.location.timeline.generated.resources.places_source_place
+import logdate.client.feature.location.timeline.generated.resources.places_source_saved_place
+import logdate.client.feature.location.timeline.generated.resources.places_stayed_days_hours
+import logdate.client.feature.location.timeline.generated.resources.places_stayed_hours_minutes
+import logdate.client.feature.location.timeline.generated.resources.places_stayed_minutes
+import org.jetbrains.compose.resources.StringResource
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -242,25 +261,25 @@ class LocationTimelineViewModel(
                     it is LocationTimelineErrorUiState.LocationServicesDisabled
             }
 
-    private fun formatCoarseLocation(address: GeocodedAddress): String =
+    private fun formatCoarseLocation(address: GeocodedAddress): UiText =
         when {
             address.thoroughfare != null && address.locality != null ->
-                "Near ${address.thoroughfare}, ${address.locality}"
+                Res.string.places_near_street.toUiText(address.thoroughfare.orEmpty(), address.locality.orEmpty())
             address.subLocality != null && address.locality != null ->
-                "${address.subLocality}, ${address.locality}"
-            address.locality != null -> "Somewhere in ${address.locality}"
-            address.adminArea != null -> "Somewhere in ${address.adminArea}"
-            else -> ""
+                "${address.subLocality}, ${address.locality}".toUiText()
+            address.locality != null -> Res.string.places_somewhere_in.toUiText(address.locality.orEmpty())
+            address.adminArea != null -> Res.string.places_somewhere_in.toUiText(address.adminArea.orEmpty())
+            else -> "".toUiText()
         }
 
     private suspend fun Location.toCurrentLocationUiModel(): CurrentLocationUiModel {
         val resolvedPlace = placeResolutionCache.resolve(this)
         val title =
             when (resolvedPlace) {
-                is PlaceResolutionResult.UserDefinedPlace -> resolvedPlace.place.name
-                is PlaceResolutionResult.ExternalSuggestion -> resolvedPlace.suggestion.name
+                is PlaceResolutionResult.UserDefinedPlace -> resolvedPlace.place.name.toUiText()
+                is PlaceResolutionResult.ExternalSuggestion -> resolvedPlace.suggestion.name.toUiText()
                 is PlaceResolutionResult.CoarseLocation -> formatCoarseLocation(resolvedPlace.address)
-                is PlaceResolutionResult.UnknownLocation -> "Current location"
+                is PlaceResolutionResult.UnknownLocation -> Res.string.places_current_location.toUiText()
             }
         val subtitle =
             when (resolvedPlace) {
@@ -280,37 +299,37 @@ class LocationTimelineViewModel(
 
     private suspend fun LocationStop.toUiModel(): LocationStopUiModel {
         val resolvedPlace = placeResolutionCache.resolve(location)
-        val title: String
+        val title: UiText
         val subtitle: String
-        val sourceLabel: String
+        val sourceLabel: StringResource
         val source: LocationLabelSource
 
         when (resolvedPlace) {
             is PlaceResolutionResult.UserDefinedPlace -> {
-                title = resolvedPlace.place.name
+                title = resolvedPlace.place.name.toUiText()
                 subtitle = formatCoordinates(location.latitude, location.longitude)
-                sourceLabel = "Saved place"
+                sourceLabel = Res.string.places_source_saved_place
                 source = LocationLabelSource.USER_DEFINED
             }
 
             is PlaceResolutionResult.ExternalSuggestion -> {
-                title = resolvedPlace.suggestion.name
+                title = resolvedPlace.suggestion.name.toUiText()
                 subtitle = resolvedPlace.suggestion.address
-                sourceLabel = "Google Places"
+                sourceLabel = Res.string.places_source_google_places
                 source = LocationLabelSource.GOOGLE_PLACES
             }
 
             is PlaceResolutionResult.CoarseLocation -> {
                 title = formatCoarseLocation(resolvedPlace.address)
                 subtitle = resolvedPlace.address.locality ?: resolvedPlace.address.adminArea ?: ""
-                sourceLabel = "Location"
+                sourceLabel = Res.string.places_source_location
                 source = LocationLabelSource.COORDINATES
             }
 
             is PlaceResolutionResult.UnknownLocation -> {
-                title = "Pinned location"
+                title = Res.string.places_pinned_location.toUiText()
                 subtitle = formatCoordinates(location.latitude, location.longitude)
-                sourceLabel = "Coordinates"
+                sourceLabel = Res.string.places_source_coordinates
                 source = LocationLabelSource.COORDINATES
             }
         }
@@ -348,44 +367,44 @@ class LocationTimelineViewModel(
                 null
             }
 
-        val title: String
+        val title: UiText
         val subtitle: String
-        val sourceLabel: String
+        val sourceLabel: StringResource
         val source: LocationLabelSource
 
         when {
             !semanticName.isNullOrBlank() -> {
-                title = semanticName.orEmpty()
+                title = semanticName.orEmpty().toUiText()
                 subtitle = formatCoordinates(latitude, longitude)
-                sourceLabel = "Place"
+                sourceLabel = Res.string.places_source_place
                 source = LocationLabelSource.USER_DEFINED
             }
 
             resolvedPlace is PlaceResolutionResult.UserDefinedPlace -> {
-                title = resolvedPlace.place.name
+                title = resolvedPlace.place.name.toUiText()
                 subtitle = formatCoordinates(latitude, longitude)
-                sourceLabel = "Saved place"
+                sourceLabel = Res.string.places_source_saved_place
                 source = LocationLabelSource.USER_DEFINED
             }
 
             resolvedPlace is PlaceResolutionResult.ExternalSuggestion -> {
-                title = resolvedPlace.suggestion.name
+                title = resolvedPlace.suggestion.name.toUiText()
                 subtitle = resolvedPlace.suggestion.address
-                sourceLabel = "Nearby place"
+                sourceLabel = Res.string.places_source_nearby_place
                 source = LocationLabelSource.GOOGLE_PLACES
             }
 
             resolvedPlace is PlaceResolutionResult.CoarseLocation -> {
                 title = formatCoarseLocation(resolvedPlace.address)
                 subtitle = formatCoordinates(latitude, longitude)
-                sourceLabel = "Location"
+                sourceLabel = Res.string.places_source_location
                 source = LocationLabelSource.COORDINATES
             }
 
             else -> {
-                title = "Pinned memory"
+                title = Res.string.pinned_memory.toUiText()
                 subtitle = formatCoordinates(latitude, longitude)
-                sourceLabel = "Coordinates"
+                sourceLabel = Res.string.places_source_coordinates
                 source = LocationLabelSource.COORDINATES
             }
         }
@@ -445,18 +464,18 @@ class LocationTimelineViewModel(
         }
     }
 
-    private fun formatEvidence(stop: LocationStop): String =
+    private fun formatEvidence(stop: LocationStop): UiText =
         when (stop.evidenceKind) {
             LocationStopEvidenceKind.STAY -> formatDuration(stop.duration)
-            LocationStopEvidenceKind.OBSERVATION -> "Observed here"
+            LocationStopEvidenceKind.OBSERVATION -> Res.string.places_observed_here.toUiText()
         }
 
-    private fun formatDuration(duration: Duration): String =
+    private fun formatDuration(duration: Duration): UiText =
         when {
-            duration >= 1.days -> "Stayed for ${duration.inWholeDays}d ${duration.inWholeHours % 24}h"
-            duration >= 1.hours -> "Stayed for ${duration.inWholeHours}h ${duration.inWholeMinutes % 60}m"
-            duration >= 1.minutes -> "Stayed for ${duration.inWholeMinutes}m"
-            else -> "Observed here"
+            duration >= 1.days -> Res.string.places_stayed_days_hours.toUiText(duration.inWholeDays, duration.inWholeHours % 24)
+            duration >= 1.hours -> Res.string.places_stayed_hours_minutes.toUiText(duration.inWholeHours, duration.inWholeMinutes % 60)
+            duration >= 1.minutes -> Res.string.places_stayed_minutes.toUiText(duration.inWholeMinutes)
+            else -> Res.string.places_observed_here.toUiText()
         }
 
     private fun calculateDistanceMeters(

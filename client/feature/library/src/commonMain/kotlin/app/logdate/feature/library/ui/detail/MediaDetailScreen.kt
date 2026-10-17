@@ -257,7 +257,7 @@ fun MediaDetailContent(
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     when (state) {
                         MediaDetailUiState.Loading -> CircularProgressIndicator()
-                        is MediaDetailUiState.Error -> Text(state.message, Modifier.padding(Spacing.lg))
+                        is MediaDetailUiState.Error -> Text(stringResource(state.message), Modifier.padding(Spacing.lg))
                         is MediaDetailUiState.AudioContent ->
                             AudioMediaDetailContent(
                                 state,
@@ -290,7 +290,7 @@ fun MediaDetailContent(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = state.message,
+                    text = stringResource(state.message),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

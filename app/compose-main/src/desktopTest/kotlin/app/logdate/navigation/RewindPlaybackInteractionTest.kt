@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.toUiText
 import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.detail.AudioNotePanel
@@ -245,8 +246,8 @@ class RewindPlaybackInteractionTest {
 
     private val panels =
         listOf(
-            SubtitledRewindPanelUiState("First moment", "Monday"),
-            SubtitledRewindPanelUiState("Second moment", "Tuesday"),
-            SubtitledRewindPanelUiState("Third moment", "Wednesday"),
+            SubtitledRewindPanelUiState("First moment", "Monday".toUiText()),
+            SubtitledRewindPanelUiState("Second moment", "Tuesday".toUiText()),
+            SubtitledRewindPanelUiState("Third moment", "Wednesday".toUiText()),
         )
 }

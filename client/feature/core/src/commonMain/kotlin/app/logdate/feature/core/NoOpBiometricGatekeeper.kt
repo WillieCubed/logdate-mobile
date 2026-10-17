@@ -1,5 +1,6 @@
 package app.logdate.feature.core
 
+import app.logdate.client.text.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -13,12 +14,12 @@ class NoOpBiometricGatekeeper : BiometricGatekeeper {
     override val authState: StateFlow<AppAuthState> = _authState
 
     override fun authenticate(
-        title: String,
-        subtitle: String,
-        cancelLabel: String,
+        title: UiText,
+        subtitle: UiText,
+        cancelLabel: UiText,
         requireConfirmation: Boolean,
         requestEnrollmentIfNecessary: Boolean,
-        description: String?,
+        description: UiText?,
         onResult: (AppAuthState) -> Unit,
     ) {
         // no-op

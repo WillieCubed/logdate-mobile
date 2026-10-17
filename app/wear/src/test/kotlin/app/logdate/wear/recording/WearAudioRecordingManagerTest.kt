@@ -83,7 +83,7 @@ class WearAudioRecordingManagerTest {
     @Test
     fun `start fails and shuts the service down when the service reports an error`() =
         runTest {
-            controller.onStart = { controller.emit(RecordingServiceState(isRecording = false, error = "microphone busy")) }
+            controller.onStart = { controller.emit(RecordingServiceState(isRecording = false, failureMessage = "microphone busy")) }
             val manager = manager()
 
             val started = manager.start()
@@ -199,7 +199,7 @@ class WearAudioRecordingManagerTest {
     fun `a failed start removes the file it created`() =
         runTest {
             recordingFile.writeText("partial")
-            controller.onStart = { controller.emit(RecordingServiceState(isRecording = false, error = "microphone busy")) }
+            controller.onStart = { controller.emit(RecordingServiceState(isRecording = false, failureMessage = "microphone busy")) }
 
             manager().start()
 

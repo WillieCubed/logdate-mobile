@@ -7,6 +7,7 @@ import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.client.text.toUiText
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.HighlightedQuoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
@@ -85,7 +86,7 @@ internal val rewindDetailPanels =
     listOf(
         SubtitledRewindPanelUiState(
             title = "Five cities in seven days",
-            subtitle = "April 6 — April 12, 2026",
+            subtitle = "April 6 — April 12, 2026".toUiText(),
         ),
         NarrativeContextRewindPanelUiState(
             sourceId = Uuid.parse("aaaaaaaa-1111-2222-3333-444444444444"),

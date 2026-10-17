@@ -1,0 +1,10 @@
+<resources>
+    <string name="onboarding_personal_intro_name_required">Enter a name to continue</string>
+    <string name="onboarding_personal_intro_bio_required">Write a little about yourself to continue</string>
+    <string name="onboarding_personal_intro_save_name_failed">Your name couldn't be saved. Try again.</string>
+    <string name="onboarding_personal_intro_save_bio_failed">Your bio couldn't be saved. Try again.</string>
+    <string name="onboarding_personal_intro_profile_setup_failed">Your profile couldn't be set up. Try again.</string>
+    <string name="onboarding_personal_intro_save_failed">Your introduction couldn't be saved. Try again.</string>
+    <string name="onboarding_recovery_phrase_enter_existing">Enter your existing recovery phrase to make it available from settings.</string>
+    <string name="onboarding_recovery_phrase_prepare_failed">Your recovery phrase couldn't be prepared. Try again.</string>
+</resources>

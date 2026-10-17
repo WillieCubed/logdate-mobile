@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.UiText
+import app.logdate.client.text.asString
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationMemoryPreviewUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
@@ -134,7 +136,7 @@ internal actual fun LocationTimelineMap(
         currentLocation?.let { location ->
             Marker(
                 state = MarkerState(position = location.toLatLng()),
-                title = location.title,
+                title = location.title.asString(),
                 snippet = location.subtitle,
                 icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE),
             )
@@ -146,7 +148,7 @@ internal actual fun LocationTimelineMap(
                     Marker(
                         state = MarkerState(position = annotation.position),
                         title = stringResource(Res.string.memories_count, annotation.memoryCount),
-                        snippet = annotation.subtitle,
+                        snippet = annotation.placeTitles.map { it.asString() }.joinToString(" • "),
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
                         onClick = {
                             onSelectPlace(annotation.placeIds.first())
@@ -164,7 +166,7 @@ internal actual fun LocationTimelineMap(
                 is LocationMapAnnotation.Place -> {
                     Marker(
                         state = MarkerState(position = annotation.place.toLatLng()),
-                        title = annotation.place.title,
+                        title = annotation.place.title.asString(),
                         snippet = stringResource(Res.string.memories_count, annotation.place.memoryCount),
                         onClick = {
                             onSelectPlace(annotation.place.id)
@@ -177,7 +179,7 @@ internal actual fun LocationTimelineMap(
                     Marker(
                         state = MarkerState(position = annotation.memory.toLatLng()),
                         title = annotation.memory.title,
-                        snippet = annotation.placeTitle,
+                        snippet = annotation.placeTitle.asString(),
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_VIOLET),
                         onClick = {
                             onSelectPlace(annotation.placeId)
@@ -194,7 +196,7 @@ private sealed interface LocationMapAnnotation {
     data class Cluster(
         val position: LatLng,
         val memoryCount: Int,
-        val subtitle: String,
+        val placeTitles: List<UiText>,
         val placeIds: List<String>,
     ) : LocationMapAnnotation
 
@@ -204,7 +206,7 @@ private sealed interface LocationMapAnnotation {
 
     data class Memory(
         val placeId: String,
-        val placeTitle: String,
+        val placeTitle: UiText,
         val memory: LocationMemoryPreviewUiModel,
     ) : LocationMapAnnotation
 }
@@ -254,11 +256,10 @@ private fun clusterPlaces(
             val latitude = groupedPlaces.map(LocationPlaceUiModel::latitude).average()
             val longitude = groupedPlaces.map(LocationPlaceUiModel::longitude).average()
             val memoryCount = groupedPlaces.sumOf(LocationPlaceUiModel::memoryCount)
-            val topNames = groupedPlaces.take(2).joinToString(" • ") { it.title }
             LocationMapAnnotation.Cluster(
                 position = LatLng(latitude, longitude),
                 memoryCount = memoryCount,
-                subtitle = topNames,
+                placeTitles = groupedPlaces.take(2).map(LocationPlaceUiModel::title),
                 placeIds = groupedPlaces.map(LocationPlaceUiModel::id),
             )
         }
@@ -282,7 +283,7 @@ private fun LocationTimelineMapFallback(
 ) {
     val primaryPlace = selectedPlace ?: places.firstOrNull()
     val supportingPlaces = places.filterNot { it.id == primaryPlace?.id }.take(2)
-    val primaryTitle = primaryPlace?.title ?: currentLocation?.title ?: stringResource(Res.string.current_location)
+    val primaryTitle = (primaryPlace?.title ?: currentLocation?.title)?.asString() ?: stringResource(Res.string.current_location)
     val primarySubtitle = primaryPlace?.subtitle ?: currentLocation?.subtitle.orEmpty()
 
     Surface(
@@ -362,19 +363,19 @@ private fun LocationTimelineMapFallback(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     primaryPlace?.let { place ->
                         PlaceSummaryPill(
-                            title = place.title,
+                            title = place.title.asString(),
                             subtitle = stringResource(Res.string.memories_count, place.memoryCount),
                         )
                     } ?: currentLocation?.let { location ->
                         PlaceSummaryPill(
-                            title = location.title,
+                            title = location.title.asString(),
                             subtitle = location.subtitle ?: "",
                         )
                     }
 
                     supportingPlaces.forEach { place ->
                         PlaceSummaryPill(
-                            title = place.title,
+                            title = place.title.asString(),
                             subtitle = stringResource(Res.string.memories_count, place.memoryCount),
                         )
                     }

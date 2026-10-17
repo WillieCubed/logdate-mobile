@@ -14,7 +14,8 @@ import kotlin.uuid.Uuid
 data class Moment(
     val id: Uuid,
     /**
-     * Contextual label: "At Blue Bottle Coffee", "That evening", "Morning run".
+     * Contextual label written by the moment extractor: "That evening", "Morning run". Empty when
+     * the moment was grouped without one.
      */
     val label: String,
     /**
@@ -51,6 +52,11 @@ data class Moment(
      * How this moment was inferred.
      */
     val inferenceSource: MomentInferenceSource,
+    /**
+     * The place that names this moment when [label] is empty, shown as "At <place>". Null when
+     * the moment is not named after a place.
+     */
+    val labelPlace: TimelinePlaceVisit? = null,
 )
 
 data class MomentTextFragment(

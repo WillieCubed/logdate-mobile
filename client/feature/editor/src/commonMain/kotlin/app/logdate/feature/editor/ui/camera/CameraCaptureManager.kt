@@ -3,7 +3,11 @@ package app.logdate.feature.editor.ui.camera
 import app.logdate.client.media.device.DefaultMediaDevices
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import kotlinx.coroutines.flow.StateFlow
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.capture_state_external_camera_detection_unavailable
 
 /**
  * Interface for managing camera capture operations.
@@ -100,7 +104,7 @@ fun defaultCameraSelection(facing: CameraFacing): MediaDeviceSelectionUiState =
                 CameraFacing.BACK -> DefaultMediaDevices.backCamera.id
                 CameraFacing.FRONT -> DefaultMediaDevices.frontCamera.id
             },
-        routeControlMessage = "External camera detection is not available in this build yet.",
+        routeControlMessage = Res.string.capture_state_external_camera_detection_unavailable.toUiText(),
     )
 
 /**
@@ -154,6 +158,6 @@ sealed class CameraCaptureError {
     data object RecordingFailed : CameraCaptureError()
 
     data class Unknown(
-        val message: String,
+        val message: UiText,
     ) : CameraCaptureError()
 }

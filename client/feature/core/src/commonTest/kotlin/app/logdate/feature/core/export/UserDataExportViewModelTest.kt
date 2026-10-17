@@ -6,6 +6,7 @@ import app.logdate.client.domain.export.GetExportCountsUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,10 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_error_archive_write
+import logdate.client.feature.core.generated.resources.export_error_not_completed
+import logdate.client.feature.core.generated.resources.export_progress_completed
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -407,7 +412,7 @@ class UserDataExportViewModelTest {
                 ExportProgressInfo(isActive = true, progressPercent = 50),
             )
             advanceUntilIdle()
-            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("Export could not be completed."))
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed(Res.string.export_error_not_completed.toUiText()))
             assertIs<ExportState.Failed>(viewModel.exportState.value)
 
             fakeExportLauncher.startExportCalls.clear()
@@ -454,7 +459,7 @@ class UserDataExportViewModelTest {
                 ExportProgressInfo(isActive = true, progressPercent = 10),
             )
             advanceUntilIdle()
-            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("Could not write the export archive."))
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed(Res.string.export_error_archive_write.toUiText()))
 
             assertIs<ExportState.Failed>(viewModel.exportState.value)
 
@@ -500,11 +505,11 @@ class UserDataExportViewModelTest {
             advanceUntilIdle()
             assertIs<ExportState.Exporting>(viewModel.exportState.value)
 
-            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("Could not write the export archive."))
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed(Res.string.export_error_archive_write.toUiText()))
 
             val state = viewModel.exportState.value
             assertIs<ExportState.Failed>(state)
-            assertEquals("Could not write the export archive.", state.reason)
+            assertEquals(Res.string.export_error_archive_write.toUiText(), state.reason)
             assertTrue(state.canRetry)
         }
 
@@ -535,7 +540,7 @@ class UserDataExportViewModelTest {
                 ExportProgressInfo(
                     isActive = true,
                     progressPercent = 42,
-                    message = "Exporting notes...",
+                    message = "Exporting notes...".toUiText(),
                 ),
             )
             advanceUntilIdle()
@@ -543,7 +548,7 @@ class UserDataExportViewModelTest {
             val state = viewModel.exportState.value
             assertIs<ExportState.Exporting>(state)
             assertEquals(42, state.progressPercent)
-            assertEquals("Exporting notes...", state.message)
+            assertEquals("Exporting notes...".toUiText(), state.message)
         }
 
     @Test
@@ -555,7 +560,7 @@ class UserDataExportViewModelTest {
             viewModel.showExportOptions()
 
             fakeExportLauncher.emitProgress(
-                ExportProgressInfo(isActive = false, progressPercent = 100, message = "Done"),
+                ExportProgressInfo(isActive = false, progressPercent = 100, message = "Done".toUiText()),
             )
             advanceUntilIdle()
 
@@ -585,7 +590,7 @@ class UserDataExportViewModelTest {
                 ExportProgressInfo(
                     isActive = false,
                     progressPercent = 100,
-                    message = "Export completed",
+                    message = Res.string.export_progress_completed.toUiText(),
                     completedFilePath = "/storage/exports/logdate-export.zip",
                     stats = testStats,
                 ),
@@ -619,7 +624,7 @@ class UserDataExportViewModelTest {
             assertIs<ExportState.Completed>(viewModel.exportState.value)
 
             // Late WorkManager callback should be ignored
-            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("late failure"))
+            fakeExportLauncher.triggerCompletion(ExportOutcome.Failed("late failure".toUiText()))
             assertIs<ExportState.Completed>(viewModel.exportState.value)
         }
 

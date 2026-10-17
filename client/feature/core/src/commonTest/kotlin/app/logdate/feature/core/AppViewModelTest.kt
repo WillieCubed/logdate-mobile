@@ -9,6 +9,7 @@ import app.logdate.client.permissions.RestoreCredentialError
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.text.UiText
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.user.AppSecurityLevel
@@ -377,12 +378,12 @@ class AppViewModelTest {
         override val authState: StateFlow<AppAuthState> = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
 
         override fun authenticate(
-            title: String,
-            subtitle: String,
-            cancelLabel: String,
+            title: UiText,
+            subtitle: UiText,
+            cancelLabel: UiText,
             requireConfirmation: Boolean,
             requestEnrollmentIfNecessary: Boolean,
-            description: String?,
+            description: UiText?,
             onResult: (AppAuthState) -> Unit,
         ) {
         }

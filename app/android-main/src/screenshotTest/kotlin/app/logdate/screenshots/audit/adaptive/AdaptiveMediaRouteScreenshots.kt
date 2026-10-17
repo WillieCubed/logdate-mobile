@@ -13,6 +13,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.toUiText
 import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.media.MediaDeviceSelector
@@ -27,19 +28,19 @@ private val cameraSelection =
             listOf(
                 MediaDeviceUiState(
                     id = "back-camera",
-                    label = "Back camera",
+                    label = "Back camera".toUiText(),
                     kind = MediaDeviceKind.CAMERA,
                     category = MediaDeviceCategory.BACK_CAMERA,
                 ),
                 MediaDeviceUiState(
                     id = "front-camera",
-                    label = "Front camera",
+                    label = "Front camera".toUiText(),
                     kind = MediaDeviceKind.CAMERA,
                     category = MediaDeviceCategory.FRONT_CAMERA,
                 ),
                 MediaDeviceUiState(
                     id = "usb-camera",
-                    label = "USB camera",
+                    label = "USB camera".toUiText(),
                     kind = MediaDeviceKind.CAMERA,
                     category = MediaDeviceCategory.USB,
                     isExternal = true,
@@ -55,13 +56,13 @@ private val audioOutputSelection =
             listOf(
                 MediaDeviceUiState(
                     id = "phone-speaker",
-                    label = "Phone speaker",
+                    label = "Phone speaker".toUiText(),
                     kind = MediaDeviceKind.AUDIO_OUTPUT,
                     category = MediaDeviceCategory.BUILT_IN,
                 ),
                 MediaDeviceUiState(
                     id = "bluetooth-headphones",
-                    label = "Bluetooth headphones",
+                    label = "Bluetooth headphones".toUiText(),
                     kind = MediaDeviceKind.AUDIO_OUTPUT,
                     category = MediaDeviceCategory.BLUETOOTH,
                     isExternal = true,
@@ -69,7 +70,7 @@ private val audioOutputSelection =
             ),
         selectedDeviceId = "phone-speaker",
         isSelectionControllable = false,
-        routeControlMessage = "LogDate shows detected outputs here. Use Android's output switcher to route playback.",
+        routeControlMessage = "LogDate shows detected outputs here. Use Android's output switcher to route playback.".toUiText(),
     )
 
 private val audioInputSelection =
@@ -79,20 +80,20 @@ private val audioInputSelection =
             listOf(
                 MediaDeviceUiState(
                     id = "phone-mic",
-                    label = "Phone microphone",
+                    label = "Phone microphone".toUiText(),
                     kind = MediaDeviceKind.AUDIO_INPUT,
                     category = MediaDeviceCategory.BUILT_IN,
                 ),
                 MediaDeviceUiState(
                     id = "usb-mic",
-                    label = "USB microphone",
+                    label = "USB microphone".toUiText(),
                     kind = MediaDeviceKind.AUDIO_INPUT,
                     category = MediaDeviceCategory.USB,
                     isExternal = true,
                 ),
                 MediaDeviceUiState(
                     id = "bluetooth-headset",
-                    label = "Bluetooth headset",
+                    label = "Bluetooth headset".toUiText(),
                     kind = MediaDeviceKind.AUDIO_INPUT,
                     category = MediaDeviceCategory.BLUETOOTH,
                     isExternal = true,

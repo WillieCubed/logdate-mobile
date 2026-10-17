@@ -3,6 +3,7 @@
 package app.logdate.feature.editor.ui.camera
 
 import app.logdate.client.media.device.DefaultMediaDevices
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -100,7 +101,7 @@ class IosCameraCaptureManager : CameraCaptureManager {
             }
         } catch (t: Throwable) {
             Napier.w("AVCaptureSession start failed: ${t.message}")
-            _state.update { it.copy(error = CameraCaptureError.Unknown(t.message ?: "")) }
+            _state.update { it.copy(error = CameraCaptureError.Unknown((t.message ?: "").toUiText())) }
         }
     }
 

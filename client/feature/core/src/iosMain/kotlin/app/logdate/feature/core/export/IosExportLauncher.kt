@@ -6,6 +6,7 @@ import app.logdate.client.domain.export.archive.ArchiveExportOptions
 import app.logdate.client.domain.export.archive.ArchiveExportProgress
 import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import app.logdate.client.domain.export.archive.StagingZipArchiveContainer
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
@@ -16,9 +17,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_alert_failed_title
+import logdate.client.feature.core.generated.resources.export_error_archive_write
+import logdate.client.feature.core.generated.resources.export_progress_archive_starting
+import logdate.client.feature.core.generated.resources.export_progress_completed
+import logdate.client.ui.generated.resources.common_ok
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import platform.Foundation.NSTemporaryDirectory
@@ -26,6 +35,7 @@ import platform.Foundation.NSURL
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIViewController
 import kotlin.coroutines.cancellation.CancellationException
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /** Creates a portable v2 archive and presents the finished file through the iOS share sheet. */
 @OptIn(ExperimentalForeignApi::class)
@@ -72,8 +82,8 @@ class IosExportLauncher(
                     throw cancellation
                 } catch (failure: Exception) {
                     Napier.e("iOS: Export process failed")
-                    showAlert("Export Failed", "Could not write the export archive.")
-                    completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
+                    showFailureAlert(Res.string.export_error_archive_write)
+                    completionCallback?.invoke(ExportOutcome.Failed(Res.string.export_error_archive_write.toUiText()))
                 } finally {
                     if (!archiveFinished) {
                         container.discard()
@@ -85,7 +95,7 @@ class IosExportLauncher(
     }
 
     /** Applies one [ArchiveExportProgress] update and returns whether the archive has finished writing. */
-    private fun handleExportProgress(
+    private suspend fun handleExportProgress(
         progress: ArchiveExportProgress,
         exportFilePath: String,
         outputPath: Path,
@@ -94,7 +104,7 @@ class IosExportLauncher(
     ): Boolean {
         when (progress) {
             ArchiveExportProgress.Starting -> {
-                updateProgress(ExportProgressInfo(isActive = true, message = "Preparing export..."))
+                updateProgress(ExportProgressInfo(isActive = true, message = Res.string.export_progress_archive_starting.toUiText()))
             }
 
             is ArchiveExportProgress.InProgress -> {
@@ -102,7 +112,7 @@ class IosExportLauncher(
                     ExportProgressInfo(
                         isActive = true,
                         progressPercent = (progress.fraction * 100).toInt(),
-                        message = progress.stage.defaultMessage,
+                        message = progress.stage.defaultMessage.toUiText(),
                     ),
                 )
             }
@@ -114,7 +124,7 @@ class IosExportLauncher(
                     ExportProgressInfo(
                         isActive = false,
                         progressPercent = 100,
-                        message = "Export completed",
+                        message = Res.string.export_progress_completed.toUiText(),
                         completedFilePath = exportFilePath,
                         stats = progress.summary.counts.toExportStats(),
                     ),
@@ -124,8 +134,8 @@ class IosExportLauncher(
 
             is ArchiveExportProgress.Failed -> {
                 val message = progress.error.defaultMessage
-                showAlert("Export Failed", message)
-                completionCallback?.invoke(ExportOutcome.Failed(message))
+                showFailureAlert(message)
+                completionCallback?.invoke(ExportOutcome.Failed(message.toUiText()))
             }
         }
         return archiveFinished
@@ -159,19 +169,16 @@ class IosExportLauncher(
         rootViewController().presentViewController(activityViewController, animated = true, completion = null)
     }
 
-    private fun showAlert(
-        title: String,
-        message: String,
-    ) {
+    private suspend fun showFailureAlert(message: StringResource) {
         val alertController =
             platform.UIKit.UIAlertController.alertControllerWithTitle(
-                title = title,
-                message = message,
+                title = getString(Res.string.export_alert_failed_title),
+                message = getString(message),
                 preferredStyle = platform.UIKit.UIAlertControllerStyleAlert,
             )
         alertController.addAction(
             platform.UIKit.UIAlertAction.actionWithTitle(
-                title = "OK",
+                title = getString(UiRes.string.common_ok),
                 style = platform.UIKit.UIAlertActionStyleDefault,
                 handler = null,
             ),

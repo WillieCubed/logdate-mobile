@@ -294,7 +294,7 @@ class AndroidAudioRecordingManager(
             withTimeoutOrNull(startTimeout) {
                 serviceController.serviceState
                     .filterNotNull()
-                    .first { it.isRecording || it.error != null }
+                    .first { it.isRecording || it.failureMessage != null }
             }
         return when {
             state == null -> {
@@ -302,7 +302,7 @@ class AndroidAudioRecordingManager(
                 null
             }
             !state.isRecording -> {
-                Napier.e("Recording service failed to start: ${state.error}")
+                Napier.e("Recording service failed to start: ${state.failureMessage}")
                 null
             }
             else -> state
@@ -350,7 +350,7 @@ class AndroidAudioRecordingManager(
         if (!state.isRecording && recordingStateFlow.value) {
             // The service ended the session on its own (notification action or recorder
             // failure). Keep the file it produced for the editor's stop call.
-            Napier.d("Recording service stopped on its own; file=${state.recordedFilePath} error=${state.error}")
+            Napier.d("Recording service stopped on its own; file=${state.recordedFilePath} error=${state.failureMessage}")
             externallyRecordedPath = state.recordedFilePath
             recordingStateFlow.value = false
         }
@@ -503,7 +503,7 @@ class AndroidAudioRecordingManager(
         val snapshot = serviceController.serviceState.value
         val reported = snapshot?.recordedFilePath ?: externallyRecordedPath
         if (reported == null) {
-            Napier.e("Recording produced no file: ${snapshot?.error ?: "service not bound"}")
+            Napier.e("Recording produced no file: ${snapshot?.failureMessage ?: "service not bound"}")
         }
         return reported
     }

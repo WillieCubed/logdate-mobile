@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
@@ -23,6 +24,7 @@ import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.ui.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
+import studio.hypertext.logdate.R
 import kotlin.time.Clock
 
 class RemoteCameraActivity : FragmentActivity() {
@@ -56,7 +58,7 @@ class RemoteCameraActivity : FragmentActivity() {
                                 publishRemoteCameraCaptureResult(
                                     RemoteCameraCaptureResult(
                                         isSaved = false,
-                                        message = message.ifBlank { "Remote camera capture failed" },
+                                        message = message.ifBlank { getString(R.string.remote_camera_capture_failed) },
                                     ),
                                 )
                             },
@@ -91,32 +93,34 @@ class RemoteCameraActivity : FragmentActivity() {
                         .getKoin()
                         .get<JournalNotesRepository>()
                 notesRepository.create(uri.toRemoteJournalNote(mediaType))
+                val savedMessage = getString(mediaType.savedMessage)
                 publishRemoteCameraCaptureResult(
                     RemoteCameraCaptureResult(
                         isSaved = true,
-                        message = mediaType.savedMessage,
+                        message = savedMessage,
                         mediaType = mediaType.remoteResultValue,
                     ),
                 )
                 Toast
                     .makeText(
                         this@RemoteCameraActivity,
-                        mediaType.savedMessage,
+                        savedMessage,
                         Toast.LENGTH_SHORT,
                     ).show()
             } catch (e: Exception) {
                 Napier.w("Remote camera capture could not be saved", e)
+                val failureMessage = getString(R.string.remote_camera_save_failed)
                 publishRemoteCameraCaptureResult(
                     RemoteCameraCaptureResult(
                         isSaved = false,
-                        message = "Could not save remote camera capture",
+                        message = failureMessage,
                         mediaType = mediaType.remoteResultValue,
                     ),
                 )
                 Toast
                     .makeText(
                         this@RemoteCameraActivity,
-                        "Could not save remote camera capture",
+                        failureMessage,
                         Toast.LENGTH_SHORT,
                     ).show()
             }
@@ -165,11 +169,12 @@ private fun String.toRemoteJournalNote(mediaType: CapturedMediaType): JournalNot
     }
 }
 
-private val CapturedMediaType.savedMessage: String
+@get:StringRes
+private val CapturedMediaType.savedMessage: Int
     get() =
         when (this) {
-            CapturedMediaType.PHOTO -> "Remote photo saved"
-            CapturedMediaType.VIDEO -> "Remote video saved"
+            CapturedMediaType.PHOTO -> R.string.remote_camera_photo_saved
+            CapturedMediaType.VIDEO -> R.string.remote_camera_video_saved
         }
 
 private val CapturedMediaType.remoteResultValue: String

@@ -1,10 +1,13 @@
 package app.logdate.wear.presentation.home
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncStatus
+import app.logdate.wear.R
+import app.logdate.wear.presentation.WearText
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -34,16 +37,16 @@ class WearHomeViewModel(
             WearHomeUiState(
                 greeting =
                     when (currentTimeOfDay()) {
-                        TimeOfDay.MORNING -> "Good morning"
-                        TimeOfDay.AFTERNOON -> "Good afternoon"
-                        TimeOfDay.EVENING -> "Good evening"
+                        TimeOfDay.MORNING -> R.string.wear_home_greeting_morning
+                        TimeOfDay.AFTERNOON -> R.string.wear_home_greeting_afternoon
+                        TimeOfDay.EVENING -> R.string.wear_home_greeting_evening
                     },
                 entryCount = entryCount,
                 entryCountLabel =
-                    when (entryCount) {
-                        0 -> "No entries yet"
-                        1 -> "1 entry today"
-                        else -> "$entryCount entries today"
+                    if (entryCount == 0) {
+                        WearText.Resource(R.string.wear_home_no_entries)
+                    } else {
+                        WearText.Plural(R.plurals.wear_tile_entry_count, entryCount, listOf(entryCount))
                     },
                 syncBadge = syncBadge,
             )
@@ -88,8 +91,9 @@ enum class SyncBadge {
 }
 
 data class WearHomeUiState(
-    val greeting: String = "",
+    /** Greets the person for the time of day; null until today's entries load. */
+    @StringRes val greeting: Int? = null,
     val entryCount: Int = 0,
-    val entryCountLabel: String = "",
+    val entryCountLabel: WearText? = null,
     val syncBadge: SyncBadge = SyncBadge.NONE,
 )

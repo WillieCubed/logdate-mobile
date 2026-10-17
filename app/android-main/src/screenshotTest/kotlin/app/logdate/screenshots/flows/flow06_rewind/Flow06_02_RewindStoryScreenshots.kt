@@ -2,6 +2,7 @@ package app.logdate.screenshots.flows.flow06_rewind
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.text.toUiText
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
 import app.logdate.feature.rewind.ui.EmptyRewindContent
@@ -164,7 +165,7 @@ fun S08_RewindPanelSubtitled() {
             panel =
                 SubtitledRewindPanelUiState(
                     title = "Your Week",
-                    subtitle = "February 17 – 23, 2025",
+                    subtitle = "February 17 – 23, 2025".toUiText(),
                 ),
         )
     }
@@ -180,8 +181,8 @@ fun S09_RewindPanelBigStatistic() {
                 BigStatisticRewindPanelUiState(
                     title = "Steps Taken",
                     statistic = "47,832",
-                    units = "steps",
-                    description = "You were more active than last week",
+                    units = "steps".toUiText(),
+                    description = "You were more active than last week".toUiText(),
                 ),
         )
     }
@@ -198,7 +199,7 @@ fun S10_RewindPanelTextNote() {
                     sourceId = sampleRewindId,
                     timestamp = baseInstant,
                     content = "Finally made it to the California coast. The sunset was incredible.",
-                    dateFormatted = "Feb 19, 2025",
+                    dateFormatted = "Feb 19, 2025".toUiText(),
                 ),
         )
     }

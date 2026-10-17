@@ -3,6 +3,7 @@ package app.logdate.feature.core.export
 import app.logdate.client.domain.export.archive.ArchiveExportOptions
 import app.logdate.client.domain.export.archive.ArchiveExportProgress
 import app.logdate.client.domain.export.archive.ExportArchiveUseCase
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,12 +13,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_alert_failed_title
+import logdate.client.feature.core.generated.resources.export_desktop_failed_message
+import logdate.client.feature.core.generated.resources.export_desktop_save_dialog_title
+import logdate.client.feature.core.generated.resources.export_desktop_success_message
+import logdate.client.feature.core.generated.resources.export_desktop_success_title
+import logdate.client.feature.core.generated.resources.export_error_archive_write
+import logdate.client.feature.core.generated.resources.export_error_not_completed
+import logdate.client.feature.core.generated.resources.export_progress_completed
+import logdate.client.ui.generated.resources.common_ok
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /** Desktop-specific data export using an AWT save dialog. */
 class DesktopExportLauncher :
@@ -63,8 +77,8 @@ class DesktopExportLauncher :
                     throw cancellation
                 } catch (failure: Exception) {
                     Napier.e("Desktop: Export process failed")
-                    showExportErrorDialog("Export could not be completed.")
-                    completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
+                    showExportErrorDialog(Res.string.export_error_not_completed)
+                    completionCallback?.invoke(ExportOutcome.Failed(Res.string.export_error_not_completed.toUiText()))
                 }
             }
     }
@@ -95,13 +109,13 @@ class DesktopExportLauncher :
                     throw cancellation
                 } catch (failure: Exception) {
                     Napier.e("Desktop: Archive export failed")
-                    ArchiveFileOutcome.Failed("Could not write the export archive.")
+                    ArchiveFileOutcome.Failed(Res.string.export_error_archive_write)
                 }
             when (outcome) {
                 is ArchiveFileOutcome.Failed -> {
                     updateProgress(ExportProgressInfo())
                     showExportErrorDialog(outcome.message)
-                    completionCallback?.invoke(ExportOutcome.Failed(outcome.message))
+                    completionCallback?.invoke(ExportOutcome.Failed(outcome.message.toUiText()))
                 }
                 is ArchiveFileOutcome.Completed -> {
                     completed = true
@@ -111,7 +125,7 @@ class DesktopExportLauncher :
                         ExportProgressInfo(
                             isActive = false,
                             progressPercent = 100,
-                            message = "Export completed",
+                            message = Res.string.export_progress_completed.toUiText(),
                             completedFilePath = zipFile.absolutePath,
                             stats = outcome.summary.counts.toExportStats(),
                         ),
@@ -128,7 +142,7 @@ class DesktopExportLauncher :
             ExportProgressInfo(
                 isActive = true,
                 progressPercent = (progress.fraction * 100).toInt(),
-                message = progress.stage.defaultMessage,
+                message = progress.stage.defaultMessage.toUiText(),
             ),
         )
 
@@ -139,22 +153,22 @@ class DesktopExportLauncher :
         Napier.i("Desktop: Export cancelled")
     }
 
-    private fun createSaveDialog(defaultFileName: String): FileDialog =
-        FileDialog(null as Frame?, "Save LogDate Export", FileDialog.SAVE).apply {
+    private suspend fun createSaveDialog(defaultFileName: String): FileDialog =
+        FileDialog(null as Frame?, getString(Res.string.export_desktop_save_dialog_title), FileDialog.SAVE).apply {
             file = defaultFileName
             isVisible = true
         }
 
-    private fun showExportSuccessDialog(filePath: String) {
+    private suspend fun showExportSuccessDialog(filePath: String) {
         Napier.i("Desktop: Export completed successfully")
         try {
-            val dialog = java.awt.Dialog(null as Frame?, "Export Successful", true)
+            val dialog = java.awt.Dialog(null as Frame?, getString(Res.string.export_desktop_success_title), true)
             dialog.layout = java.awt.BorderLayout()
             dialog.add(
-                java.awt.Label("Export completed successfully to $filePath"),
+                java.awt.Label(getString(Res.string.export_desktop_success_message, filePath)),
                 java.awt.BorderLayout.CENTER,
             )
-            val closeButton = java.awt.Button("OK")
+            val closeButton = java.awt.Button(getString(UiRes.string.common_ok))
             closeButton.addActionListener { dialog.dispose() }
             dialog.add(closeButton, java.awt.BorderLayout.SOUTH)
             dialog.setBounds(100, 100, 400, 100)
@@ -164,16 +178,16 @@ class DesktopExportLauncher :
         }
     }
 
-    private fun showExportErrorDialog(errorMessage: String) {
+    private suspend fun showExportErrorDialog(errorMessage: StringResource) {
         Napier.e("Desktop: Export failed")
         try {
-            val dialog = java.awt.Dialog(null as Frame?, "Export Failed", true)
+            val dialog = java.awt.Dialog(null as Frame?, getString(Res.string.export_alert_failed_title), true)
             dialog.layout = java.awt.BorderLayout()
             dialog.add(
-                java.awt.Label("Export failed: $errorMessage"),
+                java.awt.Label(getString(Res.string.export_desktop_failed_message, getString(errorMessage))),
                 java.awt.BorderLayout.CENTER,
             )
-            val closeButton = java.awt.Button("OK")
+            val closeButton = java.awt.Button(getString(UiRes.string.common_ok))
             closeButton.addActionListener { dialog.dispose() }
             dialog.add(closeButton, java.awt.BorderLayout.SOUTH)
             dialog.setBounds(100, 100, 400, 100)

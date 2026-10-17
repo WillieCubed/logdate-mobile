@@ -84,7 +84,8 @@ data class TimelineDay(
      */
     val end: Instant,
     /**
-     * Short human-readable summary for the day.
+     * Short summary of the day written by the summarizer, or empty when there is none yet or
+     * none can be made. [summaryUnavailableReason] says which.
      */
     val tldr: String,
     /**
@@ -116,7 +117,26 @@ data class TimelineDay(
      */
     val entries: List<JournalNote> = emptyList(),
     val marks: List<app.logdate.client.repository.moments.MarkedMoment> = emptyList(),
-)
+    /**
+     * Why the day has no summary, or null when it has one or one is still being made.
+     */
+    val summaryUnavailableReason: TimelineSummaryUnavailableReason? = null,
+) {
+    /** True while the summary has not been made yet and nothing says it cannot be. */
+    val isSummaryPending: Boolean
+        get() = tldr.isEmpty() && summaryUnavailableReason == null
+}
+
+/**
+ * Why a [TimelineDay] has no summary. The screen chooses the words for each reason.
+ */
+enum class TimelineSummaryUnavailableReason {
+    /** The summarizer needs a network connection and none is available. */
+    NO_NETWORK,
+
+    /** The summarizer cannot make a summary for this day. */
+    UNAVAILABLE,
+}
 
 data class TimelinePlaceVisit(
     /**
@@ -139,20 +159,43 @@ data class TimelinePlaceVisit(
 
 data class DayPart(
     /**
-     * A label that provides context to the part.
-     *
-     * Example: Party at Dan's Place
+     * The time of day this part covers. The screen chooses the words for it.
      */
-    val label: String = "",
+    val period: DayPartPeriod,
     /**
-     * Short supporting text shown under [label].
+     * Preview taken from the part's own content: the first written note, or the names of the
+     * places it happened at. Null when the part has neither; [captureCount] describes it then.
      */
     val description: String? = null,
+    /**
+     * How many captures fall in this part of the day.
+     */
+    val captureCount: Int,
     /**
      * Optional image URI used to visually represent this part of the day.
      */
     val featuredGraphicUri: String?,
 )
+
+/**
+ * The stretch of the day a [DayPart] covers, in local time.
+ */
+enum class DayPartPeriod {
+    /** Midnight to 6 a.m. */
+    DAWN,
+
+    /** 6 a.m. to noon. */
+    MORNING,
+
+    /** Noon to 5 p.m. */
+    AFTERNOON,
+
+    /** 5 p.m. to 10 p.m. */
+    EVENING,
+
+    /** 10 p.m. to midnight. */
+    LATE,
+}
 
 enum class TimelineSortOrder {
     CHRONOLOGICAL,
@@ -181,11 +224,13 @@ class GetTimelineDayUseCase(
         entries: List<JournalNote>,
         events: List<Event>,
     ): TimelineDay {
-        val summary =
-            when (val result = summarizeJournalEntriesUseCase(entries)) {
-                SummarizeJournalEntriesResult.NetworkUnavailable -> "Summary currently not available."
-                is SummarizeJournalEntriesResult.Success -> result.summary
-                SummarizeJournalEntriesResult.SummaryUnavailable -> "No summary available."
+        val summaryResult = summarizeJournalEntriesUseCase(entries)
+        val summary = (summaryResult as? SummarizeJournalEntriesResult.Success)?.summary.orEmpty()
+        val summaryUnavailableReason =
+            when (summaryResult) {
+                SummarizeJournalEntriesResult.NetworkUnavailable -> TimelineSummaryUnavailableReason.NO_NETWORK
+                is SummarizeJournalEntriesResult.Success -> null
+                SummarizeJournalEntriesResult.SummaryUnavailable -> TimelineSummaryUnavailableReason.UNAVAILABLE
             }
 
         val people =
@@ -221,6 +266,7 @@ class GetTimelineDayUseCase(
             moments = moments,
             parts = extractDayParts(entries),
             entries = entries.sortedByDescending { entry -> entry.creationTimestamp },
+            summaryUnavailableReason = summaryUnavailableReason,
         )
     }
 }
@@ -249,10 +295,10 @@ internal fun extractDayParts(entries: List<JournalNote>): List<DayPart> {
     val groupedEntries =
         entries
             .sortedBy { entry -> entry.creationTimestamp }
-            .groupBy { entry -> entry.creationTimestamp.toDayPartBucket() }
+            .groupBy { entry -> entry.creationTimestamp.toDayPartPeriod() }
 
-    return DayPartBucket.entries.mapNotNull { bucket ->
-        val bucketEntries = groupedEntries[bucket].orEmpty()
+    return DayPartPeriod.entries.mapNotNull { period ->
+        val bucketEntries = groupedEntries[period].orEmpty()
         if (bucketEntries.isEmpty()) {
             null
         } else {
@@ -270,11 +316,11 @@ internal fun extractDayParts(entries: List<JournalNote>): List<DayPart> {
                     .take(2)
                     .joinToString(" • ")
                     .ifBlank { null }
-            val fallbackDescription = "${bucketEntries.size} captures"
 
             DayPart(
-                label = bucket.label,
-                description = textPreview ?: locationPreview ?: fallbackDescription,
+                period = period,
+                description = textPreview ?: locationPreview,
+                captureCount = bucketEntries.size,
                 featuredGraphicUri = bucketEntries.firstVisualUri(),
             )
         }
@@ -295,24 +341,14 @@ private fun NoteLocation.toTimelinePlaceVisit(): TimelinePlaceVisit? {
 
 private fun roundCoordinate(value: Double): Double = round(value * 10_000) / 10_000
 
-private enum class DayPartBucket(
-    val label: String,
-) {
-    DAWN("Early"),
-    MORNING("Morning"),
-    AFTERNOON("Afternoon"),
-    EVENING("Evening"),
-    LATE("Late"),
-}
-
-private fun Instant.toDayPartBucket(): DayPartBucket {
+private fun Instant.toDayPartPeriod(): DayPartPeriod {
     val hour = toLocalDateTime(TimeZone.currentSystemDefault()).hour
     return when (hour) {
-        in 0..5 -> DayPartBucket.DAWN
-        in 6..11 -> DayPartBucket.MORNING
-        in 12..16 -> DayPartBucket.AFTERNOON
-        in 17..21 -> DayPartBucket.EVENING
-        else -> DayPartBucket.LATE
+        in 0..5 -> DayPartPeriod.DAWN
+        in 6..11 -> DayPartPeriod.MORNING
+        in 12..16 -> DayPartPeriod.AFTERNOON
+        in 17..21 -> DayPartPeriod.EVENING
+        else -> DayPartPeriod.LATE
     }
 }
 

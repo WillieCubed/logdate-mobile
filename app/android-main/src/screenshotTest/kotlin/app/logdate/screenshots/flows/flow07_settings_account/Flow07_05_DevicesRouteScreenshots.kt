@@ -1,6 +1,8 @@
 package app.logdate.screenshots.flows.flow07_settings_account
 
 import androidx.compose.runtime.Composable
+import app.logdate.client.text.asString
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.settings.ui.devices.DeviceApprovalContent
 import app.logdate.feature.core.settings.ui.devices.DeviceApprovalFailure
 import app.logdate.feature.core.settings.ui.devices.DeviceApprovalUiState
@@ -10,23 +12,26 @@ import app.logdate.feature.core.settings.ui.devices.DevicesUiState
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.devices_platform_android
+import logdate.client.feature.core.generated.resources.devices_platform_ios
 import kotlin.uuid.Uuid
 
 private val devices =
     listOf(
         DeviceInfoUiState(
             id = Uuid.parse("00000000-0000-0000-0000-000000000071"),
-            name = "Pixel 9 Pro",
-            platformName = "Android",
-            lastActiveFormatted = "Today",
+            name = "Pixel 9 Pro".toUiText(),
+            platformName = Res.string.devices_platform_android,
+            lastActiveFormatted = "Today".toUiText(),
             appVersion = "0.1.0",
             isCurrentDevice = true,
         ),
         DeviceInfoUiState(
             id = Uuid.parse("00000000-0000-0000-0000-000000000072"),
-            name = "iPad mini",
-            platformName = "iOS",
-            lastActiveFormatted = "Yesterday",
+            name = "iPad mini".toUiText(),
+            platformName = Res.string.devices_platform_ios,
+            lastActiveFormatted = "Yesterday".toUiText(),
             appVersion = "0.1.0",
             isCurrentDevice = false,
         ),
@@ -66,7 +71,7 @@ fun S03_DevicesRenameDialog() {
             uiState = DevicesUiState(devices = devices),
             showRenameDialog = true,
             selectedDevice = devices.first(),
-            newDeviceName = devices.first().name,
+            newDeviceName = devices.first().name.asString(),
             onNewDeviceNameChange = {},
         )
     }

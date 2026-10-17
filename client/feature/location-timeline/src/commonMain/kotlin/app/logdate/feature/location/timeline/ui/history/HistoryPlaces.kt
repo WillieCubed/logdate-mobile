@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.asString
 import app.logdate.ui.common.adaptivePanelShape
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
@@ -137,9 +138,7 @@ private fun HistoryPlaceSearch(
             }, leadingIcon = { Icon(Icons.Default.Map, null, Modifier.size(18.dp)) })
             FilterChip(selected = true, onClick = actions.onPlacesFilter, label = {
                 Text(
-                    state.placesFilterLabel.ifBlank {
-                        stringResource(Res.string.history_filter)
-                    },
+                    state.placesFilterLabel?.asString() ?: stringResource(Res.string.history_filter),
                 )
             }, leadingIcon = { Icon(Icons.Default.CalendarMonth, null, Modifier.size(18.dp)) })
         }
@@ -170,14 +169,14 @@ private fun HistoryPlaceRow(
             Column(Modifier.weight(1f)) {
                 Text(place.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    place.supportingText,
+                    place.supportingText.map { it.asString() }.joinToString("\n"),
                     Modifier.padding(top = 4.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 place.memories.firstOrNull()?.let {
                     Text(
-                        it.title,
+                        it.title.asString(),
                         Modifier.padding(top = 10.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

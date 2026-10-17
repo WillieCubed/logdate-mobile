@@ -294,7 +294,8 @@ private fun TimelineDayDetailList(
     includeNotesAndEvents: Boolean = true,
     includeLocations: Boolean = true,
 ) {
-    val summary = uiState.summary
+    val summaryNotice = uiState.summaryNotice?.let { notice -> stringResource(notice) }
+    val summary = uiState.summary.ifEmpty { summaryNotice.orEmpty() }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -366,7 +367,7 @@ internal fun targetSectionIndex(
 ): Int? {
     val sections =
         buildList {
-            if (uiState.summary.isNotBlank()) add("tldr")
+            if (uiState.summary.isNotBlank() || uiState.summaryNotice != null) add("tldr")
             if (uiState.people.isNotEmpty()) add("people")
             if (uiState.notes.isNotEmpty()) add("notes")
             if (uiState.events.isNotEmpty()) add("events")

@@ -4,7 +4,16 @@ import app.logdate.client.domain.export.ExportError
 import app.logdate.client.domain.export.ExportStage
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.archive.ArchiveCounts
+import app.logdate.client.text.UiText
 import kotlinx.coroutines.flow.StateFlow
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_error_not_completed
+import logdate.client.feature.core.generated.resources.export_progress_collecting_drafts
+import logdate.client.feature.core.generated.resources.export_progress_collecting_journals
+import logdate.client.feature.core.generated.resources.export_progress_collecting_notes
+import logdate.client.feature.core.generated.resources.export_progress_preparing_data
+import logdate.client.feature.core.generated.resources.export_progress_writing_archive
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -58,7 +67,7 @@ sealed interface ExportOutcome {
 
     /** The export failed. [reason] is a human-readable message when one is available. */
     data class Failed(
-        val reason: String? = null,
+        val reason: UiText? = null,
     ) : ExportOutcome
 }
 
@@ -73,25 +82,25 @@ sealed interface ExportOutcome {
 data class ExportProgressInfo(
     val isActive: Boolean = false,
     val progressPercent: Int = 0,
-    val message: String = "",
+    val message: UiText? = null,
     val completedFilePath: String? = null,
     val stats: ExportStats? = null,
 )
 
-internal val ExportStage.defaultMessage: String
+internal val ExportStage.defaultMessage: StringResource
     get() =
         when (this) {
-            ExportStage.COLLECTING_JOURNALS -> "Collecting journals..."
-            ExportStage.COLLECTING_NOTES -> "Collecting notes..."
-            ExportStage.COLLECTING_DRAFTS -> "Collecting drafts..."
-            ExportStage.PREPARING_DATA -> "Preparing export data..."
-            ExportStage.WRITING_ARCHIVE -> "Creating ZIP archive..."
+            ExportStage.COLLECTING_JOURNALS -> Res.string.export_progress_collecting_journals
+            ExportStage.COLLECTING_NOTES -> Res.string.export_progress_collecting_notes
+            ExportStage.COLLECTING_DRAFTS -> Res.string.export_progress_collecting_drafts
+            ExportStage.PREPARING_DATA -> Res.string.export_progress_preparing_data
+            ExportStage.WRITING_ARCHIVE -> Res.string.export_progress_writing_archive
         }
 
-internal val ExportError.defaultMessage: String
+internal val ExportError.defaultMessage: StringResource
     get() =
         when (this) {
-            ExportError.UNKNOWN -> "Export could not be completed."
+            ExportError.UNKNOWN -> Res.string.export_error_not_completed
         }
 
 /**

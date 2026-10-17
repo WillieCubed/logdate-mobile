@@ -83,6 +83,7 @@ import logdate.client.feature.postcards.generated.resources.postcards_untitled
 import logdate.client.ui.generated.resources.common_back
 import logdate.client.ui.generated.resources.common_delete
 import logdate.client.ui.generated.resources.common_save
+import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -110,7 +111,7 @@ fun CanvasEditorScreen(
 
     LaunchedEffect(state.saveError) {
         state.saveError?.let { error ->
-            snackbarHostState.showSnackbar(error)
+            snackbarHostState.showSnackbar(getString(error))
             viewModel.clearSaveError()
         }
     }

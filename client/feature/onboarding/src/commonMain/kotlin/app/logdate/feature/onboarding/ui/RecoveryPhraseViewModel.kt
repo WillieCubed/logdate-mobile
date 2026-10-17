@@ -8,11 +8,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.feature.onboarding.generated.resources.onboarding_recovery_phrase_enter_existing
+import logdate.client.feature.onboarding.generated.resources.onboarding_recovery_phrase_prepare_failed
+import org.jetbrains.compose.resources.StringResource
 
 data class RecoveryPhraseSetupUiState(
     val words: List<String> = emptyList(),
     val isLoading: Boolean = true,
-    val errorMessage: String? = null,
+    val errorMessage: StringResource? = null,
 )
 
 class RecoveryPhraseViewModel(
@@ -40,7 +44,7 @@ class RecoveryPhraseViewModel(
                         identityKeyManager.hasIdentityKey() ->
                             RecoveryPhraseSetupUiState(
                                 isLoading = false,
-                                errorMessage = "Enter your existing recovery phrase to make it available from settings.",
+                                errorMessage = Res.string.onboarding_recovery_phrase_enter_existing,
                             )
                         else -> {
                             // Goes through ensureIdentityKey so this shares the lock with the sync
@@ -56,7 +60,7 @@ class RecoveryPhraseViewModel(
                     Napier.e("Failed to prepare recovery phrase", error)
                     RecoveryPhraseSetupUiState(
                         isLoading = false,
-                        errorMessage = "Your recovery phrase couldn't be prepared. Try again.",
+                        errorMessage = Res.string.onboarding_recovery_phrase_prepare_failed,
                     )
                 }
         }

@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.client.text.toUiText
 import app.logdate.feature.location.timeline.ui.history.HistoryEditAction
 import app.logdate.feature.location.timeline.ui.history.HistoryItemKind
 import app.logdate.feature.location.timeline.ui.history.HistoryItemUi
@@ -75,7 +76,7 @@ class HumanLocationHistoryE2ETest {
         composeRule.onNodeWithContentDescription("See details").performClick()
         composeRule.onNodeWithContentDescription("Close").performScrollTo().performClick()
         composeRule.runOnIdle {
-            state.value = state.value.copy(recoveryMessage = "Location is paused. Your saved day is still here.")
+            state.value = state.value.copy(recoveryMessage = "Location is paused. Your saved day is still here.".toUiText())
         }
         composeRule.onNodeWithText("Change place").assertDoesNotExist()
         composeRule.onNodeWithText("Location is paused. Your saved day is still here.").assertIsDisplayed()
@@ -116,8 +117,11 @@ class HumanLocationHistoryE2ETest {
                         initial.items.map { item ->
                             if (item.id == "cafe-return") {
                                 item.copy(
-                                    title = "Mothership Coffee again",
-                                    memories = listOf(HistoryMemoryUi("return-memory", "Back for a second cup", HistoryMemoryKind.Text)),
+                                    title = "Mothership Coffee again".toUiText(),
+                                    memories =
+                                        listOf(
+                                            HistoryMemoryUi("return-memory", "Back for a second cup".toUiText(), HistoryMemoryKind.Text),
+                                        ),
                                 )
                             } else {
                                 item
@@ -167,7 +171,7 @@ class HumanLocationHistoryE2ETest {
         composeRule.runOnIdle {
             state.value =
                 state.value.copy(
-                    places = listOf(HistoryPlaceUi("cafe", "Mothership Coffee", "2 visits")),
+                    places = listOf(HistoryPlaceUi("cafe", "Mothership Coffee", listOf("2 visits".toUiText()))),
                     placesQuery = "library",
                 )
         }
@@ -238,22 +242,22 @@ class HumanLocationHistoryE2ETest {
 
     private fun day() =
         HumanLocationHistoryState(
-            dateLabel = "Tuesday, September 29",
+            dateLabel = "Tuesday, September 29".toUiText(),
             items =
                 listOf(
                     HistoryItemUi(
                         "cafe-morning",
                         HistoryItemKind.Visit,
-                        "Mothership Coffee",
-                        "9:00–9:30 AM",
+                        "Mothership Coffee".toUiText(),
+                        "9:00–9:30 AM".toUiText(),
                         memories =
                             listOf(
-                                HistoryMemoryUi("memory", "A quiet morning", HistoryMemoryKind.Text),
+                                HistoryMemoryUi("memory", "A quiet morning".toUiText(), HistoryMemoryKind.Text),
                             ),
                     ),
-                    HistoryItemUi("walk", HistoryItemKind.Journey, "Walked", "9:30–9:45 AM", "15 min"),
-                    HistoryItemUi("gap", HistoryItemKind.Gap, "Part of your day is missing", "9:45–10:00 AM"),
-                    HistoryItemUi("cafe-return", HistoryItemKind.Visit, "Mothership Coffee", "10:00–10:30 AM"),
+                    HistoryItemUi("walk", HistoryItemKind.Journey, "Walked".toUiText(), "9:30–9:45 AM".toUiText(), "15 min".toUiText()),
+                    HistoryItemUi("gap", HistoryItemKind.Gap, "Part of your day is missing".toUiText(), "9:45–10:00 AM".toUiText()),
+                    HistoryItemUi("cafe-return", HistoryItemKind.Visit, "Mothership Coffee".toUiText(), "10:00–10:30 AM".toUiText()),
                 ),
         )
 }

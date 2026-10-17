@@ -1,5 +1,7 @@
 package app.logdate.feature.core
 
+import app.logdate.client.text.UiText
+import app.logdate.client.text.resolve
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -8,9 +10,11 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import platform.Foundation.NSError
 import platform.LocalAuthentication.LAContext
 import platform.LocalAuthentication.LAErrorAppCancel
@@ -35,17 +39,19 @@ class IosBiometricGatekeeper : BiometricGatekeeper {
 
     override val authState: StateFlow<AppAuthState> = _authState.asStateFlow()
 
+    /** Resolves the prompt's words from string resources before the prompt is shown. */
+    private val promptScope = MainScope()
+
     override fun authenticate(
-        title: String,
-        subtitle: String,
-        cancelLabel: String,
+        title: UiText,
+        subtitle: UiText,
+        cancelLabel: UiText,
         requireConfirmation: Boolean,
         requestEnrollmentIfNecessary: Boolean,
-        description: String?,
+        description: UiText?,
         onResult: (AppAuthState) -> Unit,
     ) {
         val context = LAContext()
-        context.localizedCancelTitle = cancelLabel
 
         val canEvaluate =
             memScoped {
@@ -65,20 +71,23 @@ class IosBiometricGatekeeper : BiometricGatekeeper {
             }
         if (!canEvaluate) return
 
-        val reason = description ?: subtitle
-        context.evaluatePolicy(LAPolicyDeviceOwnerAuthentication, reason) { success, error ->
-            val state =
-                if (success) {
-                    AppAuthState.AUTHENTICATED
-                } else {
-                    Napier.i(
-                        "LAContext authentication failed: code=${error?.code} domain=${error?.domain}",
-                        tag = TAG,
-                    )
-                    mapLAError(error)
-                }
-            _authState.value = state
-            onResult(state)
+        promptScope.launch {
+            context.localizedCancelTitle = cancelLabel.resolve()
+            val reason = (description ?: subtitle).resolve()
+            context.evaluatePolicy(LAPolicyDeviceOwnerAuthentication, reason) { success, error ->
+                val state =
+                    if (success) {
+                        AppAuthState.AUTHENTICATED
+                    } else {
+                        Napier.i(
+                            "LAContext authentication failed: code=${error?.code} domain=${error?.domain}",
+                            tag = TAG,
+                        )
+                        mapLAError(error)
+                    }
+                _authState.value = state
+                onResult(state)
+            }
         }
     }
 

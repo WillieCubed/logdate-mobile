@@ -1,5 +1,6 @@
 package app.logdate.feature.rewind.ui.detail
 
+import app.logdate.client.text.resolve
 import app.logdate.feature.rewind.ui.AudioNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
@@ -88,26 +89,32 @@ data class RewindStatsShareRequest(
 /**
  * Extracts shareable content from a rewind panel. Returns null when the panel has nothing
  * meaningful to share (e.g. a pure decorative big-stat card with empty fields).
+ *
+ * Suspends to put the panel's text into words for the share sheet, outside composition.
  */
-fun RewindPanelUiState.toShareContent(): RewindShareContent? =
+suspend fun RewindPanelUiState.toShareContent(): RewindShareContent? =
     when (this) {
-        is TextNoteRewindPanelUiState ->
+        is TextNoteRewindPanelUiState -> {
+            val date = dateFormatted.resolve()
             RewindShareContent(
                 text = content,
                 visual =
                     RewindShareVisual.Quote(
                         text = content,
-                        dateLabel = dateFormatted,
+                        dateLabel = date,
                         accentSeed = sourceId.hashCode(),
                     ),
-                dateFormatted = dateFormatted,
+                dateFormatted = date,
             )
-        is ImageRewindPanelUiState ->
+        }
+        is ImageRewindPanelUiState -> {
+            val date = dateFormatted.resolve()
             RewindShareContent(
-                text = caption ?: dateFormatted,
+                text = caption ?: date,
                 visual = RewindShareVisual.ExistingMedia(imageUri),
-                dateFormatted = dateFormatted,
+                dateFormatted = date,
             )
+        }
         is ImageNoteRewindPanelUiState ->
             RewindShareContent(
                 text = caption ?: dateFormatted,
@@ -141,7 +148,7 @@ fun RewindPanelUiState.toShareContent(): RewindShareContent? =
             )
         is SubtitledRewindPanelUiState ->
             RewindShareContent(
-                text = "$title — $subtitle",
+                text = "$title — ${subtitle.resolve()}",
                 visual = backgroundUri?.let { RewindShareVisual.ExistingMedia(it) } ?: RewindShareVisual.None,
             )
         is BasicTextRewindPanelUiState ->
@@ -152,17 +159,20 @@ fun RewindPanelUiState.toShareContent(): RewindShareContent? =
             if (statistic.isBlank()) {
                 null
             } else {
-                val unitsSuffix = if (units.isNotBlank()) " $units" else ""
-                RewindShareContent(text = "$title: $statistic$unitsSuffix — $description")
+                val unitsText = units.resolve()
+                val unitsSuffix = if (unitsText.isNotBlank()) " $unitsText" else ""
+                RewindShareContent(text = "$title: $statistic$unitsSuffix — ${description.resolve()}")
             }
         is LocationMapRewindPanelUiState ->
             // Location maps don't have a useful share format yet — sharing the canvas would
             // require rasterizing on demand. Skip the share path entirely until that ships.
             null
-        is AudioNoteRewindPanelUiState ->
+        is AudioNoteRewindPanelUiState -> {
+            val date = dateFormatted.resolve()
             RewindShareContent(
-                text = transcriptionText ?: dateFormatted,
+                text = transcriptionText ?: date,
                 visual = RewindShareVisual.ExistingMedia(uri),
-                dateFormatted = dateFormatted,
+                dateFormatted = date,
             )
+        }
     }

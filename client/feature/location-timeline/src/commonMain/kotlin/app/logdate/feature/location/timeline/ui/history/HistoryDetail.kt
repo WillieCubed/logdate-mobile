@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.asString
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.PanelGroup
 import logdate.client.feature.location.timeline.generated.resources.Res
@@ -105,7 +106,7 @@ fun HumanLocationHistoryDetailContent(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                item.title,
+                item.title.asString(),
                 Modifier.weight(1f).semantics { heading() },
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
@@ -113,10 +114,11 @@ fun HumanLocationHistoryDetailContent(
             IconButton(onClick = actions.onCloseDetail) { Icon(Icons.Default.Close, stringResource(Res.string.history_close)) }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(item.timeLabel, style = MaterialTheme.typography.labelLarge)
-            if (item.supportingText.isNotBlank()) {
+            Text(item.timeLabel.asString(), style = MaterialTheme.typography.labelLarge)
+            val supportingText = item.supportingText.asString()
+            if (supportingText.isNotBlank()) {
                 Text(
-                    item.supportingText,
+                    supportingText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -9,6 +9,8 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sharing.SharingLauncher
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,6 +21,10 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.note_viewer_error_delete_failed
+import logdate.client.feature.journal.generated.resources.note_viewer_error_load_failed
+import logdate.client.feature.journal.generated.resources.note_viewer_error_not_found
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -78,12 +84,12 @@ class NoteViewerViewModel(
                 .catch { error ->
                     _uiState.value =
                         NoteViewerUiState.Error(
-                            "Failed to load note: ${error.message}",
+                            Res.string.note_viewer_error_load_failed.toUiText(error.message.toString()),
                         )
                 }.collect { notes ->
                     val note = notes.find { it.uid == noteId }
                     if (note == null) {
-                        _uiState.value = NoteViewerUiState.Error("Note not found")
+                        _uiState.value = NoteViewerUiState.Error(Res.string.note_viewer_error_not_found.toUiText())
                     } else {
                         updateForNote(note)
                     }
@@ -124,7 +130,7 @@ class NoteViewerViewModel(
             }.onSuccess {
                 onDeleted()
             }.onFailure { error ->
-                _uiState.value = NoteViewerUiState.Error("Failed to delete note: ${error.message}")
+                _uiState.value = NoteViewerUiState.Error(Res.string.note_viewer_error_delete_failed.toUiText(error.message.toString()))
             }
         }
     }
@@ -163,20 +169,22 @@ class NoteViewerViewModel(
 
     /**
      * Shares the currently viewed note using the platform share surface.
+     *
+     * @param chooserTitle The share sheet's title, already resolved for the current locale.
      */
-    fun shareCurrentNote() {
+    fun shareCurrentNote(chooserTitle: String) {
         when (val state = _uiState.value) {
             is NoteViewerUiState.TextContent -> {
-                sharingLauncher.shareContent(text = state.text, chooserTitle = "Share note")
+                sharingLauncher.shareContent(text = state.text, chooserTitle = chooserTitle)
             }
             is NoteViewerUiState.ImageContent -> {
-                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = "Share note")
+                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = chooserTitle)
             }
             is NoteViewerUiState.VideoContent -> {
-                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = "Share note")
+                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = chooserTitle)
             }
             is NoteViewerUiState.AudioContent -> {
-                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = "Share note")
+                sharingLauncher.shareContent(mediaUris = listOf(state.mediaRef), chooserTitle = chooserTitle)
             }
             else -> Unit
         }
@@ -217,7 +225,7 @@ sealed interface NoteViewerUiState {
     data object Loading : NoteViewerUiState
 
     data class Error(
-        val message: String,
+        val message: UiText,
     ) : NoteViewerUiState
 
     /**

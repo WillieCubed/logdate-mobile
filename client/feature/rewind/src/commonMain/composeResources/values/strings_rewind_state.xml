@@ -1,0 +1,72 @@
+<resources>
+    <!-- Title panel subtitle: the date range, then the week's counts -->
+    <string name="rewind_state_title_subtitle">%1$s\n%2$s</string>
+    <string name="rewind_state_counts_two">%1$s · %2$s</string>
+    <string name="rewind_state_counts_three">%1$s · %2$s · %3$s</string>
+    <plurals name="rewind_state_count_entries">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <plurals name="rewind_state_count_photos">
+        <item quantity="one">%1$d photo</item>
+        <item quantity="other">%1$d photos</item>
+    </plurals>
+    <plurals name="rewind_state_count_people">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item>
+    </plurals>
+
+    <!-- Map panel -->
+    <string name="rewind_state_map_title">Where your week was</string>
+    <plurals name="rewind_state_map_places">
+        <item quantity="one">%1$d place</item>
+        <item quantity="other">%1$d places</item>
+    </plurals>
+
+    <!-- Statistic panels -->
+    <plurals name="rewind_state_units_entries">
+        <item quantity="one">entry</item>
+        <item quantity="other">entries</item>
+    </plurals>
+    <plurals name="rewind_state_wrote_this_week">
+        <item quantity="one">You wrote %1$d time this week.</item>
+        <item quantity="other">You wrote %1$d times this week.</item>
+    </plurals>
+    <plurals name="rewind_state_units_photos">
+        <item quantity="one">photo</item>
+        <item quantity="other">photos</item>
+    </plurals>
+    <plurals name="rewind_state_captured_this_week">
+        <item quantity="one">You captured %1$d visual memory this week.</item>
+        <item quantity="other">You captured %1$d visual memories this week.</item>
+    </plurals>
+
+    <!-- Dates: "November 18-24, 2024", "November 30 - December 6, 2024", "Nov 19, 2024" -->
+    <string name="rewind_state_date_range_same_month">%1$s %2$d-%3$d, %4$d</string>
+    <string name="rewind_state_date_range">%1$s %2$d - %3$s %4$d, %5$d</string>
+    <string name="rewind_state_date">%1$s %2$d, %3$d</string>
+    <string name="rewind_state_month_january">January</string>
+    <string name="rewind_state_month_february">February</string>
+    <string name="rewind_state_month_march">March</string>
+    <string name="rewind_state_month_april">April</string>
+    <string name="rewind_state_month_may">May</string>
+    <string name="rewind_state_month_june">June</string>
+    <string name="rewind_state_month_july">July</string>
+    <string name="rewind_state_month_august">August</string>
+    <string name="rewind_state_month_september">September</string>
+    <string name="rewind_state_month_october">October</string>
+    <string name="rewind_state_month_november">November</string>
+    <string name="rewind_state_month_december">December</string>
+    <string name="rewind_state_month_short_january">Jan</string>
+    <string name="rewind_state_month_short_february">Feb</string>
+    <string name="rewind_state_month_short_march">Mar</string>
+    <string name="rewind_state_month_short_april">Apr</string>
+    <string name="rewind_state_month_short_may">May</string>
+    <string name="rewind_state_month_short_june">Jun</string>
+    <string name="rewind_state_month_short_july">Jul</string>
+    <string name="rewind_state_month_short_august">Aug</string>
+    <string name="rewind_state_month_short_september">Sep</string>
+    <string name="rewind_state_month_short_october">Oct</string>
+    <string name="rewind_state_month_short_november">Nov</string>
+    <string name="rewind_state_month_short_december">Dec</string>
+</resources>

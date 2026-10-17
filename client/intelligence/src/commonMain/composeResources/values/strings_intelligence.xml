@@ -1,0 +1,33 @@
+<resources>
+    <!-- Weekly Rewind panels, written to the saved Rewind -->
+    <string name="rewind_transition_things_shifted">But then things shifted</string>
+    <string name="rewind_transition_breakthrough">Then came a breakthrough</string>
+    <string name="rewind_transition_meanwhile">Meanwhile</string>
+    <string name="rewind_transition_evenings">When evenings came</string>
+    <string name="rewind_transition_and_then">And then</string>
+    <string name="rewind_resolution_tone">A %1$s week.</string>
+
+    <!-- Year in Review written on the device when AI is unavailable, saved with the Rewind -->
+    <plurals name="year_narrative_overall_with_theme">
+        <item quantity="one">A year shaped by %1$s across %2$d week.</item>
+        <item quantity="other">A year shaped by %1$s across %2$d weeks.</item>
+    </plurals>
+    <plurals name="year_narrative_overall">
+        <item quantity="one">A year recorded across %1$d week.</item>
+        <item quantity="other">A year recorded across %1$d weeks.</item>
+    </plurals>
+    <string name="year_narrative_emotional_arc">A varied year.</string>
+    <string name="year_narrative_chapter_summary_theme">Mostly %1$s this stretch.</string>
+    <string name="year_narrative_chapter_summary_quiet">Quieter weeks.</string>
+    <string name="year_narrative_chapter_early_year">Early year</string>
+    <string name="year_narrative_chapter_spring">Spring</string>
+    <string name="year_narrative_chapter_summer">Summer</string>
+    <string name="year_narrative_chapter_late_year">Late year</string>
+    <string name="year_narrative_months_first_quarter">January – March</string>
+    <string name="year_narrative_months_second_quarter">April – June</string>
+    <string name="year_narrative_months_third_quarter">July – September</string>
+    <string name="year_narrative_months_fourth_quarter">October – December</string>
+
+    <!-- Milestone Rewind badge, saved with the Rewind -->
+    <string name="milestone_location_change_summary">Your location shifted</string>
+</resources>

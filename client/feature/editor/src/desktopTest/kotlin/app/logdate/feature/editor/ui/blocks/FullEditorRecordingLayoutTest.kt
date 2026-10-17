@@ -34,6 +34,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.common.LOGDATE_EDITOR_DRAFTS_BUTTON_TAG
 import app.logdate.feature.editor.ui.common.LOGDATE_EDITOR_SAVE_BUTTON_TAG
@@ -124,7 +125,7 @@ class FullEditorRecordingLayoutTest {
         val journal = Journal(title = "Personal")
         val microphone =
             if (alternativeInput) {
-                DefaultMediaDevices.systemMicrophone.copy(label = "Phone microphone", category = MediaDeviceCategory.BUILT_IN)
+                DefaultMediaDevices.systemMicrophone.copy(label = "Phone microphone".toUiText(), category = MediaDeviceCategory.BUILT_IN)
             } else {
                 DefaultMediaDevices.systemMicrophone
             }
@@ -132,7 +133,7 @@ class FullEditorRecordingLayoutTest {
             if (alternativeInput) {
                 listOf(
                     microphone,
-                    MediaDeviceUiState("usb", "USB microphone", MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.USB),
+                    MediaDeviceUiState("usb", "USB microphone".toUiText(), MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.USB),
                 )
             } else {
                 listOf(microphone)

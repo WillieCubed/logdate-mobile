@@ -11,6 +11,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.text.toUiText
 import app.logdate.feature.location.timeline.ui.history.HistoryItemKind
 import app.logdate.feature.location.timeline.ui.history.HistoryItemUi
 import app.logdate.feature.location.timeline.ui.history.HistoryMemoryKind
@@ -35,42 +36,43 @@ import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-private val cafeMemory = HistoryMemoryUi("coffee-note", "A quiet table, a good book, and nowhere to rush.", HistoryMemoryKind.Text)
+private val cafeMemory =
+    HistoryMemoryUi("coffee-note", "A quiet table, a good book, and nowhere to rush.".toUiText(), HistoryMemoryKind.Text)
 internal val historyDay =
     HumanLocationHistoryState(
-        dateLabel = "Tuesday, September 29",
-        daySummary = "6 visits in your day",
+        dateLabel = "Tuesday, September 29".toUiText(),
+        daySummary = "6 visits in your day".toUiText(),
         selectedItemId = "cafe-morning",
         items =
             listOf(
-                HistoryItemUi("home-morning", HistoryItemKind.Visit, "Home", "Until 9:10 AM", ""),
-                HistoryItemUi("walk-cafe", HistoryItemKind.Journey, "Walked", "9:10–9:28 AM", "18 min"),
+                HistoryItemUi("home-morning", HistoryItemKind.Visit, "Home".toUiText(), "Until 9:10 AM".toUiText(), "".toUiText()),
+                HistoryItemUi("walk-cafe", HistoryItemKind.Journey, "Walked".toUiText(), "9:10–9:28 AM".toUiText(), "18 min".toUiText()),
                 HistoryItemUi(
                     "cafe-morning",
                     HistoryItemKind.Visit,
-                    "Mothership Coffee",
-                    "9:28–10:45 AM",
-                    "Arts District · 1 hr 17 min",
+                    "Mothership Coffee".toUiText(),
+                    "9:28–10:45 AM".toUiText(),
+                    "Arts District · 1 hr 17 min".toUiText(),
                     listOf(cafeMemory),
                 ),
                 HistoryItemUi(
                     "walk-library",
                     HistoryItemKind.Journey,
-                    "Walked",
-                    "10:45–11:12 AM",
-                    "27 min",
+                    "Walked".toUiText(),
+                    "10:45–11:12 AM".toUiText(),
+                    "27 min".toUiText(),
                 ),
                 HistoryItemUi(
                     "library",
                     HistoryItemKind.Visit,
-                    "Las Vegas Library",
-                    "11:12 AM–1:20 PM",
-                    "2 hr 8 min",
+                    "Las Vegas Library".toUiText(),
+                    "11:12 AM–1:20 PM".toUiText(),
+                    "2 hr 8 min".toUiText(),
                     listOf(
-                        HistoryMemoryUi("library-photo", "The book I came for", HistoryMemoryKind.Image),
+                        HistoryMemoryUi("library-photo", "The book I came for".toUiText(), HistoryMemoryKind.Image),
                         HistoryMemoryUi(
                             "library-audio",
-                            "A thought to come back to",
+                            "A thought to come back to".toUiText(),
                             HistoryMemoryKind.Audio,
                             audio =
                                 MomentAudioUiState(
@@ -82,39 +84,57 @@ internal val historyDay =
                         ),
                     ),
                 ),
-                HistoryItemUi("travelling", HistoryItemKind.Journey, "Travelling", "1:20–1:45 PM", "Activity not confirmed"),
+                HistoryItemUi(
+                    "travelling",
+                    HistoryItemKind.Journey,
+                    "Travelling".toUiText(),
+                    "1:20–1:45 PM".toUiText(),
+                    "Activity not confirmed".toUiText(),
+                ),
                 HistoryItemUi(
                     "cafe-afternoon",
                     HistoryItemKind.Visit,
-                    "Mothership Coffee",
-                    "1:45–2:10 PM",
-                    "Back for another coffee · 25 min",
+                    "Mothership Coffee".toUiText(),
+                    "1:45–2:10 PM".toUiText(),
+                    "Back for another coffee · 25 min".toUiText(),
                 ),
-                HistoryItemUi("bus", HistoryItemKind.Journey, "By bus", "2:10–2:42 PM", "Confirmed by you · 32 min"),
-                HistoryItemUi("brief", HistoryItemKind.Visit, "Near Baker Park", "2:42 PM", "Briefly seen here; visit length unknown"),
+                HistoryItemUi(
+                    "bus",
+                    HistoryItemKind.Journey,
+                    "By bus".toUiText(),
+                    "2:10–2:42 PM".toUiText(),
+                    "Confirmed by you · 32 min".toUiText(),
+                ),
+                HistoryItemUi(
+                    "brief",
+                    HistoryItemKind.Visit,
+                    "Near Baker Park".toUiText(),
+                    "2:42 PM".toUiText(),
+                    "Briefly seen here; visit length unknown".toUiText(),
+                ),
                 HistoryItemUi(
                     "gap",
                     HistoryItemKind.Gap,
-                    "Part of your day is missing",
-                    "2:43–3:20 PM",
-                    "No location was recorded during this time.",
+                    "Part of your day is missing".toUiText(),
+                    "2:43–3:20 PM".toUiText(),
+                    "No location was recorded during this time.".toUiText(),
                 ),
                 HistoryItemUi(
                     "home-evening",
                     HistoryItemKind.Visit,
-                    "Home",
-                    "From 3:20 PM",
+                    "Home".toUiText(),
+                    "From 3:20 PM".toUiText(),
                     memories =
                         listOf(
-                            HistoryMemoryUi("home-video", "The evening light", HistoryMemoryKind.Video, "0:18"),
+                            HistoryMemoryUi("home-video", "The evening light".toUiText(), HistoryMemoryKind.Video, "0:18"),
                         ),
                 ),
             ),
         places =
             listOf(
-                HistoryPlaceUi("cafe", "Mothership Coffee", "2 visits today · Arts District", listOf(cafeMemory)),
-                HistoryPlaceUi("library", "Las Vegas Library", "Visited today · 2 memories"),
-                HistoryPlaceUi("home", "Home", "Last visited today"),
+                HistoryPlaceUi("cafe", "Mothership Coffee", listOf("2 visits today · Arts District".toUiText()), listOf(cafeMemory)),
+                HistoryPlaceUi("library", "Las Vegas Library", listOf("Visited today · 2 memories".toUiText())),
+                HistoryPlaceUi("home", "Home", listOf("Last visited today".toUiText())),
             ),
     )
 
@@ -136,14 +156,15 @@ fun HumanLocationHistoryLargeTextScreenshot() = HistoryScene(historyDay)
 @PreviewTest
 @Preview(name = "History Places", device = PHONE, showBackground = true)
 @Composable
-fun HumanLocationHistoryPlacesScreenshot() = HistoryScene(historyDay.copy(tab = HistoryTab.Places, placesFilterLabel = "30 days"))
+fun HumanLocationHistoryPlacesScreenshot() =
+    HistoryScene(historyDay.copy(tab = HistoryTab.Places, placesFilterLabel = "30 days".toUiText()))
 
 @PreviewTest
 @Preview(name = "History Recovery", device = PHONE, showBackground = true)
 @Composable
 fun HumanLocationHistoryRecoveryScreenshot() =
     HistoryScene(
-        historyDay.copy(recoveryMessage = "Location is paused. Your saved days and memories are still here."),
+        historyDay.copy(recoveryMessage = "Location is paused. Your saved days and memories are still here.".toUiText()),
     )
 
 @PreviewTest

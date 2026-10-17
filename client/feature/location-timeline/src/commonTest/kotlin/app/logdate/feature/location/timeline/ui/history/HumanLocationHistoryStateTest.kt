@@ -1,5 +1,6 @@
 package app.logdate.feature.location.timeline.ui.history
 
+import app.logdate.client.text.toUiText
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -7,12 +8,12 @@ import kotlin.test.assertNull
 class HumanLocationHistoryStateTest {
     private val day =
         HumanLocationHistoryState(
-            dateLabel = "Tuesday, September 29",
+            dateLabel = "Tuesday, September 29".toUiText(),
             items =
                 listOf(
-                    HistoryItemUi("home", HistoryItemKind.Visit, "Home", "8:00 AM"),
-                    HistoryItemUi("walk", HistoryItemKind.Journey, "Walking", "9:00 AM"),
-                    HistoryItemUi("cafe", HistoryItemKind.Visit, "Mothership Coffee", "9:15 AM"),
+                    HistoryItemUi("home", HistoryItemKind.Visit, "Home".toUiText(), "8:00 AM".toUiText()),
+                    HistoryItemUi("walk", HistoryItemKind.Journey, "Walking".toUiText(), "9:00 AM".toUiText()),
+                    HistoryItemUi("cafe", HistoryItemKind.Visit, "Mothership Coffee".toUiText(), "9:15 AM".toUiText()),
                 ),
         )
 
@@ -41,8 +42,8 @@ class HumanLocationHistoryStateTest {
             day.copy(
                 places =
                     listOf(
-                        HistoryPlaceUi("cafe", "Mothership Coffee", "2 visits"),
-                        HistoryPlaceUi("library", "West Charleston Library", "1 visit"),
+                        HistoryPlaceUi("cafe", "Mothership Coffee", listOf("2 visits".toUiText())),
+                        HistoryPlaceUi("library", "West Charleston Library", listOf("1 visit".toUiText())),
                     ),
                 placesQuery = "  COFFEE ",
             )

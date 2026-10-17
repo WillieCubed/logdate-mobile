@@ -20,6 +20,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.video.VideoPlayerTags
 import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.library.ui.detail.MediaDetailUiState
@@ -149,13 +150,13 @@ class LibraryMediaDetailVideoE2ETest {
                 listOf(
                     MediaDeviceUiState(
                         id = "phone-speaker",
-                        label = "Phone speaker",
+                        label = "Phone speaker".toUiText(),
                         kind = MediaDeviceKind.AUDIO_OUTPUT,
                         category = MediaDeviceCategory.BUILT_IN,
                     ),
                     MediaDeviceUiState(
                         id = "bluetooth-headphones",
-                        label = "Bluetooth headphones",
+                        label = "Bluetooth headphones".toUiText(),
                         kind = MediaDeviceKind.AUDIO_OUTPUT,
                         category = MediaDeviceCategory.BLUETOOTH,
                         isExternal = true,
@@ -163,7 +164,7 @@ class LibraryMediaDetailVideoE2ETest {
                 ),
             selectedDeviceId = "phone-speaker",
             isSelectionControllable = false,
-            routeControlMessage = "Use Android's output switcher to route playback.",
+            routeControlMessage = "Use Android's output switcher to route playback.".toUiText(),
         )
 
     private fun emptyVideoFileUri(): String {

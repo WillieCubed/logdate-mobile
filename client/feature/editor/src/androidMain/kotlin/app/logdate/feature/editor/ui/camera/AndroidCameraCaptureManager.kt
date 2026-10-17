@@ -31,10 +31,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.device.DefaultMediaDevices
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.media.device.unavailableRouteMessage
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +51,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.capture_state_camera_numbered
+import logdate.client.feature.editor.generated.resources.capture_state_camera_provider_not_ready
+import logdate.client.feature.editor.generated.resources.capture_state_camera_selection_failed
+import logdate.client.feature.editor.generated.resources.capture_state_external_camera_numbered
+import logdate.client.feature.editor.generated.resources.capture_state_external_cameras_hint
+import logdate.client.feature.editor.generated.resources.capture_state_lifecycle_owner_not_ready
+import logdate.client.feature.editor.generated.resources.capture_state_switch_failed
+import logdate.client.feature.editor.generated.resources.capture_state_unknown_error
+import org.jetbrains.compose.resources.StringResource
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -213,7 +227,7 @@ class AndroidCameraCaptureManager(
                 _state.update {
                     it.copy(
                         isPreviewActive = false,
-                        error = CameraCaptureError.Unknown(e.message ?: "Unknown error"),
+                        error = e.cameraFailure(Res.string.capture_state_unknown_error),
                     )
                 }
             }
@@ -434,14 +448,14 @@ class AndroidCameraCaptureManager(
             val provider =
                 cameraProvider ?: run {
                     _state.update {
-                        it.copy(error = CameraCaptureError.Unknown("Camera provider is not ready"))
+                        it.copy(error = CameraCaptureError.Unknown(Res.string.capture_state_camera_provider_not_ready.toUiText()))
                     }
                     return@withContext
                 }
             val owner =
                 lifecycleOwner ?: run {
                     _state.update {
-                        it.copy(error = CameraCaptureError.Unknown("Lifecycle owner is not ready"))
+                        it.copy(error = CameraCaptureError.Unknown(Res.string.capture_state_lifecycle_owner_not_ready.toUiText()))
                     }
                     return@withContext
                 }
@@ -488,7 +502,7 @@ class AndroidCameraCaptureManager(
                 Napier.e("Failed to switch camera", e)
                 _previewStreaming.value = false
                 _state.update {
-                    it.copy(error = CameraCaptureError.Unknown(e.message ?: "Switch failed"))
+                    it.copy(error = e.cameraFailure(Res.string.capture_state_switch_failed))
                 }
             }
         }
@@ -503,14 +517,14 @@ class AndroidCameraCaptureManager(
             val provider =
                 cameraProvider ?: run {
                     _state.update {
-                        it.copy(error = CameraCaptureError.Unknown("Camera provider is not ready"))
+                        it.copy(error = CameraCaptureError.Unknown(Res.string.capture_state_camera_provider_not_ready.toUiText()))
                     }
                     return@withContext
                 }
             val owner =
                 lifecycleOwner ?: run {
                     _state.update {
-                        it.copy(error = CameraCaptureError.Unknown("Lifecycle owner is not ready"))
+                        it.copy(error = CameraCaptureError.Unknown(Res.string.capture_state_lifecycle_owner_not_ready.toUiText()))
                     }
                     return@withContext
                 }
@@ -552,7 +566,7 @@ class AndroidCameraCaptureManager(
                 Napier.e("Failed to select camera", e)
                 _previewStreaming.value = false
                 _state.update {
-                    it.copy(error = CameraCaptureError.Unknown(e.message ?: "Camera selection failed"))
+                    it.copy(error = e.cameraFailure(Res.string.capture_state_camera_selection_failed))
                 }
             }
         }
@@ -630,9 +644,9 @@ class AndroidCameraCaptureManager(
         val routeControlMessage =
             when {
                 preferredDeviceId != null && preferredDeviceId != selectedId ->
-                    "Selected camera is unavailable. LogDate will use ${devices.first { it.id == selectedId }.label}."
+                    unavailableRouteMessage(MediaDeviceKind.CAMERA, devices.first { it.id == selectedId }.label)
                 devices.none { it.isExternal } ->
-                    "External cameras appear here when connected."
+                    Res.string.capture_state_external_cameras_hint.toUiText()
                 else -> null
             }
 
@@ -679,13 +693,17 @@ class AndroidCameraCaptureManager(
     private fun cameraLabel(
         category: MediaDeviceCategory,
         index: Int,
-    ): String =
+    ): UiText =
         when (category) {
-            MediaDeviceCategory.FRONT_CAMERA -> "Front camera"
-            MediaDeviceCategory.BACK_CAMERA -> "Back camera"
-            MediaDeviceCategory.EXTERNAL -> "External camera ${index + 1}"
-            else -> "Camera ${index + 1}"
+            MediaDeviceCategory.FRONT_CAMERA -> DefaultMediaDevices.frontCamera.label
+            MediaDeviceCategory.BACK_CAMERA -> DefaultMediaDevices.backCamera.label
+            MediaDeviceCategory.EXTERNAL -> Res.string.capture_state_external_camera_numbered.toUiText(index + 1)
+            else -> Res.string.capture_state_camera_numbered.toUiText(index + 1)
         }
+
+    /** The platform's own words for a camera failure, or [fallback] when it gives none. */
+    private fun Exception.cameraFailure(fallback: StringResource): CameraCaptureError =
+        CameraCaptureError.Unknown(message?.toUiText() ?: fallback.toUiText())
 
     private fun MediaDeviceCategory.matchesFacing(facing: CameraFacing): Boolean =
         when (facing) {

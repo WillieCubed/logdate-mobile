@@ -57,6 +57,7 @@ kotlin {
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.device)
             implementation(projects.client.media)
+            implementation(projects.client.text)
             implementation(projects.client.util)
 
             // External dependencies

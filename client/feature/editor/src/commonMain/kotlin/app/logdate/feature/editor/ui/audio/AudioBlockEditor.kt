@@ -31,6 +31,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
@@ -272,7 +273,7 @@ fun AudioBlockEditor(
                         inputSelection = inputSelection,
                         onInputSelected = audioRouteRepository::selectInputDevice,
                         isStarting = audioUiState.isStartingRecording,
-                        errorMessage = audioUiState.error,
+                        errorMessage = audioUiState.error?.let { stringResource(it) },
                     )
                 }
             }

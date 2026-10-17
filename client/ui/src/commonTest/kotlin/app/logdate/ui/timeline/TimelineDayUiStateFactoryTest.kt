@@ -115,10 +115,10 @@ class TimelineDayUiStateFactoryTest {
     }
 
     @Test
-    fun `suppresses boilerplate summary copy`() {
+    fun `a day without a summary has no supporting summary`() {
         val state =
             createSemanticTimelineDayUiState(
-                summary = "No summary available.",
+                summary = "",
                 date = LocalDate(2025, 1, 17),
                 moments = listOf(MomentUiState(id = "moment-1", label = "", textSnippet = "Quiet evening at home.")),
             )

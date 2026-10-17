@@ -9,6 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.feature.onboarding.generated.resources.onboarding_personal_intro_bio_required
+import logdate.client.feature.onboarding.generated.resources.onboarding_personal_intro_name_required
+import logdate.client.feature.onboarding.generated.resources.onboarding_personal_intro_profile_setup_failed
+import logdate.client.feature.onboarding.generated.resources.onboarding_personal_intro_save_bio_failed
+import logdate.client.feature.onboarding.generated.resources.onboarding_personal_intro_save_failed
+import logdate.client.feature.onboarding.generated.resources.onboarding_personal_intro_save_name_failed
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * ViewModel for the personal introduction onboarding screen.
@@ -54,7 +62,7 @@ class PersonalIntroViewModel(
         val currentState = _uiState.value
 
         if (currentState.name.trim().isEmpty()) {
-            updateUiState { currentState.copy(nameError = "Enter a name to continue") }
+            updateUiState { currentState.copy(nameError = Res.string.onboarding_personal_intro_name_required) }
             return
         }
 
@@ -86,7 +94,7 @@ class PersonalIntroViewModel(
         val currentState = _uiState.value
 
         if (currentState.bio.trim().isEmpty()) {
-            updateUiState { currentState.copy(bioError = "Write a little about yourself to continue") }
+            updateUiState { currentState.copy(bioError = Res.string.onboarding_personal_intro_bio_required) }
             return
         }
 
@@ -157,16 +165,16 @@ class PersonalIntroViewModel(
         updateUiState { it.copy(errorMessage = null) }
     }
 
-    private fun errorMessageFor(reason: ProcessPersonalIntroductionUseCase.ErrorReason): String =
+    private fun errorMessageFor(reason: ProcessPersonalIntroductionUseCase.ErrorReason): StringResource =
         when (reason) {
             ProcessPersonalIntroductionUseCase.ErrorReason.SaveDisplayNameFailed ->
-                "Your name couldn't be saved. Try again."
+                Res.string.onboarding_personal_intro_save_name_failed
             ProcessPersonalIntroductionUseCase.ErrorReason.SaveBioFailed ->
-                "Your bio couldn't be saved. Try again."
+                Res.string.onboarding_personal_intro_save_bio_failed
             ProcessPersonalIntroductionUseCase.ErrorReason.ProfileUpdateFailed ->
-                "Your profile couldn't be set up. Try again."
+                Res.string.onboarding_personal_intro_profile_setup_failed
             ProcessPersonalIntroductionUseCase.ErrorReason.UnexpectedFailure ->
-                "Your introduction couldn't be saved. Try again."
+                Res.string.onboarding_personal_intro_save_failed
         }
 
     private fun updateUiState(update: (PersonalIntroUiState) -> PersonalIntroUiState) {

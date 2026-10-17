@@ -5,6 +5,8 @@ import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_recording_not_recovered
 
 /**
  * Resolves audio capture states left behind by a prior session.
@@ -35,7 +37,7 @@ class DefaultPendingAudioRecoverer(
     private val recordingManager: AudioRecordingManager? = null,
 ) : PendingAudioRecoverer {
     override suspend fun recover(state: AudioCaptureState.Stopping): AudioCaptureState {
-        var path = state.filePath ?: return AudioCaptureState.Failed(RECORDING_LOST_REASON)
+        var path = state.filePath ?: return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
         val manager = recordingManager
         try {
             if (manager?.currentRecordingPath?.removePrefix("file://") == path.removePrefix("file://")) {
@@ -48,17 +50,13 @@ class DefaultPendingAudioRecoverer(
             return if (durationMs != null) {
                 AudioCaptureState.Ready(uri = path, durationMs = durationMs)
             } else {
-                AudioCaptureState.Failed(RECORDING_LOST_REASON)
+                AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
             }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Exception) {
             Napier.w("Could not resolve duration for recovered audio $path", error)
-            return AudioCaptureState.Failed(RECORDING_LOST_REASON)
+            return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
         }
-    }
-
-    private companion object {
-        const val RECORDING_LOST_REASON: String = "Recording could not be recovered"
     }
 }

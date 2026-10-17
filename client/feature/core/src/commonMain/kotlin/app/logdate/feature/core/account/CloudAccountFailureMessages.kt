@@ -5,6 +5,30 @@ import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.networking.DiscoveryFailure
 import app.logdate.client.networking.ServerDiscoveryException
 import app.logdate.feature.core.settings.ui.ServerPreset
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_failure_account_not_found
+import logdate.client.feature.core.generated.resources.account_failure_cloud_not_responding
+import logdate.client.feature.core.generated.resources.account_failure_cloud_unreachable
+import logdate.client.feature.core.generated.resources.account_failure_cloud_unreadable
+import logdate.client.feature.core.generated.resources.account_failure_custom_not_responding
+import logdate.client.feature.core.generated.resources.account_failure_custom_unreachable
+import logdate.client.feature.core.generated.resources.account_failure_custom_unreadable
+import logdate.client.feature.core.generated.resources.account_failure_display_name_invalid
+import logdate.client.feature.core.generated.resources.account_failure_local_data_needs_adoption
+import logdate.client.feature.core.generated.resources.account_failure_no_passkey_found
+import logdate.client.feature.core.generated.resources.account_failure_passkey_creation_cancelled
+import logdate.client.feature.core.generated.resources.account_failure_passkey_creation_failed
+import logdate.client.feature.core.generated.resources.account_failure_passkey_not_supported
+import logdate.client.feature.core.generated.resources.account_failure_rate_limited
+import logdate.client.feature.core.generated.resources.account_failure_server_needs_update
+import logdate.client.feature.core.generated.resources.account_failure_server_not_responding
+import logdate.client.feature.core.generated.resources.account_failure_server_unreachable
+import logdate.client.feature.core.generated.resources.account_failure_sign_in_cancelled
+import logdate.client.feature.core.generated.resources.account_failure_sign_in_passkey_failed
+import logdate.client.feature.core.generated.resources.account_failure_unknown
+import logdate.client.feature.core.generated.resources.account_failure_username_invalid
+import logdate.client.feature.core.generated.resources.account_failure_username_taken
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * What to tell the person when the server they chose could not be set up: what failed and what to
@@ -13,86 +37,86 @@ import app.logdate.feature.core.settings.ui.ServerPreset
 internal fun serverSelectionFailureMessage(
     error: Throwable,
     server: ServerPreset,
-): String {
+): StringResource {
     val cloud = server == ServerPreset.PRODUCTION
     val kind =
         when (error) {
             is ServerDiscoveryException -> error.kind
             // A custom server that is reachable but lacks the account protocol is refused before
             // it is saved; anything else from the custom checks means it could not be reached.
-            is IllegalArgumentException -> return "That server needs an update before LogDate can use it. Ask whoever runs it to update it."
+            is IllegalArgumentException -> return Res.string.account_failure_server_needs_update
             else -> DiscoveryFailure.UNREACHABLE
         }
     return when (kind) {
         DiscoveryFailure.UNREACHABLE ->
             if (cloud) {
-                "Can’t reach LogDate Cloud. Check your internet connection, then try again."
+                Res.string.account_failure_cloud_unreachable
             } else {
-                "Can’t reach that server. Check the address and your internet connection, then try again."
+                Res.string.account_failure_custom_unreachable
             }
         DiscoveryFailure.NOT_RESPONDING ->
             if (cloud) {
-                "LogDate Cloud isn’t responding right now. Try again in a few minutes."
+                Res.string.account_failure_cloud_not_responding
             } else {
-                "That server isn’t responding right now. Try again in a few minutes."
+                Res.string.account_failure_custom_not_responding
             }
         DiscoveryFailure.UNREADABLE ->
             if (cloud) {
-                "LogDate Cloud answered with something this version of LogDate can’t read. Update LogDate, then try again."
+                Res.string.account_failure_cloud_unreadable
             } else {
-                "That address didn’t answer like a LogDate server. Check the address, then try again."
+                Res.string.account_failure_custom_unreadable
             }
     }
 }
 
 /** What to tell the person when signing in did not finish. */
-internal fun signInFailureMessage(error: AuthenticateWithPasskeyUseCase.AuthenticationError): String =
+internal fun signInFailureMessage(error: AuthenticateWithPasskeyUseCase.AuthenticationError): StringResource =
     when (error) {
         AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyNotSupported ->
-            "Passkeys are not supported on this device."
+            Res.string.account_failure_passkey_not_supported
         AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyCancelled ->
-            "Authentication was cancelled. Please try again."
+            Res.string.account_failure_sign_in_cancelled
         AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyFailed ->
-            "Failed to authenticate with passkey. Please try again."
+            Res.string.account_failure_sign_in_passkey_failed
         AuthenticateWithPasskeyUseCase.AuthenticationError.NoCredentialsFound ->
-            "No passkey found for this account. Please check your username or create a new account."
+            Res.string.account_failure_no_passkey_found
         AuthenticateWithPasskeyUseCase.AuthenticationError.AccountNotFound ->
-            "Account not found. Please check your username or create a new account."
+            Res.string.account_failure_account_not_found
         AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError ->
-            "Can’t reach the server. Check your internet connection, then try again."
+            Res.string.account_failure_server_unreachable
         AuthenticateWithPasskeyUseCase.AuthenticationError.ServerUnavailable ->
-            "The server isn’t responding right now. Try again in a few minutes."
+            Res.string.account_failure_server_not_responding
         AuthenticateWithPasskeyUseCase.AuthenticationError.LocalDataNeedsAdoption ->
-            "This device has entries that aren't in an account yet."
+            Res.string.account_failure_local_data_needs_adoption
         is AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown ->
             // The exception text names servers, key hashes and file paths. It is already in
             // the log; the user gets something they can act on.
-            "Something went wrong. Please try again."
+            Res.string.account_failure_unknown
     }
 
 /** What to tell the person when creating an account did not finish. */
-internal fun accountCreationFailureMessage(error: CreatePasskeyAccountUseCase.CreateAccountError): String =
+internal fun accountCreationFailureMessage(error: CreatePasskeyAccountUseCase.CreateAccountError): StringResource =
     when (error) {
         CreatePasskeyAccountUseCase.CreateAccountError.UsernameTaken ->
-            "Username is already taken. Please choose a different one."
+            Res.string.account_failure_username_taken
         CreatePasskeyAccountUseCase.CreateAccountError.UsernameInvalid ->
-            "Username is invalid. Use only letters, numbers, and underscores."
+            Res.string.account_failure_username_invalid
         CreatePasskeyAccountUseCase.CreateAccountError.DisplayNameInvalid ->
-            "Display name is invalid. Please enter a valid name."
+            Res.string.account_failure_display_name_invalid
         CreatePasskeyAccountUseCase.CreateAccountError.PasskeyNotSupported ->
-            "Passkeys are not supported on this device."
+            Res.string.account_failure_passkey_not_supported
         CreatePasskeyAccountUseCase.CreateAccountError.PasskeyCancelled ->
-            "Passkey creation was cancelled. Please try again."
+            Res.string.account_failure_passkey_creation_cancelled
         CreatePasskeyAccountUseCase.CreateAccountError.PasskeyFailed ->
-            "Failed to create passkey. Please check your device security settings."
+            Res.string.account_failure_passkey_creation_failed
         CreatePasskeyAccountUseCase.CreateAccountError.NetworkError ->
-            "Can’t reach the server. Check your internet connection, then try again."
+            Res.string.account_failure_server_unreachable
         CreatePasskeyAccountUseCase.CreateAccountError.RateLimited ->
-            "Too many attempts. Please wait a moment before trying again."
+            Res.string.account_failure_rate_limited
         CreatePasskeyAccountUseCase.CreateAccountError.ServerError ->
-            "The server isn’t responding right now. Try again in a few minutes."
+            Res.string.account_failure_server_not_responding
         is CreatePasskeyAccountUseCase.CreateAccountError.Unknown ->
             // The exception text names servers, key hashes and file paths. It is already in
             // the log; the user gets something they can act on.
-            "Something went wrong. Please try again."
+            Res.string.account_failure_unknown
     }

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Your day -->
+    <string name="history_today">Today</string>
+    <string name="history_loading_day">Loading your day…</string>
+    <string name="history_day_summary">%1$s · %2$s</string>
+    <plurals name="history_visit_count">
+        <item quantity="one">%1$d visit</item>
+        <item quantity="other">%1$d visits</item>
+    </plurals>
+    <plurals name="history_location_clue_count">
+        <item quantity="one">%1$d location clue</item>
+        <item quantity="other">%1$d location clues</item>
+    </plurals>
+
+    <!-- Recovery -->
+    <string name="history_change_not_saved">That change could not be saved. Try again.</string>
+    <string name="history_load_failed">Your history couldn’t be loaded. Try again.</string>
+    <string name="history_sections_failed">Some details couldn’t be loaded. Your available history is still here.</string>
+    <string name="history_conflicts_message">Some changes differ across your devices. Tap Review changes to choose what to keep.</string>
+    <string name="history_recording_off">Location history is off. You can still browse memories with a saved place.</string>
+    <string name="history_recording_paused">Location history is paused. Your saved days are still here.</string>
+
+    <!-- Your places -->
+    <plurals name="history_range_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="history_place_last_visited">
+        <item quantity="one">Last visited %1$s · %2$d visit</item>
+        <item quantity="other">Last visited %1$s · %2$d visits</item>
+    </plurals>
+    <string name="history_place_location_recorded">Location recorded %1$s</string>
+    <string name="history_place_latest_memory">Latest memory %1$s</string>
+
+    <!-- Day timeline items -->
+    <string name="history_place_you_visited">A place you visited</string>
+    <string name="history_location_recorded">Location recorded</string>
+    <string name="history_around_time">Around %1$s</string>
+    <string name="history_journey_minutes">%1$d min</string>
+    <string name="history_not_recorded">Not recorded</string>
+    <string name="history_add_missing_visit_hint">You can add a missing visit.</string>
+    <string name="history_memory_photo">A photo from this visit</string>
+    <string name="history_memory_video">A video from this visit</string>
+    <string name="history_memory_recording">A recording from this visit</string>
+
+    <!-- Travel modes -->
+    <string name="history_travel_walked">Walked</string>
+    <string name="history_travel_ran">Ran</string>
+    <string name="history_travel_cycled">Cycled</string>
+    <string name="history_travel_drove">Drove</string>
+    <string name="history_travel_bus">Bus</string>
+    <string name="history_travel_train">Train</string>
+    <string name="history_travel_travelling">Travelling</string>
+
+    <!-- Automatic place names -->
+    <string name="places_near">Near %1$s</string>
+    <string name="places_near_street">Near %1$s, %2$s</string>
+    <string name="places_somewhere_in">Somewhere in %1$s</string>
+    <string name="places_current_location">Current location</string>
+    <string name="places_pinned_location">Pinned location</string>
+
+    <!-- Place sources -->
+    <string name="places_source_saved_place">Saved place</string>
+    <string name="places_source_google_places">Google Places</string>
+    <string name="places_source_location">Location</string>
+    <string name="places_source_coordinates">Coordinates</string>
+    <string name="places_source_place">Place</string>
+    <string name="places_source_nearby_place">Nearby place</string>
+
+    <!-- Stop durations -->
+    <string name="places_stayed_days_hours">Stayed for %1$dd %2$dh</string>
+    <string name="places_stayed_hours_minutes">Stayed for %1$dh %2$dm</string>
+    <string name="places_stayed_minutes">Stayed for %1$dm</string>
+    <string name="places_observed_here">Observed here</string>
+</resources>

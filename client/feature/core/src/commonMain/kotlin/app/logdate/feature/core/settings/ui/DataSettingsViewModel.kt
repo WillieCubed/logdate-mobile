@@ -13,6 +13,8 @@ import app.logdate.client.device.restore.UnsupportedNativeBackupStatusSource
 import app.logdate.client.domain.quota.ObserveCloudQuotaUseCase
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudStorageQuota
@@ -32,6 +34,15 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.data_settings_integrity_audit_failed
+import logdate.client.feature.core.generated.resources.data_settings_integrity_repair_failed
+import logdate.client.feature.core.generated.resources.data_settings_sync_failure_conflict
+import logdate.client.feature.core.generated.resources.data_settings_sync_failure_network
+import logdate.client.feature.core.generated.resources.data_settings_sync_failure_server
+import logdate.client.feature.core.generated.resources.data_settings_sync_failure_storage
+import logdate.client.feature.core.generated.resources.data_settings_sync_failure_unknown
+import org.jetbrains.compose.resources.StringResource
 import kotlin.coroutines.cancellation.CancellationException
 
 data class DataSettingsState(
@@ -56,7 +67,7 @@ data class IntegrityState(
     val isRepairing: Boolean = false,
     val lastReport: IntegrityReport? = null,
     val lastRepair: IntegrityRepairResult? = null,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 )
 
 /**
@@ -78,7 +89,7 @@ sealed interface SyncFeedback {
     data object Started : SyncFeedback
 
     data class Failed(
-        val message: String,
+        val message: StringResource,
     ) : SyncFeedback
 }
 
@@ -196,7 +207,12 @@ class DataSettingsViewModel(
                 }.onFailure { error ->
                     Napier.e("Integrity audit failed", error)
                     _integrityState.update {
-                        it.copy(isChecking = false, errorMessage = error.message ?: "Integrity audit failed")
+                        it.copy(
+                            isChecking = false,
+                            errorMessage =
+                                error.message?.toUiText()
+                                    ?: Res.string.data_settings_integrity_audit_failed.toUiText(),
+                        )
                     }
                 }
         }
@@ -219,7 +235,12 @@ class DataSettingsViewModel(
                 }.onFailure { error ->
                     Napier.e("Integrity repair failed", error)
                     _integrityState.update {
-                        it.copy(isRepairing = false, errorMessage = error.message ?: "Integrity repair failed")
+                        it.copy(
+                            isRepairing = false,
+                            errorMessage =
+                                error.message?.toUiText()
+                                    ?: Res.string.data_settings_integrity_repair_failed.toUiText(),
+                        )
                     }
                 }
         }
@@ -275,11 +296,11 @@ class DataSettingsViewModel(
  * Sync errors carry exception text meant for the log -- entity ids, on-disk paths, the package
  * name. The snackbar says what happened and what to do about it, and leaves the detail to Napier.
  */
-private fun describeSyncFailure(type: SyncErrorType?): String =
+private fun describeSyncFailure(type: SyncErrorType?): StringResource =
     when (type) {
-        SyncErrorType.NETWORK_ERROR -> "Couldn't reach LogDate Cloud. Check your connection and try again."
-        SyncErrorType.SERVER_ERROR -> "LogDate Cloud had a problem. Try again in a moment."
-        SyncErrorType.STORAGE_ERROR -> "Some changes couldn't be uploaded. Review them in Sync issues."
-        SyncErrorType.CONFLICT_ERROR -> "Some changes need review before they can sync."
-        else -> "Sync didn't finish. Try again in a moment."
+        SyncErrorType.NETWORK_ERROR -> Res.string.data_settings_sync_failure_network
+        SyncErrorType.SERVER_ERROR -> Res.string.data_settings_sync_failure_server
+        SyncErrorType.STORAGE_ERROR -> Res.string.data_settings_sync_failure_storage
+        SyncErrorType.CONFLICT_ERROR -> Res.string.data_settings_sync_failure_conflict
+        else -> Res.string.data_settings_sync_failure_unknown
     }

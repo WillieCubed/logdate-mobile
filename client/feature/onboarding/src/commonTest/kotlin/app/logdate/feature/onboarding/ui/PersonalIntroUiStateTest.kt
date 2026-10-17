@@ -1,5 +1,7 @@
 package app.logdate.feature.onboarding.ui
 
+import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.feature.onboarding.generated.resources.onboarding_personal_intro_bio_required
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -23,7 +25,7 @@ class PersonalIntroUiStateTest {
 
     @Test
     fun `a rejected bio still blocks`() {
-        val state = PersonalIntroUiState(bio = "x", bioError = "Too short")
+        val state = PersonalIntroUiState(bio = "x", bioError = Res.string.onboarding_personal_intro_bio_required)
 
         assertFalse(state.canContinueFromBio)
     }

@@ -370,7 +370,7 @@ private fun EventDetailItemsList(
             state.errorMessage?.let { message ->
                 item("error") {
                     Text(
-                        text = message,
+                        text = stringResource(message),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyMedium,
                     )

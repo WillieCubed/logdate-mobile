@@ -5,12 +5,21 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.location.PlaceVisit
 import app.logdate.shared.model.location.SemanticPlace
+import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_around_time
+import logdate.client.feature.location.timeline.generated.resources.history_location_recorded
+import logdate.client.feature.location.timeline.generated.resources.history_place_last_visited
+import logdate.client.feature.location.timeline.generated.resources.history_place_latest_memory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -31,7 +40,10 @@ class HumanHistoryMapperTest {
     @Test
     fun `a visit spanning days shows both dates rather than implying one day's times`() {
         val end = time + 2.days
-        val label = PlaceVisit("long-stay", time, end, listOf("anchor"), 36.0, -115.0, true, place).toHistoryUi(emptyList()).timeLabel
+        val label =
+            assertIs<UiText.Raw>(
+                PlaceVisit("long-stay", time, end, listOf("anchor"), 36.0, -115.0, true, place).toHistoryUi(emptyList()).timeLabel,
+            ).value
         assertTrue(label.contains(time.toReadableDateShort()))
         assertTrue(label.contains(end.toReadableDateShort()))
     }
@@ -51,8 +63,7 @@ class HumanHistoryMapperTest {
         val result = snapshot(notes = listOf(memory)).placeRows().single()
         assertEquals("Library", result.title)
         assertEquals(memory.uid.toString(), result.memories.single().id)
-        assertTrue(result.supportingText.contains("Latest memory"))
-        assertFalse(result.supportingText.contains("Last visited"))
+        assertEquals(listOf(latestMemory()), result.supportingText)
     }
 
     @Test
@@ -68,8 +79,7 @@ class HumanHistoryMapperTest {
         val visits = listOf(visit("morning"), visit("afternoon"))
         val result = snapshot(visits, listOf(memory)).placeRows().single()
         assertEquals(place.id, result.id)
-        assertTrue(result.supportingText.contains("2 visits"))
-        assertTrue(result.supportingText.contains("Latest memory"))
+        assertEquals(listOf(lastVisited(2), latestMemory()), result.supportingText)
         assertEquals(1, result.memories.size)
     }
 
@@ -119,8 +129,8 @@ class HumanHistoryMapperTest {
     fun `sparse evidence is described as a location clue rather than a visit`() {
         val clue = visit("clue").copy(confirmedStay = false, place = null)
         val row = clue.toHistoryUi(emptyList())
-        assertEquals("Location recorded", row.title)
-        assertTrue(row.timeLabel.startsWith("Around "))
+        assertEquals(Res.string.history_location_recorded.toUiText(), row.title)
+        assertEquals(Res.string.history_around_time.toUiText(clue.start.localTime), row.timeLabel)
         assertTrue(row.isApproximate)
     }
 
@@ -141,7 +151,7 @@ class HumanHistoryMapperTest {
 
         assertEquals(2, rows.size)
         assertEquals(setOf("road-a", "road-b"), rows.first().sourceIds)
-        assertTrue(rows.first().supportingText.contains("2 visits"))
+        assertEquals(listOf(lastVisited(2)), rows.first().supportingText)
         assertEquals(setOf("road-c"), rows.last().sourceIds)
     }
 
@@ -154,6 +164,10 @@ class HumanHistoryMapperTest {
     }
 
     private fun visit(id: String) = PlaceVisit(id, time, time, listOf(id), 36.0, -115.0, true, place)
+
+    private fun lastVisited(count: Int) = Res.plurals.history_place_last_visited.toUiText(count, time.toReadableDateShort(), count)
+
+    private fun latestMemory() = Res.string.history_place_latest_memory.toUiText(time.toReadableDateShort())
 
     private fun snapshot(
         visits: List<PlaceVisit> = emptyList(),

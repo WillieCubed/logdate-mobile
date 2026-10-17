@@ -1,6 +1,13 @@
 package app.logdate.feature.core
 
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import kotlinx.coroutines.flow.StateFlow
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.biometric_prompt_default_subtitle
+import logdate.client.feature.core.generated.resources.biometric_prompt_default_title
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * An interface for managing biometric authentication.
@@ -19,14 +26,17 @@ interface BiometricGatekeeper {
      *
      * If the user has not enabled biometric authentication, the [authState] will be set to
      * [AppAuthState.NO_PROMPT_NEEDED] to indicate that no prompt is needed.
+     *
+     * The prompt is shown by the system, outside composition, so implementations resolve [title],
+     * [subtitle], [cancelLabel] and [description] to words where they build the prompt.
      */
     fun authenticate(
-        title: String = "Making sure it's you",
-        subtitle: String = "Use your fingerprint or screen lock to continue",
-        cancelLabel: String = "Cancel",
+        title: UiText = Res.string.biometric_prompt_default_title.toUiText(),
+        subtitle: UiText = Res.string.biometric_prompt_default_subtitle.toUiText(),
+        cancelLabel: UiText = UiRes.string.common_cancel.toUiText(),
         requireConfirmation: Boolean = false,
         requestEnrollmentIfNecessary: Boolean = true,
-        description: String? = null,
+        description: UiText? = null,
         onResult: (AppAuthState) -> Unit = {},
     )
 

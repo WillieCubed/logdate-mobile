@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App update status -->
+    <string name="app_update_status_unsupported_platform">In-app updates are only available on Android builds installed from Google Play.</string>
+    <string name="app_update_status_ready_to_install">Update ready to install.</string>
+    <string name="app_update_status_canceled">Update was canceled before it started.</string>
+    <string name="app_update_status_checking">Checking for updates…</string>
+    <string name="app_update_status_finishing">Finishing update…</string>
+    <string name="app_update_status_finish_failed">Unable to restart and finish the update.</string>
+    <string name="app_update_status_flow_not_ready">Update flow is not ready yet. Try again in a moment.</string>
+    <string name="app_update_status_launch_failed">Unable to launch the update flow.</string>
+
+    <!-- Data settings: integrity check -->
+    <string name="data_settings_integrity_audit_failed">Integrity audit failed</string>
+    <string name="data_settings_integrity_repair_failed">Integrity repair failed</string>
+
+    <!-- Data settings: sync failures -->
+    <string name="data_settings_sync_failure_network">Couldn't reach LogDate Cloud. Check your connection and try again.</string>
+    <string name="data_settings_sync_failure_server">LogDate Cloud had a problem. Try again in a moment.</string>
+    <string name="data_settings_sync_failure_storage">Some changes couldn't be uploaded. Review them in Sync issues.</string>
+    <string name="data_settings_sync_failure_conflict">Some changes need review before they can sync.</string>
+    <string name="data_settings_sync_failure_unknown">Sync didn't finish. Try again in a moment.</string>
+
+    <!-- Data settings: storage quota categories -->
+    <string name="data_settings_quota_category_written_entries">Written entries</string>
+    <string name="data_settings_quota_category_photos">Photos</string>
+    <string name="data_settings_quota_category_recordings">Recordings</string>
+    <string name="data_settings_quota_category_videos">Videos</string>
+    <string name="data_settings_quota_category_journals">Journals</string>
+    <string name="data_settings_quota_category_profile">Profile</string>
+    <string name="data_settings_quota_category_attachments">Attachments</string>
+    <string name="data_settings_quota_category_other">Other</string>
+
+    <!-- Export progress -->
+    <string name="export_progress_preparing">Preparing export…</string>
+    <string name="export_progress_archive_starting">Preparing export...</string>
+    <string name="export_progress_starting">Starting export...</string>
+    <string name="export_progress_collecting_journals">Collecting journals...</string>
+    <string name="export_progress_collecting_notes">Collecting notes...</string>
+    <string name="export_progress_collecting_drafts">Collecting drafts...</string>
+    <string name="export_progress_preparing_data">Preparing export data...</string>
+    <string name="export_progress_writing_archive">Creating ZIP archive...</string>
+    <string name="export_progress_completed">Export completed</string>
+
+    <!-- Export failures -->
+    <string name="export_error_not_completed">Export could not be completed.</string>
+    <string name="export_error_archive_write">Could not write the export archive.</string>
+    <string name="export_error_destination_access">Could not access the selected location.</string>
+    <string name="export_error_default">Export failed. Please try again.</string>
+    <string name="export_alert_failed_title">Export Failed</string>
+
+    <!-- Desktop export dialogs -->
+    <string name="export_desktop_save_dialog_title">Save LogDate Export</string>
+    <string name="export_desktop_success_title">Export Successful</string>
+    <string name="export_desktop_success_message">Export completed successfully to %1$s</string>
+    <string name="export_desktop_failed_message">Export failed: %1$s</string>
+
+    <!-- Restore -->
+    <string name="restore_source_label_fallback">Journal archive</string>
+</resources>
