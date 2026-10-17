@@ -16,6 +16,7 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 content = content,
                 otherJournals = otherJournals,
                 capturedOnWatch = isCapturedOnWatch,
+                capturedDuring = capturedDuring,
             )
         is JournalNote.Image ->
             EntryDisplayData.ImageEntry(
@@ -26,6 +27,7 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 presentation = presentation,
                 otherJournals = otherJournals,
                 capturedOnWatch = isCapturedOnWatch,
+                capturedDuring = capturedDuring,
             )
         is JournalNote.Video ->
             EntryDisplayData.VideoEntry(
@@ -35,6 +37,7 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 caption = caption,
                 otherJournals = otherJournals,
                 capturedOnWatch = isCapturedOnWatch,
+                capturedDuring = capturedDuring,
             )
         is JournalNote.Audio ->
             EntryDisplayData.AudioEntry(
@@ -45,5 +48,6 @@ internal fun JournalNote.toEntryDisplayData(otherJournals: List<JournalReference
                 locationName = location?.displayName,
                 otherJournals = otherJournals,
                 capturedOnWatch = isCapturedOnWatch,
+                capturedDuring = capturedDuring,
             )
     }

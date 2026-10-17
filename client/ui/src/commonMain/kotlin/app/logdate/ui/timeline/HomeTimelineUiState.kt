@@ -1,6 +1,7 @@
 package app.logdate.ui.timeline
 
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.shared.model.Event
 import app.logdate.shared.model.PhotoPresentation
@@ -131,6 +132,8 @@ data class MomentUiState(
      * Whether every note behind this moment was captured on the watch.
      */
     val capturedOnWatch: Boolean = false,
+    /** What the person was doing, when every note behind this moment records the same activity. */
+    val capturedDuring: CaptureActivity? = null,
     val capturedAt: Instant? = null,
     /** A retained memory anchor awaiting content, presented in the same chronological sequence. */
     val pendingMark: MarkedMoment? = null,
@@ -188,6 +191,9 @@ sealed interface NoteUiState {
 
     /** Whether this note was captured on the watch. */
     val capturedOnWatch: Boolean
+
+    /** What the person was doing when they captured this note, or null when it was not recorded. */
+    val capturedDuring: CaptureActivity?
 }
 
 data class TextNoteUiState(
@@ -196,6 +202,7 @@ data class TextNoteUiState(
     val timestamp: Instant,
     override val journals: List<JournalBadgeUiState> = emptyList(),
     override val capturedOnWatch: Boolean = false,
+    override val capturedDuring: CaptureActivity? = null,
 ) : NoteUiState
 
 data class ImageNoteUiState(
@@ -206,6 +213,7 @@ data class ImageNoteUiState(
     val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
     override val journals: List<JournalBadgeUiState> = emptyList(),
     override val capturedOnWatch: Boolean = false,
+    override val capturedDuring: CaptureActivity? = null,
 ) : NoteUiState
 
 data class AudioNoteUiState(
@@ -215,6 +223,7 @@ data class AudioNoteUiState(
     val duration: Long = 0, // Duration in milliseconds
     override val journals: List<JournalBadgeUiState> = emptyList(),
     override val capturedOnWatch: Boolean = false,
+    override val capturedDuring: CaptureActivity? = null,
 ) : NoteUiState
 
 data class VideoNoteUiState(
@@ -226,6 +235,7 @@ data class VideoNoteUiState(
     val caption: String = "",
     override val journals: List<JournalBadgeUiState> = emptyList(),
     override val capturedOnWatch: Boolean = false,
+    override val capturedDuring: CaptureActivity? = null,
 ) : NoteUiState
 
 data class JournalBadgeUiState(

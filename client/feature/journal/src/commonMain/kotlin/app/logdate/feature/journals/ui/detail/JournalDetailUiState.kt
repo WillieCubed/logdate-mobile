@@ -1,5 +1,6 @@
 package app.logdate.feature.journals.ui.detail
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.shared.model.PhotoPresentation
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -47,12 +48,16 @@ sealed interface EntryDisplayData {
     /** Whether the entry was captured on the watch. */
     val capturedOnWatch: Boolean
 
+    /** What the person was doing when they captured the entry, or null when it was not recorded. */
+    val capturedDuring: CaptureActivity?
+
     data class TextEntry(
         override val id: Uuid,
         override val timestamp: Instant,
         val content: String,
         override val otherJournals: List<JournalReference> = emptyList(),
         override val capturedOnWatch: Boolean = false,
+        override val capturedDuring: CaptureActivity? = null,
     ) : EntryDisplayData
 
     data class ImageEntry(
@@ -63,6 +68,7 @@ sealed interface EntryDisplayData {
         val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
         override val otherJournals: List<JournalReference> = emptyList(),
         override val capturedOnWatch: Boolean = false,
+        override val capturedDuring: CaptureActivity? = null,
     ) : EntryDisplayData
 
     data class VideoEntry(
@@ -72,6 +78,7 @@ sealed interface EntryDisplayData {
         val caption: String,
         override val otherJournals: List<JournalReference> = emptyList(),
         override val capturedOnWatch: Boolean = false,
+        override val capturedDuring: CaptureActivity? = null,
     ) : EntryDisplayData
 
     data class AudioEntry(
@@ -82,5 +89,6 @@ sealed interface EntryDisplayData {
         val locationName: String? = null,
         override val otherJournals: List<JournalReference> = emptyList(),
         override val capturedOnWatch: Boolean = false,
+        override val capturedDuring: CaptureActivity? = null,
     ) : EntryDisplayData
 }

@@ -1,6 +1,6 @@
 # Activity awareness on the phone and the watch
 
-Status: step 1 (tracking and reminders) and step 3 (suggestions on Home and Today) are built; step 2 is not. Everything ships behind a new `ACTIVITY_AWARENESS` flag.
+Status: built. Step 1 (tracking and reminders), step 2 (activity context on captured moments) and step 3 (suggestions on Home and Today) are all in place. Everything ships behind a new `ACTIVITY_AWARENESS` flag.
 
 ## Why this exists
 
@@ -185,8 +185,9 @@ val capturedDuring: ActivityKind? = null // next to capturedOn
   flight also claims the next version.
 - **Sync:** encrypted in the sync payload with the same helpers as `capturedOn`. A value the reader
   does not recognize decodes as null, so a newer kind never breaks an older device.
-- **Display:** the timeline and Rewind show "While moving" or "In a vehicle" next to where the moment
-  was captured. Sleep is never shown.
+- **Display:** Home's moments, the day detail and journal entries show "While moving" or "In a vehicle"
+  after a moment's time, where the watch glyph appears. Rewind does not, because its panels come from
+  stored Rewind content rather than the notes. Sleep is never shown.
 
 ### What the app shows
 
@@ -250,7 +251,8 @@ whether a suggestion was already shown for an activity, which enforces one sugge
 1. `ActivityTracker`, the phone's transition request, the watch's Health Services states and the peer
    state field. With these, reminders wait during activities and the end of one can remind. Built;
    see `docs/superpowers/plans/2026-10-16-activity-awareness-step-1-reminders.md`.
-2. `capturedDuring`: stamping, storage, sync and display.
+2. `capturedDuring`: stamping, storage, sync and display. Built; see
+   `docs/superpowers/plans/2026-10-16-activity-awareness-step-2-capture-context.md`.
 3. `ActivityPresenter` and `SuggestionOutcomes`: voice first, the suggestion card and the morning
    start on both devices. Built; see
    `docs/superpowers/plans/2026-10-16-activity-awareness-step-3-suggestions.md`.

@@ -5,11 +5,14 @@ package app.logdate.feature.timeline.ui.details
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.logdate.ui.audio.MomentAudioCard
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.provenance.CapturedOnWatchGlyph
+import app.logdate.ui.provenance.captureActivityText
 import app.logdate.ui.provenance.showsWatchProvenance
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
@@ -33,6 +36,9 @@ fun AudioNoteSnippet(
     ) {
         if (showsWatchProvenance(uiState.capturedOnWatch)) {
             CapturedOnWatchGlyph()
+        }
+        captureActivityText(uiState.capturedDuring)?.let { activity ->
+            Text(text = activity, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         MomentAudioCard(
             audio =

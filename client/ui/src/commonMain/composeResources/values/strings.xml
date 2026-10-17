@@ -133,4 +133,7 @@
     <string name="workspace_create_label">Add a memory</string>
     <!-- Provenance -->
     <string name="captured_on_watch">Captured on your watch</string>
+    <string name="captured_while_moving">While moving</string>
+    <string name="captured_in_vehicle">In a vehicle</string>
+    <string name="captured_time_with_activity">%1$s · %2$s</string>
 </resources>
