@@ -6,6 +6,7 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.StrictMode
+import app.logdate.client.activity.PhoneActivityAwareness
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.bubble.RecordingBubbleNotifier
@@ -183,6 +184,7 @@ class LogdateApplication :
             get<RecordingBubbleSwitch>()
         }
         startPhoneStatePublishing()
+        startActivityAwareness()
         startWatchLinking()
         startWatchReceipts()
         runCatching { get<WatchWindowPublisher>().start(get()) }
@@ -204,6 +206,15 @@ class LogdateApplication :
             get<PhoneLinkInitiator>().start(get())
         }.onFailure { error ->
             Napier.w("Failed to start linking this phone's watches", error)
+        }
+    }
+
+    /** Follows the phone's activity while activity awareness is on; a failure here must not stop startup. */
+    private fun startActivityAwareness() {
+        runCatching {
+            get<PhoneActivityAwareness>().start(get())
+        }.onFailure { error ->
+            Napier.w("Failed to start following the phone's activity", error)
         }
     }
 

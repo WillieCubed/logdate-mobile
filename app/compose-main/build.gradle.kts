@@ -136,6 +136,7 @@ kotlin {
             implementation(libs.nav3.runtime)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.kotlinx.coroutines.play.services)
+            implementation(libs.play.services.location)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.workmanager)
             implementation(projects.client.feature.androidWidgets)

@@ -79,6 +79,6 @@ fun labsFlags(
 
 private fun FeatureFlag.existsOn(platform: PlatformKind): Boolean =
     when (this) {
-        FeatureFlag.WATCH_EXPERIENCE_V2 -> platform == PlatformKind.Android
+        FeatureFlag.WATCH_EXPERIENCE_V2, FeatureFlag.ACTIVITY_AWARENESS -> platform == PlatformKind.Android
         else -> true
     }

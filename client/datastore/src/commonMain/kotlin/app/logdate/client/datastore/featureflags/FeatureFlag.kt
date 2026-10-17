@@ -99,6 +99,15 @@ enum class FeatureFlag(
      * together with every branch that reads it and the watch screens it replaces.
      */
     WATCH_EXPERIENCE_V2(key = "watch_experience_v2_enabled", defaultEnabled = false),
+
+    /**
+     * Activity awareness: the phone and the watch notice when someone is moving, in a vehicle or
+     * asleep. Reminders wait while an activity is under way, and the end of one can be the day's
+     * reminder.
+     *
+     * Off by default while it is built. The phone mirrors it to the watch.
+     */
+    ACTIVITY_AWARENESS(key = "activity_awareness_enabled", defaultEnabled = false),
     ;
 
     companion object {

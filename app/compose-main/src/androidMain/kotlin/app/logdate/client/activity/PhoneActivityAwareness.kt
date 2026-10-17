@@ -1,0 +1,176 @@
+package app.logdate.client.activity
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.SystemClock
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.ActivityTransition
+import com.google.android.gms.location.ActivityRecognition
+import com.google.android.gms.location.ActivityRecognitionClient
+import com.google.android.gms.location.ActivityTransitionRequest
+import com.google.android.gms.location.ActivityTransitionResult
+import com.google.android.gms.location.DetectedActivity
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Instant
+import com.google.android.gms.location.ActivityTransition as PlayTransition
+
+/**
+ * The activity a Play services transition reports, or null for one the tracker does not follow, such
+ * as standing still. Walking, running and cycling are all [ActivityKind.MOVING].
+ */
+internal fun activityKindOf(activityType: Int): ActivityKind? =
+    when (activityType) {
+        DetectedActivity.WALKING, DetectedActivity.RUNNING, DetectedActivity.ON_FOOT, DetectedActivity.ON_BICYCLE -> ActivityKind.MOVING
+        DetectedActivity.IN_VEHICLE -> ActivityKind.IN_VEHICLE
+        else -> null
+    }
+
+/**
+ * One Play services transition as an [ActivityTransition]. Its time is on the elapsed-realtime clock,
+ * so it is placed against [now] by how long ago it happened, [elapsedNowNanos] minus [elapsedNanos].
+ */
+internal fun activityTransitionOf(
+    activityType: Int,
+    transitionType: Int,
+    elapsedNanos: Long,
+    now: Instant,
+    elapsedNowNanos: Long,
+): ActivityTransition? {
+    val kind = activityKindOf(activityType) ?: return null
+    val at = now - (elapsedNowNanos - elapsedNanos).coerceAtLeast(0).nanoseconds
+    return ActivityTransition(kind, entered = transitionType == PlayTransition.ACTIVITY_TRANSITION_ENTER, at = at)
+}
+
+/**
+ * Asks Play services for the phone's activity transitions while activity awareness is on and the
+ * physical activity permission is granted, and stops asking otherwise.
+ *
+ * This request has its own [PendingIntent], so it neither replaces nor is replaced by the location
+ * tracker's request for the same transitions.
+ */
+class PhoneActivityAwareness(
+    private val context: Context,
+    private val tracker: ActivityTracker,
+    private val enabled: Flow<Boolean>,
+    private val client: ActivityRecognitionClient = ActivityRecognition.getClient(context),
+) {
+    private val permissionChecks = MutableStateFlow(0)
+
+    fun start(scope: CoroutineScope) {
+        tracker.start(scope)
+        scope.launch {
+            combine(enabled, permissionChecks) { on, _ -> on && permissionGranted() }
+                .distinctUntilChanged()
+                .collect { follow -> if (follow) register() else unregister() }
+        }
+    }
+
+    /** Checks the permission again, for when the person may have just granted or revoked it. */
+    fun onActivityResumed() {
+        permissionChecks.value++
+    }
+
+    private fun permissionGranted(): Boolean =
+        context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+
+    @SuppressLint("MissingPermission")
+    private suspend fun register() {
+        val transitions =
+            FOLLOWED.flatMap { activity ->
+                listOf(PlayTransition.ACTIVITY_TRANSITION_ENTER, PlayTransition.ACTIVITY_TRANSITION_EXIT).map { transition ->
+                    PlayTransition
+                        .Builder()
+                        .setActivityType(activity)
+                        .setActivityTransition(transition)
+                        .build()
+                }
+            }
+        try {
+            client.requestActivityTransitionUpdates(ActivityTransitionRequest(transitions), pendingIntent()).await()
+            Napier.i("Following the phone's activity for activity awareness")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Couldn't follow the phone's activity; reminders do not wait for walks or trips it would have seen", e)
+        }
+    }
+
+    private suspend fun unregister() {
+        try {
+            client.removeActivityTransitionUpdates(pendingIntent()).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.w("Couldn't stop following the phone's activity", e)
+        }
+    }
+
+    private fun pendingIntent(): PendingIntent =
+        PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE,
+            Intent(context, PhoneActivityTransitionReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        )
+
+    private companion object {
+        const val REQUEST_CODE = 0x4ac7
+        val FOLLOWED =
+            listOf(
+                DetectedActivity.WALKING,
+                DetectedActivity.RUNNING,
+                DetectedActivity.ON_BICYCLE,
+                DetectedActivity.IN_VEHICLE,
+            )
+    }
+}
+
+/** Hands each transition Play services reports to the phone's [ActivityTracker]. */
+class PhoneActivityTransitionReceiver :
+    BroadcastReceiver(),
+    KoinComponent {
+    private val tracker: ActivityTracker by inject()
+    private val scope: CoroutineScope by inject()
+
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
+        if (!ActivityTransitionResult.hasResult(intent)) return
+        val result = ActivityTransitionResult.extractResult(intent) ?: return
+        val now =
+            kotlin.time.Clock.System
+                .now()
+        val elapsedNow = SystemClock.elapsedRealtimeNanos()
+        val transitions =
+            result.transitionEvents.mapNotNull { event ->
+                activityTransitionOf(event.activityType, event.transitionType, event.elapsedRealTimeNanos, now, elapsedNow)
+            }
+        if (transitions.isEmpty()) return
+        val pending = goAsync()
+        scope.launch {
+            try {
+                transitions.forEach { tracker.accept(it) }
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+}

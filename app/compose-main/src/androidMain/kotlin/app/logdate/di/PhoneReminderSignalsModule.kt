@@ -1,8 +1,12 @@
 package app.logdate.di
 
+import app.logdate.client.activity.PhoneActivityAwareness
+import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.KeyValueActivityLogStore
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
@@ -24,9 +28,13 @@ import app.logdate.client.permissions.PermissionType
 import app.logdate.client.reminders.PhoneReminderEnvironmentReader
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.moments.MarkedMomentRepository
+import app.logdate.client.sync.peer.state.PeerRole
+import app.logdate.client.sync.peer.state.PeerStateStore
+import app.logdate.client.sync.peer.state.PresenceState
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.koin.androidContext
@@ -34,6 +42,25 @@ import org.koin.dsl.module
 
 val phoneReminderSignalsModule =
     module {
+        single {
+            val watches = get<PeerStateStore>().latest(PeerRole.WATCH).map { it?.watch }
+            ActivityTracker(
+                store = KeyValueActivityLogStore(get<KeyValueStorage>()),
+                peer = watches.map { it?.activity },
+                // Health Services reports sleep only while the watch is worn, so only a watch known to be
+                // off the wrist is set aside.
+                watchWorn = watches.map { it?.presence?.state != PresenceState.OFF_WRIST },
+                isPhone = true,
+                enabled = get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
+            )
+        }
+        single {
+            PhoneActivityAwareness(
+                context = androidContext(),
+                tracker = get(),
+                enabled = get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
+            )
+        }
         single<SleepRepository> { AndroidSleepRepository(androidContext()) }
         factory { WindDownTimeResolver(get()) }
         single {
@@ -93,12 +120,14 @@ val phoneReminderSignalsModule =
             val environment = get<PhoneReminderEnvironmentReader>()
             val marks = get<MarkedMomentRepository>()
             val supplemental = get<SupplementalReminderSource>()
+            val tracker = get<ActivityTracker>()
             LivePhoneReminderSnapshotSource(
                 environment = { environment.read() },
                 windDown = get(),
                 journal = get(),
                 arrivals = get(),
                 openMarks = { marks.observeOpenMarks().first().size },
+                activity = { tracker.agreed.first() },
                 supplemental = { supplemental.read(it) },
             )
         }
