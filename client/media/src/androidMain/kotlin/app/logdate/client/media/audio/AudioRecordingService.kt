@@ -52,6 +52,7 @@ fun Context.startAudioRecordingService(
             putExtra(AudioRecordingService.EXTRA_PAUSE_ON_INTERRUPTION, options.pauseOnInterruption)
             putExtra(AudioRecordingService.EXTRA_HOLD_WAKE_LOCK, options.holdWakeLock)
             putExtra(AudioRecordingService.EXTRA_CRASH_SAFE, options.crashSafe)
+            putExtra(AudioRecordingService.EXTRA_EXCLUDE_INCOMPLETE_FROM_BACKUP, options.excludeIncompleteFromBackup)
         }
     startForegroundService(intent)
 }
@@ -91,6 +92,7 @@ class AudioRecordingService : Service() {
         const val EXTRA_PAUSE_ON_INTERRUPTION = "app.logdate.extra.PAUSE_ON_INTERRUPTION"
         const val EXTRA_HOLD_WAKE_LOCK = "app.logdate.extra.HOLD_WAKE_LOCK"
         const val EXTRA_CRASH_SAFE = "app.logdate.extra.CRASH_SAFE"
+        const val EXTRA_EXCLUDE_INCOMPLETE_FROM_BACKUP = "app.logdate.extra.EXCLUDE_INCOMPLETE_FROM_BACKUP"
         private const val WAKE_LOCK_TAG = "LogDate:AudioRecordingWakeLock"
         private const val WAKE_LOCK_HEADROOM_MS = 60_000L
         private const val DEFAULT_WAKE_LOCK_TIMEOUT_MS = 35 * 60_000L
@@ -166,6 +168,7 @@ class AudioRecordingService : Service() {
                         pauseOnInterruption = intent.getBooleanExtra(EXTRA_PAUSE_ON_INTERRUPTION, false),
                         holdWakeLock = intent.getBooleanExtra(EXTRA_HOLD_WAKE_LOCK, false),
                         crashSafe = intent.getBooleanExtra(EXTRA_CRASH_SAFE, false),
+                        excludeIncompleteFromBackup = intent.getBooleanExtra(EXTRA_EXCLUDE_INCOMPLETE_FROM_BACKUP, false),
                     )
                 sessionGeneration++
                 startForegroundRecording(outputPath, inputDeviceId)
@@ -335,11 +338,13 @@ class AudioRecordingService : Service() {
                 stopRecordingLocked()
             }
             var recorder: MediaRecorder? = null
+            var recordingFile: File? = null
             try {
                 _recordingState.update { it.copy(routedInputDeviceId = null, inputRoutingError = null) }
                 val file = resolveOutputFile(outputPath)
                 outputFile = file
-                recorder = createRecorder(recordingFileFor(file), inputDeviceId)
+                recordingFile = recordingFileFor(file)
+                recorder = createRecorder(requireNotNull(recordingFile), inputDeviceId)
                 recorder.prepare()
                 recorder.start()
                 mediaRecorder = recorder
@@ -362,6 +367,7 @@ class AudioRecordingService : Service() {
             } catch (e: Exception) {
                 Napier.e("Failed to start recording", e)
                 releaseQuietly(recorder)
+                recordingFile?.delete()
                 mediaRecorder = null
                 _recordingState.update {
                     it.copy(isRecording = false, failureMessage = "Failed to start recording: ${e.message}")
@@ -382,7 +388,13 @@ class AudioRecordingService : Service() {
 
     /** The file the recorder writes: the m4a itself, or the raw AAC that is wrapped into it when it ends. */
     private fun recordingFileFor(finalFile: File): File =
-        if (options.crashSafe) CrashSafeRecording.inFlightFile(finalFile).also { it.delete() } else finalFile
+        when {
+            options.crashSafe -> {
+                CrashSafeRecording.inFlightFile(finalFile, isolateForBackup = options.excludeIncompleteFromBackup).also { it.delete() }
+            }
+            options.excludeIncompleteFromBackup -> CrashSafeRecording.backupExcludedFile(finalFile).also { it.delete() }
+            else -> finalFile
+        }
 
     private fun createRecorder(
         file: File,
@@ -554,6 +566,17 @@ class AudioRecordingService : Service() {
         mediaRecorder = null
         return try {
             recorder?.stop()
+            if (recorder != null && options.excludeIncompleteFromBackup) {
+                outputFile?.let { finalFile ->
+                    val stagedFile =
+                        if (options.crashSafe) {
+                            CrashSafeRecording.inFlightFile(finalFile, isolateForBackup = true)
+                        } else {
+                            CrashSafeRecording.backupExcludedFile(finalFile)
+                        }
+                    CrashSafeRecording.markCompletedForRetry(stagedFile)
+                }
+            }
             recorder?.release()
             val path = finalizeOutputFile()
             _recordingState.update {
@@ -584,9 +607,24 @@ class AudioRecordingService : Service() {
      */
     private fun finalizeOutputFile(): String? {
         val finalFile = outputFile ?: return null
-        if (!options.crashSafe) return finalFile.absolutePath
-        check(AdtsToM4aRemuxer.remuxToM4a(CrashSafeRecording.inFlightFile(finalFile), finalFile)) {
-            "Could not finish the recording file"
+        if (options.crashSafe) {
+            val inFlight = CrashSafeRecording.inFlightFile(finalFile, isolateForBackup = options.excludeIncompleteFromBackup)
+            if (AdtsToM4aRemuxer.remuxToM4a(inFlight, finalFile)) {
+                inFlight.delete()
+                CrashSafeRecording.clearCompletedRetryMarker(inFlight)
+                return finalFile.absolutePath
+            }
+            check(inFlight.isFile && inFlight.length() > 0L) {
+                "Could not preserve the recording for recovery"
+            }
+            Napier.w("Completed recording ${finalFile.name} is queued for startup recovery")
+            return finalFile.absolutePath
+        }
+        if (options.excludeIncompleteFromBackup) {
+            val publication = CrashSafeRecording.publishCompletedRecording(CrashSafeRecording.backupExcludedFile(finalFile), finalFile)
+            check(publication != CompletedRecordingPublication.FAILED) {
+                "Could not publish or preserve the completed recording"
+            }
         }
         return finalFile.absolutePath
     }

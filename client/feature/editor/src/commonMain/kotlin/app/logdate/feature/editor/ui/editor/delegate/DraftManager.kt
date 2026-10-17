@@ -224,6 +224,11 @@ private fun AudioBlockUiState.toPendingMediaRecord(position: Int): PendingMediaR
         mediaType = PendingMediaType.AUDIO,
         createdAt = timestamp,
         filePath = filePath,
+        fallbackFilePath =
+            when (val capture = captureState) {
+                is AudioCaptureState.Recording -> capture.fallbackFilePath
+                is AudioCaptureState.Stopping -> capture.fallbackFilePath
+            },
         timeZoneId = timeZoneId,
         position = position,
         caption = caption,
@@ -244,7 +249,7 @@ private fun PendingMediaRecord.toBlock(): EntryBlockUiState? =
             AudioBlockUiState(
                 id = blockId,
                 timestamp = createdAt,
-                captureState = AudioCaptureState.Stopping(filePath = filePath),
+                captureState = AudioCaptureState.Stopping(filePath = filePath, fallbackFilePath = fallbackFilePath),
                 caption = caption,
                 transcription = transcription,
                 timeZoneId = timeZoneId,

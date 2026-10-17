@@ -34,6 +34,10 @@ data class AudioUiState(
      * while the recording is in flight.
      */
     val recordingFilePath: String? = null,
+    /** A completed take kept recoverable until a replacement recording is safely underway. */
+    val recordingFallbackFilePath: String? = null,
+    /** A stopped recording path awaiting media validation before it can become a completed take. */
+    val pendingRecoveryFilePath: String? = null,
     /**
      * Block id the active recording is bound to. Multiple audio blocks may exist in the
      * editor; only the one matching this id should reflect the recording's live state.

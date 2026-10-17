@@ -60,6 +60,45 @@ internal suspend fun EntryEditorViewModel.persistDraftImpl(state: EditorState): 
     )
 
 /**
+ * Stores the audio block's file target before the platform opens the microphone. This guarantees
+ * that a process death during capture leaves a draft record that can reclaim the recovered file.
+ */
+internal suspend fun EntryEditorViewModel.persistAudioRecordingTargetImpl(
+    blockId: Uuid,
+    filePath: String,
+    fallbackFilePath: String? = null,
+): Boolean {
+    if (filePath.isBlank()) return false
+    val initialState = mutableEditorState.value
+    val block = initialState.blocks.firstOrNull { it.id == blockId } as? AudioBlockUiState ?: return false
+    if (initialState.isReadOnly(blockId) || initialState.shouldExit || initialState.isSaving || initialState.isEditingLocked) return false
+
+    val targetState = AudioCaptureState.Recording(filePath = filePath, fallbackFilePath = fallbackFilePath)
+    updateBlockImpl(block.copy(captureState = targetState))
+    val updatedBlock = mutableEditorState.value.blocks.firstOrNull { it.id == blockId } as? AudioBlockUiState
+    if (updatedBlock?.captureState != targetState) return false
+    val snapshot = currentDraftPersistenceState(mutableEditorState.value)
+    val persisted =
+        try {
+            draftPersistenceMutex.withLock {
+                persistLatestDraftUntilStable(snapshot) != null
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Napier.e("Could not save the recording target to its draft", error)
+            false
+        }
+    if (!persisted) {
+        val currentBlock = mutableEditorState.value.blocks.firstOrNull { it.id == blockId } as? AudioBlockUiState
+        if (currentBlock?.captureState == targetState) {
+            updateBlockImpl(currentBlock.copy(captureState = block.captureState))
+        }
+    }
+    return persisted
+}
+
+/**
  * Persists an explicit exit draft and reports whether it is safe for the UI to navigate.
  */
 internal suspend fun EntryEditorViewModel.saveAsDraftImpl(state: EditorState): Boolean {

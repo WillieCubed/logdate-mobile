@@ -214,6 +214,76 @@ class EntryEditorViewModelAudioSaveTest {
             assertEquals(4_200L, audio.durationMs)
         }
 
+    @Test
+    fun `recording target is durably attached to its draft before capture starts`() =
+        testScope.runTest {
+            val viewModel = buildViewModel()
+            viewModel.editorState.first()
+            val block = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            advanceUntilIdle()
+            val path = "/files/audio_notes/recording_recovery.m4a"
+
+            assertTrue(viewModel.persistAudioRecordingTarget(block.id, path))
+            advanceUntilIdle()
+
+            val draftId = assertIs<DraftState.Active>(viewModel.editorState.value.draftState).id
+            val persistedDraft = entryDraftRepository.getDraft(draftId).first().getOrThrow()
+            val pending = persistedDraft.pendingMedia.single()
+            assertEquals(block.id, pending.blockId)
+            assertEquals(path, pending.filePath)
+            val persistedBlocks =
+                viewModel.editorState.value.blocks
+                    .filterIsInstance<AudioBlockUiState>()
+            assertEquals(1, persistedBlocks.size)
+            val persistedBlock = persistedBlocks.single()
+            assertEquals(AudioCaptureState.Recording(filePath = path), persistedBlock.captureState)
+        }
+
+    @Test
+    fun `replacement recording target persists fallback take in the draft`() =
+        testScope.runTest {
+            val viewModel = buildViewModel()
+            viewModel.editorState.first()
+            val block = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            advanceUntilIdle()
+            val replacementPath = "/files/audio_notes/replacement.m4a"
+            val previousPath = "/files/audio_notes/previous.m4a"
+
+            assertTrue(viewModel.persistAudioRecordingTarget(block.id, replacementPath, previousPath))
+            advanceUntilIdle()
+
+            val draftId = assertIs<DraftState.Active>(viewModel.editorState.value.draftState).id
+            val pending =
+                entryDraftRepository
+                    .getDraft(draftId)
+                    .first()
+                    .getOrThrow()
+                    .pendingMedia
+                    .single()
+            assertEquals(replacementPath, pending.filePath)
+            assertEquals(previousPath, pending.fallbackFilePath)
+        }
+
+    @Test
+    fun `recording does not have an owner when target persistence fails`() =
+        testScope.runTest {
+            val viewModel = buildViewModel()
+            viewModel.editorState.first()
+            val block = viewModel.seedAudioBlock(AudioCaptureState.Empty)
+            advanceUntilIdle()
+            entryDraftRepository.createDraftFailure = IllegalStateException("disk unavailable")
+
+            assertFalse(
+                viewModel.persistAudioRecordingTarget(block.id, "/files/audio_notes/unpersisted.m4a"),
+            )
+            val persistedBlocks =
+                viewModel.editorState.value.blocks
+                    .filterIsInstance<AudioBlockUiState>()
+            assertEquals(AudioCaptureState.Empty, persistedBlocks.single().captureState)
+            assertEquals(1, entryDraftRepository.createDraftCallCount, "A failed write must not report a durable owner")
+            assertTrue(entryDraftRepository.getDrafts().first().isEmpty())
+        }
+
     /**
      * Regression for a real, live-reproduced bug: this note's own block flips read-only the
      * moment [journalNotesRepository] observes it (mirrored here by [FakeJournalNotesRepository.afterCreate]

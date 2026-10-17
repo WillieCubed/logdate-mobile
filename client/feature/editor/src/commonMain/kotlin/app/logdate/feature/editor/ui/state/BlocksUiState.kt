@@ -26,6 +26,7 @@ class BlocksUiState(
     val onUpdateBlock: (EntryBlockUiState) -> Unit,
     val onCreateBlock: (BlockType, Uuid) -> EntryBlockUiState,
     val onDeleteBlock: (Uuid) -> Unit,
+    val onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
 ) {
     val hasContent get() = blocks.any { it.hasContent() }
 }
@@ -38,12 +39,13 @@ fun rememberBlocksUiState(
     onCreateBlock: (BlockType, Uuid) -> EntryBlockUiState,
     onDeleteBlock: (Uuid) -> Unit,
     onUpdateJournalSelection: (List<Uuid>) -> Unit,
+    onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
 ): BlocksUiState {
     val hasContent by remember(editorState.blocks) {
         derivedStateOf { editorState.blocks.isNotEmpty() }
     }
 
-    return remember(editorState, hasContent) {
+    return remember(editorState, hasContent, onPersistAudioRecordingTarget) {
         BlocksUiState(
             blocks = editorState.blocks,
             expandedBlockId = editorState.expandedBlockId,
@@ -54,6 +56,7 @@ fun rememberBlocksUiState(
             onUpdateBlock = onUpdateBlock,
             onCreateBlock = onCreateBlock,
             onDeleteBlock = onDeleteBlock,
+            onPersistAudioRecordingTarget = onPersistAudioRecordingTarget,
         )
     }
 }

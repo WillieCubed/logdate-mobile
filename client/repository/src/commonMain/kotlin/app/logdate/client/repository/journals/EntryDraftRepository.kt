@@ -218,6 +218,7 @@ data class PendingMediaRecord(
     val mediaType: PendingMediaType,
     val createdAt: Instant,
     val filePath: String? = null,
+    val fallbackFilePath: String? = null,
     val timeZoneId: String? = null,
     val position: Int? = null,
     val caption: String = "",

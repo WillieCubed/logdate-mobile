@@ -26,6 +26,16 @@ interface AudioRecordingManager {
     suspend fun startRecording(targetNoteId: Uuid? = null): Boolean
 
     /**
+     * Starts recording only after [onTargetReady] has durably associated the allocated path
+     * with its owning draft. Implementations that can allocate a target before capture should
+     * override this overload; the default preserves compatibility for non-recoverable platforms.
+     */
+    suspend fun startRecording(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean
+
+    /**
      * Stops audio recording
      * @return URI to the recorded audio file, or null if recording failed
      */

@@ -66,12 +66,15 @@ interface RecordingServiceController {
  * @property holdWakeLock Keep the CPU awake while recording so a dozing device does not drop audio.
  * @property crashSafe Write the recording as raw AAC and wrap it into the requested m4a when it
  *   ends, so a process killed mid-recording leaves audio that [CrashSafeRecording] can recover.
+ * @property excludeIncompleteFromBackup Keep the recorder's working file under the backup-excluded
+ *   audio staging directory and publish it to the media library only after a successful stop.
  */
 data class RecordingSessionOptions(
     val maxDurationMs: Long = 0L,
     val pauseOnInterruption: Boolean = false,
     val holdWakeLock: Boolean = false,
     val crashSafe: Boolean = false,
+    val excludeIncompleteFromBackup: Boolean = false,
 )
 
 /**

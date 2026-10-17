@@ -361,6 +361,7 @@ internal fun EntryMemorySequence(
                                         onUpdate = uiState.onUpdateBlock,
                                         onRemove = { uiState.onDeleteBlock(block.id) },
                                         onAudioResolverReady = onAudioResolverReady,
+                                        onPersistAudioRecordingTarget = uiState.onPersistAudioRecordingTarget,
                                         onPhotoAspectRatioLoaded = { id, ratio -> aspectRatios[id] = ratio },
                                         focusedTextHeight = focusedTextHeight,
                                         unfinishedRecordingHeight = recordingHeight,

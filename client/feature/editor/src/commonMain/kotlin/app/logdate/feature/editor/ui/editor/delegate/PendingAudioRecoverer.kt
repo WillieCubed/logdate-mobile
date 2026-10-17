@@ -37,21 +37,24 @@ class DefaultPendingAudioRecoverer(
     private val recordingManager: AudioRecordingManager? = null,
 ) : PendingAudioRecoverer {
     override suspend fun recover(state: AudioCaptureState.Stopping): AudioCaptureState {
-        var path = state.filePath ?: return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
+        var path = state.filePath
         val manager = recordingManager
         try {
-            if (manager?.currentRecordingPath?.removePrefix("file://") == path.removePrefix("file://")) {
+            if (path != null && manager?.currentRecordingPath?.removePrefix("file://") == path.removePrefix("file://")) {
                 if (manager.isRecording || manager.isStartingRecording) {
-                    return AudioCaptureState.Recording(filePath = manager.currentRecordingPath)
+                    return AudioCaptureState.Recording(
+                        filePath = manager.currentRecordingPath,
+                        fallbackFilePath = state.fallbackFilePath,
+                    )
                 }
                 path = manager.stopRecording() ?: path
             }
-            val durationMs = durationResolver.resolveDurationMs(path)
-            return if (durationMs != null) {
-                AudioCaptureState.Ready(uri = path, durationMs = durationMs)
-            } else {
-                AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
-            }
+            path?.let { resolvePath(it) }?.let { return it }
+            state.fallbackFilePath
+                ?.takeIf { it != path }
+                ?.let { resolvePath(it) }
+                ?.let { return it }
+            return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Exception) {
@@ -59,4 +62,15 @@ class DefaultPendingAudioRecoverer(
             return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
         }
     }
+
+    private suspend fun resolvePath(path: String): AudioCaptureState.Ready? =
+        try {
+            durationResolver.resolveDurationMs(path)?.let { AudioCaptureState.Ready(uri = path, durationMs = it) }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Napier.w("Could not resolve recovered audio", error)
+            null
+        }
+
 }

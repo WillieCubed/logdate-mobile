@@ -32,6 +32,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -63,7 +64,7 @@ class AudioViewModelTest {
     }
 
     @Test
-    fun `cancellation while measuring a finalized recording retains its audio`() =
+    fun `cancellation while validating a finalized recording retains its recovery path`() =
         runTest(dispatcher) {
             val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 12.seconds, 0.5f)
             val model = buildViewModel(manager, AudioDurationResolver { throw CancellationException("Duration cancelled") })
@@ -74,12 +75,16 @@ class AudioViewModelTest {
 
             assertFalse(manager.isRecording)
             assertFalse(model.uiState.value.isRecording)
-            assertEquals("file:///test/audio.m4a", model.uiState.value.recordedAudioUri)
+            assertNull(model.uiState.value.recordedAudioUri)
+            val pendingPath =
+                model.uiState.value.pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(pendingPath.endsWith("/test/audio.m4a"))
             assertNull(model.uiState.value.failedRecordingTargetNoteId)
         }
 
     @Test
-    fun `duration lookup failure cannot discard a finalized recording`() =
+    fun `duration lookup failure keeps the finalized recording recoverable`() =
         runTest(dispatcher) {
             val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 12.seconds, 0.5f)
             val model = buildViewModel(manager, AudioDurationResolver { error("Metadata unavailable") })
@@ -88,13 +93,74 @@ class AudioViewModelTest {
             model.stopRecording()
             advanceUntilIdle()
 
-            assertEquals("file:///test/audio.m4a", model.uiState.value.recordedAudioUri)
+            assertNull(model.uiState.value.recordedAudioUri)
+            val pendingPath =
+                model.uiState.value.pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(pendingPath.endsWith("/test/audio.m4a"))
             assertEquals(12.seconds, model.uiState.value.duration)
             assertNull(model.uiState.value.failedRecordingTargetNoteId)
         }
 
     @Test
-    fun `restart interrupted during duration lookup keeps the completed take`() =
+    fun `recording target persistence completes before manager starts capture`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 12.seconds, 0.5f)
+            val model = buildViewModel(manager)
+            var pathAtPersistence: String? = null
+            var startCallsAtPersistence = -1
+
+            model.startRecording(Uuid.random()) { path, _ ->
+                pathAtPersistence = path
+                startCallsAtPersistence = manager.startCalls
+                true
+            }
+            advanceUntilIdle()
+
+            assertEquals("/test/audio.m4a", pathAtPersistence)
+            assertEquals(0, startCallsAtPersistence)
+            assertEquals(1, manager.startCalls)
+            assertTrue(model.uiState.value.isRecording)
+        }
+
+    @Test
+    fun `cancellation during target persistence clears starting state for retry`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 12.seconds, 0.5f)
+            val model = buildViewModel(manager)
+
+            model.startRecording(Uuid.random()) { _, _ -> throw CancellationException("Draft write cancelled") }
+            advanceUntilIdle()
+
+            assertFalse(model.uiState.value.isStartingRecording)
+            assertFalse(model.uiState.value.isRecording)
+            assertEquals(0, manager.startCalls)
+
+            model.startRecording(Uuid.random())
+            advanceUntilIdle()
+
+            assertTrue(model.uiState.value.isRecording)
+        }
+
+    @Test
+    fun `cancellation after recorder ownership attaches to the active session`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 12.seconds, 0.5f)
+            val model = buildViewModel(manager)
+            val blockId = Uuid.random()
+            manager.startFailureAfterRecording = CancellationException("UI owner cancelled after start")
+
+            model.startRecording(blockId)
+            advanceUntilIdle()
+
+            assertTrue(model.uiState.value.isRecording)
+            assertFalse(model.uiState.value.isStartingRecording)
+            assertEquals(blockId, model.uiState.value.recordingTargetNoteId)
+            assertEquals(manager.currentRecordingPath, model.uiState.value.recordingFilePath)
+        }
+
+    @Test
+    fun `restart interrupted during duration lookup keeps the recording recoverable`() =
         runTest(dispatcher) {
             val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 12.seconds, 0.5f)
             val model = buildViewModel(manager, AudioDurationResolver { throw CancellationException("Duration cancelled") })
@@ -105,7 +171,11 @@ class AudioViewModelTest {
 
             assertFalse(manager.isRecording)
             assertEquals(1, manager.startCalls)
-            assertEquals("file:///test/audio.m4a", model.uiState.value.recordedAudioUri)
+            assertNull(model.uiState.value.recordedAudioUri)
+            val pendingPath =
+                model.uiState.value.pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(pendingPath.endsWith("/test/audio.m4a"))
             assertNull(model.uiState.value.failedRecordingTargetNoteId)
         }
 
@@ -383,7 +453,7 @@ class AudioViewModelTest {
         }
 
     @Test
-    fun `restart aborts when the previous recording could not be finalized`() =
+    fun `restart retains an unfinalized recording for later recovery`() =
         runTest(dispatcher) {
             val manager = FakeAudioRecordingManager(null, 1.seconds, 0.5f)
             val model = buildViewModel(manager)
@@ -395,7 +465,12 @@ class AudioViewModelTest {
 
             assertEquals(1, manager.startCalls)
             assertFalse(model.uiState.value.isRecording)
-            assertNotNull(model.uiState.value.failedRecordingTargetNoteId)
+            assertNull(model.uiState.value.failedRecordingTargetNoteId)
+            val pendingPath =
+                model.uiState.value
+                    .pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(pendingPath.endsWith("/test/audio.m4a"))
         }
 
     @Test
@@ -406,13 +481,156 @@ class AudioViewModelTest {
             model.startRecording(Uuid.random())
             advanceUntilIdle()
             manager.startSucceeds = false
+            var durableFallback: String? = null
+
+            model.restartRecording { _, fallback ->
+                durableFallback = fallback
+                true
+            }
+            advanceUntilIdle()
+
+            assertFalse(model.uiState.value.isRecording)
+            assertEquals("file:///test/audio.m4a", model.uiState.value.recordedAudioUri)
+            assertNull(model.uiState.value.failedRecordingTargetNoteId)
+            assertEquals("file:///test/audio.m4a", durableFallback)
+        }
+
+    @Test
+    fun `cancellation after replacement ownership retains the previous take fallback`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 1.seconds, 0.5f)
+            val model = buildViewModel(manager)
+            val blockId = Uuid.random()
+            model.startRecording(blockId)
+            advanceUntilIdle()
+            manager.startFailureAfterRecording = CancellationException("Replacement owner cancelled")
+
+            model.restartRecording()
+            advanceUntilIdle()
+
+            assertTrue(model.uiState.value.isRecording)
+            assertEquals("file:///test/audio.m4a", model.uiState.value.recordingFallbackFilePath)
+        }
+
+    @Test
+    fun `failed replacement stop restores the previous completed take`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 1.seconds, 0.5f)
+            val model =
+                buildViewModel(
+                    manager,
+                    AudioDurationResolver { path -> if (path.endsWith("/test/audio.m4a")) 1_000L else null },
+                )
+            val blockId = Uuid.random()
+            model.startRecording(blockId)
+            advanceUntilIdle()
+            manager.nextRecordingPath = "/test/replacement.m4a"
+            model.restartRecording()
+            advanceUntilIdle()
+            manager.stopFailure = IllegalStateException("Replacement could not be finalized")
+
+            model.restartRecording()
+            advanceUntilIdle()
+
+            assertFalse(model.uiState.value.isRecording)
+            val pendingPath =
+                model.uiState.value.pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(pendingPath.endsWith("/test/replacement.m4a"))
+            assertEquals("file:///test/audio.m4a", model.uiState.value.recordingFallbackFilePath)
+            assertNull(model.uiState.value.recordedAudioUri)
+            assertNull(model.uiState.value.failedRecordingTargetNoteId)
+            manager.stopFailure = null
+            val recovered = assertIs<AudioCaptureState.Ready>(model.resolvePending(blockId))
+            assertEquals("file:///test/audio.m4a", recovered.uri)
+        }
+
+    @Test
+    fun `failed first stop keeps its durable draft target for startup recovery`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 1.seconds, 0.5f)
+            var canResolveDuration = false
+            val model =
+                buildViewModel(
+                    manager,
+                    AudioDurationResolver { if (canResolveDuration) 1_000L else null },
+                )
+            val blockId = Uuid.random()
+            model.startRecording(blockId)
+            advanceUntilIdle()
+            manager.stopFailure = IllegalStateException("Recorder could not finalize")
+
+            model.stopRecording()
+            advanceUntilIdle()
+
+            val state = model.uiState.value
+            assertFalse(state.isRecording)
+            assertTrue(state.pendingRecoveryFilePath.orEmpty().endsWith("/test/audio.m4a"))
+            assertNull(state.recordedAudioUri)
+            assertNull(state.failedRecordingTargetNoteId)
+            assertNull(state.error)
+            manager.stopFailure = null
+            assertIs<AudioCaptureState.Failed>(model.resolvePending(blockId))
+            val retainedPendingPath =
+                model.uiState.value.pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(retainedPendingPath.endsWith("/test/audio.m4a"))
+            assertNull(model.uiState.value.recordedAudioUri)
+            canResolveDuration = true
+            val recovered = assertIs<AudioCaptureState.Ready>(model.resolvePending(blockId))
+            assertEquals("/test/audio.m4a", recovered.uri)
+            assertNull(model.uiState.value.pendingRecoveryFilePath)
+        }
+
+    @Test
+    fun `cancellation while validating stopped recovery preserves its retry anchor`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 1.seconds, 0.5f)
+            var cancelValidation = true
+            val model =
+                buildViewModel(
+                    manager,
+                    AudioDurationResolver {
+                        if (cancelValidation) throw CancellationException("Validation cancelled")
+                        1_000L
+                    },
+                )
+            val blockId = Uuid.random()
+            model.startRecording(blockId)
+            advanceUntilIdle()
+            manager.stopFailure = IllegalStateException("Recorder could not finalize")
+            model.stopRecording()
+            advanceUntilIdle()
+
+            manager.stopFailure = null
+            assertFailsWith<CancellationException> { model.resolvePending(blockId) }
+            assertNull(model.uiState.value.recordedAudioUri)
+            val pendingPath =
+                model.uiState.value.pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(pendingPath.endsWith("/test/audio.m4a"))
+
+            cancelValidation = false
+            val recovered = assertIs<AudioCaptureState.Ready>(model.resolvePending(blockId))
+            assertEquals("/test/audio.m4a", recovered.uri)
+        }
+
+    @Test
+    fun `cancelled replacement does not attach to another untargeted recording`() =
+        runTest(dispatcher) {
+            val manager = FakeAudioRecordingManager("file:///test/audio.m4a", 1.seconds, 0.5f)
+            val model = buildViewModel(manager)
+            model.startRecording()
+            advanceUntilIdle()
+            manager.activePathOverride = "/test/other-session.m4a"
+            manager.startFailureAfterRecording = CancellationException("Replacement start cancelled")
 
             model.restartRecording()
             advanceUntilIdle()
 
             assertFalse(model.uiState.value.isRecording)
             assertEquals("file:///test/audio.m4a", model.uiState.value.recordedAudioUri)
-            assertNull(model.uiState.value.failedRecordingTargetNoteId)
+            assertTrue(manager.isRecording, "The editor must not claim or stop another owner's recording")
         }
 
     @Test
@@ -752,7 +970,7 @@ class AudioViewModelTest {
         }
 
     @Test
-    fun `a stop that yields no file clears the session and flags the block`() =
+    fun `a stop that yields no file preserves the draft target for recovery`() =
         runTest(dispatcher) {
             val recordingManager =
                 FakeAudioRecordingManager(
@@ -771,14 +989,19 @@ class AudioViewModelTest {
             val state = viewModel.uiState.value
             assertFalse(state.isRecording)
             assertNull(state.recordedAudioUri)
-            assertEquals(blockId, state.failedRecordingTargetNoteId)
-            assertNotNull(state.error)
+            assertNull(state.failedRecordingTargetNoteId)
+            assertTrue(state.pendingRecoveryFilePath.orEmpty().endsWith("/test/audio.m4a"))
+            assertNull(state.error)
 
-            // The next start clears the failure so the block can record again.
-            viewModel.startRecording(blockId)
+            viewModel.startRecording(Uuid.random())
             advanceUntilIdle()
-            assertNull(viewModel.uiState.value.failedRecordingTargetNoteId)
-            assertNull(viewModel.uiState.value.error)
+
+            assertEquals(1, recordingManager.startCalls)
+            val pendingPath =
+                viewModel.uiState.value
+                    .pendingRecoveryFilePath
+                    .orEmpty()
+            assertTrue(pendingPath.endsWith("/test/audio.m4a"))
         }
 
     @Test
@@ -880,6 +1103,9 @@ private class FakeAudioRecordingManager(
     var stopFailure: Exception? = null
     var resetGate: CompletableDeferred<Unit>? = null
     var startFailureAfterRecording: Exception? = null
+    var nextRecordingPath = "/test/audio.m4a"
+    var activePathOverride: String? = null
+    private var activeRecordingPath: String? = null
 
     val currentTranscription: TranscriptionResult?
         get() = structuredFlow.replayCache.lastOrNull()
@@ -891,7 +1117,7 @@ private class FakeAudioRecordingManager(
         private set
 
     override val currentRecordingPath: String?
-        get() = if (currentRecordingTargetNoteId != null) "/test/audio.m4a" else null
+        get() = activeRecordingPath
 
     override fun requestStopRecording() {
         requestStopCalls++
@@ -904,6 +1130,14 @@ private class FakeAudioRecordingManager(
         get() = startingFlow.value
 
     override fun getRecordingStartingFlow(): Flow<Boolean> = startingFlow
+
+    override suspend fun startRecording(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean {
+        if (!onTargetReady(nextRecordingPath)) return false
+        return startRecording(targetNoteId)
+    }
 
     fun beginPendingStart(blockId: Uuid) {
         currentRecordingTargetNoteId = blockId
@@ -926,6 +1160,7 @@ private class FakeAudioRecordingManager(
         startGate?.await()
         if (!startSucceeds) return false
         currentRecordingTargetNoteId = targetNoteId
+        activeRecordingPath = activePathOverride ?: nextRecordingPath
         isRecording = true
         recordingStateFlow.value = true
         startResult?.let { structuredFlow.emit(it) }
@@ -938,6 +1173,7 @@ private class FakeAudioRecordingManager(
         stopFailure?.let { throw it }
         isRecording = false
         recordingStateFlow.value = false
+        activeRecordingPath = null
         return outputUri
     }
 
@@ -1033,7 +1269,7 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
 }
 
 private class FakeAudioDurationResolver : AudioDurationResolver {
-    override suspend fun resolveDurationMs(uri: String): Long? = null
+    override suspend fun resolveDurationMs(uri: String): Long? = 1_000L
 }
 
 private class FakeTranscriptionService : TranscriptionService {
