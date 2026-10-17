@@ -6,6 +6,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import app.logdate.ui.common.formatting.LocalToday
+import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.ExperimentalResourceApi
@@ -32,6 +33,9 @@ fun ScreenshotTheme(
         // date renders "Yesterday" when recorded and "May 4" the next day, and every reference
         // containing one rots on a timer with no code having changed.
         LocalToday provides SCREENSHOT_TODAY,
+        // The renderer cannot draw a live Google Map, so a configured Maps key would leave map
+        // areas blank. Screenshots always use the static map preview, with or without a key.
+        LocalGoogleMapsAvailabilityOverride provides false,
     ) {
         LogDateTheme(darkTheme = resolvedDarkTheme) {
             content()
