@@ -38,10 +38,12 @@ Use `SettingsNavigationItem` for navigation, including destinations without an
 icon. Do not recreate its chevron or clickable modifier. `ToggleSettingsItem`
 owns one switch semantics node for the entire row; its visual switch delegates
 to that action. `LinkedToggleSettingsItem` intentionally keeps navigation and
-preference changes as separate targets. The master feature control stacks its
-switch below the label when its local width is too narrow for the user's text
-scale, giving long words the full label width without shrinking type. It retains
-one toggle action in either layout. A passive `SimpleSettingsItem` has no
+preference changes as separate targets. The master feature control measures the
+label's widest word and stacks its switch below the label when that word cannot
+fit beside the switch, giving long words the full label width. A word wider than
+the whole control first drops its letter spacing, then shrinks only as far as
+needed, so no font's metrics break it mid-word. It retains one toggle action in
+either layout. A passive `SimpleSettingsItem` has no
 click action unless a real callback is supplied.
 
 Use the slot-based `SettingsRow` for compound controls such as passkey removal,
@@ -141,7 +143,8 @@ navigation, toggle, linked-toggle and disabled rows with matching descriptions.
 Render the `settings-components` scene to compare their typography together.
 `SettingsRowsTest.kt` verifies the supporting text role, passive semantics,
 disabled preferences and independent linked actions. `SettingsMasterLayoutTest`
-checks long-word wrapping and the single toggle target at 200% text.
+checks long-word wrapping, including a word wider than the whole control, and the
+single toggle target at 200% text.
 
 `NativeBackupScreenshotScenes.kt` supplies the same signed-out, signed-in and
 quota-limited states to Android previews and desktop screenshot tests. It explicitly

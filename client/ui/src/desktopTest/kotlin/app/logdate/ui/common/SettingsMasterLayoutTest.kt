@@ -24,8 +24,13 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class SettingsMasterLayoutTest {
     @Test
-    fun largeTextGivesLongWordsTheFullLabelWidthAndKeepsOneAction() =
-        runDesktopComposeUiTest(width = 360, height = 891) {
+    fun largeTextGivesLongWordsTheFullLabelWidthAndKeepsOneAction() = assertLongWordStaysWhole(width = 360)
+
+    @Test
+    fun wordWiderThanTheWholeToggleStaysWholeAndKeepsOneAction() = assertLongWordStaysWhole(width = 240)
+
+    private fun assertLongWordStaysWhole(width: Int) =
+        runDesktopComposeUiTest(width = width, height = 891) {
             val label = "Use recommendations"
             var changes = 0
             setContent {
@@ -45,7 +50,7 @@ class SettingsMasterLayoutTest {
                     label.substring(layout.getLineStart(it), layout.getLineEnd(it)).trim()
                 }
             assertFalse(lines.any { it == "s" }, "The switch must not force a word into a lone final letter: $lines")
-            assertTrue(lines.any { "recommendations" in it })
+            assertTrue(lines.any { "recommendations" in it }, "The long word must stay on one line: $lines")
             assertFalse(layout.hasVisualOverflow)
             onAllNodes(isToggleable()).assertCountEquals(1)
             onNodeWithText(label).performClick()
