@@ -36,6 +36,27 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
     /** Resolves the prompt's words from string resources before the prompt is shown. */
     private val promptScope = MainScope()
 
+    private suspend fun promptInfo(
+        title: UiText,
+        subtitle: UiText,
+        description: UiText?,
+        requireConfirmation: Boolean,
+    ): BiometricPrompt.PromptInfo =
+        BiometricPrompt.PromptInfo
+            .Builder()
+            .setTitle(title.resolve())
+            .setSubtitle(subtitle.resolve())
+            .apply {
+                if (description != null) {
+                    setDescription(description.resolve())
+                }
+            }.setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            ).setConfirmationRequired(requireConfirmation)
+            // TODO: Only apply negative button text if device credential authentication is allowed
+            // .setNegativeButtonText(cancelLabel.resolve())
+            .build()
+
     /**
      * Authenticates the user using biometric authentication.
      *
@@ -80,21 +101,7 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
                 Napier.d("App can authenticate using biometrics.", tag = TAG)
                 val host = activity
                 promptScope.launch {
-                    val promptInfo =
-                        BiometricPrompt.PromptInfo
-                            .Builder()
-                            .setTitle(title.resolve())
-                            .setSubtitle(subtitle.resolve())
-                            .apply {
-                                if (description != null) {
-                                    setDescription(description.resolve())
-                                }
-                            }.setAllowedAuthenticators(
-                                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-                            ).setConfirmationRequired(requireConfirmation)
-                            // TODO: Only apply negative button text if device credential authentication is allowed
-//                            .setNegativeButtonText(cancelLabel.resolve())
-                            .build()
+                    val promptInfo = promptInfo(title, subtitle, description, requireConfirmation)
                     BiometricPrompt(host, executor, callback).authenticate(promptInfo)
                 }
             }
