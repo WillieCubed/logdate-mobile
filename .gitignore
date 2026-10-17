@@ -32,6 +32,11 @@ captures
 **/production.env
 **/*.env.production
 **/*.env.secrets
+# Local environment files hold real keys and database credentials. Only the
+# nonsecret templates (.env.example) are tracked.
+.env
+.env.*
+!.env.example
 
 **/.claude/settings.local.json
 **/.claude/scheduled_tasks.lock
