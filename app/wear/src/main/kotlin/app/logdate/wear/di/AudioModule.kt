@@ -172,6 +172,7 @@ val wearAudioModule =
                 get<WearDataLayerClient>(),
                 get(),
                 captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
+                captureActivity = get(),
             )
         }
         viewModel {

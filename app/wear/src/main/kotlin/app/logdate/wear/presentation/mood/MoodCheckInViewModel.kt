@@ -2,6 +2,7 @@ package app.logdate.wear.presentation.mood
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
@@ -51,6 +52,7 @@ class MoodCheckInViewModel(
     private val dataLayerClient: WearDataLayerClient,
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
     private val captureGuard: WatchCaptureWriteGuard = WatchCaptureWriteGuard.Unrestricted,
+    private val captureActivity: CaptureActivitySource = CaptureActivitySource.None,
 ) : ViewModel() {
     companion object {
         private const val SAVED_DISPLAY_MS = 800L
@@ -114,6 +116,7 @@ class MoodCheckInViewModel(
         try {
             val now = Clock.System.now()
             val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
+            val activity = captureActivity.now()
             captureGuard.write {
                 notesRepository.create(
                     JournalNote.Text(
@@ -123,6 +126,7 @@ class MoodCheckInViewModel(
                         lastUpdated = now,
                         location = noteLocation,
                         timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                        capturedDuring = activity,
                     ),
                 )
             }

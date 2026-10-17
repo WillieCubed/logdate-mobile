@@ -1,5 +1,6 @@
 package app.logdate.wear.recording
 
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.repository.journals.JournalNote
@@ -51,6 +52,7 @@ class AudioMomentSaver(
     private val clock: Clock = Clock.System,
     private val deleteFile: (String) -> Unit = { path -> File(path).delete() },
     private val captureGuard: WatchCaptureWriteGuard = WatchCaptureWriteGuard.Unrestricted,
+    private val captureActivity: CaptureActivitySource = CaptureActivitySource.None,
 ) {
     /**
      * Saves the recording at [path]. [recorderElapsed] is the recorder's own clock. It counts when the
@@ -107,6 +109,7 @@ class AudioMomentSaver(
                     durationMs = durationMs,
                     location = location,
                     timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                    capturedDuring = captureActivity.now(),
                 )
             notesRepository.create(note)
             // The raw file marks a recording as unsaved for startup recovery, so it goes once the note exists.
