@@ -210,6 +210,15 @@ persisted tokens inaccessible until explicit authentication repairs it. Refresh 
 origin-bound session, conditionally replaces or clears only that session, and cannot enable
 restoration. Server-scoped accounts use the same guarded storage rather than ordinary vault writes.
 
+Platform token repair retains the authorization captured before refresh or renewal begins. Each
+Android account mutation validates that authorization inside the shared platform lock, then reads
+the exact current origin and tokens after validation finishes. A refresh must not overwrite a newer
+access token merely because the account and refresh token still match. Missing-account fallback uses
+the same predicate. Explicit sign-in invalidates earlier work even when the resulting tokens match.
+Active operations retain an opaque authorization independently of the vault's bounded installation
+guard cache; eviction must not silently stop pending enrollment. Authorization remains scoped to its
+issuing vault and origin, and never grants permission to install a session using an expired guard.
+
 ## Emulator acceptance
 
 `tests/e2e/native-backup-acceptance.py` exercises Android's local debug transport on two fresh,

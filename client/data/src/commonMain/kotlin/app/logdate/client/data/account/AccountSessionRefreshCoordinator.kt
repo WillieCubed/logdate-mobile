@@ -55,13 +55,28 @@ internal class AccountSessionRefreshCoordinator(
         refreshToken: String,
         backendUrl: String,
     ) {
-        val isCurrent = {
+        val captured = sessionStorage.captureAuthenticationSnapshot()
+        if (captured == null && sessionStorage.supportsGuardedAuthentication) return
+        updateTokensOrRegisterPlatformAccount(account, accessToken, refreshToken, backendUrl, captured?.guard)
+    }
+
+    private suspend fun updateTokensOrRegisterPlatformAccount(
+        account: LogDateAccount,
+        accessToken: String,
+        refreshToken: String,
+        backendUrl: String,
+        authorization: SessionInstallationGuard?,
+    ) {
+        val isCurrent: suspend () -> Boolean = {
+            val authorized = authorization == null || sessionStorage.isAuthenticationGuardCurrent(authorization)
             val bound = sessionStorage.getOriginBoundSession()
             val current = bound?.session ?: sessionStorage.getSession()
-            configRepository.getCurrentBackendUrl() == backendUrl &&
+            authorized &&
+                configRepository.getCurrentBackendUrl() == backendUrl &&
                 (bound == null || bound.origin == backendUrl) &&
                 current?.accountId == account.id.toString() &&
-                current.refreshToken == refreshToken
+                current.refreshToken == refreshToken &&
+                current.accessToken == accessToken
         }
         val updateResult =
             platformAccountManager.updateTokensIfCurrent(
@@ -241,6 +256,7 @@ internal class AccountSessionRefreshCoordinator(
                     accessToken = newAccessToken,
                     refreshToken = session.refreshToken,
                     backendUrl = origin,
+                    authorization = captured?.guard,
                 )
             }
 

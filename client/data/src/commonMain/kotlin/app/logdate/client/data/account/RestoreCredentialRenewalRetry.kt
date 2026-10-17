@@ -9,16 +9,16 @@ import kotlinx.coroutines.ensureActive
 /** Retries a durable pending renewal while its authenticated installation is still current. */
 internal suspend fun retryRestoreCredentialRenewal(
     isPending: suspend () -> Boolean,
-    isCurrent: () -> Boolean,
+    isCurrent: suspend () -> Boolean,
     renew: suspend () -> Unit,
     pause: suspend (Long) -> Unit = { delay(it) },
     onFailure: suspend (Exception) -> Unit = {},
 ) {
     var interval = 30_000L
-    while (isCurrent()) {
+    while (true) {
         currentCoroutineContext().ensureActive()
         try {
-            if (!isPending()) return
+            if (!isCurrent() || !isPending()) return
             renew()
             currentCoroutineContext().ensureActive()
             if (!isPending()) return
@@ -26,9 +26,9 @@ internal suspend fun retryRestoreCredentialRenewal(
             throw cancelled
         } catch (error: Exception) {
             currentCoroutineContext().ensureActive()
-            if (!isCurrent()) return
             Napier.w("Restore key renewal remains pending and will retry automatically")
             try {
+                if (!isCurrent()) return
                 onFailure(error)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -36,7 +36,13 @@ internal suspend fun retryRestoreCredentialRenewal(
                 currentCoroutineContext().ensureActive()
             }
         }
-        if (!isCurrent()) return
+        try {
+            if (!isCurrent()) return
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            currentCoroutineContext().ensureActive()
+        }
         pause(interval)
         interval = (interval * 2).coerceAtMost(900_000L)
     }

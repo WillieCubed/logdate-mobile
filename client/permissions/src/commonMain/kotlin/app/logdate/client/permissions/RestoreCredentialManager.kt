@@ -49,13 +49,13 @@ interface RestoreCredentialManager {
 interface GuardedRestoreCredentialManager : RestoreCredentialManager {
     suspend fun createRestoreKeyIfCurrent(
         options: PasskeyRegistrationOptions,
-        isCurrent: () -> Boolean,
+        isCurrent: suspend () -> Boolean,
     ): Result<String>
 }
 
 suspend fun RestoreCredentialManager.createRestoreKeyIfCurrent(
     options: PasskeyRegistrationOptions,
-    isCurrent: () -> Boolean,
+    isCurrent: suspend () -> Boolean,
 ): Result<String> {
     if (this is GuardedRestoreCredentialManager) return createRestoreKeyIfCurrent(options, isCurrent)
     if (!isCurrent()) return Result.failure(RestoreCredentialError.Unknown("Restore identity changed"))

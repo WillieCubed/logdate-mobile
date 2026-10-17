@@ -185,7 +185,7 @@ class RestoreCredentialLifecycle(
 
     override suspend fun createRestoreKeyIfCurrent(
         options: PasskeyRegistrationOptions,
-        isCurrent: () -> Boolean,
+        isCurrent: suspend () -> Boolean,
     ): Result<String> =
         providerMutex.withLock {
             val expected =

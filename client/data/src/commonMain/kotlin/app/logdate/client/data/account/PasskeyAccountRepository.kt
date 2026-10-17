@@ -214,6 +214,8 @@ class DefaultPasskeyAccountRepository(
     private suspend fun renewBackgroundRestoreKey(session: app.logdate.client.datastore.UserSession) {
         if (!createsRestoreKey) return
         val renewal = restoreCredentialRenewal ?: return
+        var captured: app.logdate.client.datastore.SessionAuthenticationSnapshot? = null
+        var captureComplete = false
         val origin = configRepository.getCurrentBackendUrl()
 
         fun pinnedConfig() =
@@ -222,9 +224,21 @@ class DefaultPasskeyAccountRepository(
                 configRepository.getCurrentServerDescriptor(),
                 configRepository.apiVersion.value,
             )
-        val isCurrent = { configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session }
+        val isCurrent: suspend () -> Boolean = {
+            val guard = captured?.guard
+            val authorized = guard == null || sessionStorage.isAuthenticationGuardCurrent(guard)
+            authorized && configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session
+        }
         retryRestoreCredentialRenewal(
-            isPending = {
+            isPending = pending@{
+                if (!captureComplete) {
+                    val snapshot = sessionStorage.captureAuthenticationSnapshot()
+                    check(snapshot != null || !sessionStorage.supportsGuardedAuthentication) { "Restore authorization unavailable" }
+                    if (snapshot != null && snapshot.session != OriginBoundSession(origin, session)) return@pending false
+                    captured = snapshot
+                    captureComplete = true
+                }
+                if (!isCurrent()) return@pending false
                 renewal.ensurePendingIfAbsent(origin, session.accountId)
                 renewal.isPending(origin, session.accountId)
             },

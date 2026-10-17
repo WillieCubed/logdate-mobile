@@ -8,6 +8,29 @@ import kotlin.test.assertFailsWith
 
 class RestoreCredentialRenewalRetryTest {
     @Test
+    fun `authorization read outages during retry retain pending enrollment`() =
+        runTest {
+            for (failedRead in 1..4) {
+                var reads = 0
+                var pending = true
+                var attempts = 0
+                retryRestoreCredentialRenewal(
+                    isPending = { pending },
+                    isCurrent = {
+                        if (++reads == failedRead) error("Authorization temporarily unavailable")
+                        true
+                    },
+                    renew = {
+                        if (++attempts == 1) error("Provider temporarily unavailable")
+                        pending = false
+                    },
+                    pause = {},
+                )
+                assertEquals(false, pending)
+            }
+        }
+
+    @Test
     fun `an outage repairs itself without another session emission`() =
         runTest {
             var pending = true

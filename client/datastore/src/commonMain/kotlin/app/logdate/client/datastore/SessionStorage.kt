@@ -34,11 +34,15 @@ data class OriginBoundSession(
     val session: UserSession,
 )
 
+/** Opaque authorization retained by its caller independently of the vault's bounded guard cache. */
+interface SessionAuthorizationToken
+
 /** A vault revision that prevents an in-flight sign-in from replacing a later identity decision. */
 data class SessionInstallationGuard(
     val origin: String,
     val revision: Long,
     val token: String? = null,
+    val authorization: SessionAuthorizationToken? = null,
 )
 
 /** A session and its opaque authorization guard captured under one identity lock. */

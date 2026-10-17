@@ -4,6 +4,7 @@ import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionAuthenticationSnapshot
+import app.logdate.client.datastore.SessionAuthorizationToken
 import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
@@ -62,11 +63,13 @@ class SecureSessionStorage(
     private val authorizationRevisions: MutableStateFlow<Map<String, Long>> =
         connectedVault?.authorizationRevisions ?: MutableStateFlow(emptyMap())
 
-    private data class GuardSnapshot(
+    private class GuardSnapshot(
+        val origin: String,
+        val issuer: SecureSessionStorage,
         val record: String?,
         val decision: String?,
         val authorizationRevision: Long,
-    )
+    ) : SessionAuthorizationToken
 
     private val guards = linkedMapOf<String, GuardSnapshot>()
     override val supportsGuardedAuthentication = true
@@ -100,7 +103,8 @@ class SecureSessionStorage(
         identityMutex.withLock { authenticationGuardCurrent(expected) }
 
     private suspend fun authenticationGuardCurrent(expected: SessionInstallationGuard): Boolean {
-        val snapshot = guards[expected.token] ?: return false
+        val snapshot = expected.authorization as? GuardSnapshot ?: guards[expected.token] ?: return false
+        if (snapshot.issuer !== this || snapshot.origin != expected.origin) return false
         val cached = sessionState.value
         if (cached.origin != expected.origin || configRepository.getCurrentBackendUrl() != expected.origin) return false
         if (nativeRestorePolicy != null) return nativeRestorePolicy.decision(expected.origin) == snapshot.decision
@@ -128,10 +132,11 @@ class SecureSessionStorage(
             }
             val token = Uuid.random().toString()
             if (guards.size >= 64) guards.remove(guards.keys.first())
-            guards[token] = GuardSnapshot(record, decision, authorizationRevision(origin))
+            val snapshot = GuardSnapshot(origin, this, record, decision, authorizationRevision(origin))
+            guards[token] = snapshot
             SessionAuthenticationSnapshot(
                 cached.session?.let { OriginBoundSession(origin, it) },
-                SessionInstallationGuard(origin, cached.revision, token),
+                SessionInstallationGuard(origin, cached.revision, token, snapshot),
             )
         }
     }

@@ -66,14 +66,14 @@ class RestoreCredentialRenewal(
         session: UserSession,
         credentials: RestoreCredentialManager,
         platform: PlatformAccountManager,
-        isCurrent: () -> Boolean,
+        isCurrent: suspend () -> Boolean,
     ) {
         val origin = config.getCurrentBackendUrl()
         val obligation = storage.getString(key(origin)) ?: return
         if (obligation.substringBefore('\n') != session.accountId) return
         val api = apiFor(config) ?: return
 
-        fun checkCurrent() {
+        suspend fun checkCurrent() {
             check(isCurrent()) { "Restore key renewal account changed" }
         }
         checkCurrent()
@@ -105,7 +105,7 @@ class RestoreCredentialRenewal(
         config: LogDateConfigRepository,
         session: UserSession,
         sessions: SessionStorage,
-        isCurrent: () -> Boolean,
+        isCurrent: suspend () -> Boolean,
     ) {
         val origin = config.getCurrentBackendUrl()
         val captured = sessions.captureAuthenticationSnapshot()
