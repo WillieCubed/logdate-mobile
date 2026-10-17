@@ -267,7 +267,7 @@ class RestoreWorker(
                         includeMedia = includeMedia,
                         preservePopulatedLocalProfile = preservePopulatedProfile || attempt.previous != null,
                     ),
-                mediaImporter = AndroidArchiveMediaImporter(context, mediaManager, zip, archive.root),
+                mediaImporter = AndroidArchiveMediaImporter(context, mediaManager, zip, archive.root, getKoin().get()),
                 onProgress = { phase ->
                     check(currentArchiveRecoveryScope(getKoin()) == attempt.scope) { "Archive recovery account changed" }
                     val info = phase.toProgressInfo()

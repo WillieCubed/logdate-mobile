@@ -11,11 +11,13 @@ import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.bubble.RecordingBubbleNotifier
 import app.logdate.client.calendar.CalendarImportScheduler
+import app.logdate.client.data.notes.NativeMediaQuarantine
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.reminders.ReminderSignalObserver
 import app.logdate.client.events.EventInferenceScheduler
@@ -70,6 +72,7 @@ class LogdateApplication :
         ApplicationStartup(startupScope) {
             try {
                 get<LogDateDatabase>()
+                quarantineRestoredMedia()
                 get<AndroidPlatformSearchIndexManager>()
                 startBackgroundWork()
                 Napier.i("Encrypted storage and startup observers ready", tag = APP_STARTUP_TAG)
@@ -78,6 +81,13 @@ class LogdateApplication :
                 throw error
             }
         }
+
+    private suspend fun quarantineRestoredMedia() {
+        val detector = PostRestoreDetector(this)
+        val delivery = detector.pendingMediaQuarantineId() ?: return
+        get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
+        check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
+    }
 
     override fun newImageLoader(context: Context): ImageLoader =
         ImageLoader

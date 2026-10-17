@@ -26,3 +26,10 @@ internal suspend fun mediaSyncAllowed(
 ): Boolean =
     mode.shouldSyncMedia() ||
         (mode == DataUsageMode.Conservative && scope != null && coroutineContext[MobileDataConsent]?.scope == scope)
+
+/** Applies only to downloading bytes; local recovery remains available under every policy. */
+internal suspend fun mediaDownloadAllowed(
+    enabled: Boolean,
+    policy: app.logdate.client.networking.DataUsagePolicy,
+    scope: app.logdate.client.sync.recovery.DownloadScope?,
+): Boolean = enabled && mediaSyncAllowed(policy.currentMode(), scope?.let { UploadScope(it.owner, it.origin) })

@@ -25,6 +25,9 @@ interface AudioNoteDao {
     @Query("SELECT * FROM audio_notes WHERE uid = :uid")
     suspend fun getNoteOneOff(uid: Uuid): AudioNoteEntity
 
+    @Query("SELECT * FROM audio_notes WHERE uid = :uid")
+    suspend fun findNoteOneOff(uid: Uuid): AudioNoteEntity?
+
     /**
      * Returns a flow of all [AudioNoteEntity]s.
      */

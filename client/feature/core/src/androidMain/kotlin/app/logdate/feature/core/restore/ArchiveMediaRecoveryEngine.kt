@@ -7,6 +7,8 @@ import app.logdate.client.domain.restore.RecoveryMediaRole
 import app.logdate.client.domain.restore.RepairArchiveMediaUseCase
 import app.logdate.client.domain.restore.UnavailableMediaAsset
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.isRecoveredOriginal
 import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.sync.AutomaticMediaRecovery
 import app.logdate.client.sync.AutomaticMediaRecoveryResult
@@ -27,13 +29,14 @@ internal class ArchiveMediaRecoveryEngine(
         val cloud = koin.getOrNull<AutomaticMediaRecovery>()
         val reasons = mutableMapOf<String, DiagnosticReason>()
         RetainedArchiveMediaSources(store, scope, record.id) { zip, root ->
-            AndroidArchiveMediaImporter(context, media, zip, root)
+            AndroidArchiveMediaImporter(context, media, zip, root, koin.get())
         }.use { sources ->
             val pending = record.pending.map { it.copy(archivePath = sources.path(it)) }
             store.replacePending(record.id, pending)
             val importer =
                 object : MediaImporter {
-                    override suspend fun isAvailable(reference: String) = media.exists(reference)
+                    override suspend fun isAvailable(reference: String) =
+                        media.isRecoveredOriginal(reference, koin.get<StoredMediaReferences>())
 
                     override suspend fun importMedia(exportPath: String) = sources.importMedia(exportPath)
 

@@ -6,6 +6,8 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.mediaRefOrNull
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.uuid.Uuid
 
 internal class ArchiveMediaRepairSession(
@@ -23,13 +25,17 @@ internal class ArchiveMediaRepairSession(
 
     suspend fun stillPending(asset: UnavailableMediaAsset): Boolean {
         val id = runCatching { Uuid.parse(asset.entityId) }.getOrNull() ?: return false
-        return if (asset.blockId == null) {
-            val note = notes.getNoteById(id)
-            note?.mediaRefOrNull() == asset.reference && (asset.kind == null || note.type.name.lowercase() == asset.kind)
-        } else {
-            val block = journals.getDraftForRestore(id)?.blocks?.firstOrNull { it.id.toString() == asset.blockId }
-            block?.archiveMediaReference(asset.role) == asset.reference && (asset.kind == null || block.archiveMediaKind() == asset.kind)
-        }
+        val pending =
+            if (asset.blockId == null) {
+                val note = notes.getNoteById(id)
+                note?.mediaRefOrNull() == asset.reference && (asset.kind == null || note.type.name.lowercase() == asset.kind)
+            } else {
+                val block = journals.getDraftForRestore(id)?.blocks?.firstOrNull { it.id.toString() == asset.blockId }
+                block?.archiveMediaReference(asset.role) == asset.reference &&
+                    (asset.kind == null || block.archiveMediaKind() == asset.kind)
+            }
+        currentCoroutineContext().ensureActive()
+        return pending
     }
 
     suspend fun import(asset: UnavailableMediaAsset): String? {

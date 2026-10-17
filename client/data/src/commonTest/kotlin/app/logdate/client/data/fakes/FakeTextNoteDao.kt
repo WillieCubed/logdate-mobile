@@ -23,6 +23,8 @@ class FakeTextNoteDao : TextNoteDao {
     override suspend fun getNoteOneOff(uid: Uuid): TextNoteEntity =
         notes[uid] ?: throw NoSuchElementException("Text note with ID $uid not found")
 
+    override suspend fun findNoteOneOff(uid: Uuid): TextNoteEntity? = notes[uid]
+
     override fun getAllNotes(): Flow<List<TextNoteEntity>> = notesFlow
 
     override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }

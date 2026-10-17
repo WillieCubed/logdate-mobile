@@ -92,17 +92,20 @@ internal suspend fun LogDateCloudApiClient.requestDownloadMedia(
                         headers.append("Authorization", "Bearer $accessToken")
                     }
                 when (binaryResponse.status) {
-                    HttpStatusCode.OK ->
+                    HttpStatusCode.OK -> {
+                        val bytes = binaryResponse.body<ByteArray>()
+                        require(metadata.sizeBytes >= 0 && bytes.size.toLong() == metadata.sizeBytes) { "Media length mismatch" }
                         Result.success(
                             MediaDownloadResponse(
                                 contentId = metadata.contentId,
                                 fileName = metadata.fileName,
                                 mimeType = metadata.mimeType,
                                 sizeBytes = metadata.sizeBytes,
-                                data = binaryResponse.body<ByteArray>(),
+                                data = bytes,
                                 downloadUrl = metadata.downloadUrl,
                             ),
                         )
+                    }
                     else -> handleApiError(binaryResponse)
                 }
             }

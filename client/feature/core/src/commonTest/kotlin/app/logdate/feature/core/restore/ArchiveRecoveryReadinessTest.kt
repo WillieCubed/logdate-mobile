@@ -18,6 +18,26 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ArchiveRecoveryReadinessTest {
     @Test
+    fun `network permission changes wake retained recovery without new credentials`() =
+        runTest {
+            val network = MutableStateFlow<Any>("metered")
+            var attempts = 0
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(
+                    MutableStateFlow("origin"),
+                    MutableStateFlow("session"),
+                    networkChanges = network,
+                ) { attempts++ }
+            }
+            runCurrent()
+            val deferred = attempts
+            network.value = "unrestricted"
+            runCurrent()
+            assertEquals(deferred + 1, attempts)
+            assertTrue(DiagnosticReason.NETWORK_POLICY.shouldRetryArchiveMedia())
+        }
+
+    @Test
     fun `local persistence retries without requiring Cloud sign in`() {
         assertTrue(DiagnosticReason.LOCAL_STORAGE.shouldRetryArchiveMedia(hasSession = false))
         assertTrue(DiagnosticReason.PERSISTENCE_FAILED.shouldRetryArchiveMedia(hasSession = false))

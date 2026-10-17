@@ -212,7 +212,10 @@ class ActivityAwareLocationService :
     }
 
     private fun startTracking() {
-        if (locationCallback != null) return
+        if (locationCallback != null) {
+            if (activityTransitionPendingIntent == null) registerActivityTransitions()
+            return
+        }
 
         val notification = buildNotification()
         try {
@@ -387,13 +390,19 @@ class ActivityAwareLocationService :
             )
         activityTransitionPendingIntent = pendingIntent
 
-        activityRecognitionClient
-            .requestActivityTransitionUpdates(request, pendingIntent)
-            .addOnSuccessListener {
-                Napier.i("Activity transition updates registered")
-            }.addOnFailureListener { error ->
-                Napier.w("Failed to register activity transitions, using ON_FOOT fallback", error)
-            }
+        try {
+            activityRecognitionClient
+                .requestActivityTransitionUpdates(request, pendingIntent)
+                .addOnSuccessListener {
+                    Napier.i("Activity transition updates registered")
+                }.addOnFailureListener { error ->
+                    if (activityTransitionPendingIntent === pendingIntent) activityTransitionPendingIntent = null
+                    Napier.w("Failed to register activity transitions, using ON_FOOT fallback", error)
+                }
+        } catch (error: SecurityException) {
+            if (activityTransitionPendingIntent === pendingIntent) activityTransitionPendingIntent = null
+            Napier.w("Activity recognition grant changed before registration, using ON_FOOT fallback", error)
+        }
     }
 
     private fun unregisterActivityTransitions() {

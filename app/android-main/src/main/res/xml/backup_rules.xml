@@ -10,6 +10,8 @@
    background jobs, and incomplete media staging are not portable content.
 -->
 <full-backup-content>
+    <include domain="sharedpref" path="logdate_widget_instances.xml" requireFlags="clientSideEncryption"/>
+    <include domain="sharedpref" path="logdate_widget_instances.xml" requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="logdate.preferences_pb"
              requireFlags="clientSideEncryption"/>
     <include domain="file" path="archive_recovery/records/" requireFlags="clientSideEncryption"/>

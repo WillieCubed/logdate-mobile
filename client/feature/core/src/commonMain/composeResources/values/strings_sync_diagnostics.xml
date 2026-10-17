@@ -35,4 +35,5 @@
     <string name="sync_diagnostic_last_attempt">Last attempt: %1$s — %2$s</string>
     <string name="sync_diagnostic_reason">Recorded reason: %1$s</string>
     <string name="sync_diagnostic_retry_condition">Before retrying: %1$s</string>
+    <string name="sync_diagnostic_reason_network_policy">Waiting for a network that allows media downloads. Recovery resumes automatically.</string>
 </resources>

@@ -49,7 +49,7 @@ class LocalFirstDraftRepository(
             },
     )
 
-    private companion object {
+    internal companion object {
         const val LEGACY_KEY = "editor_drafts"
         const val LEGACY_OWNER_KEY = "editor_drafts_legacy_owner"
         const val ANONYMOUS_KEY = "editor_drafts_anonymous"
