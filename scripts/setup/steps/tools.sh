@@ -6,7 +6,7 @@ tools_describe() {
 }
 
 tools_needed() {
-    printf '%s\n' git java jq
+    printf '%s\n' git java jq node
     [[ "$SETUP_TARGET" == "local" ]] && return 0
     printf '%s\n' gh gcloud curl keytool shasum base64
 }
