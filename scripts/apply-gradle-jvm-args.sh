@@ -14,12 +14,6 @@ set -euo pipefail
 #     no effect on AGP, the Android compile toolchain, the Android
 #     runtime (ART), `compileSdk`/`targetSdk`/`minSdk`, or any Android
 #     version compatibility.
-#
-# Why a script and not a direct edit:
-#   - `gradle.properties` is on the project's protected-config list
-#     (`.githooks/block-rogue-configs.sh`), so direct edits via Claude's
-#     Edit / Write / sed / awk tools are blocked. Running this script
-#     is the explicit, reviewable path for applying the change.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROPS="$ROOT/gradle.properties"

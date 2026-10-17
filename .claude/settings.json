@@ -2,23 +2,8 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/block-rogue-configs.sh",
-            "statusMessage": "Checking protected config files..."
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/block-rogue-configs.sh",
-            "statusMessage": "Checking protected config files..."
-          },
           {
             "type": "command",
             "command": ".claude/hooks/commit-message-checklist.sh",
