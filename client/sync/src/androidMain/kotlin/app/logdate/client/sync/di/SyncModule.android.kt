@@ -2,6 +2,7 @@ package app.logdate.client.sync.di
 
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.di.deviceInstanceModule
+import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.sync.AndroidSyncManager
 import app.logdate.client.sync.CreateCollisionPolicy
@@ -97,6 +98,11 @@ actual val syncModule: Module =
                 unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
                 locationHistorySyncEngine = get(),
                 createCollisionPolicy = getOrNull<CreateCollisionPolicy>() ?: CreateCollisionPolicy.None,
+                deviceEnrollment = {
+                    check(get<DefaultDeviceManager>().registerWithCloud().getOrThrow()) {
+                        "Device registration was not accepted"
+                    }
+                },
             )
         }
         single<SyncManager> {

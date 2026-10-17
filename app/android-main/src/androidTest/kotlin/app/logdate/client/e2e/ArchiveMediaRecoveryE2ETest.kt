@@ -262,12 +262,39 @@ class ArchiveMediaRecoveryE2ETest {
         val state = JSONObject(fixture.readText())
         verifyEdits(state)
         verifyOriginals(state)
+        val photoBeforeReplay = assertIs<JournalNote.Image>(notes.getNoteById(state.id("note"))).mediaRef
+        val videoBeforeReplay =
+            assertNotNull(journals.getDraftForRestore(state.id("draft")))
+                .blocks
+                .filterIsInstance<SerializableVideoBlock>()
+                .single()
+                .uri
+        val mediaObjectsBeforeReplay = mediaObjectPaths()
         val completed = summary(worker(File(state.getString("originalSource")), state.getString("recoveryId")).doWork())
         assertEquals(0, completed.unavailableOriginals)
+        assertEquals(0, completed.mediaImported, "replaying completed recovery must not import attachments again")
+        assertEquals(photoBeforeReplay, assertIs<JournalNote.Image>(notes.getNoteById(state.id("note"))).mediaRef)
+        assertEquals(
+            videoBeforeReplay,
+            assertNotNull(journals.getDraftForRestore(state.id("draft")))
+                .blocks
+                .filterIsInstance<SerializableVideoBlock>()
+                .single()
+                .uri,
+        )
+        assertEquals(mediaObjectsBeforeReplay, mediaObjectPaths(), "replay must not create additional stored media objects")
         val record = JSONObject(context.filesDir.resolve("archive_recovery/records/${state.getString("recoveryId")}.json").readText())
         assertTrue(record.getBoolean("metadataApplied"))
         assertEquals(0, record.optJSONArray("pending")?.length() ?: 0)
     }
+
+    private fun mediaObjectPaths(): Set<String> =
+        context.filesDir
+            .resolve("media/objects/sha256")
+            .walkTopDown()
+            .filter(File::isFile)
+            .map { it.relativeTo(context.filesDir).invariantSeparatorsPath }
+            .toSet()
 
     private suspend fun verifyEdits(state: JSONObject) {
         val note = assertIs<JournalNote.Image>(notes.getNoteById(state.id("note")))

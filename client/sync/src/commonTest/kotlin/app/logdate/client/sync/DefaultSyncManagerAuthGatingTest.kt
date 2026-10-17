@@ -6,6 +6,7 @@ import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -78,6 +79,83 @@ class DefaultSyncManagerAuthGatingTest {
 
             val status = manager.getSyncStatus()
             assertFalse(status.isEnabled, "After clearing session, isEnabled must be false")
+        }
+
+    @Test
+    fun `full sync enrolls the authenticated device`() =
+        runTest {
+            var enrollments = 0
+            val session = fakeSessionStorage(authenticated = true)
+            val deviceId = MutableStateFlow(Uuid.random())
+            val manager =
+                testDefaultSyncManager(
+                    sessionStorage = session,
+                    deviceIdProvider =
+                        object : app.logdate.client.device.identity.DeviceIdProvider {
+                            override fun getDeviceId() = deviceId
+
+                            override suspend fun refreshDeviceId() {
+                                deviceId.value = Uuid.random()
+                            }
+                        },
+                    deviceEnrollment = { enrollments++ },
+                )
+
+            manager.fullSync()
+            manager.fullSync()
+
+            assertEquals(1, enrollments)
+
+            session.saveSession(UserSession(accessToken = "b", refreshToken = "r", accountId = "other-account"))
+            manager.fullSync()
+
+            assertEquals(2, enrollments, "a new account needs its own device enrollment")
+
+            session.currentOrigin = "https://another-server.example"
+            manager.fullSync()
+
+            assertEquals(3, enrollments, "the same account at a different server needs its own enrollment")
+
+            deviceId.value = Uuid.random()
+            manager.fullSync()
+
+            assertEquals(4, enrollments, "a replacement device identity needs a fresh enrollment")
+        }
+
+    @Test
+    fun `full sync does not enroll a device without an account`() =
+        runTest {
+            var enrollments = 0
+            val manager =
+                testDefaultSyncManager(
+                    sessionStorage = fakeSessionStorage(authenticated = false),
+                    deviceEnrollment = { enrollments++ },
+                )
+
+            manager.fullSync()
+
+            assertEquals(0, enrollments)
+        }
+
+    @Test
+    fun `device enrollment failure does not fail journal recovery`() =
+        runTest {
+            var attempts = 0
+            val manager =
+                testDefaultSyncManager(
+                    sessionStorage = fakeSessionStorage(authenticated = true),
+                    deviceEnrollment = {
+                        attempts++
+                        if (attempts == 1) error("registration unavailable")
+                    },
+                )
+
+            val first = manager.fullSync()
+            val retry = manager.fullSync()
+
+            assertTrue(first.success)
+            assertTrue(retry.success)
+            assertEquals(2, attempts, "failed enrollment must remain eligible for retry")
         }
 
     @Test

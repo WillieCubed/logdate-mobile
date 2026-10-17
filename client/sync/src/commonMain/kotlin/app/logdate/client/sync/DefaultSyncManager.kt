@@ -55,6 +55,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
+
+private data class DeviceEnrollmentScope(
+    val origin: String,
+    val accountId: String,
+    val deviceId: Uuid?,
+)
 
 /** Coordinates Cloud sync through the upload, download, and recovery services. */
 class DefaultSyncManager(
@@ -114,11 +121,14 @@ class DefaultSyncManager(
     internal val profile: SyncProfile = SyncProfile.Standard,
     private val createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
     private val momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
+    internal val deviceEnrollment: suspend () -> Unit = {},
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
     internal val lastErrorFlow = MutableStateFlow<SyncError?>(null)
     internal val syncMutex = Mutex()
+    private val deviceEnrollmentMutex = Mutex()
+    private var enrolledDeviceScope: DeviceEnrollmentScope? = null
 
     internal var isEnabled = true
 
@@ -199,6 +209,18 @@ class DefaultSyncManager(
     override suspend fun downloadRemoteChanges(): SyncResult = runRemoteDownload()
 
     override suspend fun fullSync(): SyncResult = runCompleteSync()
+
+    internal suspend fun ensureDeviceEnrolled() {
+        if (!tokenRefresher.isAuthenticated()) return
+        val session = sessionStorage.getOriginBoundSession() ?: return
+        val deviceId = deviceIdProvider?.getDeviceId()?.value
+        val scope = DeviceEnrollmentScope(session.origin, session.session.accountId, deviceId)
+        deviceEnrollmentMutex.withLock {
+            if (enrolledDeviceScope == scope) return@withLock
+            deviceEnrollment()
+            if (sessionStorage.getOriginBoundSession() == session) enrolledDeviceScope = scope
+        }
+    }
 
     override suspend fun <T> whilePaused(block: suspend () -> T): T = syncMutex.withLock { block() }
 

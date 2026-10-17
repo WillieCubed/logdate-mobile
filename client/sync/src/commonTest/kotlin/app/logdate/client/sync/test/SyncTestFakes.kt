@@ -176,6 +176,7 @@ fun testDefaultSyncManager(
     createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
     momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
     deviceIdProvider: app.logdate.client.device.identity.DeviceIdProvider? = null,
+    deviceEnrollment: suspend () -> Unit = {},
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -216,6 +217,7 @@ fun testDefaultSyncManager(
             createCollisionPolicy = createCollisionPolicy,
             momentSyncConfig = momentSyncConfig,
             deviceIdProvider = deviceIdProvider,
+            deviceEnrollment = deviceEnrollment,
         )
     } else {
         DefaultSyncManager(
@@ -256,6 +258,7 @@ fun testDefaultSyncManager(
             createCollisionPolicy = createCollisionPolicy,
             momentSyncConfig = momentSyncConfig,
             deviceIdProvider = deviceIdProvider,
+            deviceEnrollment = deviceEnrollment,
             syncScope = syncScope,
         )
     }

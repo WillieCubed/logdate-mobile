@@ -76,6 +76,30 @@ class NativeBackgroundCredentialCallbackTest {
     }
 
     @Test
+    fun `duplicate framework restore callbacks retain one delivery ticket`() {
+        val observedAccountRecoveries = mutableListOf<String?>()
+        val agent =
+            object : NativeBackupAgent() {
+                override suspend fun restoreAccount(preferences: DataStore<Preferences>) {
+                    observedAccountRecoveries += PostRestoreDetector(context).pendingAccountRecoveryId()
+                }
+            }
+        agent.initialize(context)
+
+        agent.onRestoreFinished()
+        val delivery = assertNotNull(PostRestoreDetector(context).pendingContentRecoveryId())
+        val account = assertNotNull(PostRestoreDetector(context).pendingAccountRecoveryId())
+        val media = assertNotNull(PostRestoreDetector(context).pendingMediaQuarantineId())
+
+        agent.onRestoreFinished()
+
+        assertEquals(listOf<String?>(account, account), observedAccountRecoveries)
+        assertEquals(delivery, PostRestoreDetector(context).pendingContentRecoveryId())
+        assertEquals(account, PostRestoreDetector(context).pendingAccountRecoveryId())
+        assertEquals(media, PostRestoreDetector(context).pendingMediaQuarantineId())
+    }
+
+    @Test
     fun `corrupt restored server leaves local content and account recovery pending`() {
         val owner = Uuid.random().toString()
         withPreferences {

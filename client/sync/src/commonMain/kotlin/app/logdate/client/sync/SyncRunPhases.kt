@@ -4,6 +4,7 @@ import app.logdate.client.sync.diagnostics.SyncRunDiagnostics
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
 
@@ -256,6 +257,14 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
         val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
         val uploadResult = run.phase(DiagnosticPhase.UPLOAD) { uploadPendingChanges() }
         val draftResult = run.phase(DiagnosticPhase.RECOVERY) { syncDrafts() }
+
+        try {
+            ensureDeviceEnrolled()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (failure: Exception) {
+            Napier.w("Couldn't enroll this account device", failure)
+        }
 
         val errors = downloadResult.errors + uploadResult.errors + draftResult.errors
         // Each phase updates the shared last error. A successful upload must not erase a failed
