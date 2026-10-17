@@ -209,8 +209,10 @@ private fun assertMatchesBaseline(
     ImageIO.write(rendered, "png", actualFile)
 
     if (updateDesktopScreenshots) {
-        // Text antialiasing differs slightly between runs, so a full update keeps every reference the
-        // comparison below already accepts. A filtered update records exactly what it rendered.
+        // Each machine's text rasterizer draws glyph edges slightly differently (about 1% of pixels between
+        // a developer Mac and CI), so a full update keeps every reference the comparison below already
+        // accepts instead of rewriting it with this machine's text. A filtered update records exactly
+        // what it rendered.
         val existing = if (referenceFile.exists()) ImageIO.read(referenceFile) else null
         if (desktopScreenshotSceneFilter == null && existing != null && compareImages(existing, rendered) == null) return
         referenceFile.parentFile.mkdirs()
