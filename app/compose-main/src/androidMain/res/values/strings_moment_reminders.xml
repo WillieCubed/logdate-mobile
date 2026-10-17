@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="moment_reminder_moving_title">Activity finished</string>
+    <string name="moment_reminder_moving_body">Record how it went</string>
+    <string name="moment_reminder_trip_title">Trip finished</string>
+    <string name="moment_reminder_trip_body">Record where you went</string>
     <string name="moment_reminder_workout_title">Workout finished</string>
     <string name="moment_reminder_workout_body">Record how it went</string>
     <string name="moment_reminder_arrival_title">Somewhere new</string>

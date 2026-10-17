@@ -1,5 +1,6 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.activity.AgreedActivity
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.domain.streak.FirePhase
 import kotlinx.datetime.LocalTime
@@ -53,7 +54,9 @@ data class ReminderClock(
  * @property openMarks Marks still waiting to be filled in.
  * @property campfire Today's fire, or null when streak tracking is off.
  * @property newPlaceArrivedAt When the person arrived at a place new to them, while they are still there.
- * @property workoutEndedAt When the latest workout ended.
+ * @property workoutEndedAt When the latest workout ended, from a watch without activity awareness.
+ * @property activity What the person is doing now and what they last finished, while activity
+ *   awareness is on.
  */
 data class ReminderSignals(
     val enabled: Boolean,
@@ -64,11 +67,17 @@ data class ReminderSignals(
     val workoutEndedAt: Instant? = null,
     val draftWaiting: Boolean = false,
     val memoryAvailable: Boolean = false,
+    val activity: AgreedActivity = AgreedActivity(),
 )
 
 /** What a reminder rings for, in the order [ReminderOrchestrator] prefers them. */
 @Serializable
 enum class ReminderTrigger {
+    /** A walk, run, ride or workout ended. Sent only to a watch that advertises activity reminders. */
+    MOVING_ENDED,
+
+    /** A trip in a vehicle ended. Sent only to a watch that advertises activity reminders. */
+    TRIP_ENDED,
     WORKOUT_ENDED,
     ARRIVED_SOMEWHERE_NEW,
     CAMPFIRE_EMBERS,
@@ -82,6 +91,9 @@ enum class SkipReason {
     OUTSIDE_WAKING_HOURS,
     ALREADY_REMINDED_TODAY,
     NOTHING_TO_REMIND,
+
+    /** The person is moving or in a vehicle; the reminder waits until they stop. */
+    ACTIVITY_UNDER_WAY,
 }
 
 sealed interface ReminderDecision {

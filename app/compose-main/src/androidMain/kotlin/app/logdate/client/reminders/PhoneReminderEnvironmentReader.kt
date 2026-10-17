@@ -81,6 +81,7 @@ class PhoneReminderEnvironmentReader(
                     context.watchNode in reachable,
                     WearFeatures.REMINDERS in watch.features,
                     WearFeatures.REMINDER_SUPPLEMENTS in watch.features,
+                    WearFeatures.ACTIVITY_REMINDERS in watch.features,
                 )
             }.sortedWith(
                 compareByDescending<ReminderWatch> { it.reachable && it.supportsReminders }.thenBy { it.context.watchNode },

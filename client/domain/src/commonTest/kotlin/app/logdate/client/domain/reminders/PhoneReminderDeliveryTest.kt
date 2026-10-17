@@ -1,5 +1,8 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.AgreedActivity
 import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
 import app.logdate.client.domain.recommendation.AmbientPromptPayload
@@ -24,6 +27,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -141,6 +145,7 @@ class PhoneReminderDeliveryTest {
     private fun linked(
         supported: Boolean = true,
         supplements: Boolean = false,
+        activity: Boolean = false,
     ) {
         state =
             state.copy(
@@ -150,6 +155,7 @@ class PhoneReminderDeliveryTest {
                         reachable = true,
                         supportsReminders = supported,
                         supportsSupplementalReminders = supplements,
+                        supportsActivityReminders = activity,
                     ),
             )
     }
@@ -176,6 +182,27 @@ class PhoneReminderDeliveryTest {
             assertEquals(emptyList(), phonePosts)
             assertEquals(now, history.latest())
         }
+
+    @Test
+    fun aWalkThatEndedRemindsOnAWatchThatKnowsActivityReminders() =
+        runTest {
+            linked(activity = true)
+            state = state.copy(signals = state.signals.copy(workoutEndedAt = null, activity = walkJustEnded))
+            assertEquals(PhoneReminderOutcome.WATCH_POSTED, delivery().run())
+            assertEquals(emptyList(), phonePosts)
+        }
+
+    @Test
+    fun aWalkThatEndedRemindsOnThePhoneWhenTheWatchCannotReadIt() =
+        runTest {
+            linked(activity = false)
+            state = state.copy(signals = state.signals.copy(workoutEndedAt = null, activity = walkJustEnded))
+            assertEquals(PhoneReminderOutcome.PHONE_POSTED, delivery().run())
+            assertEquals(listOf(ReminderTrigger.MOVING_ENDED to 0), phonePosts)
+            assertEquals(0, deliveryCalls)
+        }
+
+    private val walkJustEnded = AgreedActivity(lastEnded = Activity(ActivityKind.MOVING, now - 40.minutes, now - 5.minutes))
 
     @Test
     fun unknownPresenceUsesThePhoneAfterClaimingTheDay() =

@@ -1,5 +1,6 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.activity.AgreedActivity
 import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.streak.toStreakDay
 import kotlinx.datetime.TimeZone
@@ -23,6 +24,7 @@ class LivePhoneReminderSnapshotSource(
     private val arrivals: NovelPlaceArrivalDetector,
     private val openMarks: suspend () -> Int,
     private val workoutEndedAt: suspend () -> Instant? = { null },
+    private val activity: suspend () -> AgreedActivity = { AgreedActivity() },
     private val clock: Clock = Clock.System,
     private val supplemental: suspend (Instant) -> AmbientPromptCandidate? = { null },
 ) : PhoneReminderSnapshotSource {
@@ -39,6 +41,7 @@ class LivePhoneReminderSnapshotSource(
         val marks = openMarks().coerceAtLeast(0)
         val arrival = if (initial.capturePlaces) arrivals.read(clock.now(), initial.audience) else null
         val workout = workoutEndedAt()
+        val doing = activity()
         val signals =
             ReminderSignals(
                 enabled = true,
@@ -47,6 +50,7 @@ class LivePhoneReminderSnapshotSource(
                 campfire = activity.campfire,
                 newPlaceArrivedAt = arrival,
                 workoutEndedAt = workout,
+                activity = doing,
             )
         if (environment() != initial ||
             started.toStreakDay(initial.zone, initial.dayStartHour) != clock.now().toStreakDay(initial.zone, initial.dayStartHour)
