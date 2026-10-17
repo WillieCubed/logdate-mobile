@@ -1,6 +1,6 @@
 # Activity awareness on the phone and the watch
 
-Status: design agreed, not yet built. Everything here ships behind a new `ACTIVITY_AWARENESS` flag.
+Status: step 1 (tracking and reminders) is built; steps 2 and 3 are not. Everything ships behind a new `ACTIVITY_AWARENESS` flag.
 
 ## Why this exists
 
@@ -105,14 +105,14 @@ stored, so it survives the app process being stopped.
 
 **Where the transitions come from.** Both sources exist already:
 
-- **Phone:** Play services Activity Recognition transitions (walking, running, on a bicycle, in a
-  vehicle, still). `ActivityAwareLocationService` already registers for them, but privately. Android
-  allows one transition request per pending intent, so the registration moves into a shared
-  `ActivityTransitionFeed` in `client/location`, which the location tracker and the activity tracker
-  both read.
-- **Watch:** Health Services passive user activity states. `WorkoutEndListenerService` becomes
-  `UserActivityListenerService`: exercise maps to `MOVING` and asleep maps to `SLEEP`. It keeps the
-  existing capability check and its restore at boot and app start. The watch cannot detect vehicles.
+- **Phone:** Play services Activity Recognition transitions for walking, running, cycling and being in
+  a vehicle. `ActivityAwareLocationService` already registers for the same transitions. A request is
+  replaced only by another one with the same `PendingIntent`, so `PhoneActivityAwareness` registers
+  its own, with its own receiver, while the flag is on and the physical activity permission is granted.
+- **Watch:** Health Services passive user activity states, through the existing
+  `WorkoutEndListenerService`: exercise maps to `MOVING` and asleep maps to `SLEEP`. It keeps the
+  existing capability check and its restore at boot and app start, so the watch follows its activity
+  while reminders are on. The watch cannot detect vehicles.
 
 ### Agreeing across the phone and the watch
 
@@ -151,20 +151,24 @@ fun reactionsFor(activity: Activity): Reactions =
 
 ### Reminders
 
-- `ReminderSignals.workoutEndedAt` becomes `activity: ReminderActivity`, which holds the current
-  activity and the last ended one. `LivePhoneReminderSnapshotSource` and the watch's dispatcher take
-  `activity: suspend () -> ReminderActivity` in its place.
-- `ReminderOrchestrator.decide` gains a `Defer(until)` outcome. When the current activity holds
-  reminders, a reminder that comes due waits until the activity ends. It still has to fit the waking
-  window and the one-a-day limit when it goes out.
-- `ReminderTrigger` gains `ACTIVITY_ENDED`, which takes the place of `WORKOUT_ENDED` in the trigger
-  order. The trigger travels between phone and watch, and an older peer cannot decode a new enum
-  value. A device therefore sends `ACTIVITY_ENDED` only to a peer that advertises
-  `ACTIVITY_REMINDERS` in `WearFeatures`. To other peers it sends `WORKOUT_ENDED`, and it reads
-  `WORKOUT_ENDED` from them as a `MOVING` activity ending. `WORKOUT_ENDED` stays in the enum for that
-  reason.
-- Reminder copy uses the activity's duration, as in the table above, not its type. `MOVING` does not
-  record whether it was a walk, a run or a ride, so the copy cannot say which.
+- `ReminderSignals` gains `activity: AgreedActivity`, the current activity and the last one either
+  device saw end. `LivePhoneReminderSnapshotSource` reads it from the phone's tracker.
+  `workoutEndedAt` stays for a watch with the flag off.
+- While the current activity holds reminders, `ReminderOrchestrator.decide` returns
+  `Skip(SkipReason.ACTIVITY_UNDER_WAY)`. Delivery already asks again whenever a signal changes, and
+  the activity ending is such a change, so the reminder goes out then if it still fits the waking
+  window and the one-a-day limit. Nothing has to remember a deferred reminder.
+- `ReminderTrigger` gains `MOVING_ENDED` ("Activity finished") and `TRIP_ENDED` ("Trip finished"),
+  ahead of the other triggers. A walk, ride, workout or trip that ended within the last 30 minutes can
+  be the day's reminder; waking up is not one.
+- The trigger travels between phone and watch, and an older watch cannot decode a new enum value. The
+  phone hands these two triggers only to a watch that lists `WearFeatures.ACTIVITY_REMINDERS`, and
+  shows them itself otherwise.
+- On the watch, with the flag on, a workout that lasted at least the `MOVING` minimum ends in the
+  activity reminder instead of the workout one, and the watch's own evening reminder waits while the
+  person is moving or in a vehicle.
+- Reminder copy names neither the type nor the duration. The suggestion cards in Today and Home, in
+  step 3, carry the duration.
 
 ### Activity context on captured moments
 
@@ -233,9 +237,9 @@ whether a suggestion was already shown for an activity, which enforces one sugge
   grace periods, the cross-device ranking, a peer out of reach, and restoring the open activity after a
   restart.
 - **Reactions:** one test per kind and phase.
-- **Reminders:** a reminder that comes due during an activity is deferred and goes out after it ends,
-  but not outside the waking window and not as a second reminder that day. Old and new peers exchange
-  `WORKOUT_ENDED` and `ACTIVITY_ENDED` correctly.
+- **Reminders:** a reminder that comes due during an activity is skipped and goes out after it ends,
+  but not outside the waking window and not as a second reminder that day. A watch that does not list
+  `ACTIVITY_REMINDERS` never receives the new triggers.
 - **Capture context:** stamping, the Room migration test, and sync round trips including an unknown
   kind.
 - **UI:** the watch Today suggestion and morning start on the Wear emulator; the phone Home card in the
@@ -243,9 +247,9 @@ whether a suggestion was already shown for an activity, which enforces one sugge
 
 ## Build order
 
-1. `ActivityTransitionFeed`, the generalized watch listener, `ActivityTracker` and the peer state
-   field. With these, reminders defer during activities and `ACTIVITY_ENDED` replaces the workout
-   trigger.
+1. `ActivityTracker`, the phone's transition request, the watch's Health Services states and the peer
+   state field. With these, reminders wait during activities and the end of one can remind. Built;
+   see `docs/superpowers/plans/2026-10-16-activity-awareness-step-1-reminders.md`.
 2. `capturedDuring`: stamping, storage, sync and display.
 3. `ActivityPresenter` and `SuggestionOutcomes`: voice first, the suggestion card and the morning
    start on both devices.
