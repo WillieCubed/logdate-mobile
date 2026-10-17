@@ -30,6 +30,8 @@ data class LogDateEntry(
     val transcript: String? = null,
     /** Opaque encrypted capture device; the server stores and returns it without reading it. */
     val capturedOn: String? = null,
+    /** Opaque encrypted capture activity; the server stores and returns it without reading it. */
+    val capturedDuring: String? = null,
 )
 
 data class LogDateJournal(

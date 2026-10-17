@@ -3,6 +3,7 @@ package app.logdate.client.sync.crypto
 import app.logdate.client.device.crypto.ContentEncryptionService
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -51,6 +52,16 @@ class MarkedMomentPayloadCodecTest {
                 val moment = mark.copy(state = state, location = null, heartRateBpm = null, resolvedNoteIds = emptySet())
                 assertEquals(moment, codec.decode(moment.id, 1, 3, codec.encode(moment)))
             }
+        }
+
+    @Test
+    fun `the activity recorded with a mark round trips and a mark without one stays without`() =
+        runTest {
+            val codec = MarkedMomentPayloadCodec(cipher())
+            val moving = mark.copy(capturedDuring = CaptureActivity.MOVING)
+
+            assertEquals(moving, codec.decode(moving.id, 1, 3, codec.encode(moving)))
+            assertEquals(mark, codec.decode(mark.id, 1, 3, codec.encode(mark)))
         }
 
     @Test

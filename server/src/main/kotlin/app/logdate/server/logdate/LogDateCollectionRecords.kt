@@ -176,6 +176,9 @@ internal fun LogDateEntry.toRepoJson(): JsonObject =
         if (capturedOn != null) {
             put("capturedOn", capturedOn)
         }
+        if (capturedDuring != null) {
+            put("capturedDuring", capturedDuring)
+        }
     }
 
 internal fun LogDateEntry.toEntryRepoJson(): JsonObject =
@@ -207,6 +210,9 @@ internal fun LogDateEntry.toEntryRepoJson(): JsonObject =
         if (capturedOn != null) {
             put("capturedOn", capturedOn)
         }
+        if (capturedDuring != null) {
+            put("capturedDuring", capturedDuring)
+        }
     }
 
 internal fun JsonObject.toLogDateEntry(
@@ -228,6 +234,7 @@ internal fun JsonObject.toLogDateEntry(
         location = nullableStringValue("location"),
         transcript = nullableStringValue("transcript"),
         capturedOn = nullableStringValue("capturedOn"),
+        capturedDuring = nullableStringValue("capturedDuring"),
     )
 
 internal fun LogDateJournal.toRepoJson(): JsonObject =
