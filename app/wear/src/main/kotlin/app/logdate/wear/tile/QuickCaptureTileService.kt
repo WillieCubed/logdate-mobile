@@ -3,35 +3,41 @@ package app.logdate.wear.tile
 import android.content.ComponentName
 import android.content.Context
 import androidx.wear.protolayout.ActionBuilders
-import androidx.wear.protolayout.ColorBuilders.argb
-import androidx.wear.protolayout.DimensionBuilders.dp
-import androidx.wear.protolayout.DimensionBuilders.wrap
+import androidx.wear.protolayout.DimensionBuilders.expand
 import androidx.wear.protolayout.LayoutElementBuilders
-import androidx.wear.protolayout.ModifiersBuilders
-import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
-import androidx.wear.protolayout.material.Colors
-import androidx.wear.protolayout.material.Text
-import androidx.wear.protolayout.material.Typography
-import androidx.wear.protolayout.material.layouts.PrimaryLayout
+import androidx.wear.protolayout.material3.ButtonGroupDefaults
+import androidx.wear.protolayout.material3.MaterialScope
+import androidx.wear.protolayout.material3.Typography
+import androidx.wear.protolayout.material3.buttonGroup
+import androidx.wear.protolayout.material3.materialScope
+import androidx.wear.protolayout.material3.primaryLayout
+import androidx.wear.protolayout.material3.text
+import androidx.wear.protolayout.material3.textButton
+import androidx.wear.protolayout.modifiers.clickable
+import androidx.wear.protolayout.types.layoutString
+import androidx.wear.tiles.Material3TileService
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
+import androidx.wear.tiles.tile
 import androidx.wear.tiles.tooling.preview.Preview
 import androidx.wear.tiles.tooling.preview.TilePreviewData
 import androidx.wear.tooling.preview.devices.WearDevices
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
+import app.logdate.wear.launch.WearLaunchRequest
 import app.logdate.wear.launch.isWearStartupReady
-import com.google.android.horologist.annotations.ExperimentalHorologistApi
-import com.google.android.horologist.tiles.SuspendingTileService
+import app.logdate.wear.presentation.MainActivity
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
-private const val RESOURCES_VERSION = "1"
+private const val FRESHNESS_MINUTES = 15
 
-private const val EXTRA_TILE_ROUTE = "tile_route"
 private const val ROUTE_QUICK_RECORD = "quick_record"
 private const val ROUTE_MEMORIES = "memories"
 private const val ROUTE_MOOD = "mood"
@@ -42,18 +48,10 @@ private const val ROUTE_QUICK_TEXT = "quick_text"
  *
  * Tapping a button launches the app directly to the corresponding capture screen.
  */
-@OptIn(ExperimentalHorologistApi::class)
-class QuickCaptureTileService : SuspendingTileService() {
-    override suspend fun resourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ResourceBuilders.Resources =
-        ResourceBuilders.Resources
-            .Builder()
-            .setVersion(RESOURCES_VERSION)
-            .build()
-
-    override suspend fun tileRequest(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
-        if (!isWearStartupReady()) return quickCaptureTile(requestParams, this, null)
-        val entryCount = fetchTodayEntryCount()
-        return quickCaptureTile(requestParams, this, entryCount)
+class QuickCaptureTileService : Material3TileService() {
+    override suspend fun MaterialScope.tileResponse(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
+        if (!this@QuickCaptureTileService.isWearStartupReady()) return quickCaptureTile(entryCount = null)
+        return quickCaptureTile(fetchTodayEntryCount())
     }
 
     private suspend fun fetchTodayEntryCount(): Int =
@@ -68,176 +66,78 @@ class QuickCaptureTileService : SuspendingTileService() {
                     .toLocalDateTime(TimeZone.currentSystemDefault())
                     .date
             repository.observeNotesForDay(today).first().size
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            Napier.e("Failed to count today's notes for the Quick Capture tile", e)
             0
         }
 }
 
-internal fun quickCaptureTile(
-    requestParams: RequestBuilders.TileRequest,
-    context: Context,
-    entryCount: Int?,
-): TileBuilders.Tile {
-    val timeline =
-        TimelineBuilders.Timeline
-            .Builder()
-            .addTimelineEntry(
-                TimelineBuilders.TimelineEntry
-                    .Builder()
-                    .setLayout(
-                        LayoutElementBuilders.Layout
-                            .Builder()
-                            .setRoot(quickCaptureLayout(requestParams, context, entryCount))
-                            .build(),
-                    ).build(),
-            ).build()
+internal fun MaterialScope.quickCaptureTile(entryCount: Int?): TileBuilders.Tile =
+    tile(
+        timeline = TimelineBuilders.Timeline.fromLayoutElement(quickCaptureLayout(entryCount)),
+        freshness = FRESHNESS_MINUTES.minutes,
+    )
 
-    return TileBuilders.Tile
-        .Builder()
-        .setResourcesVersion(RESOURCES_VERSION)
-        .setTileTimeline(timeline)
-        .setFreshnessIntervalMillis(15 * 60 * 1000L) // Refresh every 15 minutes
-        .build()
-}
-
-private fun quickCaptureLayout(
-    requestParams: RequestBuilders.TileRequest,
-    context: Context,
-    entryCount: Int?,
-): LayoutElementBuilders.LayoutElement {
+internal fun MaterialScope.quickCaptureLayout(entryCount: Int?): LayoutElementBuilders.LayoutElement {
     val entryLabel =
         entryCount?.let { context.resources.getQuantityString(R.plurals.wear_tile_entry_count, it, it) }
             ?: context.getString(R.string.wear_startup_opening)
 
-    return PrimaryLayout
-        .Builder(requestParams.deviceConfiguration)
-        .setResponsiveContentInsetEnabled(true)
-        .setPrimaryLabelTextContent(
-            Text
-                .Builder(context, context.getString(R.string.app_name))
-                .setColor(argb(Colors.DEFAULT.primary))
-                .setTypography(Typography.TYPOGRAPHY_CAPTION1)
-                .build(),
-        ).setContent(
-            captureButtonRow(context),
-        ).setSecondaryLabelTextContent(
-            Text
-                .Builder(context, entryLabel)
-                .setColor(argb(Colors.DEFAULT.onSurface))
-                .setTypography(Typography.TYPOGRAPHY_CAPTION2)
-                .build(),
-        ).build()
-}
-
-private fun captureButtonRow(context: Context): LayoutElementBuilders.LayoutElement =
-    LayoutElementBuilders.Row
-        .Builder()
-        .setWidth(wrap())
-        .setHeight(wrap())
-        .addContent(
-            captureButton(
-                context = context,
-                label = context.getString(R.string.wear_tile_record),
-                route = ROUTE_QUICK_RECORD,
-            ),
-        ).addContent(spacer(8f))
-        .addContent(
-            captureButton(
-                context = context,
-                label = context.getString(R.string.wear_tile_memories),
-                route = ROUTE_MEMORIES,
-            ),
-        ).addContent(spacer(8f))
-        .addContent(
-            captureButton(
-                context = context,
-                label = context.getString(R.string.wear_tile_mood),
-                route = ROUTE_MOOD,
-            ),
-        ).addContent(spacer(8f))
-        .addContent(
-            captureButton(
-                context = context,
-                label = context.getString(R.string.wear_tile_text),
-                route = ROUTE_QUICK_TEXT,
-            ),
-        ).build()
-
-private fun captureButton(
-    context: Context,
-    label: String,
-    route: String,
-): LayoutElementBuilders.LayoutElement {
-    val launchAction =
-        ActionBuilders.LaunchAction
-            .Builder()
-            .setAndroidActivity(
-                ActionBuilders.AndroidActivity
-                    .Builder()
-                    .setPackageName(context.packageName)
-                    .setClassName(
-                        ComponentName(context, "app.logdate.wear.presentation.MainActivity")
-                            .className,
-                    ).addKeyToExtraMapping(
-                        EXTRA_TILE_ROUTE,
-                        ActionBuilders.AndroidStringExtra
-                            .Builder()
-                            .setValue(route)
-                            .build(),
-                    ).build(),
-            ).build()
-
-    val clickable =
-        ModifiersBuilders.Clickable
-            .Builder()
-            .setOnClick(launchAction)
-            .setId(route)
-            .build()
-
-    return LayoutElementBuilders.Box
-        .Builder()
-        .setWidth(dp(48f))
-        .setHeight(dp(48f))
-        .setModifiers(
-            ModifiersBuilders.Modifiers
+    return primaryLayout(
+        titleSlot = { text(context.getString(R.string.app_name).layoutString) },
+        mainSlot = {
+            LayoutElementBuilders.Column
                 .Builder()
-                .setClickable(clickable)
-                .setBackground(
-                    ModifiersBuilders.Background
-                        .Builder()
-                        .setColor(argb(Colors.DEFAULT.surface))
-                        .setCorner(
-                            ModifiersBuilders.Corner
-                                .Builder()
-                                .setRadius(dp(24f))
-                                .build(),
-                        ).build(),
-                ).build(),
-        ).addContent(
-            Text
-                .Builder(context, label)
-                .setColor(argb(Colors.DEFAULT.onSurface))
-                .setTypography(Typography.TYPOGRAPHY_CAPTION2)
-                .build(),
-        ).build()
+                .setWidth(expand())
+                .setHeight(expand())
+                .addContent(
+                    buttonGroup {
+                        buttonGroupItem { captureButton(R.string.wear_tile_record, ROUTE_QUICK_RECORD) }
+                        buttonGroupItem { captureButton(R.string.wear_tile_memories, ROUTE_MEMORIES) }
+                    },
+                ).addContent(ButtonGroupDefaults.DEFAULT_SPACER_BETWEEN_BUTTON_GROUPS)
+                .addContent(
+                    buttonGroup {
+                        buttonGroupItem { captureButton(R.string.wear_tile_mood, ROUTE_MOOD) }
+                        buttonGroupItem { captureButton(R.string.wear_tile_text, ROUTE_QUICK_TEXT) }
+                    },
+                ).build()
+        },
+        bottomSlot = {
+            text(
+                entryLabel.layoutString,
+                typography = Typography.LABEL_SMALL,
+                color = colorScheme.onSurfaceVariant,
+            )
+        },
+    )
 }
 
-private fun spacer(widthDp: Float): LayoutElementBuilders.LayoutElement =
-    LayoutElementBuilders.Spacer
-        .Builder()
-        .setWidth(dp(widthDp))
-        .build()
+private fun MaterialScope.captureButton(
+    labelRes: Int,
+    route: String,
+): LayoutElementBuilders.LayoutElement =
+    textButton(
+        onClick = clickable(quickCaptureAction(context, route), route),
+        labelContent = { text(context.getString(labelRes).layoutString) },
+        width = expand(),
+        height = expand(),
+    )
+
+internal fun quickCaptureAction(
+    context: Context,
+    route: String,
+): ActionBuilders.LaunchAction =
+    ActionBuilders.launchAction(
+        ComponentName(context, MainActivity::class.java),
+        mapOf(WearLaunchRequest.EXTRA_ROUTE to ActionBuilders.stringExtra(route)),
+    )
 
 @Preview(device = WearDevices.SMALL_ROUND)
 @Preview(device = WearDevices.LARGE_ROUND)
 fun quickCaptureTilePreview(context: Context) =
-    TilePreviewData(
-        onTileResourceRequest = {
-            ResourceBuilders.Resources
-                .Builder()
-                .setVersion(RESOURCES_VERSION)
-                .build()
-        },
-    ) {
-        quickCaptureTile(it, context, entryCount = 3)
+    TilePreviewData(onTileResourceRequest = { previewResources() }) {
+        previewTile(materialScope(context, it.deviceConfiguration) { quickCaptureLayout(entryCount = 3) })
     }
