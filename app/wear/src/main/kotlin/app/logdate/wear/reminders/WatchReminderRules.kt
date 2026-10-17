@@ -1,5 +1,6 @@
 package app.logdate.wear.reminders
 
+import app.logdate.client.domain.activity.Activity
 import app.logdate.client.domain.reminders.WakingHours
 import app.logdate.client.domain.reminders.WakingWindow
 import app.logdate.client.domain.streak.toStreakDay
@@ -37,6 +38,19 @@ object WatchReminderRules {
             now - endedAt <= WORKOUT_WINDOW &&
             isWaking(now, timeZone, hours) &&
             !remindedToday(now, lastReminderAt, timeZone)
+
+    /** An activity that lasted its kind's minimum and ended within [WORKOUT_WINDOW], in waking hours, once a day. */
+    fun activityReminderDue(
+        now: Instant,
+        activity: Activity,
+        lastReminderAt: Instant?,
+        timeZone: TimeZone,
+        hours: WakingHours = WakingHours.Fallback,
+    ): Boolean {
+        val endedAt = activity.endedAt ?: return false
+        return endedAt - activity.startedAt >= activity.kind.minimum &&
+            workoutReminderDue(now, endedAt, lastReminderAt, timeZone, hours)
+    }
 
     fun eveningReminderDue(
         now: Instant,

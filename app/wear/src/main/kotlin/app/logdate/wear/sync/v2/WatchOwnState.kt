@@ -1,5 +1,6 @@
 package app.logdate.wear.sync.v2
 
+import app.logdate.client.sync.peer.state.ActivitySnapshot
 import app.logdate.client.sync.peer.state.WatchState
 import app.logdate.wear.sync.v2.link.WatchLinkRecord
 import app.logdate.wear.sync.v2.link.peerLinkState
@@ -23,9 +24,10 @@ class WatchOwnState(
     private val links: Flow<WatchLinkRecord?>,
     private val features: Set<String> = emptySet(),
     private val counts: Flow<WatchCounts> = flowOf(WatchCounts()),
+    private val activity: Flow<ActivitySnapshot?> = flowOf(null),
 ) {
     fun observe(): Flow<WatchState> =
-        combine(links, counts) { link, count ->
+        combine(links, counts, activity) { link, count, doing ->
             WatchState(
                 outboxCount = count.outbox,
                 deadLetterCount = count.deadLetters,
@@ -35,6 +37,7 @@ class WatchOwnState(
                 linkProblem = link?.problem,
                 linkId = link?.linkId,
                 sessionId = link?.sessionId,
+                activity = doing,
             )
         }.distinctUntilChanged()
 }

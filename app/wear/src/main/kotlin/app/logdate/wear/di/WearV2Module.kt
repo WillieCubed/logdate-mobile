@@ -6,9 +6,12 @@ import androidx.health.services.client.HealthServices
 import androidx.wear.phone.interactions.PhoneTypeHelper
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import androidx.work.WorkManager
+import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.KeyValueActivityLogStore
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.reminders.CoordinatedReminderClaims
 import app.logdate.client.domain.reminders.DeviceReminderBudget
@@ -114,6 +117,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.TimeZone
@@ -390,11 +394,13 @@ val wearV2Module =
             val peers = get<WatchDeliveryPeer>()
             val states = get<PeerStateStore>()
             val hours = get<WatchReminderHours>()
+            val activity = get<ActivityTracker>()
             WatchReminderDispatcher(
                 preferences = get(),
                 notifier = get(),
                 hours = { hours.current },
                 initializeHours = hours::initialize,
+                currentActivity = { activity.agreed.first().current },
                 authorize = authorize@{
                     val peer = peers.current()
                     val phone = states.documents(PeerRole.PHONE).first()[peer?.phoneNode]?.phone
@@ -411,6 +417,16 @@ val wearV2Module =
             )
         }
         single<ReminderPermissions> { AndroidReminderPermissions(get()) }
+        single {
+            // Health Services reports sleep and exercise only while the watch is worn.
+            ActivityTracker(
+                store = KeyValueActivityLogStore(get<KeyValueStorage>()),
+                peer = get<PeerStateStore>().latest(PeerRole.PHONE).map { it?.phone?.activity },
+                watchWorn = flowOf(true),
+                isPhone = false,
+                enabled = get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
+            )
+        }
         single<ActivityRegistration> { HealthServicesActivityRegistration(get()) }
         single<ActivityTransitionStore> {
             SharedPreferencesActivityTransitionStore(
@@ -422,12 +438,20 @@ val wearV2Module =
             val experience = get<FeatureSwitch>()
             val preferences = get<WatchReminderPreferences>()
             val permissions = get<ReminderPermissions>()
-            WorkoutWatcher(transitions = get(), dispatcher = get(), experienceEnabled = {
-                experience.isOn &&
-                    preferences.enabled.value &&
-                    permissions.notificationsGranted() &&
-                    permissions.activityRecognitionGranted()
-            }, awaitExperience = experience::awaitReady)
+            val flags = get<FeatureFlagStore>()
+            WorkoutWatcher(
+                transitions = get(),
+                dispatcher = get(),
+                experienceEnabled = {
+                    experience.isOn &&
+                        preferences.enabled.value &&
+                        permissions.notificationsGranted() &&
+                        permissions.activityRecognitionGranted()
+                },
+                awaitExperience = experience::awaitReady,
+                tracker = get(),
+                awarenessEnabled = { flags.isEnabled(FeatureFlag.ACTIVITY_AWARENESS) },
+            )
         }
         single {
             val experience = get<FeatureSwitch>()

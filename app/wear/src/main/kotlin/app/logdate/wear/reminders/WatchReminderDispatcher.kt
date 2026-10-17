@@ -1,5 +1,7 @@
 package app.logdate.wear.reminders
 
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityKind
 import app.logdate.client.domain.reminders.WakingHours
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -18,6 +20,7 @@ class WatchReminderDispatcher(
     private val authorize: suspend () -> Boolean = { true },
     private val hours: () -> WakingHours = { WakingHours.Fallback },
     private val initializeHours: suspend () -> Unit = {},
+    private val currentActivity: suspend () -> Activity? = { null },
 ) {
     private val mutex = Mutex()
 
@@ -26,13 +29,29 @@ class WatchReminderDispatcher(
             WatchReminderRules.workoutReminderDue(now, endedAt, preferences.lastReminderAt(), timeZone(), hours())
         }
 
+    /** A walk, ride or workout that ended can be the day's reminder; waking up is not one. */
+    suspend fun onActivityEnded(activity: Activity): Boolean {
+        val reminder =
+            when (activity.kind) {
+                ActivityKind.MOVING -> WatchReminder.MOVING_ENDED
+                ActivityKind.IN_VEHICLE -> WatchReminder.TRIP_ENDED
+                ActivityKind.SLEEP -> return false
+            }
+        return deliverIfDue(reminder) { now ->
+            WatchReminderRules.activityReminderDue(now, activity, preferences.lastReminderAt(), timeZone(), hours())
+        }
+    }
+
+    /** The evening reminder waits while the person is moving or in a vehicle. */
     suspend fun onEveningCheck(
         phoneReachable: Boolean,
         momentsToday: Int,
-    ): Boolean =
-        deliverIfDue(WatchReminder.EVENING) { now ->
+    ): Boolean {
+        if (currentActivity()?.kind?.holdsReminders == true) return false
+        return deliverIfDue(WatchReminder.EVENING) { now ->
             WatchReminderRules.eveningReminderDue(now, preferences.lastReminderAt(), momentsToday, phoneReachable, timeZone(), hours())
         }
+    }
 
     private suspend fun authorized(): Boolean =
         try {
