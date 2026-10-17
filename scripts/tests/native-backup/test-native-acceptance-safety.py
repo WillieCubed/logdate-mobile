@@ -20,6 +20,34 @@ SPEC.loader.exec_module(HARNESS)
 
 
 class NativeAcceptanceSafetyTest(unittest.TestCase):
+    @staticmethod
+    def credentials_backup(*, omit=(), extra=()):
+        prefix = f"apps/{HARNESS.PACKAGE}"
+        files = {
+            prefix + "/_manifest": b"android app backup manifest",
+            prefix + "/f/db_recovery/passphrase_backup": b"database recovery key",
+            prefix + "/f/identity_recovery/phrase_backup": b"identity recovery phrase",
+            prefix + "/f/identity_recovery/media_key_backup": b"media recovery key",
+            prefix + "/f/logdate.preferences_pb": HARNESS.length_delimited_field(
+                1,
+                HARNESS.length_delimited_field(1, b"identity.canonical_owner_id")
+                + HARNESS.length_delimited_field(
+                    2,
+                    HARNESS.length_delimited_field(5, b"synthetic-owner"),
+                ),
+            ),
+        }
+        files.update(dict(extra))
+        payload = io.BytesIO()
+        with tarfile.open(fileobj=payload, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+            for name, contents in files.items():
+                if name in omit:
+                    continue
+                item = tarfile.TarInfo(name)
+                item.size = len(contents)
+                archive.addfile(item, io.BytesIO(contents))
+        return payload.getvalue()
+
     def test_radio_cleanup_attempts_wifi_after_airplane_mode_failure(self):
         original = (False, b"1")
         with patch.object(
@@ -108,13 +136,13 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         changed_key = {**unchanged, "files/db_recovery/passphrase_backup": {"sha256": "changed-key"}}
 
         HARNESS.assert_snapshot_preserved(original, unchanged)
-        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable journal, media, preference, or recovery data"):
+        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
             HARNESS.assert_snapshot_preserved(original, changed)
-        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable journal, media, preference, or recovery data"):
+        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
             HARNESS.assert_snapshot_preserved(original, changed_key)
-        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable journal, media, preference, or recovery data"):
+        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
             HARNESS.assert_snapshot_preserved(original, {**unchanged, "files/media/objects/original.jpg": {"sha256": "media-after"}})
-        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable journal, media, preference, or recovery data"):
+        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
             HARNESS.assert_snapshot_preserved(original, {**unchanged, "files/logdate.preferences_pb": {"sha256": "settings-after"}})
 
     def test_native_backup_checks_source_data_before_and_after_transport_backup(self):
@@ -145,7 +173,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             "adb",
             return_value=f"Package {HARNESS.PACKAGE} with result: Success".encode(),
         ):
-            with self.assertRaisesRegex(RuntimeError, "snapshot changed durable journal"):
+            with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
                 HARNESS.backup_source("emulator-5576", Path(temporary) / "backup.log")
 
     def test_preference_snapshot_ignores_only_runtime_search_index_generation(self):
@@ -237,29 +265,23 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 HARNESS.prepare("emulator-5582", allow_preinstalled_empty=True)
 
     def test_credentials_only_fixture_keeps_owner_preferences_but_excludes_journal_and_media(self):
-        entries = {
-            f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup": b"database-key",
-            f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup": b"identity-key",
-            f"apps/{HARNESS.PACKAGE}/f/identity_recovery/media_key_backup": b"media-key",
-            f"apps/{HARNESS.PACKAGE}/f/logdate.preferences_pb": b"owner-preferences",
-            f"apps/{HARNESS.PACKAGE}/d/logdate": b"encrypted-journal",
-            f"apps/{HARNESS.PACKAGE}/f/media/original.jpg": b"original-media",
-        }
-        payload = io.BytesIO()
-        with HARNESS.tarfile.open(fileobj=payload, mode="w:") as archive:
-            for name, contents in entries.items():
-                item = HARNESS.tarfile.TarInfo(name)
-                item.size = len(contents)
-                archive.addfile(item, io.BytesIO(contents))
+        prefix = f"apps/{HARNESS.PACKAGE}"
+        payload = self.credentials_backup(
+            extra=(
+                (prefix + "/db/logdate", b"encrypted-journal"),
+                (prefix + "/f/media/original.jpg", b"original-media"),
+            ),
+        )
 
-        filtered = HARNESS.credentials_only_from_full_backup(payload.getvalue())
+        filtered = HARNESS.credentials_only_from_full_backup(payload)
         with HARNESS.tarfile.open(fileobj=io.BytesIO(filtered), mode="r:") as archive:
             retained = {item.name for item in archive.getmembers()}
 
-        self.assertIn(f"apps/{HARNESS.PACKAGE}/f/logdate.preferences_pb", retained)
-        self.assertIn(f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup", retained)
-        self.assertNotIn(f"apps/{HARNESS.PACKAGE}/d/logdate", retained)
-        self.assertNotIn(f"apps/{HARNESS.PACKAGE}/f/media/original.jpg", retained)
+        self.assertIn(prefix + "/_manifest", retained)
+        self.assertIn(prefix + "/f/logdate.preferences_pb", retained)
+        self.assertIn(prefix + "/f/db_recovery/passphrase_backup", retained)
+        self.assertNotIn(prefix + "/db/logdate", retained)
+        self.assertNotIn(prefix + "/f/media/original.jpg", retained)
 
     def test_preinstalled_emulator_with_retained_datastore_state_is_rejected(self):
         with patch.object(
@@ -302,6 +324,9 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             exercise_missing_keys=False,
             exercise_credentials_only=False,
             exercise_archive_recovery=True,
+            exercise_partial_media=False,
+            exercise_data_only=False,
+            exercise_duplicate_restore=False,
             resume_seeded_source=False,
             seed_empty_source=False,
             snapshot_existing_source=True,
@@ -495,36 +520,35 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertEqual(b"other app", retained["apps/org.example.other/f/db_recovery/passphrase_backup"])
 
     def test_credentials_only_fixture_keeps_all_recovery_keys_and_removes_journal_data(self):
-        full_backup = io.BytesIO()
+        prefix = f"apps/{HARNESS.PACKAGE}"
         names = [
-            f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup",
-            f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup",
-            f"apps/{HARNESS.PACKAGE}/f/identity_recovery/media_key_backup",
-            f"apps/{HARNESS.PACKAGE}/db/logdate",
-            f"apps/{HARNESS.PACKAGE}/f/media/objects/original.jpg",
+            prefix + "/db/logdate",
+            prefix + "/f/media/objects/original.jpg",
             f"apps/org.example.other/f/db_recovery/passphrase_backup",
         ]
-        with tarfile.open(fileobj=full_backup, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-            for name in names:
-                contents = name.encode()
-                item = tarfile.TarInfo(name)
-                item.size = len(contents)
-                archive.addfile(item, io.BytesIO(contents))
+        payload = self.credentials_backup(extra=((name, name.encode()) for name in names))
 
-        retained = HARNESS.credentials_only_from_full_backup(full_backup.getvalue())
+        retained = HARNESS.credentials_only_from_full_backup(payload)
 
         with tarfile.open(fileobj=io.BytesIO(retained), mode="r:") as archive:
             names_after_filter = {item.name for item in archive.getmembers()}
             contents = {item.name: archive.extractfile(item).read() for item in archive.getmembers()}
         self.assertEqual(
             {
-                f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup",
-                f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup",
-                f"apps/{HARNESS.PACKAGE}/f/identity_recovery/media_key_backup",
+                prefix + "/_manifest",
+                prefix + "/f/db_recovery/passphrase_backup",
+                prefix + "/f/identity_recovery/phrase_backup",
+                prefix + "/f/identity_recovery/media_key_backup",
+                prefix + "/f/logdate.preferences_pb",
             },
             names_after_filter,
         )
-        self.assertTrue(all(value == name.encode() for name, value in contents.items()))
+        self.assertEqual(b"android app backup manifest", contents[prefix + "/_manifest"])
+        self.assertEqual(b"database recovery key", contents[prefix + "/f/db_recovery/passphrase_backup"])
+        self.assertEqual(b"identity recovery phrase", contents[prefix + "/f/identity_recovery/phrase_backup"])
+        self.assertEqual(b"media recovery key", contents[prefix + "/f/identity_recovery/media_key_backup"])
+        preference = HARNESS.canonical_preferences(contents[prefix + "/f/logdate.preferences_pb"])
+        self.assertTrue(preference)
 
     def test_credentials_only_acceptance_detects_nested_media_file_paths(self):
         self.assertTrue(HARNESS.contains_media_files({"files/media/objects/sha256/photo.jpg": {"bytes": 1}}))
@@ -533,35 +557,27 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertFalse(HARNESS.contains_media_files({"files/datastore/preferences": {"bytes": 1}}))
 
     def test_credentials_only_fixture_rejects_missing_database_recovery_key(self):
-        full_backup = io.BytesIO()
-        with tarfile.open(fileobj=full_backup, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-            item = tarfile.TarInfo(f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup")
-            item.size = 4
-            archive.addfile(item, io.BytesIO(b"key!"))
+        database_key = f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup"
+        full_backup = self.credentials_backup(omit=(database_key,))
 
         with self.assertRaisesRegex(RuntimeError, "missing required portable recovery keys"):
-            HARNESS.credentials_only_from_full_backup(full_backup.getvalue())
+            HARNESS.credentials_only_from_full_backup(full_backup)
 
     def test_credentials_only_transport_preserves_android_headers_and_other_packages(self):
-        full_backup = io.BytesIO()
-        with tarfile.open(fileobj=full_backup, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-            for name, contents in [
-                (f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup", b"database key"),
-                (f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup", b"identity key"),
-                (f"apps/{HARNESS.PACKAGE}/f/identity_recovery/media_key_backup", b"media key"),
-                (f"apps/{HARNESS.PACKAGE}/db/logdate", b"encrypted journal"),
-                (f"apps/{HARNESS.PACKAGE}/f/media/original.jpg", b"original media"),
+        prefix = f"apps/{HARNESS.PACKAGE}"
+        full_backup = self.credentials_backup(
+            extra=(
+                (prefix + "/db/logdate", b"encrypted journal"),
+                (prefix + "/f/media/original.jpg", b"original media"),
                 ("apps/org.example.other/f/settings", b"other app data"),
-            ]:
-                item = tarfile.TarInfo(name)
-                item.size = len(contents)
-                archive.addfile(item, io.BytesIO(contents))
+            ),
+        )
 
         payload = io.BytesIO()
         with tarfile.open(fileobj=payload, mode="w", format=tarfile.USTAR_FORMAT) as archive:
             item = tarfile.TarInfo(f"1/_full/{HARNESS.PACKAGE}")
-            item.size = len(full_backup.getvalue())
-            archive.addfile(item, io.BytesIO(full_backup.getvalue()))
+            item.size = len(full_backup)
+            archive.addfile(item, io.BytesIO(full_backup))
             metadata = tarfile.TarInfo("1/_delta/@pm@/synthetic")
             metadata.size = len(b"transport metadata")
             archive.addfile(metadata, io.BytesIO(b"transport metadata"))
@@ -574,9 +590,11 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         with tarfile.open(fileobj=io.BytesIO(nested), mode="r:") as archive:
             self.assertEqual(
                 {
-                    f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup",
-                    f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup",
-                    f"apps/{HARNESS.PACKAGE}/f/identity_recovery/media_key_backup",
+                    prefix + "/_manifest",
+                    prefix + "/f/db_recovery/passphrase_backup",
+                    prefix + "/f/identity_recovery/phrase_backup",
+                    prefix + "/f/identity_recovery/media_key_backup",
+                    prefix + "/f/logdate.preferences_pb",
                 },
                 {item.name for item in archive.getmembers()},
             )
