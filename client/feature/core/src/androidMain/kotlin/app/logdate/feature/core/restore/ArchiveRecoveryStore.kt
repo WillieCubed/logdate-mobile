@@ -140,6 +140,19 @@ internal class ArchiveRecoveryStore(
         save(record.copy(pending = pending))
     }
 
+    fun updateProgress(
+        id: String,
+        pending: List<UnavailableMediaAsset>,
+        summary: RestoreSummary,
+    ) {
+        val record = requireNotNull(read(id))
+        check(record.metadataApplied) { "Archive metadata must be applied before media recovery progress" }
+        check((record.summary?.recoveryId == null || record.summary.recoveryId == id) && summary.recoveryId == id) {
+            "Archive recovery progress identity changed"
+        }
+        save(record.copy(pending = pending, summary = summary))
+    }
+
     fun finish(
         id: String,
         summary: RestoreSummary,

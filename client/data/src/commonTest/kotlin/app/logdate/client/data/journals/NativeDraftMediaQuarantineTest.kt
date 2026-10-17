@@ -37,8 +37,10 @@ class NativeDraftMediaQuarantineTest {
             var selected: DraftStorageScope? = a
             val repository = LocalFirstDraftRepository(values, Json, currentScope = { selected })
             val source = "content://media/external/video/media/123"
+            val missingPrivate = "file:///data/user/0/studio.hypertext.logdate/files/media/objects/draft-missing.mp4"
             val block = SerializableVideoBlock(Uuid.random(), Instant.fromEpochMilliseconds(1), uri = source, caption = "Retained")
-            val draft = EditorDraft(blocks = listOf(block))
+            val missingBlock = SerializableVideoBlock(Uuid.random(), Instant.fromEpochMilliseconds(2), uri = missingPrivate)
+            val draft = EditorDraft(blocks = listOf(block, missingBlock))
             repository.saveDraftFromSync(draft)
             val key = "editor_drafts_scope_${a.ownerId.length}:${a.ownerId}:${a.serverOrigin.length}:${a.serverOrigin}"
             values.putStringOrThrow(key, ArchiveDraftStorageState(listOf(draft), setOf("retained-receipt")).encode(Json))
@@ -53,10 +55,22 @@ class NativeDraftMediaQuarantineTest {
             values.putStringOrThrow(damagedKey, damaged)
             val before = storage.data.first()
             val repair = NativeDraftMediaQuarantine(storage, Json)
-            assertFailsWith<IllegalStateException> { repair.run { false } }
+            assertFailsWith<IllegalStateException> { repair.run({ false }) }
             assertEquals(before, storage.data.first())
-            repair.run { true }
-            val expected = draft.copy(blocks = listOf(block.copy(uri = UnavailableMediaReferences.nativeRestore(source))))
+            repair.run({ true }) { reference ->
+                when (reference) {
+                    source, missingPrivate -> UnavailableMediaReferences.nativeRestore(reference)
+                    else -> null
+                }
+            }
+            val expected =
+                draft.copy(
+                    blocks =
+                        listOf(
+                            block.copy(uri = UnavailableMediaReferences.nativeRestore(source)),
+                            missingBlock.copy(uri = UnavailableMediaReferences.nativeRestore(missingPrivate)),
+                        ),
+                )
             for (scope in listOf(null, a, b)) {
                 selected = scope
                 assertEquals(listOf(expected), repository.getAllDraftsForSync())
@@ -66,7 +80,12 @@ class NativeDraftMediaQuarantineTest {
             val salvage = ArchiveDraftStorageState.decode(Json, values.getStringOrThrow(damagedKey))
             assertEquals(listOf(expected), salvage.drafts)
             val repaired = storage.data.first()
-            repair.run { true }
+            repair.run({ true }) { reference ->
+                when (reference) {
+                    source, missingPrivate -> UnavailableMediaReferences.nativeRestore(reference)
+                    else -> null
+                }
+            }
             assertEquals(repaired, storage.data.first())
         }
 }

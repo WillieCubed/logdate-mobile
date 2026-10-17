@@ -69,6 +69,28 @@ class PartialRecoveryViewModelTest {
         }
 
     @Test
+    fun `background progress keeps the result partial until every original is recovered`() =
+        runTest(dispatcher) {
+            val model = UserDataRestoreViewModel(launcher, PreviewArchiveUseCase())
+            launcher.completeRestore(RestoreOutcome.Success(summary))
+            val progress =
+                summary.copy(
+                    unavailableOriginals = 1,
+                    recoveringMedia = true,
+                    mediaRecoveryChecked = 1,
+                    mediaRecoveryTotal = 2,
+                )
+
+            launcher.updateRecovery(progress)
+
+            val visible = assertIs<RestoreState.Completed>(model.restoreState.value).summary
+            assertEquals(1, visible.unavailableOriginals)
+            assertTrue(visible.recoveringMedia)
+            assertEquals(1, visible.mediaRecoveryChecked)
+            assertEquals(2, visible.mediaRecoveryTotal)
+        }
+
+    @Test
     fun `cancelling replacement selection returns to the same partial result`() =
         runTest(dispatcher) {
             val model = UserDataRestoreViewModel(launcher, PreviewArchiveUseCase())
@@ -96,6 +118,7 @@ class PartialRecoveryViewModelTest {
     private class RecoveryLauncher : RestoreLauncher {
         var outcomeCallback: ((RestoreOutcome) -> Unit)? = null
         var fileCallback: ((ArchiveFileInfo?) -> Unit)? = null
+        var recoveryCallback: ((RestoreSummary) -> Unit)? = null
         var recoveryId: String? = null
         override val restoreProgress = MutableStateFlow<RestoreProgressInfo>(RestoreProgressInfo.Idle)
 
@@ -115,6 +138,14 @@ class PartialRecoveryViewModelTest {
 
         override fun setFileSelectedCallback(callback: (ArchiveFileInfo?) -> Unit) {
             fileCallback = callback
+        }
+
+        override fun setRecoveryUpdateCallback(callback: (RestoreSummary) -> Unit) {
+            recoveryCallback = callback
+        }
+
+        override fun updateRecovery(summary: RestoreSummary) {
+            recoveryCallback?.invoke(summary)
         }
 
         override fun updateProgress(info: RestoreProgressInfo) = Unit

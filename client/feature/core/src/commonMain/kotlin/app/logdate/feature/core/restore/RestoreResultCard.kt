@@ -31,6 +31,7 @@ import logdate.client.feature.core.generated.resources.restore_complete_title
 import logdate.client.feature.core.generated.resources.restore_failed_title
 import logdate.client.feature.core.generated.resources.restore_interrupted_description
 import logdate.client.feature.core.generated.resources.restore_interrupted_title
+import logdate.client.feature.core.generated.resources.restore_media_recovery_progress
 import logdate.client.feature.core.generated.resources.restore_missing_originals
 import logdate.client.feature.core.generated.resources.restore_missing_previews
 import logdate.client.feature.core.generated.resources.restore_partial_description
@@ -125,6 +126,18 @@ internal fun RestoreSuccessCard(
                     } else {
                         ""
                     },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (summary.recoveringMedia && summary.mediaRecoveryTotal > 0) {
+            Spacer(modifier = Modifier.height(Spacing.xs))
+            Text(
+                stringResource(
+                    Res.string.restore_media_recovery_progress,
+                    summary.mediaRecoveryChecked.coerceAtMost(summary.mediaRecoveryTotal),
+                    summary.mediaRecoveryTotal,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

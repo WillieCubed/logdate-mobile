@@ -124,7 +124,7 @@ internal class NativeMediaRecovery(
                     inbox.applied(type, row.entityId, row.version, scope)
                     continue
                 }
-                val result = transfer.hydrateDraftMedia(accessToken, original)
+                val result = transfer.hydrateDraftMedia(accessToken, original) { scope == inbox.currentScope() }
                 val (updated, mappings) =
                     when (result) {
                         is DraftMediaHydrationResult.Available -> result.draft to result.mappings

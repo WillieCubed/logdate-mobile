@@ -21,7 +21,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 
-PACKAGE = "studio.hypertext.logdate.debug"
+PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 PROBE = "app.logdate.client.e2e.NativeBackupTransferProbeTest"
 TRANSPORT = "com.android.localtransport/.LocalTransport"
@@ -117,7 +117,7 @@ def validate_preference_value(data):
     return number
 
 
-def canonical_preferences(data):
+def canonical_preferences(data, allowed_names=None):
     """Normalize DataStore preference ordering and omit its runtime search-index counter."""
     try:
         entries = {}
@@ -135,7 +135,7 @@ def canonical_preferences(data):
                 raise ValueError("invalid DataStore preferences: duplicate preference name")
             if name == "android_platform_search_index_generation" and value_type != 4:
                 raise ValueError("invalid DataStore preferences: runtime generation has invalid type")
-            if name not in RUNTIME_ONLY_PREFERENCES:
+            if name not in RUNTIME_ONLY_PREFERENCES and (allowed_names is None or name in allowed_names):
                 entries[name] = entry
         return b"".join(length_delimited_field(1, entry) for _, entry in sorted(entries.items()))
     except (IndexError, UnicodeDecodeError, ValueError) as error:
@@ -159,6 +159,37 @@ def contains_media_files(files):
         (path.decode() if isinstance(path, bytes) else path).removeprefix("./").startswith(media_roots)
         for path in files
     )
+
+
+def verify_restored_snapshot(restored_files, source_files, *, credentials_only):
+    """Validate durable restore contents and report the intended acceptance failure."""
+    database_path = "databases/logdate"
+    database = restored_files.get(database_path)
+    if credentials_only:
+        # Application startup can create an empty SQLite database on a fresh installation. The
+        # instrumentation probe verifies it contains no source journals or notes; the tar filter
+        # separately proves no database entry was transported.
+        if restored_files.get("files/db_recovery/passphrase_backup") is None:
+            raise RuntimeError("credentials-only restore omitted the journal recovery key")
+        identity_files = (
+            "files/identity_recovery/phrase_backup",
+            "files/identity_recovery/account_key_backup",
+        )
+        if not any(restored_files.get(path) is not None for path in identity_files):
+            raise RuntimeError("credentials-only restore omitted portable identity material")
+        if restored_files.get("files/identity_recovery/media_key_backup") is None:
+            raise RuntimeError("credentials-only restore omitted the media recovery key")
+        if contains_media_files(restored_files):
+            raise RuntimeError("credentials-only restore unexpectedly delivered media data")
+        return
+
+    if database is None:
+        raise RuntimeError("Android completed restore without delivering the journal database")
+    source_database = source_files.get(database_path)
+    if source_database is None:
+        raise RuntimeError("synthetic source snapshot is missing the journal database")
+    if database["sha256"] != source_database["sha256"]:
+        raise RuntimeError("Android completed restore, but the destination database differs before app startup")
 
 
 def emulator_serial(value):
@@ -213,12 +244,19 @@ def package_file_snapshot(serial):
     return snapshot
 
 
-def assert_snapshot_preserved(before, after):
+def assert_snapshot_preserved(before, after, *, require_database=True):
     volatile_files = {"databases/logdate-wal", "databases/logdate-shm"}
     before_durable = {path: value for path, value in before.items() if path not in volatile_files}
     after_durable = {path: value for path, value in after.items() if path not in volatile_files}
-    if before.get("databases/logdate") is None or before_durable != after_durable:
-        raise RuntimeError("snapshot changed durable journal, media, preference, or recovery data")
+    if require_database and before.get("databases/logdate") is None:
+        raise RuntimeError("snapshot has no journal database to preserve")
+    if before_durable != after_durable:
+        changed_paths = sorted(
+            path
+            for path in before_durable.keys() | after_durable.keys()
+            if before_durable.get(path) != after_durable.get(path)
+        )
+        raise RuntimeError("snapshot changed durable data: " + ", ".join(changed_paths))
 
 
 def backup_source(serial, output):
@@ -247,30 +285,46 @@ def package_user_files(serial):
 
 def without_portable_recovery_keys(payload):
     """Remove portable keys from LogDate's nested full backup, retaining the transport set."""
-    full_backup_name = f"1/_full/{PACKAGE}"
-    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as source:
-        item = next((member for member in source.getmembers() if member.name == full_backup_name), None)
-        if item is None:
-            raise RuntimeError("native transport did not contain the LogDate full backup")
-        full_backup = source.extractfile(item)
-        if full_backup is None:
-            raise RuntimeError("native transport did not contain the LogDate full backup")
-        filtered_full_backup = without_portable_recovery_keys_from_full_backup(full_backup.read())
-
-    # Preserve Android's transport headers. Rebuilding this outer tar can add PAX records
-    # that Android's restore reader then parses as ordinary backup entries.
-    header = bytearray(payload[item.offset:item.offset + 512])
-    header[124:136] = f"{len(filtered_full_backup):011o}\0".encode()
-    header[148:156] = b"        "
-    checksum = sum(header)
-    header[148:156] = f"{checksum:06o}\0 ".encode()
-    old_payload_end = item.offset_data + ((item.size + 511) // 512) * 512
-    padding = b"\0" * ((-len(filtered_full_backup)) % 512)
-    return payload[:item.offset] + bytes(header) + filtered_full_backup + padding + payload[old_payload_end:]
+    return rewrite_native_full_backup(payload, without_portable_recovery_keys_from_full_backup)
 
 
 def credentials_only(payload):
     """Keep LogDate's portable recovery keys while removing journal and media data."""
+    return rewrite_native_full_backup(payload, credentials_only_from_full_backup)
+
+
+def without_one_native_media_file(payload):
+    """Remove one original from the nested Android full backup and return its app path."""
+    removed = []
+    prefix = f"apps/{PACKAGE}/f/"
+
+    def remove_one(full_backup):
+        with tarfile.open(fileobj=io.BytesIO(full_backup), mode="r:") as archive:
+            media = next(
+                (
+                    member
+                    for member in archive.getmembers()
+                    if member.isfile()
+                    and member.name.startswith(prefix + "media/objects/")
+                    and member.name.lower().endswith(".png")
+                ),
+                None,
+            )
+        if media is None:
+            raise RuntimeError("native source backup did not contain the PNG original used by the image note")
+        start = media.offset
+        end = media.offset_data + ((media.size + 511) // 512) * 512
+        removed.append("files/" + media.name.removeprefix(prefix))
+        return full_backup[:start] + full_backup[end:]
+
+    rewritten = rewrite_native_full_backup(payload, remove_one)
+    if len(removed) != 1:
+        raise RuntimeError("native partial-media fixture did not remove exactly one original")
+    return rewritten, removed[0]
+
+
+def rewrite_native_full_backup(payload, transform):
+    """Replace the nested app archive while preserving Android's legacy outer tar headers."""
     full_backup_name = f"1/_full/{PACKAGE}"
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as source:
         item = next((member for member in source.getmembers() if member.name == full_backup_name), None)
@@ -279,7 +333,7 @@ def credentials_only(payload):
         full_backup = source.extractfile(item)
         if full_backup is None:
             raise RuntimeError("native transport did not contain the LogDate full backup")
-        filtered_full_backup = credentials_only_from_full_backup(full_backup.read())
+        filtered_full_backup = transform(full_backup.read())
 
     # Keep the legacy outer transport headers intact; Android parses these as backup records.
     header = bytearray(payload[item.offset:item.offset + 512])
@@ -292,10 +346,12 @@ def credentials_only(payload):
 
 
 def credentials_only_from_full_backup(payload):
-    """Keep recovery keys and owner preferences while excluding journal/media content."""
-    prefix = f"apps/{PACKAGE}/f/"
+    """Keep recovery keys and canonical owner while excluding all journal/media content."""
+    app_prefix = f"apps/{PACKAGE}"
+    prefix = app_prefix + "/f/"
     database_key = prefix + "db_recovery/passphrase_backup"
     owner_preferences = prefix + "logdate.preferences_pb"
+    manifest = app_prefix + "/_manifest"
     identity_keys = {
         prefix + "identity_recovery/phrase_backup",
         prefix + "identity_recovery/account_key_backup",
@@ -303,22 +359,61 @@ def credentials_only_from_full_backup(payload):
     }
     allowed = {database_key, owner_preferences, *identity_keys}
     found = set()
-    removed_ranges = []
+    manifest_found = False
+    replacements = {}
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as source:
         for item in source.getmembers():
+            if item.name == manifest:
+                manifest_found = True
+                continue
+            if item.isdir() and item.name.startswith(app_prefix + "/"):
+                continue
             if item.name in allowed:
                 found.add(item.name)
-            else:
-                end = item.offset_data + ((item.size + 511) // 512) * 512
-                removed_ranges.append((item.offset, end))
+                if item.name == owner_preferences:
+                    preferences = source.extractfile(item)
+                    if preferences is None:
+                        raise RuntimeError("credentials-only fixture is missing owner preferences")
+                    replacements[item.name] = canonical_preferences(
+                        preferences.read(),
+                        allowed_names={"identity.canonical_owner_id"},
+                    )
     has_identity_key = bool(found.intersection(identity_keys - {prefix + "identity_recovery/media_key_backup"}))
     required = {database_key, prefix + "identity_recovery/media_key_backup"}
-    if not required.issubset(found) or not has_identity_key:
+    if not manifest_found:
+        raise RuntimeError("credentials-only fixture is missing Android's app backup manifest")
+    if not required.issubset(found) or not has_identity_key or owner_preferences not in replacements:
         raise RuntimeError("credentials-only fixture is missing required portable recovery keys")
+    if not replacements[owner_preferences]:
+        raise RuntimeError("credentials-only fixture is missing the canonical journal owner")
+    return rewrite_app_backup(payload, allowed | {manifest}, replacements)
+
+
+def rewrite_app_backup(payload, allowed_paths, replacements=None):
+    """Retain selected Android app-backup entries, preserving tar metadata and terminators."""
+    replacements = replacements or {}
+    app_prefix = f"apps/{PACKAGE}"
     output = bytearray()
     cursor = 0
-    for start, end in sorted(removed_ranges):
-        output.extend(payload[cursor:start])
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as source:
+        members = source.getmembers()
+    for item in members:
+        end = item.offset_data + ((item.size + 511) // 512) * 512
+        if item.name not in allowed_paths and not (item.isdir() and item.name.startswith(app_prefix + "/")):
+            cursor = end
+            continue
+        output.extend(payload[cursor:item.offset])
+        replacement = replacements.get(item.name)
+        if replacement is None:
+            output.extend(payload[item.offset:end])
+        else:
+            header = bytearray(payload[item.offset:item.offset_data])
+            header[124:136] = f"{len(replacement):011o}\0".encode()
+            header[148:156] = b"        "
+            header[148:156] = f"{sum(header):06o}\0 ".encode()
+            output.extend(header)
+            output.extend(replacement)
+            output.extend(b"\0" * ((-len(replacement)) % 512))
         cursor = end
     output.extend(payload[cursor:])
     return bytes(output)
@@ -460,7 +555,7 @@ def restore_radio_state(serial, original):
     raise RuntimeError(f"Could not restore emulator radio state: {detail}")
 
 
-def probe(serial, mode, output, metadata=None, identity="phrase"):
+def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None):
     arguments = ["shell", "am", "instrument", "-w", "-r", "-e", "class", PROBE,
                  "-e", "nativeBackupMode", mode, "-e", "nativeIdentityMode", identity]
     if metadata:
@@ -473,6 +568,8 @@ def probe(serial, mode, output, metadata=None, identity="phrase"):
             arguments.extend(("-e", name, value))
         if metadata.get("recordingTransferFixture"):
             arguments.extend(("-e", "sourceRecordingTransferFixture", "true"))
+    if missing_media_path:
+        arguments.extend(("-e", "expectedMissingMediaPath", missing_media_path))
     arguments.append(RUNNER)
     result = adb(serial, *arguments)
     private_file(output, result)
@@ -562,11 +659,18 @@ def prepare_source(serial, app_apk, test_apk, output, identity, seed_source=True
             assert_snapshot_preserved(before, package_file_snapshot(serial))
         else:
             probe(serial, mode, output / f"source-{mode}.log")
-
-
 def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False,
-             exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False):
-    prepare_source(source, app_apk, test_apk, output, identity, seed_source, snapshot_source)
+             exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False,
+             exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False):
+    prepare_source(
+        source,
+        app_apk,
+        test_apk,
+        output,
+        identity,
+        seed_source,
+        snapshot_source,
+    )
     # The backup agent's file-based restore mode is a manifest contract. Update a resumed fixture
     # without clearing its synthetic content so the source actually writes that format.
     adb(source, "install", "-r", "-t", str(app_apk))
@@ -584,12 +688,24 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
             f"/data/user/0/{PACKAGE}/no_backup/archive-media-recovery-{archive_fixture_label}.json",
         )
         private_file(output / "archive-source-fixture.json", archive_fixture)
-    backup, source_files = backup_source(source, output / "native-backup.log")
+    try:
+        if exercise_data_only:
+            print("Seeding a synthetic source session for data-only restore acceptance", flush=True)
+            probe(source, "source-account-session", output / "source-account-session.log")
+        backup, source_files = backup_source(source, output / "native-backup.log")
+    finally:
+        if exercise_data_only:
+            probe(source, "source-account-session-cleanup", output / "source-account-session-cleanup.log")
+            adb(source, "shell", "am", "force-stop", PACKAGE)
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
+    missing_media_path = None
     if exercise_missing_keys:
         payload = without_portable_recovery_keys(payload)
     elif exercise_credentials_only:
         payload = credentials_only(payload)
+    elif exercise_partial_media:
+        payload, missing_media_path = without_one_native_media_file(payload)
+        private_file(output / "omitted-native-media-path.txt", missing_media_path.encode())
     private_file(output / "native-transport.tar", payload)
     print("Restoring through Android's destination backup service", flush=True)
     adb(destination, "push", str(output / "native-transport.tar"), "/data/local/tmp/logdate-native-transport.tar")
@@ -603,29 +719,21 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     private_file(output / "native-restore.log", restored)
     if b"restoreFinished: 0" not in restored:
         raise RuntimeError("Android did not complete the native restore")
+    if exercise_duplicate_restore:
+        before_replay = package_file_snapshot(destination)
+        replay = adb(destination, "shell", "bmgr", "restore", "1", PACKAGE)
+        private_file(output / "native-restore-replay.log", replay)
+        if b"restoreFinished: 0" not in replay:
+            raise RuntimeError("Android did not complete the replayed native restore")
+        assert_snapshot_preserved(
+            before_replay,
+            package_file_snapshot(destination),
+            require_database=not exercise_credentials_only,
+        )
     restored_files = package_file_snapshot(destination)
     private_file(output / "source-files-before-backup.json", json.dumps(source_files, indent=2).encode())
     private_file(output / "destination-files-after-restore.json", json.dumps(restored_files, indent=2).encode())
-    if exercise_credentials_only:
-        if restored_files["databases/logdate"] is not None:
-            raise RuntimeError("credentials-only restore unexpectedly delivered the journal database")
-        if restored_files["files/db_recovery/passphrase_backup"] is None:
-            raise RuntimeError("credentials-only restore omitted the journal recovery key")
-        identity_files = [
-            "files/identity_recovery/phrase_backup",
-            "files/identity_recovery/account_key_backup",
-        ]
-        if not any(restored_files[path] is not None for path in identity_files):
-            raise RuntimeError("credentials-only restore omitted portable identity material")
-        if restored_files["files/identity_recovery/media_key_backup"] is None:
-            raise RuntimeError("credentials-only restore omitted the media recovery key")
-        if contains_media_files(restored_files):
-            raise RuntimeError("credentials-only restore unexpectedly delivered media data")
-    else:
-        if restored_files["databases/logdate"] is None:
-            raise RuntimeError("Android completed restore without delivering the journal database")
-        if restored_files["databases/logdate"]["sha256"] != source_files["databases/logdate"]["sha256"]:
-            raise RuntimeError("Android completed restore, but the destination database differs before app startup")
+    verify_restored_snapshot(restored_files, source_files, credentials_only=exercise_credentials_only)
     print("Launching the restored app through its normal startup path", flush=True)
     launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
     private_file(output / "destination-first-launch.log", launch)
@@ -639,8 +747,20 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         print("Verifying restored credentials do not synthesize or replace journal content", flush=True)
         probe(destination, "credentials-only", output / "destination-credentials-only.log", metadata, identity)
         return
+    if exercise_partial_media:
+        print("Verifying a partial native media delivery remains recoverable", flush=True)
+        probe(
+            destination,
+            "partial-media",
+            output / "destination-partial-media.log",
+            metadata,
+            identity,
+            missing_media_path,
+        )
+        return
     print("Verifying original media, identity, drafts, and offline editing", flush=True)
-    probe(destination, "verify", output / "destination-verify.log", metadata, identity)
+    verify_mode = "data-only" if exercise_data_only else "verify"
+    probe(destination, verify_mode, output / f"destination-{verify_mode}.log", metadata, identity)
     original_radio = radio_state(destination)
     try:
         adb(destination, "shell", "am", "force-stop", PACKAGE)
@@ -710,6 +830,9 @@ def main():
     parser.add_argument("--exercise-archive-recovery", action="store_true", help="transfer an edited partial archive and recover its originals on the destination")
     parser.add_argument("--exercise-missing-keys", action="store_true", help="omit portable key files from the native payload and verify safe recovery")
     parser.add_argument("--exercise-credentials-only", action="store_true", help="restore portable recovery keys without journal or media data")
+    parser.add_argument("--exercise-data-only", action="store_true", help="verify journal and media restore without an account session")
+    parser.add_argument("--exercise-duplicate-restore", action="store_true", help="replay native restore before app launch and verify idempotent durable state")
+    parser.add_argument("--exercise-partial-media", action="store_true", help="omit one original from native transport and verify recovery state")
     parser.add_argument("--resume-seeded-source", action="store_true", help="resume from a retained synthetic source fixture without clearing or reseeding app data")
     parser.add_argument("--snapshot-existing-source", action="store_true", help="record a synthetic source's existing restore fixture without replacing journal data")
     parser.add_argument("--seed-empty-source", action="store_true", help="seed an installed emulator only when it contains no journal database or media files")
@@ -736,6 +859,9 @@ def main():
         options.exercise_credentials_only,
         seed_source=not (options.resume_seeded_source or options.snapshot_existing_source),
         snapshot_source=options.snapshot_existing_source,
+        exercise_duplicate_restore=options.exercise_duplicate_restore,
+        exercise_partial_media=options.exercise_partial_media,
+        exercise_data_only=options.exercise_data_only,
     )
     if options.exercise_quota:
         verify_quota(options.source, options.output.resolve())
@@ -744,21 +870,31 @@ def main():
 def validate_options(options, parser):
     if options.source == options.destination:
         parser.error("source and destination must be different emulators")
-    recovery_scenarios = [options.exercise_missing_keys, options.exercise_credentials_only, options.exercise_archive_recovery]
-    if sum(recovery_scenarios) > 1:
+    filtered_scenarios = [
+        options.exercise_missing_keys,
+        options.exercise_credentials_only,
+        options.exercise_archive_recovery,
+        options.exercise_partial_media,
+    ]
+    if sum(filtered_scenarios) > 1:
         parser.error("choose one restore recovery scenario per destination fixture")
-    if options.resume_seeded_source and not any(recovery_scenarios):
+    if options.exercise_data_only and any(filtered_scenarios):
+        parser.error("data-only acceptance requires a complete native app-data restore")
+    acceptance_scenarios = [*filtered_scenarios, options.exercise_duplicate_restore, options.exercise_data_only]
+    if options.resume_seeded_source and not any(acceptance_scenarios):
         parser.error("resuming a seeded source requires a recovery acceptance scenario")
     if options.resume_seeded_source and options.seed_empty_source:
         parser.error("choose either a retained synthetic source or an empty installed source")
     if options.snapshot_existing_source and (options.resume_seeded_source or options.seed_empty_source):
         parser.error("snapshot an existing source separately from resuming a fixture or seeding an empty source")
-    if options.snapshot_existing_source and not any(recovery_scenarios):
+    if options.snapshot_existing_source and not any(acceptance_scenarios):
         parser.error("snapshotting an existing source requires a recovery acceptance scenario")
     if options.snapshot_existing_source and options.exercise_archive_recovery:
         parser.error("snapshotting an existing source cannot run archive seeding because it mutates the source journal")
     if options.snapshot_existing_source and options.identity == "legacy-account":
         parser.error("legacy-account is a source seeding mode and cannot snapshot an existing source")
+    if options.exercise_data_only and options.exercise_credentials_only:
+        parser.error("data-only and credentials-only acceptance are distinct restore scenarios")
 
 
 if __name__ == "__main__":

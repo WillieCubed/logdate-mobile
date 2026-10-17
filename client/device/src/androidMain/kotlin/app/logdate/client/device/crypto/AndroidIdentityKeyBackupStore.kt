@@ -2,6 +2,8 @@ package app.logdate.client.device.crypto
 
 import android.content.Context
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -37,12 +39,14 @@ import kotlin.io.encoding.Base64
 class AndroidIdentityKeyBackupStore(
     private val context: Context,
 ) : IdentityKeyBackupStore {
-    override suspend fun hasMediaBackup(): Boolean = mediaFile().exists()
+    override suspend fun hasMediaBackup(): Boolean = backupFileMutex.withLock { mediaFile().exists() }
 
     override suspend fun readMediaIdentity(identityBinding: String): MediaIdentityBackup? =
-        readMediaIdentities()
-            .firstOrNull { it.identityBinding == identityBinding }
-            ?.let { MediaIdentityBackup(it.identityBinding, Base64.decode(it.key)) }
+        backupFileMutex.withLock {
+            readMediaIdentities()
+                .firstOrNull { it.identityBinding == identityBinding }
+                ?.let { MediaIdentityBackup(it.identityBinding, Base64.decode(it.key)) }
+        }
 
     private fun readMediaIdentities(): List<StoredMediaIdentity> {
         val file = mediaFile()
@@ -73,82 +77,98 @@ class AndroidIdentityKeyBackupStore(
     }
 
     override suspend fun writeMediaIdentity(identity: MediaIdentityBackup) {
-        require(identity.key.size == 32 && Base64.decode(identity.identityBinding).size == 32)
-        val retained = readMediaIdentities()
-        val existing = retained.firstOrNull { it.identityBinding == identity.identityBinding }
-        if (existing != null) {
-            check(Base64.decode(existing.key).contentEquals(identity.key)) { "Conflicting media recovery keys" }
-            return
-        }
-        check(retained.size < 64) { "The retained media recovery keys need attention" }
-        val stored =
-            StoredMediaIdentity(
-                identityBinding = identity.identityBinding,
-                key = Base64.encode(identity.key),
-                checksum = Base64.encode(checksum(identity.identityBinding, identity.key)),
-            )
-        writeAtomically(mediaFile(), Json.encodeToString(StoredMediaIdentities(1, retained + stored)))
-    }
-
-    override suspend fun hasBackup(): Boolean = backupFile().exists() || accountFile().exists() || mediaFile().exists()
-
-    override suspend fun readAccountIdentity(): AccountIdentityBackup? {
-        val file = accountFile()
-        if (!file.exists()) return null
-        return try {
-            check(file.length() in 1..4096) { "Invalid account identity backup size" }
-            val stored = Json.decodeFromString<StoredAccountIdentity>(file.readText())
-            check(stored.version in 1..2 && stored.accountId.isNotBlank()) { "Unsupported account identity backup" }
-            val key = Base64.decode(stored.key)
-            check(key.size == 32) { "Invalid account identity key length" }
-            val media = stored.mediaKey?.let { Base64.decode(it) }
-            check(
-                (stored.version == 1 && media == null) || (stored.version == 2 && media?.size == 32),
-            ) { "Invalid paired media recovery key" }
-            check(MessageDigest.isEqual(Base64.decode(stored.checksum), checksum(stored.accountId, key + (media ?: byteArrayOf())))) {
-                "Account identity backup integrity check failed"
+        backupFileMutex.withLock {
+            require(identity.key.size == 32 && Base64.decode(identity.identityBinding).size == 32)
+            val retained = readMediaIdentities()
+            val existing = retained.firstOrNull { it.identityBinding == identity.identityBinding }
+            if (existing != null) {
+                check(Base64.decode(existing.key).contentEquals(identity.key)) { "Conflicting media recovery keys" }
+                return
             }
-            AccountIdentityBackup(stored.accountId, key, media)
-        } catch (error: Exception) {
-            Napier.w("Native account identity backup needs recovery")
-            throw IllegalStateException("The retained account identity backup could not be read", error)
+            check(retained.size < 64) { "The retained media recovery keys need attention" }
+            val stored =
+                StoredMediaIdentity(
+                    identityBinding = identity.identityBinding,
+                    key = Base64.encode(identity.key),
+                    checksum = Base64.encode(checksum(identity.identityBinding, identity.key)),
+                )
+            writeAtomically(mediaFile(), Json.encodeToString(StoredMediaIdentities(1, retained + stored)))
         }
     }
+
+    override suspend fun hasBackup(): Boolean =
+        backupFileMutex.withLock { backupFile().exists() || accountFile().exists() || mediaFile().exists() }
+
+    override suspend fun readAccountIdentity(): AccountIdentityBackup? =
+        backupFileMutex.withLock {
+            val file = accountFile()
+            if (!file.exists()) return@withLock null
+            try {
+                check(file.length() in 1..4096) { "Invalid account identity backup size" }
+                val stored = Json.decodeFromString<StoredAccountIdentity>(file.readText())
+                check(stored.version in 1..2 && stored.accountId.isNotBlank()) { "Unsupported account identity backup" }
+                val key = Base64.decode(stored.key)
+                check(key.size == 32) { "Invalid account identity key length" }
+                val media = stored.mediaKey?.let { Base64.decode(it) }
+                check(
+                    (stored.version == 1 && media == null) || (stored.version == 2 && media?.size == 32),
+                ) { "Invalid paired media recovery key" }
+                check(MessageDigest.isEqual(Base64.decode(stored.checksum), checksum(stored.accountId, key + (media ?: byteArrayOf())))) {
+                    "Account identity backup integrity check failed"
+                }
+                AccountIdentityBackup(stored.accountId, key, media)
+            } catch (error: Exception) {
+                Napier.w("Native account identity backup needs recovery")
+                throw IllegalStateException("The retained account identity backup could not be read", error)
+            }
+        }
 
     override suspend fun writeAccountIdentity(identity: AccountIdentityBackup) {
-        require(identity.key.size == 32 && identity.accountId.isNotBlank() && (identity.mediaKey == null || identity.mediaKey.size == 32))
-        val stored =
-            StoredAccountIdentity(
-                if (identity.mediaKey == null) 1 else 2,
-                identity.accountId,
-                Base64.encode(identity.key),
-                Base64.encode(checksum(identity.accountId, identity.key + (identity.mediaKey ?: byteArrayOf()))),
-                identity.mediaKey?.let { Base64.encode(it) },
+        backupFileMutex.withLock {
+            require(
+                identity.key.size == 32 &&
+                    identity.accountId.isNotBlank() &&
+                    (identity.mediaKey == null || identity.mediaKey.size == 32),
             )
-        writeAtomically(accountFile(), Json.encodeToString(stored))
-        deleteIfPresent(backupFile())
+            val stored =
+                StoredAccountIdentity(
+                    if (identity.mediaKey == null) 1 else 2,
+                    identity.accountId,
+                    Base64.encode(identity.key),
+                    Base64.encode(checksum(identity.accountId, identity.key + (identity.mediaKey ?: byteArrayOf()))),
+                    identity.mediaKey?.let { Base64.encode(it) },
+                )
+            writeAtomically(accountFile(), Json.encodeToString(stored))
+            deleteIfPresent(backupFile())
+        }
     }
 
     override suspend fun readPhrase(): String? =
-        runCatching {
+        backupFileMutex.withLock {
             val file = backupFile()
-            if (!file.exists()) return null
-            val phrase = file.readText().trim()
-            phrase.ifEmpty { null }
-        }.getOrElse { error ->
-            Napier.w("Failed to read identity recovery phrase backup", error)
-            null
+            if (!file.exists()) return@withLock null
+            runCatching {
+                val phrase = file.readText().trim()
+                phrase.ifEmpty { null }
+            }.getOrElse { error ->
+                Napier.w("Failed to read identity recovery phrase backup", error)
+                null
+            }
         }
 
     override suspend fun writePhrase(phrase: String) {
-        writeAtomically(backupFile(), phrase)
-        deleteIfPresent(accountFile())
+        backupFileMutex.withLock {
+            writeAtomically(backupFile(), phrase)
+            deleteIfPresent(accountFile())
+        }
     }
 
     override suspend fun clear() {
-        deleteIfPresent(backupFile())
-        deleteIfPresent(accountFile())
-        deleteIfPresent(mediaFile())
+        backupFileMutex.withLock {
+            deleteIfPresent(backupFile())
+            deleteIfPresent(accountFile())
+            deleteIfPresent(mediaFile())
+        }
     }
 
     private fun backupFile(): File = File(context.filesDir, BACKUP_PATH)
@@ -181,6 +201,7 @@ class AndroidIdentityKeyBackupStore(
 
     private companion object {
         const val BACKUP_PATH = "identity_recovery/phrase_backup"
+        val backupFileMutex = Mutex()
     }
 }
 

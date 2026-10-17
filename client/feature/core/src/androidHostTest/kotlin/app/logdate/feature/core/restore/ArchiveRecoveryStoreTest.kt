@@ -205,6 +205,64 @@ class ArchiveRecoveryStoreTest {
     }
 
     @Test
+    fun `attachment progress summary and remaining media survive process restart`() {
+        val root = Files.createTempDirectory("archive-progress-").toFile()
+        try {
+            val directory = root.resolve("recovery")
+            val store = ArchiveRecoveryStore(directory, root.resolve("cache"))
+            val source = root.resolve("archive.zip").apply { writeBytes(byteArrayOf(1)) }
+            val scope = ArchiveRecoveryScope("owner", "https://example.test")
+            val id = Uuid.random().toString()
+            store.begin(id, scope, source, ImportOptions(), "Archive")
+            val first =
+                UnavailableMediaAsset(
+                    Uuid.random().toString(),
+                    reference = "logdate-unavailable://archive/original-1",
+                    reason = UnavailableMediaReason.IMPORT_FAILED,
+                )
+            val second =
+                UnavailableMediaAsset(
+                    Uuid.random().toString(),
+                    reference = "logdate-unavailable://archive/original-2",
+                    reason = UnavailableMediaReason.IMPORT_FAILED,
+                )
+            store.recordPending(id, first)
+            store.recordPending(id, second)
+            store.finish(
+                id,
+                RestoreSummary(
+                    "Archive",
+                    journalsImported = 1,
+                    notesImported = 2,
+                    draftsImported = 0,
+                    journalLinksImported = 0,
+                    mediaImported = 0,
+                    unavailableOriginals = 2,
+                    recoveryId = id,
+                    recoveringMedia = true,
+                ),
+            )
+            val progress =
+                requireNotNull(store.read(id)?.summary).copy(
+                    mediaImported = 1,
+                    unavailableOriginals = 1,
+                    mediaRecoveryChecked = 1,
+                    mediaRecoveryTotal = 2,
+                    recoveringMedia = true,
+                )
+
+            store.updateProgress(id, listOf(second), progress)
+
+            val restarted = ArchiveRecoveryStore(directory, root.resolve("cache"))
+            assertEquals(listOf(second), restarted.read(id)?.pending)
+            assertEquals(progress, restarted.read(id)?.summary)
+            assertTrue(restarted.source(id).isFile)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `failed source copy cannot publish a recovery record or accept a path as an id`() {
         val root = Files.createTempDirectory("archive-recovery-failure-").toFile()
         try {

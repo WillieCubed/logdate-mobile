@@ -112,8 +112,13 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
             assertTrue(media.exists(uri.toString()))
             val now = Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds())
             val note = ImageNoteEntity(contentUri = uri.toString(), created = now, lastUpdated = now)
+            val missingPrivateFile = context.filesDir.resolve("media/objects/sha256/${Uuid.random()}.png")
+            assertFalse(missingPrivateFile.exists())
+            val missingPrivateSource = "file://${missingPrivateFile.absolutePath}"
+            val missingPrivateNote = ImageNoteEntity(contentUri = missingPrivateSource, created = now, lastUpdated = now)
             val database = koin.get<LogDateDatabase>()
             database.imageNoteDao().addNote(note)
+            database.imageNoteDao().addNote(missingPrivateNote)
             val audio = AudioNoteEntity(contentUri = "content://media/external/audio/media/123", created = now, lastUpdated = now)
             val transcript =
                 TranscriptionEntity(
@@ -142,18 +147,30 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
                         "audio",
                         audio.uid.toString(),
                     ).put("transcript", transcript.id.toString())
+                    .put("missingPrivateNote", missingPrivateNote.uid.toString())
+                    .put("missingPrivateSource", missingPrivateSource)
                     .put("created", now.toEpochMilliseconds())
                     .toString(),
             )
-            assertEquals(note, database.imageNoteDao().getNoteOneOff(note.uid))
-            // The native callback's durable marker is the only trigger; startup performs the repair.
+            // Startup can still be completing while the fixture arms the marker. Either state is
+            // valid here: the marker is pending for the next process, or startup already repaired it.
             val marker = File(context.noBackupFilesDir, ".logdate_media_quarantine_pending")
             require(marker.createNewFile()) { "An existing native recovery must finish before this fixture" }
             FileOutputStream(marker).use {
                 it.write(Uuid.random().toString().encodeToByteArray())
                 it.fd.sync()
             }
-            assertTrue(PostRestoreDetector(context).pendingMediaQuarantineId() != null)
+            val afterArming = database.imageNoteDao().getNoteOneOff(note.uid)
+            val retainedSource = UnavailableMediaReferences.nativeSource(afterArming.contentUri)
+            assertTrue(
+                afterArming.contentUri == note.contentUri || retainedSource == uri.toString(),
+                "Cold restore must retain the original media reference until startup safely quarantines it",
+            )
+            assertEquals(note.created, afterArming.created)
+            assertTrue(
+                PostRestoreDetector(context).pendingMediaQuarantineId() != null || retainedSource == uri.toString(),
+                "The native delivery must remain pending unless its provider reference was already quarantined",
+            )
         }
 
     @Test
@@ -175,6 +192,9 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
             assertTrue(media.exists(source))
             assertFalse(media.exists(note.contentUri))
             assertFalse(media.isRecoveredOriginal(source, references))
+            val missingPrivate = database.imageNoteDao().getNoteOneOff(Uuid.parse(state.getString("missingPrivateNote")))
+            assertEquals(state.getString("missingPrivateSource"), UnavailableMediaReferences.nativeSource(missingPrivate.contentUri))
+            assertEquals(state.getLong("created"), missingPrivate.created.toEpochMilliseconds())
             val audio = database.audioNoteDao().getNoteOneOff(Uuid.parse(state.getString("audio")))
             assertEquals("content://media/external/audio/media/123", UnavailableMediaReferences.nativeSource(audio.contentUri))
             val transcript = requireNotNull(database.transcriptionDao().getTranscriptionByNoteId(audio.uid))

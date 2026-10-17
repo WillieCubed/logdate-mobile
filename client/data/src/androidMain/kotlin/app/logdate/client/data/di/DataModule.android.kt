@@ -61,6 +61,7 @@ import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.networking.DefaultAccountKeyEnvelopeApi
 import app.logdate.client.networking.EmailVerificationApiClient
@@ -224,7 +225,7 @@ actual val dataModule: Module =
                 get(),
             )
         }
-        single { NativeMediaQuarantine(get(), get(), get(), get()) }
+        single { NativeMediaQuarantine(get(), get(), get(), get()) { reference -> get<MediaManager>().exists(reference) } }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
             OfflineFirstJournalContentRepository(

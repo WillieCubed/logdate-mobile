@@ -211,6 +211,8 @@ data class RestoreSummary(
     val recoveryId: String? = null,
     val metadataIncomplete: Boolean = false,
     val recoveringMedia: Boolean = false,
+    val mediaRecoveryChecked: Int = 0,
+    val mediaRecoveryTotal: Int = 0,
     val needsAnotherArchive: Boolean =
         warnings.any { it.startsWith("Skipped") || it.startsWith("Invalid UUID") } ||
             integrityMismatches.any { it.actual < it.expected && it.category != IntegrityCategory.MEDIA },

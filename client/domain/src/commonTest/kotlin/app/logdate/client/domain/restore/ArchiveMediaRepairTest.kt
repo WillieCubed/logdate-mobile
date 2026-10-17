@@ -104,6 +104,48 @@ internal class ArchiveMediaRepairTest : RestoreArchiveTestFixture() {
         }
 
     @Test
+    fun `attachment recovery reports durable progress without hiding unresolved originals`() =
+        runTest {
+            val recoveredId = Uuid.random()
+            val unresolvedId = Uuid.random()
+            val recoveredRef = unavailableArchiveReference(recoveredId.toString())
+            val unresolvedRef = unavailableArchiveReference(unresolvedId.toString())
+            notesRepo.existingNotes[recoveredId] =
+                JournalNote.Image(uid = recoveredId, creationTimestamp = now, lastUpdated = now, mediaRef = recoveredRef)
+            notesRepo.existingNotes[unresolvedId] =
+                JournalNote.Image(uid = unresolvedId, creationTimestamp = now, lastUpdated = now, mediaRef = unresolvedRef)
+            val recovered =
+                UnavailableMediaAsset(
+                    recoveredId.toString(),
+                    reference = recoveredRef,
+                    archivePath = "media/recovered.jpg",
+                    reason = UnavailableMediaReason.IMPORT_FAILED,
+                )
+            val unresolved =
+                UnavailableMediaAsset(
+                    unresolvedId.toString(),
+                    reference = unresolvedRef,
+                    archivePath = "media/unresolved.jpg",
+                    reason = UnavailableMediaReason.IMPORT_FAILED,
+                )
+            val progress = mutableListOf<ArchiveMediaRepairProgress>()
+
+            val result =
+                RepairArchiveMediaUseCase(notesRepo, journalRepo).repair(
+                    listOf(recovered, unresolved),
+                    FakeMediaImporter(mapOf("media/recovered.jpg" to "file:///recovered.jpg")),
+                    onProgress = progress::add,
+                )
+
+            assertEquals(0, progress.first().imported)
+            assertEquals(2, progress.first().pending.size)
+            assertEquals(1, progress.last().imported)
+            assertEquals(listOf(unresolved), progress.last().pending)
+            assertEquals(1, result.imported)
+            assertEquals(listOf(unresolved), result.pending)
+        }
+
+    @Test
     fun `retry patches only the pending role in a reordered edited draft`() =
         runTest {
             val id = Uuid.random()

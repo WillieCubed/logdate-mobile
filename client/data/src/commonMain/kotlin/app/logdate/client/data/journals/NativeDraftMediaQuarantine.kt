@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.client.data.notes.quarantineNativeDraft
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlin.uuid.Uuid
@@ -14,7 +15,14 @@ class NativeDraftMediaQuarantine(
     private val storage: DataStore<Preferences>,
     private val json: Json,
 ) {
-    suspend fun run(isCurrent: () -> Boolean) =
+    suspend fun run(
+        isCurrent: () -> Boolean,
+        quarantine: suspend (String) -> String? = { reference ->
+            reference
+                .takeIf(UnavailableMediaReferences::requiresNativeQuarantine)
+                ?.let(UnavailableMediaReferences::nativeRestore)
+        },
+    ) {
         LocalFirstDraftRepository.storageMutex.withLock {
             check(isCurrent()) { "Native media delivery changed" }
             storage.edit { preferences ->
@@ -33,7 +41,11 @@ class NativeDraftMediaQuarantine(
                                 preferences[stringPreferencesKey(key)] = value
                                 PartialDraftStorageRecovery.recover(json, value)
                             }
-                        val rewritten = state.copy(drafts = state.drafts.map(::quarantineNativeDraft))
+                        val repairedDrafts =
+                            buildList {
+                                for (draft in state.drafts) add(quarantineNativeDraft(draft, quarantine))
+                            }
+                        val rewritten = state.copy(drafts = repairedDrafts)
                         val encoded = rewritten.encode(json)
                         if (encoded != value) preferences[stringPreferencesKey(name)] = encoded
                     }
@@ -41,4 +53,5 @@ class NativeDraftMediaQuarantine(
                 check(isCurrent()) { "Native media delivery changed" }
             }
         }
+    }
 }

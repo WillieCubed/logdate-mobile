@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 
-PACKAGE = "studio.hypertext.logdate.debug"
+PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 TEST = "app.logdate.client.e2e.NativeMissingMediaE2ETest"
 PERMISSIONS = ["READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "POST_NOTIFICATIONS"]

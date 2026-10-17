@@ -290,7 +290,8 @@ rather than relying on a temporary URI mismatch to trigger work.
 
 `tests/e2e/native-missing-media-acceptance.py` runs on explicitly selected synthetic emulators,
 including ones with existing fixtures. Supply `--synthetic-data`, one or more `--emulator` serials,
-`--app-apk`, `--test-apk`, and a new `--output` directory. It verifies provider-ID collisions,
+`--app-apk`, `--test-apk`, and a new `--output` directory. For an isolated debug package, set
+`LOGDATE_NATIVE_ACCEPTANCE_PACKAGE` to the same package ID used to build both APKs. It verifies provider-ID collisions,
 private originals with denied media/notification permissions, metered and Data Saver transitions,
 and retained-archive repair through WorkManager and process restart. It restores network overrides
 and each original permission state. It never clears or uninstalls the app.
@@ -305,6 +306,10 @@ until cleanup succeeds. Cleanup restores permissions and radio settings and read
 `tests/e2e/native-backup-acceptance.py` exercises Android's local debug transport on two fresh,
 rootable Google APIs emulators. It invokes the source backup service, moves that transport's
 payload, and invokes the destination restore service. The harness requires fresh installations and preserves existing app data.
+When an emulator already contains LogDate data, build an isolated application ID with
+`-Plogdate.applicationId=studio.hypertext.logdate.transfer` and set
+`LOGDATE_NATIVE_ACCEPTANCE_PACKAGE=studio.hypertext.logdate.transfer.debug`; both packages remain
+installed side by side, so the transfer fixture does not need to clear the regular app.
 
 The fixture includes two journals, shared entry relationships, original image/audio/video content,
 a rich draft, and a deleted entry. Destination assertions cover owner and content-key continuity,
@@ -335,6 +340,17 @@ The receiving implementation is the native app in `logdate-apple`, bundle
 `studio.hypertext.logdateapp`, team `T95VDD3A4W`. An iOS application target and AppMigrationKit
 extension are required, together with the App Store Connect OS data transfer mapping.
 AppMigrationKit does not run in the macOS application.
+
+The two-emulator harness also supports `--exercise-data-only` to prove a signed-in synthetic source
+restores journal and media while leaving the destination signed out, `--exercise-credentials-only`
+to prove portable recovery
+keys arrive without journal or media data, `--exercise-missing-keys` to retain encrypted journal
+data without replacing unreadable keys, `--exercise-partial-media` to omit one original while
+checking the remaining media and recoverable source reference, and `--exercise-duplicate-restore`
+to replay Android restore before app launch and compare durable state. Run filtered payload scenarios
+on a fresh destination because they intentionally alter the transported fixture. These modes use
+synthetic app data and do not establish Google Restore Credentials or setup-transfer provider
+acceptance.
 
 `RestoreCredentialCleanupRuntimeTest` checks encrypted-storage recreation, worker retry, and
 production dependency injection and scheduling. Its `cleanupSurvivesAppProcessRestart` test accepts

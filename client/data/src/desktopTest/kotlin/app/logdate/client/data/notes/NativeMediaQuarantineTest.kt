@@ -34,9 +34,21 @@ class NativeMediaQuarantineTest {
                     ImageNoteEntity(contentUri = "content://media/external/images/media/123", created = timestamp, lastUpdated = timestamp)
                 val owned = stale.copy(uid = Uuid.random(), contentUri = "logdate-media://library/original.jpg")
                 val shared = stale.copy(uid = Uuid.random(), contentUri = "/storage/emulated/0/DCIM/123.jpg")
+                val missingPrivate =
+                    stale.copy(
+                        uid = Uuid.random(),
+                        contentUri = "file:///data/user/0/studio.hypertext.logdate/files/media/objects/missing.jpg",
+                    )
+                val unknownPrivate =
+                    stale.copy(
+                        uid = Uuid.random(),
+                        contentUri = "file:///data/user/0/studio.hypertext.logdate/files/media/objects/probe-error.jpg",
+                    )
                 database.imageNoteDao().addNote(stale)
                 database.imageNoteDao().addNote(owned)
                 database.imageNoteDao().addNote(shared)
+                database.imageNoteDao().addNote(missingPrivate)
+                database.imageNoteDao().addNote(unknownPrivate)
                 val transcripts =
                     Proxy.newProxyInstance(
                         TranscriptionRepository::class.java.classLoader,
@@ -64,8 +76,14 @@ class NativeMediaQuarantineTest {
                         NativeDraftMediaQuarantine(preferences, Json),
                         RoomSyncTransactionManager(database),
                         transcripts,
-                    )
-                repair.run { true }
+                    ) { reference ->
+                        when (reference) {
+                            missingPrivate.contentUri -> false
+                            unknownPrivate.contentUri -> error("File availability could not be checked")
+                            else -> true
+                        }
+                    }
+                assertEquals(false, repair.run { true })
                 assertEquals(
                     stale.copy(contentUri = UnavailableMediaReferences.nativeRestore(stale.contentUri)),
                     database.imageNoteDao().getNoteOneOff(stale.uid),
@@ -75,6 +93,11 @@ class NativeMediaQuarantineTest {
                     shared.copy(contentUri = UnavailableMediaReferences.nativeRestore(shared.contentUri)),
                     database.imageNoteDao().getNoteOneOff(shared.uid),
                 )
+                assertEquals(
+                    missingPrivate.copy(contentUri = UnavailableMediaReferences.nativeRestore(missingPrivate.contentUri)),
+                    database.imageNoteDao().getNoteOneOff(missingPrivate.uid),
+                )
+                assertEquals(unknownPrivate, database.imageNoteDao().getNoteOneOff(unknownPrivate.uid))
                 val rows = database.imageNoteDao().getAll()
                 repair.run { true }
                 assertEquals(rows.toSet(), database.imageNoteDao().getAll().toSet())
