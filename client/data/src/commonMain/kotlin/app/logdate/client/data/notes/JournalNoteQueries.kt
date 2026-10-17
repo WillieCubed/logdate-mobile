@@ -216,20 +216,20 @@ internal class JournalNoteQueries(
 
     suspend fun getNoteById(noteId: Uuid): JournalNote? {
         // Try each note type DAO until we find the note
-        runCatching {
-            textNoteDao.getNoteOneOff(noteId).let { note ->
+        run {
+            textNoteDao.findNoteOneOff(noteId)?.let { note ->
                 note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
             }
-        }.getOrNull()?.let { return it }
-        runCatching {
+        }?.let { return it }
+        run {
             val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
-            imageNoteDao.getNoteOneOff(noteId).let { note ->
+            imageNoteDao.findNoteOneOff(noteId)?.let { note ->
                 note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
             }
-        }.getOrNull()?.let { return it }
-        runCatching {
+        }?.let { return it }
+        run {
             val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
-            audioNoteDao.getNoteOneOff(noteId).let { note ->
+            audioNoteDao.findNoteOneOff(noteId)?.let { note ->
                 note
                     .toModel(
                         note.placeId?.let { placeId ->
@@ -238,13 +238,13 @@ internal class JournalNoteQueries(
                         caption,
                     ).withTranscript(transcriptionRepository)
             }
-        }.getOrNull()?.let { return it }
-        runCatching {
+        }?.let { return it }
+        run {
             val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
-            videoNoteDao.getNoteOneOff(noteId).let { note ->
+            videoNoteDao.findNoteOneOff(noteId)?.let { note ->
                 note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
             }
-        }.getOrNull()?.let { return it }
+        }?.let { return it }
         return null
     }
 

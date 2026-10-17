@@ -43,7 +43,10 @@ internal class NativeMediaRecovery(
     }
 
     private suspend fun isMissingLocal(reference: String?): Boolean =
-        !reference.isNullOrBlank() && !reference.startsWith("https://") && !reference.startsWith("http://") && !media.exists(reference)
+        !reference.isNullOrBlank() &&
+            !reference.startsWith("https://") &&
+            !reference.startsWith("http://") &&
+            !transfer.originalAvailable(reference)
 
     private suspend fun recoverNotes(
         accessToken: String,
@@ -69,17 +72,15 @@ internal class NativeMediaRecovery(
                     inbox.applied(type, row.entityId, row.version, scope)
                     continue
                 }
-                when (val result = transfer.hydrate(accessToken, original)) {
+                when (val result = transfer.hydrate(accessToken, original) { scope == inbox.currentScope() }) {
                     is MediaHydrationResult.Pending -> inbox.failed(type, row.entityId, result.reason.name, row.version, scope)
                     is MediaHydrationResult.Available ->
                         transactions.withTransaction {
-                            if (scope != inbox.currentScope()) throw CancellationException("Native media recovery scope changed")
                             val current = notes.getNoteById(id)
                             if (current?.mediaRefOrNull() == row.payload && current.type == original.type) {
                                 val syncable = notes as? SyncableJournalNotesRepository ?: error("Sync note repository unavailable")
                                 syncable.updateMediaRef(id, requireNotNull(result.note.mediaRefOrNull()))
                                 result.mapping?.let { refs.upsert(it.copy(ownerId = scope.owner, serverOrigin = scope.origin)) }
-                                if (scope != inbox.currentScope()) throw CancellationException("Native media recovery scope changed")
                                 inbox.applied(type, row.entityId, row.version, scope)
                             }
                         }

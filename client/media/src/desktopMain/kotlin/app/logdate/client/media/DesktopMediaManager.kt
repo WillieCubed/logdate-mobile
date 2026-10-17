@@ -3,8 +3,11 @@ package app.logdate.client.media
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.desktopMediaFileResolver
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.withContext
 import kotlinx.io.asSource
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,7 +26,8 @@ import kotlin.uuid.Uuid
 class DesktopMediaManager(
     /** Resolves stored media references. Injectable so a test never touches a real home directory. */
     private val mediaFiles: MediaFileResolver = desktopMediaFileResolver(),
-) : MediaManager {
+) : MediaManager,
+    ConditionalMediaSaver {
     /** Where LogDate keeps its own copies. */
     private val mediaRoot: Path = Path.of(mediaFiles.directory(MediaCollection.Library))
 
@@ -123,6 +127,19 @@ class DesktopMediaManager(
         val filePath = directory.resolve(fileName)
         Files.write(filePath, payload.data)
         return "file://${filePath.pathString}"
+    }
+
+    override suspend fun saveMedia(
+        payload: MediaPayload,
+        canCommit: () -> Boolean,
+    ): String {
+        if (!canCommit()) throw CancellationException("Media hydration scope changed")
+        val uri = saveMedia(payload)
+        if (!canCommit()) {
+            withContext(NonCancellable) { deleteOwnedMedia(uri) }
+            throw CancellationException("Media hydration scope changed")
+        }
+        return uri
     }
 
     override suspend fun saveMediaFromFile(

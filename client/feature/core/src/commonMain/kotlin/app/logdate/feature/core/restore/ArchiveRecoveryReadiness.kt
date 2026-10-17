@@ -18,11 +18,18 @@ internal suspend fun <C, T> observeArchiveRecoveryReadiness(
     sessions: Flow<T>,
     inventory: Flow<Long> = flowOf(0L),
     identityChanges: Flow<Unit> = flowOf(Unit),
+    networkChanges: Flow<Any> = flowOf(Unit),
     schedule: suspend () -> Unit,
 ) {
     var identityRevision = 0L
-    combine(origins, sessions, inventory, identityChanges.map { ++identityRevision }) { origin, session, media, keys ->
-        (origin to session) to (media to keys)
+    combine(
+        origins,
+        sessions,
+        inventory,
+        identityChanges.map { ++identityRevision },
+        networkChanges,
+    ) { origin, session, media, keys, network ->
+        Triple(origin to session, media to keys, network)
     }.distinctUntilChanged()
         .collectLatest {
             var interval = 30_000L
@@ -46,7 +53,7 @@ internal fun RestoreSummary.shouldRetryMediaRecovery(): Boolean = recoveringMedi
 internal fun DiagnosticReason.shouldRetryArchiveMedia(hasSession: Boolean = true): Boolean =
     when (this) {
         DiagnosticReason.OFFLINE, DiagnosticReason.SERVER_UNAVAILABLE, DiagnosticReason.RATE_LIMITED,
-        DiagnosticReason.QUOTA_EXCEEDED, DiagnosticReason.UNKNOWN,
+        DiagnosticReason.QUOTA_EXCEEDED, DiagnosticReason.UNKNOWN, DiagnosticReason.NETWORK_POLICY,
         -> hasSession
         DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> true
         else -> false

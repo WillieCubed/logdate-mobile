@@ -219,6 +219,49 @@ Active operations retain an opaque authorization independently of the vault's bo
 guard cache; eviction must not silently stop pending enrollment. Authorization remains scoped to its
 issuing vault and origin, and never grants permission to install a session using an expired guard.
 
+## Missing originals on the replacement device
+
+Android provider IDs and shared-storage paths identify content on the source device. A matching
+`content://media/...` ID on the destination may name unrelated bytes. Native restore records an
+independent quarantine marker in `no_backup`. Normal startup rewrites restored external identities
+before indexing, background work, or content exposure; the backup callback does not open Room.
+The marker remains pending until notes, covers, and every retained draft scope have been processed.
+Damaged scope values are retained privately, and complete draft records are salvaged without
+blocking valid journals. Audio reference changes retain their transcripts in the same transaction.
+Draft migration preserves ownership, timestamps, and archive application receipts, including while
+signed out.
+
+`logdate-unavailable://native/` retains the source reference for scoped mapping lookup. Never open
+that source identity as a recovery fallback. Reuse an owned private original or download the mapped
+original. Outbound pending edits resolve the mapped remote URL; an unresolved marker stays local.
+A preview does not count as its original. Download validation checks the wire length before
+legacy plaintext acceptance or authenticated decryption.
+
+Local originals and retained archive files repair without media-library or notification permission.
+Availability requires an owned file whose bytes can be opened, rather than a successful provider
+metadata query. Network downloads obey the current data policy and account-scoped explicit
+mobile-data consent. A deferred download retains its recovery state; an allowed-network transition
+wakes recovery automatically. It does not require another sign-in or a manual retry.
+
+Restored entries retain their complete text. Optional enrichment counts the combined input before
+concatenating it, and day previews allocate only their displayed range. Oversized entries must not
+exhaust the replacement device's heap during timeline startup.
+
+## Replacement-device permissions and widget choices
+
+Restored tracking settings preserve the user's intent independently of the replacement device's
+grants. Resume reads the current saved setting before reconciling permissions, so a recently saved
+pause takes precedence over an older debounced observation. An unchanged resume does not replace
+periodic work. Foreground capture can retry a launch denied before the activity became visible.
+
+A later motion-permission grant must register activity transitions in an already running capture
+service. Keep an existing location subscription rather than starting a second one. Media-library
+and notification grants are separate from access to private recovered originals.
+
+Placed-widget choices live in `shared_prefs/logdate_widget_instances.xml`. Native cloud and device
+transfer include that specific file; launcher restoration remaps old widget IDs to replacement IDs.
+The selected entry, recall filters, photo shape, and prompt preference belong to the placed widget.
+
 ## Emulator acceptance
 
 Worker tests use real `androidx.work.Data`: `Data.EMPTY` for ordinary requests and
@@ -226,6 +269,32 @@ Worker tests use real `androidx.work.Data`: `Data.EMPTY` for ordinary requests a
 synthetic strings for absent inputs, making valid recovery look obsolete. Assert network calls,
 archive handoff, and retained state as well as worker results: success can mean stale work was
 correctly skipped. Stale-delivery and changed-owner tests assert that no backup listing occurs.
+
+Recovery note lookups use nullable DAO reads: absence returns null, while cancellation and storage
+errors propagate to retry. Never convert a failed read into a missing entry, because repair may then
+discard its checkpoint. Check coroutine activity after reading an attachment target before dropping
+pending recovery. Replacement archives enter through the locked worker flow and a new source
+generation; do not overwrite a retained ZIP while a worker may be reading it.
+
+Transcription waits while a recording carries an unavailable-original reference. Existing text,
+segments, and timestamps remain intact. Once recovery rebinds the recording and transcript to the
+readable private original, unfinished transcription resumes with recovery priority; a valid final
+document is reused. Regression tests must rebind both rows, as the recovery transaction does,
+rather than relying on a temporary URI mismatch to trigger work.
+
+`tests/e2e/native-missing-media-acceptance.py` runs on explicitly selected synthetic emulators,
+including ones with existing fixtures. Supply `--synthetic-data`, one or more `--emulator` serials,
+`--app-apk`, `--test-apk`, and a new `--output` directory. It verifies provider-ID collisions,
+private originals with denied media/notification permissions, metered and Data Saver transitions,
+and retained-archive repair through WorkManager and process restart. It restores network overrides
+and each original permission state. It never clears or uninstalls the app.
+
+`tests/e2e/native-permission-acceptance.py` uses the same explicit emulator and synthetic-data
+arguments. It exercises externally granted location and motion permission through the resumed
+activity, plus widget ID remapping. The test waits for SDK acceptance using a temporary in-memory
+Napier sink; a non-null pending request is insufficient, and production log redaction stays intact.
+A private checkpoint retains the original tracking preferences
+until cleanup succeeds. Cleanup restores permissions and radio settings and reads them back.
 
 `tests/e2e/native-backup-acceptance.py` exercises Android's local debug transport on two fresh,
 rootable Google APIs emulators. It invokes the source backup service, moves that transport's

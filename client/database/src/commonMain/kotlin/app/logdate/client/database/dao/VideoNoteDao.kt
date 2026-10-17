@@ -24,6 +24,9 @@ interface VideoNoteDao {
     @Query("SELECT * FROM video_notes WHERE uid = :uid")
     suspend fun getNoteOneOff(uid: Uuid): VideoNoteEntity
 
+    @Query("SELECT * FROM video_notes WHERE uid = :uid")
+    suspend fun findNoteOneOff(uid: Uuid): VideoNoteEntity?
+
     /**
      * Returns a flow of all [VideoNoteEntity]s.
      */

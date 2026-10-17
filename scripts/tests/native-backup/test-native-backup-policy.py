@@ -53,6 +53,17 @@ class NativeBackupPolicyTest(unittest.TestCase):
                 with self.subTest(modern=modern, path=path):
                     self.assertTrue(included("file", path, modern=modern, transfer=True))
 
+    def test_placed_widget_choices_survive_restore_before_launcher_id_remapping(self):
+        # WidgetInstanceSettings.remap needs the old IDs' chosen entry and presentation
+        # preferences; restoring only the journal cannot reconstruct those choices.
+        for modern in (False, True):
+            for transfer in (False, True):
+                with self.subTest(modern=modern, transfer=transfer):
+                    self.assertTrue(included(
+                        "sharedpref", "logdate_widget_instances.xml",
+                        modern=modern, transfer=transfer,
+                    ))
+
     def test_direct_transfer_excludes_keystore_ciphertext_and_cloned_jobs(self):
         for modern in (False, True):
             for domain, path in (("sharedpref", "logdate_secure_storage.xml"),

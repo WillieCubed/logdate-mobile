@@ -1,0 +1,281 @@
+package app.logdate.client.e2e
+
+import android.Manifest
+import android.content.ContentValues
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Base64
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.ImageNoteEntity
+import app.logdate.client.database.entities.TranscriptionEntity
+import app.logdate.client.database.entities.TranscriptionStatus
+import app.logdate.client.datastore.DataStoreKeyValueStorage
+import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.media.MediaFileSource
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.UnavailableMediaReferences
+import app.logdate.client.media.storage.isRecoveredOriginal
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.repository.transcription.TranscriptDocument
+import app.logdate.client.sync.AutomaticMediaRecovery
+import app.logdate.client.sync.AutomaticMediaRecoveryResult
+import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.CloudRequestLocation
+import app.logdate.client.sync.cloud.CloudRequestLocationProvider
+import app.logdate.client.sync.cloud.MediaFile
+import app.logdate.client.sync.cloud.MediaUploadResult
+import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
+import app.logdate.client.sync.metadata.MediaSyncRef
+import app.logdate.client.sync.metadata.UploadScope
+import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.diagnostics.DiagnosticReason
+import io.mockk.mockk
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import org.json.JSONObject
+import org.junit.FixMethodOrder
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
+import org.koin.core.context.GlobalContext
+import java.io.File
+import java.io.FileOutputStream
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
+
+/** Synthetic attachments only; the network test waits for the harness to remove its metered override. */
+@RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
+    private val koin get() = GlobalContext.get()
+    private val media get() = koin.get<MediaManager>()
+    private val references get() = koin.get<StoredMediaReferences>()
+    private val fixture get() = File(context.noBackupFilesDir, "native-missing-media-acceptance.txt")
+    private val png =
+        Base64.decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+            Base64.DEFAULT,
+        )
+
+    private fun requireEmulator() {
+        require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish")
+        require(context.packageName.endsWith(".debug"))
+    }
+
+    @Test
+    fun aSeedProviderCollisionForColdRestore() =
+        runBlocking {
+            requireEmulator()
+            val uri =
+                requireNotNull(
+                    context.contentResolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        ContentValues().apply {
+                            put(MediaStore.Images.Media.DISPLAY_NAME, "native-restore-${Uuid.random()}.png")
+                            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/LogDateRecoveryAcceptance")
+                        },
+                    ),
+                )
+            requireNotNull(context.contentResolver.openOutputStream(uri)).use { it.write(png) }
+            assertTrue(media.exists(uri.toString()))
+            val now = Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds())
+            val note = ImageNoteEntity(contentUri = uri.toString(), created = now, lastUpdated = now)
+            val database = koin.get<LogDateDatabase>()
+            database.imageNoteDao().addNote(note)
+            val audio = AudioNoteEntity(contentUri = "content://media/external/audio/media/123", created = now, lastUpdated = now)
+            val transcript =
+                TranscriptionEntity(
+                    noteId = audio.uid,
+                    text = "Retained transcript",
+                    documentJson = Json.encodeToString(TranscriptDocument.fromPlainText("Retained transcript")),
+                    mediaDurationMs = audio.durationMs,
+                    status = TranscriptionStatus.COMPLETED,
+                    created = now,
+                    lastUpdated = now,
+                    mediaUri = audio.contentUri,
+                )
+            koin.get<SyncTransactionManager>().withTransaction {
+                database.audioNoteDao().addNote(audio)
+                database.transcriptionDao().insertTranscription(transcript)
+            }
+            fixture.writeText(
+                JSONObject()
+                    .put(
+                        "note",
+                        note.uid.toString(),
+                    ).put(
+                        "source",
+                        uri.toString(),
+                    ).put(
+                        "audio",
+                        audio.uid.toString(),
+                    ).put("transcript", transcript.id.toString())
+                    .put("created", now.toEpochMilliseconds())
+                    .toString(),
+            )
+            assertEquals(note, database.imageNoteDao().getNoteOneOff(note.uid))
+            // The native callback's durable marker is the only trigger; startup performs the repair.
+            val marker = File(context.noBackupFilesDir, ".logdate_media_quarantine_pending")
+            require(marker.createNewFile()) { "An existing native recovery must finish before this fixture" }
+            FileOutputStream(marker).use {
+                it.write(Uuid.random().toString().encodeToByteArray())
+                it.fd.sync()
+            }
+            assertTrue(PostRestoreDetector(context).pendingMediaQuarantineId() != null)
+        }
+
+    @Test
+    fun bQuarantinedOriginalSurvivesProcessRestart() =
+        runBlocking {
+            requireEmulator()
+            require(fixture.exists()) { "Run the collision fixture first" }
+            withTimeout(30_000) {
+                while (PostRestoreDetector(context).pendingMediaQuarantineId() != null) delay(50)
+            }
+            val state = JSONObject(fixture.readText())
+            val id = Uuid.parse(state.getString("note"))
+            val source = state.getString("source")
+            val database = koin.get<LogDateDatabase>()
+            val note = database.imageNoteDao().getNoteOneOff(id)
+            assertEquals(source, UnavailableMediaReferences.nativeSource(note.contentUri))
+            assertEquals(state.getLong("created"), note.created.toEpochMilliseconds())
+            assertTrue(media.exists(source))
+            assertFalse(media.exists(note.contentUri))
+            assertFalse(media.isRecoveredOriginal(source, references))
+            val audio = database.audioNoteDao().getNoteOneOff(Uuid.parse(state.getString("audio")))
+            assertEquals("content://media/external/audio/media/123", UnavailableMediaReferences.nativeSource(audio.contentUri))
+            val transcript = requireNotNull(database.transcriptionDao().getTranscriptionByNoteId(audio.uid))
+            assertEquals(state.getString("transcript"), transcript.id.toString())
+            assertEquals("Retained transcript", transcript.text)
+            assertEquals(audio.contentUri, transcript.mediaUri)
+            assertEquals(state.getLong("created"), transcript.lastUpdated.toEpochMilliseconds())
+        }
+
+    @Test
+    fun cPrivateOriginalWorksWithoutLibraryOrNotificationPermission() =
+        runBlocking {
+            requireEmulator()
+            for (permission in listOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VIDEO,
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )) {
+                assertEquals(PackageManager.PERMISSION_DENIED, context.checkSelfPermission(permission), permission)
+            }
+            val local = media.saveMedia(MediaPayload("denied-permissions.png", "image/png", png.size.toLong(), png))
+            assertTrue(media.isRecoveredOriginal(local, references))
+            assertContentEquals(png, media.readMedia(local).data)
+        }
+
+    @Test
+    fun dMeteredRecoveryResumesWhenPlatformAllowsMedia() =
+        runBlocking {
+            requireEmulator()
+            val policy = koin.get<DataUsagePolicy>()
+            val expectedMode =
+                if (InstrumentationRegistry.getArguments().getString("restoreNetworkPolicyExpected") ==
+                    "restricted"
+                ) {
+                    DataUsageMode.Restricted
+                } else {
+                    DataUsageMode.Conservative
+                }
+            withTimeout(30_000) { policy.policy.first { it == expectedMode } }
+            val id = Uuid.random()
+            val origin = "https://sync.example"
+            val source = "content://media/external/images/media/987654321"
+            val storage =
+                object : DataStore<Preferences> {
+                    override val data = MutableStateFlow(emptyPreferences())
+
+                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
+                        transform(data.value).also { data.value = it }
+                }
+            val refs = KeyValueMediaSyncRefStore(DataStoreKeyValueStorage(storage), { origin }, { "account" })
+            refs.upsert(MediaSyncRef(id.toString(), source, "$origin/media/original", "original", 1))
+            var downloads = 0
+            val cloud =
+                object : CloudMediaDataSource {
+                    override suspend fun uploadMedia(
+                        accessToken: String,
+                        contentId: Uuid,
+                        media: MediaFileSource,
+                    ): Result<MediaUploadResult> = error("No upload")
+
+                    override suspend fun downloadMedia(
+                        accessToken: String,
+                        mediaId: String,
+                    ): Result<MediaFile> {
+                        downloads++
+                        return Result.success(MediaFile(id, "metered-original.png", "image/png", png.size.toLong(), png))
+                    }
+                }
+            val account =
+                object : CloudAccountRepository by mockk(relaxed = true), CloudRequestLocationProvider {
+                    override fun captureLocation() = CloudRequestLocation(origin, "$origin/api")
+
+                    override fun isCurrentOrigin(origin: String) = origin == "https://sync.example"
+                }
+            val owner =
+                object : CanonicalOwnerProvider {
+                    override suspend fun getCanonicalOwnerId() = "account"
+
+                    override suspend fun hasBoundOwner() = true
+                }
+            val recovery =
+                AutomaticMediaRecovery(
+                    media,
+                    refs,
+                    cloud,
+                    FakeSessionStorage(UserSession("access", "refresh", "account")),
+                    account,
+                    owner,
+                    DefaultLogDateConfigRepository(initialBackendUrl = origin),
+                    references,
+                    policy,
+                )
+            val scope = UploadScope("account", origin)
+            val quarantined = UnavailableMediaReferences.nativeRestore(source)
+            val pending =
+                assertIs<AutomaticMediaRecoveryResult.Pending>(recovery.recover(id, null, "image", quarantined, quarantined, scope))
+            assertEquals(DiagnosticReason.NETWORK_POLICY, pending.reason)
+            assertEquals(0, downloads)
+            InstrumentationRegistry.getInstrumentation().sendStatus(
+                0,
+                Bundle().apply { putString("restoreNetwork", "RESTORE_NETWORK_DEFERRED") },
+            )
+            withTimeout(45_000) { policy.policy.first { it == DataUsageMode.Unrestricted } }
+            val recovered =
+                assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", quarantined, quarantined, scope))
+            assertEquals(1, downloads)
+            assertTrue(media.isRecoveredOriginal(recovered.reference, references))
+            assertContentEquals(png, media.readMedia(recovered.reference).data)
+        }
+}

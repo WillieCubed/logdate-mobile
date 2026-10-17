@@ -1,5 +1,6 @@
 package app.logdate.client.media.storage
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.IOException
@@ -38,6 +39,37 @@ class AndroidCanonicalMediaStoreTest {
             }
 
             assertTrue(File(root, "media/objects").walkTopDown().none { it.isFile })
+        }
+
+    @Test
+    fun `scope change while staging prevents the object from being finalized`() =
+        withStore { store, root ->
+            val bytes = "account scoped journal media".encodeToByteArray()
+            var scopeIsCurrent = true
+            val input =
+                object : java.io.ByteArrayInputStream(bytes) {
+                    override fun read(
+                        buffer: ByteArray,
+                        offset: Int,
+                        length: Int,
+                    ): Int {
+                        val count = super.read(buffer, offset, length)
+                        if (count < 0) scopeIsCurrent = false
+                        return count
+                    }
+                }
+
+            assertFailsWith<CancellationException> {
+                store.store(
+                    input,
+                    "image/jpeg",
+                    bytes.size.toLong(),
+                    canCommit = { scopeIsCurrent },
+                )
+            }
+
+            assertTrue(File(root, "media/objects").walkTopDown().none { it.isFile })
+            assertTrue(File(root, "media/staging").walkTopDown().none { it.isFile })
         }
 
     @Test

@@ -3,7 +3,9 @@ package app.logdate.client.sync
 import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.cloud.MediaFile
 import app.logdate.client.sync.cloud.MediaUploadResult
@@ -46,6 +48,160 @@ class NativeMissingMediaRecoveryTest {
                     MediaFile(downloadedOwners[mediaId] ?: downloadedOwner, "$mediaId.mp4", "video/mp4", 1, byteArrayOf(1)),
                 )
             }
+        }
+
+    @Test
+    fun `a Cloud reference never reuses a transferred provider identity`() =
+        runTest {
+            val stale = "content://media/external/video/media/123"
+            val reused =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String) = mediaId == stale || super.exists(mediaId)
+                }
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = remote)
+            downloadedOwner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = stale))
+            val result = assertIs<MediaHydrationResult.Available>(SyncMediaTransfer(reused, refs, cloud).hydrate("token", note))
+            assertTrue(result.note.mediaRefOrNull() != stale)
+            assertEquals(1, downloads.size)
+        }
+
+    @Test
+    fun `an unreadable transferred private original is downloaded again`() =
+        runTest {
+            val broken = "logdate-media://library/broken.mp4"
+            val storage =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String) = mediaId == broken || super.exists(mediaId)
+
+                    override suspend fun openMedia(uri: String): MediaFileSource =
+                        if (uri ==
+                            broken
+                        ) {
+                            throw IllegalStateException("Unavailable storage")
+                        } else {
+                            super.openMedia(uri)
+                        }
+                }
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = broken)
+            downloadedOwner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = broken))
+            val result = assertIs<MediaHydrationResult.Available>(SyncMediaTransfer(storage, refs, cloud).hydrate("token", note))
+            assertTrue(result.note.mediaRefOrNull() != broken)
+            assertEquals(1, downloads.size)
+        }
+
+    @Test
+    fun `pending caption edits retain the Cloud original instead of uploading a native quarantine marker`() =
+        runTest {
+            val original = "content://media/external/video/media/123"
+            val note =
+                JournalNote.Video(
+                    creationTimestamp = timestamp,
+                    lastUpdated = timestamp,
+                    mediaRef = UnavailableMediaReferences.nativeRestore(original),
+                    caption = "New caption",
+                )
+            refs.upsert(mapping(note.uid).copy(localUri = original))
+            val prepared = SyncMediaTransfer(media, refs, cloud).uploadIfNeeded("token", note).getOrThrow()
+            assertEquals(note.copy(mediaRef = remote), prepared)
+        }
+
+    @Test
+    fun `a pending draft cannot upload destination-only quarantine identities`() =
+        runTest {
+            val source = "content://media/external/video/media/123"
+            val block = SerializableVideoBlock(Uuid.random(), timestamp, uri = UnavailableMediaReferences.nativeRestore(source))
+            val draft = EditorDraft(Uuid.random(), listOf(block), createdAt = timestamp, lastModifiedAt = timestamp)
+            val transfer = SyncMediaTransfer(media, refs, cloud)
+            assertTrue(transfer.uploadDraftMediaIfNeeded("token", draft).isFailure)
+            refs.upsertDraftAsset(draft.id, block.id, "video", mapping(block.id).copy(localUri = source))
+            val prepared = transfer.uploadDraftMediaIfNeeded("token", draft).getOrThrow()
+            assertEquals(block.copy(uri = remote), prepared.blocks.single())
+        }
+
+    @Test
+    fun `network-deferred originals repair from local mappings and resume without losing references`() =
+        runTest {
+            var allowed = false
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = missing)
+            downloadedOwner = note.uid
+            refs.upsert(mapping(note.uid))
+            val transfer = SyncMediaTransfer(media, refs, cloud, mayDownload = { allowed })
+            assertIs<MediaHydrationResult.Pending>(transfer.hydrate("token", note))
+            assertTrue(downloads.isEmpty())
+            allowed = true
+            val recovered = assertIs<MediaHydrationResult.Available>(transfer.hydrate("token", note))
+            refs.upsert(requireNotNull(recovered.mapping))
+            allowed = false
+            assertIs<MediaHydrationResult.Available>(transfer.hydrate("token", note))
+            assertEquals(1, downloads.size)
+        }
+
+    @Test
+    fun `draft network deferral preserves a transferred preview and downloads no original`() =
+        runTest {
+            val thumbnail = media.saveMedia(MediaPayload("preview.jpg", "image/jpeg", 1, byteArrayOf(2)))
+            val block = SerializableVideoBlock(Uuid.random(), timestamp, uri = missing, thumbnailUri = thumbnail)
+            refs.upsertDraftAsset(Uuid.NIL, block.id, "video", mapping(block.id))
+            val draft = EditorDraft(Uuid.NIL, listOf(block), createdAt = timestamp, lastModifiedAt = timestamp)
+            val result =
+                assertIs<DraftMediaHydrationResult.Pending>(
+                    SyncMediaTransfer(media, refs, cloud, mayDownload = {
+                        false
+                    }).hydrateDraftMedia("token", draft),
+                )
+            assertEquals(block, result.draft.blocks.single())
+            assertTrue(downloads.isEmpty())
+        }
+
+    @Test
+    fun `a reused destination content URI cannot replace the transferred original`() =
+        runTest {
+            val stale = "content://media/external/video/media/123"
+            val reused =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String): Boolean = mediaId == stale || super.exists(mediaId)
+                }
+            val quarantined = UnavailableMediaReferences.nativeRestore(stale)
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = quarantined)
+            downloadedOwner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = stale))
+            val result = assertIs<MediaHydrationResult.Available>(SyncMediaTransfer(reused, refs, cloud).hydrate("token", note))
+            assertTrue(result.note.mediaRefOrNull() != stale)
+            assertEquals(listOf("original"), downloads)
+            assertTrue(requireNotNull(result.mapping).localAliases.contains(quarantined))
+        }
+
+    @Test
+    fun `a reused draft URI without a cloud mapping stays missing`() =
+        runTest {
+            val stale = "content://media/external/video/media/123"
+            val reused =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String): Boolean = true
+                }
+            val block = SerializableVideoBlock(Uuid.random(), timestamp, uri = UnavailableMediaReferences.nativeRestore(stale))
+            val draft = EditorDraft(Uuid.random(), listOf(block), createdAt = timestamp, lastModifiedAt = timestamp)
+            val result =
+                assertIs<DraftMediaHydrationResult.Pending>(SyncMediaTransfer(reused, refs, cloud).hydrateDraftMedia("token", draft))
+            assertEquals(DiagnosticReason.MISSING_MEDIA, result.reason)
+            assertTrue(downloads.isEmpty())
+        }
+
+    @Test
+    fun `a cached note original survives rollback of the note attachment`() =
+        runTest {
+            val note = JournalNote.Video(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = missing)
+            downloadedOwner = note.uid
+            refs.upsert(mapping(note.uid))
+            val transfer = SyncMediaTransfer(media, refs, cloud)
+            val first = assertIs<MediaHydrationResult.Available>(transfer.hydrate("token", note))
+            // Mapping storage commits independently from the note's Room transaction.
+            refs.upsert(requireNotNull(first.mapping))
+            val retry = assertIs<MediaHydrationResult.Available>(transfer.hydrate("token", note))
+            assertTrue(media.exists(requireNotNull(retry.note.mediaRefOrNull())))
+            assertEquals(1, downloads.size)
         }
 
     @Test
