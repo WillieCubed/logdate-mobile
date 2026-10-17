@@ -277,8 +277,9 @@ private fun MasterToggleLayout(
                 labelPlaceable.placeRelative(0, 0)
                 controlPlaceable.placeRelative(width - controlPlaceable.width, labelPlaceable.height + gap)
             } else {
-                labelPlaceable.placeRelative(0, (height - labelPlaceable.height) / 2)
-                controlPlaceable.placeRelative(width - controlPlaceable.width, (height - controlPlaceable.height) / 2)
+                val center = Alignment.CenterVertically
+                labelPlaceable.placeRelative(0, center.align(labelPlaceable.height, height))
+                controlPlaceable.placeRelative(width - controlPlaceable.width, center.align(controlPlaceable.height, height))
             }
         }
     }
