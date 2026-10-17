@@ -111,6 +111,8 @@ public object LexiconCodegen {
 
                 LexiconType.RECORD -> definition.record?.let { record -> writeRecord(definition, record) }
 
+                in aliasedTypes -> writeAlias(definition)
+
                 LexiconType.QUERY, LexiconType.PROCEDURE -> {
                     definition.parameters?.let { writeClass("${prefix}Params", it.description, it.properties) }
                     definition.input?.schema?.takeIf { it.type.isObjectLike() }?.let {
@@ -139,6 +141,24 @@ public object LexiconCodegen {
                     appendLine("public data class $name(")
                     lines.forEach(::appendLine)
                     appendLine(")")
+                }
+        }
+
+        // A named string, array or other non-object definition, which other fields refer to by name.
+        private fun writeAlias(definition: LexiconDefinition) {
+            val name = className(document.id, definition.name)
+            val field =
+                LexiconField(
+                    type = definition.type,
+                    items = definition.items,
+                    reference = definition.reference,
+                    required = true,
+                )
+            val type = kotlinType(field, unionName = name)
+            declarations +=
+                buildString {
+                    appendKdoc(definition.description, indent = "")
+                    appendLine("public typealias $name = $type")
                 }
         }
 
@@ -400,6 +420,18 @@ public object LexiconCodegen {
             }
 
     private fun String.asIdentifier(): String = if (this in kotlinKeywords) "`$this`" else this
+
+    private val aliasedTypes =
+        setOf(
+            LexiconType.STRING,
+            LexiconType.INTEGER,
+            LexiconType.BOOLEAN,
+            LexiconType.BYTES,
+            LexiconType.CID_LINK,
+            LexiconType.BLOB,
+            LexiconType.ARRAY,
+            LexiconType.UNKNOWN,
+        )
 
     private const val KDOC_WIDTH = 120
     private const val SERIALIZABLE = "kotlinx.serialization.Serializable"
