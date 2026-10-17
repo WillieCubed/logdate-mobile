@@ -32,7 +32,7 @@ Rewind's individuality comes from each story's artwork, accent, title, quote, da
 
 Run `checkHomeWorkspaceContract` after changing a migrated adapter/root. The Kotlin PSI scope lives in `config/workspace/home-roots.txt`; narrow exceptions name one function, one rule, and a reviewed reason in `home-allowlist.txt`. Extend shared primitives for new visual behavior. Existing immersive Rewind media clipping is an explicit exception.
 
-The populated screenshot catalog in `screenshots/workspace/HomeWorkspaceScreenshots.kt` renders all destinations and immediate details through the shared shell at matching sizes. Inspect phone, compact, landscape, tablet portrait/landscape, book, tabletop, dark, 200% text, RTL, and reduced-motion scenes. Preview map geometry proves layout only. Use Gradle Managed Devices for real Maps and interaction acceptance; never use connected-test tasks or physical devices by default.
+The populated screenshot catalog in `screenshots/audit/workspace/` (`HomeWorkspaceScreenshots.kt` for destinations, `HomeWorkspaceDetailScreenshots.kt` for immediate details, and `HomeWorkspaceLayoutScreenshots.kt` for postures, desktop windows and other layouts) renders all destinations and immediate details through the shared shell at matching sizes. Inspect phone, compact, landscape, tablet portrait/landscape, book, tabletop, dark, 200% text, RTL, and reduced-motion scenes. Preview map geometry proves layout only. Use Gradle Managed Devices for real Maps and interaction acceptance; never use connected-test tasks or physical devices by default.
 
 Do not enable the flag until the native-map and complete runtime/visual acceptance matrix passes. A missing key or skipped native test is an acceptance gap, not successful map verification.
 

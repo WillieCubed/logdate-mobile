@@ -57,9 +57,9 @@ window:
 
 | Light | Dark |
 | --- | --- |
-| ![Home's timeline in a desktop window, with the search pill and account button in the caption bar between the LogDate app menu and the window buttons](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window_750cb730_0.png) | ![The same window in dark mode](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window%20dark_778ae88f_0.png) |
+| ![Home's timeline in a desktop window, with the search pill and account button in the caption bar between the LogDate app menu and the window buttons](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceLayoutScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window_750cb730_0.png) | ![The same window in dark mode](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceLayoutScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window%20dark_778ae88f_0.png) |
 | **Right-to-left** | **Narrow window, Places** |
-| ![The same window in Arabic, with the window buttons at the left and the app menu at the right](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window%20RTL_68d44ea7_0.png) | ![Places in a narrow desktop window with the navigation rail and the caption bar search](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceLocationsInDesktopWindow_Narrow%20desktop%20window_2ae90ce6_0.png) |
+| ![The same window in Arabic, with the window buttons at the left and the app menu at the right](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceLayoutScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window%20RTL_68d44ea7_0.png) | ![Places in a narrow desktop window with the navigation rail and the caption bar search](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceLayoutScreenshotsKt/WorkspaceLocationsInDesktopWindow_Narrow%20desktop%20window_2ae90ce6_0.png) |
 
 And on an Android 17 tablet emulator with desktop windowing on, where Android draws its app menu
 (LogDate's icon) and window buttons itself:
@@ -183,9 +183,9 @@ launcher that lists task labels would show it, as it would for any document app.
 
 ## Updating screenshots
 
-- The caption bar scenes are Lane 1 references in `HomeWorkspaceScreenshots.kt`
+- The caption bar scenes are Lane 1 references in `HomeWorkspaceLayoutScreenshots.kt`
   (`WorkspaceTimelineInDesktopWindow`, `WorkspaceLocationsInDesktopWindow`), recorded with
-  `./gradlew :app:android-main:updateDebugScreenshotTest --tests "*HomeWorkspaceScreenshotsKt.Workspace*InDesktopWindow*"`.
+  `./gradlew :app:android-main:updateDebugScreenshotTest --tests "*HomeWorkspaceLayoutScreenshotsKt.Workspace*InDesktopWindow*"`.
 - Side-by-side windows are Lane 2 captures, recorded with `./run screenshots:os`. Desktop windowing
   is recorded with `./run screenshots:desktop`, because it needs its own emulator (see above). Both
   land in `docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/`.
