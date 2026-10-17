@@ -334,6 +334,7 @@ class AndroidRestoreLauncher(
                 }
             }.onFailure { Napier.w("Could not pause retained recovery") }
             WorkManager.getInstance(context).cancelUniqueWork(RestoreWorker.WORK_NAME)
+            WorkManager.getInstance(context).cancelAllWorkByTag(CloudRestoreWorker.WORK_TAG)
             _restoreProgress.value = RestoreProgressInfo.Idle
             if (restoreCompleted.compareAndSet(false, true)) {
                 completionCallback?.invoke(RestoreOutcome.Cancelled)

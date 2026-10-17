@@ -39,6 +39,12 @@ and account recovery have separate markers in `noBackupFilesDir`; acknowledging 
 does not acknowledge unresolved authentication. An unreadable delivery marker cannot authorize
 automatic archive import over retained content.
 
+Android runs the agent in restricted backup mode, where the framework instantiates the base
+`Application` instead of LogDate's manifest-declared `LogdateApplication` and does not initialize
+the app's content providers. Keep backup callbacks independent of Koin, Room, WorkManager,
+location services, and same-app providers. Do not cast or depend on the `Application` object;
+persist a small durable marker and let ordinary startup reconcile it after restore completes.
+
 The installation device ID also lives in non-backed-up storage. An ordinary upgrade retains its
 previous ID; a replacement installation creates a new one even if preference cleanup is interrupted.
 Archive workers carry the native delivery ID and authenticated account/origin. Only completion of

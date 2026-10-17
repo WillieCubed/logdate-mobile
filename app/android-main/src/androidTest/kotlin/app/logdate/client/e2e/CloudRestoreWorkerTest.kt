@@ -1,15 +1,21 @@
 package app.logdate.client.e2e
 
+import android.content.ContextWrapper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Data
 import androidx.work.WorkerParameters
+import app.logdate.client.datastore.OriginBoundSession
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.sync.cloud.BackupFile
 import app.logdate.client.sync.cloud.BackupMetadata
 import app.logdate.client.sync.cloud.BackupUploadResult
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.feature.core.export.CloudArchiveCipher
 import app.logdate.feature.core.export.CloudBackupWorker
+import app.logdate.feature.core.restore.CloudRestoreScheduler
 import app.logdate.feature.core.restore.CloudRestoreWorker
 import app.logdate.feature.core.restore.NativeRestoreWorkState
 import io.mockk.every
@@ -25,6 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
@@ -48,6 +55,150 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                 .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://sync.example")
                 .build(),
         )
+
+    @Test
+    fun `cloud restore work is unique per account and origin`() {
+        val first = OriginBoundSession("https://sync.example", UserSession("a", "r", "one"))
+        val second = OriginBoundSession("https://sync.example", UserSession("a", "r", "two"))
+        val otherOrigin = OriginBoundSession("https://other.example", UserSession("a", "r", "one"))
+
+        assertEquals(CloudRestoreScheduler.workName(first), CloudRestoreScheduler.workName(first))
+        assertFalse(CloudRestoreScheduler.workName(first).contains("one"))
+        assertFalse(CloudRestoreScheduler.workName(first).contains("sync.example"))
+        assertFalse(CloudRestoreScheduler.workName(first) == CloudRestoreScheduler.workName(second))
+        assertFalse(CloudRestoreScheduler.workName(first) == CloudRestoreScheduler.workName(otherOrigin))
+        assertFalse(
+            CloudRestoreScheduler.workName(first, "delivery-one") ==
+                CloudRestoreScheduler.workName(first, "delivery-two"),
+        )
+        assertEquals(
+            CloudRestoreScheduler.deliveryWorkTag("delivery-one", first),
+            CloudRestoreScheduler.deliveryWorkTag("delivery-one", first),
+        )
+        assertFalse(
+            CloudRestoreScheduler.deliveryWorkTag("delivery-one", first) ==
+                CloudRestoreScheduler.deliveryWorkTag("delivery-two", first),
+        )
+        assertFalse(
+            CloudRestoreScheduler.deliveryWorkTag("delivery-one", first) ==
+                CloudRestoreScheduler.deliveryWorkTag("delivery-one", second),
+        )
+    }
+
+    @Test
+    fun `empty cloud account acknowledges native content recovery without changing local data`() =
+        runTest {
+            val folder = File(context.cacheDir, "empty-cloud-restore-${UUID.randomUUID()}").apply { mkdirs() }
+            val isolatedContext =
+                object : ContextWrapper(context) {
+                    override fun getNoBackupFilesDir() = File(folder, "no_backup").apply { mkdirs() }
+
+                    override fun getDatabasePath(name: String) = File(folder, "databases/$name")
+                }
+            val detector = PostRestoreDetector(isolatedContext)
+            val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
+            detector.recordRestoreCompleted()
+            val delivery = requireNotNull(detector.pendingContentRecoveryId())
+            val input = NativeRestoreWorkState.bind(Data.Builder(), delivery, session.getOriginBoundSession()).build()
+            val params = workerParameters()
+            every { params.inputData } returns input
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val worker = CloudRestoreWorker(isolatedContext, params, cloud, session, archiveCipher)
+
+            try {
+                assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+                assertNull(detector.pendingContentRecoveryId())
+                assertEquals(PostRestoreType.NONE, detector.detect(isOnboarded = true))
+                assertEquals(0, cloud.fileDownloadCalls)
+                assertFalse(isolatedContext.getDatabasePath("logdate").exists())
+            } finally {
+                folder.deleteRecursively()
+            }
+        }
+
+    @Test
+    fun `empty cloud account keeps native recovery pending when account changes before acknowledgement`() =
+        runTest {
+            val folder = File(context.cacheDir, "switched-cloud-restore-${UUID.randomUUID()}").apply { mkdirs() }
+            val isolatedContext =
+                object : ContextWrapper(context) {
+                    override fun getNoBackupFilesDir() = File(folder, "no_backup").apply { mkdirs() }
+
+                    override fun getDatabasePath(name: String) = File(folder, "databases/$name")
+                }
+            val detector = PostRestoreDetector(isolatedContext)
+            val backingSession = FakeSessionStorage(UserSession("access", "refresh", "account"))
+            val session =
+                object : SessionStorage by backingSession {
+                    override suspend fun runIfSessionCurrent(
+                        expected: OriginBoundSession?,
+                        action: () -> Unit,
+                    ): Boolean {
+                        backingSession.changeSession(UserSession("new-access", "new-refresh", "new-account"))
+                        return false
+                    }
+                }
+            detector.recordRestoreCompleted()
+            val delivery = requireNotNull(detector.pendingContentRecoveryId())
+            val input = NativeRestoreWorkState.bind(Data.Builder(), delivery, session.getOriginBoundSession()).build()
+            val params = workerParameters()
+            every { params.inputData } returns input
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val worker = CloudRestoreWorker(isolatedContext, params, cloud, session, archiveCipher)
+
+            try {
+                assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+                assertEquals(delivery, detector.pendingContentRecoveryId())
+                assertEquals(0, cloud.fileDownloadCalls)
+            } finally {
+                folder.deleteRecursively()
+            }
+        }
+
+    @Test
+    fun `cloud restore does not download again while its delivery restore is active`() =
+        runTest {
+            val folder = File(context.cacheDir, "active-cloud-restore-${UUID.randomUUID()}").apply { mkdirs() }
+            val isolatedContext =
+                object : ContextWrapper(context) {
+                    override fun getNoBackupFilesDir() = File(folder, "no_backup").apply { mkdirs() }
+
+                    override fun getDatabasePath(name: String) = File(folder, "databases/$name")
+                }
+            val detector = PostRestoreDetector(isolatedContext)
+            val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
+            detector.recordRestoreCompleted()
+            val delivery = requireNotNull(detector.pendingContentRecoveryId())
+            val input = NativeRestoreWorkState.bind(Data.Builder(), delivery, session.getOriginBoundSession()).build()
+            val params = workerParameters()
+            every { params.inputData } returns input
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            var handedOff = false
+            val worker =
+                CloudRestoreWorker(
+                    isolatedContext,
+                    params,
+                    cloud,
+                    session,
+                    archiveCipher,
+                    hasActiveRestore = { taggedDelivery, taggedSession ->
+                        assertEquals(delivery, taggedDelivery)
+                        assertEquals(session.getOriginBoundSession(), taggedSession)
+                        true
+                    },
+                    enqueueRestore = { handedOff = true },
+                )
+
+            try {
+                assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+                assertTrue(cloud.listAccessTokens.isEmpty())
+                assertEquals(0, cloud.fileDownloadCalls)
+                assertFalse(handedOff)
+                assertEquals(delivery, detector.pendingContentRecoveryId())
+            } finally {
+                folder.deleteRecursively()
+            }
+        }
 
     private fun verifyObsoleteWork(input: Data) =
         runTest {

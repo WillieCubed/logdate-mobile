@@ -73,10 +73,23 @@ internal object ArchiveRecoveryScheduler {
         withContext(Dispatchers.IO) {
             val manager = WorkManager.getInstance(context)
             records.forEach { record ->
+                val uniqueName = workName(record.id, record.metadataApplied)
+                val workInfos = manager.getWorkInfosForUniqueWork(uniqueName).get()
+                val hasRunning = workInfos.any { it.state == WorkInfo.State.RUNNING }
                 gate.enqueue(
                     hasWaiting = {
-                        manager.getWorkInfosForUniqueWork(workName(record.id, record.metadataApplied)).get().any {
-                            it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED
+                        hasRunning ||
+                            workInfos.any {
+                                it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED
+                            }
+                    },
+                    isDelayedRetry = {
+                        !hasRunning &&
+                            workInfos.any { it.state == WorkInfo.State.ENQUEUED && it.runAttemptCount > 0 }
+                    },
+                    replaceDelayedRetry = {
+                        if (currentArchiveRecoveryScope(koin) == scope) {
+                            enqueue(context, record, ExistingWorkPolicy.REPLACE)?.result?.get()
                         }
                     },
                     enqueueSuccessor = {

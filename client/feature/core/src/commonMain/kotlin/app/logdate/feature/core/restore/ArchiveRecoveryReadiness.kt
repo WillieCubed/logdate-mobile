@@ -64,10 +64,15 @@ internal class ArchiveRecoveryScheduleGate {
 
     suspend fun enqueue(
         hasWaiting: suspend () -> Boolean,
+        isDelayedRetry: suspend () -> Boolean = { false },
+        replaceDelayedRetry: suspend () -> Unit = {},
         enqueueSuccessor: suspend () -> Unit,
     ) {
         mutex.withLock {
-            if (!hasWaiting()) enqueueSuccessor()
+            when {
+                isDelayedRetry() -> replaceDelayedRetry()
+                !hasWaiting() -> enqueueSuccessor()
+            }
         }
     }
 }

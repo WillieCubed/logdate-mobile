@@ -112,6 +112,35 @@ class AndroidIdentityKeyBackupStoreTest {
         }
 
     @Test
+    fun `interrupted account backup replacement preserves the prior recovery key`() =
+        runTest {
+            val original = ByteArray(32) { 7 }
+            store.writeAccountIdentity(AccountIdentityBackup("fixture-account", original))
+            File(tempDir, "identity_recovery/account_key_backup.part").mkdir()
+
+            assertFailsWith<java.io.IOException> {
+                store.writeAccountIdentity(AccountIdentityBackup("fixture-account", ByteArray(32) { 8 }))
+            }
+
+            assertContentEquals(original, store.readAccountIdentity()?.key)
+            assertTrue(File(tempDir, "identity_recovery/account_key_backup").isFile)
+        }
+
+    @Test
+    fun `unreadable phrase backup remains present and is never mistaken for an empty recovery store`() =
+        runTest {
+            val phraseFile =
+                File(tempDir, "identity_recovery/phrase_backup").apply {
+                    parentFile?.mkdirs()
+                    mkdir()
+                }
+
+            assertNull(store.readPhrase())
+            assertTrue(store.hasBackup())
+            assertTrue(phraseFile.isDirectory)
+        }
+
+    @Test
     fun `changing back to a phrase removes the obsolete account key`() =
         runTest {
             store.writeAccountIdentity(AccountIdentityBackup("fixture-account", ByteArray(32) { 7 }))

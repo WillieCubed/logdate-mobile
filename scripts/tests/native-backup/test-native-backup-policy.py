@@ -68,7 +68,9 @@ class NativeBackupPolicyTest(unittest.TestCase):
         for modern in (False, True):
             for domain, path in (("sharedpref", "logdate_secure_storage.xml"),
                                  ("database", "androidx.work.workdb"), ("database", "androidx.work.workdb-wal"),
-                                 ("file", "media/staging/incomplete.part")):
+                                 ("file", "media/staging/incomplete.part"),
+                                 ("file", "audio_notes/staging/recording_123.aac"),
+                                 ("file", "audio_notes/staging/recording_123.m4a.tmp")):
                 with self.subTest(modern=modern, path=path):
                     self.assertFalse(included(domain, path, modern=modern, transfer=True))
 

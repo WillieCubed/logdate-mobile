@@ -38,6 +38,7 @@ class CloudRestoreWorker(
     private val cloudBackupDataSource: CloudBackupDataSource,
     private val sessionStorage: SessionStorage,
     private val cloudArchiveCipher: CloudArchiveCipher,
+    private val hasActiveRestore: (suspend (String, OriginBoundSession) -> Boolean)? = null,
     private val enqueueRestore: (suspend (File) -> Unit)? = null,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -52,6 +53,8 @@ class CloudRestoreWorker(
         val archive = cloudArchiveFile(context, "cloud-restore", id)
         var preserveArchive = false
         return try {
+            val deliveryId = inputData.getString(NativeRestoreWorkState.DELIVERY_KEY)
+            if (deliveryId != null && hasActiveRestoreForDelivery(deliveryId, expectedSession)) return Result.success()
             val tokenRefresher = CloudBackupTokenRefresher(sessionStorage, cloudBackupDataSource)
             val listResult = tokenRefresher.execute(expectedSession) { accessToken -> cloudBackupDataSource.listBackups(accessToken) }
             expectedSession = listResult.session
@@ -60,7 +63,14 @@ class CloudRestoreWorker(
                     .getOrElse {
                         Napier.w("CloudRestoreWorker: unable to list backups")
                         return Result.retry()
-                    }.maxByOrNull { it.createdAt } ?: return Result.success()
+                    }.maxByOrNull { it.createdAt }
+            if (backup == null) {
+                return if (NativeRestoreWorkState(context, inputData, sessionStorage).complete(expectedSession)) {
+                    Result.success()
+                } else {
+                    Result.retry()
+                }
+            }
 
             encrypted.delete()
             plaintextPart.delete()
@@ -110,12 +120,27 @@ class CloudRestoreWorker(
                     inputData.getString(NativeRestoreWorkState.DELIVERY_KEY),
                     session,
                 ).build()
-        val request = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(data).build()
-        WorkManager
+        val requestBuilder = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(data).addTag(WORK_TAG)
+        inputData.getString(NativeRestoreWorkState.DELIVERY_KEY)?.let { deliveryId ->
+            requestBuilder.addTag(CloudRestoreScheduler.deliveryWorkTag(deliveryId, session))
+        }
+        val request = requestBuilder.build()
+        val enqueueResult =
+            WorkManager.getInstance(context).enqueueUniqueWork(RestoreWorker.WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+        enqueueResult.result.awaitResult()
+    }
+
+    private suspend fun hasActiveRestoreForDelivery(
+        deliveryId: String,
+        session: OriginBoundSession,
+    ): Boolean {
+        val injectedCheck = hasActiveRestore
+        if (injectedCheck != null) return injectedCheck(deliveryId, session)
+        return WorkManager
             .getInstance(context)
-            .enqueueUniqueWork(RestoreWorker.WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
-            .result
+            .getWorkInfosByTag(CloudRestoreScheduler.deliveryWorkTag(deliveryId, session))
             .awaitResult()
+            .any { it.id != id && !it.state.isFinished }
     }
 
     /**
@@ -151,6 +176,7 @@ class CloudRestoreWorker(
 
     companion object {
         const val WORK_NAME = "logdate:cloud:restore"
+        const val WORK_TAG = "logdate:cloud:restore"
     }
 }
 
