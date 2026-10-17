@@ -1,5 +1,7 @@
 package app.logdate.client.domain.recommendation
 
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
@@ -24,10 +26,13 @@ import kotlinx.coroutines.flow.onStart
  * Returns the highest-priority home recommendation based on the current app state.
  *
  * Signals are evaluated in priority order:
- * 1. [HomeRecommendation.CompleteYourDraft] — an unfinished draft is waiting
- * 2. [HomeRecommendation.MemoryRecall] — past entries worth revisiting
- * 3. [HomeRecommendation.EmptyDay] — the user has not logged anything today
- * 4. [HomeRecommendation.None] — no action needed
+ * 1. [HomeRecommendation.AfterActivity] or [HomeRecommendation.MorningStart] — from [activity], while
+ *    activity awareness is on
+ * 2. [HomeRecommendation.CompleteYourDraft] — an unfinished draft is waiting
+ * 3. [HomeRecommendation.UpcomingEvent] — an event worth capturing is coming up
+ * 4. [HomeRecommendation.MemoryRecall] — past entries worth revisiting
+ * 5. [HomeRecommendation.EmptyDay] — the user has not logged anything today
+ * 6. [HomeRecommendation.None] — no action needed
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GetHomeRecommendationUseCase(
@@ -39,7 +44,16 @@ class GetHomeRecommendationUseCase(
     private val clientLocationProvider: ClientLocationProvider,
     private val placeResolutionCache: PlaceResolutionCache,
     private val memoriesSettingsRepository: MemoriesSettingsRepository,
+    private val activity: Flow<ActivityUiState> = flowOf(ActivityUiState()),
+    private val dismissActivitySuggestion: suspend () -> Unit = {},
+    private val useActivitySuggestion: suspend () -> Unit = {},
 ) {
+    /** Puts away the activity suggestion or the morning start that is showing. */
+    suspend fun dismissActivity() = dismissActivitySuggestion()
+
+    /** Notes that the person started a moment from the activity suggestion or the morning start. */
+    suspend fun useActivity() = useActivitySuggestion()
+
     private val locationFlow: Flow<CurrentLocationDescription?> =
         clientLocationProvider.currentLocation
             .distinctUntilChanged { a, b -> a.distanceTo(b) < 100.0 }
@@ -73,43 +87,52 @@ class GetHomeRecommendationUseCase(
 
     operator fun invoke(): Flow<HomeRecommendation> =
         memoriesSettingsRepository.observeSettings().flatMapLatest { settings ->
-            if (!settings.contextualRecommendationsEnabled) {
-                return@flatMapLatest flowOf(HomeRecommendation.None)
+            if (!settings.contextualRecommendationsEnabled) return@flatMapLatest flowOf(HomeRecommendation.None)
+            combine(contextual(settings), activity.onStart { emit(ActivityUiState()) }) { recommendation, doing ->
+                doing.toRecommendation() ?: recommendation
             }
-            combine(
-                hasNotesForToday(),
-                fetchMostRecentDraft(),
-                getMemoryRecall(aiEnabled = settings.aiRecallEnabled),
-                observeUpcomingEvents(),
-                locationFlow,
-            ) { hasNotes, recentDraft, recall, upcomingEvents, location ->
-                val nextUncapturedEvent =
-                    if (settings.eventNudgesEnabled) firstUncapturedEvent(upcomingEvents) else null
-                when {
-                    recentDraft != null ->
-                        HomeRecommendation.CompleteYourDraft(
-                            draftId = recentDraft.id,
-                        )
-                    nextUncapturedEvent != null ->
-                        HomeRecommendation.UpcomingEvent(
-                            eventId = nextUncapturedEvent.id,
-                            title = nextUncapturedEvent.title,
-                            startTime = nextUncapturedEvent.startTime,
-                            placeName = null,
-                        )
-                    recall != null ->
-                        HomeRecommendation.MemoryRecall(
-                            date = recall.date,
-                            summary = recall.summary,
-                            people = recall.people,
-                            mediaUris = recall.mediaUris,
-                        )
-                    !hasNotes ->
-                        HomeRecommendation.EmptyDay(
-                            location = location,
-                        )
-                    else -> HomeRecommendation.None
-                }
+        }
+
+    private fun ActivityUiState.toRecommendation(): HomeRecommendation? {
+        suggestion?.let { return HomeRecommendation.AfterActivity(it.minutes, trip = it.activity.kind == ActivityKind.IN_VEHICLE) }
+        if (morningStart != null) return HomeRecommendation.MorningStart
+        return null
+    }
+
+    private fun contextual(settings: MemoriesSettings): Flow<HomeRecommendation> =
+        combine(
+            hasNotesForToday(),
+            fetchMostRecentDraft(),
+            getMemoryRecall(aiEnabled = settings.aiRecallEnabled),
+            observeUpcomingEvents(),
+            locationFlow,
+        ) { hasNotes, recentDraft, recall, upcomingEvents, location ->
+            val nextUncapturedEvent =
+                if (settings.eventNudgesEnabled) firstUncapturedEvent(upcomingEvents) else null
+            when {
+                recentDraft != null ->
+                    HomeRecommendation.CompleteYourDraft(
+                        draftId = recentDraft.id,
+                    )
+                nextUncapturedEvent != null ->
+                    HomeRecommendation.UpcomingEvent(
+                        eventId = nextUncapturedEvent.id,
+                        title = nextUncapturedEvent.title,
+                        startTime = nextUncapturedEvent.startTime,
+                        placeName = null,
+                    )
+                recall != null ->
+                    HomeRecommendation.MemoryRecall(
+                        date = recall.date,
+                        summary = recall.summary,
+                        people = recall.people,
+                        mediaUris = recall.mediaUris,
+                    )
+                !hasNotes ->
+                    HomeRecommendation.EmptyDay(
+                        location = location,
+                    )
+                else -> HomeRecommendation.None
             }
         }
 
