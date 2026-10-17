@@ -19,7 +19,9 @@ import app.logdate.wear.launch.WearLaunchIntents
 import app.logdate.wear.launch.WearLaunchRequest
 import app.logdate.wear.presentation.MainActivity
 import app.logdate.wear.recording.WearRecorder
+import app.logdate.wear.v2.recorder.RecorderState
 import app.logdate.wear.v2.recorder.RecorderTags
+import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.today.TodayTags
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -54,7 +56,17 @@ class RecordLaunchTest {
 
     @After
     fun tearDown() {
+        // Discard the way the Discard button does, asking and then confirming. Discarding behind the
+        // app-wide recorder state leaves it saving a recording that is gone, which later tests find
+        // on Today as "The recording had no audio".
+        val screen = KoinJavaComponent.getKoin().get<RecorderViewModel>()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            screen.discard()
+            screen.discard()
+        }
         if (recorder.isRecording.value) runBlocking { recorder.discard() }
+        composeRule.waitUntil(TIMEOUT_MS) { screen.state.value !is RecorderState.Live && screen.state.value !is RecorderState.Saving }
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { screen.dismiss() }
         // onNewIntent replaces the activity's intent, so ActivityScenario.close() could wait forever.
         scenario?.onActivity { it.finish() }
         setNewWatchApp(enabled = false)
