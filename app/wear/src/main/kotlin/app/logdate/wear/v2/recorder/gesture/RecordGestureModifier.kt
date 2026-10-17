@@ -3,6 +3,7 @@ package app.logdate.wear.v2.recorder.gesture
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -37,9 +38,10 @@ object RecordGestureDefaults {
  *
  * While [armed], the touch is watched on the Initial pass, before the element's own click and
  * before the pager above it, and the down is consumed so the click never fires. Until the system
- * long-press timeout the gesture only watches: if the pager takes the drag, the gesture yields and
- * the pager scrolls. After the timeout it consumes every event, so the pager cannot move, and a
- * finger that slides sideways off the element does not end the recording until it lifts.
+ * long-press timeout the gesture only watches: a drag yields, whether a list or pager takes it or it
+ * only travels past the touch slop, so a swipe across the button never records. After the timeout it
+ * consumes every event, so nothing scrolls, and a finger that slides sideways off the element does
+ * not end the recording until it lifts.
  *
  * While not [armed], touches pass through and the element's click does what the button shows, such
  * as Stop. Either way this modifier owns the element's accessibility: TalkBack announces
@@ -146,7 +148,7 @@ private class RecordGestureNode(
             down.consume()
             val tracker = GestureTracker(RecordGestureMachine(lockDistance.toPx()), listener)
             tracker.send(RecordGestureEvent.Down(down.position.y))
-            val beforeTimeout = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { awaitDecision(down.id) }
+            val beforeTimeout = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { awaitDecision(down.id, down.position) }
             tracker.send(beforeTimeout ?: RecordGestureEvent.Timeout)
             if (tracker.phase !is RecordGesturePhase.Holding) return@awaitEachGesture
             followAfterTimeout(down.id, tracker)
@@ -171,14 +173,19 @@ private class GestureTracker(
 
 /**
  * Before the timeout: an up ends the wait (a cancelled touch arrives as an up that is already
- * consumed), and a move the pager consumed on its Main pass shows up consumed on the Final pass.
+ * consumed). A move a list or pager consumed on its Main pass shows up consumed on the Final pass,
+ * and a move past the touch slop from [downAt] is a drag even when nothing scrolls; both yield.
  */
-private suspend fun AwaitPointerEventScope.awaitDecision(pointer: PointerId): RecordGestureEvent {
+private suspend fun AwaitPointerEventScope.awaitDecision(
+    pointer: PointerId,
+    downAt: Offset,
+): RecordGestureEvent {
     while (true) {
         val initial = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull { it.id == pointer } ?: continue
         if (!initial.pressed) return if (initial.isConsumed) RecordGestureEvent.Cancel else RecordGestureEvent.Up
         val final = awaitPointerEvent(PointerEventPass.Final).changes.firstOrNull { it.id == pointer } ?: continue
         if (final.isConsumed) return RecordGestureEvent.Claimed
+        if ((final.position - downAt).getDistance() > viewConfiguration.touchSlop) return RecordGestureEvent.Claimed
     }
 }
 

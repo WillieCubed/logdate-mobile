@@ -30,7 +30,7 @@ sealed interface RecordGestureEvent {
         val y: Float,
     ) : RecordGestureEvent
 
-    /** The pager, or another handler above the button, consumed the touch before the timeout. */
+    /** Before the timeout, a list or pager took the touch, or it dragged past the touch slop. */
     data object Claimed : RecordGestureEvent
 
     /** The system long-press timeout passed with the finger still down. */
