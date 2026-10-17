@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -24,13 +23,18 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -215,34 +219,89 @@ fun MasterFeatureToggle(
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
-        BoxWithConstraints(
-            Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        MasterToggleLayout(
+            label = label,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
         ) {
-            val stacked = maxWidth < 256.dp * LocalDensity.current.fontScale
-            val control: @Composable () -> Unit = {
-                Switch(checked = checked, onCheckedChange = null, enabled = enabled)
-            }
-            if (stacked) {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(label, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyLarge)
-                    Box(Modifier.align(Alignment.End)) { control() }
-                }
+            Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        }
+    }
+}
+
+private enum class MasterToggleSlot { Label, Control }
+
+/**
+ * Places [label] beside [control] while the label's widest word fits there, and otherwise stacks
+ * [control] below a full-width label. A word wider than the full width drops its tracking, then
+ * shrinks only as far as needed, so a word is never broken mid-word under any font's metrics.
+ */
+@Composable
+private fun MasterToggleLayout(
+    label: String,
+    modifier: Modifier = Modifier,
+    control: @Composable () -> Unit,
+) {
+    val textMeasurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.bodyLarge
+    val words = remember(label) { label.split(Regex("\\s+")).filter { it.isNotEmpty() } }
+    SubcomposeLayout(modifier) { constraints ->
+        val controlPlaceable = subcompose(MasterToggleSlot.Control, control).single().measure(Constraints())
+        val inlineGap = Spacing.lg.roundToPx()
+        val width =
+            if (constraints.hasBoundedWidth) {
+                constraints.maxWidth
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = label,
-                        modifier = Modifier.weight(1f).padding(end = Spacing.lg),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    control()
-                }
+                textMeasurer.measure(label, style, softWrap = false).size.width + inlineGap + controlPlaceable.width
+            }
+
+        fun widestWord(wordStyle: TextStyle): Int =
+            words.maxOfOrNull { textMeasurer.measure(it, wordStyle, softWrap = false, maxLines = 1).size.width } ?: 0
+
+        val inlineLabelWidth = width - controlPlaceable.width - inlineGap
+        val stacked = widestWord(style) > inlineLabelWidth
+        val labelWidth = if (stacked) width else inlineLabelWidth
+        val labelStyle = style.fittingWord(labelWidth, ::widestWord)
+        val labelPlaceable =
+            subcompose(MasterToggleSlot.Label) { Text(label, style = labelStyle) }
+                .single()
+                .measure(Constraints(maxWidth = labelWidth.coerceAtLeast(0)))
+        val gap = Spacing.sm.roundToPx()
+        val height =
+            if (stacked) {
+                labelPlaceable.height + gap + controlPlaceable.height
+            } else {
+                maxOf(labelPlaceable.height, controlPlaceable.height)
+            }
+        layout(width, height) {
+            if (stacked) {
+                labelPlaceable.placeRelative(0, 0)
+                controlPlaceable.placeRelative(width - controlPlaceable.width, labelPlaceable.height + gap)
+            } else {
+                labelPlaceable.placeRelative(0, (height - labelPlaceable.height) / 2)
+                controlPlaceable.placeRelative(width - controlPlaceable.width, (height - controlPlaceable.height) / 2)
             }
         }
     }
+}
+
+private fun TextStyle.fittingWord(
+    width: Int,
+    widestWord: (TextStyle) -> Int,
+): TextStyle {
+    if (widestWord(this) <= width) return this
+    val untracked = copy(letterSpacing = 0.sp)
+    var fitted = untracked
+    var measured = widestWord(fitted)
+    while (measured > width && width > 0 && fitted.fontSize.isSpecified) {
+        val scale = width.toFloat() / measured * 0.98f
+        fitted =
+            fitted.copy(
+                fontSize = fitted.fontSize * scale,
+                lineHeight = if (fitted.lineHeight.isSpecified) fitted.lineHeight * scale else fitted.lineHeight,
+            )
+        measured = widestWord(fitted)
+    }
+    return fitted
 }
 
 /**
