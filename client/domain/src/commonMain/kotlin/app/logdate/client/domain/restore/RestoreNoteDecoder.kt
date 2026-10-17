@@ -1,6 +1,7 @@
 package app.logdate.client.domain.restore
 
 import app.logdate.client.domain.export.ExportNote
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
@@ -25,6 +26,7 @@ internal fun ExportNote.toJournalNote(
                 content = content.orEmpty(),
                 timeZoneId = timeZone,
                 capturedOn = CaptureDevice.fromWireName(capturedOn),
+                capturedDuring = CaptureActivity.fromWireName(capturedDuring),
                 syncVersion = syncVersion,
                 location = location,
             )
@@ -38,6 +40,7 @@ internal fun ExportNote.toJournalNote(
                 presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
                 timeZoneId = timeZone,
                 capturedOn = CaptureDevice.fromWireName(capturedOn),
+                capturedDuring = CaptureActivity.fromWireName(capturedDuring),
                 syncVersion = syncVersion,
                 location = location,
             )
@@ -50,6 +53,7 @@ internal fun ExportNote.toJournalNote(
                 caption = caption.orEmpty(),
                 timeZoneId = timeZone,
                 capturedOn = CaptureDevice.fromWireName(capturedOn),
+                capturedDuring = CaptureActivity.fromWireName(capturedDuring),
                 syncVersion = syncVersion,
                 location = location,
             )
@@ -64,6 +68,7 @@ internal fun ExportNote.toJournalNote(
                 caption = caption.orEmpty(),
                 timeZoneId = timeZone,
                 capturedOn = CaptureDevice.fromWireName(capturedOn),
+                capturedDuring = CaptureActivity.fromWireName(capturedDuring),
                 syncVersion = syncVersion,
                 location = location,
             )
@@ -94,10 +99,11 @@ private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): No
 internal fun JournalNote.withExistingCaptureMetadata(existing: JournalNote?): JournalNote {
     val zone = timeZoneId ?: existing?.timeZoneId
     val device = existing?.capturedOn ?: capturedOn
+    val activity = existing?.capturedDuring ?: capturedDuring
     return when (this) {
-        is JournalNote.Text -> copy(timeZoneId = zone, capturedOn = device)
-        is JournalNote.Image -> copy(timeZoneId = zone, capturedOn = device)
-        is JournalNote.Audio -> copy(timeZoneId = zone, capturedOn = device)
-        is JournalNote.Video -> copy(timeZoneId = zone, capturedOn = device)
+        is JournalNote.Text -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)
+        is JournalNote.Image -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)
+        is JournalNote.Audio -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)
+        is JournalNote.Video -> copy(timeZoneId = zone, capturedOn = device, capturedDuring = activity)
     }
 }

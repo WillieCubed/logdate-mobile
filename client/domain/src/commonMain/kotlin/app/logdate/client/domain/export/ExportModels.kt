@@ -48,6 +48,7 @@ data class ExportNote(
     val caption: String? = null, // Caption for media notes
     val photoPresentation: String? = null,
     val capturedOn: String? = null,
+    val capturedDuring: String? = null,
     val mediaPath: String? = null, // Path to media file
     val durationMs: Long? = null,
     val transcript: TranscriptDocument? = null,
