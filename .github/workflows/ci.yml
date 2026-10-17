@@ -52,8 +52,14 @@ jobs:
 
       - name: Run tests
         # JVM/Android and multiplatform modules need both aggregates. Server/client e2e
-        # tests belong to their dedicated job rather than running twice.
-        run: ./gradlew test allTests -x :integration:server-client-e2e:test --continue
+        # tests belong to their dedicated job rather than running twice. The iOS and
+        # Wasm test targets run in the multiplatform job. Compiling them here grew the
+        # Gradle daemon from 5 to 9 GB and left under 1 GB of the runner's 16 GB free;
+        # a runner that runs out of memory is shut down with no error from Gradle.
+        run: |
+          ./gradlew test allTests --continue \
+            -x :integration:server-client-e2e:test \
+            -x iosSimulatorArm64Test -x wasmJsTest -x wasmJsBrowserTest
         env:
           DATABASE_URL: jdbc:postgresql://localhost:5432/logdate_test
           DATABASE_USER: test
@@ -83,6 +89,49 @@ jobs:
       - name: Stop test services
         if: always()
         run: python3 scripts/ci/start-test-services.py stop unit
+
+  multiplatform-tests:
+    name: iOS compile and Wasm tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Materialize Firebase config
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Run iOS and Wasm tests
+        # The test targets the unit-test job leaves out. Linux compiles every iOS main and
+        # test source set but cannot link or run iOS binaries, so the iOS test tasks skip
+        # after compiling, as they did in the unit-test job. Wasm tests run in a browser.
+        run: ./gradlew iosSimulatorArm64Test wasmJsTest --continue
+
+      - name: Upload multiplatform test reports
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: multiplatform-test-reports
+          if-no-files-found: warn
+          path: |
+            **/build/test-results/**
+            **/build/reports/tests
 
   e2e-tests:
     name: Server / client e2e
