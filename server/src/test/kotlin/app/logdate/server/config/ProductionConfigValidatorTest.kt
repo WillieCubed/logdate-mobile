@@ -129,6 +129,32 @@ class ProductionConfigValidatorTest {
     }
 
     @Test
+    fun `production rejects a dedicated AT Protocol secret that reuses JWT_SECRET`() {
+        listOf(AtprotoSigningKeyKek, AtprotoSessionSecret).forEach { secret ->
+            val failure =
+                assertFailsWith<InsecureProductionConfigException> {
+                    ProductionConfigValidator.validate(
+                        profile = RuntimeProfile.PRODUCTION,
+                        readEnv = productionEnv(secret.envVar to VALID_JWT_SECRET),
+                    )
+                }
+            assertTrue(failure.message!!.contains("${secret.envVar} must differ from JWT_SECRET"), secret.envVar)
+        }
+    }
+
+    @Test
+    fun `production rejects the signing-key KEK and session secret sharing one value`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv = productionEnv(AtprotoSessionSecret.envVar to VALID_SIGNING_KEY_KEK),
+                )
+            }
+        assertTrue(failure.message!!.contains("${AtprotoSessionSecret.envVar} must differ from ${AtprotoSigningKeyKek.envVar}"))
+    }
+
+    @Test
     fun `production accepts a separate decrypt-only signing-key KEK`() {
         ProductionConfigValidator.validate(
             profile = RuntimeProfile.PRODUCTION,
