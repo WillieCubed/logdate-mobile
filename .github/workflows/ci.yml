@@ -80,10 +80,33 @@ jobs:
         run: ./gradlew koverXmlReport
         continue-on-error: true
 
+      - name: Prepare Codecov upload
+        id: coverage
+        # Each module with the Kover plugin writes build/reports/kover/report.xml. The root
+        # report (build/reports/kover/coverage.xml) merges no modules, so it has no classes.
+        # Codecov accepts uploads without a token only from forks' pull requests.
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          FORK_PULL_REQUEST: ${{ github.event.pull_request.head.repo.full_name != '' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          files="$(find . -path '*/build/reports/kover/report.xml' | sort | paste -sd, -)"
+          if [[ -z "$files" ]]; then
+            echo "::warning title=No coverage uploaded::koverXmlReport wrote no module reports, so there is nothing to upload."
+          else
+            echo "Coverage reports: $files"
+          fi
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          if [[ -z "$CODECOV_TOKEN" && "$FORK_PULL_REQUEST" != "true" ]]; then
+            echo "::warning title=Codecov token missing::The CODECOV_TOKEN repository secret is not set. Codecov rejects this upload without it; add the repository's upload token from codecov.io as CODECOV_TOKEN."
+          fi
+
       - name: Upload coverage to Codecov
+        if: ${{ steps.coverage.outputs.files != '' }}
         uses: codecov/codecov-action@v7.1.1
         with:
-          files: ./build/reports/kover/report.xml
+          files: ${{ steps.coverage.outputs.files }}
+          disable_search: true
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
       - name: Stop test services
