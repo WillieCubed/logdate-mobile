@@ -28,6 +28,7 @@
     <string name="wear_today_morning_title">Good morning</string>
     <string name="wear_today_morning_body">Start the day with a voice note</string>
     <string name="wear_today_activity_dismiss">Not now</string>
+    <string name="wear_today_voice_first">Record a voice note</string>
     <string name="wear_today_setup_phone_title">Finish setting up your watch</string>
     <string name="wear_today_setup_phone_body">Open LogDate on your phone to sync moments from this watch.</string>
     <string name="wear_today_setup_phone_failed">Couldn’t open LogDate on your phone. Try again.</string>

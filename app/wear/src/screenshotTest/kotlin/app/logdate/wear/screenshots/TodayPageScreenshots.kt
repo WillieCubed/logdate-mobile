@@ -132,6 +132,13 @@ class TodayPageScreenshots {
         val night = Activity(ActivityKind.SLEEP, at(0, 0) - 1.hours, at(7, 0))
         TodayScene(ready(summary = TodaySummary.Empty, campfire = null, activity = ActivityUiState(morningStart = night)))
     }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @Composable
+    fun S14_TodayWhileMoving() {
+        TodayScene(ready(summary = busySummary, activity = ActivityUiState(voiceFirst = true)), controls = allControls)
+    }
 }
 
 private const val LAST_ITEM_INDEX = 3
