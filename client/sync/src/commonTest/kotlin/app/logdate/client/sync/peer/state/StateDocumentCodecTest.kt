@@ -26,6 +26,18 @@ class StateDocumentCodecTest {
         assertEquals(false, StateDocumentCodec.encode(watchDocument).contains("linkProblem"))
     }
 
+    @Test
+    fun `each device's activity reads back and is left out when there is none`() {
+        val walking =
+            ActivitySnapshot(kind = "MOVING", startedAt = 1_000, lastEndedKind = "IN_VEHICLE", lastStartedAt = 100, lastEndedAt = 900)
+        val phone = phoneDocument.copy(phone = phoneDocument.phone?.copy(activity = walking))
+        val watch = watchDocument.copy(watch = watchDocument.watch?.copy(activity = walking.copy(kind = "SLEEP")))
+
+        assertEquals(Decoded.Supported(phone), StateDocumentCodec.decode(StateDocumentCodec.encode(phone)))
+        assertEquals(Decoded.Supported(watch), StateDocumentCodec.decode(StateDocumentCodec.encode(watch)))
+        assertEquals(false, StateDocumentCodec.encode(watchDocument).contains("activity"))
+    }
+
     private val phoneDocument =
         StateDocument(
             role = PeerRole.PHONE,
