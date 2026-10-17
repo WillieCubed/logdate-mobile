@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.formatMediaDuration
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.pause
+import logdate.client.feature.editor.generated.resources.play
 import logdate.client.feature.editor.generated.resources.playback_position
 import org.jetbrains.compose.resources.stringResource
 
@@ -65,6 +67,7 @@ internal fun CompletedAudioTransport(
     val elapsed = formatMediaDuration((durationMs * safeProgress).toLong(), true)
     val total = formatMediaDuration(durationMs, true)
     val playbackPositionDescription = stringResource(Res.string.playback_position)
+    val playPauseDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(end = trailingActionInset),
@@ -93,7 +96,7 @@ internal fun CompletedAudioTransport(
                     Modifier
                         .size(containerSize)
                         .then(playbackModifier)
-                        .semantics { contentDescription = if (isPlaying) "Pause" else "Play" },
+                        .semantics { contentDescription = playPauseDescription },
                 shapes = IconButtonDefaults.shapes(shape = shape, pressedShape = IconButtonDefaults.mediumPressedShape),
             ) {
                 MorphingPlayPauseIcon(

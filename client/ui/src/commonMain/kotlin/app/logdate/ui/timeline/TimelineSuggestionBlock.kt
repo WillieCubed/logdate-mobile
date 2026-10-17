@@ -45,6 +45,7 @@ import logdate.client.ui.generated.resources.suggestion_capture_for_event
 import logdate.client.ui.generated.resources.suggestion_label_draft
 import logdate.client.ui.generated.resources.suggestion_label_memory
 import logdate.client.ui.generated.resources.suggestion_label_today
+import logdate.client.ui.generated.resources.suggestion_label_upcoming
 import logdate.client.ui.generated.resources.suggestion_media_item
 import logdate.client.ui.generated.resources.suggestion_near_location
 import logdate.client.ui.generated.resources.view_memory
@@ -146,7 +147,7 @@ fun TimelineSuggestionBlock(
             TimelineSuggestionBlockType.COMPLETE_DRAFT -> stringResource(Res.string.suggestion_label_draft)
             TimelineSuggestionBlockType.EMPTY_DAY -> stringResource(Res.string.suggestion_label_today)
             TimelineSuggestionBlockType.MEMORY_RECALL -> stringResource(Res.string.suggestion_label_memory)
-            TimelineSuggestionBlockType.UPCOMING_EVENT -> "Coming up"
+            TimelineSuggestionBlockType.UPCOMING_EVENT -> stringResource(Res.string.suggestion_label_upcoming)
         }
 
     val containerColor =

@@ -32,6 +32,9 @@ import logdate.client.feature.core.generated.resources.person_detail_load_failed
 import logdate.client.feature.core.generated.resources.person_detail_loading
 import logdate.client.feature.core.generated.resources.person_detail_no_linked_entries
 import logdate.client.feature.core.generated.resources.person_detail_no_linked_events
+import logdate.client.feature.core.generated.resources.person_detail_photo_preview
+import logdate.client.feature.core.generated.resources.person_detail_video_preview
+import logdate.client.feature.core.generated.resources.person_detail_voice_note_preview
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
@@ -253,12 +256,13 @@ private fun PersonLinkedSection(uiState: PersonDetailViewModel.UiState) {
     }
 }
 
+@Composable
 private fun JournalNote.previewLabel(): String =
     when (this) {
         is JournalNote.Text -> content.take(120)
-        is JournalNote.Audio -> "Voice note"
-        is JournalNote.Image -> caption.ifBlank { "Photo" }.take(120)
-        is JournalNote.Video -> caption.ifBlank { "Video" }.take(120)
+        is JournalNote.Audio -> stringResource(Res.string.person_detail_voice_note_preview)
+        is JournalNote.Image -> caption.ifBlank { stringResource(Res.string.person_detail_photo_preview) }.take(120)
+        is JournalNote.Video -> caption.ifBlank { stringResource(Res.string.person_detail_video_preview) }.take(120)
     }
 
 private fun Event.previewLabel(): String = title

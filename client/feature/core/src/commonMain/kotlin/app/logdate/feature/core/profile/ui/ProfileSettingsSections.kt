@@ -46,15 +46,20 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_information
 import logdate.client.feature.core.generated.resources.authentication
 import logdate.client.feature.core.generated.resources.birthday
+import logdate.client.feature.core.generated.resources.birthday_not_set
 import logdate.client.feature.core.generated.resources.campfire_profile_summary
 import logdate.client.feature.core.generated.resources.current_streak
 import logdate.client.feature.core.generated.resources.edit_bio
 import logdate.client.feature.core.generated.resources.journaling_stats
 import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile
+import logdate.client.feature.core.generated.resources.profile_authenticated
 import logdate.client.feature.core.generated.resources.profile_bio_label
 import logdate.client.feature.core.generated.resources.profile_bio_not_set
+import logdate.client.feature.core.generated.resources.profile_member_since
+import logdate.client.feature.core.generated.resources.profile_not_authenticated
 import logdate.client.feature.core.generated.resources.streak_day_count
+import logdate.client.feature.core.generated.resources.username
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_save
 import org.jetbrains.compose.resources.stringResource
@@ -73,7 +78,7 @@ internal fun ProfilePersonalInformationSection(
     ) {
         val formattedBirthday =
             if (profile.birthday == null || profile.birthday == Instant.DISTANT_PAST) {
-                "Not set"
+                stringResource(Res.string.birthday_not_set)
             } else {
                 formatDateLocalized(
                     profile.birthday
@@ -169,7 +174,7 @@ internal fun ProfileAccountInformationSection(profile: ProfileDisplayModel) {
         profile.username?.let { username ->
             ProfileInfoItem(
                 icon = Icons.Default.Person,
-                label = "Username",
+                label = stringResource(Res.string.username),
                 value = "@$username",
             )
         }
@@ -177,7 +182,7 @@ internal fun ProfileAccountInformationSection(profile: ProfileDisplayModel) {
         profile.joinDate?.let { joinDate ->
             ProfileInfoItem(
                 icon = Icons.Default.CalendarMonth,
-                label = "Member since",
+                label = stringResource(Res.string.profile_member_since),
                 value =
                     formatDateLocalized(
                         joinDate
@@ -207,9 +212,9 @@ internal fun ProfileAccountInformationSection(profile: ProfileDisplayModel) {
                 Text(
                     text =
                         if (profile.isAuthenticated) {
-                            "Authenticated"
+                            stringResource(Res.string.profile_authenticated)
                         } else {
-                            "Not authenticated"
+                            stringResource(Res.string.profile_not_authenticated)
                         },
                     color =
                         if (profile.isAuthenticated) {

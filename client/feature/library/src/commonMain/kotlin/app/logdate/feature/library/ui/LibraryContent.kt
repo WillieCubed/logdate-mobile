@@ -30,6 +30,13 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
+import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.library_empty_body
+import logdate.client.feature.library.generated.resources.library_empty_headline
+import logdate.client.feature.library.generated.resources.library_error_body
+import logdate.client.feature.library.generated.resources.library_error_headline
+import logdate.client.feature.library.generated.resources.library_permission_required_body
+import logdate.client.feature.library.generated.resources.library_permission_required_headline
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
@@ -74,22 +81,22 @@ fun LibraryPanel(
 
                         is LibraryUiState.PermissionRequired -> {
                             LibraryEmptyState(
-                                headline = "Let's get started",
-                                body = "Grant photo and video access so your library can show your memories.",
+                                headline = stringResource(Res.string.library_permission_required_headline),
+                                body = stringResource(Res.string.library_permission_required_body),
                             )
                         }
 
                         is LibraryUiState.Empty -> {
                             LibraryEmptyState(
-                                headline = "Your memories live here",
-                                body = "Photos and videos you capture in LogDate will show up in your library. Go snap something!",
+                                headline = stringResource(Res.string.library_empty_headline),
+                                body = stringResource(Res.string.library_empty_body),
                             )
                         }
 
                         is LibraryUiState.Error -> {
                             LibraryEmptyState(
-                                headline = "Library couldn't load",
-                                body = "Your entries are still saved. Try loading your library again.",
+                                headline = stringResource(Res.string.library_error_headline),
+                                body = stringResource(Res.string.library_error_body),
                                 onRetry = onRetry,
                             )
                         }

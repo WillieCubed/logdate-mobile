@@ -34,6 +34,8 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_add_visit
+import logdate.client.feature.location.timeline.generated.resources.history_arrived_on
 import logdate.client.feature.location.timeline.generated.resources.history_arrived_time_label
 import logdate.client.feature.location.timeline.generated.resources.history_arrived_time_placeholder
 import logdate.client.feature.location.timeline.generated.resources.history_cancel
@@ -41,6 +43,13 @@ import logdate.client.feature.location.timeline.generated.resources.history_choo
 import logdate.client.feature.location.timeline.generated.resources.history_choose_on_map
 import logdate.client.feature.location.timeline.generated.resources.history_choose_on_map_hint
 import logdate.client.feature.location.timeline.generated.resources.history_choose_place
+import logdate.client.feature.location.timeline.generated.resources.history_edit_activity_title
+import logdate.client.feature.location.timeline.generated.resources.history_edit_invalid_times
+import logdate.client.feature.location.timeline.generated.resources.history_edit_name_required
+import logdate.client.feature.location.timeline.generated.resources.history_edit_place_required
+import logdate.client.feature.location.timeline.generated.resources.history_edit_place_title
+import logdate.client.feature.location.timeline.generated.resources.history_edit_time_title
+import logdate.client.feature.location.timeline.generated.resources.history_left_on
 import logdate.client.feature.location.timeline.generated.resources.history_left_time_label
 import logdate.client.feature.location.timeline.generated.resources.history_left_time_placeholder
 import logdate.client.feature.location.timeline.generated.resources.history_nearby_empty
@@ -90,6 +99,9 @@ internal fun HistoryEditDialog(
     var departureDate by remember { mutableStateOf(item?.end?.toLocalDateTime(zone)?.date ?: viewModel.date) }
     var choosingArrival by remember { mutableStateOf<Boolean?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    val nameRequiredError = stringResource(Res.string.history_edit_name_required)
+    val invalidTimesError = stringResource(Res.string.history_edit_invalid_times)
+    val placeRequiredError = stringResource(Res.string.history_edit_place_required)
     var nearby by remember(item?.id) { mutableStateOf(emptyList<SemanticPlace>()) }
     var loadingNearby by remember(item?.id) { mutableStateOf(action == HistoryEditAction.ChangePlace) }
     LaunchedEffect(item?.id, action) {
@@ -101,10 +113,10 @@ internal fun HistoryEditDialog(
     AlertDialog(onDismissRequest = onDismiss, title = {
         Text(
             when (action) {
-                HistoryEditAction.ChangePlace -> "Change this place"
-                HistoryEditAction.ChangeActivity -> "How did you travel?"
-                HistoryEditAction.ChangeTime -> "Adjust this visit"
-                else -> "Add a missing visit"
+                HistoryEditAction.ChangePlace -> stringResource(Res.string.history_edit_place_title)
+                HistoryEditAction.ChangeActivity -> stringResource(Res.string.history_edit_activity_title)
+                HistoryEditAction.ChangeTime -> stringResource(Res.string.history_edit_time_title)
+                else -> stringResource(Res.string.history_add_visit)
             },
         )
     }, text = {
@@ -126,14 +138,14 @@ internal fun HistoryEditDialog(
                         }) { Text(mode.humanName()) }
                     }
                 HistoryEditAction.ChangeTime, HistoryEditAction.AddVisit -> {
-                    TextButton(onClick = { choosingArrival = true }) { Text("Arrived on $arrivalDate") }
+                    TextButton(onClick = { choosingArrival = true }) { Text(stringResource(Res.string.history_arrived_on, arrivalDate)) }
                     OutlinedTextField(
                         start,
                         { start = it },
                         label = { Text(stringResource(Res.string.history_arrived_time_label)) },
                         placeholder = { Text(stringResource(Res.string.history_arrived_time_placeholder)) },
                     )
-                    TextButton(onClick = { choosingArrival = false }) { Text("Left on $departureDate") }
+                    TextButton(onClick = { choosingArrival = false }) { Text(stringResource(Res.string.history_left_on, departureDate)) }
                     OutlinedTextField(
                         end,
                         { end = it },
@@ -185,7 +197,7 @@ internal fun HistoryEditDialog(
             TextButton(onClick = {
                 if (action == HistoryEditAction.ChangePlace) {
                     if (name.isBlank()) {
-                        error = "Give this place a name."
+                        error = nameRequiredError
                         return@TextButton
                     }
                     item?.let { visit ->
@@ -206,13 +218,13 @@ internal fun HistoryEditDialog(
                         last == null ||
                         last < first
                     ) {
-                        error = "Enter valid times, with departure after arrival."
+                        error = invalidTimesError
                         return@TextButton
                     }
                     if (action == HistoryEditAction.AddVisit) {
                         val selected = place
                         if (selected == null || name.isBlank()) {
-                            error = "Choose and name the place first."
+                            error = placeRequiredError
                             return@TextButton
                         }
                         viewModel.addVisit(first, last, selected.copy(name = name.trim()))

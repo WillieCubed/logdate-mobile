@@ -283,7 +283,7 @@ class HumanLocationHistoryViewModel(
             ?.firstOrNull()
 
     private fun mutate(action: suspend () -> Unit) {
-        if (failedAction != null) mutableState.update { it.copy(recoveryMessage = null, recoveryActionLabel = null) }
+        if (failedAction != null) mutableState.update { it.copy(recoveryMessage = null, recoveryActionLabel = null, canRetry = false) }
         failedAction = null
         viewModelScope.launch {
             try {
@@ -294,7 +294,11 @@ class HumanLocationHistoryViewModel(
                 Napier.w("Location history action failed", error)
                 failedAction = action
                 mutableState.update {
-                    it.copy(recoveryMessage = "That change could not be saved. Try again.", recoveryActionLabel = "Try again")
+                    it.copy(
+                        recoveryMessage = "That change could not be saved. Try again.",
+                        recoveryActionLabel = "Try again",
+                        canRetry = true,
+                    )
                 }
             }
         }
@@ -325,6 +329,7 @@ class HumanLocationHistoryViewModel(
                         it.copy(
                             recoveryMessage = "Your history couldn’t be loaded. Try again.",
                             recoveryActionLabel = "Try again",
+                            canRetry = true,
                         )
                     }
                 }
@@ -390,6 +395,7 @@ class HumanLocationHistoryViewModel(
                         data.conflicts.isNotEmpty() -> "Review changes"
                         else -> null
                     },
+                canRetry = failedAction != null || data.failedSections.isNotEmpty(),
                 recoveryMessage =
                     when {
                         failedAction != null -> "That change could not be saved. Try again."

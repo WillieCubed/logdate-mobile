@@ -48,6 +48,14 @@
     <string name="period_this_week">This Week</string>
     <string name="period_years_ago">%1$s years ago</string>
 
+    <!-- Timeline list -->
+    <string name="timeline_today">Today</string>
+    <string name="timeline_yesterday">Yesterday</string>
+    <string name="no_notes_from_today">No notes from today yet!</string>
+    <string name="tap_to_view_content">Tap to view %1$s content</string>
+    <string name="timeline_details_empty_placeholder">Select something on your timeline to see more.</string>
+    <string name="cd_back_to_your_days">Back to your days</string>
+
     <!-- Special sections -->
     <string name="rewind">Rewind</string>
     <string name="special_section_default_action_text">Take a peek</string>

@@ -103,8 +103,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.camera
+import logdate.client.feature.editor.generated.resources.camera_microphone_route_message
 import logdate.client.feature.editor.generated.resources.captured_photo
 import logdate.client.feature.editor.generated.resources.captured_video
+import logdate.client.feature.editor.generated.resources.microphone
 import logdate.client.feature.editor.generated.resources.photo
 import logdate.client.feature.editor.generated.resources.retake
 import logdate.client.feature.editor.generated.resources.switch_camera
@@ -771,7 +774,7 @@ private fun InlineCameraCapture(
                         scope.launch { viewModel.selectCameraDevice(deviceId) }
                     }
                 },
-                label = "Camera",
+                label = stringResource(Res.string.camera),
                 enabled = !uiState.isRecording,
             )
 
@@ -779,12 +782,10 @@ private fun InlineCameraCapture(
                 MediaDeviceSelector(
                     selection =
                         inputSelection.asSystemControlledSelection(
-                            routeControlMessage =
-                                "Camera video follows Android's active microphone route. " +
-                                    "Voice-note recording uses the microphone selected in LogDate.",
+                            routeControlMessage = stringResource(Res.string.camera_microphone_route_message),
                         ),
                     onDeviceSelected = {},
-                    label = "Microphone",
+                    label = stringResource(Res.string.microphone),
                     enabled = !uiState.isRecording,
                 )
             }

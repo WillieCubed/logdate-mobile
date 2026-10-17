@@ -9,6 +9,10 @@
     <string name="choose_how_youd_like_to_proceed">Choose how you&apos;d like to proceed:</string>
     <string name="choose_memories_to_import">Choose memories to import</string>
     <string name="choose_your_storage_plan">Choose Your Storage Plan:</string>
+    <string name="onboarding_plan_basic_title">Basic</string>
+    <string name="onboarding_plan_basic_description">Max 10 GB of text, photos, videos, and voice notes. Photos and videos will be compressed in high quality (1080p).</string>
+    <string name="onboarding_plan_premium_title">Premium Plan</string>
+    <string name="onboarding_plan_premium_description">Includes up to 2 TB of storage for text, photo, video, and voice notes.\nPhotos and videos will be stored in original quality.</string>
     <string name="continue_with_memories_count">Continue with %1$d memories</string>
     <string name="continue_without_importing_memories">Continue without importing</string>
     <string name="continue_without_cloud_sync">Continue without cloud sync</string>
@@ -34,6 +38,7 @@
     <string name="memory_import_failed_body">Your selected memories couldn&apos;t be imported. Try again.</string>
     <string name="memory_load_failed_body">Your photos and videos couldn&apos;t be loaded right now.</string>
     <string name="memory_no_recent_items_body">No photos or videos on this device are available to import.</string>
+    <string name="memory_selection_image_placeholder">IMAGE</string>
     <string name="account_passkey_biometric_description">No passwords to remember. Use your device&apos;s biometric authentication (Face ID, Touch ID, or fingerprint) for secure, convenient access.</string>
     <string name="now_lets_import_your_memories">Now let&apos;s import your memories</string>
     <string name="one_more_thing">One more thing…</string>
@@ -188,4 +193,5 @@
 
     <!-- Shared -->
     <string name="onboarding_privacy_title">Private by default</string>
+    <string name="onboarding_audio_preview_playing">Playing</string>
 </resources>

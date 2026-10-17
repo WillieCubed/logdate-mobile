@@ -33,6 +33,16 @@
     <string name="welcome_back">Welcome Back</string>
     <string name="dont_have_an_account">Don&apos;t have an account?</string>
 
+    <!-- Account welcome benefits -->
+    <string name="cloud_account_benefit_sync_title">Sync across devices</string>
+    <string name="cloud_account_benefit_sync_description">Access your journals from any device that uses the same server.</string>
+    <string name="cloud_account_benefit_passkeys_title">Secure with passkeys</string>
+    <string name="cloud_account_benefit_passkeys_description">Use your device biometrics or screen lock instead of a password.</string>
+    <string name="cloud_account_benefit_backup_title">Server-based backup</string>
+    <string name="cloud_account_benefit_backup_description">Your selected server can keep your journals available across devices.</string>
+    <string name="cloud_account_benefit_privacy_title">Privacy first</string>
+    <string name="cloud_account_benefit_privacy_description">Server policies come from the server you choose.</string>
+
     <!-- Sign in -->
     <string name="sign_in">Sign in</string>
     <string name="sign_in_required">Sign in required</string>
@@ -317,6 +327,17 @@
     <string name="your_birthday">Your birthday</string>
     <string name="set_your_birthday">Set your birthday!</string>
     <string name="when_were_you_born">When were you born?</string>
+    <string name="birthday_age_less_than_one_year">You&apos;re less than a year old!</string>
+    <plurals name="birthday_age_just_getting_started">
+        <item quantity="one">You&apos;re %1$d year old! Just getting started!</item>
+        <item quantity="other">You&apos;re %1$d years old! Just getting started!</item>
+    </plurals>
+    <string name="birthday_age_young_and_bright">You&apos;re %1$d years old! So young and bright!</string>
+    <string name="birthday_age_teenage_years">You&apos;re %1$d years old! The teenage years are amazing!</string>
+    <string name="birthday_age_young_adult">You&apos;re %1$d years old! Young adult adventures await!</string>
+    <string name="birthday_age_prime_of_life">You&apos;re %1$d years old! The prime of life!</string>
+    <string name="birthday_age_wisdom">You&apos;re %1$d years old! Wisdom and experience!</string>
+    <string name="birthday_age_very_wise">You&apos;re %1$d years old! Very wise indeed!</string>
 
     <!-- Bio -->
     <string name="bio_optional">Bio (Optional)</string>
@@ -379,4 +400,7 @@
     <string name="profile_bio_label">About me</string>
     <string name="profile_bio_not_set">Add a few words about yourself</string>
     <string name="edit_bio">Edit about me</string>
+    <string name="profile_member_since">Member since</string>
+    <string name="profile_authenticated">Authenticated</string>
+    <string name="profile_not_authenticated">Not authenticated</string>
 </resources>

@@ -35,6 +35,12 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.desktop_menu_cancel_quit
+import logdate.app.composemain.generated.resources.desktop_menu_close_window
+import logdate.app.composemain.generated.resources.desktop_menu_file
+import logdate.app.composemain.generated.resources.desktop_menu_quit
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 private const val DEFAULT_ENTRY_TITLE = "New Entry"
@@ -139,15 +145,15 @@ internal fun EntryEditorWindow(
         // OS-level Close shortcut still hits handleClose, and Cmd+Q goes through
         // the application-wide cascade so dirty editors save before exit.
         MenuBar {
-            Menu(text = "File", mnemonic = 'F') {
+            Menu(text = stringResource(Res.string.desktop_menu_file), mnemonic = 'F') {
                 Item(
-                    text = "Close window",
+                    text = stringResource(Res.string.desktop_menu_close_window),
                     shortcut = KeyChord(Key.W, primary = true).toKeyShortcut(),
                     onClick = handleClose,
                 )
                 Separator()
                 Item(
-                    text = "Quit LogDate",
+                    text = stringResource(Res.string.desktop_menu_quit),
                     shortcut = KeyChord(Key.Q, primary = true).toKeyShortcut(),
                     onClick = appState::exit,
                 )
@@ -155,7 +161,7 @@ internal fun EntryEditorWindow(
                 // a quit is fanning out, so the shortcut and menu disappear once it's irrelevant.
                 if (appState.exitCascadeInFlight) {
                     Item(
-                        text = "Cancel quit",
+                        text = stringResource(Res.string.desktop_menu_cancel_quit),
                         shortcut = KeyChord(Key.Period, primary = true).toKeyShortcut(),
                         onClick = appState::cancelExit,
                     )

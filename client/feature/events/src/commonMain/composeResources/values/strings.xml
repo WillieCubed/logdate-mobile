@@ -53,8 +53,18 @@
     <string name="event_detail_choose_place">Choose a place</string>
     <string name="event_detail_saving">Saving…</string>
     <string name="event_detail_save">Save</string>
+    <string name="event_detail_add_cover_image">Add a cover image</string>
+    <string name="event_detail_when_heading">When</string>
+    <string name="event_detail_starts_label">Starts</string>
+    <string name="event_detail_ends_label">Ends</string>
+    <string name="event_detail_point_in_time">Point in time</string>
+    <string name="event_detail_attached_heading">Attached</string>
+    <string name="event_detail_attached_heading_count">Attached (%1$d)</string>
+    <string name="event_detail_no_attached_captures">No captures attached yet.</string>
     <string name="event_place_picker_no_place">No place</string>
+    <string name="event_place_picker_empty">You don&apos;t have any saved places yet. Save one from your timeline first.</string>
     <string name="event_attach_capture_title">Attach a capture</string>
+    <string name="event_attach_capture_empty">Nothing nearby in time. Captures from a day before or after the event show up here.</string>
 
     <!-- Calendar surface (month grid) -->
     <string name="events_calendar_title">Calendar</string>

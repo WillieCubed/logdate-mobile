@@ -79,6 +79,7 @@ import logdate.client.feature.postcards.generated.resources.postcards_redo_short
 import logdate.client.feature.postcards.generated.resources.postcards_save_shortcut
 import logdate.client.feature.postcards.generated.resources.postcards_undo
 import logdate.client.feature.postcards.generated.resources.postcards_undo_shortcut
+import logdate.client.feature.postcards.generated.resources.postcards_untitled
 import logdate.client.ui.generated.resources.common_back
 import logdate.client.ui.generated.resources.common_delete
 import logdate.client.ui.generated.resources.common_save
@@ -544,6 +545,7 @@ private fun EditorTopBar(
 ) {
     var isEditingTitle by remember { mutableStateOf(false) }
     var editableTitle by remember(title) { mutableStateOf(title) }
+    val untitledLabel = stringResource(Res.string.postcards_untitled)
 
     TopAppBar(
         modifier = modifier,
@@ -562,7 +564,7 @@ private fun EditorTopBar(
                     decorationBox = { innerTextField ->
                         if (editableTitle.isEmpty()) {
                             Text(
-                                "Untitled",
+                                untitledLabel,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -572,7 +574,7 @@ private fun EditorTopBar(
                 )
             } else {
                 Text(
-                    text = title.ifEmpty { "Untitled" },
+                    text = title.ifEmpty { untitledLabel },
                     style = MaterialTheme.typography.titleMedium,
                     color =
                         if (title.isEmpty()) {

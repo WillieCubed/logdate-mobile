@@ -4,52 +4,51 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# POSIX extended regular expressions, so the check runs with git alone on both
-# developer Macs and CI runners. Text( must start a name, so calls such as
-# writeText("...") or ClipData.newPlainText("...") do not match.
-PATTERNS=(
-  '(^|[^[:alnum:]_])Text\([[:space:]]*"[^"$]+"'
-  'contentDescription[[:space:]]*=[[:space:]]*"[^"$]+"'
-  'setContentText\([[:space:]]*"[^"$]+"'
-  'setContentTitle\([[:space:]]*"[^"$]+"'
-  'bigText\([[:space:]]*"[^"$]+"'
-)
+# scripts/lib/hardcoded-compose-literals.awk describes which literals count as on-screen text.
+# The check needs only git and a POSIX awk, so it runs the same on developer Macs and CI runners.
+SCANNER="scripts/lib/hardcoded-compose-literals.awk"
 
+# Tests, build outputs and the shared screenshot scenes hold fixture content, not app copy.
 PATHSPECS=(
   ':(glob)app/**/*.kt'
   ':(glob)client/**/*.kt'
   ':(glob,exclude)**/build/**'
   ':(glob,exclude)**/src/*Test/**'
-  ':(glob,exclude)**/README.md'
+  ':(glob,exclude)**/src/test/**'
+  ':(glob,exclude)client/screenshot-scenes/**'
 )
 
-GREP_ARGS=(--untracked --no-color -n -E)
-for pattern in "${PATTERNS[@]}"; do
-  GREP_ARGS+=(-e "$pattern")
-done
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR"' EXIT
+FILES="$WORK_DIR/files"
+SIGNATURES="$WORK_DIR/signatures"
 
 # git grep exits 1 when nothing matches; any other non-zero status is a failed search.
 GREP_STATUS=0
-MATCHES="$(git grep "${GREP_ARGS[@]}" -- "${PATHSPECS[@]}")" || GREP_STATUS=$?
+git grep --untracked -l -z -e '"' -- "${PATHSPECS[@]}" > "$FILES" || GREP_STATUS=$?
 if (( GREP_STATUS > 1 )); then
-  echo "Searching for hardcoded Compose literals failed (git grep exit $GREP_STATUS)." >&2
+  echo "Listing Kotlin sources for the hardcoded Compose literal check failed (git grep exit $GREP_STATUS)." >&2
   exit "$GREP_STATUS"
 fi
 
-FILTERED="$(printf '%s\n' "$MATCHES" | awk -F: '
-  NF >= 3 {
-    code = ""
-    for (i = 3; i <= NF; i++) {
-      code = code $i
-      if (i < NF) code = code ":"
-    }
-    if (code !~ /^[[:space:]]*\/\//) print $0
-  }
-')"
+MATCHES=""
+if [[ -s "$FILES" ]]; then
+  SCAN_STATUS=0
+  xargs -0 awk -v phase=1 -f "$SCANNER" < "$FILES" > "$SIGNATURES" || SCAN_STATUS=$?
+  if (( SCAN_STATUS == 0 )); then
+    MATCHES="$(xargs -0 awk -v phase=2 -f "$SCANNER" "$SIGNATURES" < "$FILES")" || SCAN_STATUS=$?
+  fi
+  if (( SCAN_STATUS != 0 )); then
+    echo "Scanning for hardcoded Compose literals failed (exit $SCAN_STATUS)." >&2
+    exit 2
+  fi
+fi
 
-if [[ -n "$FILTERED" ]]; then
+if [[ -n "$MATCHES" ]]; then
   echo "Found hardcoded static Compose literals:"
-  echo "$FILTERED"
+  echo "$MATCHES"
+  echo
+  echo "Move these strings into string resources: Compose resources in multiplatform modules, Android resources in Android-only ones."
   exit 1
 fi
 

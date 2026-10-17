@@ -9,19 +9,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import app.logdate.client.media.device.MediaDeviceKind
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.media_route_open_output_switcher
+import logdate.client.ui.generated.resources.media_route_open_sound_settings
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 actual fun rememberMediaRouteSettingsAction(kind: MediaDeviceKind): MediaRouteSettingsAction? {
     val context = LocalContext.current
-    return remember(context, kind) {
+    val soundSettingsLabel = stringResource(Res.string.media_route_open_sound_settings)
+    val outputSwitcherLabel = stringResource(Res.string.media_route_open_output_switcher)
+    return remember(context, kind, soundSettingsLabel, outputSwitcherLabel) {
         when (kind) {
             MediaDeviceKind.AUDIO_INPUT ->
-                MediaRouteSettingsAction(label = "Open sound settings") {
+                MediaRouteSettingsAction(label = soundSettingsLabel) {
                     context.openSoundSettings()
                 }
 
             MediaDeviceKind.AUDIO_OUTPUT ->
-                MediaRouteSettingsAction(label = "Open output switcher") {
+                MediaRouteSettingsAction(label = outputSwitcherLabel) {
                     val openedOutputSwitcher =
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                             MediaRouter2

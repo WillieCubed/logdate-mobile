@@ -14,6 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.feature.onboarding.generated.resources.onboarding_audio_preview_playing
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 
 // TODO: Implement live audio entries
@@ -76,7 +79,7 @@ private fun WaveformBlock(
                     ),
             ) {
                 Text(
-                    text = if (isPlaying) "Playing" else "",
+                    text = if (isPlaying) stringResource(Res.string.onboarding_audio_preview_playing) else "",
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(

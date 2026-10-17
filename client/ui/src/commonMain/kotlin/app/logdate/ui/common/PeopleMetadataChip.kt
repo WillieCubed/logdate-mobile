@@ -7,6 +7,11 @@ import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.people_chip_just_you
+import logdate.client.ui.generated.resources.people_chip_names_and_others
+import logdate.client.ui.generated.resources.people_chip_two_names
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun PeopleMetadataChip(people: List<String>) {
@@ -17,10 +22,10 @@ internal fun PeopleMetadataChip(people: List<String>) {
     // e.g. If there are four people (Lane, Anna, Willie, and Jake), the text should be "Lane, Anna, and 2 others".
     val label =
         when (people.size) {
-            0 -> "Just you"
+            0 -> stringResource(Res.string.people_chip_just_you)
             1 -> people.first()
-            2 -> "${people.first()} and ${people.last()}"
-            else -> "${people.take(2).joinToString()} and ${people.size - 2} others"
+            2 -> stringResource(Res.string.people_chip_two_names, people.first(), people.last())
+            else -> stringResource(Res.string.people_chip_names_and_others, people.take(2).joinToString(), people.size - 2)
         }
     MetadataChip(
         label = label,

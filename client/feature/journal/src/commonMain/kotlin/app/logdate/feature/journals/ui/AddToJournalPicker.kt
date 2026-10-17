@@ -145,7 +145,7 @@ private fun JournalPickerContent(
 ) {
     Column(modifier = Modifier.padding(bottom = Spacing.lg)) {
         Text(
-            text = "Add to journal",
+            text = stringResource(Res.string.add_to_journal),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
         )

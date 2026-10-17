@@ -16,6 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.adaptive.HingeAwareOverlay
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.app_update_prompt_available
+import logdate.client.feature.core.generated.resources.app_update_prompt_downloaded
+import logdate.client.feature.core.generated.resources.app_update_prompt_restart
+import logdate.client.feature.core.generated.resources.app_update_prompt_update
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Surfaces the in-app update banner above the navigation graph when Play has reported an
@@ -43,13 +49,13 @@ fun AppUpdatePrompt(
     val onAction: (() -> Unit)?
     when (uiState.status) {
         AppUpdateStatus.Available -> {
-            message = uiState.message ?: "An update is available."
-            actionLabel = "Update"
+            message = uiState.message ?: stringResource(Res.string.app_update_prompt_available)
+            actionLabel = stringResource(Res.string.app_update_prompt_update)
             onAction = onLaunchUpdate
         }
         AppUpdateStatus.Downloaded -> {
-            message = uiState.message ?: "Update downloaded. Restart to apply."
-            actionLabel = "Restart"
+            message = uiState.message ?: stringResource(Res.string.app_update_prompt_downloaded)
+            actionLabel = stringResource(Res.string.app_update_prompt_restart)
             onAction = onCompleteUpdate
         }
         else -> {

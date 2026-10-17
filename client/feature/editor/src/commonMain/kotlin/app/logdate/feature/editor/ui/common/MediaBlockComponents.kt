@@ -21,13 +21,15 @@ import app.logdate.feature.editor.ui.text.rememberInlineMarkdownVisualTransforma
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_caption
+import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun DeleteMediaButton(
     onClick: () -> Unit,
-    contentDescription: String = "Delete",
+    contentDescription: String = stringResource(UiRes.string.common_delete),
     modifier: Modifier = Modifier,
 ) {
     IconButton(

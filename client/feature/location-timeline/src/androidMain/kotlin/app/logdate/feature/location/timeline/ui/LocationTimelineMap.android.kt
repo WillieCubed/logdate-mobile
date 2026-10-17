@@ -145,7 +145,7 @@ internal actual fun LocationTimelineMap(
                 is LocationMapAnnotation.Cluster -> {
                     Marker(
                         state = MarkerState(position = annotation.position),
-                        title = annotation.title,
+                        title = stringResource(Res.string.memories_count, annotation.memoryCount),
                         snippet = annotation.subtitle,
                         icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
                         onClick = {
@@ -193,7 +193,7 @@ internal actual fun LocationTimelineMap(
 private sealed interface LocationMapAnnotation {
     data class Cluster(
         val position: LatLng,
-        val title: String,
+        val memoryCount: Int,
         val subtitle: String,
         val placeIds: List<String>,
     ) : LocationMapAnnotation
@@ -257,7 +257,7 @@ private fun clusterPlaces(
             val topNames = groupedPlaces.take(2).joinToString(" • ") { it.title }
             LocationMapAnnotation.Cluster(
                 position = LatLng(latitude, longitude),
-                title = "$memoryCount memories",
+                memoryCount = memoryCount,
                 subtitle = topNames,
                 placeIds = groupedPlaces.map(LocationPlaceUiModel::id),
             )

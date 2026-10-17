@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.theme.Spacing
 import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.media_device_audio_output
+import logdate.client.ui.generated.resources.playback_pause
+import logdate.client.ui.generated.resources.playback_play
 import logdate.client.ui.generated.resources.stop_playback
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
@@ -142,7 +145,12 @@ private fun MiniAudioPlayerContent(
                                     } else {
                                         Icons.Rounded.PlayArrow
                                     },
-                                contentDescription = if (playbackState.isPlaying) "Pause" else "Play",
+                                contentDescription =
+                                    if (playbackState.isPlaying) {
+                                        stringResource(Res.string.playback_pause)
+                                    } else {
+                                        stringResource(Res.string.playback_play)
+                                    },
                                 tint = accentColor,
                             )
                         }
@@ -171,7 +179,7 @@ private fun MiniAudioPlayerContent(
                             MediaDeviceSelector(
                                 selection = playbackState.outputSelection,
                                 onDeviceSelected = playbackState.selectOutputDevice,
-                                label = "Audio output",
+                                label = stringResource(Res.string.media_device_audio_output),
                                 modifier = Modifier.widthIn(max = 180.dp),
                             )
                         }
@@ -193,7 +201,7 @@ private fun MiniAudioPlayerContent(
                         MediaDeviceSelector(
                             selection = playbackState.outputSelection,
                             onDeviceSelected = playbackState.selectOutputDevice,
-                            label = "Audio output",
+                            label = stringResource(Res.string.media_device_audio_output),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

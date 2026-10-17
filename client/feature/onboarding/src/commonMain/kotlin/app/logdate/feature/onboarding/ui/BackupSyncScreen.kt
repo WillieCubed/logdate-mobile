@@ -29,6 +29,10 @@ import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.feature.onboarding.generated.resources.onboarding_plan_basic_description
+import logdate.client.feature.onboarding.generated.resources.onboarding_plan_basic_title
+import logdate.client.feature.onboarding.generated.resources.onboarding_plan_premium_description
+import logdate.client.feature.onboarding.generated.resources.onboarding_plan_premium_title
 import logdate.client.feature.onboarding.generated.resources.section_title_backup_sync
 import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
@@ -225,8 +229,8 @@ private fun MainContent(
         item {
             PlanContentCard(
                 option = LogDateBackupPlanOption.BASIC,
-                title = "Basic",
-                description = "Max 10 GB of text, photos, videos, and voice notes. Photos and videos will be compressed in high quality (1080p).",
+                title = stringResource(Res.string.onboarding_plan_basic_title),
+                description = stringResource(Res.string.onboarding_plan_basic_description),
                 price = "Free",
                 onPlanSelected = onPlanSelected,
             )
@@ -234,10 +238,8 @@ private fun MainContent(
         item {
             PlanContentCard(
                 option = LogDateBackupPlanOption.STANDARD,
-                title = "Premium Plan",
-                description =
-                    "Includes up to 2 TB of storage for text, photo, video, and voice notes.\n" +
-                        "Photos and videos will be stored in original quality.",
+                title = stringResource(Res.string.onboarding_plan_premium_title),
+                description = stringResource(Res.string.onboarding_plan_premium_description),
                 price = "$12/month",
                 onPlanSelected = onPlanSelected,
             )

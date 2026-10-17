@@ -31,9 +31,12 @@ import app.logdate.ui.workspace.PanelHeader
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_cancel
+import logdate.client.feature.location.timeline.generated.resources.history_close_place
+import logdate.client.feature.location.timeline.generated.resources.history_merge_body
 import logdate.client.feature.location.timeline.generated.resources.history_merge_confirm
 import logdate.client.feature.location.timeline.generated.resources.history_merge_title
 import logdate.client.feature.location.timeline.generated.resources.history_merge_with_another_place
+import logdate.client.feature.location.timeline.generated.resources.history_place_detail_title
 import logdate.client.feature.location.timeline.generated.resources.history_place_memories
 import logdate.client.feature.location.timeline.generated.resources.history_place_no_visits
 import logdate.client.feature.location.timeline.generated.resources.history_place_visits
@@ -61,8 +64,8 @@ internal fun HumanPlaceDetail(
     var target by remember { mutableStateOf<SemanticPlace?>(null) }
     val detail: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            PanelHeader(row?.title ?: "Your place", subtitle = row?.supportingText, actions = {
-                IconButton(onClick = onDismiss) { Icon(PlatformIcons.close(), "Close place") }
+            PanelHeader(row?.title ?: stringResource(Res.string.history_place_detail_title), subtitle = row?.supportingText, actions = {
+                IconButton(onClick = onDismiss) { Icon(PlatformIcons.close(), stringResource(Res.string.history_close_place)) }
             })
             Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Text(stringResource(Res.string.history_place_visits), style = MaterialTheme.typography.titleMedium)
@@ -91,7 +94,7 @@ internal fun HumanPlaceDetail(
         AlertDialog(
             onDismissRequest = { target = null },
             title = { Text(stringResource(Res.string.history_merge_title)) },
-            text = { Text("Visits will stay separate and appear under ${place.name}. Your journal memories will be kept.") },
+            text = { Text(stringResource(Res.string.history_merge_body, place.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     onMerge(placeId, place)

@@ -51,6 +51,7 @@ data class HumanLocationHistoryState(
     val detailVisible: Boolean = false,
     val replayPlaying: Boolean = false,
     val recoveryActionLabel: String? = null,
+    val canRetry: Boolean = false,
     val selectionRevision: Long = 0,
 ) {
     val selectedItem: HistoryItemUi? get() = items.firstOrNull { it.id == selectedItemId }

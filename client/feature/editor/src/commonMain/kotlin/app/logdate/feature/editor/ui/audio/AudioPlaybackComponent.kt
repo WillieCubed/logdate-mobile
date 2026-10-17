@@ -38,6 +38,8 @@ import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.generating_transcription
+import logdate.client.feature.editor.generated.resources.pause
+import logdate.client.feature.editor.generated.resources.play
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import kotlin.time.Clock
@@ -285,9 +287,9 @@ fun AudioPlaybackComponent(
                                 },
                             contentDescription =
                                 if (playbackState.isPlaying) {
-                                    "Pause"
+                                    stringResource(Res.string.pause)
                                 } else {
-                                    "Play"
+                                    stringResource(Res.string.play)
                                 },
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(24.dp),

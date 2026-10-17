@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import logdate.client.permissions.generated.resources.Res
 import logdate.client.permissions.generated.resources.allow_location_access
+import logdate.client.permissions.generated.resources.location_permission_explanation
+import logdate.client.permissions.generated.resources.location_permission_rationale
 import logdate.client.permissions.generated.resources.location_permission_required
 import logdate.client.permissions.generated.resources.location_privacy_description
 import logdate.client.permissions.generated.resources.open_settings
@@ -80,9 +82,9 @@ fun LocationPermissionRequiredScreen(
         Text(
             text =
                 if (permissionState.shouldShowRationale) {
-                    "LogDate needs location access to show your location timeline and help you track your journey. Please enable location permissions in your device settings."
+                    stringResource(Res.string.location_permission_rationale)
                 } else {
-                    "LogDate uses your location to create a personal timeline of places you've visited. Your location data stays private on your device."
+                    stringResource(Res.string.location_permission_explanation)
                 },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

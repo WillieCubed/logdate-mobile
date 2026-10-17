@@ -15,6 +15,8 @@
     <string name="timeline">Timeline</string>
     <string name="navigate_to_home_screen">Navigate to home screen</string>
     <string name="manage_your_profile_settings">Manage your profile settings</string>
+    <string name="close_search">Close search</string>
+    <string name="open_navigation">Open navigation</string>
 
     <!-- Global actions -->
     <string name="share_link">Share link</string>
@@ -32,6 +34,10 @@
     <string name="suggestion_near_location">Near %1$s</string>
     <string name="suggestion_media_item">Memory photo</string>
     <string name="suggestion_capture_for_event">Capture for this</string>
+    <string name="suggestion_label_upcoming">Coming up</string>
+    <string name="people_chip_just_you">Just you</string>
+    <string name="people_chip_two_names">%1$s and %2$s</string>
+    <string name="people_chip_names_and_others">%1$s and %2$d others</string>
 
     <!-- Playback controls -->
     <string name="audio_recording">Audio Recording</string>
@@ -39,6 +45,19 @@
     <string name="hide_transcript">Hide Transcript</string>
     <string name="stop_playback">Stop playback</string>
     <string name="media_device_selected">Selected</string>
+    <string name="playback_play">Play</string>
+    <string name="playback_pause">Pause</string>
+    <string name="media_device_camera">Camera</string>
+    <string name="media_device_microphone">Microphone</string>
+    <string name="media_device_audio_output">Audio output</string>
+    <string name="media_device_switch_hint">Tap a device to switch.</string>
+    <string name="media_device_status_unavailable">Unavailable</string>
+    <string name="media_device_status_in_use">In use</string>
+    <string name="media_device_status_detected">Detected by LogDate</string>
+    <string name="media_device_status_external">External device</string>
+    <string name="media_device_status_available">Available</string>
+    <string name="media_route_open_sound_settings">Open sound settings</string>
+    <string name="media_route_open_output_switcher">Open output switcher</string>
 
     <!-- Timeline narrative -->
     <string name="a_long_time_passed">A long time passed...</string>
@@ -52,6 +71,10 @@
     <string name="timeline_empty_title">Start your timeline</string>
     <string name="timeline_empty_message">Capture a note, photo, or voice memo and LogDate will shape it into your timeline.</string>
     <string name="timeline_empty_action">Create Entry</string>
+    <string name="timeline_loading_older_days">Loading older days</string>
+    <string name="timeline_moment_photo_count">%1$d photos</string>
+    <string name="timeline_open_full_entry">Open full entry</string>
+    <string name="timeline_media_badge_clip">Clip</string>
 
     <!-- Post-restore screens -->
     <string name="post_restore_welcome_back">Welcome back</string>
@@ -89,6 +112,11 @@
     <string name="workspace_account_label">Account, backup and settings</string>
     <string name="workspace_section_switch_label">Choose section</string>
     <string name="workspace_sheet_expand">Expand</string>
+    <string name="workspace_sheet_browse">Browse</string>
+    <string name="workspace_sheet_collapse">Collapse</string>
+    <string name="workspace_sheet_show_map">Show map</string>
+    <string name="workspace_sheet_full_view">Full view</string>
+    <string name="workspace_create_label">Add a memory</string>
     <!-- Provenance -->
     <string name="captured_on_watch">Captured on your watch</string>
 </resources>

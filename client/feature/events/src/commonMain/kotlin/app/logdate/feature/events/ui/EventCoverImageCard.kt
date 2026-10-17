@@ -24,6 +24,9 @@ import androidx.compose.ui.layout.ContentScale
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
+import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.event_detail_add_cover_image
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Cover image card for the event detail editor.
@@ -85,7 +88,7 @@ private fun EmptyCoverState() {
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = "Add a cover image",
+            text = stringResource(Res.string.event_detail_add_cover_image),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

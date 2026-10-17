@@ -101,6 +101,7 @@ import kotlinx.coroutines.withContext
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_video_to_your_entry
 import logdate.client.feature.editor.generated.resources.adding_selected_video
+import logdate.client.feature.editor.generated.resources.audio_output
 import logdate.client.feature.editor.generated.resources.choose_another_video
 import logdate.client.feature.editor.generated.resources.choose_from_gallery
 import logdate.client.feature.editor.generated.resources.enter_picture_in_picture
@@ -370,7 +371,7 @@ actual fun VideoPlayerContent(
         MediaDeviceSelector(
             selection = outputSelection,
             onDeviceSelected = audioRouteRepository::selectOutputDevice,
-            label = "Audio output",
+            label = stringResource(Res.string.audio_output),
             modifier =
                 Modifier
                     .align(Alignment.TopStart)
@@ -745,7 +746,7 @@ private fun PreviewVideoPlayerContent(
         MediaDeviceSelector(
             selection = previewVideoOutputSelection,
             onDeviceSelected = {},
-            label = "Audio output",
+            label = stringResource(Res.string.audio_output),
             modifier =
                 Modifier
                     .align(Alignment.TopStart)

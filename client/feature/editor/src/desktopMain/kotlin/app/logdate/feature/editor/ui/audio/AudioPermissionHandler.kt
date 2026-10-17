@@ -23,6 +23,8 @@ import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.allow_access
 import logdate.client.feature.editor.generated.resources.continue_anyway
+import logdate.client.feature.editor.generated.resources.editor_audio_permission_system_prompt_description
+import logdate.client.feature.editor.generated.resources.editor_audio_permission_system_settings_hint
 import logdate.client.feature.editor.generated.resources.microphone_access
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -78,15 +80,13 @@ actual fun AudioPermissionWrapper(content: @Composable () -> Unit) {
             text = {
                 Column {
                     Text(
-                        "LogDate needs access to your microphone to record audio notes. " +
-                            "Please grant permission when prompted by your system.",
+                        stringResource(Res.string.editor_audio_permission_system_prompt_description),
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        "If you don't see a system prompt, you may need to enable microphone " +
-                            "access in your system settings.",
+                        stringResource(Res.string.editor_audio_permission_system_settings_hint),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }

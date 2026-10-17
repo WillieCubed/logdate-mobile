@@ -86,6 +86,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.feature.onboarding.generated.resources.memory_selection_image_placeholder
 import logdate.client.ui.generated.resources.common_back
 import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
@@ -1044,7 +1045,7 @@ private fun SharedTransitionScope.ExpandedMemoryOverlay(
                             verticalArrangement = Arrangement.spacedBy(Spacing.md),
                         ) {
                             Text(
-                                "IMAGE",
+                                stringResource(Res.string.memory_selection_image_placeholder),
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

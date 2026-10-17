@@ -59,6 +59,7 @@ import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.journal_delete_action
+import logdate.client.feature.journal.generated.resources.journal_delete_permanent_description
 import logdate.client.feature.journal.generated.resources.journal_settings_title
 import logdate.client.feature.journal.generated.resources.save_changes
 import logdate.client.ui.generated.resources.common_back
@@ -315,9 +316,7 @@ private fun DeleteConfirmationCard(
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                text =
-                    "Are you sure you want to delete this journal? " +
-                        "This action cannot be undone and all entries in this journal will be permanently deleted.",
+                text = stringResource(Res.string.journal_delete_permanent_description),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

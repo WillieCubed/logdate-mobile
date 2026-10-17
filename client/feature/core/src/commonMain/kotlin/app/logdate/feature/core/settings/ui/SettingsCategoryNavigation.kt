@@ -32,7 +32,9 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.about_logdate
 import logdate.client.feature.core.generated.resources.account_title
 import logdate.client.feature.core.generated.resources.devices
+import logdate.client.feature.core.generated.resources.events_settings
 import logdate.client.feature.core.generated.resources.export_and_import
+import logdate.client.feature.core.generated.resources.library_settings
 import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.memories
 import logdate.client.feature.core.generated.resources.people_title
@@ -136,9 +138,9 @@ private fun settingsCategoryTitle(category: SettingsCategory): String =
         SettingsCategory.Timeline -> stringResource(Res.string.timeline_settings)
         SettingsCategory.Streaks -> stringResource(Res.string.streaks)
         SettingsCategory.Rewind -> stringResource(Res.string.rewind_settings_overview_title)
-        SettingsCategory.Events -> "Events"
+        SettingsCategory.Events -> stringResource(Res.string.events_settings)
         SettingsCategory.People -> stringResource(Res.string.people_title)
-        SettingsCategory.Library -> "Your library"
+        SettingsCategory.Library -> stringResource(Res.string.library_settings)
         SettingsCategory.Privacy -> stringResource(Res.string.privacy_and_security)
         SettingsCategory.Devices -> stringResource(Res.string.devices)
         SettingsCategory.Location -> stringResource(Res.string.location_settings)

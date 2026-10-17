@@ -56,11 +56,20 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.birthday
+import logdate.client.feature.core.generated.resources.birthday_age_just_getting_started
+import logdate.client.feature.core.generated.resources.birthday_age_less_than_one_year
+import logdate.client.feature.core.generated.resources.birthday_age_prime_of_life
+import logdate.client.feature.core.generated.resources.birthday_age_teenage_years
+import logdate.client.feature.core.generated.resources.birthday_age_very_wise
+import logdate.client.feature.core.generated.resources.birthday_age_wisdom
+import logdate.client.feature.core.generated.resources.birthday_age_young_adult
+import logdate.client.feature.core.generated.resources.birthday_age_young_and_bright
 import logdate.client.feature.core.generated.resources.birthday_detail_description
 import logdate.client.feature.core.generated.resources.birthday_not_set
 import logdate.client.feature.core.generated.resources.your_birthday
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_confirm
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
@@ -118,11 +127,7 @@ fun BirthdaySettingsContent(
         }
     }
 
-    val ageMessage by remember(age) {
-        derivedStateOf {
-            age?.let { formatAgeMessage(it) } ?: ""
-        }
-    }
+    val ageMessage = age?.let { formatAgeMessage(it) } ?: ""
 
     FoldableBookLayout(
         modifier = modifier.fillMaxSize(),
@@ -357,15 +362,16 @@ private fun calculateAge(birthday: Instant): Int {
 /**
  * Format an age message based on the age.
  */
+@Composable
 private fun formatAgeMessage(age: Int): String =
     when {
         age < 0 -> ""
-        age == 0 -> "You're less than a year old!"
-        age < 3 -> "You're $age ${if (age == 1) "year" else "years"} old! Just getting started!"
-        age < 13 -> "You're $age years old! So young and bright!"
-        age < 20 -> "You're $age years old! The teenage years are amazing!"
-        age < 30 -> "You're $age years old! Young adult adventures await!"
-        age < 40 -> "You're $age years old! The prime of life!"
-        age < 60 -> "You're $age years old! Wisdom and experience!"
-        else -> "You're $age years old! Very wise indeed!"
+        age == 0 -> stringResource(Res.string.birthday_age_less_than_one_year)
+        age < 3 -> pluralStringResource(Res.plurals.birthday_age_just_getting_started, age, age)
+        age < 13 -> stringResource(Res.string.birthday_age_young_and_bright, age)
+        age < 20 -> stringResource(Res.string.birthday_age_teenage_years, age)
+        age < 30 -> stringResource(Res.string.birthday_age_young_adult, age)
+        age < 40 -> stringResource(Res.string.birthday_age_prime_of_life, age)
+        age < 60 -> stringResource(Res.string.birthday_age_wisdom, age)
+        else -> stringResource(Res.string.birthday_age_very_wise, age)
     }

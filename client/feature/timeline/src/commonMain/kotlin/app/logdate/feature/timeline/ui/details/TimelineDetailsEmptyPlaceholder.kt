@@ -12,6 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import logdate.client.feature.timeline.generated.resources.Res
+import logdate.client.feature.timeline.generated.resources.timeline_details_empty_placeholder
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A placeholder that is displayed when no timeline item is selected.
@@ -24,7 +27,7 @@ fun TimelineDetailsEmptyPlaceholder(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            "Select something on your timeline to see more.",
+            stringResource(Res.string.timeline_details_empty_placeholder),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
