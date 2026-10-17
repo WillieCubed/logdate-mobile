@@ -2,6 +2,7 @@ package app.logdate.client.media
 
 import app.logdate.client.media.storage.DesktopMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -10,6 +11,7 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -72,5 +74,20 @@ class DesktopMediaManagerDeleteTest {
 
             assertFalse(manager.deleteOwnedMedia(directory.toUri().toString()))
             assertTrue(directory.exists())
+        }
+
+    @Test
+    fun `removes a newly written file when its recovery scope changes`() =
+        runTest {
+            var checks = 0
+            val payload = MediaPayload("recovered.jpg", "image/jpeg", 5, "bytes".encodeToByteArray())
+
+            assertFailsWith<CancellationException> {
+                manager.saveMedia(payload) {
+                    checks++ == 0
+                }
+            }
+
+            assertTrue(Files.list(mediaRoot).use { paths -> !paths.findAny().isPresent })
         }
 }

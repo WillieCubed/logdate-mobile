@@ -6,6 +6,7 @@ import app.logdate.client.media.MediaPayload
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -18,7 +19,7 @@ class RecoveredMediaAvailabilityTest {
                 object : InMemoryMediaManager() {
                     override suspend fun exists(mediaId: String) = true
 
-                    override suspend fun openMedia(uri: String): MediaFileSource = throw SecurityException("Grant revoked")
+                    override suspend fun openMedia(uri: String): MediaFileSource = throw IllegalStateException("Grant revoked")
                 }
             assertFalse(media.isRecoveredOriginal("content://media/external/images/media/123", StoredMediaReferences.Unchanged))
             assertFalse(media.isRecoveredOriginal("logdate-media://library/original.jpg", StoredMediaReferences.Unchanged))
@@ -46,5 +47,22 @@ class RecoveredMediaAvailabilityTest {
             assertFailsWith<CancellationException> {
                 media.isRecoveredOriginal("logdate-media://library/original.jpg", StoredMediaReferences.Unchanged)
             }
+        }
+
+    @Test
+    fun `a rejected conditional write preserves existing media with the same filename`() =
+        runTest {
+            val media = InMemoryMediaManager()
+            val original = MediaPayload("same.jpg", "image/jpeg", 1, byteArrayOf(1))
+            val existingUri = media.saveMedia(original)
+            var checks = 0
+
+            assertFailsWith<CancellationException> {
+                media.saveMedia(MediaPayload("same.jpg", "image/jpeg", 1, byteArrayOf(2))) {
+                    checks++ == 0
+                }
+            }
+
+            assertContentEquals(original.data, media.readMedia(existingUri).data)
         }
 }

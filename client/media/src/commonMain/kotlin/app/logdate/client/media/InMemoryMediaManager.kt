@@ -4,11 +4,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Deterministic in-memory [MediaManager] used by cross-module tests.
  */
-open class InMemoryMediaManager : MediaManager {
+open class InMemoryMediaManager :
+    MediaManager,
+    ConditionalMediaSaver {
     private val deletedOwnedMedia = mutableSetOf<String>()
     private val payloads = mutableMapOf<String, MediaPayload>()
 
@@ -52,6 +55,20 @@ open class InMemoryMediaManager : MediaManager {
     override suspend fun saveMedia(payload: MediaPayload): String {
         val uri = "file:///tmp/${payload.fileName}"
         payloads[uri] = payload.copy(data = payload.data.copyOf())
+        return uri
+    }
+
+    override suspend fun saveMedia(
+        payload: MediaPayload,
+        canCommit: () -> Boolean,
+    ): String {
+        if (!canCommit()) throw kotlinx.coroutines.CancellationException("Media hydration scope changed")
+        val uri = "file:///tmp/${Uuid.random()}-${payload.fileName}"
+        payloads[uri] = payload.copy(data = payload.data.copyOf())
+        if (!canCommit()) {
+            deleteOwnedMedia(uri)
+            throw kotlinx.coroutines.CancellationException("Media hydration scope changed")
+        }
         return uri
     }
 

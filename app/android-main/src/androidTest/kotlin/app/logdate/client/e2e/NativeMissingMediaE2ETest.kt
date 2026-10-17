@@ -52,8 +52,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
+import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 import org.koin.core.context.GlobalContext
 import java.io.File
 import java.io.FileOutputStream
@@ -68,6 +70,7 @@ import kotlin.uuid.Uuid
 
 /** Synthetic attachments only; the network test waits for the harness to remove its metered override. */
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
     private val koin get() = GlobalContext.get()
     private val media get() = koin.get<MediaManager>()
@@ -85,7 +88,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
     }
 
     @Test
-    fun seedProviderCollisionForColdRestore() =
+    fun aSeedProviderCollisionForColdRestore() =
         runBlocking {
             requireEmulator()
             val uri =
@@ -148,7 +151,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
         }
 
     @Test
-    fun quarantinedOriginalSurvivesProcessRestart() =
+    fun bQuarantinedOriginalSurvivesProcessRestart() =
         runBlocking {
             requireEmulator()
             require(fixture.exists()) { "Run the collision fixture first" }
@@ -175,7 +178,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
         }
 
     @Test
-    fun privateOriginalWorksWithoutLibraryOrNotificationPermission() =
+    fun cPrivateOriginalWorksWithoutLibraryOrNotificationPermission() =
         runBlocking {
             requireEmulator()
             for (permission in listOf(
@@ -192,7 +195,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
         }
 
     @Test
-    fun meteredRecoveryResumesWhenPlatformAllowsMedia() =
+    fun dMeteredRecoveryResumesWhenPlatformAllowsMedia() =
         runBlocking {
             requireEmulator()
             val policy = koin.get<DataUsagePolicy>()

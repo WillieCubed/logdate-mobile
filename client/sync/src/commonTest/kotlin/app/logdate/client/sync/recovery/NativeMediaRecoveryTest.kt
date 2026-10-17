@@ -1,7 +1,10 @@
 package app.logdate.client.sync.recovery
 
+import app.logdate.client.media.ConditionalMediaSaver
 import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.media.MediaFileSource
+import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.InMemoryKeyValueStorage
 import app.logdate.client.sync.SyncMediaTransfer
@@ -11,14 +14,21 @@ import app.logdate.client.sync.cloud.MediaUploadResult
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
 import app.logdate.client.sync.metadata.MediaSyncRef
+import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.FakeJournalRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableImageBlock
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -26,11 +36,39 @@ import kotlin.uuid.Uuid
 class NativeMediaRecoveryTest {
     private val db = DownloadInboxTest.Database()
     private val scope = DownloadScope("owner", "origin")
-    private val inbox = DownloadInbox(db, db, { scope }, { 1L })
+    private var epochMillis = 1L
+    private var selectedScope = scope
+
+    private fun newInbox() = DownloadInbox(db, db, { selectedScope }, { epochMillis })
+
+    private val inbox = newInbox()
     private val notes = FakeJournalNotesRepository()
     private val drafts = FakeJournalRepository()
-    private val media = InMemoryMediaManager()
-    private val refs = KeyValueMediaSyncRefStore(InMemoryKeyValueStorage(), { "origin" }, { "owner" })
+    private val media =
+        object : InMemoryMediaManager(), ConditionalMediaSaver {
+            var onSave: suspend () -> Unit = {}
+            var afterScopeValidation: suspend () -> Unit = {}
+
+            override suspend fun saveMedia(payload: MediaPayload): String {
+                onSave()
+                return super.saveMedia(payload)
+            }
+
+            override suspend fun saveMedia(
+                payload: MediaPayload,
+                canCommit: () -> Boolean,
+            ): String {
+                onSave()
+                if (!canCommit()) throw CancellationException("Media hydration scope changed")
+                afterScopeValidation()
+                return super.saveMedia(payload)
+            }
+        }
+    private val refStorage = InMemoryKeyValueStorage()
+
+    private fun newRefs() = KeyValueMediaSyncRefStore(refStorage, { selectedScope.origin }, { selectedScope.owner })
+
+    private val refs = newRefs()
     private val timestamp = Instant.fromEpochMilliseconds(1)
     private val local = "logdate-media://library/source.jpg"
     private val downloads = mutableListOf<String>()
@@ -63,7 +101,10 @@ class NativeMediaRecoveryTest {
             }
         }
 
-    private fun recovery() = NativeMediaRecovery(inbox, notes, drafts, media, SyncMediaTransfer(media, refs, cloud), refs, db)
+    private fun recovery(): NativeMediaRecovery {
+        val restoredRefs = newRefs()
+        return NativeMediaRecovery(newInbox(), notes, drafts, media, SyncMediaTransfer(media, restoredRefs, cloud), restoredRefs, db)
+    }
 
     @Test
     fun `caption edits during download keep the recovered original without another network attempt`() =
@@ -141,6 +182,130 @@ class NativeMediaRecoveryTest {
             assertTrue(row.state != "APPLIED")
             recovery().recover("token", EntityType.NOTE)
             assertEquals(row.attempts, db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.attempts)
+        }
+
+    @Test
+    fun `a quarantined content URI retries across recovery instances and scopes without crossing scopes`() =
+        runTest {
+            val source = "content://media/external/images/media/123"
+            val quarantined = UnavailableMediaReferences.nativeRestore(source)
+            val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = quarantined)
+            notes.create(note)
+            owner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = source, localAliases = listOf(quarantined)))
+            unavailable = true
+
+            recovery().recover("token", EntityType.NOTE)
+
+            val pending = requireNotNull(db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString()))
+            assertEquals("UNKNOWN", pending.reason)
+            assertEquals(quarantined, assertIs<JournalNote.Image>(notes.getNoteById(note.uid)).mediaRef)
+
+            unavailable = false
+            selectedScope = DownloadScope("replacement-owner", "replacement-origin")
+            epochMillis = pending.nextAttemptAt
+            recovery().recover("token", EntityType.NOTE)
+
+            val replacementRow = requireNotNull(db.get(selectedScope.owner, selectedScope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString()))
+            assertEquals("MISSING_MEDIA", replacementRow.reason)
+            assertEquals(1, downloads.size, "The replacement account must not use the old account's cached media mapping")
+            assertEquals("FAILED", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.state)
+
+            selectedScope = scope
+            epochMillis = pending.nextAttemptAt
+            recovery().recover("token", EntityType.NOTE)
+
+            val repaired = assertIs<JournalNote.Image>(notes.getNoteById(note.uid))
+            assertTrue(media.exists(repaired.mediaRef), "repaired reference=${repaired.mediaRef}, downloads=$downloads")
+            assertEquals("APPLIED", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.state)
+            assertEquals(2, downloads.size)
+        }
+
+    @Test
+    fun `an account switch during a media download leaves the quarantined note and retry row untouched`() =
+        runTest {
+            val source = "content://media/external/images/media/456"
+            val quarantined = UnavailableMediaReferences.nativeRestore(source)
+            val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = quarantined)
+            notes.create(note)
+            owner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = source, localAliases = listOf(quarantined)))
+
+            val downloadStarted = CompletableDeferred<Unit>()
+            val finishDownload = CompletableDeferred<Unit>()
+            onDownload = {
+                downloadStarted.complete(Unit)
+                finishDownload.await()
+            }
+            val inFlight = async { recovery().recover("token", EntityType.NOTE) }
+
+            downloadStarted.await()
+            selectedScope = DownloadScope("replacement-owner", "replacement-origin")
+            finishDownload.complete(Unit)
+
+            assertFailsWith<CancellationException> { inFlight.await() }
+            assertEquals(quarantined, assertIs<JournalNote.Image>(notes.getNoteById(note.uid)).mediaRef)
+            assertEquals("WAITING", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.state)
+            assertNull(refs.getScoped(note.uid, UploadScope("replacement-owner", "replacement-origin")))
+            assertFalse(media.exists("file:///tmp/original.jpg"), "A late old-scope response must not leave a downloaded original behind")
+        }
+
+    @Test
+    fun `an account switch during durable media save does not commit old-scope bytes`() =
+        runTest {
+            val source = "content://media/external/images/media/789"
+            val quarantined = UnavailableMediaReferences.nativeRestore(source)
+            val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = quarantined)
+            notes.create(note)
+            owner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = source, localAliases = listOf(quarantined)))
+
+            val saveStarted = CompletableDeferred<Unit>()
+            val finishSave = CompletableDeferred<Unit>()
+            media.onSave = {
+                saveStarted.complete(Unit)
+                finishSave.await()
+            }
+            val inFlight = async { recovery().recover("token", EntityType.NOTE) }
+
+            saveStarted.await()
+            selectedScope = DownloadScope("replacement-owner", "replacement-origin")
+            finishSave.complete(Unit)
+
+            assertFailsWith<CancellationException> { inFlight.await() }
+            assertFalse(media.exists("file:///tmp/original.jpg"), "Old-scope media must not become durable after an account switch")
+            assertEquals(quarantined, assertIs<JournalNote.Image>(notes.getNoteById(note.uid)).mediaRef)
+            assertEquals("WAITING", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.state)
+        }
+
+    @Test
+    fun `a scope switch after media commit finishes recovery under the captured scope`() =
+        runTest {
+            val source = "content://media/external/images/media/101"
+            val quarantined = UnavailableMediaReferences.nativeRestore(source)
+            val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = quarantined)
+            notes.create(note)
+            owner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = source, localAliases = listOf(quarantined)))
+
+            val commitValidated = CompletableDeferred<Unit>()
+            val finishCommit = CompletableDeferred<Unit>()
+            media.afterScopeValidation = {
+                commitValidated.complete(Unit)
+                finishCommit.await()
+            }
+            val inFlight = async { recovery().recover("token", EntityType.NOTE) }
+
+            commitValidated.await()
+            selectedScope = DownloadScope("replacement-owner", "replacement-origin")
+            finishCommit.complete(Unit)
+
+            inFlight.await()
+            val repaired = assertIs<JournalNote.Image>(notes.getNoteById(note.uid))
+            assertTrue(media.exists(repaired.mediaRef))
+            assertEquals("APPLIED", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.state)
+            assertNull(db.get(selectedScope.owner, selectedScope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString()))
+            assertNull(refs.getScoped(note.uid, UploadScope("replacement-owner", "replacement-origin")))
         }
 
     @Test
