@@ -10,8 +10,10 @@ import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.domain.activity.ActivityPresenter
 import app.logdate.client.domain.activity.ActivityTracker
 import app.logdate.client.domain.activity.KeyValueActivityLogStore
+import app.logdate.client.domain.activity.SuggestionOutcomes
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.reminders.CoordinatedReminderClaims
 import app.logdate.client.domain.reminders.DeviceReminderBudget
@@ -21,6 +23,7 @@ import app.logdate.client.domain.streak.toStreakDay
 import app.logdate.client.domain.watch.StampedPreferenceStore
 import app.logdate.client.domain.watch.WatchWindowPreferences
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.datalayer.v2.WearFeatures
@@ -124,6 +127,7 @@ import kotlinx.datetime.TimeZone
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /** Koin module for the redesigned watch app. Only the new app's screens resolve anything from it. */
@@ -245,6 +249,7 @@ val wearV2Module =
                 watchLinks = get(),
                 phoneHandoff = get(),
                 syncStatus = get<SyncManager>().syncStatusFlow,
+                activity = get(),
             )
         }
         single {
@@ -417,6 +422,14 @@ val wearV2Module =
             )
         }
         single<ReminderPermissions> { AndroidReminderPermissions(get()) }
+        single {
+            val notes = get<JournalNotesRepository>()
+            ActivityPresenter(
+                agreed = get<ActivityTracker>().agreed,
+                outcomes = SuggestionOutcomes(get<KeyValueStorage>()),
+                capturedSince = { since -> notes.observeNotesInRange(since, Instant.DISTANT_FUTURE).map { it.isNotEmpty() } },
+            )
+        }
         single {
             // Health Services reports sleep and exercise only while the watch is worn.
             ActivityTracker(

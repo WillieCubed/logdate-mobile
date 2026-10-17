@@ -1,5 +1,6 @@
 package app.logdate.wear.v2.today
 
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.today.TodaySummary
 import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.wear.capture.Feeling
@@ -13,6 +14,7 @@ sealed interface TodayUiState {
     /**
      * @property campfire The journaling fire, or null while campfire streaks are off.
      * @property feeling The newest mood check-in today, or null.
+     * @property activity The suggestion after an activity and the morning start, while activity awareness is on.
      */
     data class Ready(
         val date: LocalDate,
@@ -21,6 +23,7 @@ sealed interface TodayUiState {
         val feeling: Feeling?,
         val campfire: CampfirePresentation?,
         val phoneCard: PhoneCard,
+        val activity: ActivityUiState = ActivityUiState(),
     ) : TodayUiState
 
     /** Today's notes could not be read. */
