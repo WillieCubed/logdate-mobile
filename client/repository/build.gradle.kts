@@ -49,6 +49,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.core)
         }
         commonTest.dependencies {
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlin.test)
         }
     }
