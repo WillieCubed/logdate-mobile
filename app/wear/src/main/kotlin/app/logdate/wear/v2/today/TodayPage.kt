@@ -29,10 +29,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.AmbientMode
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonGroup
+import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -45,11 +47,14 @@ import androidx.wear.compose.material3.TimeSource
 import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.TimeTextDefaults
 import androidx.wear.compose.material3.TitleCard
+import androidx.wear.compose.material3.lazy.TransformationSpec
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
 import androidx.wear.compose.material3.openOnPhoneDialogCurvedText
 import androidx.wear.compose.material3.timeTextCurvedText
 import androidx.wear.compose.material3.timeTextSeparator
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.today.TodaySummary
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.glyphs.LogDateGlyph
@@ -88,6 +93,9 @@ object TodayTags {
     const val ADD = "today_add"
     const val RECORD = "today_record"
     const val MOMENTS = "today_moments"
+    const val ACTIVITY_SUGGESTION = "today_activity_suggestion"
+    const val MORNING_START = "today_morning_start"
+    const val ACTIVITY_DISMISS = "today_activity_dismiss"
 }
 
 /**
@@ -117,6 +125,8 @@ fun TodayPage(
     onHandoffDismissed: () -> Unit,
     modifier: Modifier = Modifier,
     controls: TodayControls = TodayControls(),
+    onUseActivity: () -> Unit = {},
+    onDismissActivity: () -> Unit = {},
     listState: TransformingLazyColumnState = rememberTransformingLazyColumnState(),
     timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
 ) {
@@ -135,6 +145,8 @@ fun TodayPage(
             controls = controls,
             onGetPhoneApp = onGetPhoneApp,
             onSetUpPhone = onSetUpPhone,
+            onUseActivity = onUseActivity,
+            onDismissActivity = onDismissActivity,
             listState = listState,
             contentPadding = contentPadding,
             modifier = modifier,
@@ -191,6 +203,8 @@ private fun TodayList(
     controls: TodayControls,
     onGetPhoneApp: () -> Unit,
     onSetUpPhone: () -> Unit,
+    onUseActivity: () -> Unit,
+    onDismissActivity: () -> Unit,
     listState: TransformingLazyColumnState,
     contentPadding: PaddingValues,
     modifier: Modifier,
@@ -210,6 +224,7 @@ private fun TodayList(
                 state.campfire?.let { campfire -> item { TodayCampfire(campfire) } }
                 item { CenteredText(summaryText(state.summary, state.feeling), Modifier.testTag(TodayTags.SUMMARY)) }
                 state.summary.latestMoment?.let { latest -> item { LatestMoment(latest, state.timeZone) } }
+                activityItems(state.activity, onUseActivity, onDismissActivity, spec)
                 if (state.phoneCard is PhoneCard.GetApp) {
                     item {
                         GetPhoneAppCard(
@@ -305,6 +320,56 @@ private fun LatestMoment(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * The offer to record a moment after a walk, ride or trip, or the morning start after a night's sleep,
+ * each with Not now beneath it. Tapping the card starts a recording.
+ */
+private fun TransformingLazyColumnScope.activityItems(
+    activity: ActivityUiState,
+    onUse: () -> Unit,
+    onDismiss: () -> Unit,
+    spec: TransformationSpec,
+) {
+    val suggestion = activity.suggestion
+    val morning = activity.morningStart
+    if (suggestion == null && morning == null) return
+    item {
+        val title: String
+        val body: String
+        val tag: String
+        if (suggestion != null) {
+            title = stringResource(R.string.wear_today_activity_title)
+            body =
+                if (suggestion.activity.kind == ActivityKind.IN_VEHICLE) {
+                    pluralStringResource(R.plurals.wear_today_activity_trip_body, suggestion.minutes, suggestion.minutes)
+                } else {
+                    pluralStringResource(R.plurals.wear_today_activity_moving_body, suggestion.minutes, suggestion.minutes)
+                }
+            tag = TodayTags.ACTIVITY_SUGGESTION
+        } else {
+            title = stringResource(R.string.wear_today_morning_title)
+            body = stringResource(R.string.wear_today_morning_body)
+            tag = TodayTags.MORNING_START
+        }
+        TitleCard(
+            onClick = onUse,
+            title = { Text(title) },
+            modifier = Modifier.fillMaxWidth().transformedHeight(this, spec).testTag(tag),
+            transformation = SurfaceTransformation(spec),
+        ) {
+            Text(body)
+        }
+    }
+    item {
+        CompactButton(
+            onClick = onDismiss,
+            label = { Text(stringResource(R.string.wear_today_activity_dismiss)) },
+            modifier = Modifier.transformedHeight(this, spec).testTag(TodayTags.ACTIVITY_DISMISS),
+            transformation = SurfaceTransformation(spec),
         )
     }
 }
