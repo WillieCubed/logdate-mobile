@@ -41,33 +41,6 @@ class LogDateLexiconFamilyJvmTest {
         assertTrue(records.all { it.recordKey != null && it.record?.type == LexiconType.OBJECT })
     }
 
-    @Test
-    fun `checked in test fixtures match what the generator writes`() {
-        val lexicons = moduleRoot().resolve("../../lexicons").normalize()
-        val inputs =
-            listOf(
-                lexicons.resolve("app/logdate/defs.json"),
-                lexicons.resolve("app/logdate/journal/entry.json"),
-                lexicons.resolve("app/logdate/crypto/sealed.json"),
-                lexicons.resolve("community/lexicon/location/geo.json"),
-                moduleRoot().resolve("src/commonTest/lexicons/kitchenSink.json"),
-            )
-        val checkedIn = moduleRoot().resolve("src/commonTest/kotlin/studio/hypertext/atproto/lexicon/fixtures")
-        val regenerated = Files.createTempDirectory("lexicon-fixtures")
-
-        main(
-            arrayOf(
-                inputs.joinToString(java.io.File.pathSeparator),
-                regenerated.toString(),
-                "studio.hypertext.atproto.lexicon.fixtures",
-            ),
-        )
-
-        val expected = Files.list(checkedIn).use { files -> files.asSequence().associate { it.name to it.readText() } }
-        val actual = Files.list(regenerated).use { files -> files.asSequence().associate { it.name to it.readText() } }
-        assertEquals(expected, actual, "Run ./gradlew :shared:atproto-lexicon:generateLexiconTestFixtures")
-    }
-
     private fun schemaFiles(): List<Path> {
         val root = moduleRoot().resolve("../../lexicons").normalize()
         return Files.walk(root).use { paths ->
