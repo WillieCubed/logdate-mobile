@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.wear.compose.material3.AppScaffold
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.today.TodaySummary
 import app.logdate.wear.R
 import app.logdate.wear.capture.Feeling
@@ -60,6 +61,23 @@ class TodayRecorderTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val recorder = ScriptedRecorder()
+
+    @Test
+    fun while_moving_Record_leads_Today_and_a_tap_starts_a_locked_recording() {
+        show(state = today.copy(activity = ActivityUiState(voiceFirst = true)))
+
+        composeRule.onNodeWithTag(TodayTags.VOICE_FIRST).assertIsDisplayed().performClick()
+
+        assertEquals(RecorderState.Live(LiveMode.LOCKED, lockProgress = 1f), recorder.state)
+    }
+
+    @Test
+    fun record_does_not_lead_Today_when_the_person_is_not_moving() {
+        show()
+
+        composeRule.onNodeWithTag(TodayTags.SUMMARY).assertIsDisplayed()
+        composeRule.onNodeWithTag(TodayTags.VOICE_FIRST).assertDoesNotExist()
+    }
 
     @Test
     fun holding_shows_the_live_recording_and_the_same_hold_reaches_the_lock() {
@@ -151,13 +169,16 @@ class TodayRecorderTest {
         composeRule.onNodeWithTag(RecorderTags.ELAPSED).assertIsDisplayed()
     }
 
-    private fun show(fontScale: Float = 1f) {
+    private fun show(
+        fontScale: Float = 1f,
+        state: TodayUiState = today,
+    ) {
         composeRule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
                 LogDateWearTheme(dynamicColor = false) {
                     AppScaffold {
                         TodayPage(
-                            state = today,
+                            state = state,
                             handoff = HandoffState.IDLE,
                             onGetPhoneApp = {},
                             onSetUpPhone = {},
