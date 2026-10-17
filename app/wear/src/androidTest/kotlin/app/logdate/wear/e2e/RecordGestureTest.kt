@@ -115,12 +115,12 @@ class RecordGestureTest {
     }
 
     @Test
-    fun a_quick_swipe_up_yields_to_the_list_and_records_nothing() {
+    fun a_quick_drag_yields_to_the_list_and_records_nothing() {
         show()
 
         record {
             down(center)
-            repeat(6) { moveBy(Offset(0f, -40f), delayMillis = 10) }
+            repeat(6) { moveBy(Offset(0f, 40f), delayMillis = 10) }
             up()
         }
 
@@ -238,7 +238,10 @@ class RecordGestureTest {
         composeRule.setContent {
             LogDateWearTheme(dynamicColor = false) {
                 AppScaffold {
-                    RecordPage(rememberTransformingLazyColumnState(), armed, signals) { clicks += "click" }
+                    // Record shows in full at the end of its list, where Today's list starts.
+                    RecordPage(rememberTransformingLazyColumnState(initialAnchorItemIndex = MOMENT_COUNT), armed, signals) {
+                        clicks += "click"
+                    }
                 }
             }
         }
@@ -286,6 +289,7 @@ class RecordGestureTest {
         const val DESCRIPTION = "Record"
         const val START = "Start recording"
         const val TODAY_TEXT = "Today"
+        const val MOMENT_COUNT = 20
 
         @Composable
         fun RecordPage(
@@ -316,7 +320,11 @@ class RecordGestureTest {
                     }
                 },
             ) { contentPadding ->
-                TransformingLazyColumn(state = listState, contentPadding = contentPadding) { item { Text(TODAY_TEXT) } }
+                // Earlier moments above, as on Today, so a quick drag down has a list to scroll back.
+                TransformingLazyColumn(state = listState, contentPadding = contentPadding) {
+                    items(MOMENT_COUNT) { index -> Text("Moment $index") }
+                    item { Text(TODAY_TEXT) }
+                }
             }
         }
     }
