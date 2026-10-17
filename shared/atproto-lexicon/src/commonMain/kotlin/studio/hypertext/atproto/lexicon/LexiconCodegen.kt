@@ -16,12 +16,66 @@ public object LexiconCodegen {
     public fun generate(
         document: LexiconDocument,
         packageName: String = "studio.hypertext.atproto.lexicon.generated",
-    ): String = DocumentWriter(document, packageName).write()
+    ): String = generate(document, LexiconPackageLayout.flat(packageName))
+
+    /**
+     * Generates Kotlin source for [document], placed and referring to other documents according
+     * to [layout].
+     */
+    public fun generate(
+        document: LexiconDocument,
+        layout: LexiconPackageLayout,
+    ): String = DocumentWriter(document, layout).write()
+
+    /**
+     * Generates an object named [objectName] in [packageName] whose `records` map holds the
+     * serializer for every record type in [documents], keyed by collection NSID.
+     */
+    public fun generateRecordIndex(
+        documents: List<LexiconDocument>,
+        layout: LexiconPackageLayout,
+        packageName: String,
+        objectName: String,
+    ): String {
+        val records =
+            documents
+                .filter { it.definitions[MAIN_DEFINITION_NAME]?.type == LexiconType.RECORD }
+                .sortedBy { it.id.toString() }
+        return buildString {
+            appendLine("package $packageName")
+            appendLine()
+            appendLine("import kotlinx.serialization.KSerializer")
+            appendLine()
+            appendLine("/** Every record type generated from these schemas. */")
+            appendLine("public object $objectName {")
+            appendLine("    /** The serializer for each record type, keyed by its collection NSID. */")
+            appendLine("    public val records: Map<String, KSerializer<*>> =")
+            appendLine("        mapOf(")
+            records.forEach { document ->
+                val type = "${layout.packageFor(document.id)}.${className(document.id, MAIN_DEFINITION_NAME)}"
+                appendLine("            \"${document.id}\" to $type.serializer(),")
+            }
+            appendLine("        )")
+            appendLine("}")
+        }
+    }
 
     private class DocumentWriter(
         private val document: LexiconDocument,
-        private val packageName: String,
+        private val layout: LexiconPackageLayout,
     ) {
+        private val packageName = layout.packageFor(document.id)
+
+        /** The name to use for [reference]'s class here: simple in this package, qualified otherwise. */
+        private fun typeName(reference: LexiconReference): String {
+            val targetPackage = layout.packageFor(reference.documentId)
+            val name = className(reference.documentId, reference.definitionName)
+            return if (targetPackage == packageName) name else "$targetPackage.$name"
+        }
+
+        private fun qualifiedTypeName(reference: LexiconReference): String =
+            "${layout.packageFor(reference.documentId)}.${className(reference.documentId, reference.definitionName)}"
+
         private val imports = mutableSetOf<String>()
         private val declarations = mutableListOf<String>()
         private val prefix = document.id.documentPrefix()
@@ -146,7 +200,7 @@ public object LexiconCodegen {
                 LexiconType.BLOB -> runtimeType(BLOB)
                 LexiconType.CID_LINK -> runtimeType(CID_LINK)
                 LexiconType.BYTES -> runtimeType(BYTES)
-                LexiconType.REF -> requireNotNull(field.reference).let { className(it.documentId, it.definitionName) }
+                LexiconType.REF -> typeName(requireNotNull(field.reference))
                 LexiconType.UNION -> writeUnion(unionName, field)
                 else -> {
                     imports += JSON_ELEMENT
@@ -188,7 +242,7 @@ public object LexiconCodegen {
             members.forEachIndexed { index, member ->
                 if (index > 0) appendLine()
                 appendLine("    public data class ${member.name}(")
-                appendLine("        val value: $packageName.${member.valueType},")
+                appendLine("        val value: ${member.qualifiedValueType},")
                 appendLine("    ) : $name")
             }
             if (!field.closed) {
@@ -250,8 +304,9 @@ public object LexiconCodegen {
                 val shortName = reference.memberName(qualified = false)
                 UnionMember(
                     name = if (shortNames.count { it == shortName } > 1) reference.memberName(qualified = true) else shortName,
-                    type = reference.typeName(),
-                    valueType = className(reference.documentId, reference.definitionName),
+                    type = reference.unionTypeId(),
+                    valueType = typeName(reference),
+                    qualifiedValueType = qualifiedTypeName(reference),
                 )
             }
         }
@@ -298,6 +353,7 @@ public object LexiconCodegen {
         val name: String,
         val type: String,
         val valueType: String,
+        val qualifiedValueType: String,
     )
 
     private fun className(
@@ -318,7 +374,7 @@ public object LexiconCodegen {
         }
 
     /** The `$type` a member of this definition carries: the bare NSID for `main`. */
-    private fun LexiconReference.typeName(): String =
+    private fun LexiconReference.unionTypeId(): String =
         if (definitionName == MAIN_DEFINITION_NAME) documentId.toString() else "$documentId#$definitionName"
 
     private fun LexiconRecordKey.kotlin(): String =
@@ -344,38 +400,6 @@ public object LexiconCodegen {
             }
 
     private fun String.asIdentifier(): String = if (this in kotlinKeywords) "`$this`" else this
-
-    private val kotlinKeywords =
-        setOf(
-            "as",
-            "break",
-            "class",
-            "continue",
-            "do",
-            "else",
-            "false",
-            "for",
-            "fun",
-            "if",
-            "in",
-            "interface",
-            "is",
-            "null",
-            "object",
-            "package",
-            "return",
-            "super",
-            "this",
-            "throw",
-            "true",
-            "try",
-            "typealias",
-            "typeof",
-            "val",
-            "var",
-            "when",
-            "while",
-        )
 
     private const val KDOC_WIDTH = 120
     private const val SERIALIZABLE = "kotlinx.serialization.Serializable"
