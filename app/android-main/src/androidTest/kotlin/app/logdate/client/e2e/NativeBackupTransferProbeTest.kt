@@ -5,6 +5,10 @@ import android.media.MediaPlayer
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import app.logdate.client.database.DatabaseStartupMonitor
+import app.logdate.client.database.DatabaseStartupState
+import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.IdentityKeyFingerprint
@@ -13,6 +17,7 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.device.storage.putBytes
+import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -37,11 +42,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.io.encoding.Base64
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -58,16 +65,33 @@ class NativeBackupTransferProbeTest {
         runBlocking {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val mode = InstrumentationRegistry.getArguments().getString("nativeBackupMode")
-            assumeTrue("requires the native backup acceptance harness", mode == "seed" || mode == "verify" || mode == "quota")
+            assumeTrue(
+                "requires the native backup acceptance harness",
+                mode in setOf("seed", "verify", "quota", "quota-cleanup", "missing-keys", "compact-transfer"),
+            )
             require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") { "Emulator required" }
             require(instrumentation.targetContext.packageName.endsWith(".debug")) { "Isolated debug application required" }
+            val context = instrumentation.targetContext
+            ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
             val koin = GlobalContext.get()
+            if (mode == "missing-keys") {
+                verifyMissingRecoveryKeys(context, koin)
+                return@runBlocking
+            }
             val fixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
+            if (mode == "compact-transfer") {
+                require(File(context.noBackupFilesDir, "native-backup-fixture.json").isFile) {
+                    "Synthetic source fixture required before removing the quota-only row"
+                }
+                fixture.removeQuotaOnlyNoteAndCompact(context, koin.get())
+                return@runBlocking
+            }
             if (mode == "quota") {
-                require(
-                    File(instrumentation.targetContext.noBackupFilesDir, "native-backup-fixture.json").isFile,
-                ) { "Synthetic source fixture required" }
-                fixture.exceedCloudQuota()
+                fixture.exceedCloudQuota(context)
+                return@runBlocking
+            }
+            if (mode == "quota-cleanup") {
+                NativeJournalFixture.cleanupQuotaPayload(context)
                 return@runBlocking
             }
             val identity = koin.get<IdentityKeyManager>()
@@ -156,6 +180,37 @@ class NativeBackupTransferProbeTest {
         }
 }
 
+private suspend fun verifyMissingRecoveryKeys(
+    context: android.content.Context,
+    koin: org.koin.core.Koin,
+) {
+    val databaseFile = context.getDatabasePath("logdate")
+    assertTrue(databaseFile.isFile && databaseFile.length() > 0, "Native restore did not retain the encrypted journal database")
+    val originalDatabaseDigest = MessageDigest.getInstance("SHA-256").digest(databaseFile.readBytes())
+    val passphraseBackup = PassphraseBackupStore(context)
+    val identityBackup = AndroidIdentityKeyBackupStore(context)
+    assertFalse(passphraseBackup.hasBackup(), "The synthetic missing-key transport still contains the database key")
+    assertFalse(identityBackup.hasBackup(), "The synthetic missing-key transport still contains identity recovery keys")
+
+    val startupMonitor = koin.get<DatabaseStartupMonitor>()
+    assertFailsWith<Exception>("Database startup must refuse a replacement key for retained encrypted data") {
+        koin.get<LogDateDatabase>()
+    }
+    val recovery = startupMonitor.state.value as? DatabaseStartupState.RecoveryRequired
+    assertNotNull(recovery, "Missing recovery material must leave database startup in a recoverable state")
+    assertTrue(
+        recovery.detail.contains("original encryption key"),
+        "Recovery should identify the missing journal key without exposing key material",
+    )
+    assertNull(koin.get<SecureStorage>().getString("db_encryption_key"), "Startup persisted a replacement database key")
+    assertTrue(databaseFile.isFile, "Recovery handling deleted the retained encrypted journal")
+    assertContentEquals(
+        originalDatabaseDigest,
+        MessageDigest.getInstance("SHA-256").digest(databaseFile.readBytes()),
+        "Recovery handling changed the retained encrypted journal",
+    )
+}
+
 private class NativeJournalFixture(
     private val journals: JournalRepository,
     private val notes: JournalNotesRepository,
@@ -163,11 +218,62 @@ private class NativeJournalFixture(
     private val media: MediaManager,
     private val syncMetadata: SyncMetadataService,
 ) {
-    suspend fun exceedCloudQuota() {
-        assertEquals("Native transfer journal", journals.getJournalById(id(1))?.title)
-        if (notes.getNoteById(id(999)) != null) return
-        val now = Clock.System.now()
-        notes.create(JournalNote.Text(id(999), now, now, "q".repeat(28 * 1024 * 1024)), id(1))
+    suspend fun removeQuotaOnlyNoteAndCompact(
+        context: android.content.Context,
+        database: LogDateDatabase,
+    ) {
+        notes.removeById(id(999))
+        syncMetadata
+            .getPendingUploads(EntityType.NOTE)
+            .filter { it.entityId == id(999).toString() }
+            .forEach { pending ->
+                syncMetadata.markAsSynced(pending.entityId, EntityType.NOTE, Clock.System.now(), version = 0)
+            }
+        check(!syncMetadata.hasPending(EntityType.NOTE, id(999).toString())) {
+            "Quota-only note left a pending payload in the synthetic source"
+        }
+        val db = database.openHelper.writableDatabase
+        db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { }
+        db.execSQL("VACUUM")
+        db.query("PRAGMA wal_checkpoint(TRUNCATE)").use { }
+        assertNull(notes.getNoteById(id(999)), "Quota-only fixture row survived cleanup")
+        val fileSize = context.getDatabasePath("logdate").length()
+        val pageCount =
+            db.query("PRAGMA page_count").use { cursor ->
+                cursor.moveToFirst()
+                cursor.getLong(0)
+            }
+        val freePages =
+            db.query("PRAGMA freelist_count").use { cursor ->
+                cursor.moveToFirst()
+                cursor.getLong(0)
+            }
+        check(fileSize < MAX_NATIVE_TRANSFER_FIXTURE_DATABASE_BYTES) {
+            "Synthetic transfer fixture exceeds its size guard after removing the quota-only row " +
+                "($fileSize bytes, database=${database.openHelper.databaseName}, pages=$pageCount, freePages=$freePages)"
+        }
+    }
+
+    fun exceedCloudQuota(context: android.content.Context) {
+        val payload = context.filesDir.resolve("db_recovery/native-backup-quota-acceptance.bin")
+        val directory = checkNotNull(payload.parentFile)
+        if (!directory.isDirectory) check(directory.mkdirs())
+        check(payload.createNewFile()) { "Quota acceptance payload already exists" }
+        val random = java.util.Random(0x4c6f6744617465L)
+        val buffer = ByteArray(64 * 1024)
+        payload.outputStream().buffered().use { output ->
+            repeat(28 * 1024 * 1024 / buffer.size) {
+                random.nextBytes(buffer)
+                output.write(buffer)
+            }
+        }
+    }
+
+    companion object {
+        fun cleanupQuotaPayload(context: android.content.Context) {
+            val payload = context.filesDir.resolve("db_recovery/native-backup-quota-acceptance.bin")
+            if (payload.exists()) check(payload.delete()) { "Could not remove quota acceptance payload" }
+        }
     }
 
     suspend fun seed() {
@@ -283,3 +389,5 @@ private class NativeJournalFixture(
 
     private fun id(number: Int): Uuid = Uuid.parse("00000000-0000-0000-0000-${number.toString().padStart(12, '0')}")
 }
+
+private const val MAX_NATIVE_TRANSFER_FIXTURE_DATABASE_BYTES = 24L * 1024 * 1024

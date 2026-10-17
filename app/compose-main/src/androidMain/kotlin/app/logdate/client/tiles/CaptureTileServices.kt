@@ -8,7 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import app.logdate.client.LogdateApplication
+import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.client.MainActivity
 import app.logdate.client.capture.ACTION_CAPTURE
 import app.logdate.client.capture.EXTRA_CAPTURE_MODE
@@ -63,7 +63,7 @@ class RecordVoiceTileService :
     private val recorder: AudioRecordingManager by inject()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var readinessJob: Job? = null
-    private val startup get() = (application as LogdateApplication).startup
+    private val startup get() = ApplicationStartupCoordinator.get(application)
 
     override fun onStartListening() {
         if (startup.state.value !is ApplicationStartupState.Ready) {
