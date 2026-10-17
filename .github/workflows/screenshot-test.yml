@@ -30,6 +30,13 @@ on:
       - '*.gradle.kts'
       - 'gradle.properties'
 
+# A newer push to the same pull request makes the older run moot, and every
+# lane holds a scarce macOS runner. Runs on main are never cancelled once they
+# start, so each merged change gets its own screenshot result.
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
