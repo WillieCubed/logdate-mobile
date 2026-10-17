@@ -35,6 +35,7 @@ import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_ca
 import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_confirm
 import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_message
 import logdate.client.feature.rewind.generated.resources.delete_rewind_dialog_title
+import logdate.client.feature.rewind.generated.resources.rewind_detail_load_failed
 import logdate.client.feature.rewind.generated.resources.share_rewind_chooser_title
 import logdate.client.feature.rewind.generated.resources.share_rewind_panel_caption
 import logdate.client.feature.rewind.generated.resources.share_rewind_panel_text_template
@@ -257,7 +258,7 @@ fun RewindDetailScreenContent(
 
         is RewindDetailUiState.Error -> {
             RewindErrorScreen(
-                message = "Whoops, we couldn't catch the rewind. Try again later.",
+                message = stringResource(Res.string.rewind_detail_load_failed),
                 onExit = onExitRewind,
                 modifier = modifier.fillMaxSize(),
             )
