@@ -1,6 +1,10 @@
 package app.logdate.client.domain.recommendation
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.ActivitySuggestion
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.events.ObserveUpcomingEventsUseCase
 import app.logdate.client.domain.notes.HasNotesForTodayUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
@@ -47,24 +51,87 @@ class GetHomeRecommendationUseCaseTest {
     fun setUp() {
         mockNotesRepository = MockJournalNotesRepository()
         mockDraftRepository = MockEntryDraftRepository()
+        useCase = useCase(flowOf(ActivityUiState()))
+    }
+
+    private fun useCase(
+        activity: Flow<ActivityUiState>,
+        dismiss: suspend () -> Unit = {},
+        use: suspend () -> Unit = {},
+        settings: MemoriesSettingsRepository = DefaultMemoriesSettingsRepository(MockKeyValueStorage()),
+    ): GetHomeRecommendationUseCase {
         val resolveLocationToPlaceUseCase =
             ResolveLocationToPlaceUseCase(
                 userPlacesRepository = EmptyUserPlacesRepository(),
                 externalPlacesProvider = UnavailableExternalPlacesProvider(),
                 reverseGeocodingProvider = UnavailableReverseGeocodingProvider(),
             )
-        useCase =
-            GetHomeRecommendationUseCase(
-                hasNotesForToday = HasNotesForTodayUseCase(mockNotesRepository),
-                fetchMostRecentDraft = FetchMostRecentDraftUseCase(mockDraftRepository),
-                getMemoryRecall = GetMemoryRecallUseCase(mockNotesRepository),
-                observeUpcomingEvents = ObserveUpcomingEventsUseCase(StubEventRepository),
-                eventRepository = StubEventRepository,
-                clientLocationProvider = TestLocationProvider,
-                placeResolutionCache = PlaceResolutionCache(resolveLocationToPlaceUseCase),
-                memoriesSettingsRepository = DefaultMemoriesSettingsRepository(MockKeyValueStorage()),
-            )
+        return GetHomeRecommendationUseCase(
+            hasNotesForToday = HasNotesForTodayUseCase(mockNotesRepository),
+            fetchMostRecentDraft = FetchMostRecentDraftUseCase(mockDraftRepository),
+            getMemoryRecall = GetMemoryRecallUseCase(mockNotesRepository),
+            observeUpcomingEvents = ObserveUpcomingEventsUseCase(StubEventRepository),
+            eventRepository = StubEventRepository,
+            clientLocationProvider = TestLocationProvider,
+            placeResolutionCache = PlaceResolutionCache(resolveLocationToPlaceUseCase),
+            memoriesSettingsRepository = settings,
+            activity = activity,
+            dismissActivitySuggestion = dismiss,
+            useActivitySuggestion = use,
+        )
     }
+
+    // --- Activity ---
+
+    @Test
+    fun `a walk that just ended comes before a waiting draft`() =
+        runTest {
+            mockNotesRepository.notesForRange = emptyList()
+            mockDraftRepository.drafts = listOf(createDraftWithText("Half a thought"))
+            val walk = Activity(ActivityKind.MOVING, Instant.fromEpochSeconds(1_000), Instant.fromEpochSeconds(3_400))
+            val withActivity = useCase(flowOf(ActivityUiState(suggestion = ActivitySuggestion(walk, minutes = 40))))
+
+            assertEquals(HomeRecommendation.AfterActivity(minutes = 40, trip = false), withActivity().first())
+        }
+
+    @Test
+    fun `waking up brings the morning start`() =
+        runTest {
+            mockNotesRepository.notesForRange = emptyList()
+            val night = Activity(ActivityKind.SLEEP, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(28_800))
+            val withActivity = useCase(flowOf(ActivityUiState(morningStart = night)))
+
+            assertEquals(HomeRecommendation.MorningStart, withActivity().first())
+        }
+
+    @Test
+    fun `turning off contextual recommendations also hides the activity suggestion`() =
+        runTest {
+            val settings = DefaultMemoriesSettingsRepository(MockKeyValueStorage())
+            settings.setContextualRecommendationsEnabled(false)
+            val walk = Activity(ActivityKind.MOVING, Instant.fromEpochSeconds(1_000), Instant.fromEpochSeconds(3_400))
+            val withActivity =
+                useCase(flowOf(ActivityUiState(suggestion = ActivitySuggestion(walk, minutes = 40))), settings = settings)
+
+            assertEquals(HomeRecommendation.None, withActivity().first())
+        }
+
+    @Test
+    fun `dismissing and using the activity suggestion reach the activity presenter`() =
+        runTest {
+            val calls = mutableListOf<String>()
+            val withActivity =
+                useCase(
+                    flowOf(ActivityUiState()),
+                    dismiss = { calls += "dismiss" },
+                    use = { calls += "use" },
+                )
+
+            withActivity.dismissActivity()
+            withActivity.useActivity()
+
+            assertEquals(listOf("dismiss", "use"), calls)
+        }
 
     // --- None ---
 

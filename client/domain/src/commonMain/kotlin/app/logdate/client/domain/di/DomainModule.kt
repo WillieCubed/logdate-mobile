@@ -2,6 +2,8 @@ package app.logdate.client.domain.di
 
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
+import app.logdate.client.domain.activity.ActivityPresenter
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.dayboundary.DatastoreDayBoundaryPreferences
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
@@ -114,6 +116,7 @@ import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.events.EventNamingExtractor
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.peer.state.PeerRole
+import kotlinx.coroutines.flow.flowOf
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -297,7 +300,22 @@ val domainModule: Module =
 
         // Recommendations
         factory { GetMemoryRecallUseCase(get(), getOrNull()) }
-        factory { GetHomeRecommendationUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
+        factory {
+            val activity = getOrNull<ActivityPresenter>()
+            GetHomeRecommendationUseCase(
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+                activity = activity?.state ?: flowOf(ActivityUiState()),
+                dismissActivitySuggestion = { activity?.dismiss() },
+                useActivitySuggestion = { activity?.actedOn() },
+            )
+        }
         factory { GenerateAmbientPromptCandidatesUseCase(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         single<AmbientPromptHistoryRepository> { DefaultAmbientPromptHistoryRepository(get()) }
         single<PlaceFamiliarityRepository> { DefaultPlaceFamiliarityRepository(get()) }

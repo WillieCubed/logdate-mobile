@@ -45,7 +45,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.suggestion_after_moving_message
+import logdate.client.ui.generated.resources.suggestion_after_trip_message
 import logdate.client.ui.generated.resources.suggestion_draft_fallback
+import logdate.client.ui.generated.resources.suggestion_morning_message
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
 import kotlin.uuid.Uuid
@@ -109,13 +113,30 @@ fun TimelineList(
     listState: LazyListState = rememberLazyListState(),
     pendingMomentContent: @Composable (app.logdate.client.repository.moments.MarkedMoment) -> Unit = {},
     onOpenTextNote: (Uuid) -> Unit = {},
+    onDismissSuggestion: () -> Unit = {},
+    onUseSuggestion: () -> Unit = {},
+    onRecordVoice: () -> Unit = onStartWriting,
 ) {
     val isPostCloudRestore = LocalIsPostCloudRestore.current
     val workspaceEnabled = LocalWorkspaceEnabled.current
     val draftMessage = stringResource(Res.string.suggestion_draft_fallback)
+    val morningMessage = stringResource(Res.string.suggestion_morning_message)
+    val activityMessage =
+        (timelineSuggestion as? TimelineSuggestionBlock.AfterActivity)?.let { activity ->
+            val message = if (activity.trip) Res.plurals.suggestion_after_trip_message else Res.plurals.suggestion_after_moving_message
+            pluralStringResource(message, activity.minutes, activity.minutes)
+        }
     val suggestionBlockState: TimelineSuggestionBlockUiState? =
-        remember(timelineSuggestion, draftMessage) {
+        remember(timelineSuggestion, draftMessage, morningMessage, activityMessage) {
             when (timelineSuggestion) {
+                is TimelineSuggestionBlock.AfterActivity ->
+                    TimelineSuggestionBlockUiState(
+                        type = TimelineSuggestionBlockType.AFTER_ACTIVITY,
+                        message = activityMessage.orEmpty(),
+                        activityTrip = timelineSuggestion.trip,
+                    )
+                TimelineSuggestionBlock.MorningStart ->
+                    TimelineSuggestionBlockUiState(type = TimelineSuggestionBlockType.MORNING_START, message = morningMessage)
                 is TimelineSuggestionBlock.CompleteDraft ->
                     TimelineSuggestionBlockUiState(
                         type = TimelineSuggestionBlockType.COMPLETE_DRAFT,
@@ -231,6 +252,9 @@ fun TimelineList(
                             onOpenDraft = onOpenDraft,
                             onViewMemoryDay = onViewMemoryDay,
                             onShareMemory = onShareMemory,
+                            onDismiss = onDismissSuggestion,
+                            onUse = onUseSuggestion,
+                            onRecordVoice = onRecordVoice,
                             modifier = Modifier.padding(Spacing.lg),
                         )
                     }

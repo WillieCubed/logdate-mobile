@@ -56,6 +56,7 @@ import app.logdate.feature.core.settings.navigation.settingsEntries
 import app.logdate.feature.core.settings.navigation.watchEntries
 import app.logdate.feature.core.sync.navigation.syncIssuesEntry
 import app.logdate.feature.core.watch.continuity.watchHandoffEntries
+import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.editor.navigation.editorEntry
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -255,6 +256,7 @@ fun LogDateNavDisplay(
                                         HomeScreen(
                                             onNewEntry = { backStack.add(EntryEditorRoute()) },
                                             onWriteMark = { backStack.add(EntryEditorRoute(markId = it.toString())) },
+                                            onRecordVoice = { backStack.add(EntryEditorRoute(launchMode = EditorLaunchMode.Voice)) },
                                             onOpenJournal = { backStack.add(JournalDetailsRoute(it)) },
                                             onCreateJournal = { backStack.add(JournalCreationRoute()) },
                                             onBrowseJournals = { backStack.add(JournalsOverviewRoute) },

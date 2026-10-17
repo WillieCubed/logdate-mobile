@@ -317,6 +317,44 @@ fun S03a_TimelineSuggestionEmptyDayWithLocation() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
+fun S03c_TimelineSuggestionAfterWalk() {
+    ScreenshotTheme {
+        HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
+            TimelinePane(
+                uiState = TimelineUiState(items = timelineDays),
+                onNewEntry = {},
+                onShareMemory = { _ -> },
+                onOpenDay = {},
+                onSearchClick = {},
+                onProfileClick = {},
+                timelineSuggestion = TimelineSuggestionBlock.AfterActivity(minutes = 40, trip = false),
+            )
+        }
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S03d_TimelineSuggestionMorningStart() {
+    ScreenshotTheme {
+        HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
+            TimelinePane(
+                uiState = TimelineUiState(items = timelineDays),
+                onNewEntry = {},
+                onShareMemory = { _ -> },
+                onOpenDay = {},
+                onSearchClick = {},
+                onProfileClick = {},
+                timelineSuggestion = TimelineSuggestionBlock.MorningStart,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
 fun S03b_TimelineSuggestionOnThisDayMemoryRecall() {
     ScreenshotTheme {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
