@@ -215,8 +215,10 @@ private fun assertMatchesBaseline(
         if (desktopScreenshotSceneFilter == null && existing != null && compareImages(existing, rendered) == null) return
         referenceFile.parentFile.mkdirs()
         ImageIO.write(rendered, "png", referenceFile)
+        referenceHostFile.writeText("$thisRenderHost\n")
         return
     }
+    if (!referencesRenderedOnThisHost) return
 
     assertTrue(referenceFile.exists(), "Missing desktop screenshot baseline: ${referenceFile.absolutePath}")
 
@@ -459,6 +461,37 @@ private fun compareImages(
             totalPixels = totalPixels,
         )
     }
+}
+
+/**
+ * The host the committed references were rendered on, as the OS name and major version. Text
+ * rasterization changes between OS releases (macOS 27 anti-aliases text differently from macOS 26),
+ * so pixels are only comparable on the host that rendered the references. Recording rewrites it.
+ */
+private val referenceHostFile: File
+    get() = screenshotReferenceDir.resolve("render-host.txt")
+
+private val thisRenderHost: String =
+    "${System.getProperty("os.name")} ${System.getProperty("os.version").substringBefore('.')}"
+
+/**
+ * Whether the references can be compared on this machine. Another host still renders every scene
+ * into the actual directory but skips the comparison and says so. Where comparison is required,
+ * on CI or with `LOGDATE_REQUIRE_DESKTOP_SCREENSHOTS=true`, another host fails instead, so a runner
+ * image upgrade cannot turn the check off unnoticed.
+ */
+private val referencesRenderedOnThisHost: Boolean by lazy {
+    val recorded = referenceHostFile.takeIf(File::exists)?.readText()?.trim() ?: return@lazy true
+    if (recorded == thisRenderHost) return@lazy true
+    check(System.getenv("LOGDATE_REQUIRE_DESKTOP_SCREENSHOTS") != "true" && System.getenv("CI") != "true") {
+        "The desktop screenshot references were rendered on $recorded, but this machine is $thisRenderHost. " +
+            "Re-record them on $recorded, or record them here and update CI to match."
+    }
+    println(
+        "Rendering desktop screenshots without comparing them: the references were rendered on $recorded, " +
+            "and this machine is $thisRenderHost, which renders text differently. Actual images: ${screenshotActualDir.absolutePath}",
+    )
+    false
 }
 
 private val updateDesktopScreenshots: Boolean =
