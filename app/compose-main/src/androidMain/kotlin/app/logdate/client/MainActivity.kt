@@ -24,6 +24,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.activity.PhoneActivityAwareness
 import app.logdate.client.database.DatabaseRecoveryController
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
@@ -100,6 +101,7 @@ class MainActivity : FragmentActivity() {
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
     private val watchCompanionAssociationManager: WatchCompanionAssociationManager by inject()
     private val locationTrackingManager: LocationTrackingManager by inject()
+    private val activityAwareness: PhoneActivityAwareness by inject()
     private val profileRepository: ProfileRepository by inject()
     private val userStateRepository: UserStateRepository by inject()
     private val sessionStorage: SessionStorage by inject()
@@ -348,6 +350,7 @@ class MainActivity : FragmentActivity() {
     private fun resumeReadyActivity() {
         viewModel.onAppForegrounded()
         locationTrackingManager.onActivityResumed()
+        activityAwareness.onActivityResumed()
         activityProvider.currentActivity = this
         lifecycleScope.launch {
             playInAppUpdateController.resumeIfUpdateInProgress()

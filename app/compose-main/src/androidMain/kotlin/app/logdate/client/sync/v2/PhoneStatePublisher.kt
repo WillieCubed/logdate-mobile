@@ -6,6 +6,7 @@ import app.logdate.client.domain.watch.SharedPreferenceKey
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocol
+import app.logdate.client.sync.peer.state.ActivitySnapshot
 import app.logdate.client.sync.peer.state.CampfireSnapshot
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerRole
@@ -32,6 +33,8 @@ data class PhoneStateParts(
     val dayStartHour: Int = 0,
     val campfire: CampfireSnapshot? = null,
     val reminderHours: app.logdate.client.sync.peer.state.ReminderHours? = null,
+    val activityAwareness: Boolean = false,
+    val activity: ActivitySnapshot? = null,
 )
 
 /** The campfire as the phone computed it; the watch's window is too short to compute a long run itself. */
@@ -103,7 +106,13 @@ class PhoneStatePublisher(
                 writtenAt = clock.now().toEpochMilliseconds(),
                 phone =
                     PhoneState(
-                        flags = mapOf(FeatureFlag.WATCH_EXPERIENCE_V2.key to v2Enabled),
+                        // Activity awareness is listed only while it is on: a watch reads its absence,
+                        // including from an older phone, as off.
+                        flags =
+                            buildMap {
+                                put(FeatureFlag.WATCH_EXPERIENCE_V2.key, v2Enabled)
+                                if (current.activityAwareness) put(FeatureFlag.ACTIVITY_AWARENESS.key, true)
+                            },
                         zone = timeZone().id,
                         features = features,
                         cloud = current.cloud,
@@ -113,6 +122,7 @@ class PhoneStatePublisher(
                             current.reminderHours.takeIf {
                                 v2Enabled && SharedPreferenceKey.RemindersEnabled.read(shared[SharedPreferenceKey.RemindersEnabled.name])
                             },
+                        activity = current.activity.takeIf { current.activityAwareness },
                     ),
                 shared = shared,
                 lastReminderAt = postedAt,

@@ -3,6 +3,9 @@
 package app.logdate.feature.core.settings.ui.labs
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -21,6 +24,7 @@ private const val INTRO = "These features are unfinished."
 private const val SECTION = "Unreleased features"
 private const val EMPTY = "No unreleased features to try."
 private const val WATCH_TITLE = "Redesigned watch app"
+private const val ACTIVITY_PERMISSION_TITLE = "Allow physical activity"
 private const val WATCH_DESCRIPTION = "The new watch app and its phone screens, on this phone and your watch."
 
 /**
@@ -77,6 +81,34 @@ class LabsSettingsContentTest {
         }
 
     @Test
+    fun `activity awareness that is on without physical activity asks for it`() =
+        runDesktopComposeUiTest {
+            var asked = 0
+            setContent {
+                Labs(activityFlag(enabled = true), activityAllowed = false, onAllowActivity = { asked++ })
+            }
+
+            onNodeWithText(ACTIVITY_PERMISSION_TITLE).assertIsDisplayed()
+            onNodeWithText("Allow").performClick()
+
+            assertEquals(1, asked)
+        }
+
+    @Test
+    fun `activity awareness asks nothing once physical activity is allowed or while it is off`() =
+        runDesktopComposeUiTest {
+            var state by mutableStateOf(activityFlag(enabled = true))
+            var allowed by mutableStateOf(true)
+            setContent { Labs(state, activityAllowed = allowed) }
+            onNodeWithText(ACTIVITY_PERMISSION_TITLE).assertDoesNotExist()
+
+            state = activityFlag(enabled = false)
+            allowed = false
+
+            onNodeWithText(ACTIVITY_PERMISSION_TITLE).assertDoesNotExist()
+        }
+
+    @Test
     fun `with no flags the page says nothing is in testing and shows no switch`() =
         runDesktopComposeUiTest {
             setContent { Labs(LabsUiState.Ready(emptyList())) }
@@ -100,12 +132,22 @@ class LabsSettingsContentTest {
 
 private fun watchFlag(enabled: Boolean): LabsUiState = LabsUiState.Ready(listOf(LabsFlag(FeatureFlag.WATCH_EXPERIENCE_V2, enabled)))
 
+private fun activityFlag(enabled: Boolean): LabsUiState = LabsUiState.Ready(listOf(LabsFlag(FeatureFlag.ACTIVITY_AWARENESS, enabled)))
+
 @Composable
 private fun Labs(
     uiState: LabsUiState,
+    activityAllowed: Boolean = true,
+    onAllowActivity: () -> Unit = {},
     onSetEnabled: (FeatureFlag, Boolean) -> Unit = { _, _ -> },
 ) {
     LogDateTheme(dynamicColor = false, darkTheme = false) {
-        LabsSettingsContent(uiState = uiState, onBack = {}, onSetEnabled = onSetEnabled)
+        LabsSettingsContent(
+            uiState = uiState,
+            onBack = {},
+            onSetEnabled = onSetEnabled,
+            activityAllowed = activityAllowed,
+            onAllowActivity = onAllowActivity,
+        )
     }
 }
