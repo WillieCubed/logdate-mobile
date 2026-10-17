@@ -85,12 +85,8 @@ class JournalMergeAccountLockPostgresTest {
         assumeTrue(url != null && System.getenv("LOGDATE_JOURNAL_MERGE_TEST_DISPOSABLE") == "true")
         val uri = URI(requireNotNull(url))
         require(uri.host in setOf("localhost", "127.0.0.1") && uri.path.startsWith("/logdate_agent_journal_merge_"))
-        val dataSource =
-            DatabaseConfig.createDataSource(
-                databaseUrl = url,
-                username = "logdate",
-                password = "logdate",
-            ) as HikariDataSource
+        // Credentials come from the URL, for example postgresql://user:password@localhost:6432/...
+        val dataSource = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
         // Closing the pool also ends any lock statement left blocked by a failed assertion.
         dataSource.use { runBlocking { test(it) } }
     }
