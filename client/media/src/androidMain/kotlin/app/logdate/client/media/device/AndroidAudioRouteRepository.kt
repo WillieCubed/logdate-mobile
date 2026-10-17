@@ -4,12 +4,30 @@ import android.content.Context
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_route_audio_output
+import logdate.client.media.generated.resources.media_device_route_bluetooth_audio
+import logdate.client.media.generated.resources.media_device_route_bluetooth_broadcast
+import logdate.client.media.generated.resources.media_device_route_bluetooth_headset
+import logdate.client.media.generated.resources.media_device_route_bluetooth_le_headset
+import logdate.client.media.generated.resources.media_device_route_bluetooth_le_speaker
+import logdate.client.media.generated.resources.media_device_route_built_in_microphone
+import logdate.client.media.generated.resources.media_device_route_external_microphone
+import logdate.client.media.generated.resources.media_device_route_headset_microphone
+import logdate.client.media.generated.resources.media_device_route_this_phone
+import logdate.client.media.generated.resources.media_device_route_usb_audio_device
+import logdate.client.media.generated.resources.media_device_route_usb_headset
+import logdate.client.media.generated.resources.media_device_route_usb_microphone
+import logdate.client.media.generated.resources.media_device_route_wired_headphones
+import logdate.client.media.generated.resources.media_device_route_wired_headset
 
 class AndroidAudioRouteRepository(
     context: Context,
@@ -26,7 +44,7 @@ class AndroidAudioRouteRepository(
     private val routeStateLock = Any()
     private var recordingActive = false
     private var routedInputId: String? = null
-    private var inputRoutingError: String? = null
+    private var inputRoutingError: UiText? = null
 
     private val deviceCallback =
         object : AudioDeviceCallback() {
@@ -46,7 +64,7 @@ class AndroidAudioRouteRepository(
     override fun updateRecordingInputDevice(
         deviceId: String?,
         isRecording: Boolean,
-        error: String?,
+        error: UiText?,
     ) {
         synchronized(routeStateLock) {
             recordingActive = isRecording
@@ -266,24 +284,29 @@ private fun AudioDeviceInfo.toMediaDeviceUiState(kind: MediaDeviceKind): MediaDe
         qualityRank = routeQualityRank(),
     )
 
-private fun AudioDeviceInfo.labelFor(kind: MediaDeviceKind): String {
-    if (type == AudioDeviceInfo.TYPE_BUILTIN_MIC) return "Built-in microphone"
-    if (type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) return "This phone"
+private fun AudioDeviceInfo.labelFor(kind: MediaDeviceKind): UiText {
+    if (type == AudioDeviceInfo.TYPE_BUILTIN_MIC) return Res.string.media_device_route_built_in_microphone.toUiText()
+    if (type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) return Res.string.media_device_route_this_phone.toUiText()
     val productName = productName?.toString()?.trim().orEmpty()
-    if (productName.isNotBlank()) return productName
+    if (productName.isNotBlank()) return productName.toUiText()
 
-    return when (type) {
-        AudioDeviceInfo.TYPE_WIRED_HEADSET -> if (kind == MediaDeviceKind.AUDIO_INPUT) "Headset microphone" else "Wired headset"
-        AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired headphones"
-        AudioDeviceInfo.TYPE_USB_DEVICE -> "USB audio device"
-        AudioDeviceInfo.TYPE_USB_HEADSET -> if (kind == MediaDeviceKind.AUDIO_INPUT) "USB microphone" else "USB headset"
-        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "Bluetooth headset"
-        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "Bluetooth audio"
-        AudioDeviceInfo.TYPE_BLE_HEADSET -> "Bluetooth LE headset"
-        AudioDeviceInfo.TYPE_BLE_SPEAKER -> "Bluetooth LE speaker"
-        AudioDeviceInfo.TYPE_BLE_BROADCAST -> "Bluetooth broadcast"
-        else -> if (kind == MediaDeviceKind.AUDIO_INPUT) "External microphone" else "Audio output"
-    }
+    val isInput = kind == MediaDeviceKind.AUDIO_INPUT
+    val label =
+        when (type) {
+            AudioDeviceInfo.TYPE_WIRED_HEADSET ->
+                if (isInput) Res.string.media_device_route_headset_microphone else Res.string.media_device_route_wired_headset
+            AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> Res.string.media_device_route_wired_headphones
+            AudioDeviceInfo.TYPE_USB_DEVICE -> Res.string.media_device_route_usb_audio_device
+            AudioDeviceInfo.TYPE_USB_HEADSET ->
+                if (isInput) Res.string.media_device_route_usb_microphone else Res.string.media_device_route_usb_headset
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> Res.string.media_device_route_bluetooth_headset
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> Res.string.media_device_route_bluetooth_audio
+            AudioDeviceInfo.TYPE_BLE_HEADSET -> Res.string.media_device_route_bluetooth_le_headset
+            AudioDeviceInfo.TYPE_BLE_SPEAKER -> Res.string.media_device_route_bluetooth_le_speaker
+            AudioDeviceInfo.TYPE_BLE_BROADCAST -> Res.string.media_device_route_bluetooth_broadcast
+            else -> if (isInput) Res.string.media_device_route_external_microphone else Res.string.media_device_route_audio_output
+        }
+    return label.toUiText()
 }
 
 private fun categoryForType(type: Int): MediaDeviceCategory =

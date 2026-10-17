@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.resolve
 import app.logdate.feature.editor.ui.common.NoteEditorToolbar
 import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
@@ -177,7 +178,7 @@ fun EntryEditorContent(
 
     LaunchedEffect(editorState.errorMessage) {
         editorState.errorMessage?.let { error ->
-            snackbarHostState.showSnackbar(error)
+            snackbarHostState.showSnackbar(error.resolve())
         }
     }
 

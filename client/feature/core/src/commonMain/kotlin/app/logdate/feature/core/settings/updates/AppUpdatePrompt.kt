@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.asString
 import app.logdate.ui.adaptive.HingeAwareOverlay
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.app_update_prompt_available
@@ -49,12 +50,12 @@ fun AppUpdatePrompt(
     val onAction: (() -> Unit)?
     when (uiState.status) {
         AppUpdateStatus.Available -> {
-            message = uiState.message ?: stringResource(Res.string.app_update_prompt_available)
+            message = uiState.message?.asString() ?: stringResource(Res.string.app_update_prompt_available)
             actionLabel = stringResource(Res.string.app_update_prompt_update)
             onAction = onLaunchUpdate
         }
         AppUpdateStatus.Downloaded -> {
-            message = uiState.message ?: stringResource(Res.string.app_update_prompt_downloaded)
+            message = uiState.message?.asString() ?: stringResource(Res.string.app_update_prompt_downloaded)
             actionLabel = stringResource(Res.string.app_update_prompt_restart)
             onAction = onCompleteUpdate
         }

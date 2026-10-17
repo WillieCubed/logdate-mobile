@@ -18,6 +18,10 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.LocalDate
+import logdate.client.sharing.generated.resources.Res
+import logdate.client.sharing.generated.resources.share_journal_link_text
+import logdate.client.sharing.generated.resources.share_journal_qr_code_text
+import org.jetbrains.compose.resources.getString
 import platform.CoreGraphics.CGAffineTransformMakeScale
 import platform.CoreGraphics.CGPointMake
 import platform.CoreGraphics.CGRectMake
@@ -96,13 +100,10 @@ class IosSharingLauncher(
         summary: String,
         mediaUris: List<String>,
     ) {
-        val text =
-            if (summary.isNotBlank()) {
-                "My memory from $date: $summary"
-            } else {
-                "Check out my memory from $date on LogDate!"
-            }
-        shareContent(text = text, mediaUris = mediaUris, chooserTitle = "Share memory")
+        // UIActivityViewController has no title, so there is no chooser title to resolve here.
+        coroutineScope.launch {
+            shareContent(text = memoryDayShareText(date, summary), mediaUris = mediaUris)
+        }
     }
 
     override fun shareJournalToInstagram(
@@ -153,7 +154,7 @@ class IosSharingLauncher(
                 journalRepository.observeJournalById(journalId).firstOrNull()
                     ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
             val link = journalDeepLink(journalId)
-            val text = "${journal.title} on LogDate — $link"
+            val text = getString(Res.string.share_journal_link_text, journal.title, link)
             presentActivityController(buildItems(text = text, mediaUris = emptyList()))
         }
     }
@@ -165,7 +166,7 @@ class IosSharingLauncher(
                     ?: throw IllegalArgumentException("Journal with ID $journalId does not exist")
             val link = journalDeepLink(journalId)
             val qrImage = generateQrCodeImage(link)
-            val items = mutableListOf<Any>(link, "Scan to open ${journal.title}")
+            val items = mutableListOf<Any>(link, getString(Res.string.share_journal_qr_code_text, journal.title))
             if (qrImage != null) items.add(0, qrImage)
             presentActivityController(items)
         }

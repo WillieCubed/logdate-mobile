@@ -14,10 +14,13 @@
 #     or any argument whose parameter name reads as text (title, label, message, supportingText, ...),
 #     named or positional, of a composable declared in the repository;
 #   - in a file that declares composables: a text-named argument of any other call (UI state, actions),
-#     a text-named local or default value, or a value chosen by if/when/else that reads as prose.
+#     a text-named local or default value, or a value chosen by if/when/else that reads as prose;
+#   - in any other file, such as a ViewModel, mapper or domain model: a text-named argument or default
+#     value that reads as prose, because UI state built there reaches the screen too.
 #
 # Literals inside @Preview functions, PreviewParameterProvider classes and top-level preview* or sample*
-# declarations are example content and are skipped, as are animation labels, log and exception messages, and annotations.
+# declarations are example content and are skipped, as are animation labels, log and exception messages, annotations,
+# and arguments named for diagnostics (logMessage, exceptionLabel, failureMessage) of calls that are not composables.
 # The program uses only POSIX awk, so it runs on macOS awk and the mawk of CI's Ubuntu runners.
 
 function reset_file() {
@@ -131,11 +134,16 @@ function positional_param(c, idx,   b) {
 }
 
 function is_non_ui_call(c, name) {
-  if (c ~ /^@/ || c ~ /^(Napier|Log)\./) return 1
+  if (c ~ /^@/ || c ~ /(^|\.)(Napier|Log)\.[a-z]+$/) return 1
   c = base_name(c)
   if (c ~ /(Exception|Error|Throwable)$/) return 1
   if (name == "label" && (c ~ /^animate/ || c ~ /Transition$/ || c ~ /^(Crossfade|AnimatedContent)$/)) return 1
   return 0
+}
+
+# Text that only reaches logs and exceptions, such as importContacts(logMessage = "...").
+function is_diagnostic_name(n) {
+  return n ~ /^(log|exception|failure)[A-Z]/
 }
 
 # Composables run inside function bodies and lambdas, never directly in a class body or at the top
@@ -148,7 +156,7 @@ function in_declaration(k) {
   return 1
 }
 
-function argument_rule(k, c, name, idx,   p) {
+function argument_rule(k, c, name, idx, words,   p) {
   if (name == "contentDescription") return "contentDescription ="
   if (name == "") {
     p = positional_param(c, idx)
@@ -157,7 +165,9 @@ function argument_rule(k, c, name, idx,   p) {
     name = p
   }
   if (!is_text_name(name) || is_non_ui_call(c, name)) return ""
-  if (uiFile || (is_composable(c) && !in_declaration(k))) return base_name(c) "(" name ")"
+  if (is_composable(c) && !in_declaration(k)) return base_name(c) "(" name ")"
+  if (is_diagnostic_name(name)) return ""
+  if (uiFile || is_prose(words)) return base_name(c) "(" name ")"
   return ""
 }
 
@@ -180,10 +190,11 @@ function classify(words, prev, prevC,    k, t, chosen) {
     if (t == "(") {
       if (fname[k] ~ /^(if|when|while|for|catch|val|var)$/) return ""
       if (fname[k] ~ /^(Pair|Triple)$/ && fnamed[k] == "") continue
-      return argument_rule(k, fname[k], fnamed[k], fargi[k])
+      return argument_rule(k, fname[k], fnamed[k], fargi[k], words)
     }
     if (t == "P") {
-      if ((fcomp[k] || uiFile) && is_text_name(fnamed[k])) return "default " fnamed[k]
+      if (!is_text_name(fnamed[k])) return ""
+      if (fcomp[k] || uiFile || (is_prose(words) && !is_diagnostic_name(fnamed[k]))) return "default " fnamed[k]
       return ""
     }
     if (t == "[") return ""

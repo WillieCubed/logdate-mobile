@@ -5,12 +5,16 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.GetExportCountsUseCase
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_error_default
 
 sealed class ExportState {
     data object Idle : ExportState()
@@ -24,7 +28,7 @@ sealed class ExportState {
 
     data class Exporting(
         val progressPercent: Int = 0,
-        val message: String = "",
+        val message: UiText? = null,
     ) : ExportState()
 
     data class Completed(
@@ -34,12 +38,10 @@ sealed class ExportState {
     ) : ExportState()
 
     data class Failed(
-        val reason: String,
+        val reason: UiText,
         val canRetry: Boolean = true,
     ) : ExportState()
 }
-
-private const val DEFAULT_FAILURE_REASON = "Export failed. Please try again."
 
 class UserDataExportViewModel(
     private val exportLauncher: ExportLauncher,
@@ -73,7 +75,9 @@ class UserDataExportViewModel(
                     _isSheetVisible.value = false
                 }
                 is ExportOutcome.Failed -> {
-                    _exportState.update { ExportState.Failed(outcome.reason ?: DEFAULT_FAILURE_REASON) }
+                    _exportState.update {
+                        ExportState.Failed(outcome.reason ?: Res.string.export_error_default.toUiText())
+                    }
                     _isSheetVisible.value = true
                 }
             }

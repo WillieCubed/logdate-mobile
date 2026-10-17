@@ -20,6 +20,7 @@ import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.media.MediaCleaner
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
@@ -44,6 +45,10 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_changed_while_saving
+import logdate.client.feature.editor.generated.resources.editor_error_recording_not_finalized
+import logdate.client.feature.editor.generated.resources.editor_error_save_failed
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -274,7 +279,7 @@ class EntryEditorViewModelAudioSaveTest {
 
             val finalState = viewModel.editorState.value
             assertFalse(finalState.shouldExit, "a conflict on a block this save didn't publish must still block exit")
-            assertEquals("The editor changed while saving. Review your entry before closing.", finalState.errorMessage)
+            assertEquals(Res.string.editor_error_changed_while_saving.toUiText(), finalState.errorMessage)
         }
 
     /**
@@ -372,7 +377,7 @@ class EntryEditorViewModelAudioSaveTest {
             viewModel.editorState.first()
             val seeded = viewModel.seedAudioBlock(AudioCaptureState.Recording())
             advanceUntilIdle()
-            fakeFinalizer.respondWith(seeded.id, AudioCaptureState.Failed("Recording could not be finalized"))
+            fakeFinalizer.respondWith(seeded.id, AudioCaptureState.Failed(Res.string.editor_error_recording_not_finalized))
 
             viewModel.saveEntry(viewModel.editorState.value)
             advanceUntilIdle()
@@ -380,7 +385,7 @@ class EntryEditorViewModelAudioSaveTest {
             val savedNotes = journalNotesRepository.allNotesObserved.first()
             assertTrue(savedNotes.isEmpty(), "no note must be written when audio finalization fails")
             val state = viewModel.editorState.value
-            assertEquals("Recording could not be finalized", state.errorMessage)
+            assertEquals(Res.string.editor_error_recording_not_finalized.toUiText(), state.errorMessage)
             assertFalse(state.shouldExit, "editor must stay open so the user can retry")
             assertFalse(state.isSaving)
         }
@@ -403,7 +408,7 @@ class EntryEditorViewModelAudioSaveTest {
             assertFalse(state.isSaving)
             assertFalse(state.isEditingLocked)
             assertFalse(state.shouldExit)
-            assertTrue(state.errorMessage?.contains("finalizer exploded") == true)
+            assertEquals(Res.string.editor_error_save_failed.toUiText("finalizer exploded"), state.errorMessage)
         }
 
     @Test

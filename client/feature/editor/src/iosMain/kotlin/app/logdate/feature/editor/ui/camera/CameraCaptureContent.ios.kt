@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.UIKitView
+import app.logdate.client.text.asString
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
@@ -239,7 +240,7 @@ private fun ErrorOverlay(error: CameraCaptureError) {
             CameraCaptureError.CameraNotAvailable -> stringResource(Res.string.camera_error_no_camera)
             CameraCaptureError.CaptureFailed -> stringResource(Res.string.camera_error_capture_failed)
             CameraCaptureError.RecordingFailed -> stringResource(Res.string.camera_error_recording_failed)
-            is CameraCaptureError.Unknown -> stringResource(Res.string.camera_error_unknown, error.message)
+            is CameraCaptureError.Unknown -> stringResource(Res.string.camera_error_unknown, error.message.asString())
         }
     Box(
         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),

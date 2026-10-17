@@ -34,9 +34,26 @@ import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.ui.workspace.WorkspaceSearchScope
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.Month
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_april
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_august
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_december
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_february
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_january
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_july
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_june
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_march
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_may
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_november
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_october
+import logdate.client.feature.journal.generated.resources.journal_suggestion_month_september
+import logdate.client.feature.journal.generated.resources.journal_suggestion_reason
+import logdate.client.feature.journal.generated.resources.journal_suggestion_title
 import logdate.client.feature.journal.generated.resources.search_journals
 import logdate.client.feature.journal.generated.resources.suggestion_create_journal
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -263,12 +280,17 @@ private fun SuggestionCard(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Text(
-                text = suggestion.suggestedTitle,
+                text =
+                    stringResource(
+                        Res.string.journal_suggestion_title,
+                        stringResource(suggestion.weekOf.month.suggestionName),
+                        suggestion.weekOf.day,
+                    ),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Text(
-                text = suggestion.reason,
+                text = pluralStringResource(Res.plurals.journal_suggestion_reason, suggestion.noteCount, suggestion.noteCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
             )
@@ -278,3 +300,20 @@ private fun SuggestionCard(
         }
     }
 }
+
+private val Month.suggestionName: StringResource
+    get() =
+        when (this) {
+            Month.JANUARY -> Res.string.journal_suggestion_month_january
+            Month.FEBRUARY -> Res.string.journal_suggestion_month_february
+            Month.MARCH -> Res.string.journal_suggestion_month_march
+            Month.APRIL -> Res.string.journal_suggestion_month_april
+            Month.MAY -> Res.string.journal_suggestion_month_may
+            Month.JUNE -> Res.string.journal_suggestion_month_june
+            Month.JULY -> Res.string.journal_suggestion_month_july
+            Month.AUGUST -> Res.string.journal_suggestion_month_august
+            Month.SEPTEMBER -> Res.string.journal_suggestion_month_september
+            Month.OCTOBER -> Res.string.journal_suggestion_month_october
+            Month.NOVEMBER -> Res.string.journal_suggestion_month_november
+            Month.DECEMBER -> Res.string.journal_suggestion_month_december
+        }

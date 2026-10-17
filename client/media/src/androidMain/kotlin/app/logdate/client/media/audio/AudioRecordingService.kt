@@ -15,6 +15,8 @@ import android.os.IBinder
 import android.os.PowerManager
 import app.logdate.client.media.device.AndroidAudioRouteDevices
 import app.logdate.client.media.device.MediaDeviceKind
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_microphone_switch_failed
 import java.io.File
 
 /**
@@ -239,7 +243,7 @@ class AudioRecordingService : Service() {
         } catch (e: Exception) {
             Napier.e("Error starting foreground service", e)
             _recordingState.update {
-                it.copy(isRecording = false, error = "Recording is not allowed right now: ${e.message}")
+                it.copy(isRecording = false, failureMessage = "Recording is not allowed right now: ${e.message}")
             }
             stopSelf()
             return
@@ -349,7 +353,7 @@ class AudioRecordingService : Service() {
                         pausedByInterruption = false,
                         startTime = recordingStartTime,
                         recordedFilePath = null,
-                        error = null,
+                        failureMessage = null,
                     )
                 }
                 publishInputRoute(recorder)
@@ -360,7 +364,7 @@ class AudioRecordingService : Service() {
                 releaseQuietly(recorder)
                 mediaRecorder = null
                 _recordingState.update {
-                    it.copy(isRecording = false, error = "Failed to start recording: ${e.message}")
+                    it.copy(isRecording = false, failureMessage = "Failed to start recording: ${e.message}")
                 }
             }
         }
@@ -437,7 +441,7 @@ class AudioRecordingService : Service() {
         serviceScope.launch {
             stopRecording()
             releaseSessionResources()
-            _recordingState.update { it.copy(error = "Recording stopped unexpectedly (error $what)") }
+            _recordingState.update { it.copy(failureMessage = "Recording stopped unexpectedly (error $what)") }
         }
     }
 
@@ -565,7 +569,7 @@ class AudioRecordingService : Service() {
                     isPaused = false,
                     pausedByInterruption = false,
                     recordedFilePath = null,
-                    error = "Error stopping recording: ${e.message}",
+                    failureMessage = "Error stopping recording: ${e.message}",
                 )
             }
             null
@@ -641,13 +645,13 @@ class AudioRecordingService : Service() {
         try {
             val applied = setPreferredDevice(preferredDevice)
             _recordingState.update {
-                it.copy(inputRoutingError = if (applied) null else "Could not switch microphone. Recording continues on the current input.")
+                it.copy(inputRoutingError = if (applied) null else Res.string.media_device_microphone_switch_failed.toUiText())
             }
             if (this === mediaRecorder) publishInputRoute(this)
             Napier.d("Preferred recording microphone route applied=$applied")
         } catch (e: Exception) {
             Napier.e("Could not apply the recording microphone route", e)
-            _recordingState.update { it.copy(inputRoutingError = "Could not switch microphone. Recording continues on the current input.") }
+            _recordingState.update { it.copy(inputRoutingError = Res.string.media_device_microphone_switch_failed.toUiText()) }
         }
     }
 }
@@ -664,7 +668,9 @@ data class RecordingServiceState(
     val durationSeconds: Int = 0,
     val audioLevel: Float = 0f,
     val routedInputDeviceId: String? = null,
-    val inputRoutingError: String? = null,
+    /** Why the recorder could not use the requested microphone, shown beside the microphone picker. */
+    val inputRoutingError: UiText? = null,
     val recordedFilePath: String? = null,
-    val error: String? = null,
+    /** What went wrong when the recorder failed, for logs. The person sees the editor's own message. */
+    val failureMessage: String? = null,
 )

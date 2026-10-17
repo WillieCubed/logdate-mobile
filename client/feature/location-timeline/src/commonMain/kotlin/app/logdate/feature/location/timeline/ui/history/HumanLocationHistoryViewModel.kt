@@ -10,6 +10,7 @@ import app.logdate.client.domain.places.PlaceResolutionCache
 import app.logdate.client.domain.places.PlaceResolutionResult
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -35,9 +36,28 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_change_not_saved
+import logdate.client.feature.location.timeline.generated.resources.history_conflicts_message
+import logdate.client.feature.location.timeline.generated.resources.history_day_summary
+import logdate.client.feature.location.timeline.generated.resources.history_load_failed
+import logdate.client.feature.location.timeline.generated.resources.history_loading_day
+import logdate.client.feature.location.timeline.generated.resources.history_location_clue_count
+import logdate.client.feature.location.timeline.generated.resources.history_range_days
+import logdate.client.feature.location.timeline.generated.resources.history_recording_off
+import logdate.client.feature.location.timeline.generated.resources.history_recording_paused
+import logdate.client.feature.location.timeline.generated.resources.history_review_changes
+import logdate.client.feature.location.timeline.generated.resources.history_sections_failed
+import logdate.client.feature.location.timeline.generated.resources.history_today
+import logdate.client.feature.location.timeline.generated.resources.history_visit_count
+import logdate.client.feature.location.timeline.generated.resources.places_near
+import logdate.client.feature.location.timeline.generated.resources.places_somewhere_in
+import logdate.client.ui.generated.resources.common_try_again
+import org.jetbrains.compose.resources.getString
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 class HumanLocationHistoryViewModel(
     private val history: LocationHistoryService,
@@ -57,8 +77,8 @@ class HumanLocationHistoryViewModel(
     private val mutableState =
         MutableStateFlow(
             HumanLocationHistoryState(
-                "Today",
-                recoveryMessage = "Loading your day…",
+                Res.string.history_today.toUiText(),
+                recoveryMessage = Res.string.history_loading_day.toUiText(),
                 selectedItemId = savedState["historySelection"],
                 detailVisible = savedState["historyDetail"] ?: false,
                 tab = HistoryTab.entries.firstOrNull { it.name == savedState.get<String>("historyTab") } ?: HistoryTab.Day,
@@ -295,8 +315,8 @@ class HumanLocationHistoryViewModel(
                 failedAction = action
                 mutableState.update {
                     it.copy(
-                        recoveryMessage = "That change could not be saved. Try again.",
-                        recoveryActionLabel = "Try again",
+                        recoveryMessage = Res.string.history_change_not_saved.toUiText(),
+                        recoveryActionLabel = UiRes.string.common_try_again.toUiText(),
                         canRetry = true,
                     )
                 }
@@ -327,8 +347,8 @@ class HumanLocationHistoryViewModel(
                     Napier.w("Could not read location history", error)
                     mutableState.update {
                         it.copy(
-                            recoveryMessage = "Your history couldn’t be loaded. Try again.",
-                            recoveryActionLabel = "Try again",
+                            recoveryMessage = Res.string.history_load_failed.toUiText(),
+                            recoveryActionLabel = UiRes.string.common_try_again.toUiText(),
                             canRetry = true,
                         )
                     }
@@ -370,15 +390,18 @@ class HumanLocationHistoryViewModel(
             current.copy(
                 selectedItemId = selection,
                 detailVisible = current.detailVisible && selection != null,
-                dateLabel = selectedDateLabel(),
+                dateLabel = selectedDateLabel().toUiText(),
                 daySummary =
                     data.items.filterIsInstance<PlaceVisit>().let { visits ->
                         val confirmed = visits.count { it.confirmedStay }
                         val clues = visits.size - confirmed
-                        listOfNotNull(
-                            "$confirmed ${if (confirmed == 1) "visit" else "visits"}",
-                            "$clues ${if (clues == 1) "location clue" else "location clues"}".takeIf { clues > 0 },
-                        ).joinToString(" · ")
+                        val visitCount = Res.plurals.history_visit_count.toUiText(confirmed, confirmed)
+                        if (clues > 0) {
+                            val clueCount = Res.plurals.history_location_clue_count.toUiText(clues, clues)
+                            Res.string.history_day_summary.toUiText(visitCount, clueCount)
+                        } else {
+                            visitCount
+                        }
                     },
                 items =
                     data.items.map { item ->
@@ -387,25 +410,23 @@ class HumanLocationHistoryViewModel(
                         )
                     },
                 places = data.placeRows(),
-                placesFilterLabel = "$rangeDays days",
+                placesFilterLabel = Res.plurals.history_range_days.toUiText(rangeDays, rangeDays),
                 recoveryActionLabel =
                     when {
-                        failedAction != null -> "Try again"
-                        data.failedSections.isNotEmpty() -> "Try again"
-                        data.conflicts.isNotEmpty() -> "Review changes"
+                        failedAction != null -> UiRes.string.common_try_again.toUiText()
+                        data.failedSections.isNotEmpty() -> UiRes.string.common_try_again.toUiText()
+                        data.conflicts.isNotEmpty() -> Res.string.history_review_changes.toUiText()
                         else -> null
                     },
                 canRetry = failedAction != null || data.failedSections.isNotEmpty(),
                 recoveryMessage =
                     when {
-                        failedAction != null -> "That change could not be saved. Try again."
-                        data.failedSections.isNotEmpty() ->
-                            "Some details couldn’t be loaded. Your available history is still here."
-                        data.conflicts.isNotEmpty() ->
-                            "Some changes differ across your devices. Tap Review changes to choose what to keep."
+                        failedAction != null -> Res.string.history_change_not_saved.toUiText()
+                        data.failedSections.isNotEmpty() -> Res.string.history_sections_failed.toUiText()
+                        data.conflicts.isNotEmpty() -> Res.string.history_conflicts_message.toUiText()
                         !tracking.backgroundTrackingEnabled && tracking.captureMode == LocationCaptureMode.PASSIVE ->
-                            "Location history is off. You can still browse memories with a saved place."
-                        !tracking.backgroundTrackingEnabled -> "Location history is paused. Your saved days are still here."
+                            Res.string.history_recording_off.toUiText()
+                        !tracking.backgroundTrackingEnabled -> Res.string.history_recording_paused.toUiText()
                         else -> null
                     },
             )
@@ -438,17 +459,17 @@ class HumanLocationHistoryViewModel(
             }
     }
 
-    private fun resolvedPlace(
+    private suspend fun resolvedPlace(
         result: PlaceResolutionResult,
         visit: PlaceVisit,
     ): SemanticPlace? {
         val name =
             when (result) {
                 is PlaceResolutionResult.UserDefinedPlace -> result.place.name
-                is PlaceResolutionResult.ExternalSuggestion -> "Near ${result.suggestion.name}"
+                is PlaceResolutionResult.ExternalSuggestion -> getString(Res.string.places_near, result.suggestion.name)
                 is PlaceResolutionResult.CoarseLocation ->
-                    result.address.thoroughfare?.let { "Near $it" }
-                        ?: result.address.locality?.let { "Somewhere in $it" }
+                    result.address.thoroughfare?.let { getString(Res.string.places_near, it) }
+                        ?: result.address.locality?.let { getString(Res.string.places_somewhere_in, it) }
                 else -> null
             }
         if (name != null) {

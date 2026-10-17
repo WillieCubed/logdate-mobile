@@ -5,6 +5,9 @@ import app.logdate.client.intelligence.curation.MediaCandidate
 import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.client.text.UiText
+import app.logdate.client.text.resolve
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.NarrativeOrigin
@@ -17,6 +20,13 @@ import app.logdate.shared.model.WeatherContext
 import app.logdate.shared.model.WeekNarrative
 import app.logdate.shared.model.WeekStatsSnapshot
 import io.github.aakira.napier.Napier
+import logdate.client.intelligence.generated.resources.Res
+import logdate.client.intelligence.generated.resources.rewind_resolution_tone
+import logdate.client.intelligence.generated.resources.rewind_transition_and_then
+import logdate.client.intelligence.generated.resources.rewind_transition_breakthrough
+import logdate.client.intelligence.generated.resources.rewind_transition_evenings
+import logdate.client.intelligence.generated.resources.rewind_transition_meanwhile
+import logdate.client.intelligence.generated.resources.rewind_transition_things_shifted
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -33,8 +43,14 @@ import kotlin.uuid.Uuid
  * AI-written narrative opening / resolution, [NarrativeOrigin.LOCAL_HEURISTIC] gets a
  * structural [RewindContent.PersonalityCard] opening and skips the resolution sentence
  * that would feel hollow without a real LLM behind it.
+ *
+ * Transition and closing sentences are saved with the Rewind, so they are written once in the
+ * device language. [resolveText] turns them into words; tests pass a stand-in because they cannot
+ * read Compose resources.
  */
-class RewindSequencer {
+class RewindSequencer(
+    private val resolveText: suspend (UiText) -> String = { text -> text.resolve() },
+) {
     /**
      * Composes the panel list for a Rewind.
      *
@@ -55,7 +71,7 @@ class RewindSequencer {
      * @param activities Activity classification for the period, used to choose the
      *   personality card's dominant-activity headline.
      */
-    fun sequence(
+    suspend fun sequence(
         narrative: WeekNarrative,
         curation: CurationResult,
         textEntries: List<JournalNote.Text>,
@@ -155,7 +171,7 @@ class RewindSequencer {
                 )
         }
 
-    private fun createTransition(
+    private suspend fun createTransition(
         currentBeat: StoryBeat,
         previousBeat: StoryBeat,
     ): RewindContent.Transition? {
@@ -163,18 +179,18 @@ class RewindSequencer {
             when {
                 previousBeat.emotionalWeight.contains("joyful", ignoreCase = true) &&
                     currentBeat.emotionalWeight.contains("melancholy", ignoreCase = true) ->
-                    "But then things shifted"
+                    Res.string.rewind_transition_things_shifted
 
                 previousBeat.emotionalWeight.contains("exhausted", ignoreCase = true) &&
                     currentBeat.emotionalWeight.contains("triumphant", ignoreCase = true) ->
-                    "Then came a breakthrough"
+                    Res.string.rewind_transition_breakthrough
 
                 else -> {
                     val connector =
                         when {
-                            currentBeat.context.contains("meanwhile", ignoreCase = true) -> "Meanwhile"
-                            currentBeat.context.contains("evening", ignoreCase = true) -> "When evenings came"
-                            else -> "And then"
+                            currentBeat.context.contains("meanwhile", ignoreCase = true) -> Res.string.rewind_transition_meanwhile
+                            currentBeat.context.contains("evening", ignoreCase = true) -> Res.string.rewind_transition_evenings
+                            else -> Res.string.rewind_transition_and_then
                         }
                     connector
                 }
@@ -183,7 +199,7 @@ class RewindSequencer {
         return RewindContent.Transition(
             timestamp = Instant.DISTANT_PAST,
             sourceId = Uuid.random(),
-            transitionText = transitionText,
+            transitionText = resolveText(transitionText.toUiText()),
         )
     }
 
@@ -321,7 +337,7 @@ class RewindSequencer {
         return out
     }
 
-    private fun createResolution(
+    private suspend fun createResolution(
         narrative: WeekNarrative,
         latestTimestamp: Instant,
     ): RewindContent.NarrativeContext {
@@ -330,7 +346,7 @@ class RewindSequencer {
             if (sentences.size > 1) {
                 sentences.drop(1).joinToString(". ")
             } else {
-                "A ${narrative.emotionalTone} week."
+                resolveText(Res.string.rewind_resolution_tone.toUiText(narrative.emotionalTone))
             }
         return RewindContent.NarrativeContext(
             timestamp = latestTimestamp,

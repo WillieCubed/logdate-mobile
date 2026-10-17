@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.shared.model.user.AppSecurityLevel
@@ -12,6 +13,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.privacy_biometric_enable_description
+import logdate.client.feature.core.generated.resources.privacy_biometric_enable_subtitle
+import logdate.client.feature.core.generated.resources.privacy_biometric_enable_title
 
 data class PrivacySettingsState(
     val isBiometricsEnabled: Boolean,
@@ -53,9 +58,9 @@ class PrivacySettingsViewModel(
             return
         }
         biometricGatekeeper.authenticate(
-            title = "Enable biometric lock",
-            subtitle = "Authenticate to turn on biometric lock",
-            description = "LogDate will require biometrics or your device passcode to unlock.",
+            title = Res.string.privacy_biometric_enable_title.toUiText(),
+            subtitle = Res.string.privacy_biometric_enable_subtitle.toUiText(),
+            description = Res.string.privacy_biometric_enable_description.toUiText(),
             onResult = { result ->
                 if (result == AppAuthState.AUTHENTICATED) {
                     viewModelScope.launch {

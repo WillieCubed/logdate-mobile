@@ -12,6 +12,7 @@ import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.sync.SyncStatus
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.BirthdaySettingsContent
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsContent
@@ -45,6 +46,9 @@ import app.logdate.feature.events.ui.settings.EventsSettingsContent
 import app.logdate.feature.events.ui.settings.EventsSettingsUiState
 import app.logdate.ui.streak.CampfirePhase
 import app.logdate.ui.streak.CampfireSize
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.devices_platform_android
+import logdate.client.feature.core.generated.resources.devices_platform_macos
 import kotlin.uuid.Uuid
 
 internal val systemSettingsScenes: List<SharedScreenshotSceneSpec> =
@@ -153,17 +157,17 @@ internal val systemSettingsScenes: List<SharedScreenshotSceneSpec> =
                             listOf(
                                 DeviceInfoUiState(
                                     id = Uuid.parse("10000000-0000-0000-0000-000000000001"),
-                                    name = "Alex's Pixel 9 Pro",
-                                    platformName = "Android",
-                                    lastActiveFormatted = "Today",
+                                    name = "Alex's Pixel 9 Pro".toUiText(),
+                                    platformName = Res.string.devices_platform_android,
+                                    lastActiveFormatted = "Today".toUiText(),
                                     appVersion = "1.0.0",
                                     isCurrentDevice = true,
                                 ),
                                 DeviceInfoUiState(
                                     id = Uuid.parse("10000000-0000-0000-0000-000000000002"),
-                                    name = "Alex's MacBook Pro",
-                                    platformName = "macOS",
-                                    lastActiveFormatted = "Yesterday",
+                                    name = "Alex's MacBook Pro".toUiText(),
+                                    platformName = Res.string.devices_platform_macos,
+                                    lastActiveFormatted = "Yesterday".toUiText(),
                                     appVersion = "1.0.0",
                                     isCurrentDevice = false,
                                 ),

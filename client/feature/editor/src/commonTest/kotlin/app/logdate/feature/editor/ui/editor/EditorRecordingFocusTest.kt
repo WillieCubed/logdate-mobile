@@ -1,5 +1,7 @@
 package app.logdate.feature.editor.ui.editor
 
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_recording_not_finalized
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -21,7 +23,7 @@ class EditorRecordingFocusTest {
     fun `ready failed and empty audio do not lock the recording context`() {
         listOf(
             AudioCaptureState.Empty,
-            AudioCaptureState.Failed("Unavailable"),
+            AudioCaptureState.Failed(Res.string.editor_error_recording_not_finalized),
             AudioCaptureState.Ready("file:///recording.m4a", 5000),
         ).forEach { state ->
             assertFalse(EditorState(blocks = listOf(AudioBlockUiState(captureState = state))).isRecordingAudio, state.toString())

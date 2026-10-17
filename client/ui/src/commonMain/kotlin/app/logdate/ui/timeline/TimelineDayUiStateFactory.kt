@@ -4,14 +4,8 @@ import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Instant
-
-private val hiddenSummaryValues =
-    setOf(
-        "",
-        "No summary available.",
-        "Summary currently not available.",
-    )
 
 private const val STACKED_MOMENT_THRESHOLD = 5
 private const val STACKED_NOTE_THRESHOLD = 10
@@ -25,6 +19,9 @@ private const val STACKED_NOTE_THRESHOLD = 10
  * When the caller has no moments to supply — moment inference returns nothing for a day
  * without entries — a single unlabeled moment is synthesized from the day's notes and places
  * so that the timeline has exactly one way to render a day.
+ *
+ * [summaryNotice] is shown in the day's summary section when [summary] is empty because no
+ * summary could be made. It never becomes the list's supporting summary.
  */
 fun createSemanticTimelineDayUiState(
     summary: String,
@@ -38,6 +35,7 @@ fun createSemanticTimelineDayUiState(
     isLoadingSummary: Boolean = false,
     isLoadingPeople: Boolean = false,
     pendingMarks: List<MarkedMoment> = emptyList(),
+    summaryNotice: StringResource? = null,
 ): TimelineDayUiState {
     val sortedNotes = notes.sortedByDescending { note -> note.timestamp() }
     val visuals = sortedNotes.visualNotes()
@@ -65,7 +63,8 @@ fun createSemanticTimelineDayUiState(
 
     return TimelineDayUiState(
         summary = summary,
-        supportingSummary = summary.takeIf { it !in hiddenSummaryValues },
+        supportingSummary = summary.ifEmpty { null },
+        summaryNotice = summaryNotice,
         date = date,
         people = people,
         events = events,

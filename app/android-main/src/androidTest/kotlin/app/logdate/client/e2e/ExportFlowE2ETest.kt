@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.settings.ui.DataSettingsContent
@@ -157,7 +158,7 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Exporting(progressPercent = 45, message = "Collecting notes..."),
+                exportState = ExportState.Exporting(progressPercent = 45, message = "Collecting notes...".toUiText()),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -194,7 +195,7 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Exporting(progressPercent = 45, message = "Collecting notes..."),
+                exportState = ExportState.Exporting(progressPercent = 45, message = "Collecting notes...".toUiText()),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -402,7 +403,7 @@ class ExportFlowE2ETest {
                 isQuotaAvailable = true,
                 exportState =
                     ExportState.Failed(
-                        reason = "Disk space full",
+                        reason = "Disk space full".toUiText(),
                         canRetry = true,
                     ),
                 onShowExportOptions = {},
@@ -442,7 +443,7 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Failed(reason = "Error", canRetry = true),
+                exportState = ExportState.Failed(reason = "Error".toUiText(), canRetry = true),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -478,7 +479,7 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Failed(reason = "Error"),
+                exportState = ExportState.Failed(reason = "Error".toUiText()),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -512,7 +513,7 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Exporting(progressPercent = 0, message = "Starting export..."),
+                exportState = ExportState.Exporting(progressPercent = 0, message = "Starting export...".toUiText()),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -546,7 +547,7 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Exporting(progressPercent = 100, message = "Finalizing..."),
+                exportState = ExportState.Exporting(progressPercent = 100, message = "Finalizing...".toUiText()),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -586,7 +587,7 @@ class ExportFlowE2ETest {
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
                 exportState = state,
-                onShowExportOptions = { state = ExportState.Exporting(10, "Starting...") },
+                onShowExportOptions = { state = ExportState.Exporting(10, "Starting...".toUiText()) },
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
                 onCancelExport = {},
@@ -624,7 +625,7 @@ class ExportFlowE2ETest {
     fun `state transition exporting to completed`() {
         composeRule.setContent {
             var state by remember {
-                mutableStateOf<ExportState>(ExportState.Exporting(90, "Finalizing..."))
+                mutableStateOf<ExportState>(ExportState.Exporting(90, "Finalizing...".toUiText()))
             }
             DataSettingsContent(
                 onBack = {},
@@ -672,7 +673,7 @@ class ExportFlowE2ETest {
     fun `state transition exporting to failed`() {
         composeRule.setContent {
             var state by remember {
-                mutableStateOf<ExportState>(ExportState.Exporting(30, "Working..."))
+                mutableStateOf<ExportState>(ExportState.Exporting(30, "Working...".toUiText()))
             }
             DataSettingsContent(
                 onBack = {},
@@ -683,7 +684,7 @@ class ExportFlowE2ETest {
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
                 onCancelExport = {
-                    state = ExportState.Failed(reason = "Out of memory")
+                    state = ExportState.Failed(reason = "Out of memory".toUiText())
                 },
                 onRetryExport = {},
                 onDismissExport = {},
@@ -714,7 +715,7 @@ class ExportFlowE2ETest {
     fun `state transition failed to idle via dismiss`() {
         composeRule.setContent {
             var state by remember {
-                mutableStateOf<ExportState>(ExportState.Failed(reason = "Disk full"))
+                mutableStateOf<ExportState>(ExportState.Failed(reason = "Disk full".toUiText()))
             }
             DataSettingsContent(
                 onBack = {},

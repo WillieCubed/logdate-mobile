@@ -8,6 +8,7 @@ import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.repository.account.AccountRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.profile.ui.ProfileDisplayModel
 import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileUiState
@@ -22,6 +23,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.profile_error_bio_cloud_update
+import logdate.client.feature.core.generated.resources.profile_error_display_name_empty
+import logdate.client.feature.core.generated.resources.profile_error_load
+import logdate.client.feature.core.generated.resources.profile_error_refresh
+import logdate.client.feature.core.generated.resources.profile_error_save_bio
+import logdate.client.feature.core.generated.resources.profile_error_save_birthday
+import logdate.client.feature.core.generated.resources.profile_error_save_locally
+import logdate.client.feature.core.generated.resources.profile_error_unexpected
 import kotlin.time.Instant
 
 /**
@@ -85,7 +95,7 @@ class ProfileViewModel(
                 _uiState.value =
                     _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = "Failed to load profile: ${e.message}",
+                        errorMessage = Res.string.profile_error_load.toUiText(e.message.toString()),
                     )
             }
         }
@@ -121,7 +131,7 @@ class ProfileViewModel(
         if (newDisplayName.isBlank()) {
             _uiState.value =
                 _uiState.value.copy(
-                    updateState = ProfileUpdateState.Error("Display name cannot be empty"),
+                    updateState = ProfileUpdateState.Error(Res.string.profile_error_display_name_empty.toUiText()),
                 )
             return
         }
@@ -138,7 +148,8 @@ class ProfileViewModel(
                     Napier.e("Failed to update local profile", exception)
                     _uiState.value =
                         _uiState.value.copy(
-                            updateState = ProfileUpdateState.Error("Failed to save locally: ${exception?.message}"),
+                            updateState =
+                                ProfileUpdateState.Error(Res.string.profile_error_save_locally.toUiText(exception?.message.toString())),
                         )
                     return@launch
                 }
@@ -168,7 +179,7 @@ class ProfileViewModel(
                 Napier.e("Unexpected error saving display name", e)
                 _uiState.value =
                     _uiState.value.copy(
-                        updateState = ProfileUpdateState.Error("Unexpected error: ${e.message}"),
+                        updateState = ProfileUpdateState.Error(Res.string.profile_error_unexpected.toUiText(e.message.toString())),
                     )
             }
         }
@@ -182,7 +193,7 @@ class ProfileViewModel(
             val localResult = profileRepository.updateBio(original, original)
             if (localResult.isFailure) {
                 Napier.e("Failed to update local bio", localResult.exceptionOrNull())
-                _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Error("Failed to save bio"))
+                _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Error(Res.string.profile_error_save_bio.toUiText()))
                 return@launch
             }
             if (_uiState.value.hasCloudAccount) {
@@ -192,9 +203,7 @@ class ProfileViewModel(
                     _uiState.value =
                         _uiState.value.copy(
                             updateState =
-                                ProfileUpdateState.Error(
-                                    "Bio saved on this device. Cloud could not update; try again when connected.",
-                                ),
+                                ProfileUpdateState.Error(Res.string.profile_error_bio_cloud_update.toUiText()),
                         )
                     return@launch
                 }
@@ -215,7 +224,7 @@ class ProfileViewModel(
                     Napier.e("Failed to update birthday", result.exceptionOrNull())
                     _uiState.value =
                         _uiState.value.copy(
-                            updateState = ProfileUpdateState.Error("Failed to save birthday"),
+                            updateState = ProfileUpdateState.Error(Res.string.profile_error_save_birthday.toUiText()),
                         )
                 } else {
                     _uiState.value =
@@ -227,7 +236,7 @@ class ProfileViewModel(
                 Napier.e("Unexpected error saving birthday", e)
                 _uiState.value =
                     _uiState.value.copy(
-                        updateState = ProfileUpdateState.Error("Unexpected error: ${e.message}"),
+                        updateState = ProfileUpdateState.Error(Res.string.profile_error_unexpected.toUiText(e.message.toString())),
                     )
             }
         }
@@ -248,7 +257,7 @@ class ProfileViewModel(
                     _uiState.value =
                         _uiState.value.copy(
                             isLoading = false,
-                            errorMessage = "Failed to refresh profile: ${exception?.message}",
+                            errorMessage = Res.string.profile_error_refresh.toUiText(exception?.message.toString()),
                         )
                 } else {
                     // Data will be updated through the flow collection
@@ -259,7 +268,7 @@ class ProfileViewModel(
                 _uiState.value =
                     _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = "Unexpected error: ${e.message}",
+                        errorMessage = Res.string.profile_error_unexpected.toUiText(e.message.toString()),
                     )
             }
         }

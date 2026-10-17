@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.ui.foldable.FoldableHingeBounds
@@ -74,7 +75,7 @@ class AutomaticDataSettingsTest {
                         onCancelRestore = {},
                         onRetryRestore = {},
                         onDismissRestore = {},
-                        integrityState = IntegrityState(errorMessage = "Internal metadata failure"),
+                        integrityState = IntegrityState(errorMessage = "Internal metadata failure".toUiText()),
                         onRunIntegrityCheck = {},
                         onRepairIntegrity = {},
                         snackbarHostState = SnackbarHostState(),

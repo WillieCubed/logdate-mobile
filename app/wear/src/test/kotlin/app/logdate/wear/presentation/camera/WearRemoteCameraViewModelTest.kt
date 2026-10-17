@@ -1,10 +1,13 @@
 package app.logdate.wear.presentation.camera
 
+import app.logdate.client.media.device.DefaultMediaDevices
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.client.sync.datalayer.RemoteCameraCaptureResult
+import app.logdate.client.text.toUiText
+import app.logdate.wear.presentation.WearText
 import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -242,7 +245,7 @@ class WearRemoteCameraViewModelTest {
             advanceUntilIdle()
 
             assertEquals(RemoteCameraPhase.PREVIEW, viewModel.uiState.value.phase)
-            assertEquals("Remote photo saved", viewModel.uiState.value.captureStatusMessage)
+            assertEquals(WearText.Raw("Remote photo saved"), viewModel.uiState.value.captureStatusMessage)
         }
 
     @Test
@@ -264,7 +267,7 @@ class WearRemoteCameraViewModelTest {
             advanceUntilIdle()
 
             assertEquals(RemoteCameraPhase.ERROR, viewModel.uiState.value.phase)
-            assertEquals("Could not save remote camera capture", viewModel.uiState.value.errorMessage)
+            assertEquals(WearText.Raw("Could not save remote camera capture"), viewModel.uiState.value.errorMessage)
         }
 
     // -----------------------------------------------------------------------
@@ -362,7 +365,7 @@ class WearRemoteCameraViewModelTest {
 
             coVerify { dataLayerClient.sendMessage("/logdate/camera/select", any()) }
             assertEquals("front", selectedPayload?.decodeToString())
-            assertEquals("Front camera", viewModel.uiState.value.selectedCameraLabel)
+            assertEquals(DefaultMediaDevices.frontCamera.label, viewModel.uiState.value.selectedCameraLabel)
         }
 
     @Test
@@ -382,7 +385,7 @@ class WearRemoteCameraViewModelTest {
 
             coVerify { dataLayerClient.sendMessage("/logdate/camera/select", any()) }
             assertEquals("back", selectedPayload?.decodeToString())
-            assertEquals("Back camera", viewModel.uiState.value.selectedCameraLabel)
+            assertEquals(DefaultMediaDevices.backCamera.label, viewModel.uiState.value.selectedCameraLabel)
         }
 
     @Test
@@ -395,13 +398,13 @@ class WearRemoteCameraViewModelTest {
                         listOf(
                             MediaDeviceUiState(
                                 id = "camera-back",
-                                label = "Back camera",
+                                label = "Back camera".toUiText(),
                                 kind = MediaDeviceKind.CAMERA,
                                 category = MediaDeviceCategory.BACK_CAMERA,
                             ),
                             MediaDeviceUiState(
                                 id = "usb-camera-1",
-                                label = "USB document camera",
+                                label = "USB document camera".toUiText(),
                                 kind = MediaDeviceKind.CAMERA,
                                 category = MediaDeviceCategory.USB,
                                 isExternal = true,
@@ -427,7 +430,7 @@ class WearRemoteCameraViewModelTest {
 
             coVerify { dataLayerClient.sendMessage("/logdate/camera/select", any()) }
             assertEquals("device:usb-camera-1", selectedPayload?.decodeToString())
-            assertEquals("USB document camera", viewModel.uiState.value.selectedCameraLabel)
+            assertEquals("USB document camera".toUiText(), viewModel.uiState.value.selectedCameraLabel)
             assertEquals("usb-camera-1", viewModel.uiState.value.selectedCameraDeviceId)
         }
 
@@ -446,13 +449,13 @@ class WearRemoteCameraViewModelTest {
                         listOf(
                             MediaDeviceUiState(
                                 id = "camera-back",
-                                label = "Back camera",
+                                label = "Back camera".toUiText(),
                                 kind = MediaDeviceKind.CAMERA,
                                 category = MediaDeviceCategory.BACK_CAMERA,
                             ),
                             MediaDeviceUiState(
                                 id = "usb-camera-1",
-                                label = "USB document camera",
+                                label = "USB document camera".toUiText(),
                                 kind = MediaDeviceKind.CAMERA,
                                 category = MediaDeviceCategory.USB,
                                 isExternal = true,
@@ -464,7 +467,7 @@ class WearRemoteCameraViewModelTest {
             cameraStore.update(externalSelection)
             advanceUntilIdle()
 
-            assertEquals("USB document camera", viewModel.uiState.value.selectedCameraLabel)
+            assertEquals("USB document camera".toUiText(), viewModel.uiState.value.selectedCameraLabel)
             assertEquals("usb-camera-1", viewModel.uiState.value.selectedCameraDeviceId)
             assertEquals(2, viewModel.uiState.value.availableCameras.size)
             assertEquals(
@@ -485,7 +488,7 @@ class WearRemoteCameraViewModelTest {
             advanceUntilIdle()
 
             coVerify { dataLayerClient.sendMessage("/logdate/camera/switch", any()) }
-            assertEquals("Front camera", viewModel.uiState.value.selectedCameraLabel)
+            assertEquals(DefaultMediaDevices.frontCamera.label, viewModel.uiState.value.selectedCameraLabel)
         }
 
     @Test

@@ -4,6 +4,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.uuid.Uuid
@@ -52,12 +53,9 @@ class SuggestJournalsUseCase(
                 val firstLocal = firstDate.toLocalDateTime(tz).date
 
                 JournalSuggestion(
-                    suggestedTitle = "Week of ${firstLocal.month.name.lowercase().replaceFirstChar {
-                        it.uppercase()
-                    }} ${firstLocal.day}",
+                    weekOf = firstLocal,
                     noteIds = groupNotes.map { it.uid },
                     noteCount = groupNotes.size,
-                    reason = "${groupNotes.size} entries from this week aren't in any journal",
                 )
             }.sortedByDescending { it.noteCount }
             .take(MAX_SUGGESTIONS)
@@ -72,10 +70,15 @@ class SuggestJournalsUseCase(
 
 /**
  * A suggestion to create a journal from unorganized notes.
+ *
+ * The screen names the suggestion after [weekOf] and explains it with [noteCount].
+ *
+ * @property weekOf Day of the earliest note in the group; the suggested journal covers its week.
+ * @property noteIds Notes from that week that are not in any journal.
+ * @property noteCount How many notes the suggestion would collect.
  */
 data class JournalSuggestion(
-    val suggestedTitle: String,
+    val weekOf: LocalDate,
     val noteIds: List<Uuid>,
     val noteCount: Int,
-    val reason: String,
 )

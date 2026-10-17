@@ -16,6 +16,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.toUiText
 import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.AudioPlaybackState
 import app.logdate.ui.audio.LocalAudioPlaybackState
@@ -104,13 +105,13 @@ class MiniAudioPlayerE2ETest {
                 listOf(
                     MediaDeviceUiState(
                         id = "speaker",
-                        label = "Phone speaker",
+                        label = "Phone speaker".toUiText(),
                         kind = MediaDeviceKind.AUDIO_OUTPUT,
                         category = MediaDeviceCategory.BUILT_IN,
                     ),
                     MediaDeviceUiState(
                         id = "bluetooth",
-                        label = "Bluetooth headphones",
+                        label = "Bluetooth headphones".toUiText(),
                         kind = MediaDeviceKind.AUDIO_OUTPUT,
                         category = MediaDeviceCategory.BLUETOOTH,
                         isExternal = true,
@@ -118,7 +119,7 @@ class MiniAudioPlayerE2ETest {
                 ),
             selectedDeviceId = "speaker",
             isSelectionControllable = false,
-            routeControlMessage = "Use Android's output switcher to route playback.",
+            routeControlMessage = "Use Android's output switcher to route playback.".toUiText(),
         )
 
     private fun screenWidthDp(): Int =

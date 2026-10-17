@@ -1,5 +1,6 @@
 package app.logdate.feature.rewind.ui.detail
 
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.RewindContent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +22,7 @@ class RewindVideoFramePanelTest {
                 duration = 12.seconds,
             )
 
-        val panel = video.toVideoFramePanel("Tuesday")
+        val panel = video.toVideoFramePanel("Tuesday".toUiText())
 
         assertEquals(sourceId, panel.sourceId)
         assertEquals(video.uri, panel.imageUri)

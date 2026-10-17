@@ -1,6 +1,7 @@
 package app.logdate.client.domain.rewind
 
 import app.logdate.client.domain.fakes.FakeNetworkAvailabilityMonitor
+import app.logdate.client.domain.fakes.resourceKeyText
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
 import app.logdate.client.intelligence.AIError
@@ -105,7 +106,7 @@ class GetWeekRewindUseCaseTest {
                 networkAvailabilityMonitor = networkMonitor,
                 dataUsagePolicy = dataUsagePolicy,
             )
-        val rewindSequencer = RewindSequencer()
+        val rewindSequencer = RewindSequencer(resolveText = resourceKeyText)
         val peopleExtractor =
             PeopleExtractor(
                 generativeAICache = FakeGenerativeAICache(),
@@ -147,7 +148,7 @@ class GetWeekRewindUseCaseTest {
                 fetchNotesForDay = fetchNotesForDay,
                 indexedMediaRepository = indexedMediaRepository,
                 indexMediaForPeriod = indexMediaForPeriod,
-                generateRewindTitle = GenerateRewindTitleUseCase(),
+                generateRewindTitle = GenerateRewindTitleUseCase(resolveText = resourceKeyText),
                 strategySelector = strategySelector,
                 peopleExtractor = peopleExtractor,
                 locationHistoryRepository = FakeLocationHistoryRepository(),

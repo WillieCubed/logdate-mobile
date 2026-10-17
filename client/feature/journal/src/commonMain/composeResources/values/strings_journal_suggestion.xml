@@ -1,0 +1,20 @@
+<resources>
+    <!-- Suggested journal for a week of notes that are not in any journal -->
+    <string name="journal_suggestion_title">Week of %1$s %2$d</string>
+    <plurals name="journal_suggestion_reason">
+        <item quantity="one">%1$d entry from this week isn't in any journal</item>
+        <item quantity="other">%1$d entries from this week aren't in any journal</item>
+    </plurals>
+    <string name="journal_suggestion_month_january">January</string>
+    <string name="journal_suggestion_month_february">February</string>
+    <string name="journal_suggestion_month_march">March</string>
+    <string name="journal_suggestion_month_april">April</string>
+    <string name="journal_suggestion_month_may">May</string>
+    <string name="journal_suggestion_month_june">June</string>
+    <string name="journal_suggestion_month_july">July</string>
+    <string name="journal_suggestion_month_august">August</string>
+    <string name="journal_suggestion_month_september">September</string>
+    <string name="journal_suggestion_month_october">October</string>
+    <string name="journal_suggestion_month_november">November</string>
+    <string name="journal_suggestion_month_december">December</string>
+</resources>

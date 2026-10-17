@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.logdate.client.text.asString
 import app.logdate.ui.audio.MomentAudioCard
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_add_memory
@@ -151,9 +152,13 @@ private fun HistoryVisit(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(item.timeLabel, style = MaterialTheme.typography.labelMedium, color = LocalContentColor.current.copy(alpha = 0.74f))
                 Text(
-                    item.title,
+                    item.timeLabel.asString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LocalContentColor.current.copy(alpha = 0.74f),
+                )
+                Text(
+                    item.title.asString(),
                     Modifier.semantics { heading() },
                     style = if (item.isApproximate) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
@@ -164,8 +169,9 @@ private fun HistoryVisit(
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(Res.string.history_details))
             }
         }
-        if (item.supportingText.isNotBlank()) {
-            Text(item.supportingText, style = MaterialTheme.typography.bodySmall, color = LocalContentColor.current.copy(alpha = 0.74f))
+        val supportingText = item.supportingText.asString()
+        if (supportingText.isNotBlank()) {
+            Text(supportingText, style = MaterialTheme.typography.bodySmall, color = LocalContentColor.current.copy(alpha = 0.74f))
         }
         if (item.memories.isNotEmpty()) {
             Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -187,18 +193,20 @@ private fun HistoryVisit(
 @Composable
 private fun HistoryConnection(item: HistoryItemUi) {
     Column(Modifier.padding(horizontal = 12.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val title = item.title.asString()
+        val supportingText = item.supportingText.asString()
         Text(
             if (item.kind ==
                 HistoryItemKind.Journey
             ) {
-                listOf(item.title, item.supportingText).filter { it.isNotBlank() }.joinToString(" · ")
+                listOf(title, supportingText).filter { it.isNotBlank() }.joinToString(" · ")
             } else {
-                item.title
+                title
             },
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(item.timeLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(item.timeLabel.asString(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -244,7 +252,7 @@ internal fun HistoryMemoryPreview(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    memory.title,
+                    memory.title.asString(),
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
                     color = LocalContentColor.current.copy(alpha = 0.78f),
                     maxLines = 3,

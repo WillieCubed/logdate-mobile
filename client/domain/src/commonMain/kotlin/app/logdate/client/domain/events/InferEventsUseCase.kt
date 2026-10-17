@@ -14,6 +14,9 @@ import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
+import app.logdate.client.text.UiText
+import app.logdate.client.text.resolve
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.Event
 import app.logdate.shared.model.Location
 import io.github.aakira.napier.Napier
@@ -21,6 +24,18 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.domain.generated.resources.Res
+import logdate.client.domain.generated.resources.inferred_event_description_at_place
+import logdate.client.domain.generated.resources.inferred_event_description_at_place_with_captures
+import logdate.client.domain.generated.resources.inferred_event_description_time_of_day
+import logdate.client.domain.generated.resources.inferred_event_description_time_of_day_with_captures
+import logdate.client.domain.generated.resources.inferred_event_time_afternoon
+import logdate.client.domain.generated.resources.inferred_event_time_evening
+import logdate.client.domain.generated.resources.inferred_event_time_late_night
+import logdate.client.domain.generated.resources.inferred_event_time_midday
+import logdate.client.domain.generated.resources.inferred_event_time_morning
+import logdate.client.domain.generated.resources.inferred_event_title_at_place
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -41,6 +56,10 @@ import kotlin.uuid.Uuid
  * Naming is the only AI-touched step. When the cache and the model are unavailable — or
  * when [aiNamingEnabled] is `false` — every cluster falls back to a deterministic
  * "<time of day> at <place>" label so the worker still produces useful results offline.
+ *
+ * The fallback name is saved with the event, so it is written once in the device language.
+ * [resolveText] turns it into words; tests pass a stand-in because they cannot read Compose
+ * resources.
  */
 class InferEventsUseCase(
     private val observeLocationStops: () -> Flow<List<LocationStop>>,
@@ -51,6 +70,7 @@ class InferEventsUseCase(
     private val eventRepository: EventRepository,
     private val suggestEventName: suspend (EventCluster) -> AIResult<EventName>,
     private val now: () -> Instant = { Clock.System.now() },
+    private val resolveText: suspend (UiText) -> String = { text -> text.resolve() },
 ) {
     /**
      * Runs one inference pass.
@@ -120,7 +140,7 @@ class InferEventsUseCase(
                 val cluster =
                     EventCluster(
                         placeName = place.displayName,
-                        timeOfDay = describeTimeOfDay(stop.startTime),
+                        timeOfDay = resolveText(describeTimeOfDay(stop.startTime).toUiText()),
                         mediaCount = media.size,
                         noteCount = notes.size,
                         firstNoteSnippet = firstTextSnippet(notes),
@@ -193,27 +213,26 @@ class InferEventsUseCase(
         }
     }
 
-    private fun heuristicName(cluster: EventCluster): EventNameResult {
+    private suspend fun heuristicName(cluster: EventCluster): EventNameResult {
+        val placeName = cluster.placeName
         val title =
-            if (cluster.placeName != null) {
-                "${cluster.timeOfDay} at ${cluster.placeName}"
+            if (placeName != null) {
+                resolveText(Res.string.inferred_event_title_at_place.toUiText(cluster.timeOfDay, placeName))
             } else {
                 cluster.timeOfDay
             }
         val description =
-            buildString {
-                if (cluster.placeName != null) {
-                    append("Time spent at ").append(cluster.placeName)
-                } else {
-                    append("Time spent ").append(cluster.timeOfDay.lowercase())
-                }
-                if (cluster.mediaCount > 0) {
-                    append(" with ").append(cluster.mediaCount).append(" capture")
-                    if (cluster.mediaCount != 1) append('s')
-                }
-                append('.')
+            when {
+                placeName != null && cluster.mediaCount > 0 ->
+                    Res.plurals.inferred_event_description_at_place_with_captures
+                        .toUiText(cluster.mediaCount, placeName, cluster.mediaCount)
+                placeName != null -> Res.string.inferred_event_description_at_place.toUiText(placeName)
+                cluster.mediaCount > 0 ->
+                    Res.plurals.inferred_event_description_time_of_day_with_captures
+                        .toUiText(cluster.mediaCount, cluster.timeOfDay.lowercase(), cluster.mediaCount)
+                else -> Res.string.inferred_event_description_time_of_day.toUiText(cluster.timeOfDay.lowercase())
             }
-        return EventNameResult(title = title, description = description)
+        return EventNameResult(title = title, description = resolveText(description))
     }
 
     private fun firstTextSnippet(notes: List<JournalNote>): String? {
@@ -232,14 +251,14 @@ class InferEventsUseCase(
      * resolved in the device's local timezone — the user's "evening" should not get labeled
      * "early morning" because the cluster timestamp happens to fall after UTC midnight.
      */
-    private fun describeTimeOfDay(instant: Instant): String {
+    private fun describeTimeOfDay(instant: Instant): StringResource {
         val hour = instant.toLocalDateTime(TimeZone.currentSystemDefault()).hour
         return when (hour) {
-            in 5..10 -> "Morning"
-            in 11..13 -> "Midday"
-            in 14..17 -> "Afternoon"
-            in 18..21 -> "Evening"
-            else -> "Late night"
+            in 5..10 -> Res.string.inferred_event_time_morning
+            in 11..13 -> Res.string.inferred_event_time_midday
+            in 14..17 -> Res.string.inferred_event_time_afternoon
+            in 18..21 -> Res.string.inferred_event_time_evening
+            else -> Res.string.inferred_event_time_late_night
         }
     }
 

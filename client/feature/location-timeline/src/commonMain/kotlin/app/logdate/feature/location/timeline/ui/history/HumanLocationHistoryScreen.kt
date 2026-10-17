@@ -29,6 +29,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.location.tracking.LocationCaptureStatus
+import app.logdate.client.text.asString
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.location.HistoryField
 import app.logdate.shared.model.location.PlaceVisit
 import app.logdate.shared.model.location.TravelMode
@@ -125,11 +127,11 @@ fun HumanLocationHistoryScreen(
             when {
                 state.canRetry -> state
                 recordingEnabled && !access.ready ->
-                    state.copy(recoveryMessage = stringResource(access.message), recoveryActionLabel = stringResource(access.actionLabel))
+                    state.copy(recoveryMessage = access.message.toUiText(), recoveryActionLabel = access.actionLabel.toUiText())
                 interrupted ->
                     state.copy(
-                        recoveryMessage = stringResource(Res.string.history_recording_interrupted),
-                        recoveryActionLabel = stringResource(Res.string.history_resume_recording),
+                        recoveryMessage = Res.string.history_recording_interrupted.toUiText(),
+                        recoveryActionLabel = Res.string.history_resume_recording.toUiText(),
                     )
                 else -> state
             },
@@ -183,10 +185,13 @@ fun HumanLocationHistoryScreen(
                         recording = true
                     })
                     if (state.tab == HistoryTab.Places) {
-                        DropdownMenuItem(text = { Text(stringResource(Res.string.history_through_date, state.dateLabel)) }, onClick = {
-                            moreMenu = false
-                            calendar = true
-                        })
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.history_through_date, state.dateLabel.asString())) },
+                            onClick = {
+                                moreMenu = false
+                                calendar = true
+                            },
+                        )
                     }
                     if (snapshot?.conflicts?.isNotEmpty() == true) {
                         DropdownMenuItem(text = { Text(stringResource(Res.string.history_review_changes)) }, onClick = {
@@ -276,7 +281,15 @@ fun HumanLocationHistoryScreen(
                         TextButton(onClick = {
                             viewModel.linkMemory(visitId, memory.uid.toString())
                             linkingVisit = null
-                        }) { Text(memory.toHistoryMemory().title.take(160)) }
+                        }) {
+                            Text(
+                                memory
+                                    .toHistoryMemory()
+                                    .title
+                                    .asString()
+                                    .take(160),
+                            )
+                        }
                     }
                 }
             },
@@ -366,8 +379,10 @@ fun HumanLocationHistoryScreen(
                                         snapshot?.places?.firstOrNull { it.id == edit.value }?.name
                                             ?: stringResource(Res.string.history_conflict_saved_place)
                                     HistoryField.ACTIVITY ->
-                                        TravelMode.entries.firstOrNull { it.name == edit.value }?.humanName()
-                                            ?: stringResource(Res.string.history_conflict_travelling)
+                                        stringResource(
+                                            TravelMode.entries.firstOrNull { it.name == edit.value }?.humanName()
+                                                ?: Res.string.history_conflict_travelling,
+                                        )
                                     else -> edit.value
                                 }
                             TextButton(

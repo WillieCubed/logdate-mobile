@@ -159,7 +159,7 @@ fun HomeScreen(
     if (workspaceEnabled) {
         val sourceState = rememberSaveableStateHolder()
         HomeWorkspaceComposition(
-            destinations = visibleDestinations.map { WorkspaceDestination(it.name, it.label, it.selectedIcon) },
+            destinations = visibleDestinations.map { WorkspaceDestination(it.name, stringResource(it.label), it.selectedIcon) },
             selectedKey = currentDestination.name,
             onSelect = {
                 currentDestination = HomeRouteDestination.valueOf(it)
@@ -291,7 +291,7 @@ fun HomeScreen(
                                 if (currentPlatform.isApple) {
                                     Icon(
                                         painter = destination.iosTabBarIcon(),
-                                        contentDescription = destination.label,
+                                        contentDescription = stringResource(destination.label),
                                     )
                                 } else {
                                     Icon(
@@ -301,11 +301,11 @@ fun HomeScreen(
                                             } else {
                                                 destination.unselectedIcon
                                             },
-                                        contentDescription = destination.label,
+                                        contentDescription = stringResource(destination.label),
                                     )
                                 }
                             },
-                            label = { Text(destination.label) },
+                            label = { Text(stringResource(destination.label)) },
                         )
                     }
                 },

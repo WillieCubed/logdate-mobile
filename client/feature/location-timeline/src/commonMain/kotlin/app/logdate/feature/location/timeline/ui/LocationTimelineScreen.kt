@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import app.logdate.client.permissions.rememberLocationPermissionState
+import app.logdate.client.text.asString
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationMemoryPreviewUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
@@ -619,7 +620,7 @@ private fun CurrentLocationCard(
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = currentLocation.title,
+                text = currentLocation.title.asString(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -659,7 +660,7 @@ private fun LocationPlaceCard(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = place.title,
+                text = place.title.asString(),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -717,7 +718,7 @@ private fun StopCard(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = stop.title,
+                        text = stop.title.asString(),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -753,7 +754,7 @@ private fun StopCard(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = stop.duration,
+                text = stop.duration.asString(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -809,7 +810,7 @@ private fun LocationPlaceDetailSheet(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = place.title,
+                        text = place.title.asString(),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -879,7 +880,7 @@ private fun LocationPlaceDetailSheet(
                                 fontWeight = FontWeight.Medium,
                             )
                             Text(
-                                text = stop.duration,
+                                text = stop.duration.asString(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

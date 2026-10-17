@@ -18,6 +18,7 @@ import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerUiState
@@ -87,13 +88,13 @@ private val controllableOutputSelection =
             listOf(
                 MediaDeviceUiState(
                     id = "speaker",
-                    label = "Phone speaker",
+                    label = "Phone speaker".toUiText(),
                     kind = MediaDeviceKind.AUDIO_OUTPUT,
                     category = MediaDeviceCategory.BUILT_IN,
                 ),
                 MediaDeviceUiState(
                     id = "bluetooth",
-                    label = "Bluetooth headphones",
+                    label = "Bluetooth headphones".toUiText(),
                     kind = MediaDeviceKind.AUDIO_OUTPUT,
                     category = MediaDeviceCategory.BLUETOOTH,
                     isExternal = true,

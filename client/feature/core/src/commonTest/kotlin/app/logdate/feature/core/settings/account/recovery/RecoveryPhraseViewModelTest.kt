@@ -1,5 +1,6 @@
 package app.logdate.feature.core.settings.account.recovery
 
+import app.logdate.client.text.UiText
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
 import kotlinx.coroutines.Dispatchers
@@ -170,12 +171,12 @@ class RecoveryPhraseViewModelTest {
         override val authState: StateFlow<AppAuthState> = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
 
         override fun authenticate(
-            title: String,
-            subtitle: String,
-            cancelLabel: String,
+            title: UiText,
+            subtitle: UiText,
+            cancelLabel: UiText,
             requireConfirmation: Boolean,
             requestEnrollmentIfNecessary: Boolean,
-            description: String?,
+            description: UiText?,
             onResult: (AppAuthState) -> Unit,
         ) = onResult(result)
 

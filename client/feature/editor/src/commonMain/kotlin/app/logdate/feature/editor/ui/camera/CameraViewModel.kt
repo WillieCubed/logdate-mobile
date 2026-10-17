@@ -3,6 +3,8 @@ package app.logdate.feature.editor.ui.camera
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.formatMediaDuration
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
@@ -12,6 +14,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.capture_state_camera_not_available
+import logdate.client.feature.editor.generated.resources.capture_state_camera_permission_denied
+import logdate.client.feature.editor.generated.resources.capture_state_photo_failed
+import logdate.client.feature.editor.generated.resources.capture_state_video_failed
 
 /**
  * ViewModel for managing camera capture operations.
@@ -207,7 +214,7 @@ data class CameraUiState(
     val recordingDurationMs: Long = 0L,
     val capturedMediaUri: String? = null,
     val capturedMediaType: CapturedMediaType? = null,
-    val error: String? = null,
+    val error: UiText? = null,
     val cameraSelection: MediaDeviceSelectionUiState = defaultCameraSelection(cameraFacing),
 ) {
     /**
@@ -222,11 +229,11 @@ data class CameraUiState(
 /**
  * Converts a [CameraCaptureError] to a user-friendly error message.
  */
-private fun CameraCaptureError.toErrorMessage(): String =
+private fun CameraCaptureError.toErrorMessage(): UiText =
     when (this) {
-        is CameraCaptureError.CameraNotAvailable -> "Camera is not available"
-        is CameraCaptureError.PermissionDenied -> "Camera permission denied"
-        is CameraCaptureError.CaptureFailed -> "Failed to capture photo"
-        is CameraCaptureError.RecordingFailed -> "Failed to record video"
+        is CameraCaptureError.CameraNotAvailable -> Res.string.capture_state_camera_not_available.toUiText()
+        is CameraCaptureError.PermissionDenied -> Res.string.capture_state_camera_permission_denied.toUiText()
+        is CameraCaptureError.CaptureFailed -> Res.string.capture_state_photo_failed.toUiText()
+        is CameraCaptureError.RecordingFailed -> Res.string.capture_state_video_failed.toUiText()
         is CameraCaptureError.Unknown -> message
     }

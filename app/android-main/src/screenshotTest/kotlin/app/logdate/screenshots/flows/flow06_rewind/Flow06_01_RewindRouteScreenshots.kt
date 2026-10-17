@@ -1,6 +1,7 @@
 package app.logdate.screenshots.flows.flow06_rewind
 
 import androidx.compose.runtime.Composable
+import app.logdate.client.text.toUiText
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindDetailUiState
@@ -51,14 +52,14 @@ fun S03_RewindDetailStory() {
                         listOf(
                             SubtitledRewindPanelUiState(
                                 title = "A Week of Intentional Progress",
-                                subtitle = "February 17 - 23, 2025",
+                                subtitle = "February 17 - 23, 2025".toUiText(),
                             ),
                             ImageRewindPanelUiState(
                                 sourceId = rewindId,
                                 timestamp = ScreenshotTestData.baseInstant,
                                 imageUri = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher",
                                 caption = "Wrapped the route harness late into the evening.",
-                                dateFormatted = "Feb 20, 2025",
+                                dateFormatted = "Feb 20, 2025".toUiText(),
                             ),
                             BasicTextRewindPanelUiState(
                                 text = "The work tightened up once the route inventory was real instead of inferred.",

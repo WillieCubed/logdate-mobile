@@ -10,6 +10,8 @@ import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabelAsync
 import app.logdate.ui.audio.AudioContext
@@ -26,6 +28,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.audio_note_viewer_error_load_failed
+import logdate.client.feature.journal.generated.resources.audio_note_viewer_error_not_audio
+import logdate.client.feature.journal.generated.resources.audio_note_viewer_error_not_found
 import kotlin.math.roundToLong
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -90,12 +96,12 @@ class AudioNoteViewerViewModel(
                 .catch { error ->
                     _uiState.value =
                         AudioNoteViewerUiState.Error(
-                            "Failed to load audio note: ${error.message}",
+                            Res.string.audio_note_viewer_error_load_failed.toUiText(error.message.toString()),
                         )
                 }.collect { notes ->
                     val note = notes.find { it.uid == noteId }
                     if (note == null) {
-                        _uiState.value = AudioNoteViewerUiState.Error("Audio note not found")
+                        _uiState.value = AudioNoteViewerUiState.Error(Res.string.audio_note_viewer_error_not_found.toUiText())
                     } else {
                         updateForNote(note)
                     }
@@ -106,7 +112,7 @@ class AudioNoteViewerViewModel(
     private fun updateForNote(note: JournalNote) {
         val audioNote = note as? JournalNote.Audio
         if (audioNote == null) {
-            _uiState.value = AudioNoteViewerUiState.Error("Note is not audio")
+            _uiState.value = AudioNoteViewerUiState.Error(Res.string.audio_note_viewer_error_not_audio.toUiText())
             return
         }
         updateForAudio(audioNote)
@@ -404,7 +410,7 @@ sealed interface AudioNoteViewerUiState {
     data object Loading : AudioNoteViewerUiState
 
     data class Error(
-        val message: String,
+        val message: UiText,
     ) : AudioNoteViewerUiState
 
     /**

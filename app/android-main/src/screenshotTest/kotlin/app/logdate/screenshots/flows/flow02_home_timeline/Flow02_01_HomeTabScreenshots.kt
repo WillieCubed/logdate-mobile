@@ -5,6 +5,7 @@ package app.logdate.screenshots.flows.flow02_home_timeline
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.text.toUiText
 import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalListPanel
@@ -306,8 +307,7 @@ fun S03a_TimelineSuggestionEmptyDayWithLocation() {
                 onProfileClick = {},
                 timelineSuggestion =
                     TimelineSuggestionBlock.EmptyDay(
-                        message = "What's going on?",
-                        locationName = "Blue Bottle Coffee",
+                        locationName = "Blue Bottle Coffee".toUiText(),
                     ),
             )
         }

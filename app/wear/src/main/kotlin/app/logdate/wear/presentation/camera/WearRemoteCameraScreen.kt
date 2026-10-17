@@ -38,7 +38,9 @@ import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.asString
 import app.logdate.wear.R
+import app.logdate.wear.presentation.asString
 
 @Composable
 fun WearRemoteCameraScreen(
@@ -57,7 +59,7 @@ fun WearRemoteCameraScreen(
         RemoteCameraPhase.REQUESTING -> RequestingContent()
         RemoteCameraPhase.READY ->
             ReadyContent(
-                selectedCameraLabel = uiState.selectedCameraLabel,
+                selectedCameraLabel = uiState.selectedCameraLabel.asString(),
                 selectedCameraDeviceId = uiState.selectedCameraDeviceId,
                 availableCameras = uiState.availableCameras,
                 onCapture = viewModel::capture,
@@ -70,13 +72,13 @@ fun WearRemoteCameraScreen(
         RemoteCameraPhase.CAPTURING -> CapturingContent()
         RemoteCameraPhase.PREVIEW ->
             PreviewContent(
-                message = uiState.captureStatusMessage,
+                message = uiState.captureStatusMessage?.asString(),
                 onSave = viewModel::dismiss,
                 onMore = viewModel::captureMore,
             )
         RemoteCameraPhase.ERROR ->
             ErrorContent(
-                message = uiState.errorMessage,
+                message = uiState.errorMessage?.asString(),
                 onDismiss = viewModel::dismiss,
             )
     }
@@ -230,7 +232,7 @@ private fun CameraDeviceButton(
             modifier = Modifier.size(18.dp),
         )
         Text(
-            text = camera.label,
+            text = camera.label.asString(),
             maxLines = 1,
         )
         if (isSelected) {

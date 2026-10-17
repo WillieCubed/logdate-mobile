@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.editor
 
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.ui.camera.CaptureMode
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel.LoadRequest
@@ -8,6 +9,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_load_entry_failed
 import kotlin.uuid.Uuid
 
 /**
@@ -114,7 +117,8 @@ internal fun EntryEditorViewModel.setInitialAttachmentsImpl(attachmentUris: List
                             if (!current.isEditingLocked && !current.shouldExit && attached?.captureState == attachment) {
                                 when (resolved) {
                                     is AudioCaptureState.Ready -> updateBlock(attached.copy(captureState = resolved))
-                                    is AudioCaptureState.Failed -> mutableEditorState.update { it.copy(errorMessage = resolved.reason) }
+                                    is AudioCaptureState.Failed ->
+                                        mutableEditorState.update { it.copy(errorMessage = resolved.reason.toUiText()) }
                                     else -> Unit
                                 }
                             }
@@ -185,7 +189,7 @@ internal fun EntryEditorViewModel.loadExistingEntryImpl(
                 mutableEditorState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "Failed to load entry: ${e.message}",
+                        errorMessage = Res.string.editor_error_load_entry_failed.toUiText(e.message.toString()),
                     )
                 }
             },

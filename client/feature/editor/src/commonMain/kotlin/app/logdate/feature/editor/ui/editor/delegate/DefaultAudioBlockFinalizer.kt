@@ -1,6 +1,8 @@
 package app.logdate.feature.editor.ui.editor.delegate
 
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_recording_not_finalized
 import kotlin.uuid.Uuid
 
 /**
@@ -24,12 +26,8 @@ class DefaultAudioBlockFinalizer(
         resolver.resolvePending(blockId)?.let { return it }
         return when (currentState) {
             is AudioCaptureState.Recording, is AudioCaptureState.Stopping ->
-                AudioCaptureState.Failed(UNRESOLVED_PENDING_REASON)
+                AudioCaptureState.Failed(Res.string.editor_error_recording_not_finalized)
             else -> currentState
         }
-    }
-
-    private companion object {
-        const val UNRESOLVED_PENDING_REASON: String = "Recording could not be finalized"
     }
 }

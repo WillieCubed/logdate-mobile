@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Title in the system media controls when the recording being played has none of its own. -->
+    <string name="audio_playback_untitled">Audio</string>
+</resources>

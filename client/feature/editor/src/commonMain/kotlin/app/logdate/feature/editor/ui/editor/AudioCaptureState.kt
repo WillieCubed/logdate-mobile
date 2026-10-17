@@ -1,5 +1,7 @@
 package app.logdate.feature.editor.ui.editor
 
+import org.jetbrains.compose.resources.StringResource
+
 /**
  * Lifecycle of an audio recording that belongs to an [AudioBlockUiState].
  *
@@ -52,8 +54,8 @@ sealed interface AudioCaptureState {
         val durationMs: Long,
     ) : AudioCaptureState
 
-    /** Recording could not be finalized. [reason] is suitable for surfacing to the user. */
+    /** Recording could not be finalized. [reason] is the message shown to the person. */
     data class Failed(
-        val reason: String,
+        val reason: StringResource,
     ) : AudioCaptureState
 }

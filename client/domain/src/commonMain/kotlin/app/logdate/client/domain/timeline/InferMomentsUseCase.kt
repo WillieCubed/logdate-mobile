@@ -128,10 +128,8 @@ internal fun inferMomentsHeuristically(
             val place = key.placeId?.let { id -> places.find { it.id == id } }
             // Only place-based labels are shown. Bare time-of-day labels
             // are always suppressed — they don't add semantic value.
-            val label = if (place != null) "At ${place.name}" else ""
-
             buildMomentFromNotes(
-                label = label,
+                labelPlace = place,
                 notes = notes,
                 places = if (place != null) listOf(place) else emptyList(),
                 inferenceSource = MomentInferenceSource.TIME_OF_DAY_FALLBACK,
@@ -207,7 +205,7 @@ private fun List<ExtractedMoment>.toMoments(
 }
 
 private fun buildMomentFromNotes(
-    label: String,
+    labelPlace: TimelinePlaceVisit?,
     notes: List<JournalNote>,
     places: List<TimelinePlaceVisit>,
     inferenceSource: MomentInferenceSource,
@@ -221,7 +219,7 @@ private fun buildMomentFromNotes(
 
     return Moment(
         id = Uuid.random(),
-        label = label,
+        label = "",
         estimatedStart = notes.minOf { it.creationTimestamp },
         estimatedEnd = notes.maxOf { it.creationTimestamp },
         sourceNotes = notes,
@@ -231,6 +229,7 @@ private fun buildMomentFromNotes(
         places = places,
         people = emptyList(), // Heuristic doesn't extract people
         inferenceSource = inferenceSource,
+        labelPlace = labelPlace,
     )
 }
 
@@ -299,12 +298,10 @@ private fun serializeEntries(
 private const val AMBIENT_NARRATIVE_CONFIDENCE = 0.4f
 private const val MAX_AMBIENT_LABELS = 4
 
-private enum class HeuristicTimeBucket(
-    val label: String,
-) {
-    MORNING("Morning"),
-    AFTERNOON("Afternoon"),
-    EVENING("Evening"),
+private enum class HeuristicTimeBucket {
+    MORNING,
+    AFTERNOON,
+    EVENING,
 }
 
 private fun Instant.toHeuristicBucket(timezone: TimeZone): HeuristicTimeBucket {

@@ -88,6 +88,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.asSystemControlledSelection
+import app.logdate.client.text.asString
+import app.logdate.client.text.resolve
+import app.logdate.client.text.toUiText
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.media.MediaDeviceSelector
 import coil3.compose.AsyncImage
@@ -190,7 +193,7 @@ actual fun CameraCaptureContent(
     }
 
     LaunchedEffect(uiState.error) {
-        uiState.error?.let(remoteControl.onCaptureFailed)
+        uiState.error?.let { error -> remoteControl.onCaptureFailed(error.resolve()) }
     }
 
     LaunchedEffect(uiState.cameraSelection) {
@@ -782,7 +785,7 @@ private fun InlineCameraCapture(
                 MediaDeviceSelector(
                     selection =
                         inputSelection.asSystemControlledSelection(
-                            routeControlMessage = stringResource(Res.string.camera_microphone_route_message),
+                            routeControlMessage = Res.string.camera_microphone_route_message.toUiText(),
                         ),
                     onDeviceSelected = {},
                     label = stringResource(Res.string.microphone),
@@ -884,7 +887,7 @@ private fun InlineCameraCapture(
                 color = MaterialTheme.colorScheme.errorContainer,
             ) {
                 Text(
-                    text = error,
+                    text = error.asString(),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     style = MaterialTheme.typography.bodySmall,

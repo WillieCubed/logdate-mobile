@@ -3,6 +3,6 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>LongMethod:RewindDetailViewModel.kt:RewindDetailViewModel$private suspend fun transformRewindToStoryPanels: List&lt;RewindPanelUiState></ID>
-    <ID>LongMethod:RewindShareContent.kt:fun RewindPanelUiState.toShareContent: RewindShareContent?</ID>
+    <ID>LongMethod:RewindShareContent.kt:suspend fun RewindPanelUiState.toShareContent: RewindShareContent?</ID>
   </CurrentIssues>
 </SmellBaseline>

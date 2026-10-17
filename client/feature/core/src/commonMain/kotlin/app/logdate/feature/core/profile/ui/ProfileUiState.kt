@@ -1,5 +1,6 @@
 package app.logdate.feature.core.profile.ui
 
+import app.logdate.client.text.UiText
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
@@ -15,7 +16,7 @@ data class ProfileUiState(
     val isLoading: Boolean = false,
     val editState: ProfileEditState = ProfileEditState.None,
     val updateState: ProfileUpdateState = ProfileUpdateState.Idle,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
 ) {
     val isEditing: Boolean
         get() = editState != ProfileEditState.None
@@ -49,7 +50,7 @@ sealed class ProfileUpdateState {
     data object Success : ProfileUpdateState()
 
     data class Error(
-        val message: String,
+        val message: UiText,
     ) : ProfileUpdateState()
 }
 

@@ -8,7 +8,8 @@ cd "$ROOT_DIR"
 # The check needs only git and a POSIX awk, so it runs the same on developer Macs and CI runners.
 SCANNER="scripts/lib/hardcoded-compose-literals.awk"
 
-# Tests, build outputs and the shared screenshot scenes hold fixture content, not app copy.
+# Tests, build outputs and the shared screenshot scenes hold fixture content, not app copy. The export
+# archive's README and JSON Schemas are documents written into the archive, not text shown in the app.
 PATHSPECS=(
   ':(glob)app/**/*.kt'
   ':(glob)client/**/*.kt'
@@ -16,6 +17,7 @@ PATHSPECS=(
   ':(glob,exclude)**/src/*Test/**'
   ':(glob,exclude)**/src/test/**'
   ':(glob,exclude)client/screenshot-scenes/**'
+  ':(glob,exclude)client/domain/src/commonMain/kotlin/app/logdate/client/domain/export/archive/**'
 )
 
 WORK_DIR="$(mktemp -d)"

@@ -19,6 +19,7 @@ import app.logdate.ui.adaptive.FoldableTabletopLayout
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_continue
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -26,7 +27,7 @@ import logdate.client.ui.generated.resources.Res as UiRes
 fun RecoveryPhraseSetupScreen(
     words: List<String>,
     isLoading: Boolean,
-    errorMessage: String?,
+    errorMessage: StringResource?,
     onRetry: () -> Unit,
     onPhraseContinue: (List<String>) -> Unit,
 ) {
@@ -60,7 +61,7 @@ fun RecoveryPhraseSetupScreen(
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    text = errorMessage,
+                    text = stringResource(errorMessage),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )

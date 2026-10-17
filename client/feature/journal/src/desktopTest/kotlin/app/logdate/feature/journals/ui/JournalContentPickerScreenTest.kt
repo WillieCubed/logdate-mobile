@@ -65,9 +65,9 @@ class JournalContentPickerScreenTest {
                 }
             }
 
-            onNodeWithText(sampleWriting.title).assertIsDisplayed()
-            onNodeWithText(recording.title).assertIsDisplayed()
-            onNodeWithText(photo.title).assertIsDisplayed()
+            onNodeWithText(checkNotNull(sampleWriting.title)).assertIsDisplayed()
+            onNodeWithText(checkNotNull(recording.title)).assertIsDisplayed()
+            onNodeWithText(checkNotNull(photo.title)).assertIsDisplayed()
             onNodeWithText("Writing").assertDoesNotExist()
             onNodeWithText("Recording").assertDoesNotExist()
             onNodeWithText("Photo").assertDoesNotExist()

@@ -19,6 +19,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
+import logdate.client.sharing.generated.resources.Res
+import logdate.client.sharing.generated.resources.share_memory_chooser_title
+import org.jetbrains.compose.resources.getString
 import java.io.File
 import kotlin.math.abs
 import kotlin.uuid.Uuid
@@ -57,17 +60,13 @@ class AndroidSharingLauncher(
         summary: String,
         mediaUris: List<String>,
     ) {
-        val shareText =
-            if (summary.isNotBlank()) {
-                "My memory from $date: $summary"
-            } else {
-                "Check out my memory from $date on LogDate!"
-            }
-        shareContent(
-            text = shareText,
-            mediaUris = mediaUris,
-            chooserTitle = "Share memory",
-        )
+        coroutineScope.launch {
+            shareContent(
+                text = memoryDayShareText(date, summary),
+                mediaUris = mediaUris,
+                chooserTitle = getString(Res.string.share_memory_chooser_title),
+            )
+        }
     }
 
     /**

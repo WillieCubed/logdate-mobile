@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.UiText
 import app.logdate.ui.common.MetadataChip
 import app.logdate.ui.common.PeopleMetadataChip
 import app.logdate.ui.theme.Spacing
@@ -65,10 +66,11 @@ sealed interface TimelineSuggestionBlock {
 
     /**
      * Encourage writing when the user has no entries today.
+     *
+     * @property locationName Where the user is now, or null when it is not known.
      */
     data class EmptyDay(
-        val message: String,
-        val locationName: String? = null,
+        val locationName: UiText? = null,
     ) : TimelineSuggestionBlock
 
     /**

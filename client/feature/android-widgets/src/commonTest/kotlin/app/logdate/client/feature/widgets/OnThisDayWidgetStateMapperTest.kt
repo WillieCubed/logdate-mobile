@@ -10,8 +10,8 @@ import kotlin.test.assertNull
  * Tests for the mapping logic between domain-level memory recall data and the UI state
  * required by the "On This Day" Android widget.
  *
- * This ensures that dates are formatted correctly, media thumbnails are correctly extracted,
- * and fallback summaries are used when necessary.
+ * This ensures that the state shows the date the platform formatted, media thumbnails are correctly
+ * extracted, and fallback summaries are used when necessary.
  */
 class OnThisDayWidgetStateMapperTest {
     @Test
@@ -22,20 +22,20 @@ class OnThisDayWidgetStateMapperTest {
                 summary = "Trip to the park",
             )
 
-        val state = data.toWidgetState()
+        val state = data.toWidgetState(dateFormatted = DATE_FORMATTED)
 
         assertEquals("2025-03-24", state.dateIso)
     }
 
     @Test
-    fun `toWidgetState formats date for display`() {
+    fun `toWidgetState shows the date as the platform formatted it`() {
         val data =
             MemoryRecallData(
                 date = LocalDate(2025, 3, 24),
                 summary = "Trip to the park",
             )
 
-        val state = data.toWidgetState()
+        val state = data.toWidgetState(dateFormatted = "March 24, 2025")
 
         assertEquals("March 24, 2025", state.dateFormatted)
     }
@@ -48,7 +48,7 @@ class OnThisDayWidgetStateMapperTest {
                 summary = "New Year's Day celebration",
             )
 
-        val state = data.toWidgetState()
+        val state = data.toWidgetState(dateFormatted = DATE_FORMATTED)
 
         assertEquals("New Year's Day celebration", state.summary)
     }
@@ -61,7 +61,7 @@ class OnThisDayWidgetStateMapperTest {
                 summary = "",
             )
 
-        val state = data.toWidgetState(fallbackSummary = "A memory from this day")
+        val state = data.toWidgetState(dateFormatted = DATE_FORMATTED, fallbackSummary = "A memory from this day")
 
         assertEquals("A memory from this day", state.summary)
     }
@@ -74,7 +74,7 @@ class OnThisDayWidgetStateMapperTest {
                 summary = "",
             )
 
-        val state = data.toWidgetState()
+        val state = data.toWidgetState(dateFormatted = DATE_FORMATTED)
 
         assertEquals("", state.summary)
     }
@@ -88,7 +88,7 @@ class OnThisDayWidgetStateMapperTest {
                 mediaUris = listOf("content://media/1", "content://media/2"),
             )
 
-        val state = data.toWidgetState()
+        val state = data.toWidgetState(dateFormatted = DATE_FORMATTED)
 
         assertEquals("content://media/1", state.thumbnailUri)
     }
@@ -102,8 +102,12 @@ class OnThisDayWidgetStateMapperTest {
                 mediaUris = emptyList(),
             )
 
-        val state = data.toWidgetState()
+        val state = data.toWidgetState(dateFormatted = DATE_FORMATTED)
 
         assertNull(state.thumbnailUri)
+    }
+
+    private companion object {
+        const val DATE_FORMATTED = "a formatted date"
     }
 }

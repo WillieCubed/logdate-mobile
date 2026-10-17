@@ -24,6 +24,9 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.restore_source_label_fallback
+import org.jetbrains.compose.resources.getString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -143,7 +146,10 @@ class RestoreWorker(
     private suspend fun openAndRestore(attempt: Attempt): Result {
         val retained = if (attempt.previous != null && !attempt.replacement) store.source(recoveryId).takeIf { it.isFile } else null
         val uri = retained?.let(Uri::fromFile) ?: sourceUri ?: return missingSource(attempt.previous)
-        val label = attempt.previous?.sourceLabel ?: context.contentResolver.resolveDisplayName(uri) ?: "Journal archive"
+        val label =
+            attempt.previous?.sourceLabel
+                ?: context.contentResolver.resolveDisplayName(uri)
+                ?: getString(Res.string.restore_source_label_fallback)
         emitProgress(RestoreStage.COPYING_ARCHIVE, 5)
         val file = retained ?: copyToCache(uri) ?: return Result.retry()
         try {

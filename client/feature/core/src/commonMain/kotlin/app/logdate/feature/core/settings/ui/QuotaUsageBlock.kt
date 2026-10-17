@@ -38,6 +38,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_photos
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_recordings
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_videos
 import logdate.client.feature.core.generated.resources.quota_usage_block
 import logdate.client.feature.core.generated.resources.total_usage
 import org.jetbrains.compose.resources.stringResource
@@ -187,7 +190,7 @@ fun QuotaUsageBlock(
                                                 ),
                                     )
                                     Text(
-                                        text = category.name,
+                                        text = stringResource(category.name),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                                     )
@@ -218,21 +221,21 @@ private fun QuotaUsageBlockPreview() {
             categories =
                 listOf(
                     StorageCategory(
-                        name = "Photos",
+                        name = Res.string.data_settings_quota_category_photos,
                         usedBytes = 255L * 1024L * 1024L, // 255MB
                         usagePercentage = 0.02f,
                         color = Color(0xFF2196F3), // Blue
                         formattedUsed = "255 MB",
                     ),
                     StorageCategory(
-                        name = "Videos",
+                        name = Res.string.data_settings_quota_category_videos,
                         usedBytes = 12L * 1024L * 1024L * 1024L, // 12GB
                         usagePercentage = 0.92f,
                         color = Color(0xFFFF9800), // Orange
                         formattedUsed = "12 GB",
                     ),
                     StorageCategory(
-                        name = "Recordings",
+                        name = Res.string.data_settings_quota_category_recordings,
                         usedBytes = 255L * 1024L * 1024L, // 255MB
                         usagePercentage = 0.02f,
                         color = Color(0xFFF44336), // Red

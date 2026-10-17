@@ -1,5 +1,6 @@
 package app.logdate.client.feature.widgets
 
+import android.content.Context
 import app.logdate.client.domain.recommendation.MemoryRecallData
 import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.repository.journals.JournalNote
@@ -11,11 +12,12 @@ internal fun TranscriptionData.displayText(): String? =
     transcriptDocument?.plainText?.takeIf(String::isNotBlank) ?: text?.takeIf(String::isNotBlank)
 
 internal suspend fun MemoryRecallData.toWidgetStateWithAudio(
+    context: Context,
     notesRepository: JournalNotesRepository,
     transcriptionRepository: TranscriptionRepository,
     contentTypes: Set<WidgetContentType>,
 ): OnThisDayWidgetState.HasMemory {
-    val base = toWidgetState()
+    val base = toWidgetState(dateFormatted = date.formatForDisplay(context))
     if (WidgetContentType.AUDIO !in contentTypes || base.summary.isNotBlank() || base.thumbnailUri != null) return base
     val audio = notesRepository.getNotesForDay(date).filterIsInstance<JournalNote.Audio>().firstOrNull() ?: return base
     val transcript = runCatching { transcriptionRepository.getTranscription(audio.uid)?.displayText() }.getOrNull().orEmpty()

@@ -19,6 +19,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.ui.media.MediaDeviceSelectorTags
 import app.logdate.ui.theme.LogDateTheme
@@ -40,8 +41,9 @@ class ActiveRecordingInputSelectionTest {
     @Test
     fun `switcher only appears for distinct available controllable recording inputs and closes on disconnect`() =
         runSkikoComposeUiTest(size = Size(390f, 780f)) {
-            val builtIn = MediaDeviceUiState("built-in", "Phone microphone", MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.BUILT_IN)
-            val usb = MediaDeviceUiState("usb", "USB microphone", MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.USB)
+            val builtIn =
+                MediaDeviceUiState("built-in", "Phone microphone".toUiText(), MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.BUILT_IN)
+            val usb = MediaDeviceUiState("usb", "USB microphone".toUiText(), MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.USB)
             val selection = mutableStateOf(MediaDeviceSelectionUiState(MediaDeviceKind.AUDIO_INPUT, listOf(builtIn), builtIn.id))
             var changes = 0
             setContent {
@@ -93,8 +95,16 @@ class ActiveRecordingInputSelectionTest {
 
     private fun verifySelection(paused: Boolean) =
         runSkikoComposeUiTest(size = Size(390f, 780f)) {
-            val builtIn = MediaDeviceUiState("built-in", "Built-in microphone", MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.BUILT_IN)
-            val usb = MediaDeviceUiState("usb", "USB microphone", MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.USB, isExternal = true)
+            val builtIn =
+                MediaDeviceUiState("built-in", "Built-in microphone".toUiText(), MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.BUILT_IN)
+            val usb =
+                MediaDeviceUiState(
+                    "usb",
+                    "USB microphone".toUiText(),
+                    MediaDeviceKind.AUDIO_INPUT,
+                    MediaDeviceCategory.USB,
+                    isExternal = true,
+                )
             val selection = mutableStateOf(MediaDeviceSelectionUiState(MediaDeviceKind.AUDIO_INPUT, listOf(builtIn, usb), builtIn.id))
             var restarts = 0
             var finishes = 0

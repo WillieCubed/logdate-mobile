@@ -1,6 +1,7 @@
 package app.logdate.feature.library.ui.detail
 
 import app.logdate.client.repository.journals.NoteLocation
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -11,7 +12,7 @@ sealed interface MediaDetailUiState {
     data object Loading : MediaDetailUiState
 
     data class Error(
-        val message: String,
+        val message: StringResource,
     ) : MediaDetailUiState
 
     data class ImageContent(

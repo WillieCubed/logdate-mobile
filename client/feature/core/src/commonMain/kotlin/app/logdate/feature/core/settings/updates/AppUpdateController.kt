@@ -2,10 +2,14 @@ package app.logdate.feature.core.settings.updates
 
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.AppInfoRetrievalException
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.app_update_status_unsupported_platform
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -83,7 +87,7 @@ data class AppUpdateUiState(
     /** Flow Play should use for the available update, when one has been chosen. */
     val flowType: AppUpdateFlowType? = null,
     /** Optional user-facing status or error message for settings surfaces. */
-    val message: String? = null,
+    val message: UiText? = null,
     /** Timestamp of the last completed Play check surfaced through this state. */
     val lastCheckedAt: Instant? = null,
 )
@@ -119,7 +123,7 @@ class UnsupportedAppUpdateController(
         MutableStateFlow(
             installedVersion(appInfoProvider).copy(
                 status = AppUpdateStatus.Unsupported,
-                message = "In-app updates are only available on Android builds installed from Google Play.",
+                message = Res.string.app_update_status_unsupported_platform.toUiText(),
                 lastCheckedAt = Clock.System.now(),
             ),
         )

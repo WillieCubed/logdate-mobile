@@ -1,5 +1,6 @@
 package app.logdate.feature.rewind.ui
 
+import app.logdate.client.text.UiText
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -39,7 +40,7 @@ data class BasicTextRewindPanelUiState(
  */
 data class SubtitledRewindPanelUiState(
     val title: String,
-    val subtitle: String,
+    val subtitle: UiText,
     val backgroundUri: String? = null,
     val weatherChip: WeatherChipUiState? = null,
 ) : RewindPanelUiState
@@ -90,8 +91,8 @@ enum class WeatherChipCategory {
 data class BigStatisticRewindPanelUiState(
     val title: String,
     val statistic: String,
-    val units: String,
-    val description: String,
+    val units: UiText,
+    val description: UiText,
     val background: RewindPanelBackgroundSpec = RewindPanelBackgroundSpec(),
 ) : RewindPanelUiState
 
@@ -110,7 +111,7 @@ data class TextNoteRewindPanelUiState(
     val sourceId: Uuid,
     val timestamp: Instant,
     val content: String,
-    val dateFormatted: String,
+    val dateFormatted: UiText,
     val background: RewindPanelBackgroundSpec =
         RewindPanelBackgroundSpec(
             color = 0xFF1A1A1A, // Dark gray background by default
@@ -133,7 +134,7 @@ data class ImageRewindPanelUiState(
     val timestamp: Instant,
     val imageUri: String,
     val caption: String? = null,
-    val dateFormatted: String,
+    val dateFormatted: UiText,
     val isVideoFrame: Boolean = false,
 ) : RewindPanelUiState
 
@@ -160,7 +161,7 @@ data class AudioNoteRewindPanelUiState(
     val uri: String,
     val durationMs: Long,
     val transcriptionText: String?,
-    val dateFormatted: String,
+    val dateFormatted: UiText,
     val cachedAmplitudes: List<Float>? = null,
 ) : RewindPanelUiState
 
@@ -273,8 +274,8 @@ data class ReflectionPromptRewindPanelUiState(
  */
 data class LocationMapRewindPanelUiState(
     val points: List<MapPanelPoint>,
-    val title: String,
-    val subtitle: String,
+    val title: UiText,
+    val subtitle: UiText,
     val accentSeed: Int = 0,
 ) : RewindPanelUiState
 

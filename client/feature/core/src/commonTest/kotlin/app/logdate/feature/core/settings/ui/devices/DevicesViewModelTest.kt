@@ -5,6 +5,8 @@ import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.DeviceRepository
 import app.logdate.client.device.models.DeviceInfo
 import app.logdate.client.device.models.DevicePlatform
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +20,12 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.devices_error_load
+import logdate.client.feature.core.generated.resources.devices_error_remove
+import logdate.client.feature.core.generated.resources.devices_fallback_name
+import logdate.client.feature.core.generated.resources.devices_platform_android
+import logdate.client.feature.core.generated.resources.devices_platform_wear_os
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -120,7 +128,7 @@ class DevicesViewModelTest {
             // Verify current device is properly marked
             val currentDevice = assertNotNull(state.devices.find { it.id == currentDeviceId })
             assertTrue(currentDevice.isCurrentDevice, "Current device should be marked as current")
-            assertEquals("Current Device", currentDevice.name, "Current device should have correct name")
+            assertEquals("Current Device".toUiText(), currentDevice.name, "Current device should have correct name")
 
             // Verify other devices are not marked as current
             state.devices
@@ -140,7 +148,7 @@ class DevicesViewModelTest {
             advanceUntilIdle()
 
             assertEquals(
-                "Wear OS",
+                Res.string.devices_platform_wear_os,
                 viewModel.uiState
                     .first()
                     .devices
@@ -166,8 +174,8 @@ class DevicesViewModelTest {
             val names =
                 viewModel.uiState.value.devices
                     .map { it.name }
-            assertTrue("Android device" in names)
-            assertFalse("sdk_gphone16k_arm64" in names)
+            assertTrue(Res.string.devices_fallback_name.toUiText(Res.string.devices_platform_android.toUiText()) in names)
+            assertFalse("sdk_gphone16k_arm64".toUiText() in names)
         }
 
     @Test
@@ -202,7 +210,7 @@ class DevicesViewModelTest {
             // Then
             assertEquals(initialDeviceCount, updatedState.devices.size, "Device count should not change")
             val currentDevice = updatedState.devices.find { it.isCurrentDevice }
-            assertEquals(newName, currentDevice?.name, "Device should be renamed")
+            assertEquals(newName.toUiText(), currentDevice?.name, "Device should be renamed")
             assertEquals(1, repository.updateDeviceInfoCallCount, "Should update device info in repository")
         }
 
@@ -257,7 +265,7 @@ class DevicesViewModelTest {
 
             // Then
             assertFalse(state.isLoading, "Loading should complete even on error")
-            assertTrue(state.error?.contains("Failed to load devices") ?: false, "Error message should be set")
+            assertEquals(Res.string.devices_error_load, (state.error as? UiText.Resource)?.resource, "Error message should be set")
         }
 
     @Test
@@ -274,7 +282,7 @@ class DevicesViewModelTest {
             val state = viewModel.uiState.first()
 
             // Then
-            assertTrue(state.error?.contains("Failed to remove device") ?: false, "Error message should be set")
+            assertEquals(Res.string.devices_error_remove, (state.error as? UiText.Resource)?.resource, "Error message should be set")
         }
 
     /**

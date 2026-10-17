@@ -32,6 +32,7 @@ import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import app.logdate.client.text.toUiText
 import app.logdate.feature.location.timeline.ui.history.HistoryPlaceUi
 import app.logdate.feature.location.timeline.ui.history.HistoryTab
 import app.logdate.feature.location.timeline.ui.history.HumanHistoryMap
@@ -66,12 +67,12 @@ class HomeWorkspaceE2ETest {
         val state =
             mutableStateOf(
                 HumanLocationHistoryState(
-                    "Tuesday, September 29",
+                    "Tuesday, September 29".toUiText(),
                     tab = HistoryTab.Places,
                     places =
                         listOf(
-                            HistoryPlaceUi("cafe", "Mothership Coffee", "Visited today"),
-                            HistoryPlaceUi("library", "Las Vegas Library", "Visited today"),
+                            HistoryPlaceUi("cafe", "Mothership Coffee", listOf("Visited today".toUiText())),
+                            HistoryPlaceUi("library", "Las Vegas Library", listOf("Visited today".toUiText())),
                         ),
                 ),
             )
@@ -223,9 +224,9 @@ class HomeWorkspaceE2ETest {
                         ) {
                             app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryContent(
                                 app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryState(
-                                    "Today",
-                                    recoveryMessage = "Recording was interrupted",
-                                    recoveryActionLabel = "Resume recording",
+                                    "Today".toUiText(),
+                                    recoveryMessage = "Recording was interrupted".toUiText(),
+                                    recoveryActionLabel = "Resume recording".toUiText(),
                                 ),
                                 app.logdate.feature.location.timeline.ui.history
                                     .HumanLocationHistoryActions(onRecover = { resumed = true }),

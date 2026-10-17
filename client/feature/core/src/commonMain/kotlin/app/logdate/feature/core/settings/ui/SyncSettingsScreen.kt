@@ -88,7 +88,7 @@ fun SyncSettingsScreen(
 
             is SyncFeedback.Failed ->
                 snackbarHostState.showSnackbar(
-                    getString(Res.string.sync_feedback_failed, feedback.message),
+                    getString(Res.string.sync_feedback_failed, getString(feedback.message)),
                 )
         }
         viewModel.consumeSyncFeedback()

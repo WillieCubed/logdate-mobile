@@ -29,6 +29,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.ui.theme.LogDateTheme
@@ -157,7 +158,7 @@ class CompletedAudioPresentationTest {
                                         DefaultMediaDevices.systemOutput,
                                         MediaDeviceUiState(
                                             "headphones",
-                                            "Headphones",
+                                            "Headphones".toUiText(),
                                             MediaDeviceKind.AUDIO_OUTPUT,
                                             MediaDeviceCategory.WIRED,
                                         ),
@@ -217,7 +218,7 @@ class CompletedAudioPresentationTest {
                                         DefaultMediaDevices.systemOutput,
                                         MediaDeviceUiState(
                                             "headphones",
-                                            "Headphones",
+                                            "Headphones".toUiText(),
                                             MediaDeviceKind.AUDIO_OUTPUT,
                                             MediaDeviceCategory.WIRED,
                                         ),

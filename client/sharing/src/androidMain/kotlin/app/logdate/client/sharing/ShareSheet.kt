@@ -9,6 +9,12 @@ import android.net.Uri
 import android.os.Build
 import android.service.chooser.ChooserAction
 import app.logdate.shared.model.Journal
+import logdate.client.sharing.generated.resources.Res
+import logdate.client.sharing.generated.resources.action_label_share_qr_code
+import logdate.client.sharing.generated.resources.share_action_copy_link
+import logdate.client.sharing.generated.resources.share_title_share_journal
+import logdate.client.sharing.generated.resources.share_title_share_qr_code
+import org.jetbrains.compose.resources.getString
 
 internal data class ShareContentRequest(
     val text: String? = null,
@@ -18,7 +24,23 @@ internal data class ShareContentRequest(
     val copyText: String? = null,
     val qrCodeImageUri: Uri? = null,
     val qrCodeText: String? = null,
+    val actionLabels: ShareActionLabels? = null,
 )
+
+/**
+ * Labels for the share sheet's custom actions, resolved for the current locale with
+ * [shareActionLabels]. A request needs them for its copy-link and QR code actions to appear.
+ */
+internal data class ShareActionLabels(
+    val copyLink: String,
+    val shareQrCode: String,
+)
+
+internal suspend fun shareActionLabels(): ShareActionLabels =
+    ShareActionLabels(
+        copyLink = getString(Res.string.share_action_copy_link),
+        shareQrCode = getString(Res.string.action_label_share_qr_code),
+    )
 
 /**
  * Shares a journal link using the system share sheet.
@@ -26,7 +48,7 @@ internal data class ShareContentRequest(
  * This presents a system share sheet with some custom share options for the user to choose from,
  * including quick actions on supported Android versions.
  */
-internal fun Context.shareJournalLink(
+internal suspend fun Context.shareJournalLink(
     journal: Journal,
     previewImage: Uri? = null,
     qrCodeImage: Uri? = null,
@@ -39,15 +61,16 @@ internal fun Context.shareJournalLink(
                 text = url,
                 mediaUris = mediaUris,
                 title = journal.title,
-                chooserTitle = "Share journal",
+                chooserTitle = getString(Res.string.share_title_share_journal),
                 copyText = url,
                 qrCodeImageUri = qrCodeImage,
                 qrCodeText = url,
+                actionLabels = shareActionLabels(),
             ),
     )
 }
 
-internal fun Context.shareJournalQrCode(
+internal suspend fun Context.shareJournalQrCode(
     journal: Journal,
     qrCodeImage: Uri,
 ) {
@@ -58,8 +81,9 @@ internal fun Context.shareJournalQrCode(
                 text = url,
                 mediaUris = listOf(qrCodeImage),
                 title = journal.title,
-                chooserTitle = "Share QR code",
+                chooserTitle = getString(Res.string.share_title_share_qr_code),
                 copyText = url,
+                actionLabels = shareActionLabels(),
             ),
     )
 }
@@ -143,6 +167,7 @@ private fun Context.resolveMimeType(mediaUris: List<Uri>): String {
 }
 
 private fun Context.buildChooserActions(request: ShareContentRequest): Array<ChooserAction> {
+    val labels = request.actionLabels ?: return emptyArray()
     val actions = mutableListOf<ChooserAction>()
     request.copyText
         ?.takeIf(String::isNotBlank)
@@ -151,7 +176,7 @@ private fun Context.buildChooserActions(request: ShareContentRequest): Array<Cho
                 ChooserAction
                     .Builder(
                         Icon.createWithResource(this, android.R.drawable.ic_menu_set_as),
-                        "Copy link",
+                        labels.copyLink,
                         PendingIntent.getBroadcast(
                             this,
                             1,
@@ -170,7 +195,7 @@ private fun Context.buildChooserActions(request: ShareContentRequest): Array<Cho
             ChooserAction
                 .Builder(
                     Icon.createWithResource(this, android.R.drawable.ic_menu_share),
-                    "Share QR code",
+                    labels.shareQrCode,
                     PendingIntent.getBroadcast(
                         this,
                         2,

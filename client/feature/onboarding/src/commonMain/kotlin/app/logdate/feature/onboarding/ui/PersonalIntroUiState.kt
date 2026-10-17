@@ -1,5 +1,7 @@
 package app.logdate.feature.onboarding.ui
 
+import org.jetbrains.compose.resources.StringResource
+
 /**
  * UI state for the personal introduction onboarding screen.
  *
@@ -9,13 +11,13 @@ data class PersonalIntroUiState(
     val currentStep: PersonalIntroStep = PersonalIntroStep.Name,
     val name: String = "",
     val bio: String = "",
-    val nameError: String? = null,
-    val bioError: String? = null,
+    val nameError: StringResource? = null,
+    val bioError: StringResource? = null,
     val isProcessingLlm: Boolean = false,
     val llmResponse: String? = null,
     val llmError: String? = null,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: StringResource? = null,
 ) {
     val canContinueFromName: Boolean
         get() = name.trim().isNotEmpty() && nameError == null && !isLoading

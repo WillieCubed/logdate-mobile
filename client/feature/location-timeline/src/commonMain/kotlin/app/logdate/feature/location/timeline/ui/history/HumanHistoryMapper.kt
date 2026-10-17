@@ -2,6 +2,7 @@ package app.logdate.feature.location.timeline.ui.history
 
 import app.logdate.client.domain.location.history.LocationHistorySnapshot
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.location.HistoryGap
 import app.logdate.shared.model.location.JourneyLeg
 import app.logdate.shared.model.location.LocationDayItem
@@ -13,6 +14,27 @@ import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_add_missing_visit_hint
+import logdate.client.feature.location.timeline.generated.resources.history_around_time
+import logdate.client.feature.location.timeline.generated.resources.history_journey_minutes
+import logdate.client.feature.location.timeline.generated.resources.history_location_recorded
+import logdate.client.feature.location.timeline.generated.resources.history_memory_photo
+import logdate.client.feature.location.timeline.generated.resources.history_memory_recording
+import logdate.client.feature.location.timeline.generated.resources.history_memory_video
+import logdate.client.feature.location.timeline.generated.resources.history_not_recorded
+import logdate.client.feature.location.timeline.generated.resources.history_place_last_visited
+import logdate.client.feature.location.timeline.generated.resources.history_place_latest_memory
+import logdate.client.feature.location.timeline.generated.resources.history_place_location_recorded
+import logdate.client.feature.location.timeline.generated.resources.history_place_you_visited
+import logdate.client.feature.location.timeline.generated.resources.history_travel_bus
+import logdate.client.feature.location.timeline.generated.resources.history_travel_cycled
+import logdate.client.feature.location.timeline.generated.resources.history_travel_drove
+import logdate.client.feature.location.timeline.generated.resources.history_travel_ran
+import logdate.client.feature.location.timeline.generated.resources.history_travel_train
+import logdate.client.feature.location.timeline.generated.resources.history_travel_travelling
+import logdate.client.feature.location.timeline.generated.resources.history_travel_walked
+import org.jetbrains.compose.resources.StringResource
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -26,9 +48,10 @@ internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemU
             HistoryItemUi(
                 id,
                 HistoryItemKind.Visit,
-                place?.name ?: if (confirmedStay) "A place you visited" else "Location recorded",
-                if (confirmedStay) historyTimeRange() else "Around ${start.localTime}",
-                place?.locality.orEmpty(),
+                place?.name?.toUiText()
+                    ?: (if (confirmedStay) Res.string.history_place_you_visited else Res.string.history_location_recorded).toUiText(),
+                if (confirmedStay) historyTimeRange().toUiText() else Res.string.history_around_time.toUiText(start.localTime),
+                place?.locality.orEmpty().toUiText(),
                 notes.filter { it.uid.toString() in memoryIds }.map { it.toHistoryMemory() },
                 isApproximate = !confirmedStay,
             )
@@ -36,17 +59,21 @@ internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemU
             HistoryItemUi(
                 id,
                 HistoryItemKind.Journey,
-                mode.humanName(),
-                historyTimeRange(),
-                if (end > start) "${(end - start).inWholeMinutes} min" else "Around ${start.localTime}",
+                mode.humanName().toUiText(),
+                historyTimeRange().toUiText(),
+                if (end > start) {
+                    Res.string.history_journey_minutes.toUiText((end - start).inWholeMinutes)
+                } else {
+                    Res.string.history_around_time.toUiText(start.localTime)
+                },
             )
         is HistoryGap ->
             HistoryItemUi(
                 id,
                 HistoryItemKind.Gap,
-                "Not recorded",
-                historyTimeRange(),
-                "You can add a missing visit.",
+                Res.string.history_not_recorded.toUiText(),
+                historyTimeRange().toUiText(),
+                Res.string.history_add_missing_visit_hint.toUiText(),
             )
     }
 
@@ -59,24 +86,25 @@ private fun LocationDayItem.historyTimeRange(): String {
     }
 }
 
-internal fun TravelMode.humanName(): String =
+internal fun TravelMode.humanName(): StringResource =
     when (this) {
-        TravelMode.WALKING -> "Walked"
-        TravelMode.RUNNING -> "Ran"
-        TravelMode.CYCLING -> "Cycled"
-        TravelMode.DRIVING -> "Drove"
-        TravelMode.BUS -> "Bus"
-        TravelMode.TRAIN -> "Train"
-        else -> "Travelling"
+        TravelMode.WALKING -> Res.string.history_travel_walked
+        TravelMode.RUNNING -> Res.string.history_travel_ran
+        TravelMode.CYCLING -> Res.string.history_travel_cycled
+        TravelMode.DRIVING -> Res.string.history_travel_drove
+        TravelMode.BUS -> Res.string.history_travel_bus
+        TravelMode.TRAIN -> Res.string.history_travel_train
+        else -> Res.string.history_travel_travelling
     }
 
 internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
     when (this) {
-        is JournalNote.Text -> HistoryMemoryUi(uid.toString(), content, HistoryMemoryKind.Text, creationTimestamp.toReadableDateShort())
+        is JournalNote.Text ->
+            HistoryMemoryUi(uid.toString(), content.toUiText(), HistoryMemoryKind.Text, creationTimestamp.toReadableDateShort())
         is JournalNote.Image ->
             HistoryMemoryUi(
                 uid.toString(),
-                caption.ifBlank { "A photo from this visit" },
+                if (caption.isBlank()) Res.string.history_memory_photo.toUiText() else caption.toUiText(),
                 HistoryMemoryKind.Image,
                 creationTimestamp.toReadableDateShort(),
                 mediaRef,
@@ -84,7 +112,7 @@ internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
         is JournalNote.Video ->
             HistoryMemoryUi(
                 uid.toString(),
-                caption.ifBlank { "A video from this visit" },
+                if (caption.isBlank()) Res.string.history_memory_video.toUiText() else caption.toUiText(),
                 HistoryMemoryKind.Video,
                 creationTimestamp.toReadableDateShort(),
                 mediaRef,
@@ -92,7 +120,7 @@ internal fun JournalNote.toHistoryMemory(): HistoryMemoryUi =
         is JournalNote.Audio ->
             HistoryMemoryUi(
                 uid.toString(),
-                "A recording from this visit",
+                Res.string.history_memory_recording.toUiText(),
                 HistoryMemoryKind.Audio,
                 creationTimestamp.toReadableDateShort(),
                 audio = MomentAudioUiState(mediaRef, durationMs, noteId = uid, recordedAt = creationTimestamp),
@@ -156,19 +184,22 @@ internal fun LocationHistorySnapshot.placeRows(): List<HistoryPlaceUi> {
             val lastVisit =
                 visits.filter { it.confirmedStay }.maxByOrNull { it.start }?.let {
                     val count = visits.count { visit -> visit.confirmedStay }
-                    "Last visited ${it.start.toReadableDateShort()} · $count ${if (count == 1) "visit" else "visits"}"
+                    Res.plurals.history_place_last_visited.toUiText(count, it.start.toReadableDateShort(), count)
                 }
             val lastClue =
                 if (lastVisit == null) {
-                    visits.maxByOrNull { it.start }?.let { "Location recorded ${it.start.toReadableDateShort()}" }
+                    visits.maxByOrNull { it.start }?.let {
+                        Res.string.history_place_location_recorded.toUiText(it.start.toReadableDateShort())
+                    }
                 } else {
                     null
                 }
-            val latestMemory = memories.firstOrNull()?.let { "Latest memory ${it.creationTimestamp.toReadableDateShort()}" }
+            val latestMemory =
+                memories.firstOrNull()?.let { Res.string.history_place_latest_memory.toUiText(it.creationTimestamp.toReadableDateShort()) }
             HistoryPlaceUi(
                 place.id,
                 place.name,
-                listOfNotNull(place.locality, lastVisit, lastClue, latestMemory).joinToString("\n"),
+                listOfNotNull(place.locality?.toUiText(), lastVisit, lastClue, latestMemory),
                 memories.map { it.toHistoryMemory() },
                 ids,
             )

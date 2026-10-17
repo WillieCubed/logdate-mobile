@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import app.logdate.wear.R
+import app.logdate.wear.presentation.WearText
 import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.presentation.home.WearHomeContent
 import app.logdate.wear.presentation.home.WearHomeUiState
@@ -25,9 +27,9 @@ class WearHomeScreenshots {
             WearHomeContent(
                 homeState =
                     WearHomeUiState(
-                        greeting = "Good morning",
+                        greeting = R.string.wear_home_greeting_morning,
                         entryCount = 0,
-                        entryCountLabel = "No entries yet",
+                        entryCountLabel = WearText.Resource(R.string.wear_home_no_entries),
                     ),
             )
         }
@@ -41,9 +43,9 @@ class WearHomeScreenshots {
             WearHomeContent(
                 homeState =
                     WearHomeUiState(
-                        greeting = "Good afternoon",
+                        greeting = R.string.wear_home_greeting_afternoon,
                         entryCount = 5,
-                        entryCountLabel = "5 entries today",
+                        entryCountLabel = WearText.Plural(R.plurals.wear_tile_entry_count, 5, listOf(5)),
                     ),
             )
         }
@@ -57,9 +59,9 @@ class WearHomeScreenshots {
             WearHomeContent(
                 homeState =
                     WearHomeUiState(
-                        greeting = "Good evening",
+                        greeting = R.string.wear_home_greeting_evening,
                         entryCount = 1,
-                        entryCountLabel = "1 entry today",
+                        entryCountLabel = WearText.Plural(R.plurals.wear_tile_entry_count, 1, listOf(1)),
                     ),
             )
         }
@@ -192,7 +194,7 @@ class WearHomeScreenshots {
 private fun HomeWithRecorder(recordingState: RecordingUiState) {
     OnWatchSurface {
         WearHomeContent(
-            homeState = WearHomeUiState(greeting = "Good morning"),
+            homeState = WearHomeUiState(greeting = R.string.wear_home_greeting_morning),
             recordingState = recordingState,
         )
     }

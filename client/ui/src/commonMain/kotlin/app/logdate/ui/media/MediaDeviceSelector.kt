@@ -54,6 +54,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.asString
 import app.logdate.ui.platform.PlatformSheet
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.common_done
@@ -98,7 +99,7 @@ fun MediaDeviceSelector(
 ) {
     var isSheetVisible by visibilityState
     val selected = selection.selectedDevice
-    val chipLabel = selected?.label ?: label
+    val chipLabel = selected?.label?.asString() ?: label
 
     AssistChip(
         onClick = { isSheetVisible = true },
@@ -177,7 +178,7 @@ fun MediaDeviceSelectorSheet(
 
         selection.routeControlMessage?.let { message ->
             Text(
-                text = message,
+                text = message.asString(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
@@ -189,7 +190,7 @@ fun MediaDeviceSelectorSheet(
             val rowEnabled = selection.isSelectionControllable && device.isAvailable
             val supportingText = device.supportingText(selection)
             ListItem(
-                headlineContent = { Text(device.label) },
+                headlineContent = { Text(device.label.asString()) },
                 supportingContent = {
                     Text(
                         text = supportingText,

@@ -22,6 +22,7 @@ import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.journals.PendingMediaType
+import app.logdate.client.text.UiText
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.fakes.FakeActivityTimelineRepository
@@ -48,12 +49,15 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_save_draft_failed
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -389,9 +393,13 @@ class DraftManagementTest {
 
             assertFalse(saved)
             assertFalse(viewModel.editorState.value.shouldExit)
+            val error = assertIs<UiText.Resource>(viewModel.editorState.value.errorMessage)
+            assertEquals(Res.string.editor_error_save_draft_failed, error.resource)
             assertTrue(
-                viewModel.editorState.value.errorMessage
-                    ?.contains("disk full") == true,
+                error.args
+                    .single()
+                    .toString()
+                    .contains("disk full"),
             )
             assertEquals(DraftState.None, viewModel.editorState.value.draftState)
         }

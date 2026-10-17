@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.text.UiText
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.shared.model.user.AppSecurityLevel
@@ -108,12 +109,12 @@ class PrivacySettingsViewModelTest {
             private set
 
         override fun authenticate(
-            title: String,
-            subtitle: String,
-            cancelLabel: String,
+            title: UiText,
+            subtitle: UiText,
+            cancelLabel: UiText,
             requireConfirmation: Boolean,
             requestEnrollmentIfNecessary: Boolean,
-            description: String?,
+            description: UiText?,
             onResult: (AppAuthState) -> Unit,
         ) {
             authenticateInvocations += 1

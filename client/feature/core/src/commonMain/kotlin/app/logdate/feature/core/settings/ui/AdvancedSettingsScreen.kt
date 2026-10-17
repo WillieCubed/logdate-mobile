@@ -18,6 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.text.asString
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
@@ -140,7 +141,7 @@ private fun AppUpdateSection(
             AppUpdateStatus.Idle -> null
             AppUpdateStatus.Checking -> stringResource(Res.string.app_update_checking)
             AppUpdateStatus.UpToDate ->
-                appUpdateUiState.message ?: stringResource(Res.string.app_update_up_to_date)
+                appUpdateUiState.message?.asString() ?: stringResource(Res.string.app_update_up_to_date)
             AppUpdateStatus.Available ->
                 when (appUpdateUiState.flowType) {
                     AppUpdateFlowType.Immediate -> stringResource(Res.string.app_update_immediate_required)
@@ -149,9 +150,9 @@ private fun AppUpdateSection(
             AppUpdateStatus.Downloading -> stringResource(Res.string.app_update_downloading)
             AppUpdateStatus.Downloaded -> stringResource(Res.string.app_update_downloaded)
             AppUpdateStatus.Unsupported ->
-                appUpdateUiState.message ?: stringResource(Res.string.app_update_unsupported)
+                appUpdateUiState.message?.asString() ?: stringResource(Res.string.app_update_unsupported)
             AppUpdateStatus.Error ->
-                appUpdateUiState.message ?: stringResource(Res.string.app_update_check_failed)
+                appUpdateUiState.message?.asString() ?: stringResource(Res.string.app_update_check_failed)
         }
 
     val buttonEnabled = appUpdateUiState.status != AppUpdateStatus.Checking

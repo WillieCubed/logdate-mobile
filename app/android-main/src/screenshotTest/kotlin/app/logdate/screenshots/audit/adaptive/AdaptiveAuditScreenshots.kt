@@ -28,6 +28,7 @@ import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
+import app.logdate.client.text.toUiText
 import app.logdate.client.ui.LockableContent
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
@@ -1776,7 +1777,7 @@ fun A111_DataSettingsExportProgressBookPosture() {
                 onBack = {},
                 quotaUsage = auditStorageQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Exporting(progressPercent = 62, message = "Packaging entries and attachments"),
+                exportState = ExportState.Exporting(progressPercent = 62, message = "Packaging entries and attachments".toUiText()),
                 isExportSheetVisible = true,
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
@@ -1924,7 +1925,7 @@ fun A117_AppUpdatePromptBookPosture() {
                 uiState =
                     AppUpdateUiState(
                         status = AppUpdateStatus.Available,
-                        message = "LogDate 0.2.0 is ready to install.",
+                        message = "LogDate 0.2.0 is ready to install.".toUiText(),
                     ),
                 onLaunchUpdate = {},
                 onCompleteUpdate = {},

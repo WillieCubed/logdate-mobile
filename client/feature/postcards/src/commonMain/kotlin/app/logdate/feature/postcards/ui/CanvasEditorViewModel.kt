@@ -20,6 +20,11 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.postcards_save_failed
+import logdate.client.feature.postcards.generated.resources.postcards_untitled
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -56,7 +61,7 @@ data class CanvasEditorState(
     val shelfPhotos: List<ShelfPhoto> = emptyList(),
     val isSaving: Boolean = false,
     val isNewPostcard: Boolean = true,
-    val saveError: String? = null,
+    val saveError: StringResource? = null,
     val editingTextElementId: Uuid? = null,
     val isTextEditorVisible: Boolean = false,
     val shelfStickers: List<StickerShelfItem> = emptyList(),
@@ -554,7 +559,7 @@ class CanvasEditorViewModel(
                 val entity =
                     PostcardEntity(
                         id = doc.id,
-                        title = doc.title.ifEmpty { "Untitled" },
+                        title = doc.title.ifEmpty { getString(Res.string.postcards_untitled) },
                         createdAt = doc.createdAt,
                         modifiedAt = doc.modifiedAt,
                         sourceMomentRef = doc.sourceMomentRef,
@@ -568,7 +573,7 @@ class CanvasEditorViewModel(
                 _state.update { it.copy(document = doc, isSaving = false, isNewPostcard = false) }
             } catch (e: Exception) {
                 Napier.e("Failed to save postcard", e)
-                _state.update { it.copy(isSaving = false, saveError = "Could not save postcard") }
+                _state.update { it.copy(isSaving = false, saveError = Res.string.postcards_save_failed) }
             }
         }
     }

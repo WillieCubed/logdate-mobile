@@ -12,6 +12,13 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.ui.graphics.vector.ImageVector
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.home_destination_journals
+import logdate.client.feature.core.generated.resources.home_destination_library
+import logdate.client.feature.core.generated.resources.home_destination_places
+import logdate.client.feature.core.generated.resources.home_destination_rewind
+import logdate.client.feature.core.generated.resources.home_destination_timeline
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * Tabs in the home navigation shell.
@@ -20,32 +27,32 @@ import androidx.compose.ui.graphics.vector.ImageVector
  * and Android experiences stay consistent.
  */
 enum class HomeRouteDestination(
-    val label: String,
+    val label: StringResource,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 ) {
     Timeline(
-        label = "Timeline",
+        label = Res.string.home_destination_timeline,
         selectedIcon = Icons.Filled.History,
         unselectedIcon = Icons.Outlined.History,
     ),
     LocationHistory(
-        label = "Places",
+        label = Res.string.home_destination_places,
         selectedIcon = Icons.Filled.LocationOn,
         unselectedIcon = Icons.Outlined.LocationOn,
     ),
     Journals(
-        label = "Journals",
+        label = Res.string.home_destination_journals,
         selectedIcon = Icons.Filled.Book,
         unselectedIcon = Icons.Outlined.Book,
     ),
     Library(
-        label = "Library",
+        label = Res.string.home_destination_library,
         selectedIcon = Icons.Filled.PhotoLibrary,
         unselectedIcon = Icons.Outlined.PhotoLibrary,
     ),
     Rewind(
-        label = "Rewind",
+        label = Res.string.home_destination_rewind,
         selectedIcon = Icons.Filled.DateRange,
         unselectedIcon = Icons.Outlined.DateRange,
     ),

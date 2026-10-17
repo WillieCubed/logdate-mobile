@@ -40,16 +40,15 @@ class GetHomeRecommendationUseCase(
     private val placeResolutionCache: PlaceResolutionCache,
     private val memoriesSettingsRepository: MemoriesSettingsRepository,
 ) {
-    private val locationNameFlow: Flow<String?> =
+    private val locationFlow: Flow<CurrentLocationDescription?> =
         clientLocationProvider.currentLocation
             .distinctUntilChanged { a, b -> a.distanceTo(b) < 100.0 }
             .mapLatest { location ->
                 try {
                     when (val result = placeResolutionCache.resolve(location)) {
-                        is PlaceResolutionResult.UserDefinedPlace -> result.place.name
-                        is PlaceResolutionResult.ExternalSuggestion -> result.suggestion.name
-                        is PlaceResolutionResult.CoarseLocation ->
-                            formatCoarseLocation(result.address)
+                        is PlaceResolutionResult.UserDefinedPlace -> CurrentLocationDescription.NamedPlace(result.place.name)
+                        is PlaceResolutionResult.ExternalSuggestion -> CurrentLocationDescription.NamedPlace(result.suggestion.name)
+                        is PlaceResolutionResult.CoarseLocation -> describeCoarseLocation(result.address)
                         is PlaceResolutionResult.UnknownLocation -> null
                     }
                 } catch (e: Exception) {
@@ -58,16 +57,19 @@ class GetHomeRecommendationUseCase(
                 }
             }.onStart { emit(null) }
 
-    private fun formatCoarseLocation(address: GeocodedAddress): String? =
-        when {
-            address.thoroughfare != null && address.locality != null ->
-                "Near ${address.thoroughfare}, ${address.locality}"
-            address.subLocality != null && address.locality != null ->
-                "${address.subLocality}, ${address.locality}"
-            address.locality != null -> "Somewhere in ${address.locality}"
-            address.adminArea != null -> "Somewhere in ${address.adminArea}"
+    private fun describeCoarseLocation(address: GeocodedAddress): CurrentLocationDescription? {
+        val thoroughfare = address.thoroughfare
+        val subLocality = address.subLocality
+        val locality = address.locality
+        val adminArea = address.adminArea
+        return when {
+            thoroughfare != null && locality != null -> CurrentLocationDescription.Street(thoroughfare, locality)
+            subLocality != null && locality != null -> CurrentLocationDescription.Neighborhood(subLocality, locality)
+            locality != null -> CurrentLocationDescription.Area(locality)
+            adminArea != null -> CurrentLocationDescription.Area(adminArea)
             else -> null
         }
+    }
 
     operator fun invoke(): Flow<HomeRecommendation> =
         memoriesSettingsRepository.observeSettings().flatMapLatest { settings ->
@@ -79,8 +81,8 @@ class GetHomeRecommendationUseCase(
                 fetchMostRecentDraft(),
                 getMemoryRecall(aiEnabled = settings.aiRecallEnabled),
                 observeUpcomingEvents(),
-                locationNameFlow,
-            ) { hasNotes, recentDraft, recall, upcomingEvents, locationName ->
+                locationFlow,
+            ) { hasNotes, recentDraft, recall, upcomingEvents, location ->
                 val nextUncapturedEvent =
                     if (settings.eventNudgesEnabled) firstUncapturedEvent(upcomingEvents) else null
                 when {
@@ -104,7 +106,7 @@ class GetHomeRecommendationUseCase(
                         )
                     !hasNotes ->
                         HomeRecommendation.EmptyDay(
-                            locationName = locationName,
+                            location = location,
                         )
                     else -> HomeRecommendation.None
                 }

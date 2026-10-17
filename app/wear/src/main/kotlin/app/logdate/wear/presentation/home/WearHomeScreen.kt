@@ -250,7 +250,7 @@ private fun ReadyStatus(
         StatusText(stringResource(R.string.wear_recorder_hint), secondary)
         return
     }
-    StatusText(homeState.greeting, secondary)
+    StatusText(homeState.greeting?.let { stringResource(it) }.orEmpty(), secondary)
     if (homeState.syncBadge == SyncBadge.NONE) return
     val (text, color) =
         when (homeState.syncBadge) {

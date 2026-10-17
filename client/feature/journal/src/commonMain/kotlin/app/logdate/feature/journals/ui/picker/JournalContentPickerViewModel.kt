@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.content_picker_add_failed
+import org.jetbrains.compose.resources.StringResource
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -123,7 +126,7 @@ class JournalContentPickerViewModel(
                 .onSuccess { count -> addState.value = AddState(addedCount = count) }
                 .onFailure { error ->
                     Napier.e("Could not add selected journal content", error)
-                    addState.value = AddState(error = ADD_ERROR)
+                    addState.value = AddState(error = Res.string.content_picker_add_failed)
                 }
         }
     }
@@ -137,7 +140,7 @@ class JournalContentPickerViewModel(
                     uid,
                     JournalContentPickerItemKind.PHOTO,
                     creationTimestamp,
-                    caption.ifBlank { "Photo" },
+                    caption.ifBlank { null },
                     mediaRef,
                 )
             is JournalNote.Video ->
@@ -145,7 +148,7 @@ class JournalContentPickerViewModel(
                     uid,
                     JournalContentPickerItemKind.VIDEO,
                     creationTimestamp,
-                    caption.ifBlank { "Video" },
+                    caption.ifBlank { null },
                     mediaRef,
                 )
             is JournalNote.Audio ->
@@ -153,7 +156,7 @@ class JournalContentPickerViewModel(
                     uid,
                     JournalContentPickerItemKind.RECORDING,
                     creationTimestamp,
-                    location?.displayName ?: "Recording",
+                    location?.displayName,
                     mediaRef,
                 )
         }
@@ -170,13 +173,12 @@ class JournalContentPickerViewModel(
 
     private data class AddState(
         val isAdding: Boolean = false,
-        val error: String? = null,
+        val error: StringResource? = null,
         val addedCount: Int? = null,
     )
 
     private companion object {
         const val SEARCH_RESULT_LIMIT = 200
         const val STOP_TIMEOUT_MILLIS = 5_000L
-        const val ADD_ERROR = "Could not add the selected content. Try again."
     }
 }

@@ -13,10 +13,14 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import app.logdate.client.domain.export.ExportFormat
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_error_destination_access
+import logdate.client.feature.core.generated.resources.export_progress_preparing
 import java.util.UUID
 
 /**
@@ -107,7 +111,7 @@ class AndroidExportLauncher(
                         _exportProgress.value = ExportProgressInfo()
                         val reason = workInfo.outputData.getString(ExportWorker.ERROR_KEY)
                         Napier.i("Export failed")
-                        completionCallback?.invoke(ExportOutcome.Failed(reason))
+                        completionCallback?.invoke(ExportOutcome.Failed(reason?.toUiText()))
                     }
                     WorkInfo.State.CANCELLED -> {
                         currentWorkId = null
@@ -192,7 +196,7 @@ class AndroidExportLauncher(
                 pendingExportCallback?.invoke()
             } catch (e: Exception) {
                 Napier.e("Failed to take persistent URI permission")
-                completionCallback?.invoke(ExportOutcome.Failed("Could not access the selected location."))
+                completionCallback?.invoke(ExportOutcome.Failed(Res.string.export_error_destination_access.toUiText()))
             }
         } else {
             Napier.i("User cancelled export destination selection")
@@ -215,7 +219,7 @@ class AndroidExportLauncher(
             ExportProgressInfo(
                 isActive = true,
                 progressPercent = 0,
-                message = "Preparing export…",
+                message = Res.string.export_progress_preparing.toUiText(),
             )
 
         val dataBuilder =

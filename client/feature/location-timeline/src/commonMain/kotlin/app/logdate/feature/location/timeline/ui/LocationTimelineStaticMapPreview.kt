@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.asString
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
 import app.logdate.feature.location.timeline.ui.model.LocationPlaceUiModel
 import logdate.client.feature.location.timeline.generated.resources.Res
@@ -42,7 +43,7 @@ internal fun LocationTimelineStaticMapPreview(
     val selectedPlace = places.firstOrNull { place -> place.id == selectedPlaceId }
     val primaryPlace = selectedPlace ?: places.firstOrNull()
     val supportingPlaces = places.filterNot { place -> place.id == primaryPlace?.id }.take(2)
-    val primaryTitle = primaryPlace?.title ?: currentLocation?.title ?: stringResource(Res.string.current_location)
+    val primaryTitle = (primaryPlace?.title ?: currentLocation?.title)?.asString() ?: stringResource(Res.string.current_location)
     val primarySubtitle = primaryPlace?.subtitle ?: currentLocation?.subtitle.orEmpty()
 
     Surface(
@@ -105,19 +106,19 @@ internal fun LocationTimelineStaticMapPreview(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     primaryPlace?.let { place ->
                         PlaceSummaryPill(
-                            title = place.title,
+                            title = place.title.asString(),
                             subtitle = stringResource(Res.string.memories_count, place.memoryCount),
                         )
                     } ?: currentLocation?.let { location ->
                         PlaceSummaryPill(
-                            title = location.title,
+                            title = location.title.asString(),
                             subtitle = location.subtitle.orEmpty(),
                         )
                     }
 
                     supportingPlaces.forEach { place ->
                         PlaceSummaryPill(
-                            title = place.title,
+                            title = place.title.asString(),
                             subtitle = stringResource(Res.string.memories_count, place.memoryCount),
                         )
                     }

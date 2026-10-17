@@ -1,5 +1,11 @@
 package app.logdate.client.media.device
 
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_microphone_checking
+import logdate.client.media.generated.resources.media_device_microphone_not_active
+
 internal object MediaDeviceSelectionResolver {
     fun resolveAudioInput(
         devices: List<MediaDeviceUiState>,
@@ -32,7 +38,7 @@ internal object MediaDeviceSelectionResolver {
     fun resolveRecordingAudioInput(
         selection: MediaDeviceSelectionUiState,
         routedDeviceId: String?,
-        error: String?,
+        error: UiText?,
     ): MediaDeviceSelectionUiState {
         val routed = selection.devices.firstOrNull { it.id == routedDeviceId && it.isAvailable }
         return selection.copy(
@@ -40,10 +46,9 @@ internal object MediaDeviceSelectionResolver {
             isSelectionConfirmed = routed != null,
             routeControlMessage =
                 error ?: when {
-                    routed == null -> "Checking active microphone…"
+                    routed == null -> Res.string.media_device_microphone_checking.toUiText()
                     routed.id != selection.selectedDeviceId ->
-                        "Android is using ${routed.label}. " +
-                            "The selected microphone is not active yet."
+                        Res.string.media_device_microphone_not_active.toUiText(routed.label)
                     else -> null
                 },
         )

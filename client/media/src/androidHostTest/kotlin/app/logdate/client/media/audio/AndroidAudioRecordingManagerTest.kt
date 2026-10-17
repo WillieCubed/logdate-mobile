@@ -14,6 +14,8 @@ import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -35,6 +37,8 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_microphone_switch_failed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -100,7 +104,7 @@ class AndroidAudioRecordingManagerTest {
             val manager = buildManager()
             val starter = launch { manager.startRecording() }
             runCurrent()
-            controller.connect(RecordingServiceState(isRecording = false, error = "Failed to start recording"))
+            controller.connect(RecordingServiceState(isRecording = false, failureMessage = "Failed to start recording"))
             advanceUntilIdle()
             starter.join()
 
@@ -662,7 +666,7 @@ class AndroidAudioRecordingManagerTest {
             routes.selectInputDevice("usb")
             advanceUntilIdle()
             assertTrue(manager.isRecording)
-            assertTrue(requireNotNull(routes.reported?.third).contains("switch"))
+            assertEquals(Res.string.media_device_microphone_switch_failed.toUiText(), routes.reported?.third)
             controller.inputUpdateThrows = null
             routes.selectInputDevice("headset")
             advanceUntilIdle()
@@ -835,12 +839,12 @@ private class FakeAudioRouteRepository : AudioRouteRepository {
 
     private val requested = MutableSharedFlow<String?>(replay = 1).apply { tryEmit(null) }
     override val requestedInputDeviceIds: SharedFlow<String?> = requested
-    var reported: Triple<String?, Boolean, String?>? = null
+    var reported: Triple<String?, Boolean, UiText?>? = null
 
     override fun updateRecordingInputDevice(
         deviceId: String?,
         isRecording: Boolean,
-        error: String?,
+        error: UiText?,
     ) {
         reported = Triple(deviceId, isRecording, error)
     }

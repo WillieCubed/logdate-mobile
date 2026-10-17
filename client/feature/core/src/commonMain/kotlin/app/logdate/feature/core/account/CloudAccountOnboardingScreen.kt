@@ -34,6 +34,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_body
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_confirm
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_title
+import logdate.client.feature.core.generated.resources.custom_server
 import logdate.client.feature.core.generated.resources.first_sync_failed
 import logdate.client.feature.core.generated.resources.first_sync_partial
 import logdate.client.feature.core.generated.resources.first_sync_progress
@@ -60,7 +61,6 @@ import logdate.client.ui.generated.resources.Res as UiRes
 private const val FALLBACK_HANDLE_DOMAIN = "logdate.app"
 private const val FALLBACK_PRIVACY_POLICY_URL = "https://logdate.app/privacy"
 private const val FALLBACK_TERMS_OF_SERVICE_URL = "https://logdate.app/terms"
-private const val CUSTOM_SERVER_FALLBACK_NAME = "Custom server"
 
 /** The blocking first sync shown once an account exists. */
 const val CLOUD_ACCOUNT_INITIAL_SYNC_ROOT_TAG = "cloud_account_initial_sync_root"
@@ -111,9 +111,10 @@ fun CloudAccountOnboardingScreen(
     val showCustomServerInfo = remember { mutableStateOf(false) }
     val showRecoveryInfo = remember { mutableStateOf(false) }
     val productionDisplayName = stringResource(Res.string.logdate_cloud)
+    val customDisplayName = stringResource(Res.string.custom_server)
     val serverPresentation =
-        remember(uiState.serverSelectionState, productionDisplayName) {
-            uiState.serverSelectionState.toPresentation(productionDisplayName)
+        remember(uiState.serverSelectionState, productionDisplayName, customDisplayName) {
+            uiState.serverSelectionState.toPresentation(productionDisplayName, customDisplayName)
         }
 
     if (showCustomServerInfo.value) {
@@ -192,7 +193,7 @@ fun CloudAccountOnboardingScreen(
             OnboardingStep.SignIn -> {
                 val googleAuthError = uiState.googleAuthError
                 val signInError =
-                    uiState.errorMessage
+                    uiState.errorMessage?.let { stringResource(it) }
                         ?: if (googleAuthError != null) googleAuthErrorMessage(googleAuthError) else null
                 CloudAccountSignInScreen(
                     onSignIn = viewModel::signInWithPasskey,
@@ -248,7 +249,7 @@ fun CloudAccountOnboardingScreen(
                     onCreateAccount = viewModel::createAccount,
                     onBack = viewModel::goToPreviousStep,
                     isCreatingAccount = uiState.isCreatingAccount,
-                    errorMessage = uiState.errorMessage,
+                    errorMessage = uiState.errorMessage?.let { stringResource(it) },
                     onClearError = viewModel::clearError,
                     isPasskeySupported = uiState.isPasskeySupported,
                     serverDisplayName = serverPresentation.displayName,
@@ -392,11 +393,14 @@ private data class ServerPresentation(
     val termsOfServiceUrl: String?,
 )
 
-private fun app.logdate.feature.core.settings.ui.ServerSelectionState.toPresentation(productionDisplayName: String): ServerPresentation {
+private fun app.logdate.feature.core.settings.ui.ServerSelectionState.toPresentation(
+    productionDisplayName: String,
+    customDisplayName: String,
+): ServerPresentation {
     val descriptor = activeServerDescriptor
     val isProduction = selectedPreset == ServerPreset.PRODUCTION
     return ServerPresentation(
-        displayName = descriptor.displayNameOrFallback(isProduction, productionDisplayName),
+        displayName = descriptor.displayNameOrFallback(isProduction, productionDisplayName, customDisplayName),
         handleDomain = descriptor?.handleDomain ?: if (isProduction) FALLBACK_HANDLE_DOMAIN else "your-server.example.com",
         privacyPolicyUrl = descriptor?.privacyPolicyUrl ?: if (isProduction) FALLBACK_PRIVACY_POLICY_URL else null,
         termsOfServiceUrl = descriptor?.termsOfServiceUrl ?: if (isProduction) FALLBACK_TERMS_OF_SERVICE_URL else null,
@@ -406,4 +410,5 @@ private fun app.logdate.feature.core.settings.ui.ServerSelectionState.toPresenta
 private fun ServerDescriptor?.displayNameOrFallback(
     isProduction: Boolean,
     productionDisplayName: String,
-): String = this?.displayName ?: if (isProduction) productionDisplayName else CUSTOM_SERVER_FALLBACK_NAME
+    customDisplayName: String,
+): String = this?.displayName ?: if (isProduction) productionDisplayName else customDisplayName

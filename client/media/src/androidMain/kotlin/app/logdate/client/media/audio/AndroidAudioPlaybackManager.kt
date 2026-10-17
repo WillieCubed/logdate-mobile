@@ -13,6 +13,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import app.logdate.client.media.R
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.media.storage.playableUri
@@ -52,7 +53,7 @@ class AndroidAudioPlaybackManager(
     progressDispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val controllerFactory: MediaControllerFutureFactory = defaultMediaControllerFutureFactory,
     private val controllerExecutor: Executor = mainThreadExecutor(),
-    private val mediaItemFactory: AudioPlaybackItemFactory = defaultMediaItemFactory,
+    private val mediaItemFactory: AudioPlaybackItemFactory = defaultMediaItemFactory(context),
     private val serviceStarter: AudioPlaybackServiceStarter = defaultAudioPlaybackServiceStarter,
     private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
     private val skipSilenceCommand: SkipSilenceCommand = SkipSilenceCommand.Session,
@@ -222,7 +223,7 @@ class AndroidAudioPlaybackManager(
                 _playbackStatus.value =
                     _playbackStatus.value.copy(
                         isPlaying = false,
-                        errorMessage = e.message ?: e::class.simpleName ?: "Unknown playback error",
+                        errorMessage = e.message ?: e.toString(),
                     )
                 onPlaybackCompleted?.invoke()
             }
@@ -361,13 +362,13 @@ class AndroidAudioPlaybackManager(
                 MediaController.Builder(context, token).buildAsync()
             }
 
-        val defaultMediaItemFactory =
+        fun defaultMediaItemFactory(context: Context) =
             AudioPlaybackItemFactory { uri, metadata ->
                 MediaItem
                     .Builder()
                     .setUri(uri)
                     .setMediaId(metadata?.noteId?.toString() ?: uri)
-                    .setMediaMetadata(buildMediaMetadata(metadata))
+                    .setMediaMetadata(buildMediaMetadata(metadata, context.getString(R.string.audio_playback_untitled)))
                     .build()
             }
 
@@ -378,13 +379,16 @@ class AndroidAudioPlaybackManager(
 
         private val artworkGenerator = AudioNotificationArtworkGenerator()
 
-        fun buildMediaMetadata(metadata: AudioPlaybackMetadata?): MediaMetadata {
+        fun buildMediaMetadata(
+            metadata: AudioPlaybackMetadata?,
+            untitledTitle: String,
+        ): MediaMetadata {
             val extras = Bundle()
             metadata?.noteId?.let { extras.putString(EXTRA_NOTE_ID, it.toString()) }
             val builder =
                 MediaMetadata
                     .Builder()
-                    .setTitle(metadata?.title ?: "Audio")
+                    .setTitle(metadata?.title ?: untitledTitle)
                     .setSubtitle(metadata?.subtitle)
                     .setExtras(extras.takeIf { !it.isEmpty })
 

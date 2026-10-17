@@ -1,5 +1,12 @@
 package app.logdate.client.media.device
 
+import app.logdate.client.text.toUiText
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_back_camera
+import logdate.client.media.generated.resources.media_device_camera_system_controlled
+import logdate.client.media.generated.resources.media_device_microphone_system_controlled
+import logdate.client.media.generated.resources.media_device_microphone_unavailable
+import logdate.client.media.generated.resources.media_device_output_system_controlled
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -14,12 +21,12 @@ class MediaDeviceSelectionUiStateTest {
                 devices =
                     listOf(
                         DefaultMediaDevices.systemOutput,
-                        DefaultMediaDevices.systemOutput.copy(id = "bluetooth", label = "Bluetooth headphones"),
+                        DefaultMediaDevices.systemOutput.copy(id = "bluetooth", label = "Bluetooth headphones".toUiText()),
                     ),
                 selectedDeviceId = "bluetooth",
             )
 
-        assertEquals("Bluetooth headphones", selection.selectedDevice?.label)
+        assertEquals("Bluetooth headphones".toUiText(), selection.selectedDevice?.label)
     }
 
     @Test
@@ -30,12 +37,12 @@ class MediaDeviceSelectionUiStateTest {
                 devices =
                     listOf(
                         DefaultMediaDevices.systemMicrophone.copy(isAvailable = false),
-                        DefaultMediaDevices.systemMicrophone.copy(id = "usb", label = "USB microphone"),
+                        DefaultMediaDevices.systemMicrophone.copy(id = "usb", label = "USB microphone".toUiText()),
                     ),
                 selectedDeviceId = "missing",
             )
 
-        assertEquals("USB microphone", selection.selectedDevice?.label)
+        assertEquals("USB microphone".toUiText(), selection.selectedDevice?.label)
     }
 
     @Test
@@ -52,11 +59,11 @@ class MediaDeviceSelectionUiStateTest {
 
     @Test
     fun `audio input resolver selects preferred microphone when it is available`() {
-        val builtIn = DefaultMediaDevices.systemMicrophone.copy(id = "built-in", label = "Built-in microphone")
+        val builtIn = DefaultMediaDevices.systemMicrophone.copy(id = "built-in", label = "Built-in microphone".toUiText())
         val usb =
             DefaultMediaDevices.systemMicrophone.copy(
                 id = "usb",
-                label = "USB microphone",
+                label = "USB microphone".toUiText(),
                 category = MediaDeviceCategory.USB,
                 isExternal = true,
             )
@@ -68,14 +75,14 @@ class MediaDeviceSelectionUiStateTest {
             )
 
         assertEquals(usb.id, selection.selectedDeviceId)
-        assertEquals("USB microphone", selection.selectedDevice?.label)
+        assertEquals("USB microphone".toUiText(), selection.selectedDevice?.label)
         assertEquals(true, selection.isSelectionControllable)
         assertNull(selection.routeControlMessage)
     }
 
     @Test
     fun `audio input resolver falls back with copy when preferred microphone is unplugged`() {
-        val builtIn = DefaultMediaDevices.systemMicrophone.copy(id = "built-in", label = "Built-in microphone")
+        val builtIn = DefaultMediaDevices.systemMicrophone.copy(id = "built-in", label = "Built-in microphone".toUiText())
 
         val selection =
             MediaDeviceSelectionResolver.resolveAudioInput(
@@ -84,20 +91,20 @@ class MediaDeviceSelectionUiStateTest {
             )
 
         assertEquals(builtIn.id, selection.selectedDeviceId)
-        assertEquals("Built-in microphone", selection.selectedDevice?.label)
+        assertEquals("Built-in microphone".toUiText(), selection.selectedDevice?.label)
         assertEquals(
-            "Selected microphone is unavailable. LogDate will use Built-in microphone.",
+            Res.string.media_device_microphone_unavailable.toUiText(builtIn.label),
             selection.routeControlMessage,
         )
     }
 
     @Test
     fun `audio input resolver restores preferred microphone when it is plugged back in`() {
-        val builtIn = DefaultMediaDevices.systemMicrophone.copy(id = "built-in", label = "Built-in microphone")
+        val builtIn = DefaultMediaDevices.systemMicrophone.copy(id = "built-in", label = "Built-in microphone".toUiText())
         val usb =
             DefaultMediaDevices.systemMicrophone.copy(
                 id = "usb",
-                label = "USB microphone",
+                label = "USB microphone".toUiText(),
                 category = MediaDeviceCategory.USB,
                 isExternal = true,
             )
@@ -120,11 +127,11 @@ class MediaDeviceSelectionUiStateTest {
 
     @Test
     fun `audio output resolver keeps the preferred output selected and controllable`() {
-        val speaker = DefaultMediaDevices.systemOutput.copy(id = "speaker", label = "Built-in speaker")
+        val speaker = DefaultMediaDevices.systemOutput.copy(id = "speaker", label = "Built-in speaker".toUiText())
         val headset =
             DefaultMediaDevices.systemOutput.copy(
                 id = "headset",
-                label = "USB headset",
+                label = "USB headset".toUiText(),
                 category = MediaDeviceCategory.USB,
                 isExternal = true,
             )
@@ -136,7 +143,7 @@ class MediaDeviceSelectionUiStateTest {
             )
 
         assertEquals(headset.id, selection.selectedDeviceId)
-        assertEquals("USB headset", selection.selectedDevice?.label)
+        assertEquals("USB headset".toUiText(), selection.selectedDevice?.label)
         // Output routing is applied by the playback service now, so the picker is live rather
         // than deferring to Android's switcher.
         assertTrue(selection.isSelectionControllable)
@@ -148,10 +155,10 @@ class MediaDeviceSelectionUiStateTest {
         val selection = MediaDeviceSelectionResolver.resolveAudioInput(devices = emptyList(), preferredDeviceId = null)
 
         assertEquals(DefaultMediaDevices.systemMicrophone.id, selection.selectedDeviceId)
-        assertEquals("System microphone", selection.selectedDevice?.label)
+        assertEquals(DefaultMediaDevices.systemMicrophone.label, selection.selectedDevice?.label)
         assertEquals(false, selection.isSelectionControllable)
         assertEquals(
-            "Microphone selection is currently controlled by the system.",
+            Res.string.media_device_microphone_system_controlled.toUiText(),
             selection.routeControlMessage,
         )
     }
@@ -161,10 +168,10 @@ class MediaDeviceSelectionUiStateTest {
         val selection = MediaDeviceSelectionResolver.resolveAudioOutput(devices = emptyList(), preferredDeviceId = null)
 
         assertEquals(DefaultMediaDevices.systemOutput.id, selection.selectedDeviceId)
-        assertEquals("System output", selection.selectedDevice?.label)
+        assertEquals(DefaultMediaDevices.systemOutput.label, selection.selectedDevice?.label)
         assertEquals(false, selection.isSelectionControllable)
         assertEquals(
-            "Use Android's output switcher to route playback.",
+            Res.string.media_device_output_system_controlled.toUiText(),
             selection.routeControlMessage,
         )
     }
@@ -177,29 +184,29 @@ class MediaDeviceSelectionUiStateTest {
 
         val overriddenInput =
             input.asSystemControlledSelection(
-                routeControlMessage = "Open system settings to change the microphone.",
+                routeControlMessage = "Open system settings to change the microphone.".toUiText(),
             )
 
-        assertEquals("System microphone", input.selectedDevice?.label)
+        assertEquals(DefaultMediaDevices.systemMicrophone.label, input.selectedDevice?.label)
         assertEquals(
-            "Microphone selection is currently controlled by the system.",
+            Res.string.media_device_microphone_system_controlled.toUiText(),
             input.routeControlMessage,
         )
 
-        assertEquals("System output", output.selectedDevice?.label)
+        assertEquals(DefaultMediaDevices.systemOutput.label, output.selectedDevice?.label)
         assertEquals(
-            "Use Android's output switcher to route playback.",
+            Res.string.media_device_output_system_controlled.toUiText(),
             output.routeControlMessage,
         )
 
-        assertEquals("Back camera", camera.selectedDevice?.label)
+        assertEquals(Res.string.media_device_back_camera.toUiText(), camera.selectedDevice?.label)
         assertEquals(
-            "Camera selection is currently controlled by the system.",
+            Res.string.media_device_camera_system_controlled.toUiText(),
             camera.routeControlMessage,
         )
 
         assertEquals(false, overriddenInput.isSelectionControllable)
-        assertEquals("Open system settings to change the microphone.", overriddenInput.routeControlMessage)
+        assertEquals("Open system settings to change the microphone.".toUiText(), overriddenInput.routeControlMessage)
         assertEquals(input.devices, overriddenInput.devices)
     }
     // region output collapsing
@@ -212,7 +219,7 @@ class MediaDeviceSelectionUiStateTest {
         category: MediaDeviceCategory = MediaDeviceCategory.BLUETOOTH,
     ) = MediaDeviceUiState(
         id = id,
-        label = label,
+        label = label.toUiText(),
         kind = MediaDeviceKind.AUDIO_OUTPUT,
         category = category,
         isExternal = category != MediaDeviceCategory.BUILT_IN,
@@ -252,7 +259,7 @@ class MediaDeviceSelectionUiStateTest {
                 preferredDeviceId = null,
             )
 
-        assertEquals(listOf("Earbuds", "Kitchen speaker"), selection.devices.map { it.label })
+        assertEquals(listOf("Earbuds".toUiText(), "Kitchen speaker".toUiText()), selection.devices.map { it.label })
     }
 
     @Test
@@ -268,7 +275,7 @@ class MediaDeviceSelectionUiStateTest {
                 preferredDeviceId = null,
             )
 
-        assertEquals(listOf("Built-in speaker", "Earbuds"), selection.devices.map { it.label })
+        assertEquals(listOf("Built-in speaker".toUiText(), "Earbuds".toUiText()), selection.devices.map { it.label })
     }
 
     @Test

@@ -97,18 +97,16 @@ fun RewindDetailScreen(
     val audioPlaybackState by viewModel.audioPlaybackState.collectAsStateWithLifecycle()
 
     val onSharePanel: (RewindPanelUiState) -> Unit = { panel ->
-        val shareContent = panel.toShareContent()
-        if (shareContent != null) {
-            coroutineScope.launch {
-                val request =
-                    RewindShareRequest(
-                        text = getString(Res.string.share_rewind_panel_text_template, shareContent.text),
-                        title = getString(Res.string.share_rewind_panel_caption),
-                        chooserTitle = getString(Res.string.share_rewind_chooser_title),
-                        visual = shareContent.visual,
-                    )
-                viewModel.sharePanel(request)
-            }
+        coroutineScope.launch {
+            val shareContent = panel.toShareContent() ?: return@launch
+            val request =
+                RewindShareRequest(
+                    text = getString(Res.string.share_rewind_panel_text_template, shareContent.text),
+                    title = getString(Res.string.share_rewind_panel_caption),
+                    chooserTitle = getString(Res.string.share_rewind_chooser_title),
+                    visual = shareContent.visual,
+                )
+            viewModel.sharePanel(request)
         }
     }
 

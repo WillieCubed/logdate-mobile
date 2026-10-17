@@ -1,6 +1,7 @@
 package app.logdate.feature.core.settings.ui
 
 import app.logdate.shared.model.ServerDescriptor
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * Server preset options for connecting to LogDate servers.
@@ -35,6 +36,6 @@ sealed class ServerValidationState {
 
     /** The selected server could not be reached or rejected the request. */
     data class Error(
-        val message: String,
+        val message: StringResource,
     ) : ServerValidationState()
 }

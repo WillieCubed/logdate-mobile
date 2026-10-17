@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.text.asString
 import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
@@ -88,6 +89,7 @@ import logdate.client.feature.journal.generated.resources.cd_previous_entry
 import logdate.client.feature.journal.generated.resources.error
 import logdate.client.feature.journal.generated.resources.image_note
 import logdate.client.feature.journal.generated.resources.location
+import logdate.client.feature.journal.generated.resources.note_viewer_share_chooser_title
 import logdate.client.feature.journal.generated.resources.open_in_locations
 import logdate.client.feature.journal.generated.resources.pinned_location
 import logdate.client.feature.journal.generated.resources.recording_playback_failed
@@ -131,6 +133,8 @@ fun NoteViewerScreen(
             enableSharedBounds = enableSharedBounds,
         )
     var showAddToJournal by remember { mutableStateOf(false) }
+    val shareChooserTitle = stringResource(Res.string.note_viewer_share_chooser_title)
+    val shareCurrentNote = { viewModel.shareCurrentNote(shareChooserTitle) }
 
     when (val state = uiState) {
         NoteViewerUiState.Loading -> {
@@ -138,7 +142,7 @@ fun NoteViewerScreen(
         }
         is NoteViewerUiState.Error -> {
             NoteViewerErrorContent(
-                message = state.message,
+                message = state.message.asString(),
                 modifier = modifier.then(sharedBoundsModifier),
             )
         }
@@ -157,7 +161,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
-                onShare = viewModel::shareCurrentNote,
+                onShare = shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
                 TextNoteViewerContent(
@@ -173,7 +177,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
-                onShare = viewModel::shareCurrentNote,
+                onShare = shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
                 ImageNoteViewer(
@@ -189,7 +193,7 @@ fun NoteViewerScreen(
                 onOpenLocationTimeline = onOpenLocationTimeline,
                 onNavigateToNote = onNavigateToNote,
                 onShowAddToJournal = { showAddToJournal = true },
-                onShare = viewModel::shareCurrentNote,
+                onShare = shareCurrentNote,
                 modifier = modifier.then(sharedBoundsModifier),
             ) {
                 VideoNoteViewerContent(mediaRef = state.mediaRef)
@@ -807,7 +811,7 @@ fun AudioNoteViewerContent(
 
         is AudioNoteViewerUiState.Error -> {
             NoteViewerErrorContent(
-                message = uiState.message,
+                message = uiState.message.asString(),
                 modifier = modifier,
             )
         }

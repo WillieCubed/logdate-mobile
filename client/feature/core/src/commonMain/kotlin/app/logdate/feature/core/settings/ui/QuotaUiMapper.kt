@@ -2,6 +2,16 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.compose.ui.graphics.Color
 import app.logdate.shared.model.CloudStorageQuota
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_attachments
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_journals
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_other
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_photos
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_profile
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_recordings
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_videos
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_written_entries
+import org.jetbrains.compose.resources.StringResource
 
 /**
  * UI state representation of quota usage for display in settings.
@@ -23,7 +33,7 @@ data class StorageQuotaUi(
  * UI state representation of a storage category (e.g., images, text, etc.)
  */
 data class StorageCategory(
-    val name: String,
+    val name: StringResource,
     val usedBytes: Long,
     val usagePercentage: Float,
     val color: Color,
@@ -69,16 +79,16 @@ fun CloudStorageQuota.toStorageQuotaUi(): StorageQuotaUi {
  * The quota API names its categories the way the server enumerates them. Those names are not
  * something to put in front of someone reading a storage breakdown.
  */
-private fun categoryLabel(categoryName: String): String =
+private fun categoryLabel(categoryName: String): StringResource =
     when (categoryName.uppercase()) {
-        "TEXT_NOTES" -> "Written entries"
-        "IMAGE_NOTES" -> "Photos"
-        "VOICE_NOTES" -> "Recordings"
-        "VIDEO_NOTES" -> "Videos"
-        "JOURNAL_DATA" -> "Journals"
-        "USER_PROFILE" -> "Profile"
-        "ATTACHMENTS" -> "Attachments"
-        else -> "Other"
+        "TEXT_NOTES" -> Res.string.data_settings_quota_category_written_entries
+        "IMAGE_NOTES" -> Res.string.data_settings_quota_category_photos
+        "VOICE_NOTES" -> Res.string.data_settings_quota_category_recordings
+        "VIDEO_NOTES" -> Res.string.data_settings_quota_category_videos
+        "JOURNAL_DATA" -> Res.string.data_settings_quota_category_journals
+        "USER_PROFILE" -> Res.string.data_settings_quota_category_profile
+        "ATTACHMENTS" -> Res.string.data_settings_quota_category_attachments
+        else -> Res.string.data_settings_quota_category_other
     }
 
 /**

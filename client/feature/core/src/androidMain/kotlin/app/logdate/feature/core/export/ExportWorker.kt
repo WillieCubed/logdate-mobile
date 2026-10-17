@@ -13,7 +13,15 @@ import app.logdate.client.domain.export.archive.ArchiveExportOptions
 import app.logdate.client.domain.export.archive.ArchiveExportProgress
 import app.logdate.client.domain.export.archive.ArchiveExportSummary
 import app.logdate.client.domain.export.archive.ExportArchiveUseCase
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_error_archive_write
+import logdate.client.feature.core.generated.resources.export_error_not_completed
+import logdate.client.feature.core.generated.resources.export_progress_completed
+import logdate.client.feature.core.generated.resources.export_progress_starting
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -40,8 +48,6 @@ class ExportWorker(
         const val MESSAGE_KEY = "export_message"
         const val FILE_PATH_KEY = "export_file_path"
         const val ERROR_KEY = "export_error"
-        private const val EXPORT_FAILED_MESSAGE = "Export could not be completed."
-        private const val ARCHIVE_WRITE_FAILED_MESSAGE = "Could not write the export archive."
         const val DESTINATION_URI_KEY = "destination_uri"
         const val INCLUDE_JOURNALS_KEY = "include_journals"
         const val INCLUDE_NOTES_KEY = "include_notes"
@@ -134,25 +140,22 @@ class ExportWorker(
             } catch (failure: Exception) {
                 Napier.e("Could not open the export destination")
                 null
-            } ?: run {
-                trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
-                return failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
-            }
+            } ?: return archiveFailed(Res.string.export_error_archive_write)
         var finished = false
         try {
             var summary: ArchiveExportSummary? = null
-            var failure: String? = null
+            var failure: StringResource? = null
             val options = ArchiveExportOptions(includeJournals, includeNotes, includeDrafts, includeMedia, from = dateRangeCutoff)
             ZipOutputStream(target.stream.buffered()).use { zip ->
                 exportArchiveUseCase.export(options, ZipStreamArchiveContainer(zip)).collect { progress ->
                     when (progress) {
                         ArchiveExportProgress.Starting -> {
-                            trySetForeground(notificationHelper.createForegroundInfo(0, "Starting export..."))
-                            emitProgress(0, "Starting export...")
+                            trySetForeground(notificationHelper.createForegroundInfo(0, getString(Res.string.export_progress_starting)))
+                            emitProgress(0, Res.string.export_progress_starting)
                         }
                         is ArchiveExportProgress.InProgress -> {
                             val percent = (progress.fraction * 100).toInt()
-                            trySetForeground(notificationHelper.createForegroundInfo(percent, progress.stage.defaultMessage))
+                            trySetForeground(notificationHelper.createForegroundInfo(percent, getString(progress.stage.defaultMessage)))
                             emitProgress(percent, progress.stage.defaultMessage)
                         }
                         is ArchiveExportProgress.Completed -> summary = progress.summary
@@ -162,9 +165,7 @@ class ExportWorker(
             }
             val completed = summary
             if (failure != null || completed == null) {
-                val message = failure ?: EXPORT_FAILED_MESSAGE
-                trySetForeground(notificationHelper.createErrorInfo(message))
-                return failureResult(message)
+                return archiveFailed(failure ?: Res.string.export_error_not_completed)
             }
 
             target.commit()
@@ -174,8 +175,7 @@ class ExportWorker(
             throw cancellation
         } catch (exception: Throwable) {
             Napier.e("Archive export failed")
-            trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
-            return failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
+            return archiveFailed(Res.string.export_error_archive_write)
         } finally {
             // ZipOutputStream.close() skips closing the stream under it when finishing the zip fails.
             runCatching { target.stream.close() }
@@ -192,12 +192,23 @@ class ExportWorker(
             ExportProgressInfo(
                 isActive = false,
                 progressPercent = 100,
-                message = "Export completed",
+                message = Res.string.export_progress_completed.toUiText(),
                 completedFilePath = target.path,
                 stats = summary.counts.toExportStats(),
             ),
         )
-        return Result.success(workDataOf(PROGRESS_KEY to 100, MESSAGE_KEY to "Export completed", FILE_PATH_KEY to target.path))
+        val completedMessage = getString(Res.string.export_progress_completed)
+        return Result.success(workDataOf(PROGRESS_KEY to 100, MESSAGE_KEY to completedMessage, FILE_PATH_KEY to target.path))
+    }
+
+    /**
+     * Shows [reason] in the export notification and reports it as the work's failure. The words are
+     * resolved here because the notification and the WorkManager output both carry plain text.
+     */
+    private suspend fun archiveFailed(reason: StringResource): Result {
+        val message = getString(reason)
+        trySetForeground(notificationHelper.createErrorInfo(message))
+        return failureResult(message)
     }
 
     private fun failureResult(message: String): Result =
@@ -213,13 +224,13 @@ class ExportWorker(
      */
     private fun emitProgress(
         percent: Int,
-        message: String,
+        message: StringResource,
     ) {
         exportLauncher.updateProgress(
             ExportProgressInfo(
                 isActive = true,
                 progressPercent = percent,
-                message = message,
+                message = message.toUiText(),
             ),
         )
     }
@@ -239,6 +250,6 @@ class ExportWorker(
     override suspend fun getForegroundInfo(): ForegroundInfo =
         notificationHelper.createForegroundInfo(
             progress = 0,
-            message = "Starting export...",
+            message = getString(Res.string.export_progress_starting),
         )
 }

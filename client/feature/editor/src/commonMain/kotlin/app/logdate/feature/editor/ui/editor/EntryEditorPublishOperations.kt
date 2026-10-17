@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor
 
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.mapper.toJournalNote
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -12,6 +13,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_changed_while_saving
+import logdate.client.feature.editor.generated.resources.editor_error_clear_draft_failed
+import logdate.client.feature.editor.generated.resources.editor_error_recording_still_finalizing
+import logdate.client.feature.editor.generated.resources.editor_error_save_failed
 import kotlin.uuid.Uuid
 
 /**
@@ -33,7 +39,7 @@ internal fun EntryEditorViewModel.saveEntryImpl(state: EditorState) {
         } catch (error: Exception) {
             Napier.e("Failed to save entry: ${error.message}", error)
             mutableEditorState.update {
-                it.copy(errorMessage = "Failed to save: ${error.message}")
+                it.copy(errorMessage = Res.string.editor_error_save_failed.toUiText(error.message.toString()))
             }
         } finally {
             mutableEditorState.update { currentState ->
@@ -132,7 +138,7 @@ internal fun EntryEditorViewModel.publishSnapshotChanged(
 internal fun EntryEditorViewModel.failPublishInvariant() {
     mutableEditorState.update {
         it.copy(
-            errorMessage = "The editor changed while saving. Review your entry before closing.",
+            errorMessage = Res.string.editor_error_changed_while_saving.toUiText(),
             isSaving = false,
             isEditingLocked = false,
         )
@@ -207,7 +213,7 @@ internal suspend fun EntryEditorViewModel.finalizePendingAudio(): Map<Uuid, Audi
                 Napier.w("Audio finalization timed out for block $blockId")
                 mutableEditorState.update {
                     it.copy(
-                        errorMessage = "Recording is still finalizing. Try again in a moment.",
+                        errorMessage = Res.string.editor_error_recording_still_finalizing.toUiText(),
                         isSaving = false,
                         isEditingLocked = false,
                     )
@@ -215,10 +221,10 @@ internal suspend fun EntryEditorViewModel.finalizePendingAudio(): Map<Uuid, Audi
                 return null
             }
             is AudioCaptureState.Failed -> {
-                Napier.w("Audio finalization failed for block $blockId: ${state.reason}")
+                Napier.w("Audio finalization failed for block $blockId: ${state.reason.key}")
                 mutableEditorState.update {
                     it.copy(
-                        errorMessage = state.reason,
+                        errorMessage = state.reason.toUiText(),
                         isSaving = false,
                         isEditingLocked = false,
                     )
@@ -267,7 +273,7 @@ private suspend fun EntryEditorViewModel.finishEmptyPublish(
         Napier.e("Failed to delete cleared draft: ${deletionFailure.message}", deletionFailure)
         applyResolvedAudio(resolvedAudio)
         mutableEditorState.update {
-            it.copy(errorMessage = "Failed to clear draft: ${deletionFailure.message}")
+            it.copy(errorMessage = Res.string.editor_error_clear_draft_failed.toUiText(deletionFailure.message.toString()))
         }
         return
     }

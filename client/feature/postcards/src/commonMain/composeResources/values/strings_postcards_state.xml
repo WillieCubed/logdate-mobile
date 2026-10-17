@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="postcards_save_failed">Could not save postcard</string>
+</resources>

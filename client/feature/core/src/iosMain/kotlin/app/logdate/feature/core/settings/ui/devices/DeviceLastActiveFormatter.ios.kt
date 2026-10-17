@@ -7,9 +7,9 @@ import platform.Foundation.NSDateFormatterShortStyle
 import platform.Foundation.dateWithTimeIntervalSince1970
 import kotlin.time.Instant
 
-actual fun formatDeviceLastActive(timestamp: Instant): String {
+actual fun formatDeviceLastActive(timestamp: Instant): String? {
     if (timestamp == Instant.DISTANT_PAST) {
-        return "Unknown"
+        return null
     }
 
     val formatter =

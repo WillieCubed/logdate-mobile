@@ -31,6 +31,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_failure_server_url_empty
+import logdate.client.feature.core.generated.resources.account_validation_display_name_required
+import logdate.client.feature.core.generated.resources.account_validation_display_name_too_long
+import logdate.client.feature.core.generated.resources.account_validation_username_characters
+import logdate.client.feature.core.generated.resources.account_validation_username_too_short
+import logdate.client.feature.core.generated.resources.username_is_already_taken
+import org.jetbrains.compose.resources.StringResource
 
 class CloudAccountOnboardingViewModel(
     private val createPasskeyAccountUseCase: CreatePasskeyAccountUseCase,
@@ -552,8 +560,8 @@ class CloudAccountOnboardingViewModel(
                     val customServerUrl = serverSelectionState.customServerUrl
                     if (customServerUrl.isBlank()) {
                         updateServerSelectionState(
-                            validationState = ServerValidationState.Error("Server URL cannot be empty"),
-                            errorMessage = "Server URL cannot be empty",
+                            validationState = ServerValidationState.Error(Res.string.account_failure_server_url_empty),
+                            errorMessage = Res.string.account_failure_server_url_empty,
                         )
                         return@launch
                     }
@@ -576,7 +584,7 @@ class CloudAccountOnboardingViewModel(
 
     private suspend fun persistServerSelection(
         nextStep: OnboardingStep,
-        failureMessage: (Throwable) -> String,
+        failureMessage: (Throwable) -> StringResource,
         save: suspend () -> Result<ServerConfigurationCoordinator.SaveResult>,
     ) {
         save()
@@ -603,7 +611,7 @@ class CloudAccountOnboardingViewModel(
 
     private fun updateServerSelectionState(
         validationState: ServerValidationState,
-        errorMessage: String?,
+        errorMessage: StringResource?,
         nextStep: OnboardingStep? = null,
         activeServerDescriptor: ServerDescriptor? = _uiState.value.serverSelectionState.activeServerDescriptor,
         customServerUrl: String? = null,
@@ -629,13 +637,13 @@ class CloudAccountOnboardingViewModel(
         if (currentState.displayName.isBlank()) {
             _uiState.value =
                 currentState.copy(
-                    displayNameError = "Display name is required",
+                    displayNameError = Res.string.account_validation_display_name_required,
                 )
             isValid = false
         } else if (currentState.displayName.length > 100) {
             _uiState.value =
                 currentState.copy(
-                    displayNameError = "Display name must be less than 100 characters",
+                    displayNameError = Res.string.account_validation_display_name_too_long,
                 )
             isValid = false
         }
@@ -644,19 +652,19 @@ class CloudAccountOnboardingViewModel(
         if (currentState.username.isBlank() || currentState.username.length < 3) {
             _uiState.value =
                 currentState.copy(
-                    usernameError = "Username must be at least 3 characters",
+                    usernameError = Res.string.account_validation_username_too_short,
                 )
             isValid = false
         } else if (!currentState.username.matches(Regex("^[a-zA-Z0-9_]+$"))) {
             _uiState.value =
                 currentState.copy(
-                    usernameError = "Username can only contain letters, numbers, and underscores",
+                    usernameError = Res.string.account_validation_username_characters,
                 )
             isValid = false
         } else if (currentState.usernameAvailability == UsernameAvailability.Taken) {
             _uiState.value =
                 currentState.copy(
-                    usernameError = "Username is already taken",
+                    usernameError = Res.string.username_is_already_taken,
                 )
             isValid = false
         }
@@ -729,8 +737,8 @@ data class CloudAccountOnboardingUiState(
     val bio: String = "",
     /** True when onboarding already captured a name, which collapses the DisplayName step. */
     val hasProfileDisplayName: Boolean = false,
-    val displayNameError: String? = null,
-    val usernameError: String? = null,
+    val displayNameError: StringResource? = null,
+    val usernameError: StringResource? = null,
     val usernameAvailability: UsernameAvailability = UsernameAvailability.Unknown,
     val isPasskeySupported: Boolean = true,
     val isPlatformAuthenticatorAvailable: Boolean = true,
@@ -750,7 +758,7 @@ data class CloudAccountOnboardingUiState(
      */
     val isExitRequested: Boolean = false,
     val createdAccount: LogDateAccount? = null,
-    val errorMessage: String? = null,
+    val errorMessage: StringResource? = null,
     /** Semantic Google sign-in failure; the UI resolves it to a localized string resource. */
     val googleAuthError: GoogleAuthError? = null,
     /**
