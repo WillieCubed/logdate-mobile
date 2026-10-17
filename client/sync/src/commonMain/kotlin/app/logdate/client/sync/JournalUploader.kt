@@ -178,8 +178,6 @@ internal class JournalUploader(
                 retryCoordinator.handleUploadConflict(
                     entityType = EntityType.JOURNAL,
                     pending = pending,
-                    itemLabel = "journal ${journal.id}",
-                    conflictLabel = "Journal",
                     error = error,
                     localVersion = journal.syncVersion,
                     localUpdatedAt = journal.lastUpdated,
