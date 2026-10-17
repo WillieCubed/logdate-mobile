@@ -15,6 +15,10 @@ The models aren't checked in. Every build generates them from `lexicons/` into
 next time anything builds. An invalid schema fails the build with a message naming the schema
 and the problem.
 
+The `app.logdate.lexicon-models` plugin from `build-logic` does this. Any Kotlin Multiplatform
+module can generate models the same way by applying it and naming its schemas in a
+`lexiconModels { }` block; see `LexiconModelsPlugin` for the options.
+
 To look at the generated code, build the module and open that folder, or jump to a class from
 your IDE once Gradle has synced:
 

@@ -16,6 +16,8 @@ dependencies {
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("org.jetbrains.dokka:dokka-gradle-plugin:2.2.0")
     compileOnly("com.android.tools.build:gradle:9.1.1")
+    // The Kotlin Gradle plugin is on the classpath of every module that applies lexicon-models.
+    compileOnly("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.21")
 
     testImplementation(kotlin("test"))
 }
@@ -49,6 +51,10 @@ gradlePlugin {
         register("dynamicFeature") {
             id = "app.logdate.dynamic-feature"
             implementationClass = "app.logdate.DynamicFeaturePlugin"
+        }
+        register("lexiconModels") {
+            id = "app.logdate.lexicon-models"
+            implementationClass = "app.logdate.LexiconModelsPlugin"
         }
         register("androidRelease") {
             id = "app.logdate.android-release"

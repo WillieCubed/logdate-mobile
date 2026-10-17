@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("app.logdate.atproto-published-module")
+    id("app.logdate.lexicon-models")
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlinx.serialization)
@@ -27,22 +28,18 @@ val atprotoSyncLexiconInputDir = layout.projectDirectory.dir("src/commonMain/res
 val atprotoSyncLexiconOutputDir =
     layout.projectDirectory.dir("src/commonMain/kotlin/studio/hypertext/atproto/lexicon/generated/com/atproto/sync")
 
+// The official AT Protocol models are checked in, because this module generates them itself and
+// can't build its own main sources first. Regenerate them with generateOfficialAtprotoLexicons; a
+// JVM test fails when they no longer match the generator.
 fun registerLexiconCodegenTask(
     name: String,
     inputDir: org.gradle.api.file.Directory,
     outputDir: org.gradle.api.file.Directory,
     packageName: String,
-) = registerLexiconCodegenTask(name, listOf(inputDir.asFile), outputDir, packageName)
-
-fun registerLexiconCodegenTask(
-    name: String,
-    inputs: List<File>,
-    outputDir: org.gradle.api.file.Directory,
-    packageName: String,
 ) = tasks.register<JavaExec>(name) {
     group = "codegen"
-    description = "Generate Kotlin models for ${inputs.joinToString { it.relativeTo(projectDir).path }}."
-    inputs.forEach { this.inputs.files(it) }
+    description = "Generate checked-in Kotlin models for ${inputDir.asFile.relativeTo(projectDir).path}."
+    inputs.dir(inputDir)
     outputs.dir(outputDir)
 
     dependsOn(tasks.named("jvmJar"))
@@ -50,11 +47,7 @@ fun registerLexiconCodegenTask(
     val jvmJar = tasks.named<Jar>("jvmJar")
     classpath(jvmJar.map { it.archiveFile.get().asFile }, configurations.named("jvmRuntimeClasspath"))
     mainClass.set("studio.hypertext.atproto.lexicon.GenerateLexiconsKt")
-    args(
-        inputs.joinToString(File.pathSeparator) { it.absolutePath },
-        outputDir.asFile.absolutePath,
-        packageName,
-    )
+    args(inputDir.asFile.absolutePath, outputDir.asFile.absolutePath, packageName)
 }
 
 registerLexiconCodegenTask(
@@ -91,31 +84,6 @@ registerLexiconCodegenTask(
     outputDir = atprotoSyncLexiconOutputDir,
     packageName = "studio.hypertext.atproto.lexicon.generated.com.atproto.sync",
 )
-
-// Test fixtures: real LogDate and community schemas plus one synthetic schema for the kinds LogDate
-// doesn't use yet. The build generates them before compiling the tests, which round-trip them on
-// every platform, so a schema or generator change reaches the tests with nothing to run by hand.
-val repositoryLexiconDir = rootProject.layout.projectDirectory.dir("lexicons")
-val lexiconTestFixturesDir = layout.buildDirectory.dir("generated/lexiconTestFixtures/kotlin")
-val generateLexiconTestFixtures =
-    registerLexiconCodegenTask(
-        name = "generateLexiconTestFixtures",
-        inputs =
-            listOf(
-                repositoryLexiconDir.file("app/logdate/defs.json").asFile,
-                repositoryLexiconDir.file("app/logdate/journal/entry.json").asFile,
-                repositoryLexiconDir.file("app/logdate/crypto/sealed.json").asFile,
-                repositoryLexiconDir.file("community/lexicon/location/geo.json").asFile,
-                layout.projectDirectory.file("src/commonTest/lexicons/kitchenSink.json").asFile,
-            ),
-        outputDir = lexiconTestFixturesDir.get(),
-        packageName = "studio.hypertext.atproto.lexicon.fixtures",
-    )
-generateLexiconTestFixtures.configure {
-    // Start empty, so a fixture whose schema was removed doesn't linger.
-    val outputDirectory = lexiconTestFixturesDir.get().asFile
-    doFirst { outputDirectory.deleteRecursively() }
-}
 
 tasks.register("generateOfficialAtprotoLexicons") {
     group = "codegen"
@@ -163,11 +131,27 @@ kotlin {
             api(libs.kotlinx.serialization.json)
         }
 
-        commonTest {
-            kotlin.srcDir(generateLexiconTestFixtures.map { lexiconTestFixturesDir.get() })
-            dependencies {
-                implementation(libs.kotlin.test)
-            }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
     }
+}
+
+// Test fixtures: real LogDate and community schemas plus one synthetic schema for the kinds LogDate
+// doesn't use yet. The build generates them before compiling the tests, which round-trip them on
+// every platform, so a schema or generator change reaches the tests with nothing to run by hand.
+// This module is the generator, so it runs its own JVM build.
+lexiconModels {
+    val repositoryLexicons = rootProject.layout.projectDirectory.dir("lexicons")
+    schemas.from(
+        repositoryLexicons.file("app/logdate/defs.json"),
+        repositoryLexicons.file("app/logdate/journal/entry.json"),
+        repositoryLexicons.file("app/logdate/crypto/sealed.json"),
+        repositoryLexicons.file("community/lexicon/location/geo.json"),
+        layout.projectDirectory.file("src/commonTest/lexicons/kitchenSink.json"),
+    )
+    basePackage = "studio.hypertext.atproto.lexicon.fixtures"
+    namespaceLayout = false
+    sourceSet = "commonTest"
+    generator.from(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
 }
