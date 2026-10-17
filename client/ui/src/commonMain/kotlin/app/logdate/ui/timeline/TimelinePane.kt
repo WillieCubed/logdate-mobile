@@ -76,6 +76,9 @@ fun TimelinePane(
     onOpenDraft: (draftId: String) -> Unit = {},
     onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
     onImportBackup: () -> Unit = {},
+    onDismissSuggestion: () -> Unit = {},
+    onUseSuggestion: () -> Unit = {},
+    onRecordVoice: () -> Unit = onStartWriting,
     birthday: Instant? = null,
     statusActions: @Composable RowScope.() -> Unit = {},
     banner: @Composable () -> Unit = {},
@@ -125,6 +128,9 @@ fun TimelinePane(
                         listState,
                         pendingMomentContent,
                         onOpenTextNote,
+                        onDismissSuggestion = onDismissSuggestion,
+                        onUseSuggestion = onUseSuggestion,
+                        onRecordVoice = onRecordVoice,
                     )
                     ScrollToTopButton(listState, Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.lg))
                 }
@@ -179,6 +185,9 @@ fun TimelinePane(
                     listState,
                     pendingMomentContent,
                     onOpenTextNote,
+                    onDismissSuggestion = onDismissSuggestion,
+                    onUseSuggestion = onUseSuggestion,
+                    onRecordVoice = onRecordVoice,
                 )
 
                 ScrollToTopButton(

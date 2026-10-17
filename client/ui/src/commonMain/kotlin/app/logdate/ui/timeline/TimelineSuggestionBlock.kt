@@ -6,21 +6,28 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
@@ -39,19 +46,32 @@ import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.common_dismiss
 import logdate.client.ui.generated.resources.finish_draft
 import logdate.client.ui.generated.resources.share_link
 import logdate.client.ui.generated.resources.start_writing
+import logdate.client.ui.generated.resources.suggestion_add_moment
 import logdate.client.ui.generated.resources.suggestion_capture_for_event
+import logdate.client.ui.generated.resources.suggestion_label_activity
 import logdate.client.ui.generated.resources.suggestion_label_draft
 import logdate.client.ui.generated.resources.suggestion_label_memory
+import logdate.client.ui.generated.resources.suggestion_label_morning
 import logdate.client.ui.generated.resources.suggestion_label_today
+import logdate.client.ui.generated.resources.suggestion_label_trip
 import logdate.client.ui.generated.resources.suggestion_label_upcoming
 import logdate.client.ui.generated.resources.suggestion_media_item
 import logdate.client.ui.generated.resources.suggestion_near_location
+import logdate.client.ui.generated.resources.suggestion_record_voice
 import logdate.client.ui.generated.resources.view_memory
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
+
+/** Test tags for the suggestion block's actions. */
+object TimelineSuggestionTags {
+    const val ADD_MOMENT = "timeline_suggestion_add_moment"
+    const val DISMISS = "timeline_suggestion_dismiss"
+    const val RECORD_VOICE = "timeline_suggestion_record_voice"
+}
 
 /**
  * Represents different types of timeline suggestion blocks that can be shown to users.
@@ -94,6 +114,15 @@ sealed interface TimelineSuggestionBlock {
         val startTime: Instant,
         val placeName: String? = null,
     ) : TimelineSuggestionBlock
+
+    /** A walk, ride or trip that lasted [minutes] just ended; [trip] for a vehicle. */
+    data class AfterActivity(
+        val minutes: Int,
+        val trip: Boolean,
+    ) : TimelineSuggestionBlock
+
+    /** The person just woke up. */
+    data object MorningStart : TimelineSuggestionBlock
 }
 
 data class TimelineSuggestionBlockUiState(
@@ -107,6 +136,8 @@ data class TimelineSuggestionBlockUiState(
     val isAiGenerated: Boolean = false,
     val eventId: String? = null,
     val eventStartTime: Instant? = null,
+    /** For [TimelineSuggestionBlockType.AFTER_ACTIVITY]: whether it was a trip in a vehicle. */
+    val activityTrip: Boolean = false,
 )
 
 enum class TimelineSuggestionBlockType {
@@ -129,6 +160,12 @@ enum class TimelineSuggestionBlockType {
      * An upcoming event the user can capture media for.
      */
     UPCOMING_EVENT,
+
+    /** A walk, ride or trip just ended, while activity awareness is on. */
+    AFTER_ACTIVITY,
+
+    /** The person just woke up, while activity awareness is on. */
+    MORNING_START,
 }
 
 /**
@@ -143,6 +180,9 @@ fun TimelineSuggestionBlock(
     onViewMemoryDay: (LocalDate) -> Unit,
     onShareMemory: (TimelineSuggestionBlockUiState) -> Unit,
     modifier: Modifier = Modifier,
+    onDismiss: () -> Unit = {},
+    onUse: () -> Unit = {},
+    onRecordVoice: () -> Unit = onStartWriting,
 ) {
     val suggestedTypeTitle =
         when (state.type) {
@@ -150,6 +190,9 @@ fun TimelineSuggestionBlock(
             TimelineSuggestionBlockType.EMPTY_DAY -> stringResource(Res.string.suggestion_label_today)
             TimelineSuggestionBlockType.MEMORY_RECALL -> stringResource(Res.string.suggestion_label_memory)
             TimelineSuggestionBlockType.UPCOMING_EVENT -> stringResource(Res.string.suggestion_label_upcoming)
+            TimelineSuggestionBlockType.AFTER_ACTIVITY ->
+                stringResource(if (state.activityTrip) Res.string.suggestion_label_trip else Res.string.suggestion_label_activity)
+            TimelineSuggestionBlockType.MORNING_START -> stringResource(Res.string.suggestion_label_morning)
         }
 
     val containerColor =
@@ -213,6 +256,9 @@ fun TimelineSuggestionBlock(
             onOpenDraft = onOpenDraft,
             onViewMemoryDay = onViewMemoryDay,
             onShareMemory = onShareMemory,
+            onDismiss = onDismiss,
+            onUse = onUse,
+            onRecordVoice = onRecordVoice,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -303,6 +349,9 @@ private fun SuggestionActions(
     onOpenDraft: (String) -> Unit,
     onViewMemoryDay: (LocalDate) -> Unit,
     onShareMemory: (TimelineSuggestionBlockUiState) -> Unit,
+    onDismiss: () -> Unit,
+    onUse: () -> Unit,
+    onRecordVoice: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -360,6 +409,34 @@ private fun SuggestionActions(
                         )
                     },
                 )
+            }
+            TimelineSuggestionBlockType.AFTER_ACTIVITY, TimelineSuggestionBlockType.MORNING_START -> {
+                TextButton(onClick = onDismiss, modifier = Modifier.testTag(TimelineSuggestionTags.DISMISS)) {
+                    Text(stringResource(Res.string.common_dismiss))
+                }
+                if (state.type == TimelineSuggestionBlockType.MORNING_START) {
+                    Button(
+                        onClick = {
+                            onUse()
+                            onRecordVoice()
+                        },
+                        modifier = Modifier.testTag(TimelineSuggestionTags.RECORD_VOICE),
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(stringResource(Res.string.suggestion_record_voice))
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            onUse()
+                            onStartWriting()
+                        },
+                        modifier = Modifier.testTag(TimelineSuggestionTags.ADD_MOMENT),
+                    ) {
+                        Text(stringResource(Res.string.suggestion_add_moment))
+                    }
+                }
             }
             TimelineSuggestionBlockType.UPCOMING_EVENT -> {
                 AssistChip(
