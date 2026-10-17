@@ -1,6 +1,8 @@
 package app.logdate.wear.v2.mark
 
 import app.logdate.client.database.entities.moments.MarkedMomentState
+import app.logdate.client.domain.activity.CaptureActivitySource
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sync.metadata.EntityType
@@ -20,6 +22,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -42,6 +45,22 @@ class MarkMomentUseCaseTest {
             assertEquals(id, mark.id)
             useCase().mark(clickedAt, "America/Los_Angeles", id)
             assertEquals(1, marks.rows.size)
+        }
+
+    @Test
+    fun `a mark made while moving records it`() =
+        runTest {
+            val mark = useCase(activity = { CaptureActivity.MOVING }).mark()
+
+            assertEquals("moving", mark.capturedDuring)
+        }
+
+    @Test
+    fun `a mark saved long after it was made does not take the activity under way`() =
+        runTest {
+            val mark = useCase(activity = { CaptureActivity.IN_VEHICLE }).mark(clock.start - 10.minutes, "UTC", kotlin.uuid.Uuid.random())
+
+            assertEquals(null, mark.capturedDuring)
         }
 
     @Test
@@ -154,6 +173,7 @@ class MarkMomentUseCaseTest {
     private fun useCase(
         readPlace: suspend () -> NoteLocation? = { place },
         sensor: HeartRateSampler = HeartRateSampler { bpm },
+        activity: CaptureActivitySource = CaptureActivitySource.None,
     ) = MarkMomentUseCase(
         store = MarkedMomentStore(marks, FakePeerDeliveryDao(), syncMetadataService, clock, MarkTestTransactions),
         deviceId = { "watch-1" },
@@ -161,6 +181,7 @@ class MarkMomentUseCaseTest {
         heartRate = sensor,
         clock = clock,
         timeZoneId = { "Europe/Paris" },
+        captureActivity = activity,
     )
 
     private class SteppingClock(

@@ -2,6 +2,7 @@ package app.logdate.wear.v2.mark
 
 import app.logdate.client.database.entities.moments.MarkedMomentEntity
 import app.logdate.client.database.entities.moments.MarkedMomentState
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.wear.health.HeartRateSampler
 import io.github.aakira.napier.Napier
@@ -11,6 +12,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -27,6 +29,7 @@ class MarkMomentUseCase(
     private val heartRate: HeartRateSampler,
     private val clock: Clock = Clock.System,
     private val timeZoneId: () -> String = { TimeZone.currentSystemDefault().id },
+    private val captureActivity: CaptureActivitySource = CaptureActivitySource.None,
 ) {
     suspend fun mark(
         capturedAt: Instant? = null,
@@ -42,6 +45,8 @@ class MarkMomentUseCase(
                 state = MarkedMomentState.OPEN,
                 originDeviceId = deviceId(),
                 lastUpdated = now,
+                // A mark saved later than it was made (a retried cold start) does not take what is happening now.
+                capturedDuring = if (clock.now() - now <= RECENT_CAPTURE) captureActivity.now()?.wireName else null,
             )
         store.create(mark)
         return mark
@@ -83,5 +88,8 @@ class MarkMomentUseCase(
 
     companion object {
         const val PLACE_TIMEOUT_MS = 3_000L
+
+        /** How late a mark may be saved and still take the activity under way. */
+        val RECENT_CAPTURE = 2.minutes
     }
 }

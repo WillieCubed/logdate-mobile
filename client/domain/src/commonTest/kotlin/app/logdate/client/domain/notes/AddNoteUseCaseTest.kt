@@ -13,6 +13,7 @@ import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
@@ -98,6 +99,46 @@ class AddNoteUseCaseTest {
             // Then
             assertEquals(1, mockRepository.createdNotes.size)
             assertEquals(testNote, mockRepository.createdNotes.first())
+        }
+
+    @Test
+    fun `a note captured now records what the person is doing unless it names an activity`() =
+        runTest {
+            val stamping =
+                AddNoteUseCase(
+                    repository = mockRepository,
+                    journalContentRepository = mockJournalContentRepository,
+                    logLocationUseCase = mockLogLocationUseCase.useCase,
+                    logCurrentLocationUseCase = mockLogCurrentLocationUseCase.useCase,
+                    settingsRepository = mockSettingsRepository,
+                    mediaManager = mockMediaManager,
+                    captureActivity = { CaptureActivity.MOVING },
+                )
+            val plain = createTestNote()
+            val named = createTestNote().copy(capturedDuring = CaptureActivity.IN_VEHICLE)
+
+            stamping(notes = listOf(plain, named))
+
+            assertEquals(listOf(CaptureActivity.MOVING, CaptureActivity.IN_VEHICLE), mockRepository.createdNotes.map { it.capturedDuring })
+        }
+
+    @Test
+    fun `a note written about another time records no activity`() =
+        runTest {
+            val stamping =
+                AddNoteUseCase(
+                    repository = mockRepository,
+                    journalContentRepository = mockJournalContentRepository,
+                    logLocationUseCase = mockLogLocationUseCase.useCase,
+                    logCurrentLocationUseCase = mockLogCurrentLocationUseCase.useCase,
+                    settingsRepository = mockSettingsRepository,
+                    mediaManager = mockMediaManager,
+                    captureActivity = { CaptureActivity.MOVING },
+                )
+
+            stamping(notes = listOf(createTestNote()), captureCurrentLocation = false)
+
+            assertEquals(null, mockRepository.createdNotes.single().capturedDuring)
         }
 
     @Test
