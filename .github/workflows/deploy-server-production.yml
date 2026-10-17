@@ -53,11 +53,28 @@ jobs:
             echo "::error::HEALTH_INTERNAL_TOKEN_STAGING repo secret is unset; cannot gate production deploys without it."
             exit 1
           fi
-          response=$(curl -sS -f --max-time 10 \
-            -H "X-LogDate-Health-Token: $HEALTH_TOKEN" \
-            https://cloud-staging.logdate.app/health)
+          # Staging scales to zero, and a cold start takes about ten seconds to answer.
+          # Only connection failures and timeouts are retried; an HTTP error fails at once.
+          for attempt in 1 2 3; do
+            status=0
+            response=$(curl -sS -f --max-time 30 \
+              -H "X-LogDate-Health-Token: $HEALTH_TOKEN" \
+              https://cloud-staging.logdate.app/health) || status=$?
+            if [[ "$status" == 0 ]]; then
+              break
+            fi
+            if [[ ! "$status" =~ ^(6|7|28|35)$ || "$attempt" == 3 ]]; then
+              echo "::error::Staging /health check failed (curl exit $status, attempt $attempt of 3)."
+              exit 1
+            fi
+            echo "Staging /health did not respond (curl exit $status); retrying."
+            sleep $((attempt * 5))
+          done
           echo "$response"
-          echo "$response" | jq -e '.db_connected == true' >/dev/null
+          if ! echo "$response" | jq -e '.db_connected == true' >/dev/null; then
+            echo "::error::Staging /health did not report db_connected=true."
+            exit 1
+          fi
 
       - name: Set up Python with pip cache
         uses: actions/setup-python@v7.0.0
