@@ -10,6 +10,8 @@ import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.identity.DefaultDeviceManager
+import app.logdate.client.device.models.DeviceInfo
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.networking.ServerDiscoveryClient
@@ -29,6 +31,7 @@ import app.logdate.shared.model.SerializableVideoBlock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -80,6 +83,8 @@ class RecoveryAcceptanceProbeTest {
             config.updateServerDescriptor(descriptor)
 
             val identity = koin.get<IdentityKeyManager>()
+            val devices = koin.get<DefaultDeviceManager>()
+            val localDeviceId = devices.getDeviceId().value
             val sessions = koin.get<SessionStorage>()
             val sync = koin.get<DefaultSyncManager>()
             val journals = koin.get<JournalRepository>()
@@ -103,13 +108,18 @@ class RecoveryAcceptanceProbeTest {
             if (mode == "create") {
                 createFixture(fixture, journals, notes, links, media)
                 awaitSettledSync(sync)
+                assertDeviceEnrolled(devices, localDeviceId)
                 notes.removeById(fixture.id("deletedNote"))
                 journals.deleteDraft(fixture.id("deletedDraft"))
                 awaitSettledSync(sync)
                 assertEquals(null, notes.getNoteById(fixture.id("deletedNote")))
                 assertEquals(null, journals.getDraft(fixture.id("deletedDraft")))
             } else {
+                val sourceDevices = awaitAccountDevices(devices) { it.isNotEmpty() }
+                assertFalse(sourceDevices.any { it.id == localDeviceId }, "replacement device was already enrolled before first sync")
                 awaitSettledSync(sync)
+                val accountDevices = assertDeviceEnrolled(devices, localDeviceId)
+                assertTrue(accountDevices.any { it.id != localDeviceId }, "source device enrollment was not retained")
                 assertRecovered(fixture, journals, notes, links, media)
                 val device = UiDevice.getInstance(instrumentation)
                 try {
@@ -131,6 +141,18 @@ class RecoveryAcceptanceProbeTest {
                 }
             }
         }
+
+    private suspend fun assertDeviceEnrolled(
+        devices: DefaultDeviceManager,
+        localDeviceId: Uuid,
+    ) = awaitAccountDevices(devices) { accountDevices -> accountDevices.any { it.id == localDeviceId } }
+
+    private suspend fun awaitAccountDevices(
+        devices: DefaultDeviceManager,
+        ready: (List<DeviceInfo>) -> Boolean,
+    ) = withTimeout(30_000) {
+        devices.getAssociatedDevices().first(ready)
+    }
 
     private suspend fun createFixture(
         fixture: Fixture,
