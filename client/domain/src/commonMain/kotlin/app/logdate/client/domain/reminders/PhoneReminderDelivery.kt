@@ -21,6 +21,8 @@ data class ReminderWatch(
     val reachable: Boolean,
     val supportsReminders: Boolean,
     val supportsSupplementalReminders: Boolean = false,
+    /** Whether the watch can show [ReminderTrigger.MOVING_ENDED] and [ReminderTrigger.TRIP_ENDED]. */
+    val supportsActivityReminders: Boolean = false,
 )
 
 enum class PhoneReminderOutcome { SKIPPED, HELD, PHONE_POSTED, WATCH_POSTED, UNCERTAIN }
@@ -68,6 +70,10 @@ class PhoneReminderDelivery(
                     (
                         final.supplemental?.reminderTrigger() != trigger.trigger ||
                             (confirmed.watch?.supportsSupplementalReminders == true && final.watch?.supportsSupplementalReminders == true)
+                    ) &&
+                    (
+                        trigger.trigger !in ACTIVITY_TRIGGERS ||
+                            (confirmed.watch?.supportsActivityReminders == true && final.watch?.supportsActivityReminders == true)
                     ),
                 reading,
                 final.clock.now.toEpochMilliseconds(),
@@ -138,3 +144,6 @@ class PhoneReminderDelivery(
 
     private fun PhoneReminderSnapshot.day() = clock.now.toStreakDay(clock.zone, clock.dayStartHour)
 }
+
+/** Triggers a watch can only decode once it advertises activity reminders. */
+private val ACTIVITY_TRIGGERS = setOf(ReminderTrigger.MOVING_ENDED, ReminderTrigger.TRIP_ENDED)

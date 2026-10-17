@@ -2,6 +2,10 @@
 <resources>
     <!-- Reminders on the watch, in the new watch app -->
     <string name="wear_reminder_record">Record</string>
+    <string name="wear_reminder_moving_title">Activity finished</string>
+    <string name="wear_reminder_moving_body">Record how it went</string>
+    <string name="wear_reminder_trip_title">Trip finished</string>
+    <string name="wear_reminder_trip_body">Record where you went</string>
     <string name="wear_reminder_workout_title">Workout finished</string>
     <string name="wear_reminder_workout_body">Record how it went</string>
     <string name="wear_reminder_evening_title">Nothing recorded today</string>

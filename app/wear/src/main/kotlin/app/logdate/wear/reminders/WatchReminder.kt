@@ -16,10 +16,14 @@ enum class WatchReminder(
     CAMPFIRE_EMBERS(R.string.wear_reminder_campfire_title, R.string.wear_reminder_campfire_body),
     WIND_DOWN(R.string.wear_reminder_wind_down_title, R.string.wear_reminder_evening_body),
     WORKOUT_ENDED(R.string.wear_reminder_workout_title, R.string.wear_reminder_workout_body),
+    MOVING_ENDED(R.string.wear_reminder_moving_title, R.string.wear_reminder_moving_body),
+    TRIP_ENDED(R.string.wear_reminder_trip_title, R.string.wear_reminder_trip_body),
 }
 
 fun reminderForTrigger(trigger: ReminderTrigger): WatchReminder =
     when (trigger) {
+        ReminderTrigger.MOVING_ENDED -> WatchReminder.MOVING_ENDED
+        ReminderTrigger.TRIP_ENDED -> WatchReminder.TRIP_ENDED
         ReminderTrigger.WORKOUT_ENDED -> WatchReminder.WORKOUT_ENDED
         ReminderTrigger.ARRIVED_SOMEWHERE_NEW -> WatchReminder.ARRIVED_SOMEWHERE_NEW
         ReminderTrigger.CAMPFIRE_EMBERS -> WatchReminder.CAMPFIRE_EMBERS

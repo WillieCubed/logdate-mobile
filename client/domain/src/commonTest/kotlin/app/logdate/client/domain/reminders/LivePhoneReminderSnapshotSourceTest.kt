@@ -1,5 +1,8 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.AgreedActivity
 import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
 import app.logdate.client.domain.recommendation.AmbientPromptPayload
@@ -31,6 +34,7 @@ class LivePhoneReminderSnapshotSourceTest {
     private var marks = 2
     private var afterMarks: () -> Unit = {}
     private var workout: Instant? = null
+    private var doing = AgreedActivity()
     private var healthReads = 0
     private var supplementalReads = 0
     private var afterSupplemental: () -> Unit = {}
@@ -91,6 +95,7 @@ class LivePhoneReminderSnapshotSourceTest {
                 }, { error("Places are off") }),
             openMarks = { marks.also { afterMarks() } },
             workoutEndedAt = { workout },
+            activity = { doing },
             supplemental = {
                 supplementalReads++
                 afterSupplemental()
@@ -169,6 +174,29 @@ class LivePhoneReminderSnapshotSourceTest {
             assertEquals(
                 ReminderDecision.Deliver(ReminderTrigger.WORKOUT_ENDED, 2),
                 ReminderOrchestrator.decide(snapshot.clock, snapshot.signals),
+            )
+        }
+
+    @Test
+    fun `a drive under way holds the reminder and its end can be the reminder`() =
+        runTest {
+            doing = AgreedActivity(current = Activity(ActivityKind.IN_VEHICLE, Instant.parse("2026-10-12T21:00:00Z"), null))
+            val driving = source().read()
+            assertEquals(ReminderDecision.Skip(SkipReason.ACTIVITY_UNDER_WAY), ReminderOrchestrator.decide(driving.clock, driving.signals))
+
+            doing =
+                AgreedActivity(
+                    lastEnded =
+                        Activity(
+                            ActivityKind.IN_VEHICLE,
+                            Instant.parse("2026-10-12T21:00:00Z"),
+                            Instant.parse("2026-10-12T21:25:00Z"),
+                        ),
+                )
+            val arrived = source().read()
+            assertEquals(
+                ReminderDecision.Deliver(ReminderTrigger.TRIP_ENDED, 2),
+                ReminderOrchestrator.decide(arrived.clock, arrived.signals),
             )
         }
 
