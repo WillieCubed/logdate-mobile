@@ -4,11 +4,13 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import studio.hypertext.atproto.syntax.Nsid
 
 /**
@@ -72,6 +74,15 @@ public object LexiconParser {
                             description = errorObject["description"]?.jsonPrimitive?.contentOrNull,
                         )
                     }.orEmpty(),
+            keyRule = source["key"]?.jsonPrimitive?.contentOrNull,
+            record = source["record"]?.jsonObject?.let { parseField(owner = owner, source = it) },
+            refs = source.references(owner),
+            closed = source.boolean("closed"),
+            accept = source.strings("accept"),
+            maxSize = source.long("maxSize"),
+            minLength = source.long("minLength"),
+            maxLength = source.long("maxLength"),
+            unsupportedType = source.unsupportedTypeName(),
         )
     }
 
@@ -96,6 +107,13 @@ public object LexiconParser {
             items = source["items"]?.jsonObject?.let { parseField(owner = owner, source = it) },
             reference = source["ref"]?.jsonPrimitive?.contentOrNull?.let { LexiconReference.parse(owner, it) },
             knownValues = source.enumValues(),
+            refs = source.references(owner),
+            closed = source.boolean("closed"),
+            accept = source.strings("accept"),
+            maxSize = source.long("maxSize"),
+            minLength = source.long("minLength"),
+            maxLength = source.long("maxLength"),
+            unsupportedType = source.unsupportedTypeName(),
         )
 
     private fun parseProperties(
@@ -126,21 +144,43 @@ public object LexiconParser {
             schema = source["schema"]?.jsonObject?.let { parseField(owner = owner, source = it) },
         )
 
-    private fun JsonObject.lexiconType(): LexiconType =
-        when (this["type"]?.jsonPrimitive?.contentOrNull?.trim()) {
-            "object" -> LexiconType.OBJECT
-            "query" -> LexiconType.QUERY
-            "procedure" -> LexiconType.PROCEDURE
-            "params" -> LexiconType.PARAMS
-            "string" -> LexiconType.STRING
-            "boolean" -> LexiconType.BOOLEAN
-            "integer" -> LexiconType.INTEGER
-            "array" -> LexiconType.ARRAY
-            "blob" -> LexiconType.BLOB
-            "token" -> LexiconType.TOKEN
-            "ref" -> LexiconType.REF
-            else -> LexiconType.UNKNOWN
-        }
+    private fun JsonObject.lexiconType(): LexiconType = typeName()?.let(typesByName::get) ?: LexiconType.UNSUPPORTED
+
+    private fun JsonObject.typeName(): String? = this["type"]?.jsonPrimitive?.contentOrNull?.trim()
+
+    private fun JsonObject.unsupportedTypeName(): String? = typeName().takeIf { lexiconType() == LexiconType.UNSUPPORTED }
+
+    private fun JsonObject.references(owner: Nsid): List<LexiconReference> = strings("refs").map { LexiconReference.parse(owner, it) }
+
+    private fun JsonObject.strings(key: String): List<String> =
+        (this[key] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+
+    private fun JsonObject.boolean(key: String): Boolean = (this[key] as? JsonPrimitive)?.booleanOrNull ?: false
+
+    private fun JsonObject.long(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
+
+    private val typesByName: Map<String, LexiconType> =
+        mapOf(
+            "object" to LexiconType.OBJECT,
+            "query" to LexiconType.QUERY,
+            "procedure" to LexiconType.PROCEDURE,
+            "params" to LexiconType.PARAMS,
+            "string" to LexiconType.STRING,
+            "boolean" to LexiconType.BOOLEAN,
+            "integer" to LexiconType.INTEGER,
+            "array" to LexiconType.ARRAY,
+            "blob" to LexiconType.BLOB,
+            "bytes" to LexiconType.BYTES,
+            "cid-link" to LexiconType.CID_LINK,
+            "token" to LexiconType.TOKEN,
+            "ref" to LexiconType.REF,
+            "union" to LexiconType.UNION,
+            "unknown" to LexiconType.UNKNOWN,
+            "record" to LexiconType.RECORD,
+            "subscription" to LexiconType.SUBSCRIPTION,
+            "permission-set" to LexiconType.PERMISSION_SET,
+            "permission" to LexiconType.PERMISSION,
+        )
 
     private fun JsonObject.enumValues(): List<String> =
         (
