@@ -27,7 +27,7 @@ val MIGRATION_53_54 =
         }
     }
 
-private fun SQLiteConnection.hasColumn(
+internal fun SQLiteConnection.hasColumn(
     table: String,
     column: String,
 ): Boolean =

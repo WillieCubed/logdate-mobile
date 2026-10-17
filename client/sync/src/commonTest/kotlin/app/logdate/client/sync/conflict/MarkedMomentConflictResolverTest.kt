@@ -1,5 +1,6 @@
 package app.logdate.client.sync.conflict
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -84,6 +85,14 @@ class MarkedMomentConflictResolverTest {
                 for (c in variants) assertEquals(resolver.merge(resolver.merge(a, b), c), resolver.merge(a, resolver.merge(b, c)))
             }
         }
+    }
+
+    @Test fun `the activity recorded at capture survives a merge with a copy that lacks it`() {
+        val moving = mark.copy(capturedDuring = CaptureActivity.MOVING, lastUpdated = Instant.fromEpochMilliseconds(1))
+        val newer = mark.copy(caption = "edited", lastUpdated = Instant.fromEpochMilliseconds(5))
+
+        assertEquals(CaptureActivity.MOVING, resolver.merge(moving, newer).capturedDuring)
+        assertEquals(CaptureActivity.MOVING, resolver.merge(newer, moving).capturedDuring)
     }
 
     @Test fun `different capture identities cannot be merged`() {

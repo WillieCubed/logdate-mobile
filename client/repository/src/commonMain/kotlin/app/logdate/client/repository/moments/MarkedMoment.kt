@@ -1,5 +1,6 @@
 package app.logdate.client.repository.moments
 
+import app.logdate.client.repository.journals.CaptureActivity
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -26,6 +27,7 @@ data class MarkLocation(
  *
  * @property resolvedNoteIds The notes that filled this mark in.
  * @property originDeviceId The device that captured the mark.
+ * @property capturedDuring What the person was doing when they marked it, while activity awareness was on.
  */
 data class MarkedMoment(
     val id: Uuid,
@@ -39,6 +41,7 @@ data class MarkedMoment(
     val originDeviceId: String,
     val lastUpdated: Instant,
     val syncVersion: Long,
+    val capturedDuring: CaptureActivity? = null,
 )
 
 /** Room and peer delivery identify mark clocks at millisecond precision. Normalize wire snapshots before merging stored projections. */

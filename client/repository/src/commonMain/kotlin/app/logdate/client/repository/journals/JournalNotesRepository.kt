@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package app.logdate.client.repository.journals
 
 import app.logdate.client.repository.transcription.TranscriptDocument
@@ -12,6 +14,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
@@ -291,6 +294,14 @@ sealed class JournalNote(
     abstract val capturedOn: CaptureDevice?
 
     /**
+     * What the person was doing when the note was captured, or null when nothing was recorded:
+     * activity awareness was off, nothing was under way, or the note predates this. Set once where the
+     * note is captured and never edited; no copy of the note may erase it. Left out of the note's JSON
+     * while null, so notes without it encode as they did before it existed.
+     */
+    abstract val capturedDuring: CaptureActivity?
+
+    /**
      * A text note, like a unit of content on a microblog (e.g. post, tweet).
      *
      * Text notes can constitute simple statements or long form content.
@@ -307,6 +318,9 @@ sealed class JournalNote(
         override val timeZoneId: String? = null,
         @Serializable(with = LenientCaptureDeviceSerializer::class)
         override val capturedOn: CaptureDevice? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = LenientCaptureActivitySerializer::class)
+        override val capturedDuring: CaptureActivity? = null,
     ) : JournalNote(NoteType.TEXT)
 
     @Serializable
@@ -323,6 +337,9 @@ sealed class JournalNote(
         override val timeZoneId: String? = null,
         @Serializable(with = LenientCaptureDeviceSerializer::class)
         override val capturedOn: CaptureDevice? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = LenientCaptureActivitySerializer::class)
+        override val capturedDuring: CaptureActivity? = null,
     ) : JournalNote(NoteType.IMAGE)
 
     @Serializable
@@ -338,6 +355,9 @@ sealed class JournalNote(
         override val timeZoneId: String? = null,
         @Serializable(with = LenientCaptureDeviceSerializer::class)
         override val capturedOn: CaptureDevice? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = LenientCaptureActivitySerializer::class)
+        override val capturedDuring: CaptureActivity? = null,
     ) : JournalNote(NoteType.VIDEO)
 
     @Serializable
@@ -356,6 +376,9 @@ sealed class JournalNote(
         val transcript: TranscriptDocument? = null,
         @Serializable(with = LenientCaptureDeviceSerializer::class)
         override val capturedOn: CaptureDevice? = null,
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        @Serializable(with = LenientCaptureActivitySerializer::class)
+        override val capturedDuring: CaptureActivity? = null,
     ) : JournalNote(NoteType.AUDIO)
 }
 
