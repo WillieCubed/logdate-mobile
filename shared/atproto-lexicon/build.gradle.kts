@@ -39,22 +39,22 @@ fun registerLexiconCodegenTask(
     inputs: List<File>,
     outputDir: org.gradle.api.file.Directory,
     packageName: String,
-) {
-    tasks.register<JavaExec>(name) {
-        group = "codegen"
-        description = "Generate checked-in Kotlin models for ${inputs.joinToString { it.relativeTo(projectDir).path }}."
+) = tasks.register<JavaExec>(name) {
+    group = "codegen"
+    description = "Generate Kotlin models for ${inputs.joinToString { it.relativeTo(projectDir).path }}."
+    inputs.forEach { this.inputs.files(it) }
+    outputs.dir(outputDir)
 
-        dependsOn(tasks.named("jvmJar"))
+    dependsOn(tasks.named("jvmJar"))
 
-        val jvmJar = tasks.named<Jar>("jvmJar")
-        classpath(jvmJar.map { it.archiveFile.get().asFile }, configurations.named("jvmRuntimeClasspath"))
-        mainClass.set("studio.hypertext.atproto.lexicon.GenerateLexiconsKt")
-        args(
-            inputs.joinToString(File.pathSeparator) { it.absolutePath },
-            outputDir.asFile.absolutePath,
-            packageName,
-        )
-    }
+    val jvmJar = tasks.named<Jar>("jvmJar")
+    classpath(jvmJar.map { it.archiveFile.get().asFile }, configurations.named("jvmRuntimeClasspath"))
+    mainClass.set("studio.hypertext.atproto.lexicon.GenerateLexiconsKt")
+    args(
+        inputs.joinToString(File.pathSeparator) { it.absolutePath },
+        outputDir.asFile.absolutePath,
+        packageName,
+    )
 }
 
 registerLexiconCodegenTask(
@@ -93,21 +93,29 @@ registerLexiconCodegenTask(
 )
 
 // Test fixtures: real LogDate and community schemas plus one synthetic schema for the kinds LogDate
-// doesn't use yet. Their generated code is compiled and round-trip tested on every platform.
+// doesn't use yet. The build generates them before compiling the tests, which round-trip them on
+// every platform, so a schema or generator change reaches the tests with nothing to run by hand.
 val repositoryLexiconDir = rootProject.layout.projectDirectory.dir("lexicons")
-registerLexiconCodegenTask(
-    name = "generateLexiconTestFixtures",
-    inputs =
-        listOf(
-            repositoryLexiconDir.file("app/logdate/defs.json").asFile,
-            repositoryLexiconDir.file("app/logdate/journal/entry.json").asFile,
-            repositoryLexiconDir.file("app/logdate/crypto/sealed.json").asFile,
-            repositoryLexiconDir.file("community/lexicon/location/geo.json").asFile,
-            layout.projectDirectory.file("src/commonTest/lexicons/kitchenSink.json").asFile,
-        ),
-    outputDir = layout.projectDirectory.dir("src/commonTest/kotlin/studio/hypertext/atproto/lexicon/fixtures"),
-    packageName = "studio.hypertext.atproto.lexicon.fixtures",
-)
+val lexiconTestFixturesDir = layout.buildDirectory.dir("generated/lexiconTestFixtures/kotlin")
+val generateLexiconTestFixtures =
+    registerLexiconCodegenTask(
+        name = "generateLexiconTestFixtures",
+        inputs =
+            listOf(
+                repositoryLexiconDir.file("app/logdate/defs.json").asFile,
+                repositoryLexiconDir.file("app/logdate/journal/entry.json").asFile,
+                repositoryLexiconDir.file("app/logdate/crypto/sealed.json").asFile,
+                repositoryLexiconDir.file("community/lexicon/location/geo.json").asFile,
+                layout.projectDirectory.file("src/commonTest/lexicons/kitchenSink.json").asFile,
+            ),
+        outputDir = lexiconTestFixturesDir.get(),
+        packageName = "studio.hypertext.atproto.lexicon.fixtures",
+    )
+generateLexiconTestFixtures.configure {
+    // Start empty, so a fixture whose schema was removed doesn't linger.
+    val outputDirectory = lexiconTestFixturesDir.get().asFile
+    doFirst { outputDirectory.deleteRecursively() }
+}
 
 tasks.register("generateOfficialAtprotoLexicons") {
     group = "codegen"
@@ -155,8 +163,11 @@ kotlin {
             api(libs.kotlinx.serialization.json)
         }
 
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
+        commonTest {
+            kotlin.srcDir(generateLexiconTestFixtures.map { lexiconTestFixturesDir.get() })
+            dependencies {
+                implementation(libs.kotlin.test)
+            }
         }
     }
 }
