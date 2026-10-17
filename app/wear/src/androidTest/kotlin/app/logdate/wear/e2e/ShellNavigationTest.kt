@@ -146,7 +146,8 @@ class ShellNavigationTest {
     }
 
     private companion object {
-        const val ROUTE = "memories"
+        /** A request whose screen is Today itself, so a second Today would show if the shell stacked it. */
+        const val ROUTE = "mood"
         const val TIMEOUT_MS = 10_000L
     }
 }
