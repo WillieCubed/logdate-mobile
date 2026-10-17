@@ -4,6 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.TimeSource
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityKind
+import app.logdate.client.domain.activity.ActivitySuggestion
+import app.logdate.client.domain.activity.ActivityUiState
 import app.logdate.client.domain.today.TodaySummary
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.streak.CampfirePhase
@@ -24,6 +28,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -105,6 +110,28 @@ class TodayPageScreenshots {
     fun S11_TodayWithControlsLargeFont() {
         TodayScene(ready(summary = busySummary, feeling = Feeling.GOOD), controls = allControls, scrolledToEnd = true)
     }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @Composable
+    fun S12_TodayAfterWalk() {
+        val walk = Activity(ActivityKind.MOVING, at(8, 10), at(8, 50))
+        TodayScene(
+            ready(
+                summary = TodaySummary.Empty,
+                campfire = null,
+                activity = ActivityUiState(suggestion = ActivitySuggestion(walk, minutes = 40)),
+            ),
+        )
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @Composable
+    fun S13_TodayMorningStart() {
+        val night = Activity(ActivityKind.SLEEP, at(0, 0) - 1.hours, at(7, 0))
+        TodayScene(ready(summary = TodaySummary.Empty, campfire = null, activity = ActivityUiState(morningStart = night)))
+    }
 }
 
 private const val LAST_ITEM_INDEX = 3
@@ -135,6 +162,7 @@ private fun ready(
     feeling: Feeling? = null,
     campfire: CampfirePresentation? = burning,
     phoneCard: PhoneCard = PhoneCard.None,
+    activity: ActivityUiState = ActivityUiState(),
 ) = TodayUiState.Ready(
     date = saturday,
     timeZone = zone,
@@ -142,6 +170,7 @@ private fun ready(
     feeling = feeling,
     campfire = campfire,
     phoneCard = phoneCard,
+    activity = activity,
 )
 
 @Composable
