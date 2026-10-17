@@ -55,6 +55,10 @@ import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.ui.platform.PlatformSheet
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.common_done
+import logdate.client.ui.generated.resources.media_device_selected
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Opens a media-device selector from the compact route chip.
@@ -193,7 +197,7 @@ fun MediaDeviceSelectorSheet(
                     if (selected) {
                         Icon(
                             imageVector = Icons.Rounded.Check,
-                            contentDescription = "Selected",
+                            contentDescription = stringResource(Res.string.media_device_selected),
                         )
                     }
                 },
@@ -245,7 +249,7 @@ fun MediaDeviceSelectorSheet(
             horizontalArrangement = Arrangement.End,
         ) {
             TextButton(onClick = onDismiss) {
-                Text("Done")
+                Text(stringResource(Res.string.common_done))
             }
         }
     }

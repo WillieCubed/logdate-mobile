@@ -41,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.theme.Spacing
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.stop_playback
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
 /**
@@ -179,7 +182,7 @@ private fun MiniAudioPlayerContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Close,
-                                contentDescription = "Stop playback",
+                                contentDescription = stringResource(Res.string.stop_playback),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

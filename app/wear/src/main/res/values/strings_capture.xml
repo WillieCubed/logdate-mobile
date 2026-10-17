@@ -12,4 +12,20 @@
     <string name="wear_capture_phone_camera">Phone camera</string>
     <string name="wear_capture_saved">Saved</string>
     <string name="wear_capture_failed">Couldn’t save</string>
+
+    <!-- The phone camera remote -->
+    <string name="wear_camera_open">Open camera</string>
+    <string name="wear_camera_label">Camera</string>
+    <string name="wear_camera_opening">Opening camera\non your phone...</string>
+    <string name="wear_camera_take_photo">Take photo</string>
+    <string name="wear_camera_select_back">Back camera</string>
+    <string name="wear_camera_switch">Switch camera</string>
+    <string name="wear_camera_select_front">Front camera</string>
+    <string name="wear_camera_close">Close</string>
+    <string name="wear_camera_selected">Selected</string>
+    <string name="wear_camera_capturing">Capturing...</string>
+    <string name="wear_camera_photo_captured">Photo captured</string>
+    <string name="wear_camera_done">Done</string>
+    <string name="wear_camera_take_another">Take another</string>
+    <string name="wear_camera_error_back">Back</string>
 </resources>

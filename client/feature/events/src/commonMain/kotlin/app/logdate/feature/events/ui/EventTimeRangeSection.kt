@@ -38,7 +38,11 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_ok
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * "When" section of the event detail editor.
@@ -157,10 +161,10 @@ private fun DateTimeChipRow(
                         val newDate = Instant.fromEpochMilliseconds(selectedMillis).toLocalDateTime(zone).date
                         onPick(LocalDateTime(newDate, localDateTime.time).toInstant(zone))
                     },
-                ) { Text("OK") }
+                ) { Text(stringResource(UiRes.string.common_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { datePickerOpen = false }) { Text("Cancel") }
+                TextButton(onClick = { datePickerOpen = false }) { Text(stringResource(UiRes.string.common_cancel)) }
             },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
@@ -187,10 +191,10 @@ private fun DateTimeChipRow(
                         val newTime = LocalTime(timePickerState.hour, timePickerState.minute)
                         onPick(LocalDateTime(localDateTime.date, newTime).toInstant(zone))
                     },
-                ) { Text("OK") }
+                ) { Text(stringResource(UiRes.string.common_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { timePickerOpen = false }) { Text("Cancel") }
+                TextButton(onClick = { timePickerOpen = false }) { Text(stringResource(UiRes.string.common_cancel)) }
             },
         ) {
             TimePicker(state = timePickerState, modifier = Modifier.padding(Spacing.lg))

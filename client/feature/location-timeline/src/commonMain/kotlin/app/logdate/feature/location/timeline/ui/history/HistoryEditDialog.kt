@@ -33,8 +33,25 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_arrived_time_label
+import logdate.client.feature.location.timeline.generated.resources.history_arrived_time_placeholder
+import logdate.client.feature.location.timeline.generated.resources.history_cancel
+import logdate.client.feature.location.timeline.generated.resources.history_choose_date
+import logdate.client.feature.location.timeline.generated.resources.history_choose_on_map
+import logdate.client.feature.location.timeline.generated.resources.history_choose_on_map_hint
+import logdate.client.feature.location.timeline.generated.resources.history_choose_place
+import logdate.client.feature.location.timeline.generated.resources.history_left_time_label
+import logdate.client.feature.location.timeline.generated.resources.history_left_time_placeholder
+import logdate.client.feature.location.timeline.generated.resources.history_nearby_empty
+import logdate.client.feature.location.timeline.generated.resources.history_nearby_loading
+import logdate.client.feature.location.timeline.generated.resources.history_nearby_suggestions
+import logdate.client.feature.location.timeline.generated.resources.history_place_name
+import logdate.client.ui.generated.resources.common_save
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,15 +127,25 @@ internal fun HistoryEditDialog(
                     }
                 HistoryEditAction.ChangeTime, HistoryEditAction.AddVisit -> {
                     TextButton(onClick = { choosingArrival = true }) { Text("Arrived on $arrivalDate") }
-                    OutlinedTextField(start, { start = it }, label = { Text("Arrived (24-hour time)") }, placeholder = { Text("10:15") })
+                    OutlinedTextField(
+                        start,
+                        { start = it },
+                        label = { Text(stringResource(Res.string.history_arrived_time_label)) },
+                        placeholder = { Text(stringResource(Res.string.history_arrived_time_placeholder)) },
+                    )
                     TextButton(onClick = { choosingArrival = false }) { Text("Left on $departureDate") }
-                    OutlinedTextField(end, { end = it }, label = { Text("Left (24-hour time)") }, placeholder = { Text("11:30") })
+                    OutlinedTextField(
+                        end,
+                        { end = it },
+                        label = { Text(stringResource(Res.string.history_left_time_label)) },
+                        placeholder = { Text(stringResource(Res.string.history_left_time_placeholder)) },
+                    )
                 }
                 else -> Unit
             }
             if (action == HistoryEditAction.ChangePlace || action == HistoryEditAction.AddVisit) {
-                OutlinedTextField(name, { name = it }, label = { Text("Place name") })
-                Text("Choose a place")
+                OutlinedTextField(name, { name = it }, label = { Text(stringResource(Res.string.history_place_name)) })
+                Text(stringResource(Res.string.history_choose_place))
                 places.forEach { option ->
                     TextButton(onClick = {
                         place = option
@@ -129,11 +156,11 @@ internal fun HistoryEditDialog(
                     }
                 }
                 if (action == HistoryEditAction.ChangePlace) {
-                    Text("Nearby suggestions")
+                    Text(stringResource(Res.string.history_nearby_suggestions))
                     if (loadingNearby) {
-                        Text("Looking for nearby places…")
+                        Text(stringResource(Res.string.history_nearby_loading))
                     } else if (nearby.isEmpty()) {
-                        Text("No nearby suggestions available. You can name this place or choose it on the map.")
+                        Text(stringResource(Res.string.history_nearby_empty))
                     }
                     nearby.forEach { suggestion ->
                         TextButton(onClick = {
@@ -143,9 +170,9 @@ internal fun HistoryEditDialog(
                         }) { Text(suggestion.name) }
                     }
                 }
-                TextButton(onClick = { chooseNew = !chooseNew }) { Text("Choose on a map") }
+                TextButton(onClick = { chooseNew = !chooseNew }) { Text(stringResource(Res.string.history_choose_on_map)) }
                 if (chooseNew) {
-                    Text("Find the place, then tap its position on the map.")
+                    Text(stringResource(Res.string.history_choose_on_map_hint))
                     HumanPlacePicker(place, { latitude, longitude ->
                         place = SemanticPlace(Uuid.random().toString(), name, latitude, longitude, userConfirmed = true)
                     }, Modifier.fillMaxWidth().height(240.dp))
@@ -194,9 +221,9 @@ internal fun HistoryEditDialog(
                     }
                     onDismiss()
                 }
-            }) { Text("Save") }
+            }) { Text(stringResource(UiRes.string.common_save)) }
         }
-    }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+    }, dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.history_cancel)) } })
     choosingArrival?.let { isArrival ->
         val picker =
             rememberDatePickerState(
@@ -212,7 +239,9 @@ internal fun HistoryEditDialog(
                     if (isArrival) arrivalDate = picked else departureDate = picked
                 }
                 choosingArrival = null
-            }) { Text("Choose date") }
-        }, dismissButton = { TextButton(onClick = { choosingArrival = null }) { Text("Cancel") } }) { DatePicker(picker) }
+            }) { Text(stringResource(Res.string.history_choose_date)) }
+        }, dismissButton = {
+            TextButton(onClick = { choosingArrival = null }) { Text(stringResource(Res.string.history_cancel)) }
+        }) { DatePicker(picker) }
     }
 }

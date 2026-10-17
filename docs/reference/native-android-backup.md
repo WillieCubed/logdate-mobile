@@ -77,6 +77,36 @@ over the owner and key to detect corruption. Conflicting database key copies pre
 recovery. Backfill validates retained identity and media copies against the primary keys before
 writing, and preserves conflicting or malformed material. Key files are replaced atomically, and incomplete replacements are excluded from backup.
 
+## Provider credential cleanup
+
+Sign-out records an installation-local cleanup obligation before changing the backed restore
+policy or clearing the secure session. Local sign-out precedes best-effort remote logout. A worker
+can finish an interrupted local sign-out only while its captured policy decision still applies;
+a later explicit login supersedes that decision.
+
+`RestoreCredentialLifecycle` owns provider creation and clearing through one process-wide mutex.
+Its durable records retain cleanup separately for each server and track provider-key origins.
+An uncertain creation preserves every possible origin until a successful replacement. A newer enrollment supersedes
+older global provider deletion, while old-server Android account cleanup can still finish.
+Provider calls keep the mutex until the SDK operation finishes, including caller cancellation.
+Secure-storage read failures retain work for retry instead of authorizing deletion.
+
+The cleanup scheduler awaits WorkManager persistence and uses a unique name per ticket. Startup
+reconciliation repairs interrupted scheduling; worker failures retain their ticket and retry with
+backoff. These obligations and WorkManager state are excluded from device backup. The portable
+restore policy travels with native backup and independently prevents signed-out account recovery.
+
+Android account creation, token updates, and removal share a mutation mutex. Writers validate the
+captured login inside that boundary. Removal validates the sign-out decision there and handles
+partial records, including a missing access token. Use `addAccountIfCurrent`,
+`updateTokensIfCurrent`, and `removeAccountIfSignedOut` for these operations. Checking identity
+before dispatching an Android account operation does not protect its eventual mutation.
+
+Connected Android account repositories receive `RestoreCredentialLifecycle` rather than the raw
+SDK manager. The native backup callback uses the raw manager only to retrieve a delivered key;
+it must not create or clear provider credentials. Server-scoped repositories retain their existing
+no-provider behavior because Android has one restore credential for the application.
+
 ## Incomplete media recovery
 
 Before importing content, Android stores a private copy of the archive and a recovery record bound
@@ -170,7 +200,7 @@ writing the secure session tombstone. A replacement device therefore retains sig
 though Keystore-bound session records are excluded from transfer. Missing decisions preserve
 compatibility with older backups; malformed decisions and storage-read failures cannot authorize
 restoration. This protects snapshots containing the decision; it cannot change older provider backups.
-Provider credential clearing remains best effort.
+Provider cleanup remains locally queued until it succeeds or newer enrollment supersedes it.
 
 Explicit authentication captures an opaque guard before its ceremony and enables restoration only
 after securely persisting the resulting session. Installation compares the durable session record
@@ -215,6 +245,18 @@ The receiving implementation is the native app in `logdate-apple`, bundle
 `studio.hypertext.logdateapp`, team `T95VDD3A4W`. An iOS application target and AppMigrationKit
 extension are required, together with the App Store Connect OS data transfer mapping.
 AppMigrationKit does not run in the macOS application.
+
+`RestoreCredentialCleanupRuntimeTest` checks encrypted-storage recreation, worker retry, and
+production dependency injection and scheduling. Its `cleanupSurvivesAppProcessRestart` test accepts
+a unique `cleanupProcessNamespace` and `cleanupProcessStage=seed` for the first instrumentation
+invocation. After stopping the synthetic emulator app, invoke the test with the same namespace and
+`cleanupProcessStage=verify` to complete the retained failed ticket. These preferences are isolated
+from the journal and its credentials. `PlatformCredentialCleanupRuntimeTest` checks delayed writers
+and removal of partial account records against the Android account implementation.
+
+`NativeProviderCleanupProbeTest` is opt-in with `nativeProviderCleanup=true`. It calls the actual SDK
+clear operation twice on an unseeded emulator. A successful probe establishes SDK availability and
+idempotency; deleting a delivered Google restore key still requires the dedicated test account.
 
 ## Platform references
 

@@ -1,9 +1,11 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
+import app.logdate.client.device.addAccountIfCurrent
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
@@ -103,9 +105,10 @@ internal class PasskeyRegistrationCoordinator(
                 account = completeData.account,
                 accessToken = completeData.tokens.accessToken,
                 refreshToken = completeData.tokens.refreshToken,
+                origin = origin,
             )
 
-            sessionState.markAuthenticated(completeData.account)
+            publishAccount(completeData.account, completeData.tokens.accessToken, completeData.tokens.refreshToken, origin)
 
             // Android enrollment is durable and continues independently of this sign-up result.
             createRestoreKey().onFailure { error ->
@@ -182,10 +185,10 @@ internal class PasskeyRegistrationCoordinator(
                 completeData.account,
                 completeData.tokens.accessToken,
                 completeData.tokens.refreshToken,
-                configRepository.getCurrentBackendUrl(),
+                origin,
             )
 
-            sessionState.markAuthenticated(completeData.account)
+            publishAccount(completeData.account, completeData.tokens.accessToken, completeData.tokens.refreshToken, origin)
 
             Napier.i("Authentication successful for user: ${completeData.account.username}")
             Result.success(completeData.account)
@@ -221,19 +224,38 @@ internal class PasskeyRegistrationCoordinator(
         account: LogDateAccount,
         accessToken: String,
         refreshToken: String,
+        origin: String,
     ) {
         val platformResult =
-            platformAccountManager.addAccount(
+            platformAccountManager.addAccountIfCurrent(
                 account = account,
                 accessToken = accessToken,
                 refreshToken = refreshToken,
-                backendUrl = configRepository.getCurrentBackendUrl(),
+                backendUrl = origin,
+                isCurrent = {
+                    val current = sessionStorage.getOriginBoundSession()
+                    configRepository.getCurrentBackendUrl() == origin &&
+                        (current == null || current.origin == origin) &&
+                        (current?.session ?: sessionStorage.getSession())?.let {
+                            it.accountId == account.id.toString() && it.refreshToken == refreshToken
+                        } == true
+                },
             )
 
         if (platformResult.isFailure) {
             Napier.w("Failed to add account to platform account manager", platformResult.exceptionOrNull())
             // Don't fail the entire operation since the account was created successfully
         }
+    }
+
+    private suspend fun publishAccount(
+        account: LogDateAccount,
+        access: String,
+        refresh: String,
+        origin: String,
+    ) {
+        val expected = OriginBoundSession(origin, UserSession(access, refresh, account.id.toString()))
+        check(sessionStorage.runIfSessionCurrent(expected) { sessionState.markAuthenticated(account, origin) }) { "Authentication changed" }
     }
 
     private suspend fun persistSession(

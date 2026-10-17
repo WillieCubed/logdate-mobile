@@ -92,4 +92,26 @@ class SettingsUiContractTest {
         """.trimIndent()
         assertEquals(listOf(2), SettingsUiContract.inspect(source))
     }
+    @Test
+    fun `local cards cannot group multiple shared preference rows`() {
+        val source = """
+            import androidx.compose.material3.Card as Panel
+            fun Example() { Panel { Column { SettingsChoiceItem(); SettingsChoiceItem() } } }
+        """.trimIndent()
+        assertEquals(listOf(2), SettingsUiContract.inspect(source))
+    }
+
+    @Test
+    fun `summary cards and proper settings sections remain allowed`() {
+        val source = """
+            fun Example() {
+                MaterialCard { Text("Summary"); Button() }
+                Card { SimpleSettingsItem(); Text("Summary") }
+                Card { SettingsSection { SettingsChoiceItem(); SettingsChoiceItem() } }
+                SettingsSection { SettingsChoiceItem(); SettingsChoiceItem() }
+            }
+        """.trimIndent()
+        assertTrue(SettingsUiContract.inspect(source).isEmpty())
+    }
+
 }

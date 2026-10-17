@@ -38,9 +38,25 @@ import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_app_permission_settings
+import logdate.client.feature.location.timeline.generated.resources.history_cancel
+import logdate.client.feature.location.timeline.generated.resources.history_conflicts_body
+import logdate.client.feature.location.timeline.generated.resources.history_conflicts_title
+import logdate.client.feature.location.timeline.generated.resources.history_link_memory_body
+import logdate.client.feature.location.timeline.generated.resources.history_link_memory_empty
+import logdate.client.feature.location.timeline.generated.resources.history_link_memory_title
+import logdate.client.feature.location.timeline.generated.resources.history_pause_recording
+import logdate.client.feature.location.timeline.generated.resources.history_recording_settings
+import logdate.client.feature.location.timeline.generated.resources.history_recording_title
+import logdate.client.feature.location.timeline.generated.resources.history_review_changes
+import logdate.client.feature.location.timeline.generated.resources.history_show_day
+import logdate.client.ui.generated.resources.common_done
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -150,7 +166,7 @@ fun HumanLocationHistoryScreen(
                     Icon(Icons.Default.MoreVert, "More place options", Modifier.size(20.dp))
                 }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
-                    DropdownMenuItem(text = { Text("Recording settings") }, onClick = {
+                    DropdownMenuItem(text = { Text(stringResource(Res.string.history_recording_settings)) }, onClick = {
                         moreMenu = false
                         recording = true
                     })
@@ -161,7 +177,7 @@ fun HumanLocationHistoryScreen(
                         })
                     }
                     if (snapshot?.conflicts?.isNotEmpty() == true) {
-                        DropdownMenuItem(text = { Text("Review changes") }, onClick = {
+                        DropdownMenuItem(text = { Text(stringResource(Res.string.history_review_changes)) }, onClick = {
                             moreMenu = false
                             reviewingChanges = true
                         })
@@ -223,8 +239,10 @@ fun HumanLocationHistoryScreen(
                 }
                 calendar =
                     false
-            }) { Text("Show day") }
-        }, dismissButton = { TextButton(onClick = { calendar = false }) { Text("Cancel") } }) { DatePicker(picker) }
+            }) { Text(stringResource(Res.string.history_show_day)) }
+        }, dismissButton = {
+            TextButton(onClick = { calendar = false }) { Text(stringResource(Res.string.history_cancel)) }
+        }) { DatePicker(picker) }
     }
     linkingVisit?.let { visitId ->
         val assigned =
@@ -237,11 +255,11 @@ fun HumanLocationHistoryScreen(
         val available = snapshot?.notes.orEmpty().filterNot { it.uid.toString() in assigned }
         AlertDialog(
             onDismissRequest = { linkingVisit = null },
-            title = { Text("Link a memory from this day") },
+            title = { Text(stringResource(Res.string.history_link_memory_title)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text("Choose a memory to keep with this visit. Its original date and location will stay the same.")
-                    if (available.isEmpty()) Text("There are no unlinked memories for this day.")
+                    Text(stringResource(Res.string.history_link_memory_body))
+                    if (available.isEmpty()) Text(stringResource(Res.string.history_link_memory_empty))
                     available.forEach { memory ->
                         TextButton(onClick = {
                             viewModel.linkMemory(visitId, memory.uid.toString())
@@ -250,18 +268,18 @@ fun HumanLocationHistoryScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { linkingVisit = null }) { Text("Cancel") } },
+            confirmButton = { TextButton(onClick = { linkingVisit = null }) { Text(stringResource(Res.string.history_cancel)) } },
         )
     }
     if (recording) {
         AlertDialog(
             onDismissRequest = { recording = false },
-            title = { Text("Remember your day") },
+            title = { Text(stringResource(Res.string.history_recording_title)) },
             text = {
                 Column {
                     Text(access.message)
                     access.openSettings?.let { open ->
-                        TextButton(onClick = open) { Text("App permission settings") }
+                        TextButton(onClick = open) { Text(stringResource(Res.string.history_app_permission_settings)) }
                     }
                 }
             },
@@ -280,7 +298,7 @@ fun HumanLocationHistoryScreen(
                 TextButton(onClick = {
                     viewModel.pauseRecording()
                     recording = false
-                }) { Text("Pause recording") }
+                }) { Text(stringResource(Res.string.history_pause_recording)) }
             },
         )
     }
@@ -314,10 +332,10 @@ fun HumanLocationHistoryScreen(
     if (reviewingChanges) {
         AlertDialog(
             onDismissRequest = { reviewingChanges = false },
-            title = { Text("Choose the change to keep") },
+            title = { Text(stringResource(Res.string.history_conflicts_title)) },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    Text("These details were changed differently on your devices. Both versions have been kept until you choose.")
+                    Text(stringResource(Res.string.history_conflicts_body))
                     snapshot?.conflicts.orEmpty().groupBy { it.targetEvidenceId to it.field }.forEach { (key, edits) ->
                         Text(
                             when (key.second) {
@@ -345,7 +363,7 @@ fun HumanLocationHistoryScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { reviewingChanges = false }) { Text("Done") } },
+            confirmButton = { TextButton(onClick = { reviewingChanges = false }) { Text(stringResource(UiRes.string.common_done)) } },
         )
     }
 }

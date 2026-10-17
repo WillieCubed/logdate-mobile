@@ -11,6 +11,7 @@
     <string name="add_an_image_to_your_entry">Add an image to your entry</string>
     <string name="editor_action_add_audio">Add Audio</string>
     <string name="audio_recording">Audio Recording</string>
+    <string name="audio_waveform">Audio waveform</string>
     <string name="editor_action_add_image">Add Image</string>
     <string name="editor_action_add_photo_gallery">Add photo from gallery</string>
     <string name="editor_action_add_text">Add Text</string>
@@ -27,6 +28,7 @@
     <string name="capture">Capture</string>
     <string name="capture_photo_or_video">Capture photo or video</string>
     <string name="changes_saved">Changes saved</string>
+    <string name="change_microphone">Change microphone</string>
     <string name="choose_a_photo">Choose a photo</string>
     <string name="choose_another_video">Choose another video</string>
     <string name="choose_from_gallery">Choose from gallery</string>
@@ -79,6 +81,7 @@
     <string name="pick_from_your_library_or_browse_all_your_photos">Pick from your library or browse all your photos.</string>
     <string name="play_audio">Play audio</string>
     <string name="play_video">Play video</string>
+    <string name="playback_position">Playback position</string>
     <string name="previous_drafts">Drafts</string>
     <string name="clear_all">Clear all</string>
     <string name="recent_photos">Recent photos</string>
@@ -87,6 +90,7 @@
     <string name="record_audio">Record audio</string>
     <string name="remove_block">Remove Block</string>
     <string name="restart">Restart</string>
+    <string name="restart_recording">Restart recording</string>
     <string name="save_draft">Save Draft</string>
     <string name="save_entry">Save entry</string>
     <string name="saving">Saving...</string>
@@ -104,6 +108,7 @@
     <string name="stop">Stop</string>
     <string name="stop_recording">Stop Recording</string>
     <string name="switch_camera">Switch camera</string>
+    <string name="switch_camera_short">Switch</string>
     <string name="take_a_photo">Take a photo</string>
     <string name="take_photo">Take Photo</string>
     <string name="tap_to_enable_camera">Tap to enable camera</string>

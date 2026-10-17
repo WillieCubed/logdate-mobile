@@ -105,12 +105,18 @@ import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import logdate.client.feature.library.generated.resources.Res
 import logdate.client.feature.library.generated.resources.cd_library_photo_full
+import logdate.client.feature.library.generated.resources.library_audio_recording
+import logdate.client.feature.library.generated.resources.library_stop_presenting
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_go_back
+import logdate.client.ui.generated.resources.common_share
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Stateful media detail screen that loads indexed media by ID and displays its content with metadata.
@@ -263,7 +269,7 @@ fun MediaDetailContent(
                 )
                 Spacer(modifier = Modifier.height(Spacing.md))
                 TextButton(onClick = onBack) {
-                    Text("Go back")
+                    Text(stringResource(UiRes.string.common_go_back))
                 }
             }
         }
@@ -358,17 +364,17 @@ private fun AudioMediaDetailContent(
                 onClick = onBack,
                 modifier = Modifier.align(Alignment.Start).padding(Spacing.md),
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
             }
         }
         Icon(
             painter = PlatformIcons.audioFile(),
-            contentDescription = "Audio recording",
+            contentDescription = stringResource(Res.string.library_audio_recording),
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(80.dp),
         )
         Spacer(Modifier.height(Spacing.lg))
-        Text("Audio recording", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(Res.string.library_audio_recording), style = MaterialTheme.typography.headlineSmall)
         Text(
             text =
                 state.createdAt
@@ -672,7 +678,7 @@ private fun MediaDetailTabletopControls(
             FilledTonalIconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(UiRes.string.common_back),
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
@@ -703,7 +709,7 @@ private fun MediaDetailTabletopControls(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Share,
-                    contentDescription = "Share",
+                    contentDescription = stringResource(UiRes.string.common_share),
                 )
             }
         }
@@ -908,7 +914,7 @@ private fun CompactMediaDetailViewer(
                     Spacer(
                         modifier = Modifier.size(Spacing.sm),
                     )
-                    Text("Stop Presenting")
+                    Text(stringResource(Res.string.library_stop_presenting))
                 }
             }
         }
@@ -920,7 +926,7 @@ private fun CompactMediaDetailViewer(
                     FilledTonalIconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(UiRes.string.common_back),
                         )
                     }
                 },
@@ -953,7 +959,7 @@ private fun CompactMediaDetailViewer(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Share,
-                            contentDescription = "Share",
+                            contentDescription = stringResource(UiRes.string.common_share),
                         )
                     }
                 },

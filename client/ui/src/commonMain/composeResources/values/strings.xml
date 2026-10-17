@@ -5,6 +5,7 @@
     <string name="cd_timeline_video">Video clip on the timeline</string>
 
     <!-- Navigation -->
+    <string name="app_name">LogDate</string>
     <string name="home">Home</string>
     <string name="options">Options</string>
     <string name="profile">Profile</string>
@@ -30,11 +31,14 @@
     <string name="suggestion_label_memory">Memory</string>
     <string name="suggestion_near_location">Near %1$s</string>
     <string name="suggestion_media_item">Memory photo</string>
+    <string name="suggestion_capture_for_event">Capture for this</string>
 
     <!-- Playback controls -->
     <string name="audio_recording">Audio Recording</string>
     <string name="preview_transcript">Preview Transcript</string>
     <string name="hide_transcript">Hide Transcript</string>
+    <string name="stop_playback">Stop playback</string>
+    <string name="media_device_selected">Selected</string>
 
     <!-- Timeline narrative -->
     <string name="a_long_time_passed">A long time passed...</string>
@@ -83,6 +87,8 @@
     <string name="search_type_label_person">Person</string>
     <string name="workspace_search_hint">Search your log</string>
     <string name="workspace_account_label">Account, backup and settings</string>
+    <string name="workspace_section_switch_label">Choose section</string>
+    <string name="workspace_sheet_expand">Expand</string>
     <!-- Provenance -->
     <string name="captured_on_watch">Captured on your watch</string>
 </resources>

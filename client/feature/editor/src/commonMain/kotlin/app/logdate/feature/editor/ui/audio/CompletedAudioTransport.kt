@@ -39,6 +39,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.formatMediaDuration
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.playback_position
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -61,6 +64,7 @@ internal fun CompletedAudioTransport(
     val controlSize = containerSize.height
     val elapsed = formatMediaDuration((durationMs * safeProgress).toLong(), true)
     val total = formatMediaDuration(durationMs, true)
+    val playbackPositionDescription = stringResource(Res.string.playback_position)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(end = trailingActionInset),
@@ -114,7 +118,7 @@ internal fun CompletedAudioTransport(
                         enabled = durationMs > 0,
                         modifier =
                             Modifier.fillMaxSize().testTag("completed_audio_waveform").semantics {
-                                contentDescription = "Playback position"
+                                contentDescription = playbackPositionDescription
                                 stateDescription = "$elapsed / $total"
                             },
                         thumb = {

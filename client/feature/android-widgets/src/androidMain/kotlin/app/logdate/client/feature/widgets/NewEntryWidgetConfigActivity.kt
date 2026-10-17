@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.media.MediaManager
@@ -133,7 +134,7 @@ private fun NewEntrySetup(
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Scaffold(
             modifier = Modifier.widthIn(max = 600.dp).fillMaxHeight().fillMaxWidth(),
-            topBar = { TopAppBar(title = { Text("New Entry shape") }) },
+            topBar = { TopAppBar(title = { Text(stringResource(R.string.widget_config_new_entry_title)) }) },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
@@ -142,7 +143,11 @@ private fun NewEntrySetup(
                         Pair(previewState, shape),
                     )
                 }
-                Text("Shape", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 4.dp))
+                Text(
+                    stringResource(R.string.widget_config_shape),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
                 Spacer(Modifier.height(16.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     val photoUri = previewState.photoUri
@@ -150,9 +155,9 @@ private fun NewEntrySetup(
                     val photoPainter = photoBitmap?.let(::BitmapPainter) ?: painterResource(R.drawable.widget_photo_sample)
                     val systemRadius = systemWidgetCornerRadiusDp(context)
                     for ((option, label) in listOf(
-                        PhotoWidgetShape.SYSTEM to "System",
-                        PhotoWidgetShape.SOFT to "Soft",
-                        PhotoWidgetShape.CIRCLE to "Circle",
+                        PhotoWidgetShape.SYSTEM to stringResource(R.string.widget_config_shape_system),
+                        PhotoWidgetShape.SOFT to stringResource(R.string.widget_config_shape_soft),
+                        PhotoWidgetShape.CIRCLE to stringResource(R.string.widget_config_shape_circle),
                     )) {
                         val previewShape =
                             when (option) {
@@ -186,10 +191,12 @@ private fun NewEntrySetup(
                 }
                 if (!hasAccess) {
                     Spacer(Modifier.height(16.dp))
-                    TextButton(onClick = { launcher.launch(permissions) }) { Text("Allow photos") }
+                    TextButton(onClick = { launcher.launch(permissions) }) { Text(stringResource(R.string.widget_config_allow_photos)) }
                 }
                 Spacer(Modifier.height(20.dp))
-                Button(onClick = { onDone(shape) }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text("Save") }
+                Button(onClick = { onDone(shape) }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                    Text(stringResource(R.string.widget_config_save))
+                }
                 Spacer(Modifier.height(12.dp))
             }
         }

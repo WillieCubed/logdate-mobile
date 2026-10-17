@@ -43,6 +43,16 @@ interface PlatformAccountManager {
         backendUrl: String,
     ): Result<Unit>
 
+    /** Removes only the retained login; implementations serialize this with account replacement. */
+    suspend fun removeAccountIfMatching(
+        username: String,
+        backendUrl: String,
+        refreshToken: String,
+    ): Result<Unit> {
+        val tokens = getTokens(username, backendUrl).getOrElse { return Result.failure(it) }
+        return if (tokens?.refreshToken == refreshToken) removeAccount(username, backendUrl) else Result.success(Unit)
+    }
+
     /**
      * Get all stored LogDate Cloud accounts
      */

@@ -2,6 +2,7 @@
 <resources>
     <!-- Accessibility -->
     <string name="cd_event_linked_photo">Photo linked to this event</string>
+    <string name="cd_event_linked_note_detach">Detach</string>
 
     <!-- Events hub (settings entry that gathers everything event-related) -->
     <string name="events_hub_title">Events</string>
@@ -52,6 +53,8 @@
     <string name="event_detail_choose_place">Choose a place</string>
     <string name="event_detail_saving">Saving…</string>
     <string name="event_detail_save">Save</string>
+    <string name="event_place_picker_no_place">No place</string>
+    <string name="event_attach_capture_title">Attach a capture</string>
 
     <!-- Calendar surface (month grid) -->
     <string name="events_calendar_title">Calendar</string>

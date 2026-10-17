@@ -161,6 +161,7 @@
     <string name="sync_device_rename_label">Rename device</string>
     <string name="sync_device_options_label">Device options</string>
     <string name="sync_device_rename_title">Rename Device</string>
+    <string name="devices_wear_os">Wear OS</string>
 
     <!-- Debug / developer -->
     <string name="app_version_label">App version: %1$s</string>

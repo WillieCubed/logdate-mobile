@@ -82,6 +82,7 @@ import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.add_to_journal
+import logdate.client.feature.journal.generated.resources.cd_edit_entry
 import logdate.client.feature.journal.generated.resources.cd_next_entry
 import logdate.client.feature.journal.generated.resources.cd_previous_entry
 import logdate.client.feature.journal.generated.resources.error
@@ -587,7 +588,7 @@ private fun NoteViewerToolbar(
             IconButton(onClick = onEdit) {
                 Icon(
                     painter = PlatformIcons.edit(),
-                    contentDescription = "Edit entry",
+                    contentDescription = stringResource(Res.string.cd_edit_entry),
                     tint = MaterialTheme.colorScheme.onSurface,
                 )
             }

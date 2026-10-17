@@ -65,8 +65,10 @@ import app.logdate.ui.media.MediaDeviceSelectorSheet
 import app.logdate.ui.media.MediaDeviceSelectorTags
 import app.logdate.ui.platform.PlatformSheet
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.change_microphone
 import logdate.client.feature.editor.generated.resources.finish
 import logdate.client.feature.editor.generated.resources.listening
+import logdate.client.feature.editor.generated.resources.restart_recording
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 
@@ -369,12 +371,13 @@ private fun RecordingDockHeader(
             )
         }
         if (isPaused) {
+            val restartDescription = stringResource(Res.string.restart_recording)
             Surface(
                 onClick = onRestart,
                 modifier =
                     Modifier.size(48.dp).semantics {
                         role = Role.Button
-                        contentDescription = "Restart recording"
+                        contentDescription = restartDescription
                     },
                 shape = RoundedCornerShape(8.dp),
                 color = Color.Transparent,
@@ -417,7 +420,11 @@ private fun RecordingInputControl(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Icon(Icons.Default.ArrowDropDown, contentDescription = "Change microphone", modifier = Modifier.size(18.dp))
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = stringResource(Res.string.change_microphone),
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
     if (pickerOpen) {

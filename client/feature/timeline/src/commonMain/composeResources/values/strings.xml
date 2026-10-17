@@ -6,6 +6,7 @@
     <string name="close">Close</string>
     <string name="convert_to_text">Convert to Text</string>
     <string name="converting_to_text">Converting to text...</string>
+    <string name="decorate">Decorate</string>
     <string name="delete_entry">Delete entry?</string>
     <string name="more">More</string>
     <string name="open_in_new_window">Open in new window</string>

@@ -57,6 +57,17 @@ object SettingsUiContract {
                         }
                         .map { wrapper -> source.take(wrapper.textOffset).count { it == '\n' } + 1 }
                 }
+            val ungroupedCards = calls
+                .filter { name(it) in setOf("Card", "ElevatedCard", "OutlinedCard", "MaterialCard") }
+                .filter { card ->
+                    PsiTreeUtil.findChildrenOfType(card, KtCallExpression::class.java)
+                        .count { row ->
+                            name(row) in rows && generateSequence(row.parent) { it.parent }
+                                .takeWhile { it != card }
+                                .none { it is KtCallExpression && name(it) == "SettingsSection" }
+                        } > 1
+                }
+                .map { card -> source.take(card.textOffset).count { it == '\n' } + 1 }
             val settingsImplementation = file.packageFqName.asString().split('.').contains("settings") ||
                 calls.any { name(it) == "SettingsScaffold" || name(it) == "SettingsSection" }
             val duplicatedRows = if (settingsImplementation) calls.filter { name(it) in setOf("ListItem", "Switch", "RadioButton") } else emptyList()
@@ -68,7 +79,7 @@ object SettingsUiContract {
                         it.getArgumentName()?.asName?.asString() == "style"
                     } }
             }
-            return (grouping + (duplicatedRows + typographyOverrides).map { call ->
+            return (grouping + ungroupedCards + (duplicatedRows + typographyOverrides).map { call ->
                 source.take(call.textOffset).count { it == '\n' } + 1
             }).distinct().sorted()
         } finally {

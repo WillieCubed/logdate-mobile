@@ -34,6 +34,24 @@
     <string name="widget_config_content_text">Text notes</string>
     <string name="widget_config_content_photos">Photos</string>
     <string name="widget_config_content_audio">Audio notes</string>
+    <string name="widget_config_find_memories">Find memories</string>
+    <string name="widget_config_find_on_this_day">On this day</string>
+    <string name="widget_config_find_archive">Archive</string>
+    <string name="widget_config_show">Show</string>
+    <string name="widget_config_show_text">Text</string>
+    <string name="widget_config_show_audio">Audio</string>
+    <string name="widget_config_fixed_memory_title">Pinned memory</string>
+    <string name="widget_config_fixed_memory_empty">Add an entry to pin it here.</string>
+    <string name="widget_config_fixed_memory_search">Search entries</string>
+    <string name="widget_config_fixed_memory_no_matches">No matching entries</string>
+    <string name="widget_config_add_widget">Add widget</string>
+    <string name="widget_config_new_entry_title">New Entry shape</string>
+    <string name="widget_config_shape">Shape</string>
+    <string name="widget_config_shape_system">System</string>
+    <string name="widget_config_shape_soft">Soft</string>
+    <string name="widget_config_shape_circle">Circle</string>
+    <string name="widget_config_allow_photos">Allow photos</string>
+    <string name="widget_config_save">Save</string>
 
     <!-- Dynamic launcher shortcuts -->
     <string name="dynamic_shortcut_continue_draft_short">Continue draft</string>

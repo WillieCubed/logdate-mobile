@@ -27,7 +27,19 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.feature.postcards.model.PostcardDocument
 import app.logdate.ui.platform.PlatformSheet
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.postcards_export_and_share
+import logdate.client.feature.postcards.generated.resources.postcards_export_print
+import logdate.client.feature.postcards.generated.resources.postcards_export_ready
+import logdate.client.feature.postcards.generated.resources.postcards_export_rendering
+import logdate.client.feature.postcards.generated.resources.postcards_export_save_to_files
+import logdate.client.feature.postcards.generated.resources.postcards_export_title
+import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_share
+import logdate.client.ui.generated.resources.common_try_again
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Export UI that adapts by screen size:
@@ -58,7 +70,7 @@ fun ExportSheet(
     if (isExpanded) {
         AlertDialog(
             onDismissRequest = onDismissRequest,
-            title = { Text("Export Postcard") },
+            title = { Text(stringResource(Res.string.postcards_export_title)) },
             text = {
                 ExportContent(
                     viewModel = viewModel,
@@ -72,7 +84,7 @@ fun ExportSheet(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = onDismissRequest) {
-                    Text("Cancel")
+                    Text(stringResource(UiRes.string.common_cancel))
                 }
             },
         )
@@ -89,7 +101,7 @@ fun ExportSheet(
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("Export Postcard", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(Res.string.postcards_export_title), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(16.dp))
                 ExportContent(
                     viewModel = viewModel,
@@ -140,24 +152,24 @@ private fun ExportContent(
                 onClick = { viewModel.render(document, stickerUriMap) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Export & Share")
+                Text(stringResource(Res.string.postcards_export_and_share))
             }
         }
 
         is ExportUiState.Rendering -> {
             CircularProgressIndicator()
             Spacer(Modifier.height(8.dp))
-            Text("Rendering...", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(Res.string.postcards_export_rendering), style = MaterialTheme.typography.bodyMedium)
         }
 
         is ExportUiState.Complete -> {
-            Text("Ready to share", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(Res.string.postcards_export_ready), style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = { onShareResult(current.result.uri) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Share")
+                Text(stringResource(UiRes.string.common_share))
             }
             if (onSaveToFiles != null) {
                 Spacer(Modifier.height(8.dp))
@@ -165,7 +177,7 @@ private fun ExportContent(
                     onClick = { onSaveToFiles(current.result.uri) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Save to Files")
+                    Text(stringResource(Res.string.postcards_export_save_to_files))
                 }
             }
             if (onPrint != null) {
@@ -174,7 +186,7 @@ private fun ExportContent(
                     onClick = { onPrint(current.result.uri) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Print")
+                    Text(stringResource(Res.string.postcards_export_print))
                 }
             }
         }
@@ -190,7 +202,7 @@ private fun ExportContent(
                 onClick = { viewModel.startExport() },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Try again")
+                Text(stringResource(UiRes.string.common_try_again))
             }
         }
     }

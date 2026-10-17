@@ -7,6 +7,8 @@ import android.os.Bundle
 import app.logdate.shared.model.LogDateAccount
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -14,8 +16,10 @@ import kotlinx.coroutines.withContext
  */
 class AndroidAccountManager(
     context: Context,
-) : PlatformAccountManager {
+    private val accountManager: AccountManager = AccountManager.get(context),
+) : GuardedPlatformAccountManager {
     companion object {
+        private val mutationMutex = Mutex()
         const val TOKEN_TYPE_ACCESS = "access_token"
         const val TOKEN_TYPE_REFRESH = "refresh_token"
 
@@ -36,15 +40,22 @@ class AndroidAccountManager(
      */
     private val accountType = "${context.packageName}.account"
 
-    private val accountManager = AccountManager.get(context)
-
     override suspend fun addAccount(
         account: LogDateAccount,
         accessToken: String,
         refreshToken: String,
         backendUrl: String,
+    ): Result<Unit> = addAccountIfCurrent(account, accessToken, refreshToken, backendUrl) { true }
+
+    override suspend fun addAccountIfCurrent(
+        account: LogDateAccount,
+        accessToken: String,
+        refreshToken: String,
+        backendUrl: String,
+        isCurrent: suspend () -> Boolean,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        serialized {
+            if (!isCurrent()) return@serialized Result.failure(PlatformAccountException("Authentication changed"))
             try {
                 val backendAwareAccount = Account(accountKey(account.username, backendUrl), accountType)
 
@@ -90,11 +101,11 @@ class AndroidAccountManager(
         account: LogDateAccount,
         backendUrl: String,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        serialized {
             try {
                 val systemAccount =
                     findSystemAccount(account.username, backendUrl)
-                        ?: return@withContext Result.failure(Exception("Account not found"))
+                        ?: return@serialized Result.failure(Exception("Account not found"))
 
                 // Update user data
                 accountManager.setUserData(systemAccount, KEY_DISPLAY_NAME, account.displayName)
@@ -115,12 +126,21 @@ class AndroidAccountManager(
         backendUrl: String,
         accessToken: String,
         refreshToken: String,
+    ): Result<Unit> = updateTokensIfCurrent(username, backendUrl, accessToken, refreshToken) { true }
+
+    override suspend fun updateTokensIfCurrent(
+        username: String,
+        backendUrl: String,
+        accessToken: String,
+        refreshToken: String,
+        isCurrent: suspend () -> Boolean,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        serialized {
+            if (!isCurrent()) return@serialized Result.failure(PlatformAccountException("Authentication changed"))
             try {
                 val systemAccount =
                     findSystemAccount(username, backendUrl)
-                        ?: return@withContext Result.failure(Exception("Account not found"))
+                        ?: return@serialized Result.failure(Exception("Account not found"))
 
                 // Update tokens
                 accountManager.setAuthToken(systemAccount, TOKEN_TYPE_ACCESS, accessToken)
@@ -138,11 +158,11 @@ class AndroidAccountManager(
         username: String,
         backendUrl: String,
     ): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        serialized {
             try {
                 val systemAccount =
                     findSystemAccount(username, backendUrl)
-                        ?: return@withContext Result.failure(Exception("Account not found"))
+                        ?: return@serialized Result.failure(Exception("Account not found"))
 
                 // Remove account from system
                 @Suppress("DEPRECATION")
@@ -163,8 +183,50 @@ class AndroidAccountManager(
             }
         }
 
+    override suspend fun removeAccountIfMatching(
+        username: String,
+        backendUrl: String,
+        refreshToken: String,
+    ): Result<Unit> =
+        serialized {
+            try {
+                val account = findSystemAccount(username, backendUrl) ?: return@serialized Result.success(Unit)
+                if (accountManager.peekAuthToken(account, TOKEN_TYPE_REFRESH) != refreshToken) return@serialized Result.success(Unit)
+                if (accountManager.removeAccountExplicitly(account)) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(PlatformAccountException("Account removal will retry"))
+                }
+            } catch (error: Exception) {
+                Napier.w("Could not remove the retained Android account", error)
+                Result.failure(error)
+            }
+        }
+
+    override suspend fun removeAccountIfSignedOut(
+        username: String,
+        backendUrl: String,
+        isSignedOut: suspend () -> Boolean,
+    ): Result<Unit> =
+        serialized {
+            if (!isSignedOut()) return@serialized Result.success(Unit)
+            try {
+                val account = findSystemAccount(username, backendUrl) ?: return@serialized Result.success(Unit)
+                if (accountManager.removeAccountExplicitly(account)) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(PlatformAccountException("Account removal will retry"))
+                }
+            } catch (error: Exception) {
+                Napier.w("Could not remove the signed-out Android account", error)
+                Result.failure(error)
+            }
+        }
+
+    private suspend fun <T> serialized(block: suspend () -> T): T = withContext(Dispatchers.IO) { mutationMutex.withLock { block() } }
+
     override suspend fun getStoredAccounts(): Result<List<PlatformAccountInfo>> =
-        withContext(Dispatchers.IO) {
+        serialized {
             try {
                 val accounts = accountManager.getAccountsByType(accountType)
 
@@ -190,11 +252,11 @@ class AndroidAccountManager(
         username: String,
         backendUrl: String,
     ): Result<TokenPair?> =
-        withContext(Dispatchers.IO) {
+        serialized {
             try {
                 val systemAccount =
                     findSystemAccount(username, backendUrl)
-                        ?: return@withContext Result.success(null)
+                        ?: return@serialized Result.success(null)
 
                 val accessToken = accountManager.peekAuthToken(systemAccount, TOKEN_TYPE_ACCESS)
                 val refreshToken = accountManager.peekAuthToken(systemAccount, TOKEN_TYPE_REFRESH)
@@ -211,7 +273,7 @@ class AndroidAccountManager(
         }
 
     override suspend fun clearAllTokens(): Result<Unit> =
-        withContext(Dispatchers.IO) {
+        serialized {
             try {
                 val accounts = accountManager.getAccountsByType(accountType)
 

@@ -12,6 +12,7 @@ import android.os.IBinder
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.location.R
 import app.logdate.client.location.history.LocationTracker
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.permissions.PermissionManager
@@ -208,7 +209,7 @@ class DetailedLocationTrackingService :
 
         return NotificationCompat
             .Builder(this, CHANNEL_ID)
-            .setContentTitle("Location history is on")
+            .setContentTitle(getString(R.string.location_history_notification_title))
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pendingIntent)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)

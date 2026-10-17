@@ -17,6 +17,59 @@ class TransferredSignOutPolicyTest {
     private val session = UserSession("access", "refresh", "owner")
 
     @Test
+    fun `connected vault guards reject identical token login without native policy`() =
+        runTest {
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = origin)
+            val source = SecureSessionStorage(FakeSecureStorage(), config, backgroundScope)
+            source.saveExplicitSession(session)
+            val pinned = source.openSessionStorage(origin, backgroundScope)
+            val guard = assertNotNull(pinned.captureAuthenticationGuard())
+            source.saveExplicitSession(session)
+            assertFalse(pinned.isAuthenticationGuardCurrent(guard))
+            assertFalse(pinned.clearSessionIfUnchanged(guard))
+            assertEquals(session, source.read(origin))
+        }
+
+    @Test
+    fun `stale signed out and signed in publications cannot change a later identity`() =
+        runTest {
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = origin)
+            val source = SecureSessionStorage(FakeSecureStorage(), config, backgroundScope)
+            source.saveExplicitSession(session)
+            val binding = assertNotNull(source.getOriginBoundSession())
+            var published = false
+            assertFalse(source.runIfSessionCurrent(null) { published = true })
+            assertFalse(published)
+            assertTrue(source.runIfSessionCurrent(binding) { published = true })
+            source.clearSession()
+            published = false
+            assertFalse(source.runIfSessionCurrent(binding) { published = true })
+            assertFalse(published)
+            assertTrue(source.runIfSessionCurrent(null) { published = true })
+            assertTrue(published)
+        }
+
+    @Test
+    fun `guarded sign out preserves a newer login and can commit an unchanged empty session`() =
+        runTest {
+            val settings = mutableMapOf<String, String>()
+            val policy = NativeRestorePolicy({ settings[it] }, { key, value -> settings[key] = value })
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = origin)
+            val source = SecureSessionStorage(FakeSecureStorage(), config, backgroundScope, nativeRestorePolicy = policy)
+            val empty = assertNotNull(source.captureAuthenticationGuard())
+            assertTrue(source.clearSessionIfUnchanged(empty))
+            assertFalse(policy.canRestore(origin))
+            source.saveExplicitSession(session)
+            val old = assertNotNull(source.captureAuthenticationGuard())
+            val newer = session.copy(refreshToken = "newer-refresh")
+            source.saveExplicitSession(newer)
+            assertFalse(source.clearSessionIfUnchanged(old))
+            assertEquals(newer, source.getSession())
+            assertTrue(source.clearSessionIfUnchanged(assertNotNull(source.captureAuthenticationGuard())))
+            assertNull(source.getSession())
+        }
+
+    @Test
     fun `rejected pinned login cannot hide a newer connected login`() =
         runTest {
             val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://other.example")

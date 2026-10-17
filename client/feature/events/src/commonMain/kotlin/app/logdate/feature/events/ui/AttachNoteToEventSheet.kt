@@ -26,7 +26,12 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
+import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.event_attach_capture_title
+import logdate.client.ui.generated.resources.common_done
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Adaptive sheet/dialog for picking a note to attach to an event.
@@ -55,7 +60,7 @@ internal fun AttachNoteToEventSheet(
     if (isExpanded) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Attach a capture") },
+            title = { Text(stringResource(Res.string.event_attach_capture_title)) },
             text = {
                 AttachNoteList(
                     attachableNotes = attachableNotes,
@@ -63,7 +68,7 @@ internal fun AttachNoteToEventSheet(
                 )
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) { Text("Done") }
+                TextButton(onClick = onDismiss) { Text(stringResource(UiRes.string.common_done)) }
             },
         )
     } else {
@@ -74,7 +79,7 @@ internal fun AttachNoteToEventSheet(
         ) {
             Column(modifier = Modifier.padding(bottom = Spacing.lg)) {
                 Text(
-                    text = "Attach a capture",
+                    text = stringResource(Res.string.event_attach_capture_title),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
                 )

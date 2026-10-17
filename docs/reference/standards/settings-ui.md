@@ -62,7 +62,9 @@ SimpleSettingsItem(title = title, description = description, action = {})
 The contract rejects raw `ListItem`, `Switch` and `RadioButton` calls in settings
 packages and sources using settings scaffolds or sections, including aliased
 imports. It also rejects local supporting text styles in `SettingsRow`. Its grouping rules
-also recognize `SettingsRow`. Extend its tests when introducing a new component
+also recognize `SettingsRow`. Cards that group multiple shared rows must use a
+`SettingsSection`; summary cards without a preference group remain valid. Extend
+its tests when introducing a new component
 rather than bypassing the shared base.
 
 ## Emit rows directly
@@ -91,7 +93,27 @@ SettingsSection(title = stringResource(Res.string.data_management)) {
 ```
 
 Remove the wrapper to repair grouping. Do not compensate with dividers, nested
-containers, per-row backgrounds or a new section API. A form with segmented choices, explanatory text or controls may still need its
+containers, per-row backgrounds or a new section API. `ServerSelectionCard` uses
+`SettingsSection` with direct `SettingsChoiceItem` children, including when embedded
+in account setup. Keep this composition when reusing preferences outside Settings;
+a local card around shared rows can introduce conflicting surfaces and lose their gaps.
+
+```kotlin
+SettingsSection(title = stringResource(Res.string.server)) {
+    SettingsChoiceItem(
+        title = cloudTitle,
+        selected = preset == ServerPreset.PRODUCTION,
+        onClick = { selectPreset(ServerPreset.PRODUCTION) },
+    )
+    SettingsChoiceItem(
+        title = customTitle,
+        selected = preset == ServerPreset.CUSTOM,
+        onClick = { selectPreset(ServerPreset.CUSTOM) },
+    )
+}
+```
+
+A form with segmented choices, explanatory text or controls may still need its
 own layout inside a section. Radio preferences use `SettingsChoiceItem`.
 
 `checkSettingsUiContract` parses Kotlin and rejects layout wrappers around multiple
