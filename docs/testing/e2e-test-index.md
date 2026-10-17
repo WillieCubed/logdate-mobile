@@ -282,7 +282,8 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 Two of its jobs cover the suites on this page:
 
 - **`test` — Unit tests and coverage**: `./gradlew test allTests`, with Postgres and Redis service
-  containers. This is what exercises the `:server:test` e2e classes above.
+  containers. This is what exercises the `:server:test` e2e classes above. It leaves out the iOS
+  and Wasm test targets, which the `multiplatform-tests` job runs on a runner of its own.
 - **`e2e-tests` — Server / client e2e**: `./gradlew :integration:server-client-e2e:test`, with a
   Postgres service container.
 
