@@ -202,6 +202,7 @@ actual val dataModule: Module =
                 mediaReferences = get(),
                 rescuer = getOrNull<MediaRescuer>() ?: MediaRescuer.None,
                 transcriptions = getOrNull<TranscriptionRepository>(),
+                transactions = get(),
             )
         }
         single { StoredMediaReferenceMigrationLauncher { get() } }
