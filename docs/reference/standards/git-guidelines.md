@@ -162,51 +162,75 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ---
 
-## Branch Workflow
+## Branch and Pull Request Workflow
 
-### Feature Branch Strategy
+Every change reaches `main` through a pull request merged with **Rebase and merge**. This is the
+same flow every Hypertext Studio repository uses. History on `main` stays linear: there are no merge
+commits and nobody pushes directly to `main`.
 
 ```
-main (protected)
-  └── feature/TICKET-123-add-workspace-sharing
+main
+  └── sync-retry-backoff        (short-lived branch, one change)
         ├── commit 1: types
         ├── commit 2: implementation
         ├── commit 3: tests
         └── commit 4: docs
+              → pull request → Rebase and merge → each commit lands on main as-is
 ```
 
-**Branch naming conventions:**
-- `feature/TICKET-description` — New functionality
-- `fix/TICKET-description` — Bug fixes
-- `refactor/description` — Code restructuring
-- `chore/description` — Maintenance tasks
+### Branches
 
-### Keeping Branches Updated
+- **One short-lived branch per change.** Name it after the change in lowercase kebab-case, such as
+  `sync-retry-backoff`. Agent sessions keep the branch their worktree was created on.
+- **No long-lived feature branches.** Unfinished features hide behind feature flags, not branches.
+- **Every commit must be shippable.** A rebase merge replays each commit onto `main` individually,
+  so each one has to build and leave `main` working, not just the last one on the branch.
 
-**Prefer rebase for feature branches** (cleaner history):
+### Keeping a Branch Current
+
+Rebase onto `origin/main`. Never merge `main` into the branch, because that creates a merge commit.
 
 ```bash
-# Update feature branch with latest main
 git fetch origin
 git rebase origin/main
-
-# If conflicts, resolve then continue
-git add resolved-file.kt
-git rebase --continue
 ```
 
-**Use merge only when:**
-- Branch has been shared/pushed and others are working on it
-- You need to preserve the exact commit history for audit purposes
+When a rebase stops on a conflict, resolve the files, then restage **every** path the picked commit
+changes before continuing. The [atomic staging chain](#atomic-workflow-pattern) clears the index
+first, which would otherwise drop the commit's non-conflicting changes, so record the paths before
+clearing:
 
-### Before Creating a PR
+```bash
+paths=$(mktemp)
+git diff -z --name-only HEAD > "$paths"
+git restore --staged . && xargs -0 git add -- < "$paths" && GIT_EDITOR=true git rebase --continue
+```
 
-1. **Rebase on latest main**: `git rebase origin/main`
+If someone else is working on the same branch, agree on the rebase with them before rewriting it.
+
+### Opening a Pull Request
+
+1. **Rebase on latest main**: `git fetch origin && git rebase origin/main`
 2. **Verify all commits are logical**: `git log --oneline origin/main..HEAD`
-3. **Squash fixup commits**: `git rebase -i origin/main` — combine "fix typo" or "WIP" commits into their parent
-4. **Review commit messages**: Ensure each follows **[Commit Message Standards](./commit-messages.md)** (clear title, body explains why)
-5. **Run full validation**: `./gradlew test lint`
-6. **Push with lease**: `git push --force-with-lease` (safer than `--force`)
+3. **Fold fixup commits into their parent**: commit the fix with `git commit --fixup <sha>`, then
+   run `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`
+4. **Review commit messages**: each follows **[Commit Message Standards](./commit-messages.md)**
+   (clear title, body explains why)
+5. **Run the checks for what you changed**: the pre-push hook compiles the app and runs the tests
+   for affected modules; run any extra suites the change needs before pushing
+6. **Push the branch**: `git push -u origin HEAD`. After rewriting a branch that is already pushed,
+   use `git push --force-with-lease` (safer than `--force`)
+7. **Open the pull request against `main`**: write the description to a file and pass it with
+   `gh pr create --base main --body-file <file>`. Follow the repository's pull request template,
+   or use `## TL;DR`, `## Changes`, and `## Follow-ups and Next Work` when there is none
+
+Agents ask the developer before pushing a branch or opening a pull request.
+
+### Merging
+
+Merge with **Rebase and merge** (`gh pr merge --rebase`) once CI passes. Do not squash: squashing
+collapses the changelog-style commits into one and loses the history the commit standards exist to
+keep. Merge commits are disabled for this repository, and GitHub deletes the branch after the merge.
 
 ---
 
@@ -231,6 +255,8 @@ git rebase --continue
 | `git add -A` / `git add .` / `git add *` | Stages everything indiscriminately |
 | `git reset --hard` | Permanently destroys uncommitted work |
 | `git push --force` | Destroys commit history on remote |
+| Pushing directly to `main` | Skips the pull request, its CI, and its review |
+| Merge commits (`git merge`, **Create a merge commit**) | Breaks the linear history on `main` |
 | `git commit -a` | Commits without proper review |
 | `git commit --no-verify` | Bypasses critical quality enforcement |
 | Dropping failing files after hooks fail | Hides problems instead of fixing them |

@@ -4,9 +4,12 @@
 
 ## Development Workflow
 
-All changes land directly on `main`. There are no long-lived feature branches. This demands extreme
-commit discipline — every commit must leave `main` in a shippable state. Incomplete features are
-gated behind feature flags, not hidden in branches.
+Every change lands on `main` through a pull request merged with **Rebase and merge**, the same way
+every Hypertext Studio repository lands work. Work happens on a short-lived branch; there are no
+long-lived feature branches, no merge commits, and no direct pushes to `main`. A rebase merge puts
+each commit on `main` as-is, which demands extreme commit discipline — every commit must leave
+`main` in a shippable state. Incomplete features are gated behind feature flags, not hidden in
+branches.
 
 Every change follows this process. No exceptions.
 
@@ -92,6 +95,17 @@ unacceptable regardless of how correct the code is.
 
 For staging safety and commit mechanics, see [
 `docs/reference/standards/git-guidelines.md`](./docs/reference/standards/git-guidelines.md).
+
+### 8. Land Through a Pull Request
+
+Rebase the branch onto `origin/main` (never merge `main` into it), push it, and open a pull request
+against `main`. Write the description from the repository's pull request template, or use
+`## TL;DR`, `## Changes`, and `## Follow-ups and Next Work` when there is none. Once CI passes,
+merge with **Rebase and merge** so history stays linear. Agents ask the developer before pushing a
+branch or opening a pull request.
+
+The full flow, including conflict handling under the hooks, is in
+[Branch and Pull Request Workflow](./docs/reference/standards/git-guidelines.md#branch-and-pull-request-workflow).
 
 ## Non-Negotiable Principles
 
