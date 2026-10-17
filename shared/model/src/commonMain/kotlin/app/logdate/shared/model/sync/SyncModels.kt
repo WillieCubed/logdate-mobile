@@ -78,6 +78,11 @@ data class ContentUploadRequest(
      * The server stores and returns it without reading it; an update that omits it leaves it as it is.
      */
     val capturedOn: String? = null,
+    /**
+     * What the person was doing at capture, encrypted by the apps, or null when it was not recorded.
+     * The server stores and returns it without reading it; an update that omits it leaves it as it is.
+     */
+    val capturedDuring: String? = null,
 )
 
 @Serializable
@@ -120,6 +125,11 @@ data class ContentUpdateRequest(
      * The server stores and returns it without reading it; an update that omits it leaves it as it is.
      */
     val capturedOn: String? = null,
+    /**
+     * What the person was doing at capture, encrypted by the apps, or null when it was not recorded.
+     * The server stores and returns it without reading it; an update that omits it leaves it as it is.
+     */
+    val capturedDuring: String? = null,
 )
 
 @Serializable
@@ -160,6 +170,11 @@ data class ContentChange(
      * The server stores and returns it without reading it; an update that omits it leaves it as it is.
      */
     val capturedOn: String? = null,
+    /**
+     * What the person was doing at capture, encrypted by the apps, or null when it was not recorded.
+     * The server stores and returns it without reading it; an update that omits it leaves it as it is.
+     */
+    val capturedDuring: String? = null,
 )
 
 @Serializable

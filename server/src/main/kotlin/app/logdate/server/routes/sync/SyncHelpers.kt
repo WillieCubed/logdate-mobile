@@ -413,6 +413,7 @@ internal fun LogDateEntry.toContentChange(): ContentChange =
         location = location,
         transcript = transcript,
         capturedOn = capturedOn,
+        capturedDuring = capturedDuring,
     )
 
 internal fun LogDateJournal.toJournalChange(): JournalChange =

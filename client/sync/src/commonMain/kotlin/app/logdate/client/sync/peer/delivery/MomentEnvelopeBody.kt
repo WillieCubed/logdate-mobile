@@ -1,5 +1,6 @@
 package app.logdate.client.sync.peer.delivery
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -39,6 +40,7 @@ object MomentEnvelopeBody {
                         resolvedNoteIds = moment.resolvedNoteIds.map { it.toString() }.sorted(),
                         originDeviceId = moment.originDeviceId,
                         lastUpdated = moment.lastUpdated.toString(),
+                        capturedDuring = moment.capturedDuring?.wireName,
                     ),
                 ),
         )
@@ -62,6 +64,7 @@ object MomentEnvelopeBody {
                 originDeviceId = body.originDeviceId,
                 lastUpdated = Instant.parse(body.lastUpdated),
                 syncVersion = envelope.syncVersion,
+                capturedDuring = CaptureActivity.fromWireName(body.capturedDuring),
             )
         require(moment.id.toString() == envelope.id && moment.lastUpdated.toEpochMilliseconds() == envelope.contentVersion)
         return moment
@@ -82,5 +85,6 @@ object MomentEnvelopeBody {
         val resolvedNoteIds: List<String>,
         val originDeviceId: String,
         val lastUpdated: String,
+        val capturedDuring: String? = null,
     )
 }

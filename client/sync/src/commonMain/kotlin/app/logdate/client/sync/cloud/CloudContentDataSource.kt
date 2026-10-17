@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteLocation
@@ -195,6 +196,7 @@ class DefaultCloudContentDataSource(
             location = encryptNoteLocation(uid, location),
             transcript = (this as? JournalNote.Audio)?.transcript?.let { encryptNoteTranscript(uid, it) },
             capturedOn = capturedOn?.let { encryptNoteCapturedOn(uid, it) },
+            capturedDuring = capturedDuring?.let { encryptNoteCapturedDuring(uid, it) },
         )
 
     private suspend fun JournalNote.toUpdateRequest(): ContentUpdateRequest =
@@ -235,6 +237,7 @@ class DefaultCloudContentDataSource(
             location = encryptNoteLocation(uid, location),
             transcript = (this as? JournalNote.Audio)?.transcript?.let { encryptNoteTranscript(uid, it) },
             capturedOn = capturedOn?.let { encryptNoteCapturedOn(uid, it) },
+            capturedDuring = capturedDuring?.let { encryptNoteCapturedDuring(uid, it) },
         )
 
     private suspend fun ContentChangesResponse.toContentSyncResult(): ContentSyncResult {
@@ -266,6 +269,7 @@ class DefaultCloudContentDataSource(
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
+                    capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
             "IMAGE" ->
                 JournalNote.Image(
@@ -278,6 +282,7 @@ class DefaultCloudContentDataSource(
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
+                    capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
             "VIDEO" ->
                 JournalNote.Video(
@@ -289,6 +294,7 @@ class DefaultCloudContentDataSource(
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
+                    capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
             "AUDIO" ->
                 JournalNote.Audio(
@@ -302,6 +308,7 @@ class DefaultCloudContentDataSource(
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                     capturedOn = decryptNoteCapturedOn(uid, capturedOn),
+                    capturedDuring = decryptNoteCapturedDuring(uid, capturedDuring),
                 )
             else -> throw UnsupportedRemoteFormatException()
         }
@@ -403,4 +410,25 @@ class DefaultCloudContentDataSource(
     }
 
     private fun noteCapturedOnFieldId(noteId: Uuid): String = "sync:note:$noteId:capturedOn"
+
+    private suspend fun encryptNoteCapturedDuring(
+        noteId: Uuid,
+        activity: CaptureActivity,
+    ): String = syncPayloadCipher?.encryptString(noteCapturedDuringFieldId(noteId), activity.wireName) ?: activity.wireName
+
+    /**
+     * Reads what the person was doing at capture. An activity a newer app version names reads as
+     * unknown, so the entry still downloads; a payload that does not decrypt fails the entry like any
+     * other encrypted field.
+     */
+    private suspend fun decryptNoteCapturedDuring(
+        noteId: Uuid,
+        payload: String?,
+    ): CaptureActivity? {
+        if (payload.isNullOrBlank()) return null
+        val plaintext = syncPayloadCipher?.decryptString(noteCapturedDuringFieldId(noteId), payload) ?: payload
+        return CaptureActivity.fromWireName(plaintext)
+    }
+
+    private fun noteCapturedDuringFieldId(noteId: Uuid): String = "sync:note:$noteId:capturedDuring"
 }
