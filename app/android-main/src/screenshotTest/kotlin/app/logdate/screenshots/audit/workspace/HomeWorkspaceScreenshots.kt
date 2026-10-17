@@ -43,24 +43,15 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import app.logdate.client.text.toUiText
 import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalSortOption
 import app.logdate.feature.journals.ui.JournalsOverviewScreenContent
-import app.logdate.feature.journals.ui.detail.EntryDisplayData
-import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
-import app.logdate.feature.journals.ui.detail.JournalDetailUiState
-import app.logdate.feature.journals.ui.detail.NoteViewerScaffoldContent
-import app.logdate.feature.journals.ui.detail.NoteViewerShared
-import app.logdate.feature.journals.ui.detail.TextNoteViewerContent
 import app.logdate.feature.library.ui.LibraryScreenContent
-import app.logdate.feature.library.ui.detail.MediaDetailContent
 import app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryActions
 import app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryContent
 import app.logdate.feature.rewind.ui.RewindScreenContent
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
-import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.screenshots.components.home_timeline.HistoryMapFixture
@@ -69,7 +60,6 @@ import app.logdate.screenshots.components.library.LibraryScreenshotData
 import app.logdate.screenshots.flows.flow02_home_timeline.mostRecentRewind
 import app.logdate.screenshots.flows.flow02_home_timeline.pastRewinds
 import app.logdate.screenshots.flows.flow02_home_timeline.timelineDays
-import app.logdate.screenshots.flows.flow02_home_timeline.timelineDetailState
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineUiState
@@ -82,7 +72,6 @@ import coil3.asImage
 import coil3.compose.AsyncImagePreviewHandler
 import coil3.compose.LocalAsyncImagePreviewHandler
 import com.android.tools.screenshot.PreviewTest
-import kotlin.uuid.Uuid
 
 @Preview(name = "Phone", device = ScreenshotTestData.PHONE, showBackground = true)
 @Preview(name = "Compact", device = ScreenshotTestData.COMPACT_PHONE, showBackground = true)
@@ -111,12 +100,12 @@ internal val workspaceDestinations =
     )
 
 @Composable
-private fun PlacesOptionsFixture() {
+internal fun PlacesOptionsFixture() {
     IconButton(onClick = {}) { Icon(PlatformIcons.more(), "More place options", Modifier.size(20.dp)) }
 }
 
 @Composable
-private fun WorkspaceScene(
+internal fun WorkspaceScene(
     key: String,
     detail: (@Composable () -> Unit)? = null,
     inDesktopWindow: Boolean = false,
@@ -180,9 +169,9 @@ private fun WorkspaceSceneContent(
     }
 }
 
-@Composable private fun TimelineFixture() = TimelinePane(TimelineUiState(timelineDays), {}, {})
+@Composable internal fun TimelineFixture() = TimelinePane(TimelineUiState(timelineDays), {}, {})
 
-@Composable private fun JournalsFixture() =
+@Composable internal fun JournalsFixture() =
     JournalsOverviewScreenContent(
         journals = ScreenshotTestData.sampleJournals.map(JournalListItemUiState::ExistingJournal),
         layoutMode = JournalLayoutMode.GRID,
@@ -200,7 +189,7 @@ private fun WorkspaceSceneContent(
         onToggleFilter = {},
     )
 
-@Composable private fun LibraryFixture() =
+@Composable internal fun LibraryFixture() =
     BoxWithConstraints {
         LibraryScreenContent(
             LibraryScreenshotData.gridContent,
@@ -247,199 +236,6 @@ fun WorkspaceLibrary() = WorkspaceScene("library") { LibraryFixture() }
 
 @PreviewTest @WorkspacePreviewMatrix @Composable
 fun WorkspaceRewind() = WorkspaceScene("rewind") { RewindFixture() }
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceDayDetail() =
-    WorkspaceScene(
-        "timeline",
-        detail = { TimelineDayDetailPanel(timelineDetailState, {}) },
-    ) { TimelineFixture() }
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceVisitDetail() =
-    WorkspaceScene("locations") {
-        HumanLocationHistoryContent(
-            historyDay.copy(detailVisible = true),
-            HumanLocationHistoryActions(),
-            showTitle = false,
-            toolbarActions = { PlacesOptionsFixture() },
-            mapContent = { HistoryMapFixture(it) },
-        )
-    }
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceJournalDetail() =
-    WorkspaceScene("journals", detail = {
-        JournalDetailScreenContent(
-            uiState =
-                JournalDetailUiState.Success(
-                    ScreenshotTestData.sampleJournal.id,
-                    "Everyday moments",
-                    listOf(
-                        EntryDisplayData.TextEntry(
-                            Uuid.parse("00000000-0000-0000-0000-000000000031"),
-                            ScreenshotTestData.baseInstant,
-                            "A quiet table, a good book, and nowhere to rush.",
-                        ),
-                    ),
-                ),
-            onGoBack = {},
-            onOpenEditor = {},
-            onNavigateToShare = {},
-            onNavigateToSettings = {},
-            onNavigateToNoteDetail = {},
-            onToggleSortOrder = {},
-            onRequestDelete = {},
-        )
-    }) { JournalsFixture() }
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceMediaDetail() =
-    WorkspaceScene("library", detail = {
-        MediaDetailContent(LibraryScreenshotData.imageDetail, isExpanded = true, onBack = {})
-    }) { LibraryFixture() }
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceNoteDetail() =
-    WorkspaceScene("timeline", detail = {
-        val shared =
-            NoteViewerShared(
-                Uuid.parse("00000000-0000-0000-0000-000000000031"),
-                ScreenshotTestData.baseInstant,
-                ScreenshotTestData.baseInstant,
-                null,
-            )
-        NoteViewerScaffoldContent(shared, {}) { TextNoteViewerContent("A quiet table, a good book, and nowhere to rush.", shared) }
-    }) { TimelineFixture() }
-
-@PreviewTest
-@Preview(name = "Book", device = ScreenshotTestData.TABLET, showBackground = true)
-@Composable
-fun WorkspaceBook() {
-    app.logdate.ui.foldable.provideFoldableLayoutInfo(workspaceFold(true)) {
-        WorkspaceScene("timeline", detail = { TimelineDayDetailPanel(timelineDetailState, {}) }) { TimelineFixture() }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Tabletop", device = ScreenshotTestData.TABLET_PORTRAIT, showBackground = true)
-@Composable
-fun WorkspaceTabletop() {
-    app.logdate.ui.foldable.provideFoldableLayoutInfo(workspaceFold(false)) {
-        WorkspaceScene("locations") {
-            HumanLocationHistoryContent(
-                historyDay,
-                HumanLocationHistoryActions(),
-                showTitle = false,
-                toolbarActions = { PlacesOptionsFixture() },
-                mapContent = { HistoryMapFixture(it) },
-            )
-        }
-    }
-}
-
-private fun workspaceFold(book: Boolean): app.logdate.ui.foldable.FoldableLayoutInfo {
-    val bounds =
-        if (book) {
-            app.logdate.ui.foldable
-                .FoldableHingeBounds(630.dp, 0.dp, 650.dp, 800.dp, 20.dp, 800.dp)
-        } else {
-            app.logdate.ui.foldable
-                .FoldableHingeBounds(0.dp, 630.dp, 800.dp, 650.dp, 800.dp, 20.dp)
-        }
-    return app.logdate.ui.foldable.FoldableLayoutInfo(
-        true,
-        if (book) app.logdate.ui.foldable.FoldablePosture.Book else app.logdate.ui.foldable.FoldablePosture.Tabletop,
-        app.logdate.ui.foldable.FoldableHingeInfo(
-            if (book) {
-                app.logdate.ui.foldable.FoldableHingeOrientation.Vertical
-            } else {
-                app.logdate.ui.foldable.FoldableHingeOrientation.Horizontal
-            },
-            app.logdate.ui.foldable.FoldableHingeState.HalfOpened,
-            app.logdate.ui.foldable.FoldableOcclusionType.Full,
-            bounds,
-            true,
-        ),
-    )
-}
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspacePlaces() =
-    WorkspaceScene("locations") {
-        HumanLocationHistoryContent(
-            historyDay.copy(tab = app.logdate.feature.location.timeline.ui.history.HistoryTab.Places),
-            HumanLocationHistoryActions(),
-            showTitle = false,
-            toolbarActions = { PlacesOptionsFixture() },
-            initialSupportingExtent = app.logdate.ui.workspace.SupportingExtent.Browsing,
-            mapContent = {
-                HistoryMapFixture(it)
-            },
-        )
-    }
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceRewindPlayback() = ImmersiveRewindScreenshot()
-
-@PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceLocationsBrowsing() =
-    WorkspaceScene("locations") {
-        HumanLocationHistoryContent(
-            historyDay,
-            HumanLocationHistoryActions(),
-            showTitle = false,
-            initialSupportingExtent = app.logdate.ui.workspace.SupportingExtent.Browsing,
-            toolbarActions = { PlacesOptionsFixture() },
-            mapContent = { HistoryMapFixture(it) },
-        )
-    }
-
-@PreviewTest
-@Preview(name = "Reduced motion", device = ScreenshotTestData.PHONE, showBackground = true)
-@Composable
-fun WorkspaceReducedMotion() {
-    CompositionLocalProvider(app.logdate.ui.platform.LocalReduceMotionOverride provides true) {
-        WorkspaceScene("locations") {
-            HumanLocationHistoryContent(
-                historyDay,
-                HumanLocationHistoryActions(),
-                showTitle = false,
-                toolbarActions = { PlacesOptionsFixture() },
-                mapContent = { HistoryMapFixture(it) },
-            )
-        }
-    }
-}
-
-@PreviewTest
-@Preview(name = "Sync recovery", device = ScreenshotTestData.COMPACT_PHONE, fontScale = 2f, showBackground = true)
-@Composable
-fun WorkspaceSyncRecovery() =
-    ScreenshotTheme {
-        WorkspaceScaffold(workspaceDestinations, "locations", {}, onSearch = {}, actions = {
-            app.logdate.feature.core.main.HomeWorkspaceAccountAction(
-                app.logdate.feature.core.sync.SyncPresentation.NeedsRecovery,
-                null,
-                {},
-                {},
-                {},
-            )
-        }) {
-            HumanLocationHistoryContent(
-                historyDay.copy(
-                    recoveryMessage = "Recording was interrupted".toUiText(),
-                    recoveryActionLabel = "Resume recording".toUiText(),
-                ),
-                HumanLocationHistoryActions(),
-                showTitle = false,
-                toolbarActions = { PlacesOptionsFixture() },
-                mapContent = {
-                    HistoryMapFixture(it)
-                },
-            )
-        }
-    }
 
 @Preview(name = "Desktop window", device = ScreenshotTestData.TABLET, showBackground = true)
 @Preview(
@@ -506,14 +302,3 @@ private fun SystemCaptionControls(
         }
     }
 }
-
-@PreviewTest @DesktopWindowPreviewMatrix @Composable
-fun WorkspaceTimelineInDesktopWindow() = WorkspaceScene("timeline", inDesktopWindow = true) { TimelineFixture() }
-
-@PreviewTest @DesktopWindowPreviewMatrix @Composable
-fun WorkspaceLocationsInDesktopWindow() =
-    WorkspaceScene("locations", inDesktopWindow = true) {
-        HumanLocationHistoryContent(historyDay, HumanLocationHistoryActions(), showTitle = false, toolbarActions = {
-            PlacesOptionsFixture()
-        }, mapContent = { HistoryMapFixture(it) })
-    }

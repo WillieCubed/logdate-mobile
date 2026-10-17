@@ -290,7 +290,7 @@ adb -s emulator-5554 devices
 Create or update reference images for the first time or after intentional changes. `./run
 test:screenshots:update` updates every lane at once. Updating rewrites every reference in a lane,
 including ones your change did not touch, so prefer updating only your own tests with `--tests`
-(for example `--tests '*HomeWorkspaceScreenshotsKt.Workspace*InDesktopWindow*'`) and review what
+(for example `--tests '*HomeWorkspaceLayoutScreenshotsKt.Workspace*InDesktopWindow*'`) and review what
 changed before committing:
 
 ```bash
