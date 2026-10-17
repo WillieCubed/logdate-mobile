@@ -124,8 +124,9 @@ fun RewindScreenContent(
     modifier: Modifier = Modifier,
 ) {
     // Combine current and past rewinds into a single list, always showing at least current week placeholder
+    val generationFailedMessage = stringResource(Res.string.rewind_generation_failed)
     val rewindItems =
-        remember(state) {
+        remember(state, generationFailedMessage) {
             when (state) {
                 is RewindOverviewScreenUiState.Ready -> {
                     listOf(state.mostRecentRewind) + state.pastRewinds.map { it.toPreview() }
@@ -138,7 +139,7 @@ fun RewindScreenContent(
                                 if (state.isGeneratingRewind) {
                                     "Putting your week together..."
                                 } else if (state.generationFailed) {
-                                    "We couldn't finish your Rewind. Try again."
+                                    generationFailedMessage
                                 } else {
                                     "No entries from last week yet."
                                 },

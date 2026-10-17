@@ -56,6 +56,8 @@
 
     <!-- Rewind screens -->
     <string name="close_rewind">Close rewind</string>
+    <string name="rewind_generation_failed">Your Rewind couldn&apos;t be finished. Try again.</string>
+    <string name="rewind_detail_load_failed">This Rewind couldn&apos;t be loaded. Try again later.</string>
     <string name="delete_rewind">Delete this Rewind</string>
     <string name="delete_rewind_dialog_title">Delete this Rewind?</string>
     <string name="delete_rewind_dialog_message">The story, the photos and notes pulled into it, and any replies you typed back at it will all be removed from this device. Your original journal entries are not touched.</string>
