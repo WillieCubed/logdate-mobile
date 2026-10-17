@@ -51,18 +51,29 @@ import kotlin.test.assertTrue
  * - Support for dark/light theme, right-to-left, font scale, and custom viewport variants.
  */
 class DesktopScreenshotTest {
+    /**
+     * Every scene is rendered and compared before the test fails, so one run reports every stale
+     * reference and leaves every actual image behind, ready to replace them.
+     */
     @Test
     fun `shared catalog matches baselines`() {
         if (skipWithoutDisplay()) return
         val sceneFilter = desktopScreenshotSceneFilter
-        SharedScreenshotCatalog.allScenes
-            .filter { scene -> sceneFilter == null || scene.id.value.contains(sceneFilter) }
-            .filter { scene -> nonDeterministicScenePrefixes.none(scene.id.value::startsWith) }
-            .forEach { scene ->
-                scene.variants.forEach { variant ->
-                    assertMatchesBaseline(scene = scene, variant = variant)
+        val mismatches =
+            SharedScreenshotCatalog.allScenes
+                .filter { scene -> sceneFilter == null || scene.id.value.contains(sceneFilter) }
+                .filter { scene -> nonDeterministicScenePrefixes.none(scene.id.value::startsWith) }
+                .flatMap { scene -> scene.variants.map { variant -> scene to variant } }
+                .mapNotNull { (scene, variant) ->
+                    try {
+                        assertMatchesBaseline(scene = scene, variant = variant)
+                        null
+                    } catch (mismatch: AssertionError) {
+                        mismatch.message
+                    }
                 }
-            }
+        if (mismatches.isEmpty()) return
+        throw AssertionError("${mismatches.size} desktop screenshots differ from their references.\n\n${mismatches.joinToString("\n\n")}")
     }
 
     /** Scene-id prefixes whose rendering still drifts run-to-run even with the strict-stability
@@ -202,8 +213,10 @@ private fun assertMatchesBaseline(
     if (updateDesktopScreenshots) {
         referenceFile.parentFile.mkdirs()
         ImageIO.write(rendered, "png", referenceFile)
+        referenceHostFile.writeText("$thisRenderHost\n")
         return
     }
+    if (!referencesRenderedOnThisHost) return
 
     assertTrue(referenceFile.exists(), "Missing desktop screenshot baseline: ${referenceFile.absolutePath}")
 
@@ -446,6 +459,37 @@ private fun compareImages(
             totalPixels = totalPixels,
         )
     }
+}
+
+/**
+ * The host the committed references were rendered on, as the OS name and major version. Text
+ * rasterization changes between OS releases (macOS 27 anti-aliases text differently from macOS 26),
+ * so pixels are only comparable on the host that rendered the references. Recording rewrites it.
+ */
+private val referenceHostFile: File
+    get() = screenshotReferenceDir.resolve("render-host.txt")
+
+private val thisRenderHost: String =
+    "${System.getProperty("os.name")} ${System.getProperty("os.version").substringBefore('.')}"
+
+/**
+ * Whether the references can be compared on this machine. Another host still renders every scene
+ * into the actual directory but skips the comparison and says so. Where comparison is required,
+ * on CI or with `LOGDATE_REQUIRE_DESKTOP_SCREENSHOTS=true`, another host fails instead, so a runner
+ * image upgrade cannot turn the check off unnoticed.
+ */
+private val referencesRenderedOnThisHost: Boolean by lazy {
+    val recorded = referenceHostFile.takeIf(File::exists)?.readText()?.trim() ?: return@lazy true
+    if (recorded == thisRenderHost) return@lazy true
+    check(System.getenv("LOGDATE_REQUIRE_DESKTOP_SCREENSHOTS") != "true" && System.getenv("CI") != "true") {
+        "The desktop screenshot references were rendered on $recorded, but this machine is $thisRenderHost. " +
+            "Re-record them on $recorded, or record them here and update CI to match."
+    }
+    println(
+        "Rendering desktop screenshots without comparing them: the references were rendered on $recorded, " +
+            "and this machine is $thisRenderHost, which renders text differently. Actual images: ${screenshotActualDir.absolutePath}",
+    )
+    false
 }
 
 private val updateDesktopScreenshots: Boolean =
