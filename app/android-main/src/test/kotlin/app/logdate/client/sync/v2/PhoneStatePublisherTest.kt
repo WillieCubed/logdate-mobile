@@ -1,10 +1,12 @@
 package app.logdate.client.sync.v2
 
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.streak.CampfireState
 import app.logdate.client.domain.streak.FirePhase
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.datalayer.v2.WearFeatures
+import app.logdate.client.sync.peer.state.ActivitySnapshot
 import app.logdate.client.sync.peer.state.CampfireSnapshot
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerDocument
@@ -350,6 +352,21 @@ class PhoneStatePublisherTest {
             sharedPreferences = preferences,
             adoptWatchPreferences = { adopted += it },
         )
+
+    @Test
+    fun `activity awareness and the phone's activity go to the watch only while it is on`() =
+        runTest {
+            val walking = ActivitySnapshot(kind = "MOVING", startedAt = 500)
+
+            publisher.publish(v2Enabled = true, current = PhoneStateParts(activityAwareness = false, activity = walking))
+            publisher.publish(v2Enabled = true, current = PhoneStateParts(activityAwareness = true, activity = walking))
+
+            val (off, on) = channel.published.map { it.phone }
+            assertEquals(mapOf(FLAG_KEY to true), off?.flags)
+            assertEquals(null, off?.activity)
+            assertEquals(mapOf(FLAG_KEY to true, FeatureFlag.ACTIVITY_AWARENESS.key to true), on?.flags)
+            assertEquals(walking, on?.activity)
+        }
 
     @Test
     fun `the phone publishes its state with the switch off`() =

@@ -10,18 +10,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.feature.core.settings.ui.rememberReminderSettingsAccess
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.labs_activity_permission_action
+import logdate.client.feature.core.generated.resources.labs_activity_permission_description
+import logdate.client.feature.core.generated.resources.labs_activity_permission_title
 import logdate.client.feature.core.generated.resources.labs_empty
 import logdate.client.feature.core.generated.resources.labs_intro
 import logdate.client.feature.core.generated.resources.labs_section_unreleased
@@ -41,11 +47,17 @@ fun LabsSettingsScreen(
     viewModel: LabsSettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val access = rememberReminderSettingsAccess()
 
     LabsSettingsContent(
         uiState = uiState,
         onBack = onBack,
-        onSetEnabled = viewModel::setEnabled,
+        onSetEnabled = { flag, enabled ->
+            viewModel.setEnabled(flag, enabled)
+            if (flag == FeatureFlag.ACTIVITY_AWARENESS && enabled && !access.activityAllowed) access.resolveActivity()
+        },
+        activityAllowed = access.activityAllowed,
+        onAllowActivity = access.resolveActivity,
         modifier = modifier,
     )
 }
@@ -56,6 +68,8 @@ fun LabsSettingsContent(
     onBack: () -> Unit,
     onSetEnabled: (FeatureFlag, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    activityAllowed: Boolean = true,
+    onAllowActivity: () -> Unit = {},
 ) {
     FoldableBookLayout(
         modifier = modifier.fillMaxSize(),
@@ -88,6 +102,8 @@ fun LabsSettingsContent(
                 LabsFlagsSection(
                     uiState = uiState,
                     onSetEnabled = onSetEnabled,
+                    activityAllowed = activityAllowed,
+                    onAllowActivity = onAllowActivity,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
@@ -104,6 +120,8 @@ fun LabsSettingsContent(
                     LabsFlagsSection(
                         uiState = uiState,
                         onSetEnabled = onSetEnabled,
+                        activityAllowed = activityAllowed,
+                        onAllowActivity = onAllowActivity,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -126,6 +144,8 @@ private fun LabsIntro(modifier: Modifier = Modifier) {
 private fun LabsFlagsSection(
     uiState: LabsUiState,
     onSetEnabled: (FeatureFlag, Boolean) -> Unit,
+    activityAllowed: Boolean,
+    onAllowActivity: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (uiState !is LabsUiState.Ready) return
@@ -149,6 +169,14 @@ private fun LabsFlagsSection(
                 checked = row.enabled,
                 onCheckedChange = { enabled -> onSetEnabled(row.flag, enabled) },
             )
+            if (row.flag == FeatureFlag.ACTIVITY_AWARENESS && row.enabled && !activityAllowed) {
+                SimpleSettingsItem(
+                    title = stringResource(Res.string.labs_activity_permission_title),
+                    description = stringResource(Res.string.labs_activity_permission_description),
+                ) {
+                    TextButton(onClick = onAllowActivity) { Text(stringResource(Res.string.labs_activity_permission_action)) }
+                }
+            }
         }
     }
 }
