@@ -1,10 +1,12 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.RestoreCredentialError
 import app.logdate.client.permissions.RestoreCredentialManager
+import app.logdate.client.permissions.createRestoreKeyIfCurrent
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.config.PinnedLogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
@@ -36,13 +38,24 @@ internal class RestoreCredentialCoordinator(
     suspend fun createRestoreKey(): Result<Unit> = registrationMutex.withLock { registerRestoreKey() }
 
     private suspend fun registerRestoreKey(): Result<Unit> {
-        if (sessionStorage.getSession() == null) {
-            return Result.failure(Exception("No active session"))
+        val binding = sessionStorage.getOriginBoundSession()
+        if (binding == null && sessionStorage.supportsGuardedAuthentication) return Result.failure(Exception("No active session"))
+        val expected = binding?.session ?: sessionStorage.getSession() ?: return Result.failure(Exception("No active session"))
+        val origin = binding?.origin ?: configRepository.getCurrentBackendUrl()
+        val apiBase = configRepository.getCurrentApiBaseUrl()
+        val api = renewal?.apiFor(PinnedLogDateConfigRepository(origin, null, configRepository.apiVersion.value)) ?: apiClient
+        val isCurrent = {
+            val current = sessionStorage.getSession()
+            configRepository.getCurrentBackendUrl() == origin &&
+                configRepository.getCurrentApiBaseUrl() == apiBase &&
+                current?.accountId == expected.accountId &&
+                current.refreshToken == expected.refreshToken
         }
         return try {
             val optionsResult =
                 sessionRefreshCoordinator.withFreshAccessToken { accessToken ->
-                    apiClient.beginRestoreKeyRegistration(accessToken)
+                    check(isCurrent()) { "Restore registration identity changed" }
+                    api.beginRestoreKeyRegistration(accessToken)
                 }
             if (optionsResult.isFailure) {
                 val cause = optionsResult.exceptionOrNull()
@@ -51,7 +64,7 @@ internal class RestoreCredentialCoordinator(
             }
             val options = optionsResult.getOrThrow()
 
-            val credentialResult = restoreCredentialManager.createRestoreKey(options)
+            val credentialResult = restoreCredentialManager.createRestoreKeyIfCurrent(options, isCurrent)
             if (credentialResult.isFailure) {
                 val error = credentialResult.exceptionOrNull()
                 if (error is RestoreCredentialError.BackupUnavailable) {
@@ -70,9 +83,11 @@ internal class RestoreCredentialCoordinator(
                 return Result.failure(error ?: Exception("Restore credential creation failed"))
             }
 
+            check(isCurrent()) { "Restore registration identity changed" }
             val completeResult =
                 sessionRefreshCoordinator.withFreshAccessToken { accessToken ->
-                    apiClient.completeRestoreKeyRegistration(
+                    check(isCurrent()) { "Restore registration identity changed" }
+                    api.completeRestoreKeyRegistration(
                         accessToken = accessToken,
                         credentialJson = credentialResult.getOrThrow(),
                         challenge = options.challenge,
@@ -143,7 +158,11 @@ internal class RestoreCredentialCoordinator(
             currentCoroutineContext().ensureActive()
             check(configRepository.getCurrentBackendUrl() == guard.origin && sessionStorage.getSession() == session)
             onSessionInstalled()
-            sessionState.markAuthenticated(completeData.account)
+            check(
+                sessionStorage.runIfSessionCurrent(OriginBoundSession(guard.origin, session)) {
+                    sessionState.markAuthenticated(completeData.account, guard.origin)
+                },
+            ) { "Restore session changed" }
             currentCoroutineContext().ensureActive()
             Napier.i("Restore sign-in succeeded; credential enrollment will resume automatically")
             Result.success(completeData.account)

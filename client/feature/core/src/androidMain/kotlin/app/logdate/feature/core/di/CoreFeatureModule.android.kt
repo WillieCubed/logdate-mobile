@@ -1,6 +1,7 @@
 package app.logdate.feature.core.di
 
 import android.app.Activity
+import app.logdate.client.data.account.RestoreCredentialCleanupScheduler
 import app.logdate.client.device.crypto.AndroidDeviceTransferSealer
 import app.logdate.client.device.crypto.DeviceTransferSealer
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -33,10 +34,12 @@ import app.logdate.feature.core.people.ui.PeopleInboxViewModel
 import app.logdate.feature.core.people.ui.PeopleSettingsViewModel
 import app.logdate.feature.core.people.ui.PersonDetailViewModel
 import app.logdate.feature.core.profile.ui.ProfileViewModel
+import app.logdate.feature.core.restore.AndroidRestoreCredentialCleanupScheduler
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.restore.CloudRestoreScheduler
 import app.logdate.feature.core.restore.CloudRestoreWorker
 import app.logdate.feature.core.restore.DefaultRestoreDiagnosticEvents
+import app.logdate.feature.core.restore.RestoreCredentialCleanupWorker
 import app.logdate.feature.core.restore.RestoreDiagnosticEvents
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreWorker
@@ -127,6 +130,8 @@ actual val coreFeatureModule: Module =
         single { AndroidRestoreLauncher(androidContext()) }
         single<RestoreLauncher> { get<AndroidRestoreLauncher>() }
         workerOf(::RestoreWorker)
+        workerOf(::RestoreCredentialCleanupWorker)
+        single<RestoreCredentialCleanupScheduler> { AndroidRestoreCredentialCleanupScheduler(androidContext()) }
         worker { CloudRestoreWorker(androidContext(), get(), get(), get(), get()) }
         single<RestoreDiagnosticEvents> { DefaultRestoreDiagnosticEvents(get(), get()) }
 

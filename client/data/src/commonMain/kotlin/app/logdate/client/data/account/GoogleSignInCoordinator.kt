@@ -1,10 +1,13 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
+import app.logdate.client.device.addAccountIfCurrent
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.updateTokensIfCurrent
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.GoogleSignInManager
 import app.logdate.shared.config.LogDateConfigRepository
@@ -150,27 +153,37 @@ internal class GoogleSignInCoordinator(
 
         onSessionPersisted()
         currentCoroutineContext().ensureActive()
-        val backendUrl = configRepository.getCurrentBackendUrl()
+        val backendUrl = origin
+        val isCurrent = {
+            configRepository.getCurrentBackendUrl() == origin &&
+                (sessionStorage.getOriginBoundSession()?.session ?: sessionStorage.getSession()) == session
+        }
         val platformResult =
             if (isNewAccount) {
-                platformAccountManager.addAccount(
+                platformAccountManager.addAccountIfCurrent(
                     account = account,
                     accessToken = tokens.accessToken,
                     refreshToken = tokens.refreshToken,
                     backendUrl = backendUrl,
+                    isCurrent = isCurrent,
                 )
             } else {
-                platformAccountManager.updateTokens(
+                platformAccountManager.updateTokensIfCurrent(
                     username = account.username,
                     backendUrl = backendUrl,
                     accessToken = tokens.accessToken,
                     refreshToken = tokens.refreshToken,
+                    isCurrent = isCurrent,
                 )
             }
         if (platformResult.isFailure) {
             Napier.w("Failed to update platform account manager after Google auth", platformResult.exceptionOrNull())
         }
 
-        sessionState.markAuthenticated(account)
+        check(
+            sessionStorage.runIfSessionCurrent(OriginBoundSession(origin, session)) {
+                sessionState.markAuthenticated(account, origin)
+            },
+        ) { "Authentication changed" }
     }
 }

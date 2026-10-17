@@ -2,6 +2,7 @@
 
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.CanonicalOwnerProvider
@@ -97,6 +98,13 @@ class DefaultPasskeyAccountRepository(
             configRepository = configRepository,
             sessionState = sessionState,
             deleteRestoreKey = { deleteRestoreKey() },
+            prepareRestoreKeyClear = restoreCredentialManager::prepareRestoreCredentialClear,
+            apiForOrigin = { origin ->
+                restoreCredentialRenewal?.apiFor(
+                    app.logdate.shared.config
+                        .PinnedLogDateConfigRepository(origin, null, configRepository.apiVersion.value),
+                ) ?: apiClient
+            },
         )
 
     private val restoreCredentialCoordinator =
@@ -160,29 +168,48 @@ class DefaultPasskeyAccountRepository(
     init {
         repositoryScope.launch {
             combine(sessionStorage.getSessionFlow(), restoreRenewalRequests) { session, _ -> session }.collectLatest { session ->
+                val binding = currentBinding(session)
+                if (binding?.session != session) return@collectLatest
                 if (session != null && !bindingGuard.sessionBelongsToCanonicalOwner(session)) {
                     Napier.w("Discarding credentials for a different LogDate identity")
-                    sessionStorage.clearSession()
-                    sessionState.clear()
-                } else {
-                    sessionState.setAuthenticated(session != null)
-                    if (session == null) {
-                        sessionState.clearAccount()
-                    } else {
-                        renewBackgroundRestoreKey(session)
+                    if (binding != null && sessionStorage.supportsGuardedAuthentication) {
+                        sessionStorage.clearSessionIfCurrent(binding) { sessionState.clear() }
+                    } else if (sessionStorage.getSession() == session) {
+                        sessionStorage.clearSession()
+                        sessionState.clear()
                     }
+                } else {
+                    val published =
+                        sessionStorage.runIfSessionCurrent(binding) {
+                            sessionState.setAuthenticated(session != null)
+                            if (session == null || sessionState.accountOrigin != binding?.origin) sessionState.clearAccount()
+                        }
+                    if (published && session != null) renewBackgroundRestoreKey(session)
                 }
             }
         }
 
         repositoryScope.launch {
             configRepository.backendUrl.drop(1).collect {
-                sessionState.clearAccount()
-                val session = sessionStorage.getSession()
-                sessionState.setAuthenticated(session != null && bindingGuard.sessionBelongsToCanonicalOwner(session))
+                val binding = currentBinding(sessionStorage.getSession())
+                val belongs = binding?.session?.let { bindingGuard.sessionBelongsToCanonicalOwner(it) } == true
+                sessionStorage.runIfSessionCurrent(binding) {
+                    val session = binding?.session
+                    if (session == null) {
+                        sessionState.clear()
+                    } else {
+                        if (sessionState.accountOrigin != binding.origin) sessionState.clearAccount()
+                        sessionState.setAuthenticated(belongs)
+                    }
+                }
             }
         }
     }
+
+    private fun currentBinding(session: app.logdate.client.datastore.UserSession?): OriginBoundSession? =
+        sessionStorage.getOriginBoundSession() ?: session
+            ?.takeUnless { sessionStorage.supportsGuardedAuthentication }
+            ?.let { OriginBoundSession(configRepository.getCurrentBackendUrl(), it) }
 
     private suspend fun renewBackgroundRestoreKey(session: app.logdate.client.datastore.UserSession) {
         if (!createsRestoreKey) return

@@ -1,8 +1,10 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.storage.SecureSessionStorage
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.shared.config.PinnedLogDateConfigRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +18,24 @@ class RestoreCredentialRenewalRefreshTest {
     private val original = UserSession("expired", "refresh", "owner")
     private val sessions = BoundRenewalSessions(OriginBoundSession(origin, original))
     private val delegate = DefaultPasskeyAccountRepositoryTest().FakePasskeyApiClient()
+
+    @Test
+    fun `renewal refresh preserves a later identical token login`() =
+        runTest {
+            val decisions = mutableMapOf<String, String>()
+            val policy = NativeRestorePolicy({ decisions[it] }, { key, value -> decisions[key] = value })
+            val vault = SecureSessionStorage(RenewalStorage(), config, backgroundScope, nativeRestorePolicy = policy)
+            vault.saveExplicitSession(original)
+            val api =
+                object : PasskeyApiClientContract by delegate {
+                    override suspend fun refreshToken(refreshToken: String): Result<String> {
+                        vault.saveExplicitSession(original)
+                        return Result.success("stale-refresh")
+                    }
+                }
+            RestoreCredentialRenewal(RenewalStorage()) { api }.refreshSession(config, original, vault) { true }
+            assertEquals(original, vault.getSession())
+        }
 
     @Test
     fun `expired access token refreshes in the captured vault`() =

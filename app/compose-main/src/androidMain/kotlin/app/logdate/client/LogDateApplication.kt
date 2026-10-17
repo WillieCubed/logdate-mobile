@@ -128,6 +128,7 @@ class LogdateApplication :
      * schedulers. Each part is isolated so one failing to start doesn't stop the others.
      */
     private fun startBackgroundWork() {
+        startRestoreCredentialCleanup()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             runCatching { get<IdentityKeyManager>().ensureExistingIdentityBackup() }
                 .onFailure { Napier.w("Native encryption recovery material needs attention", it) }
@@ -217,6 +218,11 @@ class LogdateApplication :
     }
 
     /** Runs one part of startup, logging [failure] instead of letting it stop the parts after it. */
+    private fun startRestoreCredentialCleanup() =
+        isolated("Failed to start restore credential cleanup reconciliation") {
+            get<app.logdate.client.data.account.RestoreCredentialLifecycle>().start(get<CoroutineScope>())
+        }
+
     private inline fun isolated(
         failure: String,
         start: () -> Unit,

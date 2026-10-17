@@ -17,17 +17,28 @@ internal class PasskeyAccountSessionState {
     private val _isAuthenticated = MutableStateFlow(false)
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
 
+    var accountOrigin: String? = null
+        private set
+
     /** The account most recently observed, without subscribing to [currentAccount]. */
     val account: LogDateAccount? get() = _currentAccount.value
 
     /** Marks [account] as the signed-in account. */
-    fun markAuthenticated(account: LogDateAccount) {
+    fun markAuthenticated(
+        account: LogDateAccount,
+        origin: String? = null,
+    ) {
+        accountOrigin = origin
         _currentAccount.value = account
         _isAuthenticated.value = true
     }
 
     /** Updates the current account without changing authentication status. */
-    fun updateAccount(account: LogDateAccount) {
+    fun updateAccount(
+        account: LogDateAccount,
+        origin: String? = accountOrigin,
+    ) {
+        accountOrigin = origin
         _currentAccount.value = account
     }
 
@@ -36,11 +47,13 @@ internal class PasskeyAccountSessionState {
     }
 
     fun clearAccount() {
+        accountOrigin = null
         _currentAccount.value = null
     }
 
     /** Clears both the current account and authentication status, e.g. on sign-out. */
     fun clear() {
+        accountOrigin = null
         _currentAccount.value = null
         _isAuthenticated.value = false
     }

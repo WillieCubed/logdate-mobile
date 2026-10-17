@@ -1,7 +1,13 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.datastore.OriginBoundSession
+import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
+import app.logdate.client.device.addAccountIfCurrent
+import app.logdate.client.device.removeAccountIfSignedOut
+import app.logdate.client.device.updateTokensIfCurrent
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.networking.PasskeyApiErrorCodes
 import app.logdate.client.networking.PasskeyApiException
@@ -29,6 +35,8 @@ internal class AccountSessionRefreshCoordinator(
     private val configRepository: LogDateConfigRepository,
     private val sessionState: PasskeyAccountSessionState,
     private val deleteRestoreKey: suspend () -> Result<Unit>,
+    private val apiForOrigin: (String) -> PasskeyApiClientContract = { apiClient },
+    private val prepareRestoreKeyClear: suspend (String, suspend () -> Boolean) -> Unit = { _, _ -> },
 ) {
     /**
      * Updates tokens for an existing platform account, falling back to registering the
@@ -47,22 +55,32 @@ internal class AccountSessionRefreshCoordinator(
         refreshToken: String,
         backendUrl: String,
     ) {
+        val isCurrent = {
+            val bound = sessionStorage.getOriginBoundSession()
+            val current = bound?.session ?: sessionStorage.getSession()
+            configRepository.getCurrentBackendUrl() == backendUrl &&
+                (bound == null || bound.origin == backendUrl) &&
+                current?.accountId == account.id.toString() &&
+                current.refreshToken == refreshToken
+        }
         val updateResult =
-            platformAccountManager.updateTokens(
+            platformAccountManager.updateTokensIfCurrent(
                 username = account.username,
                 backendUrl = backendUrl,
                 accessToken = accessToken,
                 refreshToken = refreshToken,
+                isCurrent = isCurrent,
             )
 
         if (updateResult.isSuccess) return
 
         val addResult =
-            platformAccountManager.addAccount(
+            platformAccountManager.addAccountIfCurrent(
                 account = account,
                 accessToken = accessToken,
                 refreshToken = refreshToken,
                 backendUrl = backendUrl,
+                isCurrent = isCurrent,
             )
 
         if (addResult.isFailure) {
@@ -70,79 +88,127 @@ internal class AccountSessionRefreshCoordinator(
         }
     }
 
-    /** Deletes the account on the server, then clears this device's credentials for it. */
-    suspend fun deleteAccount(): Result<Unit> =
-        authorized { accessToken -> apiClient.deleteAccount(accessToken) }
-            .onSuccess {
-                Napier.i("Account deleted on the server; clearing local credentials")
-                clearLocalCredentials()
-            }
+    /** Deletes the account on the server, then clears only its retained local sign-in. */
+    suspend fun deleteAccount(): Result<Unit> {
+        val captured = sessionStorage.captureAuthenticationSnapshot()
+        if (captured == null && sessionStorage.supportsGuardedAuthentication) return Result.failure(NotSignedInException())
+        val binding = captured?.session ?: sessionStorage.getOriginBoundSession()
+        val original = if (captured != null) captured.session?.session else binding?.session ?: sessionStorage.getSession()
+        if (original == null) return Result.failure(NotSignedInException())
+        val origin = captured?.guard?.origin ?: binding?.origin ?: configRepository.getCurrentBackendUrl()
+        val api = apiForOrigin(origin)
+        return authorized(binding, expectedAuthorization = captured?.guard) { accessToken -> api.deleteAccount(accessToken) }.onSuccess {
+            clearLocalCredentials(origin, original, captured?.guard)
+        }
+    }
 
     suspend fun signOut(): Result<Unit> =
         try {
-            sessionStorage.getSession()?.let {
-                apiClient.logout(it.refreshToken).onFailure { error ->
-                    Napier.w("Remote logout failed; local credentials will still be cleared", error)
+            val captured = sessionStorage.captureAuthenticationSnapshot()
+            if (captured == null && sessionStorage.supportsGuardedAuthentication) return Result.failure(NotSignedInException())
+            val binding = if (captured != null) captured.session else sessionStorage.getOriginBoundSession()
+            val original = if (captured != null) binding?.session else binding?.session ?: sessionStorage.getSession()
+            val origin = captured?.guard?.origin ?: binding?.origin ?: configRepository.getCurrentBackendUrl()
+            clearLocalCredentials(origin, original, captured?.guard)
+            original?.let {
+                apiForOrigin(origin).logout(it.refreshToken).onFailure { error ->
+                    Napier.w("Remote logout failed; local sign-out remains committed", error)
                 }
             }
-            clearLocalCredentials()
-            Napier.i("User signed out successfully")
             Result.success(Unit)
-        } catch (e: Exception) {
-            Napier.w("Failed to sign out", e)
-            Result.failure(e)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.w("Failed to sign out", error)
+            Result.failure(error)
         }
 
-    private suspend fun clearLocalCredentials() {
-        val currentAccountValue = sessionState.account
-        sessionStorage.clearSession()
-
-        // A LogDate installation has one canonical identity. Remove the platform account
-        // rather than leaving an origin-scoped blank account that can later be mistaken for
-        // another selectable identity.
-        if (currentAccountValue != null) {
-            platformAccountManager
-                .removeAccount(
-                    username = currentAccountValue.username,
-                    backendUrl = configRepository.getCurrentBackendUrl(),
-                ).onFailure { Napier.w("Failed to remove platform account on sign-out", it) }
+    private suspend fun clearLocalCredentials(
+        origin: String,
+        original: UserSession?,
+        authorization: SessionInstallationGuard?,
+    ) {
+        val account = sessionState.account
+        if (!commitSignOut(origin, original, authorization)) return
+        // Local sign-out commits before asynchronous platform cleanup. Later login owns its state.
+        if (account != null && original != null) {
+            val removal =
+                if (sessionStorage.supportsGuardedAuthentication) {
+                    platformAccountManager.removeAccountIfSignedOut(account.username, origin) {
+                        configRepository.getCurrentBackendUrl() == origin && sessionStorage.isSignedOutForProviderCleanup()
+                    }
+                } else {
+                    platformAccountManager.removeAccountIfMatching(account.username, origin, original.refreshToken)
+                }
+            removal.onFailure { Napier.w("Failed to remove platform account on sign-out", it) }
         }
-
-        sessionState.clear()
-
-        // Clear restore credential on sign-out — best effort, non-fatal.
-        deleteRestoreKey()
+        if (sessionStorage.getSession() == null) deleteRestoreKey()
     }
 
-    suspend fun refreshAuthentication(): Result<Unit> {
+    private suspend fun commitSignOut(
+        origin: String,
+        original: UserSession?,
+        authorization: SessionInstallationGuard?,
+    ): Boolean {
+        suspend fun isCurrent(): Boolean {
+            if (configRepository.getCurrentBackendUrl() != origin) return false
+            if (authorization != null) return sessionStorage.isAuthenticationGuardCurrent(authorization)
+            val current = sessionStorage.getSession()
+            return if (original == null) {
+                current == null
+            } else {
+                current?.accountId == original.accountId && current.refreshToken == original.refreshToken
+            }
+        }
+        while (isCurrent()) {
+            val guard = sessionStorage.captureAuthenticationGuard()
+            if (sessionStorage.supportsGuardedAuthentication && guard == null) {
+                kotlinx.coroutines.yield()
+                continue
+            }
+            try {
+                prepareRestoreKeyClear(origin, ::isCurrent)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Napier.w("Provider cleanup will reconcile after local sign-out", error)
+            }
+            if (!isCurrent()) return false
+            if (guard != null) {
+                if (sessionStorage.clearSessionIfUnchanged(guard) { sessionState.clear() }) return true
+                kotlinx.coroutines.yield()
+            } else {
+                sessionStorage.clearSession()
+                sessionState.clear()
+                return true
+            }
+        }
+        return false
+    }
+
+    suspend fun refreshAuthentication(expected: OriginBoundSession? = null): Result<Unit> {
         return try {
-            val binding = sessionStorage.getOriginBoundSession()
-            if (binding == null && sessionStorage.supportsGuardedAuthentication) {
+            val captured = sessionStorage.captureAuthenticationSnapshot()
+            if (captured == null && sessionStorage.supportsGuardedAuthentication) return Result.failure(NotSignedInException())
+            val binding = if (captured != null) captured.session else sessionStorage.getOriginBoundSession()
+            if (expected != null &&
+                (
+                    binding?.origin != expected.origin ||
+                        binding.session.accountId != expected.session.accountId ||
+                        binding.session.refreshToken != expected.session.refreshToken
+                )
+            ) {
                 return Result.failure(NotSignedInException())
             }
+            if (binding == null && sessionStorage.supportsGuardedAuthentication) return Result.failure(NotSignedInException())
             val session =
                 binding?.session ?: sessionStorage.getSession()
                     ?: return Result.failure(NotSignedInException())
             val origin = binding?.origin ?: configRepository.getCurrentBackendUrl()
-            val refreshResult = apiClient.refreshToken(session.refreshToken)
+            val refreshResult = apiForOrigin(origin).refreshToken(session.refreshToken)
             if (refreshResult.isFailure) {
                 val error = refreshResult.exceptionOrNull()!!
-                // Only a server that refuses the refresh token ends the session. A network error
-                // or an outage leaves it in place for the next attempt.
-                if (error.isRejected(REJECTED_REFRESH_TOKEN_CODES)) {
-                    if (binding != null) {
-                        // End only the rejected session. A later login owns its platform account
-                        // and provider key, so this stale request cannot run global sign-out.
-                        if (sessionStorage.clearSessionIfCurrent(binding) &&
-                            configRepository.getCurrentBackendUrl() == origin &&
-                            sessionStorage.getSession() == null
-                        ) {
-                            sessionState.clear()
-                        }
-                    } else if (configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session) {
-                        signOut()
-                    }
-                }
+                if (error.isRejected(REJECTED_REFRESH_TOKEN_CODES)) rejectSession(binding, captured?.guard, session, origin)
                 return Result.failure(error)
             }
 
@@ -151,7 +217,9 @@ internal class AccountSessionRefreshCoordinator(
             // Update session with new access token
             val updatedSession = session.copy(accessToken = newAccessToken)
             if (binding != null) {
-                check(sessionStorage.replaceSessionIfCurrent(binding, updatedSession)) { "Authentication changed during refresh" }
+                check(
+                    sessionStorage.replaceSessionIfAuthorized(binding, updatedSession, captured?.guard),
+                ) { "Authentication changed during refresh" }
             } else {
                 check(configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session) {
                     "Authentication changed during refresh"
@@ -186,36 +254,42 @@ internal class AccountSessionRefreshCoordinator(
         }
     }
 
-    suspend fun getAccountInfo(): Result<LogDateAccount> {
-        return try {
-            val session =
-                sessionStorage.getSession()
-                    ?: return Result.failure(Exception("No active session"))
-
-            val result = apiClient.getAccountInfo(session.accessToken)
-            if (result.isSuccess) {
-                val account = result.getOrThrow()
-                sessionState.updateAccount(account)
-                return Result.success(account)
-            } else {
-                // Try refreshing token and retry once
-                val refreshResult = refreshAuthentication()
-                if (refreshResult.isSuccess) {
-                    val updatedSession = sessionStorage.getSession()!!
-                    val retryResult = apiClient.getAccountInfo(updatedSession.accessToken)
-                    if (retryResult.isSuccess) {
-                        val account = retryResult.getOrThrow()
-                        sessionState.updateAccount(account)
-                        return Result.success(account)
-                    }
-                }
-                return result
-            }
-        } catch (e: Exception) {
-            Napier.w("Failed to get account info", e)
-            Result.failure(e)
+    private suspend fun rejectSession(
+        binding: OriginBoundSession?,
+        guard: SessionInstallationGuard?,
+        session: UserSession,
+        origin: String,
+    ) {
+        if (guard != null) {
+            sessionStorage.clearSessionIfUnchanged(guard) { sessionState.clear() }
+        } else if (binding != null) {
+            sessionStorage.clearSessionIfCurrent(binding) { sessionState.clear() }
+        } else if (configRepository.getCurrentBackendUrl() == origin && sessionStorage.getSession() == session) {
+            signOut()
         }
     }
+
+    suspend fun getAccountInfo(): Result<LogDateAccount> =
+        try {
+            val binding = sessionStorage.getOriginBoundSession()
+            val session = binding?.session ?: sessionStorage.getSession() ?: return Result.failure(NotSignedInException())
+            val origin = binding?.origin ?: configRepository.getCurrentBackendUrl()
+            val expected = binding ?: OriginBoundSession(origin, session)
+            val api = apiForOrigin(origin)
+            val result = authorized(binding, retryAnyFailure = true) { api.getAccountInfo(it) }
+            val account = result.getOrElse { return Result.failure(it) }
+            check(account.id.toString() == session.accountId) { "Account identity changed" }
+            if (!sessionStorage.runIfSessionCurrent(expected) { sessionState.updateAccount(account, origin) }) {
+                Result.failure(NotSignedInException())
+            } else {
+                Result.success(account)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.w("Failed to get account info", error)
+            Result.failure(error)
+        }
 
     /**
      * Runs an authenticated call with the stored access token. If the server rejects the token,
@@ -223,73 +297,75 @@ internal class AccountSessionRefreshCoordinator(
      * returned as is, so a call that isn't safe to repeat never runs twice. Without a session the
      * call never runs.
      */
-    suspend fun <T> authorized(call: suspend (accessToken: String) -> Result<T>): Result<T> {
-        val session = sessionStorage.getSession() ?: return Result.failure(NotSignedInException())
+    suspend fun <T> authorized(
+        expected: OriginBoundSession? = null,
+        retryAnyFailure: Boolean = false,
+        expectedAuthorization: SessionInstallationGuard? = null,
+        call: suspend (accessToken: String) -> Result<T>,
+    ): Result<T> {
+        val captured = sessionStorage.captureAuthenticationSnapshot()
+        if (captured == null && sessionStorage.supportsGuardedAuthentication) return Result.failure(NotSignedInException())
+        val binding = if (captured != null) captured.session else sessionStorage.getOriginBoundSession()
+        val authorization = expectedAuthorization ?: captured?.guard
+        if (authorization != null &&
+            !sessionStorage.isAuthenticationGuardCurrent(authorization)
+        ) {
+            return Result.failure(NotSignedInException())
+        }
+        if (expected != null &&
+            (
+                binding?.origin != expected.origin ||
+                    binding.session.accountId != expected.session.accountId ||
+                    binding.session.refreshToken != expected.session.refreshToken
+            )
+        ) {
+            return Result.failure(NotSignedInException())
+        }
+        if (binding == null && sessionStorage.supportsGuardedAuthentication) return Result.failure(NotSignedInException())
+        val session = binding?.session ?: sessionStorage.getSession() ?: return Result.failure(NotSignedInException())
+        val origin = binding?.origin ?: configRepository.getCurrentBackendUrl()
+
+        suspend fun stillCurrent(): Boolean {
+            if (authorization != null && !sessionStorage.isAuthenticationGuardCurrent(authorization)) return false
+            val current = sessionStorage.getOriginBoundSession()
+            val retained = current?.session ?: sessionStorage.getSession()
+            return configRepository.getCurrentBackendUrl() == origin &&
+                (current == null || current.origin == origin) &&
+                retained?.accountId == session.accountId &&
+                retained.refreshToken == session.refreshToken
+        }
         val result = call(session.accessToken)
-        if (!result.exceptionOrNull().isRejected(REJECTED_ACCESS_TOKEN_CODES)) return result
-        if (refreshAuthentication().isFailure) return result
-        val refreshed = sessionStorage.getSession() ?: return result
+        if (result.isSuccess ||
+            (!retryAnyFailure && !result.exceptionOrNull().isRejected(REJECTED_ACCESS_TOKEN_CODES)) ||
+            !stillCurrent()
+        ) {
+            return result
+        }
+        if (refreshAuthentication(binding).isFailure || !stillCurrent()) return result
+        val refreshedBinding = sessionStorage.getOriginBoundSession()
+        val refreshed = refreshedBinding?.session ?: sessionStorage.getSession() ?: return result
+        if (refreshed.accountId != session.accountId ||
+            refreshed.refreshToken != session.refreshToken ||
+            (refreshedBinding != null && refreshedBinding.origin != origin) ||
+            configRepository.getCurrentBackendUrl() != origin
+        ) {
+            return result
+        }
         return call(refreshed.accessToken)
     }
 
     suspend fun listPasskeys(): Result<List<PasskeyInfo>> = authorized { apiClient.listPasskeys(it) }
 
     suspend fun deletePasskey(credentialId: String): Result<Unit> {
-        return try {
-            val session =
-                sessionStorage.getSession()
-                    ?: return Result.failure(Exception("No active session"))
-
-            val result = apiClient.deletePasskey(session.accessToken, credentialId)
-            if (result.isSuccess) {
-                Napier.i("Passkey deleted successfully: $credentialId")
-                return Result.success(Unit)
-            } else {
-                // Try refreshing token and retry once
-                val refreshResult = refreshAuthentication()
-                if (refreshResult.isSuccess) {
-                    val updatedSession = sessionStorage.getSession()!!
-                    val retryResult = apiClient.deletePasskey(updatedSession.accessToken, credentialId)
-                    if (retryResult.isSuccess) {
-                        Napier.i("Passkey deleted successfully after token refresh: $credentialId")
-                        return Result.success(Unit)
-                    }
-                }
-                return result
-            }
-        } catch (e: Exception) {
-            Napier.w("Failed to delete passkey: $credentialId", e)
-            Result.failure(e)
-        }
+        val binding = sessionStorage.getOriginBoundSession()
+        val origin = binding?.origin ?: configRepository.getCurrentBackendUrl()
+        val api = apiForOrigin(origin)
+        return authorized(binding, retryAnyFailure = true) { api.deletePasskey(it, credentialId) }
     }
 
-    /**
-     * Run [block] with a valid access token, transparently refreshing on first failure.
-     *
-     * Used everywhere we make an authenticated request. Without this, every authenticated call
-     * site would have to inline the same "fail → refreshAuthentication → retry once" structure,
-     * and missing it (e.g. updateAccountProfile, restore-key registration) silently surfaces a
-     * generic error to users when the access token has expired in the background.
-     *
-     * Refreshes opportunistically on any failure, not just 401, to match the existing inline
-     * pattern in [getAccountInfo] / [deletePasskey]. The cost is one extra refresh attempt when
-     * a non-auth failure happens; the benefit is symmetry with the existing pattern and no need
-     * to introspect server error shapes.
-     */
-    suspend fun <T> withFreshAccessToken(block: suspend (accessToken: String) -> Result<T>): Result<T> {
-        val session =
-            sessionStorage.getSession()
-                ?: return Result.failure(IllegalStateException("No active session"))
-
-        val first = block(session.accessToken)
-        if (first.isSuccess) return first
-
-        val refreshResult = refreshAuthentication()
-        if (refreshResult.isFailure) return first
-
-        val updatedSession = sessionStorage.getSession() ?: return first
-        return block(updatedSession.accessToken)
-    }
+    /** Refreshes once on failure while retaining the captured account and server. */
+    suspend fun <T> withFreshAccessToken(block: suspend (accessToken: String) -> Result<T>): Result<T> =
+        authorized(retryAnyFailure = true, call = block)
 
     private fun Throwable?.isRejected(codes: Set<String>): Boolean = this is PasskeyApiException && errorCode in codes
 

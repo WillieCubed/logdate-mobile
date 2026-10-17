@@ -23,6 +23,12 @@ interface RestoreCredentialManager {
      */
     suspend fun createRestoreKey(options: PasskeyRegistrationOptions): Result<String>
 
+    /** Records cleanup before local sign-out commits; unsupported platforms do nothing. */
+    suspend fun prepareRestoreCredentialClear(
+        origin: String,
+        isCurrent: suspend () -> Boolean,
+    ) = Unit
+
     /**
      * Retrieve the restore credential from the device's cloud backup.
      *
@@ -34,9 +40,27 @@ interface RestoreCredentialManager {
 
     /**
      * Clear the restore credential. Should be called on sign-out.
-     * Failures are non-fatal — best effort only.
+     * Returns the provider outcome; durable implementations retain failed cleanup for retry.
      */
     suspend fun clearRestoreCredential(): Result<Unit>
+}
+
+/** Provider implementations that serialize guarded enrollment with durable cleanup. */
+interface GuardedRestoreCredentialManager : RestoreCredentialManager {
+    suspend fun createRestoreKeyIfCurrent(
+        options: PasskeyRegistrationOptions,
+        isCurrent: () -> Boolean,
+    ): Result<String>
+}
+
+suspend fun RestoreCredentialManager.createRestoreKeyIfCurrent(
+    options: PasskeyRegistrationOptions,
+    isCurrent: () -> Boolean,
+): Result<String> {
+    if (this is GuardedRestoreCredentialManager) return createRestoreKeyIfCurrent(options, isCurrent)
+    if (!isCurrent()) return Result.failure(RestoreCredentialError.Unknown("Restore identity changed"))
+    val result = createRestoreKey(options)
+    return if (isCurrent()) result else Result.failure(RestoreCredentialError.Unknown("Restore identity changed"))
 }
 
 sealed class RestoreCredentialError(
