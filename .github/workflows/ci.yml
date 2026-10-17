@@ -53,7 +53,14 @@ jobs:
       - name: Run tests
         # JVM/Android and multiplatform modules need both aggregates. Server/client e2e
         # tests belong to their dedicated job rather than running twice.
-        run: ./gradlew test allTests -x :integration:server-client-e2e:test --continue
+        # A runner that runs out of memory is shut down without any error from Gradle,
+        # so memory use and the largest processes are logged once a minute.
+        run: |
+          (while sleep 60; do
+            free -m | awk 'NR==2 { printf "Memory: %s MB used, %s MB available.", $3, $7 }'
+            ps -eo rss=,comm= --sort=-rss | awk 'NR<=4 { printf " %s %d MB", $2, $1 / 1024 } END { print "" }'
+          done) &
+          ./gradlew test allTests -x :integration:server-client-e2e:test --continue
         env:
           DATABASE_URL: jdbc:postgresql://localhost:5432/logdate_test
           DATABASE_USER: test
