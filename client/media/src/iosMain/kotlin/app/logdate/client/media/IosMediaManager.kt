@@ -12,7 +12,9 @@ import app.logdate.client.media.storage.iosMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -66,7 +68,8 @@ import kotlin.uuid.Uuid
  */
 class IosMediaManager(
     private val mediaFiles: MediaFileResolver = iosMediaFileResolver(),
-) : MediaManager {
+) : MediaManager,
+    ConditionalMediaSaver {
     private val fileManager = NSFileManager.defaultManager
     private val mediaRootPath = mediaFiles.directory(MediaCollection.Library)
     private val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif")
@@ -218,6 +221,19 @@ class IosMediaManager(
             }
             return@withContext "file://$path"
         }
+
+    override suspend fun saveMedia(
+        payload: MediaPayload,
+        canCommit: () -> Boolean,
+    ): String {
+        if (!canCommit()) throw CancellationException("Media hydration scope changed")
+        val uri = saveMedia(payload)
+        if (!canCommit()) {
+            withContext(NonCancellable) { deleteOwnedMedia(uri) }
+            throw CancellationException("Media hydration scope changed")
+        }
+        return uri
+    }
 
     override suspend fun saveMediaFromFile(
         sourceFilePath: String,
