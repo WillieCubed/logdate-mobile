@@ -253,7 +253,7 @@ Beta and production are `wear:beta` and `wear:production`. The two publishes run
 job because Play assigns both apps version codes from a single sequence, and two uploads racing for
 the next code would collide.
 
-Promoting the watch to production is not wired up. The `android-v*` tag job promotes only the
+Promoting the watch to production is not wired up. The production stages promote only the
 phone's internal release.
 
 ### One-time Play Console setup

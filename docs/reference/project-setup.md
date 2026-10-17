@@ -82,16 +82,30 @@ The exit status is `0` when everything is ok, `1` when something is wrong, and
 | `play-keystore` | The `production` GitHub environment holds the upload keystore and its passwords. |
 | `play-release-tag` | An `android-v<x.y.z>` tag exists, which version codes are derived from. Asks before pushing one. |
 | `play-first-bundle` | Play has at least one bundle. **Manual once:** setup builds and verifies it, and you upload it. |
-| `play-publishing` | Every push to `main` publishes to the internal testing track ("dogfood"). |
+| `play-publishing` | The publish workflow is allowed to upload to the internal testing track ("dogfood"), and with `--enable-play-production` to promote to production. Nothing publishes until someone dispatches it. |
 
 ## How releases flow once setup is done
 
-- **Dogfood:** every push to `main` builds a release bundle, signs it with the
-  upload key, and publishes it to the Play **internal testing** track. Testers
-  on that track get it from the Play Store within minutes.
-- **Production:** pushing a tag such as `android-v1.2.0` *promotes* that exact
-  internal build to the production track. It is never rebuilt, so what you
-  tested is what ships. Turn this on with `--enable-play-production`.
+Nothing reaches Play on its own. Pushing to `main` or pushing a tag publishes
+nothing; every release is a manual run of **Publish Android to Play**
+(`.github/workflows/publish-android-play.yml`), and its `stage` input picks
+what that run does.
+
+- **Dogfood:** dispatch the workflow from `main` with stage `internal`. It
+  builds a release bundle, signs it with the upload key, and publishes it to
+  the Play **internal testing** track. Testers on that track get it from the
+  Play Store within minutes.
+- **Production:** dispatch a production stage with `candidate_tag` set to a
+  tested `android-v*` tag (such as `android-v1.2.0`) and
+  `candidate_version_code` set to that build's exact Play version code. The
+  run *promotes* that internal build; it is never rebuilt, so what you tested
+  is what ships. The stages move one release through a staged rollout:
+  `start-5` starts it at 5%, `advance-25` raises it to 25%, `complete-100`
+  finishes it, `halt` stops it, and `resume-5` or `resume-25` restarts a
+  halted rollout. Production stages are available only after setup runs with
+  `--enable-play-production`.
+
+See [Google Play publishing](google-play-publishing.md) for the full workflow.
 
 Both tracks talk to `https://cloud.logdate.app`. That works because Play
 re-signs every install with its app-signing key, and the production server
