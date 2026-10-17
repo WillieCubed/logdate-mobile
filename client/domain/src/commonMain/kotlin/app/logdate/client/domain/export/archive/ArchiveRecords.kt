@@ -109,6 +109,7 @@ internal fun JournalNote.toArchiveNote(
         caption = caption.ifEmpty { null },
         photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
         capturedOn = capturedOn?.wireName,
+        capturedDuring = capturedDuring?.wireName,
         media = mediaRefOrNull()?.let(media::refFor),
         durationMs = (this as? JournalNote.Audio)?.durationMs,
         transcript = (this as? JournalNote.Audio)?.transcript,

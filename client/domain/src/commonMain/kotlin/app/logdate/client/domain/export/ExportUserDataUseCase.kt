@@ -183,6 +183,7 @@ class ExportUserDataUseCase(
                                     location = note.location?.toExportLocation(),
                                     syncVersion = note.syncVersion,
                                     capturedOn = note.capturedOn?.wireName,
+                                    capturedDuring = note.capturedDuring?.wireName,
                                 )
                             is JournalNote.Image ->
                                 ExportNote(
@@ -196,6 +197,7 @@ class ExportUserDataUseCase(
                                     location = note.location?.toExportLocation(),
                                     syncVersion = note.syncVersion,
                                     capturedOn = note.capturedOn?.wireName,
+                                    capturedDuring = note.capturedDuring?.wireName,
                                 )
                             is JournalNote.Audio ->
                                 ExportNote(
@@ -210,6 +212,7 @@ class ExportUserDataUseCase(
                                     location = note.location?.toExportLocation(),
                                     syncVersion = note.syncVersion,
                                     capturedOn = note.capturedOn?.wireName,
+                                    capturedDuring = note.capturedDuring?.wireName,
                                 )
                             is JournalNote.Video ->
                                 ExportNote(
@@ -222,6 +225,7 @@ class ExportUserDataUseCase(
                                     location = note.location?.toExportLocation(),
                                     syncVersion = note.syncVersion,
                                     capturedOn = note.capturedOn?.wireName,
+                                    capturedDuring = note.capturedDuring?.wireName,
                                 )
                         }
                     }

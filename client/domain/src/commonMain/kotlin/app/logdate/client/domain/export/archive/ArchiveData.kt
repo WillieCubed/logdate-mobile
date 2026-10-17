@@ -51,6 +51,8 @@ data class ArchiveNote(
     val photoPresentation: String? = null,
     /** The kind of device the note was captured on, `phone` or `watch`. Absent when it was not recorded. */
     val capturedOn: String? = null,
+    /** What the person was doing at capture, `moving` or `in_vehicle`. Absent when it was not recorded. */
+    val capturedDuring: String? = null,
     val media: ArchiveMediaRef? = null,
     val durationMs: Long? = null,
     val transcript: TranscriptDocument? = null,

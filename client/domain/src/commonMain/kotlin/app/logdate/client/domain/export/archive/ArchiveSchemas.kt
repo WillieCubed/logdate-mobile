@@ -158,6 +158,7 @@ object ArchiveSchemas {
                                 "caption" to string(),
                                 "photoPresentation" to string(),
                                 "capturedOn" to string(minLength = 1),
+                                "capturedDuring" to string(minLength = 1),
                                 "transcript" to transcript(),
                                 "media" to ref("mediaRef"),
                                 "durationMs" to count(),

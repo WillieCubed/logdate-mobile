@@ -119,6 +119,9 @@ draft attachment is skipped; a source-device path is never retained as a fallbac
   membership lives on the note.
 - `media`: where the file is. See below.
 - `timeZone` and `createdAtLocal`: see below.
+- `capturedOn`, the kind of device the note was captured on (`phone` or `watch`), and `capturedDuring`,
+  what the person was doing then (`moving` or `in_vehicle`), when they were recorded. Restoring reads a
+  value it does not know as not recorded.
 
 **Media.** `media.status` is `included` or `omitted`. An included file has a `path` and a `mediaType`.
 An omitted file has an `omittedReason` and no path, so nothing ever points at a file that is not

@@ -163,6 +163,7 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                 updatedAt = note.updatedAt,
                 timeZone = note.timeZone,
                 capturedOn = note.capturedOn,
+                capturedDuring = note.capturedDuring,
                 location = note.location?.toExportLocation(),
             )
         }
