@@ -10,13 +10,14 @@ public object RefreshSessionLexicon {
 @Serializable
 public data class RefreshSessionOutput(
     val accessJwt: String,
-    val active: Boolean?,
+    val active: Boolean? = null,
     val did: String,
-    val didDoc: JsonElement?,
-    val email: String?,
-    val emailAuthFactor: Boolean?,
-    val emailConfirmed: Boolean?,
+    val didDoc: JsonElement? = null,
+    val email: String? = null,
+    val emailAuthFactor: Boolean? = null,
+    val emailConfirmed: Boolean? = null,
     val handle: String,
     val refreshJwt: String,
-    val status: String?,
+    /** Hosting status of the account. If not specified, then assume 'active'. */
+    val status: String? = null,
 )

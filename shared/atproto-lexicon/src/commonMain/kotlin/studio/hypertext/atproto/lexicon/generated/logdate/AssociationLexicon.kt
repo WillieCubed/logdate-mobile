@@ -10,6 +10,6 @@ public object AssociationLexicon {
 public data class Association(
     val contentId: String,
     val createdAt: Long,
-    val deviceId: String?,
+    val deviceId: String? = null,
     val journalId: String,
 )

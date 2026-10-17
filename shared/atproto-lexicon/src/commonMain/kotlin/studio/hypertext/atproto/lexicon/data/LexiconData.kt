@@ -71,12 +71,12 @@ public data class Blob(
  * of their JSON form.
  */
 public object LexiconData {
-    /** The JSON configuration generated models use. */
-    public val json: Json =
-        Json {
-            ignoreUnknownKeys = true
-            explicitNulls = false
-        }
+    /**
+     * The JSON configuration generated models use. Unknown fields from newer schema versions are
+     * ignored. A field that's required but nullable is always written, as null when it's null,
+     * while optional fields left at their null default are omitted.
+     */
+    public val json: Json = Json { ignoreUnknownKeys = true }
 
     /** Encodes [value] as deterministic DAG-CBOR bytes. */
     public fun <T> encodeToDagCbor(

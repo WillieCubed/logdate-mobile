@@ -32,10 +32,17 @@ fun registerLexiconCodegenTask(
     inputDir: org.gradle.api.file.Directory,
     outputDir: org.gradle.api.file.Directory,
     packageName: String,
+) = registerLexiconCodegenTask(name, listOf(inputDir.asFile), outputDir, packageName)
+
+fun registerLexiconCodegenTask(
+    name: String,
+    inputs: List<File>,
+    outputDir: org.gradle.api.file.Directory,
+    packageName: String,
 ) {
     tasks.register<JavaExec>(name) {
         group = "codegen"
-        description = "Generate checked-in Kotlin models for lexicon documents in ${inputDir.asFile.relativeTo(projectDir)}."
+        description = "Generate checked-in Kotlin models for ${inputs.joinToString { it.relativeTo(projectDir).path }}."
 
         dependsOn(tasks.named("jvmJar"))
 
@@ -43,7 +50,7 @@ fun registerLexiconCodegenTask(
         classpath(jvmJar.map { it.archiveFile.get().asFile }, configurations.named("jvmRuntimeClasspath"))
         mainClass.set("studio.hypertext.atproto.lexicon.GenerateLexiconsKt")
         args(
-            inputDir.asFile.absolutePath,
+            inputs.joinToString(File.pathSeparator) { it.absolutePath },
             outputDir.asFile.absolutePath,
             packageName,
         )
@@ -83,6 +90,23 @@ registerLexiconCodegenTask(
     inputDir = atprotoSyncLexiconInputDir,
     outputDir = atprotoSyncLexiconOutputDir,
     packageName = "studio.hypertext.atproto.lexicon.generated.com.atproto.sync",
+)
+
+// Test fixtures: real LogDate and community schemas plus one synthetic schema for the kinds LogDate
+// doesn't use yet. Their generated code is compiled and round-trip tested on every platform.
+val repositoryLexiconDir = rootProject.layout.projectDirectory.dir("lexicons")
+registerLexiconCodegenTask(
+    name = "generateLexiconTestFixtures",
+    inputs =
+        listOf(
+            repositoryLexiconDir.file("app/logdate/defs.json").asFile,
+            repositoryLexiconDir.file("app/logdate/journal/entry.json").asFile,
+            repositoryLexiconDir.file("app/logdate/crypto/sealed.json").asFile,
+            repositoryLexiconDir.file("community/lexicon/location/geo.json").asFile,
+            layout.projectDirectory.file("src/commonTest/lexicons/kitchenSink.json").asFile,
+        ),
+    outputDir = layout.projectDirectory.dir("src/commonTest/kotlin/studio/hypertext/atproto/lexicon/fixtures"),
+    packageName = "studio.hypertext.atproto.lexicon.fixtures",
 )
 
 tasks.register("generateOfficialAtprotoLexicons") {

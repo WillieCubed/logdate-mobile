@@ -8,21 +8,26 @@ public object DescribeServerLexicon {
 
 @Serializable
 public data class DescribeServerOutput(
+    /** List of domain suffixes that can be used in account handles. */
     val availableUserDomains: List<String>,
-    val contact: DescribeServerContact?,
+    /** Contact information */
+    val contact: DescribeServerContact? = null,
     val did: String,
-    val inviteCodeRequired: Boolean?,
-    val links: DescribeServerLinks?,
-    val phoneVerificationRequired: Boolean?,
+    /** If true, an invite code must be supplied to create an account on this instance. */
+    val inviteCodeRequired: Boolean? = null,
+    /** URLs of service policy documents. */
+    val links: DescribeServerLinks? = null,
+    /** If true, a phone verification token must be supplied to create an account on this instance. */
+    val phoneVerificationRequired: Boolean? = null,
 )
 
 @Serializable
 public data class DescribeServerContact(
-    val email: String?,
+    val email: String? = null,
 )
 
 @Serializable
 public data class DescribeServerLinks(
-    val privacyPolicy: String?,
-    val termsOfService: String?,
+    val privacyPolicy: String? = null,
+    val termsOfService: String? = null,
 )

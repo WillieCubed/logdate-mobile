@@ -8,6 +8,7 @@ public object GetRepoStatusLexicon {
 
 @Serializable
 public data class GetRepoStatusParams(
+    /** The DID of the repo. */
     val did: String,
 )
 
@@ -15,6 +16,12 @@ public data class GetRepoStatusParams(
 public data class GetRepoStatusOutput(
     val active: Boolean,
     val did: String,
-    val rev: String?,
-    val status: String?,
+    /** Optional field, the current rev of the repo, if active=true */
+    val rev: String? = null,
+    /**
+     * If active=false, this optional field indicates a possible reason for why the account is not active. If
+     * active=false and no status is supplied, then the host makes no claim for why the repository is no longer being
+     * hosted.
+     */
+    val status: String? = null,
 )

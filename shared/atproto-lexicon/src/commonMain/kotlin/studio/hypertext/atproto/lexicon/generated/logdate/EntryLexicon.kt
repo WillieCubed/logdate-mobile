@@ -8,11 +8,11 @@ public object EntryLexicon {
 
 @Serializable
 public data class Entry(
-    val content: String?,
+    val content: String? = null,
     val createdAt: Long,
-    val deviceId: String?,
-    val durationMs: Long?,
-    val id: String?,
+    val deviceId: String? = null,
+    val durationMs: Long? = null,
+    val id: String? = null,
     val lastUpdated: Long,
     val type: String,
 )
