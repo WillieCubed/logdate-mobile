@@ -115,7 +115,7 @@ class CurrentCaptureActivity(
 
 `tracker.agreed` is already empty while the flag is off.
 
-- [ ] **Step 1: Write the failing tests**: the watch's `AudioMomentSaver` and `QuickNoteWriter` stamp the current activity; `MarkMomentUseCase` stamps the mark; the phone editor's `toJournalNote` stamps new notes and never changes an existing note's value; `withMarkedCapture` copies the mark's value onto the notes that fill it; nothing is stamped with the flag off.
+- [ ] **Step 1: Write the failing tests**: the watch's `AudioMomentSaver` and `QuickNoteWriter` stamp the current activity; `MarkMomentUseCase` stamps the mark; the phone editor's `toJournalNote` stamps new notes and never changes an existing note's value; `withMarkedCapture` copies the mark's value onto the notes that fill it; a moment started from Home's activity suggestion or the watch's Today card is stamped with that ended activity, passed through `EntryEditorRoute` on the phone; nothing is stamped with the flag off.
 - [ ] **Step 2: Run and confirm failure.** `./gradlew :app:wear:testDebugUnitTest :client:feature:editor:desktopTest :client:domain:jvmTest`
 - [ ] **Step 3: Implement**, injecting `CurrentCaptureActivity` beside each site's time zone stamp. Recovery (`WearRecordingRecovery`) does not stamp, because the activity at recovery time is not the activity at capture time.
 - [ ] **Step 4: Run the tests, then the Wear emulator suite** (`./gradlew :app:wear:wearDevicesGroupDebugAndroidTest`).
