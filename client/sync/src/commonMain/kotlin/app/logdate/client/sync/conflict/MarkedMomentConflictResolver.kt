@@ -29,6 +29,8 @@ class MarkedMomentConflictResolver {
             state = maxOf(local.state, remote.state),
             resolvedNoteIds = local.resolvedNoteIds + remote.resolvedNoteIds,
             syncVersion = maxOf(local.syncVersion, remote.syncVersion),
+            // Recorded once at capture; a copy that has it keeps it, and two that differ settle the same way in either order.
+            capturedDuring = listOfNotNull(local.capturedDuring, remote.capturedDuring).minOrNull(),
         )
     }
 }

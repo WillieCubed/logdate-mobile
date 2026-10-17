@@ -14,6 +14,7 @@ import kotlin.uuid.Uuid
  *
  * @property caption Plain text here; encrypted before it leaves the device.
  * @property resolvedNoteIds The ids of the notes that filled this mark, comma-separated; empty when none.
+ * @property capturedDuring The wire name of what the person was doing when they marked it, or null.
  */
 @Entity(tableName = "marked_moments")
 data class MarkedMomentEntity(
@@ -32,6 +33,7 @@ data class MarkedMomentEntity(
     val lastUpdated: Instant,
     val syncVersion: Long = 0,
     val deletedAt: Instant? = null,
+    val capturedDuring: String? = null,
 )
 
 /** The stored values of [MarkedMomentEntity.state]. */
