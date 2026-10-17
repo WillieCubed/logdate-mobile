@@ -417,8 +417,6 @@ internal class SyncRetryCoordinator(
     suspend fun handleUploadConflict(
         entityType: EntityType,
         pending: PendingUpload,
-        itemLabel: String,
-        conflictLabel: String,
         error: Throwable,
         localVersion: Long,
         localUpdatedAt: Instant,
