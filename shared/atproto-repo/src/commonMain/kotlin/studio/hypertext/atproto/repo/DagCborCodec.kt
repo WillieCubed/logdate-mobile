@@ -36,7 +36,7 @@ public object DagCborCodec {
 
     internal fun bytes(bytes: ByteArray): JsonObject =
         buildJsonObject {
-            put(BYTES_KEY, Base64.UrlSafe.encode(bytes).trimEnd('='))
+            put(BYTES_KEY, bytesBase64.encode(bytes))
         }
 
     internal fun linkOrNull(element: JsonElement?): Cid? {
@@ -60,7 +60,7 @@ public object DagCborCodec {
                 ?.jsonPrimitive
                 ?.contentOrNull
                 ?: return null
-        return Base64.UrlSafe.decode(encoded.padBase64Url())
+        return bytesBase64.decode(encoded)
     }
 
     private fun encodeJsonElement(element: JsonElement): ByteArray =
@@ -275,4 +275,5 @@ private const val CID_LINK_LEAD_BYTE: Byte = 0x00
 private const val LINK_KEY: String = "\$link"
 private const val BYTES_KEY: String = "\$bytes"
 
-private fun String.padBase64Url(): String = this + "=".repeat((4 - length % 4) % 4)
+// The data model encodes bytes with the standard base64 alphabet; padding is optional on read.
+private val bytesBase64 = Base64.Default.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
