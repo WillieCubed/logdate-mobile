@@ -22,7 +22,7 @@ Billing Module
 ### Core Components
 
 - `SubscriptionBiller.kt` - Main billing interface
-- `LogDateBackupPlanOption.kt` - Plan definitions and pricing
+- `LogDateBackupPlanOption.kt` - Plan definitions and their store product SKUs (the UI supplies each plan's name, description and price)
 - `StubSubscriptionBiller.kt` - Testing implementation
 
 ### Platform Implementations

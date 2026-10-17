@@ -2,12 +2,15 @@ package app.logdate.client.media.audio
 
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_microphone_switch_failed
 
 internal class TranscriptionInputHealth {
     @Volatile
@@ -88,7 +91,7 @@ internal fun applyRecordingInputRoute(
         routes.updateRecordingInputDevice(
             recorder.serviceState.value?.routedInputDeviceId,
             true,
-            "Could not switch microphone. Recording continues on the current input.",
+            Res.string.media_device_microphone_switch_failed.toUiText(),
         )
     }
     return recorder.serviceState.value?.routedInputDeviceId ?: deviceId

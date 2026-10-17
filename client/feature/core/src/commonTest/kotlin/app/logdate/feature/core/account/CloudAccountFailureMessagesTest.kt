@@ -5,9 +5,16 @@ import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.networking.DiscoveryFailure
 import app.logdate.client.networking.ServerDiscoveryException
 import app.logdate.feature.core.settings.ui.ServerPreset
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_failure_cloud_not_responding
+import logdate.client.feature.core.generated.resources.account_failure_cloud_unreachable
+import logdate.client.feature.core.generated.resources.account_failure_cloud_unreadable
+import logdate.client.feature.core.generated.resources.account_failure_custom_unreachable
+import logdate.client.feature.core.generated.resources.account_failure_server_not_responding
+import logdate.client.feature.core.generated.resources.account_failure_server_unreachable
+import logdate.client.feature.core.generated.resources.account_failure_unknown
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 
 class CloudAccountFailureMessagesTest {
     private fun cloudMessage(kind: DiscoveryFailure) =
@@ -18,23 +25,17 @@ class CloudAccountFailureMessagesTest {
 
     @Test
     fun `LogDate Cloud not responding says to try again later`() {
-        assertEquals("LogDate Cloud isn’t responding right now. Try again in a few minutes.", cloudMessage(DiscoveryFailure.NOT_RESPONDING))
+        assertEquals(Res.string.account_failure_cloud_not_responding, cloudMessage(DiscoveryFailure.NOT_RESPONDING))
     }
 
     @Test
     fun `LogDate Cloud out of reach says to check the connection`() {
-        assertEquals(
-            "Can’t reach LogDate Cloud. Check your internet connection, then try again.",
-            cloudMessage(DiscoveryFailure.UNREACHABLE),
-        )
+        assertEquals(Res.string.account_failure_cloud_unreachable, cloudMessage(DiscoveryFailure.UNREACHABLE))
     }
 
     @Test
     fun `an unreadable answer from LogDate Cloud says to update LogDate`() {
-        assertEquals(
-            "LogDate Cloud answered with something this version of LogDate can’t read. Update LogDate, then try again.",
-            cloudMessage(DiscoveryFailure.UNREADABLE),
-        )
+        assertEquals(Res.string.account_failure_cloud_unreadable, cloudMessage(DiscoveryFailure.UNREADABLE))
     }
 
     @Test
@@ -42,46 +43,39 @@ class CloudAccountFailureMessagesTest {
         val message =
             serverSelectionFailureMessage(ServerDiscoveryException(DiscoveryFailure.UNREACHABLE, "boom"), ServerPreset.CUSTOM)
 
-        assertEquals("Can’t reach that server. Check the address and your internet connection, then try again.", message)
+        assertEquals(Res.string.account_failure_custom_unreachable, message)
     }
 
     @Test
     fun `sign-in tells a stalled server apart from no connection`() {
         assertEquals(
-            "The server isn’t responding right now. Try again in a few minutes.",
+            Res.string.account_failure_server_not_responding,
             signInFailureMessage(AuthenticateWithPasskeyUseCase.AuthenticationError.ServerUnavailable),
         )
         assertEquals(
-            "Can’t reach the server. Check your internet connection, then try again.",
+            Res.string.account_failure_server_unreachable,
             signInFailureMessage(AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError),
         )
     }
 
     @Test
-    fun `no account failure message speaks as we`() {
-        val messages =
-            listOf(
-                CreatePasskeyAccountUseCase.CreateAccountError.UsernameTaken,
-                CreatePasskeyAccountUseCase.CreateAccountError.UsernameInvalid,
-                CreatePasskeyAccountUseCase.CreateAccountError.DisplayNameInvalid,
-                CreatePasskeyAccountUseCase.CreateAccountError.PasskeyNotSupported,
-                CreatePasskeyAccountUseCase.CreateAccountError.PasskeyCancelled,
-                CreatePasskeyAccountUseCase.CreateAccountError.PasskeyFailed,
-                CreatePasskeyAccountUseCase.CreateAccountError.NetworkError,
-                CreatePasskeyAccountUseCase.CreateAccountError.RateLimited,
-                CreatePasskeyAccountUseCase.CreateAccountError.ServerError,
+    fun `an unknown account creation failure gives a generic message instead of the exception text`() {
+        assertEquals(
+            Res.string.account_failure_unknown,
+            accountCreationFailureMessage(
                 CreatePasskeyAccountUseCase.CreateAccountError.Unknown("HTTP 504 from https://cloud.logdate.app"),
-            ).map(::accountCreationFailureMessage)
-
-        assertFalse(messages.any { Regex("\\b(we|our|us)\\b", RegexOption.IGNORE_CASE).containsMatchIn(it) })
+            ),
+        )
     }
 
     @Test
-    fun `no message repeats the technical failure`() {
-        val technical = "https://cloud.logdate.app answered HTTP 504"
+    fun `no message depends on the technical failure`() {
         for (kind in DiscoveryFailure.entries) {
             for (preset in ServerPreset.entries) {
-                assertFalse(technical in serverSelectionFailureMessage(ServerDiscoveryException(kind, technical), preset))
+                assertEquals(
+                    serverSelectionFailureMessage(ServerDiscoveryException(kind, "boom"), preset),
+                    serverSelectionFailureMessage(ServerDiscoveryException(kind, "https://cloud.logdate.app answered HTTP 504"), preset),
+                )
             }
         }
     }

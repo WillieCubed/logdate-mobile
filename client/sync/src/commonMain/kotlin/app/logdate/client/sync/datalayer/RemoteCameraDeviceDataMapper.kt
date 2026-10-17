@@ -4,6 +4,8 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.resolve
+import app.logdate.client.text.toUiText
 
 object RemoteCameraDeviceDataMapper {
     const val PATH_CAMERA_DEVICES = "/logdate/camera/devices"
@@ -21,14 +23,15 @@ object RemoteCameraDeviceDataMapper {
 
     private fun keyDeviceExternal(index: Int) = "device_${index}_external"
 
-    fun toDataMap(selection: MediaDeviceSelectionUiState): Map<String, String> {
+    /** Writes each camera's label in the phone's language; the watch shows the labels as sent. */
+    suspend fun toDataMap(selection: MediaDeviceSelectionUiState): Map<String, String> {
         val data = mutableMapOf<String, String>()
         val cameraDevices = selection.devices.filter { it.kind == MediaDeviceKind.CAMERA }
         data[KEY_COUNT] = cameraDevices.size.toString()
         selection.selectedDeviceId?.let { data[KEY_SELECTED_DEVICE_ID] = it }
         cameraDevices.forEachIndexed { index, device ->
             data[keyDeviceId(index)] = device.id
-            data[keyDeviceLabel(index)] = device.label
+            data[keyDeviceLabel(index)] = device.label.resolve()
             data[keyDeviceCategory(index)] = device.category.name
             data[keyDeviceAvailable(index)] = device.isAvailable.toString()
             data[keyDeviceExternal(index)] = device.isExternal.toString()
@@ -48,7 +51,7 @@ object RemoteCameraDeviceDataMapper {
                         ?: MediaDeviceCategory.EXTERNAL
                 MediaDeviceUiState(
                     id = id,
-                    label = label,
+                    label = label.toUiText(),
                     kind = MediaDeviceKind.CAMERA,
                     category = category,
                     isAvailable = data[keyDeviceAvailable(index)]?.toBooleanStrictOrNull() ?: true,

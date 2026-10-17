@@ -24,6 +24,7 @@ import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import app.logdate.ui.workspace.WorkspaceDestination
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -49,7 +50,8 @@ fun MarkedTimelineAcceptanceContent(
             1,
         )
     HomeWorkspaceComposition(
-        destinations = HomeRouteDestination.visibleEntries(true).map { WorkspaceDestination(it.name, it.label, it.selectedIcon) },
+        destinations =
+            HomeRouteDestination.visibleEntries(true).map { WorkspaceDestination(it.name, stringResource(it.label), it.selectedIcon) },
         selectedKey = HomeRouteDestination.Timeline.name,
         onSelect = {},
         onCreate = {},

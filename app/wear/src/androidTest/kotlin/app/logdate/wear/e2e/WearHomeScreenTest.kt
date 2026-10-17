@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.wear.compose.material3.MaterialTheme
+import app.logdate.wear.R
 import app.logdate.wear.presentation.home.WearHomeContent
 import app.logdate.wear.presentation.home.WearHomeUiState
 import app.logdate.wear.presentation.recording.RecordingError
@@ -40,7 +41,7 @@ class WearHomeScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val home = WearHomeUiState(greeting = "Good morning")
+    private val home = WearHomeUiState(greeting = R.string.wear_home_greeting_morning)
 
     // -----------------------------------------------------------------------
     // Idle content

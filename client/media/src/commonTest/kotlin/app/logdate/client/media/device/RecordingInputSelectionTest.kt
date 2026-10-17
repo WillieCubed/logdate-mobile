@@ -1,5 +1,9 @@
 package app.logdate.client.media.device
 
+import app.logdate.client.text.toUiText
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_microphone_checking
+import logdate.client.media.generated.resources.media_device_microphone_not_active
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -7,8 +11,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RecordingInputSelectionTest {
-    private val builtIn = MediaDeviceUiState("built-in", "Built-in microphone", MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.BUILT_IN)
-    private val usb = MediaDeviceUiState("usb", "USB microphone", MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.USB, isExternal = true)
+    private val builtIn =
+        MediaDeviceUiState("built-in", "Built-in microphone".toUiText(), MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.BUILT_IN)
+    private val usb =
+        MediaDeviceUiState("usb", "USB microphone".toUiText(), MediaDeviceKind.AUDIO_INPUT, MediaDeviceCategory.USB, isExternal = true)
     private val requested = MediaDeviceSelectionUiState(MediaDeviceKind.AUDIO_INPUT, listOf(builtIn, usb), usb.id)
 
     @Test
@@ -17,7 +23,7 @@ class RecordingInputSelectionTest {
         assertNull(state.selectedDeviceId)
         assertFalse(state.isSelectionConfirmed)
         assertNull(state.selectedDevice)
-        assertTrue(requireNotNull(state.routeControlMessage).contains("Checking"))
+        assertEquals(Res.string.media_device_microphone_checking.toUiText(), state.routeControlMessage)
     }
 
     @Test
@@ -25,7 +31,7 @@ class RecordingInputSelectionTest {
         val state = MediaDeviceSelectionResolver.resolveRecordingAudioInput(requested, builtIn.id, null)
         assertEquals(builtIn.id, state.selectedDeviceId)
         assertEquals(builtIn, state.selectedDevice)
-        assertTrue(requireNotNull(state.routeControlMessage).contains(builtIn.label))
+        assertEquals(Res.string.media_device_microphone_not_active.toUiText(builtIn.label), state.routeControlMessage)
     }
 
     @Test
@@ -38,9 +44,10 @@ class RecordingInputSelectionTest {
 
     @Test
     fun `rejected switch keeps the actual microphone and surfaces its error`() {
-        val state = MediaDeviceSelectionResolver.resolveRecordingAudioInput(requested, builtIn.id, "Could not switch microphone")
+        val error = "Could not switch microphone".toUiText()
+        val state = MediaDeviceSelectionResolver.resolveRecordingAudioInput(requested, builtIn.id, error)
         assertEquals(builtIn.id, state.selectedDeviceId)
-        assertEquals("Could not switch microphone", state.routeControlMessage)
+        assertEquals(error, state.routeControlMessage)
     }
 
     @Test

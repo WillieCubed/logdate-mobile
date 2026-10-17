@@ -34,7 +34,7 @@ import kotlin.uuid.Uuid
 @Composable
 internal fun MarkContextBanner(
     markId: String,
-    refreshKey: String?,
+    refreshKey: Any?,
     onContinueAsNew: () -> Unit,
 ) {
     val marks: MarkedMomentRepository = koinInject()

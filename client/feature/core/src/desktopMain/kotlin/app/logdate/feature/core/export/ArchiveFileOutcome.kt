@@ -5,6 +5,9 @@ import app.logdate.client.domain.export.archive.ArchiveExportProgress
 import app.logdate.client.domain.export.archive.ArchiveExportSummary
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.export_error_not_completed
+import org.jetbrains.compose.resources.StringResource
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.AtomicMoveNotSupportedException
@@ -18,7 +21,7 @@ internal sealed interface ArchiveFileOutcome {
     ) : ArchiveFileOutcome
 
     data class Failed(
-        val message: String,
+        val message: StringResource,
     ) : ArchiveFileOutcome
 }
 
@@ -38,7 +41,7 @@ internal suspend fun exportArchiveToFile(
     var replaced = false
     try {
         var summary: ArchiveExportSummary? = null
-        var failure: String? = null
+        var failure: StringResource? = null
         ZipOutputStream(FileOutputStream(partial).buffered()).use { zip ->
             export(ZipStreamArchiveContainer(zip)).collect { progress ->
                 when (progress) {
@@ -50,7 +53,7 @@ internal suspend fun exportArchiveToFile(
             }
         }
         val completed = summary
-        if (failure != null || completed == null) return ArchiveFileOutcome.Failed(failure ?: "Export could not be completed.")
+        if (failure != null || completed == null) return ArchiveFileOutcome.Failed(failure ?: Res.string.export_error_not_completed)
 
         moveOver(partial, target)
         replaced = true

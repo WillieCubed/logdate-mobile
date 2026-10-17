@@ -220,14 +220,15 @@ class TimelineViewModel(
 
         return createSemanticTimelineDayUiState(
             summary = tldr,
+            summaryNotice = summaryUnavailableReason?.notice,
             date = date,
             moments = momentUiStates,
             people = peopleUiStates,
             notes = noteUiStates,
             placesVisited = placeUiStates,
             events = eventUiStates,
-            isLoadingSummary = tldr.isEmpty() && marks.isEmpty(),
-            isLoadingPeople = people.isEmpty() && tldr.isEmpty() && marks.isEmpty(),
+            isLoadingSummary = isSummaryPending && marks.isEmpty(),
+            isLoadingPeople = people.isEmpty() && isSummaryPending && marks.isEmpty(),
             pendingMarks = marks,
         )
     }
@@ -256,6 +257,7 @@ class TimelineViewModel(
             id = id.toString(),
             capturedAt = estimatedStart,
             label = label,
+            labelPlaceName = labelPlace?.name,
             timeOfDay = timeOfDay,
             textSnippet = textFragments.firstOrNull()?.text,
             media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
@@ -287,8 +289,7 @@ class TimelineViewModel(
         when (this) {
             is HomeRecommendation.EmptyDay ->
                 TimelineSuggestionBlock.EmptyDay(
-                    message = message,
-                    locationName = locationName,
+                    locationName = location?.toUiText(),
                 )
             is HomeRecommendation.CompleteYourDraft ->
                 TimelineSuggestionBlock.CompleteDraft(

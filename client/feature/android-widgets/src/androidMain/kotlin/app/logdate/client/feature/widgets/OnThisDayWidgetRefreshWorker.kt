@@ -78,6 +78,7 @@ class OnThisDayWidgetRefreshWorker(
                         ).firstOrNull()
                     val widgetState =
                         recallData?.toWidgetStateWithAudio(
+                            context,
                             notesRepository,
                             transcriptionRepository,
                             instanceSettings.contentTypes(appWidgetId, settings.widgetContentTypes),
@@ -117,7 +118,7 @@ class OnThisDayWidgetRefreshWorker(
                                         } else {
                                             null
                                         }
-                                    note.toFixedWidgetState(transcript)
+                                    note.toFixedWidgetState(context, transcript)
                                 } ?: OnThisDayWidgetState.MissingMemory
                         }
                     updateAppWidgetState(context, OnThisDayWidgetStateDefinition, glanceId) { state }

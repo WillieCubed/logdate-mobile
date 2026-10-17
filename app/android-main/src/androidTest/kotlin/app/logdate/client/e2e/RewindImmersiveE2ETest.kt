@@ -37,6 +37,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.main.HomeRoute
 import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.feature.rewind.ui.RewindDetailUiState
@@ -203,9 +204,9 @@ class RewindImmersiveE2ETest {
                                         uiState =
                                             RewindDetailUiState.Success(
                                                 listOf(
-                                                    SubtitledRewindPanelUiState("First moment", "Monday", photo),
-                                                    SubtitledRewindPanelUiState("Second moment", "Tuesday", photo),
-                                                    SubtitledRewindPanelUiState("Third moment", "Wednesday", photo),
+                                                    SubtitledRewindPanelUiState("First moment", "Monday".toUiText(), photo),
+                                                    SubtitledRewindPanelUiState("Second moment", "Tuesday".toUiText(), photo),
+                                                    SubtitledRewindPanelUiState("Third moment", "Wednesday".toUiText(), photo),
                                                 ),
                                             ),
                                         onExitRewind = { backStack.removeLastOrNull() },

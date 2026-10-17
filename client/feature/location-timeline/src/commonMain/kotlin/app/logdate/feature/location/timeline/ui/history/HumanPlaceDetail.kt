@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import app.logdate.client.domain.location.history.LocationHistorySnapshot
+import app.logdate.client.text.asString
 import app.logdate.shared.model.location.PlaceVisit
 import app.logdate.shared.model.location.SemanticPlace
 import app.logdate.ui.platform.PlatformIcons
@@ -64,16 +65,20 @@ internal fun HumanPlaceDetail(
     var target by remember { mutableStateOf<SemanticPlace?>(null) }
     val detail: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            PanelHeader(row?.title ?: stringResource(Res.string.history_place_detail_title), subtitle = row?.supportingText, actions = {
-                IconButton(onClick = onDismiss) { Icon(PlatformIcons.close(), stringResource(Res.string.history_close_place)) }
-            })
+            PanelHeader(
+                row?.title ?: stringResource(Res.string.history_place_detail_title),
+                subtitle = row?.supportingText?.map { it.asString() }?.joinToString("\n"),
+                actions = {
+                    IconButton(onClick = onDismiss) { Icon(PlatformIcons.close(), stringResource(Res.string.history_close_place)) }
+                },
+            )
             Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Text(stringResource(Res.string.history_place_visits), style = MaterialTheme.typography.titleMedium)
                 if (visits.isEmpty()) Text(stringResource(Res.string.history_place_no_visits))
                 visits.forEach { visit ->
                     TextButton(
                         onClick = { onVisit(visit) },
-                    ) { Text("${visit.start.toReadableDateShort()} · ${visit.toHistoryUi(emptyList()).timeLabel}") }
+                    ) { Text("${visit.start.toReadableDateShort()} · ${visit.toHistoryUi(emptyList()).timeLabel.asString()}") }
                 }
                 Text(stringResource(Res.string.history_place_memories), style = MaterialTheme.typography.titleMedium)
                 row?.memories?.forEach { HistoryMemoryPreview(it, onMemory) }

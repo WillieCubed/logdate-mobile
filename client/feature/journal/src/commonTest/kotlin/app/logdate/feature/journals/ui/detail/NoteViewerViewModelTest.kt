@@ -228,7 +228,7 @@ class NoteViewerViewModelTest {
                 )
 
             advanceUntilIdle()
-            viewModel.shareCurrentNote()
+            viewModel.shareCurrentNote(chooserTitle = "Share note")
 
             assertEquals("Share me", sharingLauncher.sharedText)
             assertTrue(sharingLauncher.sharedMediaUris.isEmpty())
@@ -259,7 +259,7 @@ class NoteViewerViewModelTest {
                 )
 
             advanceUntilIdle()
-            viewModel.shareCurrentNote()
+            viewModel.shareCurrentNote(chooserTitle = "Share note")
 
             assertEquals(listOf("content://media/image/1"), sharingLauncher.sharedMediaUris)
         }

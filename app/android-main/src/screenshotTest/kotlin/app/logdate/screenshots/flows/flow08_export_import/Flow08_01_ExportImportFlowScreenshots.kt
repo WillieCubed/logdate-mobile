@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.restore.RestoreError
 import app.logdate.feature.core.restore.RestoreStage
@@ -113,7 +114,7 @@ fun S04_ExportInProgress() {
             exportState =
                 ExportState.Exporting(
                     progressPercent = 65,
-                    message = "Exporting media files\u2026",
+                    message = "Exporting media files\u2026".toUiText(),
                 ),
         )
     }
@@ -149,7 +150,7 @@ fun S06_ExportFailed() {
         ExportImportPreviewContent(
             exportState =
                 ExportState.Failed(
-                    reason = "Not enough storage space to create the export archive.",
+                    reason = "Not enough storage space to create the export archive.".toUiText(),
                 ),
         )
     }

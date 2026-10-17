@@ -6,9 +6,13 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import app.logdate.client.text.UiText
+import app.logdate.client.text.resolve
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 
 /**
@@ -29,6 +33,9 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
 
     override val authState: StateFlow<AppAuthState> = _authState
 
+    /** Resolves the prompt's words from string resources before the prompt is shown. */
+    private val promptScope = MainScope()
+
     /**
      * Authenticates the user using biometric authentication.
      *
@@ -36,12 +43,12 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
      * [AppAuthState.NO_PROMPT_NEEDED] to indicate that no prompt is needed.
      */
     override fun authenticate(
-        title: String,
-        subtitle: String,
-        cancelLabel: String,
+        title: UiText,
+        subtitle: UiText,
+        cancelLabel: UiText,
         requireConfirmation: Boolean,
         requestEnrollmentIfNecessary: Boolean,
-        description: String?,
+        description: UiText?,
         onResult: (AppAuthState) -> Unit,
     ) {
         val biometricManager = BiometricManager.from(activity)
@@ -71,22 +78,25 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
         ) {
             BiometricManager.BIOMETRIC_SUCCESS -> {
                 Napier.d("App can authenticate using biometrics.", tag = TAG)
-                BiometricPrompt(activity, executor, callback).authenticate(
-                    BiometricPrompt.PromptInfo
-                        .Builder()
-                        .setTitle(title)
-                        .setSubtitle(subtitle)
-                        .apply {
-                            if (description != null) {
-                                setDescription(description)
-                            }
-                        }.setAllowedAuthenticators(
-                            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-                        ).setConfirmationRequired(requireConfirmation)
-                        // TODO: Only apply negative button text if device credential authentication is allowed
-//                        .setNegativeButtonText(cancelLabel)
-                        .build(),
-                )
+                val host = activity
+                promptScope.launch {
+                    val promptInfo =
+                        BiometricPrompt.PromptInfo
+                            .Builder()
+                            .setTitle(title.resolve())
+                            .setSubtitle(subtitle.resolve())
+                            .apply {
+                                if (description != null) {
+                                    setDescription(description.resolve())
+                                }
+                            }.setAllowedAuthenticators(
+                                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+                            ).setConfirmationRequired(requireConfirmation)
+                            // TODO: Only apply negative button text if device credential authentication is allowed
+//                            .setNegativeButtonText(cancelLabel.resolve())
+                            .build()
+                    BiometricPrompt(host, executor, callback).authenticate(promptInfo)
+                }
             }
 
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {

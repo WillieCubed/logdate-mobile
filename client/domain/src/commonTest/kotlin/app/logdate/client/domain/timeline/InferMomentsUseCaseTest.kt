@@ -133,7 +133,8 @@ class InferMomentsUseCaseTest {
             val moments = useCase(date, listOf(noteWithPlace), places)
 
             assertEquals(1, moments.size)
-            assertEquals("At Blue Bottle Coffee", moments[0].label)
+            assertEquals("", moments[0].label)
+            assertEquals(places.single(), moments[0].labelPlace)
         }
 
     @Test

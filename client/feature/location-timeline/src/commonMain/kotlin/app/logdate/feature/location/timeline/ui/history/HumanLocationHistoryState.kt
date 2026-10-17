@@ -1,5 +1,6 @@
 package app.logdate.feature.location.timeline.ui.history
 
+import app.logdate.client.text.UiText
 import kotlin.math.roundToInt
 
 enum class HistoryTab { Day, Places }
@@ -12,7 +13,7 @@ enum class HistoryEditAction { ChangePlace, ChangeActivity, ChangeTime, AddVisit
 
 data class HistoryMemoryUi(
     val id: String,
-    val title: String,
+    val title: UiText,
     val kind: HistoryMemoryKind,
     val supportingText: String = "",
     val thumbnailUri: String? = null,
@@ -22,9 +23,9 @@ data class HistoryMemoryUi(
 data class HistoryItemUi(
     val id: String,
     val kind: HistoryItemKind,
-    val title: String,
-    val timeLabel: String,
-    val supportingText: String = "",
+    val title: UiText,
+    val timeLabel: UiText,
+    val supportingText: UiText = UiText.Raw(""),
     val memories: List<HistoryMemoryUi> = emptyList(),
     val isApproximate: Boolean = false,
 )
@@ -32,25 +33,25 @@ data class HistoryItemUi(
 data class HistoryPlaceUi(
     val id: String,
     val title: String,
-    val supportingText: String,
+    val supportingText: List<UiText>,
     val memories: List<HistoryMemoryUi> = emptyList(),
     val sourceIds: Set<String> = setOf(id),
 )
 
 data class HumanLocationHistoryState(
-    val dateLabel: String,
-    val daySummary: String = "",
+    val dateLabel: UiText,
+    val daySummary: UiText = UiText.Raw(""),
     val items: List<HistoryItemUi> = emptyList(),
     val places: List<HistoryPlaceUi> = emptyList(),
     val selectedItemId: String? = null,
     val tab: HistoryTab = HistoryTab.Day,
     val placesQuery: String = "",
     val placesMapVisible: Boolean = false,
-    val placesFilterLabel: String = "",
-    val recoveryMessage: String? = null,
+    val placesFilterLabel: UiText? = null,
+    val recoveryMessage: UiText? = null,
     val detailVisible: Boolean = false,
     val replayPlaying: Boolean = false,
-    val recoveryActionLabel: String? = null,
+    val recoveryActionLabel: UiText? = null,
     val canRetry: Boolean = false,
     val selectionRevision: Long = 0,
 ) {

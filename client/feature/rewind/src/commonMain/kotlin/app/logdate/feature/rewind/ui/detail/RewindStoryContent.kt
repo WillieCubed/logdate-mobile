@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.asString
 import app.logdate.feature.rewind.ui.AudioNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.AudioPanelPlaybackUiState
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
@@ -84,7 +85,7 @@ fun RewindStoryContent(
         is SubtitledRewindPanelUiState -> {
             SubtitledPanel(
                 title = panel.title,
-                subtitle = panel.subtitle,
+                subtitle = panel.subtitle.asString(),
                 backgroundImageUri = panel.backgroundUri,
                 weatherChip = panel.weatherChip,
                 modifier = modifier,
@@ -95,8 +96,8 @@ fun RewindStoryContent(
             StatisticPanel(
                 title = panel.title,
                 statistic = panel.statistic,
-                units = panel.units,
-                description = panel.description,
+                units = panel.units.asString(),
+                description = panel.description.asString(),
                 backgroundColor = panel.background.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary,
                 backgroundImageUri = panel.background.uri,
                 modifier = modifier,
@@ -106,7 +107,7 @@ fun RewindStoryContent(
         is TextNoteRewindPanelUiState -> {
             TextNotePanel(
                 content = panel.content,
-                dateFormatted = panel.dateFormatted,
+                dateFormatted = panel.dateFormatted.asString(),
                 backgroundColor = panel.background.color?.let { Color(it) } ?: Color(0xFF1A1A1A),
                 backgroundImageUri = panel.background.uri,
                 modifier = modifier,
@@ -117,7 +118,7 @@ fun RewindStoryContent(
             ImageNotePanel(
                 imageUri = panel.imageUri,
                 caption = panel.caption,
-                dateFormatted = panel.dateFormatted,
+                dateFormatted = panel.dateFormatted.asString(),
                 isVideoFrame = panel.isVideoFrame,
                 modifier = modifier,
             )
@@ -160,8 +161,8 @@ fun RewindStoryContent(
         is LocationMapRewindPanelUiState -> {
             LocationMapPanel(
                 points = panel.points,
-                title = panel.title,
-                subtitle = panel.subtitle,
+                title = panel.title.asString(),
+                subtitle = panel.subtitle.asString(),
                 accentSeed = panel.accentSeed,
                 modifier = modifier,
             )
@@ -173,7 +174,7 @@ fun RewindStoryContent(
                 uri = panel.uri,
                 durationMs = panel.durationMs,
                 transcriptionText = panel.transcriptionText,
-                dateFormatted = panel.dateFormatted,
+                dateFormatted = panel.dateFormatted.asString(),
                 cachedAmplitudes = panel.cachedAmplitudes,
                 isPlaying = audioPlaybackState.playingSourceId == panel.sourceId,
                 playbackProgress = if (audioPlaybackState.playingSourceId == panel.sourceId) audioPlaybackState.progress else 0f,

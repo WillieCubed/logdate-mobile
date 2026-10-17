@@ -2,6 +2,8 @@ package app.logdate.feature.editor.ui.editor
 
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_audio_duration_unreadable
 
 /** Reads the managed file's metadata before an unknown-duration attachment can be published. */
 internal suspend fun EntryEditorViewModel.resolveAudioDuration(state: AudioCaptureState.Ready): AudioCaptureState {
@@ -18,6 +20,6 @@ internal suspend fun EntryEditorViewModel.resolveAudioDuration(state: AudioCaptu
     return if (duration != null && duration > 0L) {
         state.copy(durationMs = duration)
     } else {
-        AudioCaptureState.Failed("Audio duration could not be read. Your file is still attached. Try saving again.")
+        AudioCaptureState.Failed(Res.string.editor_error_audio_duration_unreadable)
     }
 }

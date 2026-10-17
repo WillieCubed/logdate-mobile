@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import app.logdate.client.text.toUiText
 import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.feature.rewind.ui.AudioNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.ImageRewindPanelUiState
@@ -45,8 +46,9 @@ import kotlin.uuid.Uuid
 private val rewindId = Uuid.parse("00000000-0000-0000-0000-000000000020")
 private val sampleTime = Instant.parse("2026-09-24T18:00:00Z")
 private const val PHOTO_URI = "android.resource://studio.hypertext.logdate.debug/drawable/workspace_sample_photo"
-private val cover = SubtitledRewindPanelUiState("A few quiet moments", "September 21–27, 2026", backgroundUri = PHOTO_URI)
-private val photo = ImageRewindPanelUiState(rewindId, sampleTime, PHOTO_URI, "An afternoon outside", "Thursday, September 24")
+private val cover = SubtitledRewindPanelUiState("A few quiet moments", "September 21–27, 2026".toUiText(), backgroundUri = PHOTO_URI)
+private val photo =
+    ImageRewindPanelUiState(rewindId, sampleTime, PHOTO_URI, "An afternoon outside", "Thursday, September 24".toUiText())
 
 @PreviewTest @WorkspacePreviewMatrix @Composable
 fun ImmersiveRewindPhoto() = ImmersiveRewindScreenshot(photo)
@@ -61,7 +63,7 @@ fun ImmersiveRewindText() =
             rewindId,
             sampleTime,
             "I took the long way home today. The afternoon light made everything feel a little slower, and I was glad I had time to notice it.",
-            "Thursday, September 24",
+            "Thursday, September 24".toUiText(),
         ),
     )
 
@@ -74,7 +76,7 @@ fun ImmersiveRewindAudio() =
             "fixture://afternoon-recording",
             42000L,
             "A few thoughts from the walk home. I want to remember how peaceful this afternoon felt.",
-            "Thursday, September 24",
+            "Thursday, September 24".toUiText(),
             listOf(0.2f, 0.5f, 0.8f, 0.4f, 0.6f, 0.9f, 0.3f, 0.7f),
         ),
     )

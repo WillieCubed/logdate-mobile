@@ -1,6 +1,9 @@
 package app.logdate.feature.editor.ui.audio
 
 import app.logdate.client.media.audio.transcription.TranscriptionResult
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.capture_state_recording_could_not_be_saved
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
 
@@ -46,7 +49,7 @@ internal fun AudioUiState.withStartedRecording(
     )
 
 internal fun AudioUiState.withFailedRecordingStart(
-    message: String,
+    message: StringResource,
     lastTargetNoteId: Uuid?,
     fallback: AudioUiState?,
 ): AudioUiState =
@@ -83,7 +86,7 @@ internal fun AudioUiState.withStoppedRecording(
                 else -> AudioUiState.TranscriptionState.NotRequested
             },
         failedRecordingTargetNoteId = if (uri == null) targetNoteId else null,
-        error = if (uri == null) "Recording could not be saved" else error,
+        error = if (uri == null) Res.string.capture_state_recording_could_not_be_saved else error,
     )
 
 internal fun AudioUiState.withFailedRecordingStop(targetNoteId: Uuid?): AudioUiState =
@@ -93,7 +96,7 @@ internal fun AudioUiState.withFailedRecordingStop(targetNoteId: Uuid?): AudioUiS
         recordingFilePath = null,
         recordingTargetNoteId = null,
         failedRecordingTargetNoteId = targetNoteId,
-        error = "Recording could not be saved",
+        error = Res.string.capture_state_recording_could_not_be_saved,
     )
 
 internal fun AudioUiState.withRestoredRecording(previous: AudioUiState): AudioUiState =

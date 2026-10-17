@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui.audio
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.ZERO
 import kotlin.uuid.Uuid
@@ -45,7 +46,7 @@ data class AudioUiState(
     val playbackProgress: Float = 0f,
     val currentUri: String? = null,
     // Shared state
-    val error: String? = null,
+    val error: StringResource? = null,
     // Transcription state
     val transcriptionState: TranscriptionState = TranscriptionState.NotRequested,
     // Combined state of the on-device enhanced model downloads (Whisper for

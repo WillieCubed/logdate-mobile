@@ -7,6 +7,9 @@ import app.logdate.client.intelligence.narrative.YearNarrativeSynthesizer
 import app.logdate.client.intelligence.narrative.buildLocalYearNarrative
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.text.UiText
+import app.logdate.client.text.resolve
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.ActivityType
 import app.logdate.shared.model.LocationSummary
 import app.logdate.shared.model.Rewind
@@ -20,6 +23,8 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.domain.generated.resources.Res
+import logdate.client.domain.generated.resources.rewind_title_annual
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
@@ -33,12 +38,17 @@ import kotlin.uuid.Uuid
  * people, and milestones — and compresses them into 5-8 "chapters" that trace
  * the arc of the year. The LLM input is ~3000-5000 tokens for 52 weeks, well
  * within a single call.
+ *
+ * The title and any locally written narrative are saved with the Rewind, so they are written
+ * once in the device language at generation time. [resolveText] turns that text into words;
+ * tests pass a stand-in because they cannot read Compose resources.
  */
 class GenerateAnnualRewindUseCase(
     private val rewindRepository: RewindRepository,
     private val generationManager: RewindGenerationManager,
     private val yearNarrativeSynthesizer: YearNarrativeSynthesizer,
     private val annualRewindSequencer: AnnualRewindSequencer,
+    private val resolveText: suspend (UiText) -> String = { text -> text.resolve() },
 ) {
     /**
      * Generates an annual rewind for [year].
@@ -129,11 +139,11 @@ class GenerateAnnualRewindUseCase(
                     is AIResult.Success -> narrativeResult.value
                     is AIResult.Unavailable -> {
                         Napier.w("AI unavailable for annual rewind — falling back to local narrative")
-                        buildLocalYearNarrative(year = year, weeklyRewinds = weeklyRewinds)
+                        buildLocalYearNarrative(year = year, weeklyRewinds = weeklyRewinds, resolveText = resolveText)
                     }
                     is AIResult.Error -> {
                         Napier.w("AI error for annual rewind — falling back to local narrative", narrativeResult.throwable)
-                        buildLocalYearNarrative(year = year, weeklyRewinds = weeklyRewinds)
+                        buildLocalYearNarrative(year = year, weeklyRewinds = weeklyRewinds, resolveText = resolveText)
                     }
                 }
 
@@ -150,7 +160,7 @@ class GenerateAnnualRewindUseCase(
                     endDate = endTime,
                     generationDate = Clock.System.now(),
                     label = "$year",
-                    title = "Your $year in Review",
+                    title = resolveText(Res.string.rewind_title_annual.toUiText(year)),
                     content = content,
                     metadata = metadata,
                 )

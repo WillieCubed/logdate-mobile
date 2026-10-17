@@ -1,0 +1,10 @@
+<resources>
+    <string name="share_memory_chooser_title">Share memory</string>
+    <string name="share_memory_text_with_summary">My memory from %1$s: %2$s</string>
+    <string name="share_memory_text">Check out my memory from %1$s on LogDate!</string>
+    <string name="share_title_share_qr_code">Share QR code</string>
+    <string name="share_action_copy_link">Copy link</string>
+    <string name="share_link_copied">Link copied</string>
+    <string name="share_journal_link_text">%1$s on LogDate — %2$s</string>
+    <string name="share_journal_qr_code_text">Scan to open %1$s</string>
+</resources>

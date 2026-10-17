@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.text.asString
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
@@ -114,7 +115,7 @@ private fun AttachNoteList(
     ) {
         items(attachableNotes, key = { it.uid }) { note ->
             ListItem(
-                headlineContent = { Text(note.headline()) },
+                headlineContent = { Text(note.headline().asString()) },
                 supportingContent = { Text(note.creationTimestamp.toReadableDateTimeShort()) },
                 modifier =
                     Modifier

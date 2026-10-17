@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Results of a photo or video taken on the phone from the watch. The phone shows them as a
+         toast and sends them to the watch, which shows them as they are. -->
+    <string name="remote_camera_photo_saved">Remote photo saved</string>
+    <string name="remote_camera_video_saved">Remote video saved</string>
+    <string name="remote_camera_save_failed">Could not save remote camera capture</string>
+    <string name="remote_camera_capture_failed">Remote camera capture failed</string>
+</resources>

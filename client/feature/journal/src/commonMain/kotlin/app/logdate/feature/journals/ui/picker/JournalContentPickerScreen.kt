@@ -88,6 +88,7 @@ import logdate.client.feature.journal.generated.resources.content_picker_subtitl
 import logdate.client.feature.journal.generated.resources.content_picker_title
 import logdate.client.feature.journal.generated.resources.content_picker_title_for_journal
 import logdate.client.ui.generated.resources.common_retry
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
@@ -274,13 +275,14 @@ private fun PickerItemTile(
     onClick: () -> Unit,
 ) {
     val typeLabel = item.kind.label
+    val title = item.displayTitle
     val selectionLabel =
         if (selected) {
             stringResource(Res.string.content_picker_selected)
         } else {
             stringResource(Res.string.content_picker_not_selected)
         }
-    val itemDescription = stringResource(Res.string.content_picker_item_description, typeLabel, item.title, selectionLabel)
+    val itemDescription = stringResource(Res.string.content_picker_item_description, typeLabel, title, selectionLabel)
     Card(
         modifier =
             Modifier
@@ -328,7 +330,7 @@ private fun PickerItemTile(
                             modifier = Modifier.size(36.dp),
                         )
                         Text(
-                            text = item.title,
+                            text = title,
                             style = MaterialTheme.typography.titleSmall,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
@@ -378,7 +380,7 @@ private fun PickerItemTile(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        text = item.title,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -389,7 +391,7 @@ private fun PickerItemTile(
         } else {
             Box(Modifier.fillMaxWidth().padding(Spacing.lg)) {
                 Text(
-                    text = item.title,
+                    text = title,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 8,
                     overflow = TextOverflow.Ellipsis,
@@ -434,6 +436,10 @@ private fun SelectionMarker(
 private val JournalContentPickerItem.isVisualMedia: Boolean
     get() = kind == JournalContentPickerItemKind.PHOTO || kind == JournalContentPickerItemKind.VIDEO
 
+private val JournalContentPickerItem.displayTitle: String
+    @Composable
+    get() = title ?: kind.label
+
 private val JournalContentPickerItemKind.label: String
     @Composable
     get() =
@@ -448,7 +454,7 @@ private val JournalContentPickerItemKind.label: String
 private fun SelectionReview(
     selectedItems: List<JournalContentPickerItem>,
     isAdding: Boolean,
-    error: String?,
+    error: StringResource?,
     onRemoveSelection: (Uuid) -> Unit,
     onAddSelected: () -> Unit,
 ) {
@@ -462,16 +468,17 @@ private fun SelectionReview(
                 if (selectedItems.isNotEmpty()) {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         lazyItems(selectedItems, key = { it.id }) { item ->
+                            val itemTitle = item.displayTitle
                             Card(Modifier.widthIn(max = 168.dp)) {
                                 Row(
                                     modifier = Modifier.padding(start = Spacing.sm),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                    Text(itemTitle, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                     IconButton(onClick = { onRemoveSelection(item.id) }) {
                                         Icon(
                                             Icons.Rounded.Close,
-                                            contentDescription = stringResource(Res.string.cd_content_picker_remove_selection, item.title),
+                                            contentDescription = stringResource(Res.string.cd_content_picker_remove_selection, itemTitle),
                                         )
                                     }
                                 }
@@ -481,7 +488,7 @@ private fun SelectionReview(
                 }
                 error?.let {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(it, Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(it), Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
                         TextButton(onClick = onAddSelected) { Text(stringResource(UiRes.string.common_retry)) }
                     }
                 }

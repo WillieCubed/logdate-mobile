@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.text.asString
 import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.media.MediaDeviceSelectorSheet
@@ -410,7 +411,7 @@ private fun RecordingInputControl(
     modifier: Modifier = Modifier,
 ) {
     var pickerOpen by remember { mutableStateOf(false) }
-    val inputLabel = selection.selectedDevice?.label ?: stringResource(Res.string.microphone)
+    val inputLabel = selection.selectedDevice?.label?.asString() ?: stringResource(Res.string.microphone)
     Surface(
         onClick = { pickerOpen = true },
         modifier = modifier.heightIn(min = 48.dp).testTag(MediaDeviceSelectorTags.chip("Microphone")),

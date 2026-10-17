@@ -1,5 +1,6 @@
 package app.logdate.client.media.device
 
+import app.logdate.client.text.UiText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -14,7 +15,7 @@ interface AudioRouteRepository {
     fun updateRecordingInputDevice(
         deviceId: String?,
         isRecording: Boolean,
-        error: String? = null,
+        error: UiText? = null,
     ) = Unit
 
     fun selectInputDevice(deviceId: String)

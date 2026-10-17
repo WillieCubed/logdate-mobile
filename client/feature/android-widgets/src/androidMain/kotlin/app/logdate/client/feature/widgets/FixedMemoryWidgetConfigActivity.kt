@@ -125,7 +125,7 @@ private fun FixedMemorySetup(
             }
         }
     val context = LocalContext.current
-    val displayPreview = selected?.toFixedWidgetState(selectedTranscript) ?: sampleFixedMemory(context)
+    val displayPreview = selected?.toFixedWidgetState(context, selectedTranscript) ?: sampleFixedMemory(context)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Scaffold(
             modifier = Modifier.widthIn(max = 600.dp).fillMaxHeight().fillMaxWidth(),
@@ -217,7 +217,7 @@ private fun FixedMemorySetup(
                                     Column(Modifier.weight(1f)) {
                                         Text(content.summary.ifBlank { rowTranscript ?: content.dateIso }, maxLines = 2)
                                         Text(
-                                            LocalDate.parse(content.dateIso).formatForDisplay(),
+                                            LocalDate.parse(content.dateIso).formatForDisplay(context),
                                             style = MaterialTheme.typography.bodySmall,
                                         )
                                     }

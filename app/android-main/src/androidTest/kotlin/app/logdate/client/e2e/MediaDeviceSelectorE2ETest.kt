@@ -15,6 +15,7 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
+import app.logdate.client.text.toUiText
 import app.logdate.ui.media.MediaDeviceSelectorSheet
 import app.logdate.ui.media.MediaDeviceSelectorTags
 import app.logdate.ui.media.MediaRouteSettingsAction
@@ -39,13 +40,13 @@ class MediaDeviceSelectorE2ETest {
                     listOf(
                         MediaDeviceUiState(
                             id = "back-camera",
-                            label = "Back camera",
+                            label = "Back camera".toUiText(),
                             kind = MediaDeviceKind.CAMERA,
                             category = MediaDeviceCategory.BACK_CAMERA,
                         ),
                         MediaDeviceUiState(
                             id = "usb-camera",
-                            label = "USB camera",
+                            label = "USB camera".toUiText(),
                             kind = MediaDeviceKind.CAMERA,
                             category = MediaDeviceCategory.USB,
                             isExternal = true,
@@ -94,13 +95,13 @@ class MediaDeviceSelectorE2ETest {
                     listOf(
                         MediaDeviceUiState(
                             id = "speaker",
-                            label = "Phone speaker",
+                            label = "Phone speaker".toUiText(),
                             kind = MediaDeviceKind.AUDIO_OUTPUT,
                             category = MediaDeviceCategory.BUILT_IN,
                         ),
                         MediaDeviceUiState(
                             id = "bluetooth",
-                            label = "Bluetooth headphones",
+                            label = "Bluetooth headphones".toUiText(),
                             kind = MediaDeviceKind.AUDIO_OUTPUT,
                             category = MediaDeviceCategory.BLUETOOTH,
                             isExternal = true,
@@ -108,7 +109,7 @@ class MediaDeviceSelectorE2ETest {
                     ),
                 selectedDeviceId = "speaker",
                 isSelectionControllable = false,
-                routeControlMessage = "Use Android's output switcher to route playback.",
+                routeControlMessage = "Use Android's output switcher to route playback.".toUiText(),
             )
 
         composeRule.setContent {
@@ -146,14 +147,14 @@ class MediaDeviceSelectorE2ETest {
                     listOf(
                         MediaDeviceUiState(
                             id = "speaker",
-                            label = "Phone speaker",
+                            label = "Phone speaker".toUiText(),
                             kind = MediaDeviceKind.AUDIO_OUTPUT,
                             category = MediaDeviceCategory.BUILT_IN,
                         ),
                     ),
                 selectedDeviceId = "speaker",
                 isSelectionControllable = false,
-                routeControlMessage = "Use Android's output switcher to route playback.",
+                routeControlMessage = "Use Android's output switcher to route playback.".toUiText(),
             )
 
         composeRule.setContent {

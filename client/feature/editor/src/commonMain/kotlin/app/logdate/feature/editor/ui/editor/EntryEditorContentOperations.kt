@@ -1,7 +1,12 @@
 package app.logdate.feature.editor.ui.editor
 
+import app.logdate.client.text.toUiText
 import app.logdate.shared.model.location.VisitMemoryContext
 import kotlinx.coroutines.flow.update
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_block_saved_cannot_change
+import logdate.client.feature.editor.generated.resources.editor_error_block_saved_cannot_remove
+import logdate.client.feature.editor.generated.resources.editor_error_finish_recording_before_removing
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -144,7 +149,7 @@ internal fun EntryEditorViewModel.updateBlockImpl(
     baseBlock: EntryBlockUiState? = null,
 ) {
     if (editorState.value.isReadOnly(updatedBlock.id)) {
-        mutableEditorState.update { it.copy(errorMessage = "This memory has already been saved and cannot be changed here.") }
+        mutableEditorState.update { it.copy(errorMessage = Res.string.editor_error_block_saved_cannot_change.toUiText()) }
         return
     }
     mutateEditorContent { currentState ->
@@ -310,14 +315,14 @@ internal fun EntryEditorViewModel.appendTextBlockImpl(text: String) {
  */
 internal fun EntryEditorViewModel.removeBlockImpl(blockId: Uuid) {
     if (editorState.value.isReadOnly(blockId)) {
-        mutableEditorState.update { it.copy(errorMessage = "This memory has already been saved and cannot be removed here.") }
+        mutableEditorState.update { it.copy(errorMessage = Res.string.editor_error_block_saved_cannot_remove.toUiText()) }
         return
     }
     val block = mutableEditorState.value.blocks.find { it.id == blockId } ?: return
     if (block is AudioBlockUiState &&
         (block.captureState is AudioCaptureState.Recording || block.captureState is AudioCaptureState.Stopping)
     ) {
-        mutableEditorState.update { it.copy(errorMessage = "Finish recording before removing this memory.") }
+        mutableEditorState.update { it.copy(errorMessage = Res.string.editor_error_finish_recording_before_removing.toUiText()) }
         return
     }
     val removed =

@@ -59,6 +59,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.asString
 import app.logdate.ui.adaptive.AdaptivePaneLayout
 import app.logdate.ui.common.PlatformBackHandler
 import app.logdate.ui.common.adaptivePanelShape
@@ -141,11 +142,11 @@ fun HumanLocationHistoryContent(
             state.recoveryMessage?.let { message ->
                 Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
-                        Text(message, style = MaterialTheme.typography.bodyMedium)
+                        Text(message.asString(), style = MaterialTheme.typography.bodyMedium)
                         actions.onRecover?.let { recover ->
                             TextButton(
                                 onClick = recover,
-                            ) { Text(state.recoveryActionLabel ?: stringResource(Res.string.history_recover)) }
+                            ) { Text(state.recoveryActionLabel?.asString() ?: stringResource(Res.string.history_recover)) }
                         }
                     }
                 }
@@ -316,7 +317,7 @@ private fun HistoryDateHeader(
         HistoryDateButton(state, actions, Modifier.fillMaxWidth())
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                state.daySummary,
+                state.daySummary.asString(),
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -339,7 +340,7 @@ private fun HistoryDateButton(
 ) {
     TextButton(onClick = actions.onCalendar, modifier = modifier, contentPadding = PaddingValues(0.dp)) {
         Text(
-            state.dateLabel,
+            state.dateLabel.asString(),
             Modifier.weight(1f),
             textAlign = TextAlign.Start,
             style = MaterialTheme.typography.titleLarge,
@@ -465,8 +466,12 @@ private fun HistoryReplay(
                 Modifier.fillMaxWidth().testTag("history-replay-preview"),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(item.title, style = MaterialTheme.typography.titleMedium)
-                Text(item.timeLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(item.title.asString(), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    item.timeLabel.asString(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 item.memories.take(2).forEach { HistoryMemoryPreview(it, actions.onOpenMemory) }
                 TextButton(onClick = { actions.onOpenDetail(item.id) }, modifier = Modifier.align(Alignment.End)) {
                     Text(stringResource(Res.string.history_details))
@@ -512,8 +517,12 @@ private fun HumanHistoryWorkspace(
                 PanelContainment.Collection
             },
         summary =
-            state.recoveryMessage
-                ?: if (state.tab == HistoryTab.Day) state.dateLabel else stringResource(Res.string.history_places_count, state.places.size),
+            state.recoveryMessage?.asString()
+                ?: if (state.tab == HistoryTab.Day) {
+                    state.dateLabel.asString()
+                } else {
+                    stringResource(Res.string.history_places_count, state.places.size)
+                },
         modifier = modifier.fillMaxSize(),
         header = {
             WorkspaceSectionSwitch(
@@ -533,7 +542,7 @@ private fun HumanHistoryWorkspace(
             )
         },
         headerActions = toolbarActions,
-        summaryDetail = state.daySummary.takeIf { state.tab == HistoryTab.Day },
+        summaryDetail = state.daySummary.asString().takeIf { state.tab == HistoryTab.Day },
         supportingContextKey = if (supportingDetail != null) "place" else state.selectedItemId.takeIf { state.detailVisible },
         focus = { mapContent(Modifier.fillMaxSize()) },
         supporting = {
@@ -566,8 +575,8 @@ private fun HistoryRecovery(
 ) {
     state.recoveryMessage?.let { message ->
         PanelGroup(Modifier.fillMaxWidth().padding(Spacing.lg)) {
-            Text(message)
-            state.recoveryActionLabel?.let { label -> actions.onRecover?.let { TextButton(onClick = it) { Text(label) } } }
+            Text(message.asString())
+            state.recoveryActionLabel?.let { label -> actions.onRecover?.let { TextButton(onClick = it) { Text(label.asString()) } } }
         }
     }
 }

@@ -1,11 +1,15 @@
 package app.logdate.feature.editor.ui.editor
 
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_discard_draft_failed
+import logdate.client.feature.editor.generated.resources.editor_error_save_draft_failed
 import kotlin.uuid.Uuid
 
 /**
@@ -24,7 +28,7 @@ internal fun EntryEditorViewModel.autoSaveEntryImpl(state: EditorState) {
         } catch (e: Exception) {
             Napier.e("Failed to auto-save draft: ${e.message}", e)
             mutableEditorState.update {
-                it.copy(errorMessage = "Failed to save draft: ${e.message}")
+                it.copy(errorMessage = Res.string.editor_error_save_draft_failed.toUiText(e.message.toString()))
             }
         }
     }
@@ -80,7 +84,7 @@ internal suspend fun EntryEditorViewModel.saveAsDraftImpl(state: EditorState): B
         Napier.e("Failed to save exit draft: ${e.message}", e)
         mutableEditorState.update {
             it.copy(
-                errorMessage = "Failed to save draft: ${e.message}",
+                errorMessage = Res.string.editor_error_save_draft_failed.toUiText(e.message.toString()),
             )
         }
         false
@@ -123,7 +127,7 @@ internal suspend fun EntryEditorViewModel.discardAndExitImpl(): Boolean {
     } catch (error: Exception) {
         Napier.e("Failed to discard draft: ${error.message}", error)
         mutableEditorState.update {
-            it.copy(errorMessage = "Failed to discard draft: ${error.message}")
+            it.copy(errorMessage = Res.string.editor_error_discard_draft_failed.toUiText(error.message.toString()))
         }
         false
     } finally {

@@ -1,0 +1,10 @@
+<resources>
+    <!-- Shown in a day's summary section when no summary can be made -->
+    <string name="timeline_summary_no_network">Summary currently not available.</string>
+    <string name="timeline_summary_unavailable">No summary available.</string>
+
+    <!-- Where the user is now, on the empty-day suggestion card -->
+    <string name="timeline_suggestion_location_street">Near %1$s, %2$s</string>
+    <string name="timeline_suggestion_location_neighborhood">%1$s, %2$s</string>
+    <string name="timeline_suggestion_location_area">Somewhere in %1$s</string>
+</resources>

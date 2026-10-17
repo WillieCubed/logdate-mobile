@@ -1,6 +1,8 @@
 package app.logdate.feature.location.timeline.ui.model
 
 import app.logdate.client.domain.location.LocationMemoryTimeFilter
+import app.logdate.client.text.UiText
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -73,7 +75,7 @@ enum class LocationMemoryKind {
 }
 
 data class CurrentLocationUiModel(
-    val title: String,
+    val title: UiText,
     val subtitle: String?,
     val latitude: Double,
     val longitude: Double,
@@ -81,13 +83,13 @@ data class CurrentLocationUiModel(
 
 data class LocationPlaceUiModel(
     val id: String,
-    val title: String,
+    val title: UiText,
     val subtitle: String,
     val latitude: Double,
     val longitude: Double,
     val lastVisitedLabel: String,
     val memoryCount: Int,
-    val sourceLabel: String,
+    val sourceLabel: StringResource,
     val source: LocationLabelSource,
     val memories: List<LocationMemoryPreviewUiModel>,
     val relatedStops: List<LocationStopUiModel>,
@@ -105,15 +107,15 @@ data class LocationMemoryPreviewUiModel(
 
 data class LocationStopUiModel(
     val id: String,
-    val title: String,
+    val title: UiText,
     val subtitle: String,
     val latitude: Double,
     val longitude: Double,
     val startedAt: String,
     val endedAt: String,
     val timeRange: String,
-    val duration: String,
-    val sourceLabel: String,
+    val duration: UiText,
+    val sourceLabel: StringResource,
     val source: LocationLabelSource,
     val sampleCount: Int,
     val startTime: Instant,

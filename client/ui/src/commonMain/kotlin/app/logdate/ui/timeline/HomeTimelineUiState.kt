@@ -8,6 +8,7 @@ import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.util.now
 import kotlinx.datetime.LocalDate
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -40,6 +41,8 @@ data class TimelineDayUiState(
     // Semantic Timeline fields
     val moments: List<MomentUiState> = emptyList(),
     val dayPresentation: DayPresentation = DayPresentation.FLOWING,
+    /** Shown in the summary section in place of [summary] when the day has none. */
+    val summaryNotice: StringResource? = null,
 )
 
 /**
@@ -134,6 +137,10 @@ data class MomentUiState(
     val capturedAt: Instant? = null,
     /** A retained memory anchor awaiting content, presented in the same chronological sequence. */
     val pendingMark: MarkedMoment? = null,
+    /**
+     * Place that names the moment when [label] is blank, shown as "At <place>".
+     */
+    val labelPlaceName: String? = null,
 )
 
 data class MomentMediaUiState(

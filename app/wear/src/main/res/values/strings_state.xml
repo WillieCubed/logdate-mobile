@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Remote camera errors. %1$s is the system's description of what went wrong. -->
+    <string name="wear_camera_phone_not_found">Phone not found</string>
+    <string name="wear_camera_open_on_phone_failed">Failed to open camera on phone</string>
+    <string name="wear_camera_connect_failed">Failed to connect: %1$s</string>
+    <string name="wear_camera_capture_photo_failed">Failed to capture photo</string>
+    <string name="wear_camera_capture_failed_reason">Capture failed: %1$s</string>
+    <string name="wear_camera_switch_failed">Failed to switch camera</string>
+    <!-- Shown when the phone reports a result without a message of its own. -->
+    <string name="wear_camera_photo_saved">Photo saved</string>
+    <string name="wear_camera_capture_failed">Capture failed</string>
+</resources>

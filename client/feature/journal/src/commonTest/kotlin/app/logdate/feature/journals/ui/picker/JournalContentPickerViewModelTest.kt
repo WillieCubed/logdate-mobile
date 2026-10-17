@@ -20,6 +20,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.content_picker_add_failed
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -125,7 +127,7 @@ class JournalContentPickerViewModelTest {
             viewModel.addSelected()
             advanceUntilIdle()
 
-            assertEquals("Could not add the selected content. Try again.", viewModel.uiState.value.addError)
+            assertEquals(Res.string.content_picker_add_failed, viewModel.uiState.value.addError)
             assertEquals(
                 setOf(newestText.uid, matchingPhoto.uid),
                 viewModel.uiState.value.selectedItems

@@ -43,6 +43,9 @@ import app.logdate.feature.core.settings.ui.UserProfile
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsContent
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import kotlinx.datetime.LocalDate
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_photos
+import logdate.client.feature.core.generated.resources.data_settings_quota_category_written_entries
 import kotlin.time.Instant
 
 internal val personalSettingsScenes: List<SharedScreenshotSceneSpec> =
@@ -200,14 +203,14 @@ internal val personalSettingsScenes: List<SharedScreenshotSceneSpec> =
                         categories =
                             listOf(
                                 StorageCategory(
-                                    name = "Photos",
+                                    name = Res.string.data_settings_quota_category_photos,
                                     usedBytes = 1_400_000_000,
                                     usagePercentage = 0.53f,
                                     color = Color(0xFF4CAF50),
                                     formattedUsed = "1.4 GB",
                                 ),
                                 StorageCategory(
-                                    name = "Written entries",
+                                    name = Res.string.data_settings_quota_category_written_entries,
                                     usedBytes = 650_000_000,
                                     usagePercentage = 0.25f,
                                     color = Color(0xFF2196F3),

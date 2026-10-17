@@ -1,5 +1,6 @@
 package app.logdate.client.domain.events
 
+import app.logdate.client.domain.fakes.resourceKeyText
 import app.logdate.client.domain.location.LocationStop
 import app.logdate.client.domain.location.LocationStopEvidenceKind
 import app.logdate.client.domain.places.PlaceResolutionResult
@@ -60,6 +61,7 @@ class InferEventsUseCaseTest {
                     eventRepository = eventRepo,
                     suggestEventName = { successName("Recital", "Time at the place") },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase()
@@ -88,6 +90,7 @@ class InferEventsUseCaseTest {
                     eventRepository = eventRepo,
                     suggestEventName = { error("naming should not be called for familiar places") },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase()
@@ -112,6 +115,7 @@ class InferEventsUseCaseTest {
                     eventRepository = eventRepo,
                     suggestEventName = { error("should not be called when below threshold") },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase(sensitivity = EventInferenceSensitivity.LOW)
@@ -141,6 +145,7 @@ class InferEventsUseCaseTest {
                     eventRepository = eventRepo,
                     suggestEventName = { error("dedupe should short-circuit before naming") },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase()
@@ -170,6 +175,7 @@ class InferEventsUseCaseTest {
                     eventRepository = eventRepo,
                     suggestEventName = { AIResult.Error(AIError.InvalidResponse) },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase()
@@ -177,10 +183,11 @@ class InferEventsUseCaseTest {
             assertEquals(1, result.getOrThrow())
             val saved = eventRepo.created.single()
             assertTrue(
-                saved.title.endsWith("at Stubb's"),
-                "Expected heuristic title to mention place, was '${saved.title}'",
+                saved.title.startsWith("inferred_event_title_at_place(inferred_event_time_") &&
+                    saved.title.endsWith(", Stubb's)"),
+                "Expected heuristic title to name the time of day at the place, was '${saved.title}'",
             )
-            assertTrue(saved.description?.contains("Stubb's") == true)
+            assertEquals("inferred_event_description_at_place_with_captures[2](Stubb's, 2)", saved.description)
         }
 
     @Test
@@ -197,6 +204,7 @@ class InferEventsUseCaseTest {
                     eventRepository = eventRepo,
                     suggestEventName = { error("no stops, no naming call") },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase()
@@ -220,6 +228,7 @@ class InferEventsUseCaseTest {
                     eventRepository = eventRepo,
                     suggestEventName = { error("naming should not be called for unknown places") },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase()
@@ -247,6 +256,7 @@ class InferEventsUseCaseTest {
                         successName("Should not show up", "Nope")
                     },
                     now = { NOW },
+                    resolveText = resourceKeyText,
                 )
 
             val result = useCase(aiNamingEnabled = false)

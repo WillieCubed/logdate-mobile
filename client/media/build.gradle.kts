@@ -60,6 +60,9 @@ kotlin {
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
+            implementation(libs.compose.components.resources)
+            // Device labels and route messages travel to the screen as UiText.
+            api(projects.client.text)
             // Logging
             implementation(libs.napier)
             // Repository

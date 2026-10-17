@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.camera
 
 import app.logdate.client.media.device.DefaultMediaDevices
+import app.logdate.client.text.toUiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.test.Test
@@ -110,9 +111,9 @@ class CameraUiStateTest {
     @Test
     fun `copy with error state updates correctly`() {
         val initial = CameraUiState()
-        val updated = initial.copy(error = "Camera not available")
+        val updated = initial.copy(error = "Camera not available".toUiText())
 
-        assertEquals("Camera not available", updated.error)
+        assertEquals("Camera not available".toUiText(), updated.error)
     }
 }
 

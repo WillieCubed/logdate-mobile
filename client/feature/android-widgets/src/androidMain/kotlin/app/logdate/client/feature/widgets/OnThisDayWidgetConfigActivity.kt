@@ -112,7 +112,12 @@ class OnThisDayWidgetConfigActivity : SecureWidgetConfigActivity() {
                                             .toLocalDateTime(
                                                 kotlinx.datetime.TimeZone.currentSystemDefault(),
                                             ).date,
-                                ).firstOrNull()?.toWidgetStateWithAudio(notesRepository, transcriptionRepository, types)
+                                ).firstOrNull()?.toWidgetStateWithAudio(
+                                    this@OnThisDayWidgetConfigActivity,
+                                    notesRepository,
+                                    transcriptionRepository,
+                                    types,
+                                )
                                     ?: resolveEmptyWidgetState(notesRepository)
                             }.getOrNull() ?: OnThisDayWidgetState.NoMemoryToday
                         },
@@ -241,7 +246,7 @@ internal fun sampleRotatingMemory(
             .minus(1, DateTimeUnit.YEAR)
     return OnThisDayWidgetState.HasMemory(
         dateIso = previousYear.toString(),
-        dateFormatted = previousYear.formatForDisplay(),
+        dateFormatted = previousYear.formatForDisplay(context),
         summary = if (WidgetContentType.PHOTOS in contentTypes) "Milo after the rain" else "We stayed out until the rain stopped",
         thumbnailUri =
             if (WidgetContentType.PHOTOS in contentTypes) {

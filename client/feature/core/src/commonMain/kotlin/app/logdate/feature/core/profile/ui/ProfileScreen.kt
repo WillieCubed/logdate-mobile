@@ -42,6 +42,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.streak.StreakData
+import app.logdate.client.text.resolve
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.ui.adaptive.FoldableBookLayout
@@ -75,7 +76,7 @@ fun ProfileScreen(
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
-            snackbarHostState.showSnackbar(message)
+            snackbarHostState.showSnackbar(message.resolve())
             viewModel.clearError()
         }
     }
@@ -85,7 +86,7 @@ fun ProfileScreen(
             snackbarHostState.showSnackbar(profileUpdatedMessage)
             viewModel.clearUpdateState()
         } else if (uiState.updateState is ProfileUpdateState.Error) {
-            snackbarHostState.showSnackbar((uiState.updateState as ProfileUpdateState.Error).message)
+            snackbarHostState.showSnackbar((uiState.updateState as ProfileUpdateState.Error).message.resolve())
             viewModel.clearUpdateState()
         }
     }

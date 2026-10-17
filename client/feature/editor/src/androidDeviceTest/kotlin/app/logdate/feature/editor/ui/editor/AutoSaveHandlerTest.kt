@@ -4,6 +4,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import app.logdate.client.text.toUiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -205,7 +206,7 @@ class AutoSaveHandlerTest {
                     editorState.value =
                         editorState.value.copy(
                             isModified = true,
-                            errorMessage = "recompose without content changes",
+                            errorMessage = "recompose without content changes".toUiText(),
                         )
                 }
             }

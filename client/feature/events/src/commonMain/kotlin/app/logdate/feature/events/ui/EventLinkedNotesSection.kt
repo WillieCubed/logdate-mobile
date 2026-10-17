@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.text.asString
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
@@ -115,7 +116,7 @@ private fun LinkedNoteCard(
             NotePreview(note)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = note.headline(),
+                    text = note.headline().asString(),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                 )

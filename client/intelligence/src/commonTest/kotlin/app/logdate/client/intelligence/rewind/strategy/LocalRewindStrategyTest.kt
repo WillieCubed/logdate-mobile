@@ -10,6 +10,7 @@ import app.logdate.client.intelligence.curation.PhotoHardFilter
 import app.logdate.client.intelligence.curation.RejectReason
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.curation.SignificanceScorer
+import app.logdate.client.intelligence.fakes.resourceKeyText
 import app.logdate.client.intelligence.narrative.RewindSequencer
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
@@ -140,7 +141,7 @@ class LocalRewindStrategyTest {
             }
         return LocalRewindStrategy(
             curator = curator,
-            sequencer = RewindSequencer(),
+            sequencer = RewindSequencer(resolveText = resourceKeyText),
             configProvider = configProvider,
         )
     }

@@ -5,9 +5,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.time.Instant
 
-actual fun formatDeviceLastActive(timestamp: Instant): String {
+actual fun formatDeviceLastActive(timestamp: Instant): String? {
     if (timestamp == Instant.DISTANT_PAST) {
-        return "Unknown"
+        return null
     }
 
     val formatter =

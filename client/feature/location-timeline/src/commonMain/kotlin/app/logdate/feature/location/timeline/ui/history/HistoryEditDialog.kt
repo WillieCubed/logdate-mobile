@@ -135,7 +135,7 @@ internal fun HistoryEditDialog(
                         TextButton(onClick = {
                             item?.let { viewModel.changeActivity(it.id, mode.name) }
                             onDismiss()
-                        }) { Text(mode.humanName()) }
+                        }) { Text(stringResource(mode.humanName())) }
                     }
                 HistoryEditAction.ChangeTime, HistoryEditAction.AddVisit -> {
                     TextButton(onClick = { choosingArrival = true }) { Text(stringResource(Res.string.history_arrived_on, arrivalDate)) }

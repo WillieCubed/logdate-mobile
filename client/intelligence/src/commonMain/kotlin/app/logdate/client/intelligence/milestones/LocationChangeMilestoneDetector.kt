@@ -12,6 +12,9 @@ import kotlinx.datetime.minus
 import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.intelligence.generated.resources.Res
+import logdate.client.intelligence.generated.resources.milestone_location_change_summary
+import org.jetbrains.compose.resources.getString
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sqrt
@@ -37,6 +40,9 @@ import kotlin.time.Instant
  * The detector is intentionally conservative — false positives are worse than false
  * negatives because the user reads each milestone rewind as the system claiming "your
  * life changed", and that should be true when it shows up.
+ *
+ * The candidate's summary is saved on the Rewind as its milestone badge, so it is written once
+ * in the device language.
  */
 class LocationChangeMilestoneDetector(
     private val locationHistoryRepository: LocationHistoryRepository,
@@ -80,7 +86,7 @@ class LocationChangeMilestoneDetector(
                 kind = MilestoneKind.LOCATION_CHANGE,
                 startTime = windowStartDate.atStartOfWeek(zone),
                 endTime = windowEndDate.atStartOfWeek(zone),
-                summary = "Your location shifted",
+                summary = getString(Res.string.milestone_location_change_summary),
             )
         }
         return null

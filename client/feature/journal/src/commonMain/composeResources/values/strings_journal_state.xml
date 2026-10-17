@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="note_viewer_error_load_failed">Failed to load note: %1$s</string>
+    <string name="note_viewer_error_not_found">Note not found</string>
+    <string name="note_viewer_error_delete_failed">Failed to delete note: %1$s</string>
+    <string name="note_viewer_share_chooser_title">Share note</string>
+    <string name="audio_note_viewer_error_load_failed">Failed to load audio note: %1$s</string>
+    <string name="audio_note_viewer_error_not_found">Audio note not found</string>
+    <string name="audio_note_viewer_error_not_audio">Note is not audio</string>
+    <string name="content_picker_add_failed">Could not add the selected content. Try again.</string>
+</resources>

@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import app.logdate.client.domain.export.ExportCounts
+import app.logdate.client.text.asString
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -114,7 +115,7 @@ internal fun ExportBottomSheet(
                     is ExportState.Exporting -> {
                         ExportProgressCard(
                             progressPercent = state.progressPercent,
-                            message = state.message,
+                            message = state.message?.asString().orEmpty(),
                             onCancel = onCancel,
                         )
                     }
@@ -128,7 +129,7 @@ internal fun ExportBottomSheet(
                     }
                     is ExportState.Failed -> {
                         ExportFailureCard(
-                            reason = state.reason,
+                            reason = state.reason.asString(),
                             onRetry = onRetry,
                             onDismiss = onDismiss,
                         )

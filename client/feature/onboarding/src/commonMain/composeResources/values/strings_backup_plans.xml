@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_plan_basic_price">Free</string>
+    <string name="onboarding_plan_premium_price">$12/month</string>
+</resources>

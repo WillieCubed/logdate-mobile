@@ -1,20 +1,31 @@
 package app.logdate.client.media.device
 
-internal fun systemControlledRouteControlMessage(kind: MediaDeviceKind): String =
+import app.logdate.client.text.UiText
+import app.logdate.client.text.toUiText
+import logdate.client.media.generated.resources.Res
+import logdate.client.media.generated.resources.media_device_camera_system_controlled
+import logdate.client.media.generated.resources.media_device_camera_unavailable
+import logdate.client.media.generated.resources.media_device_microphone_system_controlled
+import logdate.client.media.generated.resources.media_device_microphone_unavailable
+import logdate.client.media.generated.resources.media_device_output_system_controlled
+import logdate.client.media.generated.resources.media_device_output_unavailable
+
+internal fun systemControlledRouteControlMessage(kind: MediaDeviceKind): UiText =
     when (kind) {
-        MediaDeviceKind.CAMERA -> "Camera selection is currently controlled by the system."
-        MediaDeviceKind.AUDIO_INPUT -> "Microphone selection is currently controlled by the system."
-        MediaDeviceKind.AUDIO_OUTPUT -> "Use Android's output switcher to route playback."
+        MediaDeviceKind.CAMERA -> Res.string.media_device_camera_system_controlled.toUiText()
+        MediaDeviceKind.AUDIO_INPUT -> Res.string.media_device_microphone_system_controlled.toUiText()
+        MediaDeviceKind.AUDIO_OUTPUT -> Res.string.media_device_output_system_controlled.toUiText()
     }
 
-internal fun unavailableRouteMessage(
+/** Says that the selected device is gone and names the device used in its place. */
+fun unavailableRouteMessage(
     kind: MediaDeviceKind,
-    replacementLabel: String,
-): String =
+    replacementLabel: UiText,
+): UiText =
     when (kind) {
-        MediaDeviceKind.CAMERA -> "Selected camera is unavailable. LogDate will use $replacementLabel."
-        MediaDeviceKind.AUDIO_INPUT -> "Selected microphone is unavailable. LogDate will use $replacementLabel."
-        MediaDeviceKind.AUDIO_OUTPUT -> "Selected output is unavailable. LogDate will use $replacementLabel."
+        MediaDeviceKind.CAMERA -> Res.string.media_device_camera_unavailable.toUiText(replacementLabel)
+        MediaDeviceKind.AUDIO_INPUT -> Res.string.media_device_microphone_unavailable.toUiText(replacementLabel)
+        MediaDeviceKind.AUDIO_OUTPUT -> Res.string.media_device_output_unavailable.toUiText(replacementLabel)
     }
 
 fun systemControlledSelection(kind: MediaDeviceKind): MediaDeviceSelectionUiState =
@@ -48,7 +59,7 @@ fun systemControlledSelection(kind: MediaDeviceKind): MediaDeviceSelectionUiStat
     }
 
 fun MediaDeviceSelectionUiState.asSystemControlledSelection(
-    routeControlMessage: String = systemControlledRouteControlMessage(kind),
+    routeControlMessage: UiText = systemControlledRouteControlMessage(kind),
 ): MediaDeviceSelectionUiState =
     copy(
         isSelectionControllable = false,

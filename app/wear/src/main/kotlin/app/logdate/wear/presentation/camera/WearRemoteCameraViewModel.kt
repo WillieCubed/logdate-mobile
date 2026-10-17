@@ -2,9 +2,14 @@ package app.logdate.wear.presentation.camera
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.media.device.DefaultMediaDevices
+import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.client.sync.datalayer.RemoteCameraCaptureResult
+import app.logdate.client.text.UiText
+import app.logdate.wear.R
+import app.logdate.wear.presentation.WearText
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,12 +29,14 @@ enum class RemoteCameraPhase {
 
 data class RemoteCameraUiState(
     val phase: RemoteCameraPhase = RemoteCameraPhase.IDLE,
-    val errorMessage: String? = null,
+    /** The watch's own error, or the message the phone sent when a capture failed. */
+    val errorMessage: WearText? = null,
     val navigateBack: Boolean = false,
-    val selectedCameraLabel: String = "Back camera",
+    /** The selected camera: its name from the phone, or the default name for the camera the watch asked for. */
+    val selectedCameraLabel: UiText = DefaultMediaDevices.backCamera.label,
     val selectedCameraDeviceId: String? = defaultRemoteCameraSelection().selectedDeviceId,
     val availableCameras: List<MediaDeviceUiState> = defaultRemoteCameraSelection().devices,
-    val captureStatusMessage: String? = null,
+    val captureStatusMessage: WearText? = null,
 )
 
 class WearRemoteCameraViewModel(
@@ -83,7 +90,7 @@ class WearRemoteCameraViewModel(
                     _uiState.update {
                         it.copy(
                             phase = RemoteCameraPhase.ERROR,
-                            errorMessage = "Phone not found",
+                            errorMessage = WearText.Resource(R.string.wear_camera_phone_not_found),
                         )
                     }
                     return@launch
@@ -94,7 +101,7 @@ class WearRemoteCameraViewModel(
                     _uiState.update {
                         it.copy(
                             phase = RemoteCameraPhase.ERROR,
-                            errorMessage = "Failed to open camera on phone",
+                            errorMessage = WearText.Resource(R.string.wear_camera_open_on_phone_failed),
                         )
                     }
                     return@launch
@@ -107,7 +114,7 @@ class WearRemoteCameraViewModel(
                 _uiState.update {
                     it.copy(
                         phase = RemoteCameraPhase.ERROR,
-                        errorMessage = "Failed to connect: ${e.message}",
+                        errorMessage = WearText.Resource(R.string.wear_camera_connect_failed, listOf(e.message.toString())),
                     )
                 }
             }
@@ -132,7 +139,7 @@ class WearRemoteCameraViewModel(
                     _uiState.update {
                         it.copy(
                             phase = RemoteCameraPhase.ERROR,
-                            errorMessage = "Failed to capture photo",
+                            errorMessage = WearText.Resource(R.string.wear_camera_capture_photo_failed),
                         )
                     }
                     return@launch
@@ -144,7 +151,7 @@ class WearRemoteCameraViewModel(
                 _uiState.update {
                     it.copy(
                         phase = RemoteCameraPhase.ERROR,
-                        errorMessage = "Capture failed: ${e.message}",
+                        errorMessage = WearText.Resource(R.string.wear_camera_capture_failed_reason, listOf(e.message.toString())),
                     )
                 }
             }
@@ -164,10 +171,10 @@ class WearRemoteCameraViewModel(
     fun selectBackCamera() {
         selectCamera(
             payload = CAMERA_SELECT_BACK,
-            label = "Back camera",
+            label = DefaultMediaDevices.backCamera.label,
             deviceId =
                 _uiState.value.availableCameras
-                    .firstOrNull { it.label == "Back camera" }
+                    .firstOrNull { it.category == MediaDeviceCategory.BACK_CAMERA }
                     ?.id,
         )
     }
@@ -175,10 +182,10 @@ class WearRemoteCameraViewModel(
     fun selectFrontCamera() {
         selectCamera(
             payload = CAMERA_SELECT_FRONT,
-            label = "Front camera",
+            label = DefaultMediaDevices.frontCamera.label,
             deviceId =
                 _uiState.value.availableCameras
-                    .firstOrNull { it.label == "Front camera" }
+                    .firstOrNull { it.category == MediaDeviceCategory.FRONT_CAMERA }
                     ?.id,
         )
     }
@@ -193,10 +200,10 @@ class WearRemoteCameraViewModel(
                     _uiState.update { state ->
                         state.copy(
                             selectedCameraLabel =
-                                if (state.selectedCameraLabel == "Front camera") {
-                                    "Back camera"
+                                if (state.isFrontCameraSelected()) {
+                                    DefaultMediaDevices.backCamera.label
                                 } else {
-                                    "Front camera"
+                                    DefaultMediaDevices.frontCamera.label
                                 },
                         )
                     }
@@ -238,7 +245,7 @@ class WearRemoteCameraViewModel(
 
     private fun selectCamera(
         payload: String,
-        label: String,
+        label: UiText,
         deviceId: String? = null,
     ) {
         if (_uiState.value.phase != RemoteCameraPhase.READY) return
@@ -267,7 +274,7 @@ class WearRemoteCameraViewModel(
         _uiState.update {
             it.copy(
                 phase = RemoteCameraPhase.ERROR,
-                errorMessage = "Failed to switch camera",
+                errorMessage = WearText.Resource(R.string.wear_camera_switch_failed),
             )
         }
     }
@@ -291,15 +298,23 @@ class WearRemoteCameraViewModel(
                 it.copy(
                     phase = RemoteCameraPhase.PREVIEW,
                     errorMessage = null,
-                    captureStatusMessage = result.message.ifBlank { "Photo saved" },
+                    captureStatusMessage = result.phoneMessage() ?: WearText.Resource(R.string.wear_camera_photo_saved),
                 )
             } else {
                 it.copy(
                     phase = RemoteCameraPhase.ERROR,
-                    errorMessage = result.message.ifBlank { "Capture failed" },
+                    errorMessage = result.phoneMessage() ?: WearText.Resource(R.string.wear_camera_capture_failed),
                     captureStatusMessage = null,
                 )
             }
         }
     }
+
+    /** True when the selected camera is a front camera, named in the watch's words or the phone's. */
+    private fun RemoteCameraUiState.isFrontCameraSelected(): Boolean =
+        selectedCameraLabel == DefaultMediaDevices.frontCamera.label ||
+            availableCameras.any { it.category == MediaDeviceCategory.FRONT_CAMERA && it.label == selectedCameraLabel }
+
+    /** The message the phone sent, already in the phone's language, or null when it sent none. */
+    private fun RemoteCameraCaptureResult.phoneMessage(): WearText? = message.takeIf { it.isNotBlank() }?.let(WearText::Raw)
 }

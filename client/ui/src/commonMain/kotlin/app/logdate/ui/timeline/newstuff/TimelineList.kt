@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import app.logdate.client.text.asString
 import app.logdate.ui.common.applyPaddingIfLast
 import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.Spacing
@@ -46,6 +47,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.suggestion_draft_fallback
+import logdate.client.ui.generated.resources.suggestion_empty_day_prompt
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.absoluteValue
 import kotlin.uuid.Uuid
@@ -113,8 +115,10 @@ fun TimelineList(
     val isPostCloudRestore = LocalIsPostCloudRestore.current
     val workspaceEnabled = LocalWorkspaceEnabled.current
     val draftMessage = stringResource(Res.string.suggestion_draft_fallback)
+    val emptyDayMessage = stringResource(Res.string.suggestion_empty_day_prompt)
+    val emptyDayLocation = (timelineSuggestion as? TimelineSuggestionBlock.EmptyDay)?.locationName?.asString()
     val suggestionBlockState: TimelineSuggestionBlockUiState? =
-        remember(timelineSuggestion, draftMessage) {
+        remember(timelineSuggestion, draftMessage, emptyDayMessage, emptyDayLocation) {
             when (timelineSuggestion) {
                 is TimelineSuggestionBlock.CompleteDraft ->
                     TimelineSuggestionBlockUiState(
@@ -125,8 +129,8 @@ fun TimelineList(
                 is TimelineSuggestionBlock.EmptyDay ->
                     TimelineSuggestionBlockUiState(
                         type = TimelineSuggestionBlockType.EMPTY_DAY,
-                        message = timelineSuggestion.message,
-                        location = timelineSuggestion.locationName,
+                        message = emptyDayMessage,
+                        location = emptyDayLocation,
                     )
                 is TimelineSuggestionBlock.MemoryRecall ->
                     TimelineSuggestionBlockUiState(

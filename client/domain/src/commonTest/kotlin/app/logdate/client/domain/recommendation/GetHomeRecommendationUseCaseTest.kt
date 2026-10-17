@@ -25,6 +25,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -93,14 +94,14 @@ class GetHomeRecommendationUseCaseTest {
         }
 
     @Test
-    fun `EmptyDay carries default message`() =
+    fun `EmptyDay has no location before the current place resolves`() =
         runTest {
             mockNotesRepository.notesForRange = emptyList()
             mockDraftRepository.drafts = emptyList()
 
             val result = useCase().first() as HomeRecommendation.EmptyDay
 
-            assertEquals("What's going on?", result.message)
+            assertNull(result.location)
         }
 
     // --- CompleteYourDraft ---

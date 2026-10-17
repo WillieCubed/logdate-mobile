@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_error_recording_not_finalized
 import kotlin.uuid.Uuid
 
 /**
@@ -50,7 +52,7 @@ class EntryEditorViewModel(
         AudioBlockFinalizer { _, currentState ->
             when (currentState) {
                 is AudioCaptureState.Recording, is AudioCaptureState.Stopping ->
-                    AudioCaptureState.Failed("Recording could not be finalized")
+                    AudioCaptureState.Failed(Res.string.editor_error_recording_not_finalized)
                 else -> currentState
             }
         },

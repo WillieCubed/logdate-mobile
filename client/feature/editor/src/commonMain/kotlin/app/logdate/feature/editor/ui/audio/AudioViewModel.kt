@@ -24,6 +24,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.capture_state_playback_failed
+import logdate.client.feature.editor.generated.resources.capture_state_playback_start_failed
+import logdate.client.feature.editor.generated.resources.capture_state_recording_could_not_start
+import logdate.client.feature.editor.generated.resources.editor_error_recording_not_finalized
+import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
@@ -149,7 +155,7 @@ class AudioViewModel(
                 lastTargetNoteId = targetNoteId
                 val started = audioRecordingManager.startRecording(targetNoteId)
                 if (!started) {
-                    failStart("Recording could not start", fallbackRecording)
+                    failStart(Res.string.capture_state_recording_could_not_start, fallbackRecording)
                     return
                 }
                 startRecordingCollectors()
@@ -165,7 +171,7 @@ class AudioViewModel(
                 throw cancellation
             } catch (e: Exception) {
                 Napier.e("Failed to start recording: ${e.message}", e)
-                failStart("Recording could not start", fallbackRecording)
+                failStart(Res.string.capture_state_recording_could_not_start, fallbackRecording)
             }
         }
     }
@@ -194,7 +200,7 @@ class AudioViewModel(
     }
 
     private fun failStart(
-        message: String,
+        message: StringResource,
         fallbackRecording: AudioUiState? = null,
     ) {
         _uiState.update { it.withFailedRecordingStart(message, lastTargetNoteId, fallbackRecording) }
@@ -438,14 +444,14 @@ class AudioViewModel(
                             it.copy(
                                 isPlaying = false,
                                 playbackProgress = 0f,
-                                error = if (failure != null) "Failed to play back recording" else null,
+                                error = if (failure != null) Res.string.capture_state_playback_failed else null,
                             )
                         }
                     },
                 )
             } catch (e: Exception) {
                 Napier.e("Failed to start playback: ${e.message}", e)
-                _uiState.update { it.copy(isPlaying = false, error = "Failed to start playback") }
+                _uiState.update { it.copy(isPlaying = false, error = Res.string.capture_state_playback_start_failed) }
             }
         }
     }
@@ -568,7 +574,7 @@ class AudioViewModel(
             val after = _uiState.value
             val resolvedUri =
                 after.recordedAudioUri
-                    ?: return@withLock AudioCaptureState.Failed("Recording could not be finalized")
+                    ?: return@withLock AudioCaptureState.Failed(Res.string.editor_error_recording_not_finalized)
             _uiState.update { it.copy(recordedAudioUri = null) }
             AudioCaptureState.Ready(uri = resolvedUri, durationMs = after.duration.inWholeMilliseconds)
         }
@@ -669,7 +675,7 @@ class AudioViewModel(
             stopRecording()
         } else {
             stopRecordingCollectors()
-            failStart("Recording could not start")
+            failStart(Res.string.capture_state_recording_could_not_start)
         }
     }
 

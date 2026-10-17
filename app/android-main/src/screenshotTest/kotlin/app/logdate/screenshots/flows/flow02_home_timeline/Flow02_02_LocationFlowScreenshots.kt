@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.domain.location.LocationMemoryTimeFilter
+import app.logdate.client.text.toUiText
 import app.logdate.feature.location.timeline.ui.LocationTimelineContent
 import app.logdate.feature.location.timeline.ui.LocationTimelineQuickPeekSheet
 import app.logdate.feature.location.timeline.ui.model.CurrentLocationUiModel
@@ -32,12 +33,15 @@ import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.places_source_google_places
+import logdate.client.feature.location.timeline.generated.resources.places_source_saved_place
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private val sampleCurrentLocation =
     CurrentLocationUiModel(
-        title = "Blue Bottle Coffee",
+        title = "Blue Bottle Coffee".toUiText(),
         subtitle = "123 Main St, San Francisco, CA",
         latitude = 37.7749,
         longitude = -122.4194,
@@ -47,15 +51,15 @@ private val sampleStops =
     listOf(
         LocationStopUiModel(
             id = "1",
-            title = "Golden Gate Park",
+            title = "Golden Gate Park".toUiText(),
             subtitle = "501 Stanyan St, San Francisco, CA",
             latitude = 37.7749,
             longitude = -122.4194,
             startedAt = "2:15 PM",
             endedAt = "3:00 PM",
             timeRange = "2:15 PM - 3:00 PM",
-            duration = "Stayed for 45m",
-            sourceLabel = "Google Places",
+            duration = "Stayed for 45m".toUiText(),
+            sourceLabel = Res.string.places_source_google_places,
             source = LocationLabelSource.GOOGLE_PLACES,
             sampleCount = 8,
             startTime = Instant.fromEpochMilliseconds(1_740_000_000_000L),
@@ -64,15 +68,15 @@ private val sampleStops =
         ),
         LocationStopUiModel(
             id = "2",
-            title = "Home",
+            title = "Home".toUiText(),
             subtitle = "456 Oak St, San Francisco, CA",
             latitude = 37.7694,
             longitude = -122.4862,
             startedAt = "10:30 AM",
             endedAt = "12:00 PM",
             timeRange = "10:30 AM - 12:00 PM",
-            duration = "Stayed for 1h 30m",
-            sourceLabel = "Saved place",
+            duration = "Stayed for 1h 30m".toUiText(),
+            sourceLabel = Res.string.places_source_saved_place,
             source = LocationLabelSource.USER_DEFINED,
             sampleCount = 12,
             startTime = Instant.fromEpochMilliseconds(1_739_990_000_000L),
@@ -85,13 +89,13 @@ private val samplePlaces =
     listOf(
         LocationPlaceUiModel(
             id = "place-1",
-            title = "Golden Gate Park",
+            title = "Golden Gate Park".toUiText(),
             subtitle = "2 memories · San Francisco, CA",
             latitude = 37.7749,
             longitude = -122.4194,
             lastVisitedLabel = "Visited today",
             memoryCount = 2,
-            sourceLabel = "Google Places",
+            sourceLabel = Res.string.places_source_google_places,
             source = LocationLabelSource.GOOGLE_PLACES,
             memories =
                 listOf(
@@ -118,13 +122,13 @@ private val samplePlaces =
         ),
         LocationPlaceUiModel(
             id = "place-2",
-            title = "Home",
+            title = "Home".toUiText(),
             subtitle = "1 memory · San Francisco, CA",
             latitude = 37.7694,
             longitude = -122.4862,
             lastVisitedLabel = "Visited yesterday",
             memoryCount = 1,
-            sourceLabel = "Saved place",
+            sourceLabel = Res.string.places_source_saved_place,
             source = LocationLabelSource.USER_DEFINED,
             memories =
                 listOf(

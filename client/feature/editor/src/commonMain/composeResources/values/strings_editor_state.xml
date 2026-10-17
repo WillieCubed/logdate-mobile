@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="editor_error_block_saved_cannot_change">This memory has already been saved and cannot be changed here.</string>
+    <string name="editor_error_block_saved_cannot_remove">This memory has already been saved and cannot be removed here.</string>
+    <string name="editor_error_finish_recording_before_removing">Finish recording before removing this memory.</string>
+    <string name="editor_error_load_draft_failed">Failed to load draft: %1$s</string>
+    <string name="editor_error_delete_draft_failed">Failed to delete draft: %1$s</string>
+    <string name="editor_error_delete_drafts_failed">Failed to delete drafts: %1$s</string>
+    <string name="editor_error_save_draft_failed">Failed to save draft: %1$s</string>
+    <string name="editor_error_discard_draft_failed">Failed to discard draft: %1$s</string>
+    <string name="editor_error_load_entry_failed">Failed to load entry: %1$s</string>
+    <string name="editor_error_save_failed">Failed to save: %1$s</string>
+    <string name="editor_error_changed_while_saving">The editor changed while saving. Review your entry before closing.</string>
+    <string name="editor_error_recording_still_finalizing">Recording is still finalizing. Try again in a moment.</string>
+    <string name="editor_error_clear_draft_failed">Failed to clear draft: %1$s</string>
+    <string name="editor_error_recording_not_finalized">Recording could not be finalized</string>
+    <string name="editor_error_recording_not_recovered">Recording could not be recovered</string>
+    <string name="editor_error_audio_duration_unreadable">Audio duration could not be read. Your file is still attached. Try saving again.</string>
+</resources>

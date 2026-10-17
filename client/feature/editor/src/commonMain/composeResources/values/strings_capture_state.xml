@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Camera capture errors. -->
+    <string name="capture_state_camera_not_available">Camera is not available</string>
+    <string name="capture_state_camera_permission_denied">Camera permission denied</string>
+    <string name="capture_state_photo_failed">Failed to capture photo</string>
+    <string name="capture_state_video_failed">Failed to record video</string>
+    <!-- Shown when the camera fails without saying why. -->
+    <string name="capture_state_unknown_error">Unknown error</string>
+    <string name="capture_state_camera_provider_not_ready">Camera provider is not ready</string>
+    <string name="capture_state_lifecycle_owner_not_ready">Lifecycle owner is not ready</string>
+    <string name="capture_state_switch_failed">Switch failed</string>
+    <string name="capture_state_camera_selection_failed">Camera selection failed</string>
+
+    <!-- Explanations under the camera picker. -->
+    <string name="capture_state_external_camera_detection_unavailable">External camera detection is not available in this build yet.</string>
+    <string name="capture_state_external_cameras_hint">External cameras appear here when connected.</string>
+
+    <!-- Names for cameras Android lists without a facing LogDate names. %1$d counts the cameras from 1. -->
+    <string name="capture_state_external_camera_numbered">External camera %1$d</string>
+    <string name="capture_state_camera_numbered">Camera %1$d</string>
+
+    <!-- Audio recording and playback errors. -->
+    <string name="capture_state_recording_could_not_start">Recording could not start</string>
+    <string name="capture_state_recording_could_not_be_saved">Recording could not be saved</string>
+    <string name="capture_state_playback_failed">Failed to play back recording</string>
+    <string name="capture_state_playback_start_failed">Failed to start playback</string>
+</resources>

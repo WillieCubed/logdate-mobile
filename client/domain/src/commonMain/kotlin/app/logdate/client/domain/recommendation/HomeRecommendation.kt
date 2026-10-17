@@ -21,10 +21,13 @@ sealed class HomeRecommendation {
     /** No recommendation to show — the user is up to date. */
     data object None : HomeRecommendation()
 
-    /** The user has not added any entries today. */
+    /**
+     * The user has not added any entries today. The screen supplies the prompt to write.
+     *
+     * @property location Where the user is right now, or null when it is not known.
+     */
     data class EmptyDay(
-        val message: String = "What's going on?",
-        val locationName: String? = null,
+        val location: CurrentLocationDescription? = null,
     ) : HomeRecommendation()
 
     /** The user has an unfinished draft that has not been saved as a journal entry. */
@@ -51,4 +54,32 @@ sealed class HomeRecommendation {
         val startTime: Instant,
         val placeName: String? = null,
     ) : HomeRecommendation()
+}
+
+/**
+ * Where the user is right now, as precisely as the place lookup could tell. The screen chooses
+ * the words for each case.
+ */
+sealed interface CurrentLocationDescription {
+    /** One of the user's places, or a nearby point of interest. */
+    data class NamedPlace(
+        val name: String,
+    ) : CurrentLocationDescription
+
+    /** A street in a city or town. */
+    data class Street(
+        val street: String,
+        val locality: String,
+    ) : CurrentLocationDescription
+
+    /** A neighborhood in a city or town. */
+    data class Neighborhood(
+        val neighborhood: String,
+        val locality: String,
+    ) : CurrentLocationDescription
+
+    /** Only the city, town, or wider region is known. */
+    data class Area(
+        val name: String,
+    ) : CurrentLocationDescription
 }

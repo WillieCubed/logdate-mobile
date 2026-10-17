@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016 # the `$` in single-quoted Kotlin fixtures is literal on purpose
-# The hardcoded Compose literal check: on-screen text is reported wherever Compose puts it, and
-# keys, logs, animation labels, previews and tests are not.
+# The hardcoded Compose literal check: on-screen text is reported wherever Compose puts it, including
+# UI state built in ViewModels and domain models, and keys, logs, animation labels, previews and tests are not.
 set -euo pipefail
 
 source "$(git rev-parse --show-toplevel)/scripts/tests/lib/assertions.sh"
@@ -156,6 +156,28 @@ fun log() {
 }
 KT
 
+write "client/feature/demo/src/commonMain/kotlin/app/logdate/demo/DemoViewModel.kt" <<'KT'
+class DemoViewModel {
+    fun fail(e: Exception) {
+        _state.update { it.copy(errorMessage = "Couldn't save event") }
+        _state.update { it.copy(errorMessage = "Failed to load devices: ${e.message}") }
+        importContacts(logMessage = "Failed to import contacts")
+        runPhase(exceptionLabel = "Upload failed")
+        request(failureMessage = "Failed to load identity status")
+        io.github.aakira.napier.Napier.d(tag = "Demo", message = "Fetching notes for today")
+        download(logLabel = "journal")
+        AVAudioPlayer(contentsOfURL = url, fileTypeHint = "m4a", error = null)
+        val label = "Only checked in UI files"
+        val chosen = if (e is IOException) "Not checked here" else "Nor here"
+    }
+}
+
+data class Recommendation(
+    val message: String = "What's going on?",
+    val key: String = "home_recommendation",
+)
+KT
+
 write "client/location/src/androidMain/kotlin/app/logdate/location/RecordingService.kt" <<'KT'
 class RecordingService {
     fun notification() =
@@ -208,6 +230,10 @@ reported "RecordingService.kt:4: setContentTitle(): \"Recording your day\""
 reported "RecordingService.kt:8: contentDescription =: \"Recording\""
 
 reported 'Extras.kt:3: Sheet(summary): "$count places"'
+reported "Destinations.kt:2: Timeline(label): \"Timeline\""
+reported "DemoViewModel.kt:3: copy(errorMessage): \"Couldn't save event\""
+reported 'DemoViewModel.kt:4: copy(errorMessage): "Failed to load devices: ${e.message}"'
+reported "DemoViewModel.kt:17: default message: \"What's going on?\""
 
 not_reported "Screen.kt:9:"
 not_reported "Screen.kt:10:"
@@ -225,7 +251,17 @@ not_reported "select_tool"
 not_reported "Preview sample"
 not_reported "Preview title"
 not_reported "Preview journal"
-not_reported "Destinations.kt"
+not_reported "Destination changed"
+not_reported "Failed to import contacts"
+not_reported "Upload failed"
+not_reported "Failed to load identity status"
+not_reported "Fetching notes for today"
+not_reported '"journal"'
+not_reported "m4a"
+not_reported "Only checked in UI files"
+not_reported "Not checked here"
+not_reported "Nor here"
+not_reported "home_recommendation"
 not_reported "Unit test text"
 not_reported "Common test text"
 not_reported "Screenshot fixture"
@@ -240,7 +276,8 @@ fun Screen() {
     Text(stringResource(Res.string.screen_title))
 }
 KT
-rm "$SANDBOX/$UI/Components.kt" "$SANDBOX/$UI/Extras.kt" "$SANDBOX/client/location/src/androidMain/kotlin/app/logdate/location/RecordingService.kt"
+rm "$SANDBOX/$UI/Components.kt" "$SANDBOX/$UI/Extras.kt" "$SANDBOX/$UI/Destinations.kt" "$SANDBOX/$UI/DemoViewModel.kt" \
+    "$SANDBOX/client/location/src/androidMain/kotlin/app/logdate/location/RecordingService.kt"
 run_check
 assert_exit_code 0 "$STATUS"
 assert_contains "No hardcoded static Compose literals found." "$OUTPUT"

@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports", "ktlint:standard:max-line-length")
+@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:max-line-length")
 
 package app.logdate.feature.onboarding.ui
 
@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
@@ -27,14 +28,17 @@ import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
-import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
+import logdate.client.feature.onboarding.generated.resources.onboarding_cloud_backup_description
 import logdate.client.feature.onboarding.generated.resources.onboarding_plan_basic_description
+import logdate.client.feature.onboarding.generated.resources.onboarding_plan_basic_price
 import logdate.client.feature.onboarding.generated.resources.onboarding_plan_basic_title
 import logdate.client.feature.onboarding.generated.resources.onboarding_plan_premium_description
+import logdate.client.feature.onboarding.generated.resources.onboarding_plan_premium_price
 import logdate.client.feature.onboarding.generated.resources.onboarding_plan_premium_title
 import logdate.client.feature.onboarding.generated.resources.section_title_backup_sync
 import logdate.client.ui.generated.resources.common_back
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -225,27 +229,38 @@ private fun MainContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        // TODO: Use data classes for plan options
-        item {
+        items(LogDateBackupPlanOption.entries) { option ->
             PlanContentCard(
-                option = LogDateBackupPlanOption.BASIC,
-                title = stringResource(Res.string.onboarding_plan_basic_title),
-                description = stringResource(Res.string.onboarding_plan_basic_description),
-                price = "Free",
-                onPlanSelected = onPlanSelected,
-            )
-        }
-        item {
-            PlanContentCard(
-                option = LogDateBackupPlanOption.STANDARD,
-                title = stringResource(Res.string.onboarding_plan_premium_title),
-                description = stringResource(Res.string.onboarding_plan_premium_description),
-                price = "$12/month",
+                option = option,
+                title = stringResource(option.titleResource),
+                description = stringResource(option.descriptionResource),
+                price = stringResource(option.priceResource),
                 onPlanSelected = onPlanSelected,
             )
         }
     }
 }
+
+private val LogDateBackupPlanOption.titleResource: StringResource
+    get() =
+        when (this) {
+            LogDateBackupPlanOption.BASIC -> Res.string.onboarding_plan_basic_title
+            LogDateBackupPlanOption.STANDARD -> Res.string.onboarding_plan_premium_title
+        }
+
+private val LogDateBackupPlanOption.descriptionResource: StringResource
+    get() =
+        when (this) {
+            LogDateBackupPlanOption.BASIC -> Res.string.onboarding_plan_basic_description
+            LogDateBackupPlanOption.STANDARD -> Res.string.onboarding_plan_premium_description
+        }
+
+private val LogDateBackupPlanOption.priceResource: StringResource
+    get() =
+        when (this) {
+            LogDateBackupPlanOption.BASIC -> Res.string.onboarding_plan_basic_price
+            LogDateBackupPlanOption.STANDARD -> Res.string.onboarding_plan_premium_price
+        }
 
 @Composable
 internal fun PlanContentCard(

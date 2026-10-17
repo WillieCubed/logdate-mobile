@@ -47,6 +47,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.text.asString
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.settings.ui.watch.WatchDeviceCard
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
 import app.logdate.feature.core.settings.ui.watch.WatchStatus
@@ -56,6 +58,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.device_name
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.devices_connected
+import logdate.client.feature.core.generated.resources.devices_platform_wear_os
 import logdate.client.feature.core.generated.resources.devices_wear_os
 import logdate.client.feature.core.generated.resources.enter_a_new_name_for_this_device
 import logdate.client.feature.core.generated.resources.last_active_label
@@ -100,6 +103,7 @@ fun DevicesScreen(
     var showResetDialog by remember { mutableStateOf(false) }
     var selectedDevice by remember { mutableStateOf<DeviceInfoUiState?>(null) }
     var newDeviceName by remember { mutableStateOf("") }
+    val deviceNames = uiState.devices.associate { it.id to it.name.asString() }
 
     DevicesScreenContent(
         onBackClick = onBackClick,
@@ -118,7 +122,7 @@ fun DevicesScreen(
         onNewDeviceNameChange = { newDeviceName = it },
         onRenameClick = { device ->
             selectedDevice = device
-            newDeviceName = device.name
+            newDeviceName = deviceNames[device.id].orEmpty()
             showRenameDialog = true
         },
         onRemoveClick = { device ->
@@ -152,7 +156,7 @@ fun DevicesScreenContent(
     showDeleteDialog: Boolean = false,
     showResetDialog: Boolean = false,
     selectedDevice: DeviceInfoUiState? = null,
-    newDeviceName: String = selectedDevice?.name.orEmpty(),
+    newDeviceName: String = selectedDevice?.name?.asString().orEmpty(),
     onNewDeviceNameChange: (String) -> Unit = {},
     onRenameClick: (DeviceInfoUiState) -> Unit = {},
     onRemoveClick: (DeviceInfoUiState) -> Unit = {},
@@ -169,7 +173,7 @@ fun DevicesScreenContent(
 ) {
     if (showRenameDialog && selectedDevice != null) {
         RenameDeviceDialog(
-            currentName = newDeviceName.ifBlank { selectedDevice.name },
+            currentName = newDeviceName.ifBlank { selectedDevice.name.asString() },
             onNameChange = onNewDeviceNameChange,
             onConfirm = onRenameConfirm,
             onDismiss = onDismissRenameDialog,
@@ -178,7 +182,7 @@ fun DevicesScreenContent(
 
     if (showDeleteDialog && selectedDevice != null) {
         RemoveDeviceDialog(
-            deviceName = selectedDevice.name,
+            deviceName = selectedDevice.name.asString(),
             onConfirm = onRemoveConfirm,
             onDismiss = onDismissDeleteDialog,
         )
@@ -244,7 +248,7 @@ private fun CompanionDeviceInDevices(
             is WatchStatus.NotInstalled -> current.watchName
             else -> return
         }
-    if (uiState.devices.any { it.platformName == "Wear OS" && it.name == name }) return
+    if (uiState.devices.any { it.platformName == Res.string.devices_platform_wear_os && it.name == name.toUiText() }) return
     Column(Modifier.padding(horizontal = Spacing.lg)) {
         Text(stringResource(Res.string.devices_wear_os), style = MaterialTheme.typography.labelMedium)
         WatchDeviceCard(status, onClick)
@@ -291,12 +295,12 @@ private fun DeviceItem(
                     Icon(Icons.Outlined.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(device.name, style = MaterialTheme.typography.titleMedium)
+                    Text(device.name.asString(), style = MaterialTheme.typography.titleMedium)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(device.platformName, style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(device.platformName), style = MaterialTheme.typography.bodyMedium)
                         if (device.isCurrentDevice) {
                             Text(
                                 text = stringResource(Res.string.this_device),
@@ -329,7 +333,7 @@ private fun DeviceItem(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = stringResource(Res.string.last_active_label, device.lastActiveFormatted),
+                text = stringResource(Res.string.last_active_label, device.lastActiveFormatted.asString()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("device-supplemental-row"),

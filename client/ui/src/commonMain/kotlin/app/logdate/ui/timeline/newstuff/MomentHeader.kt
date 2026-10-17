@@ -17,11 +17,14 @@ import app.logdate.ui.provenance.CapturedOnWatchGlyph
 import app.logdate.ui.provenance.showsWatchProvenance
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.MomentUiState
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.timeline_moment_at_place
 import org.jetbrains.compose.resources.stringResource
 
 /**
  * A moment's label, followed by the watch glyph when everything in the moment was captured on the
  * watch. `MomentLabel` draws nothing for a blank label, so a moment with neither shows nothing.
+ * A moment named only by its place reads "At <place>".
  */
 @Composable
 internal fun MomentHeader(
@@ -29,15 +32,17 @@ internal fun MomentHeader(
     timeOfDay: DaylightPeriod?,
     color: Color,
 ) {
+    val placeLabel = moment.labelPlaceName?.let { place -> stringResource(Res.string.timeline_moment_at_place, place) }
+    val label = moment.label.ifBlank { placeLabel.orEmpty() }
     if (!showsWatchProvenance(moment.capturedOnWatch)) {
-        MomentLabel(label = moment.label, timeOfDay = timeOfDay, color = color)
+        MomentLabel(label = label, timeOfDay = timeOfDay, color = color)
         return
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        MomentLabel(label = moment.label, timeOfDay = timeOfDay, color = color)
+        MomentLabel(label = label, timeOfDay = timeOfDay, color = color)
         CapturedOnWatchGlyph()
     }
 }

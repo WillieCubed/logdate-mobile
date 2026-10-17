@@ -2,6 +2,7 @@ package app.logdate.feature.core.settings.account.recovery
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.text.toUiText
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
 import io.github.aakira.napier.Napier
@@ -129,9 +130,9 @@ class RecoveryPhraseViewModel(
         if (_state.value == RecoveryPhraseUiState.Confirming) return
         _state.value = RecoveryPhraseUiState.Confirming
         gatekeeper.authenticate(
-            title = prompt.title,
-            subtitle = prompt.subtitle,
-            description = prompt.description,
+            title = prompt.title.toUiText(),
+            subtitle = prompt.subtitle.toUiText(),
+            description = prompt.description?.toUiText(),
             onResult = { result ->
                 if (result != AppAuthState.AUTHENTICATED && result != AppAuthState.NO_PROMPT_NEEDED) {
                     _state.value = RecoveryPhraseUiState.Failed(RevealFailure.NOT_CONFIRMED)

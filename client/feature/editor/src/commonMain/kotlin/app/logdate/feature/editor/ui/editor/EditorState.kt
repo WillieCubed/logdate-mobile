@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor
 
 import androidx.compose.runtime.Stable
 import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.text.UiText
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.location.VisitMemoryContext
 import kotlin.uuid.Uuid
@@ -46,7 +47,7 @@ class EditorState(
     val availableDrafts: List<EntryDraft> = emptyList(),
     val isLoadingDrafts: Boolean = false,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
     val shouldExit: Boolean = false,
     val exitReason: EditorExitReason? = null,
     val disableEmptyBlockCreation: Boolean = false,
@@ -125,7 +126,7 @@ class EditorState(
         availableDrafts: List<EntryDraft> = this.availableDrafts,
         isLoadingDrafts: Boolean = this.isLoadingDrafts,
         isLoading: Boolean = this.isLoading,
-        errorMessage: String? = this.errorMessage,
+        errorMessage: UiText? = this.errorMessage,
         shouldExit: Boolean = this.shouldExit,
         exitReason: EditorExitReason? = this.exitReason,
         disableEmptyBlockCreation: Boolean = this.disableEmptyBlockCreation,
