@@ -57,6 +57,7 @@ object ProductionConfigValidator {
                 "value that encrypted them (see server/docs/environment-variables.md).",
             readEnv,
             failures,
+            mustDifferFrom = listOf("JWT_SECRET"),
         )
         validateDecryptOnlySigningKeyKek(readEnv, failures)
         validateDedicatedSecret(
@@ -64,6 +65,7 @@ object ProductionConfigValidator {
             "It signs hosted AT Protocol session tokens (see server/docs/environment-variables.md).",
             readEnv,
             failures,
+            mustDifferFrom = listOf("JWT_SECRET", AtprotoSigningKeyKek.envVar),
         )
         validateDatabase(readEnv, failures)
         validateBlobStorage(readEnv, failures)
@@ -105,19 +107,26 @@ object ProductionConfigValidator {
         }
     }
 
+    /**
+     * A dedicated secret must also differ from every secret in [mustDifferFrom]: a shared value means
+     * rotating one silently changes the other, which is what the dedicated secret exists to prevent.
+     */
     private fun validateDedicatedSecret(
         secret: DedicatedSecret,
         purpose: String,
         readEnv: (String) -> String?,
         failures: MutableList<String>,
+        mustDifferFrom: List<String>,
     ) {
         val name = secret.envVar
         val value = readEnv(name)?.trim().orEmpty()
+        val sharedWith = mustDifferFrom.firstOrNull { other -> value.isNotEmpty() && value == readEnv(other)?.trim() }
         when {
             value.isEmpty() -> failures += "$name is required in production. $purpose"
             value.length < MIN_DEDICATED_SECRET_LENGTH ->
                 failures += "$name must be at least $MIN_DEDICATED_SECRET_LENGTH characters (got ${value.length})."
             value.lowercase() in INSECURE_JWT_SECRETS -> failures += "$name is set to a known placeholder value."
+            sharedWith != null -> failures += "$name must differ from $sharedWith; give it its own value."
         }
     }
 
