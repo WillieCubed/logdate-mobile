@@ -3,6 +3,7 @@ package app.logdate.wear.e2e
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
@@ -88,10 +89,19 @@ class CampfireComplicationDataTest {
             try {
                 flags.setEnabled(FeatureFlag.CAMPFIRE_STREAKS, false)
                 val request = ComplicationRequest(1, ComplicationType.RANGED_VALUE, false)
-                assertTrue(StreakComplicationService().onComplicationRequest(request) is NoDataComplicationData)
+                assertTrue(attachedService().onComplicationRequest(request) is NoDataComplicationData)
             } finally {
                 flags.setEnabled(FeatureFlag.CAMPFIRE_STREAKS, previous)
             }
+        }
+
+    /** A service with the app as its base context, as the system binds it, so startup checks can reach the app. */
+    private fun attachedService(): StreakComplicationService =
+        StreakComplicationService().also { service ->
+            ContextWrapper::class.java
+                .getDeclaredMethod("attachBaseContext", Context::class.java)
+                .apply { isAccessible = true }
+                .invoke(service, context)
         }
 
     private fun ComplicationText.read(): String = getTextAt(context.resources, Instant.now()).toString()
