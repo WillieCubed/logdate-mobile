@@ -1,5 +1,7 @@
 package app.logdate.client.domain.reminders
 
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityKind
 import app.logdate.client.domain.streak.FirePhase
 import app.logdate.client.domain.streak.nextStreakDayStart
 import app.logdate.client.domain.streak.toStreakDay
@@ -21,8 +23,9 @@ import kotlin.time.Instant
  *
  * Pure: the same clock and signals always give the same decision, so delivery can ask again whenever
  * a signal changes. A reminder rings only with reminders on, only inside the person's waking hours,
- * at most once per streak day across both devices, and for the first of these that applies:
- * 1. a workout that ended within the last [WORKOUT_RECENCY];
+ * at most once per streak day across both devices, never while the person is moving or in a vehicle,
+ * and for the first of these that applies:
+ * 1. a walk, ride, workout or trip that ended within the last [ACTIVITY_RECENCY];
  * 2. arriving somewhere new and staying at least [ARRIVAL_DWELL];
  * 3. a campfire in embers with nothing logged today and at most [CAMPFIRE_LAST_STRETCH] left before
  *    bedtime or the end of the streak day, whichever comes first;
@@ -30,7 +33,8 @@ import kotlin.time.Instant
  *    or marks wait to be filled in.
  */
 object ReminderOrchestrator {
-    val WORKOUT_RECENCY: Duration = 30.minutes
+    val ACTIVITY_RECENCY: Duration = 30.minutes
+    val WORKOUT_RECENCY: Duration = ACTIVITY_RECENCY
     val ARRIVAL_DWELL: Duration = 10.minutes
     val CAMPFIRE_LAST_STRETCH: Duration = 3.hours
     val WIND_DOWN_LEAD: Duration = 90.minutes
@@ -44,6 +48,12 @@ object ReminderOrchestrator {
             WakingWindow.containing(clock.now, clock.zone, clock.wakingHours)
                 ?: return ReminderDecision.Skip(SkipReason.OUTSIDE_WAKING_HOURS)
         if (remindedThisStreakDay(clock)) return ReminderDecision.Skip(SkipReason.ALREADY_REMINDED_TODAY)
+        if (signals.activity.current
+                ?.kind
+                ?.holdsReminders == true
+        ) {
+            return ReminderDecision.Skip(SkipReason.ACTIVITY_UNDER_WAY)
+        }
         val trigger = firstTrigger(clock, signals, window) ?: return ReminderDecision.Skip(SkipReason.NOTHING_TO_REMIND)
         return ReminderDecision.Deliver(trigger, signals.openMarks)
     }
@@ -59,6 +69,7 @@ object ReminderOrchestrator {
         window: WakingWindow,
     ): ReminderTrigger? {
         val now = clock.now
+        activityEnded(now, signals.activity.lastEnded)?.let { return it }
         if (signals.workoutEndedAt.endedWithin(now, WORKOUT_RECENCY)) return ReminderTrigger.WORKOUT_ENDED
         if (signals.newPlaceArrivedAt.lastedAtLeast(now, ARRIVAL_DWELL)) return ReminderTrigger.ARRIVED_SOMEWHERE_NEW
         if (campfireFading(clock, signals, window)) return ReminderTrigger.CAMPFIRE_EMBERS
@@ -66,6 +77,19 @@ object ReminderOrchestrator {
         if (signals.draftWaiting) return ReminderTrigger.DRAFT_RESCUE
         if (signals.memoryAvailable) return ReminderTrigger.MEMORY_RECALL
         return null
+    }
+
+    /** The trigger for an activity that ended within [ACTIVITY_RECENCY]; waking up is not one. */
+    private fun activityEnded(
+        now: Instant,
+        activity: Activity?,
+    ): ReminderTrigger? {
+        if (activity == null || !activity.endedAt.endedWithin(now, ACTIVITY_RECENCY)) return null
+        return when (activity.kind) {
+            ActivityKind.MOVING -> ReminderTrigger.MOVING_ENDED
+            ActivityKind.IN_VEHICLE -> ReminderTrigger.TRIP_ENDED
+            ActivityKind.SLEEP -> null
+        }
     }
 
     private fun campfireFading(

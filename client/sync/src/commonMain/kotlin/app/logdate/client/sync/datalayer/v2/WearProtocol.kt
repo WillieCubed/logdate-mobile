@@ -44,6 +44,9 @@ object WearFeatures {
     const val LIVE = "live.v1"
     const val REMINDERS = "reminders.v1"
     const val REMINDER_SUPPLEMENTS = "reminders.supplements.v1"
+
+    /** The device can read the reminder triggers for a walk or trip that just ended. */
+    const val ACTIVITY_REMINDERS = "reminders.activity.v1"
     const val LINK_CLOUD = "link.cloud.v1"
     const val PHONE_CAMERA = "phone.camera.v1"
     const val PHONE_PLAYBACK = "phone.playback.v1"
@@ -60,6 +63,7 @@ object WearFeatures {
             LIVE,
             REMINDERS,
             REMINDER_SUPPLEMENTS,
+            ACTIVITY_REMINDERS,
             LINK_CLOUD,
             PHONE_CAMERA,
             PHONE_PLAYBACK,
