@@ -25,6 +25,20 @@
 
     <!-- Suggestion cards -->
     <string name="suggestion_label_today">Today</string>
+    <string name="suggestion_label_activity">Activity finished</string>
+    <string name="suggestion_label_trip">Trip finished</string>
+    <string name="suggestion_label_morning">Good morning</string>
+    <string name="suggestion_add_moment">Add a moment</string>
+    <string name="suggestion_record_voice">Record a voice note</string>
+    <string name="suggestion_morning_message">How is your day starting?</string>
+    <plurals name="suggestion_after_moving_message">
+        <item quantity="one">You were moving for a minute. How did it go?</item>
+        <item quantity="other">You were moving for %1$d minutes. How did it go?</item>
+    </plurals>
+    <plurals name="suggestion_after_trip_message">
+        <item quantity="one">Your trip took a minute. Where did you go?</item>
+        <item quantity="other">Your trip took %1$d minutes. Where did you go?</item>
+    </plurals>
     <string name="suggestion_label_draft">Draft</string>
     <string name="suggestion_draft_fallback">Finish your draft while it&apos;s still fresh.</string>
     <string name="finish_draft">Finish Draft</string>

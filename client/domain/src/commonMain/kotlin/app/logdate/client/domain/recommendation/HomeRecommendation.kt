@@ -8,6 +8,8 @@ import kotlin.uuid.Uuid
  * Represents a home screen recommendation to prompt the user to capture content.
  *
  * Recommendations are ordered by priority (highest first):
+ * 1. [AfterActivity] or [MorningStart] — a walk, ride or trip just ended, or the person just woke,
+ *    while activity awareness is on
  * 1. [CompleteYourDraft] — an unfinished draft is waiting
  * 2. [UpcomingEvent] — an event is starting soon and the user hasn't captured anything for it
  * 3. [MemoryRecall] — entries exist near today's date from a prior year
@@ -20,6 +22,15 @@ import kotlin.uuid.Uuid
 sealed class HomeRecommendation {
     /** No recommendation to show — the user is up to date. */
     data object None : HomeRecommendation()
+
+    /** A walk, ride or trip that lasted [minutes] just ended; [trip] for a vehicle. */
+    data class AfterActivity(
+        val minutes: Int,
+        val trip: Boolean,
+    ) : HomeRecommendation()
+
+    /** The person just woke up, as their watch saw it. */
+    data object MorningStart : HomeRecommendation()
 
     /** The user has not added any entries today. */
     data class EmptyDay(

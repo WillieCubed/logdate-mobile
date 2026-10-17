@@ -245,6 +245,16 @@ class HomeViewModel(
                 false,
             )
 
+    /** Puts away the suggestion after an activity, or the morning start. */
+    fun dismissActivitySuggestion() {
+        viewModelScope.launch { getHomeRecommendation.dismissActivity() }
+    }
+
+    /** Notes that a moment was started from the suggestion after an activity, or the morning start. */
+    fun useActivitySuggestion() {
+        viewModelScope.launch { getHomeRecommendation.useActivity() }
+    }
+
     private val timelineSuggestionState: StateFlow<TimelineSuggestionBlock?> =
         getHomeRecommendation()
             .map { recommendation -> recommendation.toTimelineSuggestionBlock() }

@@ -5,8 +5,10 @@ import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.domain.activity.ActivityPresenter
 import app.logdate.client.domain.activity.ActivityTracker
 import app.logdate.client.domain.activity.KeyValueActivityLogStore
+import app.logdate.client.domain.activity.SuggestionOutcomes
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.places.PlaceResolutionCache
@@ -39,6 +41,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
+import kotlin.time.Instant
 
 val phoneReminderSignalsModule =
     module {
@@ -52,6 +55,14 @@ val phoneReminderSignalsModule =
                 watchWorn = watches.map { it?.presence?.state != PresenceState.OFF_WRIST },
                 isPhone = true,
                 enabled = get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
+            )
+        }
+        single {
+            val notes = get<JournalNotesRepository>()
+            ActivityPresenter(
+                agreed = get<ActivityTracker>().agreed,
+                outcomes = SuggestionOutcomes(get<KeyValueStorage>()),
+                capturedSince = { since -> notes.observeNotesInRange(since, Instant.DISTANT_FUTURE).map { it.isNotEmpty() } },
             )
         }
         single {

@@ -306,6 +306,8 @@ class TimelineViewModel(
                         },
                     isAiGenerated = isAiGenerated,
                 )
+            is HomeRecommendation.AfterActivity -> TimelineSuggestionBlock.AfterActivity(minutes = minutes, trip = trip)
+            HomeRecommendation.MorningStart -> TimelineSuggestionBlock.MorningStart
             HomeRecommendation.None -> null
             // No timeline card for upcoming events yet — the events UI block is not built.
             is HomeRecommendation.UpcomingEvent -> null

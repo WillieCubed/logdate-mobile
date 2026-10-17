@@ -181,5 +181,7 @@ internal fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionB
                 startTime = startTime,
                 placeName = placeName,
             )
+        is HomeRecommendation.AfterActivity -> TimelineSuggestionBlock.AfterActivity(minutes = minutes, trip = trip)
+        HomeRecommendation.MorningStart -> TimelineSuggestionBlock.MorningStart
         HomeRecommendation.None -> null
     }
