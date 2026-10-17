@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.ui.provenance.CaptureTimeLabel
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
@@ -48,12 +49,13 @@ internal fun VerticalEntryCardShell(
     cardModifier: Modifier = Modifier,
     contentPadding: Dp = Spacing.md,
     capturedOnWatch: Boolean = false,
+    capturedDuring: CaptureActivity? = null,
     content: @Composable () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Column(modifier = modifier) {
-        CaptureTimeLabel(text = timestamp.localTime, capturedOnWatch = capturedOnWatch)
+        CaptureTimeLabel(text = timestamp.localTime, capturedOnWatch = capturedOnWatch, capturedDuring = capturedDuring)
 
         Card(
             onClick = onClick,
@@ -92,12 +94,13 @@ internal fun InlineEntryCardShell(
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
     capturedOnWatch: Boolean = false,
+    capturedDuring: CaptureActivity? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Column(modifier = modifier) {
-        CaptureTimeLabel(text = timestamp.localTime, capturedOnWatch = capturedOnWatch)
+        CaptureTimeLabel(text = timestamp.localTime, capturedOnWatch = capturedOnWatch, capturedDuring = capturedDuring)
 
         Card(
             onClick = onClick,

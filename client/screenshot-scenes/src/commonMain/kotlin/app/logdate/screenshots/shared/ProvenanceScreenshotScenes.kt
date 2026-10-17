@@ -14,18 +14,40 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.ui.provenance.CaptureTimeLabel
 import app.logdate.ui.provenance.CapturedOnWatchBanner
 import app.logdate.ui.provenance.CapturedOnWatchGlyph
+import app.logdate.ui.provenance.LocalActivityContextVisible
 import app.logdate.ui.provenance.LocalWatchProvenanceVisible
 
-/** How a moment captured on the watch is marked: the editor banner, a note's time, and a moment's label. */
+/**
+ * How a moment captured on the watch is marked (the editor banner, a note's time, and a moment's label),
+ * and how a moment captured during a walk or a trip says so after its time.
+ */
 internal val provenanceScenes: List<SharedScreenshotSceneSpec> =
     listOf(
         sharedScene(SharedScreenshotSceneId.CapturedOnWatch, ScreenshotSceneGroup.TIMELINE, standardMatrixVariants) {
             CapturedOnWatchScene()
         },
+        sharedScene(SharedScreenshotSceneId.CapturedDuringActivity, ScreenshotSceneGroup.TIMELINE, standardMatrixVariants) {
+            CapturedDuringActivityScene()
+        },
     )
+
+@Composable
+private fun CapturedDuringActivityScene() {
+    CompositionLocalProvider(LocalActivityContextVisible provides true, LocalWatchProvenanceVisible provides true) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            CaptureTimeLabel(text = "Today, 7:40 AM", capturedOnWatch = false, capturedDuring = CaptureActivity.MOVING)
+            CaptureTimeLabel(text = "Today, 8:05 AM", capturedOnWatch = true, capturedDuring = CaptureActivity.IN_VEHICLE)
+            CaptureTimeLabel(text = "Today, 9:15 AM", capturedOnWatch = false)
+        }
+    }
+}
 
 @Composable
 private fun CapturedOnWatchScene() {

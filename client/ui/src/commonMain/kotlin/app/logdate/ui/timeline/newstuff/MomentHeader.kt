@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.awareness.daylight.stringRes
 import app.logdate.ui.provenance.CapturedOnWatchGlyph
+import app.logdate.ui.provenance.captureActivityText
 import app.logdate.ui.provenance.showsWatchProvenance
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.MomentUiState
@@ -22,9 +23,9 @@ import logdate.client.ui.generated.resources.timeline_moment_at_place
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * A moment's label, followed by the watch glyph when everything in the moment was captured on the
- * watch. `MomentLabel` draws nothing for a blank label, so a moment with neither shows nothing.
- * A moment named only by its place reads "At <place>".
+ * A moment's label and what the person was doing, followed by the watch glyph when everything in the
+ * moment was captured on the watch. `MomentLabel` draws nothing for a blank label, so a moment with
+ * neither shows nothing. A moment named only by its place reads "At <place>".
  */
 @Composable
 internal fun MomentHeader(
@@ -34,15 +35,16 @@ internal fun MomentHeader(
 ) {
     val placeLabel = moment.labelPlaceName?.let { place -> stringResource(Res.string.timeline_moment_at_place, place) }
     val label = moment.label.ifBlank { placeLabel.orEmpty() }
+    val activity = captureActivityText(moment.capturedDuring)
     if (!showsWatchProvenance(moment.capturedOnWatch)) {
-        MomentLabel(label = label, timeOfDay = timeOfDay, color = color)
+        MomentLabel(label = label, timeOfDay = timeOfDay, color = color, activity = activity)
         return
     }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        MomentLabel(label = label, timeOfDay = timeOfDay, color = color)
+        MomentLabel(label = label, timeOfDay = timeOfDay, color = color, activity = activity)
         CapturedOnWatchGlyph()
     }
 }
@@ -53,15 +55,17 @@ private fun MomentLabel(
     timeOfDay: DaylightPeriod?,
     color: Color,
     modifier: Modifier = Modifier,
+    activity: String? = null,
 ) {
     if (label.isBlank()) return
     val periodName = timeOfDay?.let { stringResource(it.stringRes) }
-    val displayText =
+    val withPeriod =
         if (periodName != null && !label.lowercase().contains(periodName.lowercase())) {
             "$label \u00b7 $periodName"
         } else {
             label
         }
+    val displayText = if (activity != null) "$withPeriod \u00b7 $activity" else withPeriod
     Text(
         text = displayText,
         style = MaterialTheme.typography.titleSmall,

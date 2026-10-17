@@ -107,6 +107,7 @@ enum class SharedScreenshotSceneId(
     FirstRewindOnboardingSheet("first-rewind-onboarding-sheet"),
     DayBoundaryRecovery("day-boundary-recovery"),
     CapturedOnWatch("captured-on-watch"),
+    CapturedDuringActivity("captured-during-activity"),
 }
 
 enum class ScreenshotSceneGroup {

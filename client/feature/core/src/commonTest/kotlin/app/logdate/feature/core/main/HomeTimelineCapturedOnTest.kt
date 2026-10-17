@@ -4,6 +4,7 @@ import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.MomentInferenceSource
 import app.logdate.client.domain.timeline.MomentTextFragment
 import app.logdate.client.domain.timeline.TimelineDay
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.moments.MarkState
@@ -28,6 +29,17 @@ class HomeTimelineCapturedOnTest {
             capturedOn = CaptureDevice.WATCH,
         )
     private val fromPhone = JournalNote.Text(creationTimestamp = at, lastUpdated = at, content = "Typed on the phone")
+
+    @Test
+    fun `the day detail carries what the person was doing for each note`() {
+        val walking = fromPhone.copy(capturedDuring = CaptureActivity.MOVING)
+        val day = TimelineDay(start = at, end = at, tldr = "", date = LocalDate(2026, 10, 10), entries = listOf(walking, fromWatch))
+
+        val notes = day.toHomeTimelineUiState().notes
+
+        assertEquals(CaptureActivity.MOVING, notes.single { it.noteId == walking.uid }.capturedDuring)
+        assertEquals(null, notes.single { it.noteId == fromWatch.uid }.capturedDuring)
+    }
 
     @Test
     fun `notes captured on the watch are marked in the day detail`() {

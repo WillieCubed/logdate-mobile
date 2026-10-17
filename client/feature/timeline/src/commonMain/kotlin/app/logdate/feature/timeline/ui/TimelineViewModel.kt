@@ -14,6 +14,7 @@ import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
+import app.logdate.client.domain.timeline.capturedDuring
 import app.logdate.client.domain.timeline.capturedOnWatch
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.isCapturedOnWatch
@@ -274,6 +275,7 @@ class TimelineViewModel(
             people = resolvedPeople,
             isHero = isHero,
             capturedOnWatch = capturedOnWatch(),
+            capturedDuring = capturedDuring(),
         )
     }
 
@@ -330,6 +332,7 @@ class TimelineViewModel(
                         timestamp = note.creationTimestamp,
                         journals = noteJournals,
                         capturedOnWatch = note.isCapturedOnWatch,
+                        capturedDuring = note.capturedDuring,
                     )
                 is JournalNote.Image ->
                     ImageNoteUiState(
@@ -340,6 +343,7 @@ class TimelineViewModel(
                         presentation = note.presentation,
                         journals = noteJournals,
                         capturedOnWatch = note.isCapturedOnWatch,
+                        capturedDuring = note.capturedDuring,
                     )
                 is JournalNote.Audio ->
                     AudioNoteUiState(
@@ -349,6 +353,7 @@ class TimelineViewModel(
                         duration = note.durationMs,
                         journals = noteJournals,
                         capturedOnWatch = note.isCapturedOnWatch,
+                        capturedDuring = note.capturedDuring,
                     )
                 is JournalNote.Video ->
                     VideoNoteUiState(
@@ -358,6 +363,7 @@ class TimelineViewModel(
                         caption = note.caption,
                         journals = noteJournals,
                         capturedOnWatch = note.isCapturedOnWatch,
+                        capturedDuring = note.capturedDuring,
                     )
             }
         }

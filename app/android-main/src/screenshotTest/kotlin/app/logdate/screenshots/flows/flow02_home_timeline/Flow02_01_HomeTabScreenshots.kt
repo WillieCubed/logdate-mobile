@@ -4,7 +4,9 @@ package app.logdate.screenshots.flows.flow02_home_timeline
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.text.toUiText
 import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
@@ -23,6 +25,7 @@ import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.provenance.LocalActivityContextVisible
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
 import app.logdate.ui.timeline.MomentAudioUiState
@@ -348,6 +351,50 @@ fun S03d_TimelineSuggestionMorningStart() {
                 onProfileClick = {},
                 timelineSuggestion = TimelineSuggestionBlock.MorningStart,
             )
+        }
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S03e_TimelineMomentsCapturedWhileMoving() {
+    val walk =
+        createSemanticTimelineDayUiState(
+            summary = "Walked to the park, then rode the ferry home.",
+            date = LocalDate(2025, 2, 20),
+            moments =
+                listOf(
+                    MomentUiState(
+                        id = "moment-2025-02-20-walk",
+                        label = "Walk to Dolores Park",
+                        timeOfDay = DaylightPeriod.MORNING,
+                        textSnippet = "The whole hill was out in the sun, and every dog in the city with it.",
+                        places = listOf(doloresPark),
+                        capturedDuring = CaptureActivity.MOVING,
+                    ),
+                    MomentUiState(
+                        id = "moment-2025-02-20-ferry",
+                        label = "Ferry home",
+                        timeOfDay = DaylightPeriod.EVENING,
+                        textSnippet = "Fog over the bridge, and the city lights coming on behind it.",
+                        capturedDuring = CaptureActivity.IN_VEHICLE,
+                    ),
+                ),
+            placesVisited = listOf(doloresPark),
+        )
+    ScreenshotTheme {
+        CompositionLocalProvider(LocalActivityContextVisible provides true) {
+            HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
+                TimelinePane(
+                    uiState = TimelineUiState(items = listOf(walk)),
+                    onNewEntry = {},
+                    onShareMemory = { _ -> },
+                    onOpenDay = {},
+                    onSearchClick = {},
+                    onProfileClick = {},
+                )
+            }
         }
     }
 }
