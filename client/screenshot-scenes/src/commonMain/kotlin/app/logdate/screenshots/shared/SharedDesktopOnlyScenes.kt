@@ -58,7 +58,7 @@ internal val catalogDesktopOnlyScenes: List<SharedScreenshotSceneSpec> =
         },
         sharedScene(SharedScreenshotSceneId.RewindError, ScreenshotSceneGroup.REWIND, desktopOnlyVariants) {
             RewindErrorScreen(
-                message = "Whoops, we couldn't catch the rewind. Try again later.",
+                message = "This Rewind couldn't be loaded. Try again later.",
                 onExit = {},
             )
         },
