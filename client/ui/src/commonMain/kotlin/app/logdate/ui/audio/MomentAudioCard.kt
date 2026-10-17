@@ -27,6 +27,9 @@ import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.MomentAudioUiState
 import app.logdate.ui.timeline.buildTranscriptExcerpt
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.media_device_audio_output
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 
 /**
@@ -127,7 +130,7 @@ fun MomentAudioCard(
                 MediaDeviceSelector(
                     selection = playbackState.outputSelection,
                     onDeviceSelected = playbackState.selectOutputDevice,
-                    label = "Audio output",
+                    label = stringResource(Res.string.media_device_audio_output),
                     visibilityState = outputSheetVisible,
                 )
                 PlaybackHandoffAction(handoff)

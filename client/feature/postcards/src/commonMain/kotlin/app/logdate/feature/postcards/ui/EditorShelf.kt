@@ -36,7 +36,9 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.postcards.generated.resources.Res
 import logdate.client.feature.postcards.generated.resources.postcards_shelf_browse
 import logdate.client.feature.postcards.generated.resources.postcards_shelf_photos
+import logdate.client.feature.postcards.generated.resources.postcards_shelf_photos_empty
 import logdate.client.feature.postcards.generated.resources.postcards_shelf_stickers
+import logdate.client.feature.postcards.generated.resources.postcards_shelf_stickers_empty
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -117,7 +119,7 @@ private fun ShelfPhotoStrip(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "Your photos will appear here",
+                stringResource(Res.string.postcards_shelf_photos_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -156,7 +158,7 @@ private fun StickerShelfStrip(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                "Extract stickers from photos in your library",
+                stringResource(Res.string.postcards_shelf_stickers_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -35,8 +35,12 @@ import logdate.client.feature.core.generated.resources.account_settings_descript
 import logdate.client.feature.core.generated.resources.account_title
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.devices_settings_description
+import logdate.client.feature.core.generated.resources.events_settings
+import logdate.client.feature.core.generated.resources.events_settings_description
 import logdate.client.feature.core.generated.resources.export_and_import
 import logdate.client.feature.core.generated.resources.export_and_import_description
+import logdate.client.feature.core.generated.resources.library_settings
+import logdate.client.feature.core.generated.resources.library_settings_description
 import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.location_settings_description
 import logdate.client.feature.core.generated.resources.memories
@@ -121,8 +125,8 @@ internal fun SettingsPersonalSection(
             onClick = onNavigateToRewindSettings,
         )
         SettingsNavigationItem(
-            title = "Events",
-            description = "The moments worth remembering, gathered for you",
+            title = stringResource(Res.string.events_settings),
+            description = stringResource(Res.string.events_settings_description),
             icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
             onClick = onNavigateToEventsSettings,
         )
@@ -133,8 +137,8 @@ internal fun SettingsPersonalSection(
             onClick = onNavigateToPeopleSettings,
         )
         SettingsNavigationItem(
-            title = "Your library",
-            description = "Browse and manage your photos and videos",
+            title = stringResource(Res.string.library_settings),
+            description = stringResource(Res.string.library_settings_description),
             icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
             onClick = onNavigateToLibrarySettings,
         )

@@ -58,7 +58,7 @@ fun SearchBarBase(
     modifier: Modifier = Modifier,
     onDismiss: () -> Unit = {},
     onNavigationClick: () -> Unit = {},
-    hint: String = "Search",
+    hint: String = stringResource(Res.string.search),
     query: String = "",
     onQueryChange: (String) -> Unit = {},
     content: @Composable () -> Unit = {},
@@ -114,9 +114,9 @@ fun SearchBarBase(
                         }
                     val contentDescription =
                         if (expanded) {
-                            "Close search"
+                            stringResource(Res.string.close_search)
                         } else {
-                            "Open navigation"
+                            stringResource(Res.string.open_navigation)
                         }
                     Icon(icon, contentDescription)
                 }
@@ -155,7 +155,7 @@ fun SearchBarBase(
 @Composable
 fun SearchAppBar(
     modifier: Modifier = Modifier,
-    hint: String = "Search",
+    hint: String = stringResource(Res.string.search),
     onExpand: () -> Unit = {},
     onNavigationClick: () -> Unit = {},
     expanded: Boolean = false,

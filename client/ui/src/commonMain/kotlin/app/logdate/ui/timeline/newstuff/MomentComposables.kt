@@ -44,6 +44,10 @@ import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
 import coil3.compose.AsyncImage
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.timeline_moment_photo_count
+import logdate.client.ui.generated.resources.timeline_open_full_entry
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
 @Composable
@@ -167,7 +171,11 @@ private fun HeroMomentContainer(
                         Text(
                             text =
                                 moment.places.first().title +
-                                    if (moment.media.size > 1) " \u00b7 ${moment.media.size} photos" else "",
+                                    if (moment.media.size > 1) {
+                                        " \u00b7 " + stringResource(Res.string.timeline_moment_photo_count, moment.media.size)
+                                    } else {
+                                        ""
+                                    },
                             style = MaterialTheme.typography.labelLarge,
                             color = Color.White,
                         )
@@ -346,8 +354,9 @@ private fun TextQuoteContainer(
 private fun MomentUiState.openTextEntryAction(onOpenTextNote: (Uuid) -> Unit): (() -> Unit)? =
     textNoteId?.let { id -> { onOpenTextNote(id) } }
 
+@Composable
 private fun Modifier.openTextEntryOnClick(onClick: (() -> Unit)?): Modifier =
-    if (onClick == null) this else clickable(onClickLabel = "Open full entry", onClick = onClick)
+    if (onClick == null) this else clickable(onClickLabel = stringResource(Res.string.timeline_open_full_entry), onClick = onClick)
 
 @Composable
 private fun PersonAvatarRow(

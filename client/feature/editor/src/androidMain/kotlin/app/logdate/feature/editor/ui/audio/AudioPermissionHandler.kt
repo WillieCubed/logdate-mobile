@@ -30,6 +30,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.allow_microphone_access
+import logdate.client.feature.editor.generated.resources.editor_audio_permission_request_description
+import logdate.client.feature.editor.generated.resources.editor_audio_permission_settings_rationale
 import logdate.client.feature.editor.generated.resources.editor_audio_post_grant_description
 import logdate.client.feature.editor.generated.resources.open_app_settings
 import org.jetbrains.compose.resources.stringResource
@@ -104,9 +106,9 @@ actual fun AudioPermissionWrapper(content: @Composable () -> Unit) {
                 Text(
                     text =
                         if (showRationale) {
-                            "Microphone permission is required to record audio notes. Please enable it in app settings."
+                            stringResource(Res.string.editor_audio_permission_settings_rationale)
                         } else {
-                            "LogDate needs access to your microphone to record audio notes. This permission is only used when you actively choose to record audio."
+                            stringResource(Res.string.editor_audio_permission_request_description)
                         },
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,

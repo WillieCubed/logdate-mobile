@@ -54,6 +54,9 @@ import logdate.client.feature.journal.generated.resources.cd_close_search
 import logdate.client.feature.journal.generated.resources.search_entries_loading
 import logdate.client.feature.journal.generated.resources.search_journals
 import logdate.client.feature.journal.generated.resources.search_no_results
+import logdate.client.feature.journal.generated.resources.search_result_type_note
+import logdate.client.feature.journal.generated.resources.search_result_type_text_note
+import logdate.client.feature.journal.generated.resources.search_result_type_voice_note
 import logdate.client.feature.journal.generated.resources.search_section_entries
 import logdate.client.feature.journal.generated.resources.search_section_journals
 import org.jetbrains.compose.resources.stringResource
@@ -159,12 +162,15 @@ private fun JournalSearchResults(
     val matchingJournals = filteredJournals.filterIsInstance<JournalListItemUiState.ExistingJournal>()
     val hasJournals = matchingJournals.isNotEmpty()
     val hasEntries = entryResults.isNotEmpty()
+    val textNoteLabel = stringResource(Res.string.search_result_type_text_note)
+    val voiceNoteLabel = stringResource(Res.string.search_result_type_voice_note)
+    val noteLabel = stringResource(Res.string.search_result_type_note)
     val entryResultRows =
-        remember(entryResults) {
+        remember(entryResults, textNoteLabel, voiceNoteLabel, noteLabel) {
             entryResults.map { result ->
                 EntryResultRow(
                     result = result,
-                    uiState = result.toUiState(),
+                    uiState = result.toUiState(textNoteLabel, voiceNoteLabel, noteLabel),
                 )
             }
         }
@@ -286,16 +292,20 @@ private data class EntryResultRow(
     val uiState: EntrySearchResultUiState,
 )
 
-private fun SearchResult.toUiState(): EntrySearchResultUiState =
+private fun SearchResult.toUiState(
+    textNoteLabel: String,
+    voiceNoteLabel: String,
+    noteLabel: String,
+): EntrySearchResultUiState =
     EntrySearchResultUiState(
         id = uid.toString(),
         contentText = parseSnippetMarkers(content),
         dateLabel = created.toReadableDateTimeShort(),
         typeLabel =
             when (contentType) {
-                SearchContentType.TEXT_NOTE -> "Text note"
-                SearchContentType.TRANSCRIPTION -> "Voice note"
-                else -> "Note"
+                SearchContentType.TEXT_NOTE -> textNoteLabel
+                SearchContentType.TRANSCRIPTION -> voiceNoteLabel
+                else -> noteLabel
             },
         typeIcon =
             when (contentType) {

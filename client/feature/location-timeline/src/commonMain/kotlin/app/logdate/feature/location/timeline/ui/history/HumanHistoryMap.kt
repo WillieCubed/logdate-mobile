@@ -30,6 +30,7 @@ import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_map_empty
 import logdate.client.feature.location.timeline.generated.resources.history_map_overview_description
+import logdate.client.feature.location.timeline.generated.resources.history_map_recorded_places
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.PI
 import kotlin.math.cos
@@ -205,7 +206,7 @@ fun HumanHistoryMap(
             color = colors.surfaceContainerHigh,
         ) {
             Text(
-                selected?.label ?: "Recorded places and paths",
+                selected?.label ?: stringResource(Res.string.history_map_recorded_places),
                 Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.labelMedium,
             )

@@ -41,16 +41,29 @@ import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_app_permission_settings
 import logdate.client.feature.location.timeline.generated.resources.history_cancel
+import logdate.client.feature.location.timeline.generated.resources.history_conflict_activity
+import logdate.client.feature.location.timeline.generated.resources.history_conflict_arrival
+import logdate.client.feature.location.timeline.generated.resources.history_conflict_deleted_visit
+import logdate.client.feature.location.timeline.generated.resources.history_conflict_departure
+import logdate.client.feature.location.timeline.generated.resources.history_conflict_place
+import logdate.client.feature.location.timeline.generated.resources.history_conflict_saved_place
+import logdate.client.feature.location.timeline.generated.resources.history_conflict_travelling
 import logdate.client.feature.location.timeline.generated.resources.history_conflicts_body
 import logdate.client.feature.location.timeline.generated.resources.history_conflicts_title
+import logdate.client.feature.location.timeline.generated.resources.history_device_number
 import logdate.client.feature.location.timeline.generated.resources.history_link_memory_body
 import logdate.client.feature.location.timeline.generated.resources.history_link_memory_empty
 import logdate.client.feature.location.timeline.generated.resources.history_link_memory_title
+import logdate.client.feature.location.timeline.generated.resources.history_more_place_options
 import logdate.client.feature.location.timeline.generated.resources.history_pause_recording
+import logdate.client.feature.location.timeline.generated.resources.history_place_name
+import logdate.client.feature.location.timeline.generated.resources.history_recording_interrupted
 import logdate.client.feature.location.timeline.generated.resources.history_recording_settings
 import logdate.client.feature.location.timeline.generated.resources.history_recording_title
+import logdate.client.feature.location.timeline.generated.resources.history_resume_recording
 import logdate.client.feature.location.timeline.generated.resources.history_review_changes
 import logdate.client.feature.location.timeline.generated.resources.history_show_day
+import logdate.client.feature.location.timeline.generated.resources.history_through_date
 import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -110,14 +123,13 @@ fun HumanLocationHistoryScreen(
             .PlatformBackHandler(enabled = workspace && openedPlace != null) { openedPlace = null }
         HumanLocationHistoryContent(
             when {
-                state.recoveryActionLabel == "Try again" -> state
+                state.canRetry -> state
                 recordingEnabled && !access.ready ->
-                    state.copy(recoveryMessage = access.message, recoveryActionLabel = access.actionLabel)
+                    state.copy(recoveryMessage = stringResource(access.message), recoveryActionLabel = stringResource(access.actionLabel))
                 interrupted ->
                     state.copy(
-                        recoveryMessage =
-                            "Recording was interrupted. Your saved history is still here, but part of your day may be missing.",
-                        recoveryActionLabel = "Resume recording",
+                        recoveryMessage = stringResource(Res.string.history_recording_interrupted),
+                        recoveryActionLabel = stringResource(Res.string.history_resume_recording),
                     )
                 else -> state
             },
@@ -150,7 +162,7 @@ fun HumanLocationHistoryScreen(
                 onReplayPlaying = if (access.reducedMotion) null else viewModel::replay,
                 onRecover = {
                     when {
-                        state.recoveryActionLabel == "Try again" -> viewModel.retry()
+                        state.canRetry -> viewModel.retry()
                         recordingEnabled && !access.ready -> access.resolve()
                         interrupted -> access.resolve()
                         snapshot?.conflicts?.isNotEmpty() == true -> reviewingChanges = true
@@ -163,7 +175,7 @@ fun HumanLocationHistoryScreen(
             supportingDetail = placeDetail.takeIf { workspace },
             toolbarActions = {
                 IconButton(onClick = { moreMenu = true }) {
-                    Icon(Icons.Default.MoreVert, "More place options", Modifier.size(20.dp))
+                    Icon(Icons.Default.MoreVert, stringResource(Res.string.history_more_place_options), Modifier.size(20.dp))
                 }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                     DropdownMenuItem(text = { Text(stringResource(Res.string.history_recording_settings)) }, onClick = {
@@ -171,7 +183,7 @@ fun HumanLocationHistoryScreen(
                         recording = true
                     })
                     if (state.tab == HistoryTab.Places) {
-                        DropdownMenuItem(text = { Text("Through ${state.dateLabel}") }, onClick = {
+                        DropdownMenuItem(text = { Text(stringResource(Res.string.history_through_date, state.dateLabel)) }, onClick = {
                             moreMenu = false
                             calendar = true
                         })
@@ -183,7 +195,7 @@ fun HumanLocationHistoryScreen(
                         })
                     }
                     snapshot?.recordingDevices?.takeIf { it.size > 1 }?.forEachIndexed { index, device ->
-                        DropdownMenuItem(text = { Text("Device ${index + 1}") }, onClick = {
+                        DropdownMenuItem(text = { Text(stringResource(Res.string.history_device_number, index + 1)) }, onClick = {
                             moreMenu = false
                             viewModel.selectSource(device)
                         })
@@ -277,7 +289,7 @@ fun HumanLocationHistoryScreen(
             title = { Text(stringResource(Res.string.history_recording_title)) },
             text = {
                 Column {
-                    Text(access.message)
+                    Text(stringResource(access.message))
                     access.openSettings?.let { open ->
                         TextButton(onClick = open) { Text(stringResource(Res.string.history_app_permission_settings)) }
                     }
@@ -292,7 +304,7 @@ fun HumanLocationHistoryScreen(
                     } else {
                         access.resolve()
                     }
-                }) { Text(access.actionLabel) }
+                }) { Text(stringResource(access.actionLabel)) }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -339,21 +351,23 @@ fun HumanLocationHistoryScreen(
                     snapshot?.conflicts.orEmpty().groupBy { it.targetEvidenceId to it.field }.forEach { (key, edits) ->
                         Text(
                             when (key.second) {
-                                HistoryField.PLACE -> "Place"
-                                HistoryField.LABEL -> "Place name"
-                                HistoryField.ACTIVITY -> "Activity"
-                                HistoryField.START -> "Arrival"
-                                HistoryField.END -> "Departure"
-                                HistoryField.DELETE -> "Deleted visit"
+                                HistoryField.PLACE -> stringResource(Res.string.history_conflict_place)
+                                HistoryField.LABEL -> stringResource(Res.string.history_place_name)
+                                HistoryField.ACTIVITY -> stringResource(Res.string.history_conflict_activity)
+                                HistoryField.START -> stringResource(Res.string.history_conflict_arrival)
+                                HistoryField.END -> stringResource(Res.string.history_conflict_departure)
+                                HistoryField.DELETE -> stringResource(Res.string.history_conflict_deleted_visit)
                             },
                         )
                         edits.distinctBy { it.value }.forEach { edit ->
                             val label =
                                 when (edit.field) {
-                                    HistoryField.PLACE -> snapshot?.places?.firstOrNull { it.id == edit.value }?.name ?: "Saved place"
+                                    HistoryField.PLACE ->
+                                        snapshot?.places?.firstOrNull { it.id == edit.value }?.name
+                                            ?: stringResource(Res.string.history_conflict_saved_place)
                                     HistoryField.ACTIVITY ->
                                         TravelMode.entries.firstOrNull { it.name == edit.value }?.humanName()
-                                            ?: "Travelling"
+                                            ?: stringResource(Res.string.history_conflict_travelling)
                                     else -> edit.value
                                 }
                             TextButton(

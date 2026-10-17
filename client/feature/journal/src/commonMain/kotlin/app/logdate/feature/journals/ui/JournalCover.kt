@@ -51,6 +51,9 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.util.toReadableDateShort
 import coil3.compose.AsyncImage
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.last_updated_prefix
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -242,7 +245,7 @@ private fun BoxScope.JournalCoverContent(
         )
         if (showLastUpdated) {
             Text(
-                "Last updated ${journal.lastUpdated.toReadableDateShort()}",
+                stringResource(Res.string.last_updated_prefix, journal.lastUpdated.toReadableDateShort()),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.labelSmall,
                 color = textColor.copy(alpha = textColor.alpha * 0.7f),

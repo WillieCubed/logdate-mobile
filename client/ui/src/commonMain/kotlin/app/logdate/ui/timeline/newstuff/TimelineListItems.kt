@@ -56,6 +56,7 @@ import logdate.client.ui.generated.resources.cd_timeline_video
 import logdate.client.ui.generated.resources.congrats_curious_explorer
 import logdate.client.ui.generated.resources.happy_birthday
 import logdate.client.ui.generated.resources.journey_days_count
+import logdate.client.ui.generated.resources.timeline_media_badge_clip
 import logdate.client.ui.generated.resources.youve_reached_the_end
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
@@ -248,7 +249,7 @@ fun TimelineMediaTile(
         if (media.isVideo) {
             MediaBadge(
                 icon = Icons.Default.PlayArrow,
-                text = "Clip",
+                text = stringResource(Res.string.timeline_media_badge_clip),
                 modifier =
                     Modifier
                         .align(Alignment.BottomStart)

@@ -6,6 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.logdate.shared.model.location.LocationDayItem
 import app.logdate.ui.workspace.PanelHeader
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_map_unavailable_on_device
+import logdate.client.feature.location.timeline.generated.resources.history_map_unavailable_on_device_body
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal actual fun NativeHistoryMap(
@@ -16,5 +20,9 @@ internal actual fun NativeHistoryMap(
     onInteraction: () -> Unit,
     historyKey: String?,
 ) {
-    PanelHeader("Map unavailable on this device", modifier, "Your visits and memories are still available.")
+    PanelHeader(
+        stringResource(Res.string.history_map_unavailable_on_device),
+        modifier,
+        stringResource(Res.string.history_map_unavailable_on_device_body),
+    )
 }

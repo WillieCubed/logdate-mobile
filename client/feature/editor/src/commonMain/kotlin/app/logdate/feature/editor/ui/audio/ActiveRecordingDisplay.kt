@@ -67,8 +67,18 @@ import app.logdate.ui.platform.PlatformSheet
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.change_microphone
 import logdate.client.feature.editor.generated.resources.finish
+import logdate.client.feature.editor.generated.resources.hide_transcript
 import logdate.client.feature.editor.generated.resources.listening
+import logdate.client.feature.editor.generated.resources.microphone
+import logdate.client.feature.editor.generated.resources.recorder_bubble_pause
+import logdate.client.feature.editor.generated.resources.recorder_bubble_paused
+import logdate.client.feature.editor.generated.resources.recorder_bubble_recording
+import logdate.client.feature.editor.generated.resources.recorder_bubble_resume
 import logdate.client.feature.editor.generated.resources.restart_recording
+import logdate.client.feature.editor.generated.resources.show_transcript
+import logdate.client.feature.editor.generated.resources.transcript_status_listening
+import logdate.client.feature.editor.generated.resources.transcription_improving
+import logdate.client.feature.editor.generated.resources.transcription_ready
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 
@@ -187,6 +197,7 @@ private fun ActiveRecordingTranscriptPane(
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
+    val transcriptToggleDescription = stringResource(if (collapsed) Res.string.show_transcript else Res.string.hide_transcript)
     LaunchedEffect(transcriptionText, collapsed) {
         scrollState.animateScrollTo(scrollState.maxValue)
     }
@@ -214,7 +225,7 @@ private fun ActiveRecordingTranscriptPane(
                         modifier =
                             Modifier.size(48.dp).semantics {
                                 role = Role.Button
-                                contentDescription = if (collapsed) "Show transcript" else "Hide transcript"
+                                contentDescription = transcriptToggleDescription
                             },
                         shape = CircleShape,
                         color = Color.Transparent,
@@ -311,7 +322,7 @@ private fun ActiveRecordingTransportPane(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 RecordingActionSurface(
-                    label = if (isPaused) "Resume" else "Pause",
+                    label = stringResource(if (isPaused) Res.string.recorder_bubble_resume else Res.string.recorder_bubble_pause),
                     icon = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                     onClick = onPause,
                     primary = false,
@@ -399,7 +410,7 @@ private fun RecordingInputControl(
     modifier: Modifier = Modifier,
 ) {
     var pickerOpen by remember { mutableStateOf(false) }
-    val inputLabel = selection.selectedDevice?.label ?: "Microphone"
+    val inputLabel = selection.selectedDevice?.label ?: stringResource(Res.string.microphone)
     Surface(
         onClick = { pickerOpen = true },
         modifier = modifier.heightIn(min = 48.dp).testTag(MediaDeviceSelectorTags.chip("Microphone")),
@@ -431,7 +442,7 @@ private fun RecordingInputControl(
         PlatformSheet(onDismissRequest = { pickerOpen = false }) {
             MediaDeviceSelectorSheet(
                 selection = selection,
-                title = "Microphone",
+                title = stringResource(Res.string.microphone),
                 onDeviceSelected = {
                     onInputSelected(it)
                     pickerOpen = false
@@ -494,11 +505,11 @@ private fun RecordingTranscriptStatus(
 ) {
     val label =
         when {
-            isPaused -> "Paused"
-            isRefining -> "Improving transcript"
-            isFinal -> "Transcript ready"
-            hasTranscript -> "Recording"
-            else -> "Listening"
+            isPaused -> stringResource(Res.string.recorder_bubble_paused)
+            isRefining -> stringResource(Res.string.transcription_improving)
+            isFinal -> stringResource(Res.string.transcription_ready)
+            hasTranscript -> stringResource(Res.string.recorder_bubble_recording)
+            else -> stringResource(Res.string.transcript_status_listening)
         }
     val indicatorColor =
         when {

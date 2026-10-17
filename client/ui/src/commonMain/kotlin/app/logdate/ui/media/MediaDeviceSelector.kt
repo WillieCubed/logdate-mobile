@@ -57,7 +57,16 @@ import app.logdate.client.media.device.MediaDeviceUiState
 import app.logdate.ui.platform.PlatformSheet
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.common_done
+import logdate.client.ui.generated.resources.media_device_audio_output
+import logdate.client.ui.generated.resources.media_device_camera
+import logdate.client.ui.generated.resources.media_device_microphone
 import logdate.client.ui.generated.resources.media_device_selected
+import logdate.client.ui.generated.resources.media_device_status_available
+import logdate.client.ui.generated.resources.media_device_status_detected
+import logdate.client.ui.generated.resources.media_device_status_external
+import logdate.client.ui.generated.resources.media_device_status_in_use
+import logdate.client.ui.generated.resources.media_device_status_unavailable
+import logdate.client.ui.generated.resources.media_device_switch_hint
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -222,7 +231,7 @@ fun MediaDeviceSelectorSheet(
                 selection.devices.any { it.isAvailable && it.id != selection.selectedDeviceId }
         if (hasSelectableDevice) {
             Text(
-                text = "Tap a device to switch.",
+                text = stringResource(Res.string.media_device_switch_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
@@ -282,20 +291,22 @@ private fun MediaDeviceUiState?.iconFor(kind: MediaDeviceKind): ImageVector =
         }
     }
 
+@Composable
 private fun MediaDeviceUiState.supportingText(selection: MediaDeviceSelectionUiState): String =
     when {
-        !isAvailable -> "Unavailable"
-        id == selection.selectedDeviceId -> "In use"
-        !selection.isSelectionControllable -> "Detected by LogDate"
-        isExternal -> "External device"
-        else -> "Available"
+        !isAvailable -> stringResource(Res.string.media_device_status_unavailable)
+        id == selection.selectedDeviceId -> stringResource(Res.string.media_device_status_in_use)
+        !selection.isSelectionControllable -> stringResource(Res.string.media_device_status_detected)
+        isExternal -> stringResource(Res.string.media_device_status_external)
+        else -> stringResource(Res.string.media_device_status_available)
     }
 
+@Composable
 private fun defaultSelectorLabel(kind: MediaDeviceKind): String =
     when (kind) {
-        MediaDeviceKind.CAMERA -> "Camera"
-        MediaDeviceKind.AUDIO_INPUT -> "Microphone"
-        MediaDeviceKind.AUDIO_OUTPUT -> "Audio output"
+        MediaDeviceKind.CAMERA -> stringResource(Res.string.media_device_camera)
+        MediaDeviceKind.AUDIO_INPUT -> stringResource(Res.string.media_device_microphone)
+        MediaDeviceKind.AUDIO_OUTPUT -> stringResource(Res.string.media_device_audio_output)
     }
 
 data class MediaRouteSettingsAction(

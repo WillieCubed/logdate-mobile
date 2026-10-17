@@ -54,12 +54,20 @@ import io.github.aakira.napier.Napier
 import logdate.client.feature.postcards.generated.resources.Res
 import logdate.client.feature.postcards.generated.resources.postcards_clear_selection
 import logdate.client.feature.postcards.generated.resources.postcards_delete_selected
+import logdate.client.feature.postcards.generated.resources.postcards_empty
+import logdate.client.feature.postcards.generated.resources.postcards_menu_open
+import logdate.client.feature.postcards.generated.resources.postcards_menu_select
 import logdate.client.feature.postcards.generated.resources.postcards_new
+import logdate.client.feature.postcards.generated.resources.postcards_selection_count
 import logdate.client.feature.postcards.generated.resources.postcards_title
+import logdate.client.feature.postcards.generated.resources.postcards_untitled
+import logdate.client.ui.generated.resources.common_delete
+import logdate.client.ui.generated.resources.common_edit
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.math.floor
 import kotlin.uuid.Uuid
+import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Grid collection view for the user's Postcards.
@@ -93,7 +101,7 @@ fun PostcardsCollectionScreen(
         topBar = {
             if (multiSelect.hasSelection) {
                 TopAppBar(
-                    title = { Text("${multiSelect.selectionCount} selected") },
+                    title = { Text(stringResource(Res.string.postcards_selection_count, multiSelect.selectionCount)) },
                     navigationIcon = {
                         IconButton(onClick = { multiSelect.clear() }) {
                             Icon(Icons.Filled.Close, contentDescription = stringResource(Res.string.postcards_clear_selection))
@@ -129,7 +137,7 @@ fun PostcardsCollectionScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "No Postcards yet",
+                    stringResource(Res.string.postcards_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -206,6 +214,10 @@ private fun PostcardsGridPane(
     modifier: Modifier = Modifier,
 ) {
     val gridState = rememberLazyGridState()
+    val openLabel = stringResource(Res.string.postcards_menu_open)
+    val editLabel = stringResource(UiRes.string.common_edit)
+    val selectLabel = stringResource(Res.string.postcards_menu_select)
+    val deleteLabel = stringResource(UiRes.string.common_delete)
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Fixed(columnCount),
@@ -222,10 +234,10 @@ private fun PostcardsGridPane(
             ContextMenuArea(
                 items =
                     listOf(
-                        ContextMenuItem("Open") { onOpenPostcard(postcard.id) },
-                        ContextMenuItem("Edit") { onEditPostcard(postcard.id) },
-                        ContextMenuItem("Select") { onToggleSelection(id) },
-                        ContextMenuItem("Delete") { onDeletePostcard(postcard.id) },
+                        ContextMenuItem(openLabel) { onOpenPostcard(postcard.id) },
+                        ContextMenuItem(editLabel) { onEditPostcard(postcard.id) },
+                        ContextMenuItem(selectLabel) { onToggleSelection(id) },
+                        ContextMenuItem(deleteLabel) { onDeletePostcard(postcard.id) },
                     ),
             ) {
                 PostcardCard(
@@ -295,7 +307,7 @@ private fun PostcardCard(
                 )
             }
             Text(
-                text = postcard.title.ifEmpty { "Untitled" },
+                text = postcard.title.ifEmpty { stringResource(Res.string.postcards_untitled) },
                 style = MaterialTheme.typography.titleSmall,
                 color =
                     if (thumbnailUri != null) {

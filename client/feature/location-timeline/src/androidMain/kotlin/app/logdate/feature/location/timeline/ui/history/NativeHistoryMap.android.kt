@@ -38,6 +38,14 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.delay
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_map_loaded
+import logdate.client.feature.location.timeline.generated.resources.history_map_loading
+import logdate.client.feature.location.timeline.generated.resources.history_map_slow
+import logdate.client.feature.location.timeline.generated.resources.history_map_slow_body
+import logdate.client.feature.location.timeline.generated.resources.history_map_unavailable
+import logdate.client.feature.location.timeline.generated.resources.history_map_unavailable_body
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal actual fun NativeHistoryMap(
@@ -51,7 +59,11 @@ internal actual fun NativeHistoryMap(
     val geometry = remember(items) { historyMapGeometry(items) }
     val enabled = rememberGoogleMapsEnabled()
     if (!enabled) {
-        PanelHeader("Map unavailable", modifier, "Your visits and memories are still available below.")
+        PanelHeader(
+            stringResource(Res.string.history_map_unavailable),
+            modifier,
+            stringResource(Res.string.history_map_unavailable_body),
+        )
         return
     }
     val first = geometry.coordinates.firstOrNull()?.toLatLng() ?: LatLng(36.17, -115.14)
@@ -99,12 +111,14 @@ internal actual fun NativeHistoryMap(
         snapshotFlow { camera.isMoving && camera.cameraMoveStartedReason == CameraMoveStartedReason.GESTURE }
             .collect { if (it) onInteraction() }
     }
+    val mapLoadedDescription = stringResource(Res.string.history_map_loaded)
+    val mapLoadingDescription = stringResource(Res.string.history_map_loading)
     Box(modifier) {
         GoogleMap(
             modifier =
                 Modifier.fillMaxSize().testTag("history-native-map").semantics {
                     stateDescription =
-                        if (loaded) "Map loaded" else "Map loading"
+                        if (loaded) mapLoadedDescription else mapLoadingDescription
                 },
             cameraPositionState = camera,
             contentPadding = PaddingValues(bottom = overlap + 8.dp),
@@ -155,7 +169,12 @@ internal actual fun NativeHistoryMap(
                 )
             }
         }
-        if (timedOut) PanelHeader("Map is taking longer to load", subtitle = "You can still browse your history below.")
+        if (timedOut) {
+            PanelHeader(
+                stringResource(Res.string.history_map_slow),
+                subtitle = stringResource(Res.string.history_map_slow_body),
+            )
+        }
     }
 }
 

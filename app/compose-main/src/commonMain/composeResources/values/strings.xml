@@ -21,4 +21,12 @@
     <string name="new_entry">New Entry</string>
     <string name="select_a_setting_to_configure">Select a setting to configure</string>
     <string name="select_an_entry_to_view_details">Select an entry to view details</string>
+
+    <!-- Desktop windows -->
+    <string name="desktop_window_title">LogDate</string>
+    <string name="desktop_menu_file">File</string>
+    <string name="desktop_menu_go">Go</string>
+    <string name="desktop_menu_close_window">Close window</string>
+    <string name="desktop_menu_quit">Quit LogDate</string>
+    <string name="desktop_menu_cancel_quit">Cancel quit</string>
 </resources>

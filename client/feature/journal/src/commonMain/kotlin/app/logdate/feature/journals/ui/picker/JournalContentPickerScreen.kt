@@ -69,7 +69,24 @@ import app.logdate.util.formatDateLocalized
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.cd_back_to_journal
+import logdate.client.feature.journal.generated.resources.cd_content_picker_remove_selection
 import logdate.client.feature.journal.generated.resources.cd_search_existing_content
+import logdate.client.feature.journal.generated.resources.content_picker_add_count
+import logdate.client.feature.journal.generated.resources.content_picker_adding
+import logdate.client.feature.journal.generated.resources.content_picker_empty
+import logdate.client.feature.journal.generated.resources.content_picker_item_description
+import logdate.client.feature.journal.generated.resources.content_picker_kind_photo
+import logdate.client.feature.journal.generated.resources.content_picker_kind_recording
+import logdate.client.feature.journal.generated.resources.content_picker_kind_video
+import logdate.client.feature.journal.generated.resources.content_picker_kind_writing
+import logdate.client.feature.journal.generated.resources.content_picker_no_matches
+import logdate.client.feature.journal.generated.resources.content_picker_not_selected
+import logdate.client.feature.journal.generated.resources.content_picker_search_hint
+import logdate.client.feature.journal.generated.resources.content_picker_selected
+import logdate.client.feature.journal.generated.resources.content_picker_selected_count
+import logdate.client.feature.journal.generated.resources.content_picker_subtitle
+import logdate.client.feature.journal.generated.resources.content_picker_title
+import logdate.client.feature.journal.generated.resources.content_picker_title_for_journal
 import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -113,10 +130,16 @@ fun JournalContentPickerScreenContent(
     modifier: Modifier = Modifier,
 ) {
     val workspaceEnabled = LocalWorkspaceEnabled.current
+    val pickerTitle =
+        if (state.journalTitle.isBlank()) {
+            stringResource(Res.string.content_picker_title)
+        } else {
+            stringResource(Res.string.content_picker_title_for_journal, state.journalTitle)
+        }
     if (workspaceEnabled) {
         WorkspaceSearchScope(
             query = state.query,
-            hint = "Search content",
+            hint = stringResource(Res.string.content_picker_search_hint),
             onQuery = onQueryChange,
         )
     }
@@ -128,8 +151,8 @@ fun JournalContentPickerScreenContent(
             Column(Modifier.fillMaxSize()) {
                 if (workspaceEnabled) {
                     PanelHeader(
-                        title = if (state.journalTitle.isBlank()) "Add existing content" else "Add to ${state.journalTitle}",
-                        subtitle = "Pick anything already in your LogDate. It stays where it is.",
+                        title = pickerTitle,
+                        subtitle = stringResource(Res.string.content_picker_subtitle),
                         actions = {
                             IconButton(onClick = onBack) {
                                 Icon(
@@ -145,7 +168,7 @@ fun JournalContentPickerScreenContent(
                     Box(Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
                         WorkspaceSearchField(
                             query = state.query,
-                            hint = "Search content",
+                            hint = stringResource(Res.string.content_picker_search_hint),
                             onQueryChange = onQueryChange,
                             modifier = Modifier.semantics { contentDescription = searchDescription },
                         )
@@ -175,7 +198,7 @@ fun JournalContentPickerScreenContent(
             modifier = modifier,
             topBar = {
                 TopAppBar(
-                    title = { Text(if (state.journalTitle.isBlank()) "Add existing content" else "Add to ${state.journalTitle}") },
+                    title = { Text(pickerTitle) },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(Res.string.cd_back_to_journal))
@@ -199,7 +222,11 @@ private fun PickerGallery(
     if (state.groups.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                if (state.query.isBlank()) "No content available to add." else "No matching content.",
+                if (state.query.isBlank()) {
+                    stringResource(Res.string.content_picker_empty)
+                } else {
+                    stringResource(Res.string.content_picker_no_matches)
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -247,6 +274,13 @@ private fun PickerItemTile(
     onClick: () -> Unit,
 ) {
     val typeLabel = item.kind.label
+    val selectionLabel =
+        if (selected) {
+            stringResource(Res.string.content_picker_selected)
+        } else {
+            stringResource(Res.string.content_picker_not_selected)
+        }
+    val itemDescription = stringResource(Res.string.content_picker_item_description, typeLabel, item.title, selectionLabel)
     Card(
         modifier =
             Modifier
@@ -254,7 +288,7 @@ private fun PickerItemTile(
                 .semantics {
                     role = Role.Checkbox
                     this.selected = selected
-                    contentDescription = "$typeLabel: ${item.title}. ${if (selected) "Selected" else "Not selected"}"
+                    contentDescription = itemDescription
                 }.clickable(onClick = onClick),
         colors =
             CardDefaults.cardColors(
@@ -401,12 +435,13 @@ private val JournalContentPickerItem.isVisualMedia: Boolean
     get() = kind == JournalContentPickerItemKind.PHOTO || kind == JournalContentPickerItemKind.VIDEO
 
 private val JournalContentPickerItemKind.label: String
+    @Composable
     get() =
         when (this) {
-            JournalContentPickerItemKind.WRITING -> "Writing"
-            JournalContentPickerItemKind.PHOTO -> "Photo"
-            JournalContentPickerItemKind.VIDEO -> "Video"
-            JournalContentPickerItemKind.RECORDING -> "Recording"
+            JournalContentPickerItemKind.WRITING -> stringResource(Res.string.content_picker_kind_writing)
+            JournalContentPickerItemKind.PHOTO -> stringResource(Res.string.content_picker_kind_photo)
+            JournalContentPickerItemKind.VIDEO -> stringResource(Res.string.content_picker_kind_video)
+            JournalContentPickerItemKind.RECORDING -> stringResource(Res.string.content_picker_kind_recording)
         }
 
 @Composable
@@ -434,7 +469,10 @@ private fun SelectionReview(
                                 ) {
                                     Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                     IconButton(onClick = { onRemoveSelection(item.id) }) {
-                                        Icon(Icons.Rounded.Close, contentDescription = "Remove ${item.title} from selection")
+                                        Icon(
+                                            Icons.Rounded.Close,
+                                            contentDescription = stringResource(Res.string.cd_content_picker_remove_selection, item.title),
+                                        )
                                     }
                                 }
                             }
@@ -453,12 +491,18 @@ private fun SelectionReview(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
                 ) {
                     Text(
-                        text = "${selectedItems.size} selected",
+                        text = stringResource(Res.string.content_picker_selected_count, selectedItems.size),
                         style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.weight(1f),
                     )
                     Button(onClick = onAddSelected, enabled = selectedItems.isNotEmpty() && !isAdding) {
-                        Text(if (isAdding) "Adding…" else "Add ${selectedItems.size}")
+                        Text(
+                            if (isAdding) {
+                                stringResource(Res.string.content_picker_adding)
+                            } else {
+                                stringResource(Res.string.content_picker_add_count, selectedItems.size)
+                            },
+                        )
                     }
                 }
             }

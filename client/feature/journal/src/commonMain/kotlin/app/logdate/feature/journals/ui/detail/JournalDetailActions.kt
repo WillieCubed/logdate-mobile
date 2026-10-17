@@ -52,6 +52,10 @@ import logdate.client.feature.journal.generated.resources.journal_add_menu_add_e
 import logdate.client.feature.journal.generated.resources.journal_add_menu_create_entry
 import logdate.client.feature.journal.generated.resources.journal_add_to_home_screen
 import logdate.client.feature.journal.generated.resources.journal_delete_label
+import logdate.client.feature.journal.generated.resources.journal_detail_item_count
+import logdate.client.feature.journal.generated.resources.journal_detail_loading
+import logdate.client.feature.journal.generated.resources.journal_detail_show_newest_first
+import logdate.client.feature.journal.generated.resources.journal_detail_show_oldest_first
 import logdate.client.feature.journal.generated.resources.journal_merge_action
 import logdate.client.feature.journal.generated.resources.journal_settings_label
 import logdate.client.feature.journal.generated.resources.journal_share_label
@@ -60,6 +64,7 @@ import logdate.client.feature.journal.generated.resources.remove_from_journal_ti
 import logdate.client.feature.journal.generated.resources.sort_newest_first
 import logdate.client.feature.journal.generated.resources.sort_oldest_first
 import logdate.client.ui.generated.resources.common_cancel
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -114,7 +119,7 @@ internal fun JournalDetailBookSummaryPane(
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "${uiState.entries.size} ${if (uiState.entries.size == 1) "item" else "items"}",
+            text = pluralStringResource(Res.plurals.journal_detail_item_count, uiState.entries.size, uiState.entries.size),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -144,9 +149,9 @@ internal fun JournalDetailBookSummaryPane(
                 icon = sortIcon(uiState.sortOrder),
                 label =
                     if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                        "Show oldest first"
+                        stringResource(Res.string.journal_detail_show_oldest_first)
                     } else {
-                        "Show newest first"
+                        stringResource(Res.string.journal_detail_show_newest_first)
                     },
                 onClick = onToggleSortOrder,
             )
@@ -265,7 +270,7 @@ internal fun JournalDetailPlaceholder() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            "Loading...",
+            stringResource(Res.string.journal_detail_loading),
         )
     }
 }

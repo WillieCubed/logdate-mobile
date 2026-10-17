@@ -26,6 +26,13 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.PlaybackState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.ui.platform.PlatformIcons
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.pause
+import logdate.client.feature.editor.generated.resources.play
+import logdate.client.feature.editor.generated.resources.resume_recording
+import logdate.client.feature.editor.generated.resources.start_recording
+import logdate.client.feature.editor.generated.resources.stop_recording
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A button that animates between play/pause/record icons and state-appropriate shapes.
@@ -96,13 +103,15 @@ fun AnimatedPlayPauseButton(
 
     // Determine content description for accessibility
     val description =
-        when {
-            recordingState == RecordingState.RECORDING -> "Stop Recording"
-            recordingState == RecordingState.PAUSED -> "Resume Recording"
-            recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED -> "Start Recording"
-            playbackState == PlaybackState.PLAYING -> "Pause"
-            else -> "Play"
-        }
+        stringResource(
+            when {
+                recordingState == RecordingState.RECORDING -> Res.string.stop_recording
+                recordingState == RecordingState.PAUSED -> Res.string.resume_recording
+                recordingState == RecordingState.INACTIVE && playbackState == PlaybackState.STOPPED -> Res.string.start_recording
+                playbackState == PlaybackState.PLAYING -> Res.string.pause
+                else -> Res.string.play
+            },
+        )
 
     FilledIconButton(
         onClick = onClick,
@@ -203,7 +212,7 @@ fun AnimatedPlayPauseButton(
     )
 
     val shape = RoundedCornerShape(cornerRadius.dp)
-    val description = if (isPlaying) "Pause" else "Play"
+    val description = stringResource(if (isPlaying) Res.string.pause else Res.string.play)
 
     FilledIconButton(
         onClick = onClick,

@@ -22,6 +22,10 @@
     <string name="app_update_unsupported">In-app updates require a Google Play installed build.</string>
     <string name="app_update_up_to_date">App is up to date.</string>
     <string name="check_for_updates">Check for updates</string>
+    <string name="app_update_prompt_available">An update is available.</string>
+    <string name="app_update_prompt_update">Update</string>
+    <string name="app_update_prompt_downloaded">Update downloaded. Restart to apply.</string>
+    <string name="app_update_prompt_restart">Restart</string>
 
     <!-- Settings navigation -->
     <string name="settings">Settings</string>
@@ -58,6 +62,9 @@
     <string name="reset_options">Reset options</string>
     <string name="dialog_reset_app_description">This will remove all LogDate data from this device and can&apos;t be undone. Are you sure you want to continue?</string>
     <string name="dialog_reset_app_title">Reset App?</string>
+    <string name="reset_entire_app_dialog_title">Reset Entire App?</string>
+    <string name="reset_entire_app_dialog_message">This action cannot be undone.\n\nThis will permanently delete all your journals, entries, photos, settings, and account data on this device.\n\nBefore continuing, export and verify a backup from Data &amp; Storage.</string>
+    <string name="reset_entire_app_acknowledgement">I understand that resetting may permanently remove encrypted local data.</string>
 
     <!-- Shortcuts -->
     <string name="shortcut_label_new_note_short">New note</string>
@@ -146,6 +153,21 @@
     <string name="person_detail_linked_events">Events</string>
     <string name="person_detail_no_linked_entries">No memories linked yet.</string>
     <string name="person_detail_no_linked_events">No events linked yet.</string>
+    <string name="person_detail_voice_note_preview">Voice note</string>
+    <string name="person_detail_photo_preview">Photo</string>
+    <string name="person_detail_video_preview">Video</string>
+
+    <!-- Events -->
+    <string name="events_settings">Events</string>
+    <string name="events_settings_description">The moments worth remembering, gathered for you</string>
+
+    <!-- Library -->
+    <string name="library_settings">Your library</string>
+    <string name="library_settings_description">Browse and manage your photos and videos</string>
+    <string name="library_settings_general">General</string>
+    <string name="library_settings_enable">Enable Library</string>
+    <string name="library_settings_tab_visible">Library tab is visible in navigation</string>
+    <string name="library_settings_tab_hidden">Library tab is hidden from navigation</string>
 
     <!-- Common actions -->
     <string name="check">Check</string>

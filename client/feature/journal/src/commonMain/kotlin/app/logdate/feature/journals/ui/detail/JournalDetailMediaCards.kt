@@ -57,6 +57,7 @@ import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.audio_output
 import logdate.client.feature.journal.generated.resources.video_note
 import org.jetbrains.compose.resources.stringResource
 
@@ -295,7 +296,7 @@ internal fun AudioEntryCard(
                         MediaDeviceSelector(
                             selection = audioPlaybackState.outputSelection,
                             onDeviceSelected = audioPlaybackState.selectOutputDevice,
-                            label = "Audio output",
+                            label = stringResource(Res.string.audio_output),
                             modifier = Modifier.widthIn(max = 160.dp),
                         )
                     }
@@ -304,7 +305,7 @@ internal fun AudioEntryCard(
                     MediaDeviceSelector(
                         selection = audioPlaybackState.outputSelection,
                         onDeviceSelected = audioPlaybackState.selectOutputDevice,
-                        label = "Audio output",
+                        label = stringResource(Res.string.audio_output),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

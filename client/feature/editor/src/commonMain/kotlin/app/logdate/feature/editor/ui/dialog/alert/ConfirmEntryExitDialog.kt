@@ -8,10 +8,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.editor_action_discard
+import logdate.client.feature.editor.generated.resources.editor_delete_block_dialog_description
+import logdate.client.feature.editor.generated.resources.editor_delete_block_dialog_title
 import logdate.client.feature.editor.generated.resources.editor_discard_dialog_description
 import logdate.client.feature.editor.generated.resources.editor_discard_dialog_title
 import logdate.client.feature.editor.generated.resources.save_draft
 import logdate.client.ui.generated.resources.common_cancel
+import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -36,8 +39,8 @@ internal fun ConfirmEntryExitDialog(
                 )
             ConfirmDialogType.DELETE_BLOCK ->
                 Pair(
-                    "Delete Block",
-                    "Are you sure you want to delete this block? This action cannot be undone.",
+                    stringResource(Res.string.editor_delete_block_dialog_title),
+                    stringResource(Res.string.editor_delete_block_dialog_description),
                 )
         }
 
@@ -81,7 +84,7 @@ internal fun ConfirmEntryExitDialog(
                     Text(
                         when (dialogType) {
                             ConfirmDialogType.EXIT_EDITOR -> stringResource(Res.string.editor_action_discard)
-                            ConfirmDialogType.DELETE_BLOCK -> "Delete"
+                            ConfirmDialogType.DELETE_BLOCK -> stringResource(UiRes.string.common_delete)
                         },
                     )
                 }

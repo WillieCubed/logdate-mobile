@@ -49,6 +49,7 @@ import logdate.client.feature.core.generated.resources.google_sign_in_no_account
 import logdate.client.feature.core.generated.resources.google_sign_in_rate_limited
 import logdate.client.feature.core.generated.resources.google_sign_in_server_error
 import logdate.client.feature.core.generated.resources.google_sign_in_unavailable
+import logdate.client.feature.core.generated.resources.logdate_cloud
 import logdate.client.feature.core.generated.resources.sign_in_help_body
 import logdate.client.feature.core.generated.resources.sign_in_help_title
 import logdate.client.ui.generated.resources.common_cancel
@@ -109,9 +110,10 @@ fun CloudAccountOnboardingScreen(
     val uriHandler = LocalUriHandler.current
     val showCustomServerInfo = remember { mutableStateOf(false) }
     val showRecoveryInfo = remember { mutableStateOf(false) }
+    val productionDisplayName = stringResource(Res.string.logdate_cloud)
     val serverPresentation =
-        remember(uiState.serverSelectionState) {
-            uiState.serverSelectionState.toPresentation()
+        remember(uiState.serverSelectionState, productionDisplayName) {
+            uiState.serverSelectionState.toPresentation(productionDisplayName)
         }
 
     if (showCustomServerInfo.value) {
@@ -390,16 +392,18 @@ private data class ServerPresentation(
     val termsOfServiceUrl: String?,
 )
 
-private fun app.logdate.feature.core.settings.ui.ServerSelectionState.toPresentation(): ServerPresentation {
+private fun app.logdate.feature.core.settings.ui.ServerSelectionState.toPresentation(productionDisplayName: String): ServerPresentation {
     val descriptor = activeServerDescriptor
     val isProduction = selectedPreset == ServerPreset.PRODUCTION
     return ServerPresentation(
-        displayName = descriptor.displayNameOrFallback(isProduction),
+        displayName = descriptor.displayNameOrFallback(isProduction, productionDisplayName),
         handleDomain = descriptor?.handleDomain ?: if (isProduction) FALLBACK_HANDLE_DOMAIN else "your-server.example.com",
         privacyPolicyUrl = descriptor?.privacyPolicyUrl ?: if (isProduction) FALLBACK_PRIVACY_POLICY_URL else null,
         termsOfServiceUrl = descriptor?.termsOfServiceUrl ?: if (isProduction) FALLBACK_TERMS_OF_SERVICE_URL else null,
     )
 }
 
-private fun ServerDescriptor?.displayNameOrFallback(isProduction: Boolean): String =
-    this?.displayName ?: if (isProduction) "LogDate Cloud" else CUSTOM_SERVER_FALLBACK_NAME
+private fun ServerDescriptor?.displayNameOrFallback(
+    isProduction: Boolean,
+    productionDisplayName: String,
+): String = this?.displayName ?: if (isProduction) productionDisplayName else CUSTOM_SERVER_FALLBACK_NAME

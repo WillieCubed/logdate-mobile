@@ -22,12 +22,15 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.journal_detail_back_to_journals
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun JournalReadingHeader(
     title: String,
     onGoBack: () -> Unit,
-    backDescription: String = "Back to journals",
+    backDescription: String = stringResource(Res.string.journal_detail_back_to_journals),
     actions: @Composable RowScope.() -> Unit,
 ) {
     BoxWithConstraints(Modifier.padding(Spacing.lg)) {

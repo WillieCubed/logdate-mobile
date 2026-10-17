@@ -50,11 +50,16 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.WorkspacePanel
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.add_to_journal
+import logdate.client.feature.journal.generated.resources.cd_journal_options
+import logdate.client.feature.journal.generated.resources.cd_sorted_newest_first
+import logdate.client.feature.journal.generated.resources.cd_sorted_oldest_first
 import logdate.client.feature.journal.generated.resources.journal_add_to_home_screen
 import logdate.client.feature.journal.generated.resources.journal_change_order
 import logdate.client.feature.journal.generated.resources.journal_delete_label
 import logdate.client.feature.journal.generated.resources.journal_detail_back_to_journals
 import logdate.client.feature.journal.generated.resources.journal_detail_load_error
+import logdate.client.feature.journal.generated.resources.journal_header_title
 import logdate.client.feature.journal.generated.resources.journal_merge_action
 import logdate.client.feature.journal.generated.resources.journal_merge_success
 import logdate.client.feature.journal.generated.resources.journal_settings_label
@@ -182,14 +187,17 @@ fun JournalDetailScreenContent(
                     uiState.entries.filter { it is EntryDisplayData.ImageEntry || it is EntryDisplayData.VideoEntry }
                 }
             val hasMedia = mediaEntries.isNotEmpty()
+            val journalHeaderTitle = stringResource(Res.string.journal_header_title)
 
             JournalReadingFrame(modifier) { contextVisible ->
                 if (LocalWorkspaceEnabled.current) {
                     WorkspacePanel(Modifier.fillMaxSize()) {
                         Column(Modifier.fillMaxSize()) {
-                            JournalReadingHeader(if (contextVisible) "Journal" else uiState.title, onGoBack, actions = {
+                            JournalReadingHeader(if (contextVisible) journalHeaderTitle else uiState.title, onGoBack, actions = {
                                 Box {
-                                    IconButton(onClick = { showAddMenu = true }) { Icon(Icons.Rounded.Add, "Add to journal") }
+                                    IconButton(onClick = { showAddMenu = true }) {
+                                        Icon(Icons.Rounded.Add, stringResource(Res.string.add_to_journal))
+                                    }
                                     JournalAddMenu(
                                         expanded = showAddMenu,
                                         onDismiss = { showAddMenu = false },
@@ -198,7 +206,9 @@ fun JournalDetailScreenContent(
                                     )
                                 }
                                 Box {
-                                    IconButton(onClick = { showOverflowMenu = true }) { Icon(Icons.Rounded.MoreVert, "Journal options") }
+                                    IconButton(onClick = { showOverflowMenu = true }) {
+                                        Icon(Icons.Rounded.MoreVert, stringResource(Res.string.cd_journal_options))
+                                    }
                                     DropdownMenu(showOverflowMenu, { showOverflowMenu = false }) {
                                         DropdownMenuItem(text = { Text(stringResource(Res.string.journal_change_order)) }, onClick = {
                                             showOverflowMenu = false
@@ -269,12 +279,14 @@ fun JournalDetailScreenContent(
                         snackbarHost = { SnackbarHost(snackbarHostState) },
                         topBar = {
                             JournalReadingHeader(
-                                title = if (contextVisible) "Journal" else uiState.title,
+                                title = if (contextVisible) journalHeaderTitle else uiState.title,
                                 onGoBack = onGoBack,
                                 backDescription = stringResource(UiRes.string.common_back),
                                 actions = {
                                     Box {
-                                        IconButton(onClick = { showAddMenu = true }) { Icon(Icons.Rounded.Add, "Add to journal") }
+                                        IconButton(onClick = { showAddMenu = true }) {
+                                            Icon(Icons.Rounded.Add, stringResource(Res.string.add_to_journal))
+                                        }
                                         JournalAddMenu(
                                             expanded = showAddMenu,
                                             onDismiss = { showAddMenu = false },
@@ -292,9 +304,9 @@ fun JournalDetailScreenContent(
 
                                         val description =
                                             if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                                "Sorted: Newest first (click to show oldest first)"
+                                                stringResource(Res.string.cd_sorted_newest_first)
                                             } else {
-                                                "Sorted: Oldest first (click to show newest first)"
+                                                stringResource(Res.string.cd_sorted_oldest_first)
                                             }
 
                                         Icon(

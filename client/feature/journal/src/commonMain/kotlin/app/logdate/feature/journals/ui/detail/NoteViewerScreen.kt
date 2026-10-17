@@ -90,6 +90,7 @@ import logdate.client.feature.journal.generated.resources.image_note
 import logdate.client.feature.journal.generated.resources.location
 import logdate.client.feature.journal.generated.resources.open_in_locations
 import logdate.client.feature.journal.generated.resources.pinned_location
+import logdate.client.feature.journal.generated.resources.recording_playback_failed
 import logdate.client.feature.journal.generated.resources.share
 import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
@@ -862,7 +863,7 @@ private fun AudioPlaybackErrorBanner(
         content =
             if (visible) {
                 BannerContent(
-                    message = "Recording playback failed",
+                    message = stringResource(Res.string.recording_playback_failed),
                     icon = Icons.Filled.Error,
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,

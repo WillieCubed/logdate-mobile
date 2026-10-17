@@ -20,6 +20,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.shared.model.Journal
 import app.logdate.ui.content.JournalContentCover
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.untitled_journal
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 
 /**
@@ -84,7 +87,7 @@ private fun JournalListItem(
 
         // Journal title on the right
         Text(
-            text = journal.title.ifEmpty { "Untitled Journal" },
+            text = journal.title.ifEmpty { stringResource(Res.string.untitled_journal) },
             style = MaterialTheme.typography.bodyLarge,
         )
     }

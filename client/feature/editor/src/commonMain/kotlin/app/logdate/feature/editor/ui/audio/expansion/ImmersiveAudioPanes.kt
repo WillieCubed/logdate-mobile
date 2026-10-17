@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.client.awareness.daylight.stringRes
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.editor.ui.formatMediaDuration
@@ -48,6 +49,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.audio_output
 import logdate.client.feature.editor.generated.resources.skip_back_10_seconds
 import logdate.client.feature.editor.generated.resources.skip_forward_10_seconds
 import org.jetbrains.compose.resources.stringResource
@@ -76,7 +78,7 @@ internal fun ImmersiveAudioContextPane(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = formatDaylightPeriod(daylightPeriod),
+            text = stringResource(daylightPeriod.stringRes),
             style = MaterialTheme.typography.labelLarge,
             color = onBackgroundColor.copy(alpha = 0.6f),
         )
@@ -237,7 +239,7 @@ internal fun ImmersiveAudioControlsPane(
                     MediaDeviceSelector(
                         selection = selection,
                         onDeviceSelected = onOutputDeviceSelected,
-                        label = "Audio output",
+                        label = stringResource(Res.string.audio_output),
                         colors =
                             AssistChipDefaults.assistChipColors(
                                 labelColor = onBackgroundColor,
@@ -288,17 +290,6 @@ private fun formatDateTime(instant: Instant): String {
     val amPm = if (local.hour < 12) "AM" else "PM"
     return "${months[local.month.number - 1]} ${local.day}, ${local.year}\n$hour:${local.minute.toString().padStart(2, '0')} $amPm"
 }
-
-private fun formatDaylightPeriod(period: DaylightPeriod): String =
-    when (period) {
-        DaylightPeriod.DAWN -> "Dawn"
-        DaylightPeriod.MORNING -> "Morning"
-        DaylightPeriod.MIDDAY -> "Midday"
-        DaylightPeriod.AFTERNOON -> "Afternoon"
-        DaylightPeriod.GOLDEN_HOUR -> "Golden Hour"
-        DaylightPeriod.EVENING -> "Evening"
-        DaylightPeriod.NIGHT -> "Night"
-    }
 
 /**
  * A wrapping row of pill-shaped chips listing the ambient sounds the

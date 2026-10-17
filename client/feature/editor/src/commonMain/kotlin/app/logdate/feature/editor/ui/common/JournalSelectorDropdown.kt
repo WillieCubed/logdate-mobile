@@ -57,6 +57,12 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.expand
+import logdate.client.feature.editor.generated.resources.journal_selector_header
+import logdate.client.feature.editor.generated.resources.journal_selector_multiple_journals
+import logdate.client.feature.editor.generated.resources.journal_selector_no_journals
+import logdate.client.feature.editor.generated.resources.journal_selector_select_journals
+import logdate.client.feature.editor.generated.resources.journal_selector_selected_count
+import logdate.client.feature.editor.generated.resources.journal_selector_unknown_journal
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
@@ -356,9 +362,9 @@ private fun JournalSelectionText(
         }
     val titleText =
         when (selectedCount) {
-            0 -> "Select journals"
-            1 -> selectedJournal?.title ?: "Unknown journal"
-            else -> "Multiple journals"
+            0 -> stringResource(Res.string.journal_selector_select_journals)
+            1 -> selectedJournal?.title ?: stringResource(Res.string.journal_selector_unknown_journal)
+            else -> stringResource(Res.string.journal_selector_multiple_journals)
         }
     // When exactly one journal is selected, the title participates in a shared element
     // transition with the matching JournalItem row in the expanded list.
@@ -397,7 +403,7 @@ private fun JournalSelectionText(
 
         if (selectedCount > 1 && !isCompact) {
             Text(
-                text = "$selectedCount journals selected",
+                text = stringResource(Res.string.journal_selector_selected_count, selectedCount),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
             )
@@ -462,7 +468,7 @@ private fun JournalPickerList(
     Column(modifier = modifier.fillMaxWidth()) {
         // Header stays fixed during predictive back — only the list below clips.
         Text(
-            text = "Journals",
+            text = stringResource(Res.string.journal_selector_header),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier =
@@ -508,7 +514,7 @@ private fun EmptyJournalItem() {
     ListItem(
         headlineContent = {
             Text(
-                text = "No journals available",
+                text = stringResource(Res.string.journal_selector_no_journals),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

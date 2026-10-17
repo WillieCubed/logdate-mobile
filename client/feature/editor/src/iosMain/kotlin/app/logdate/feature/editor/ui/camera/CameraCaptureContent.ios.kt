@@ -45,9 +45,20 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.camera_error_capture_failed
+import logdate.client.feature.editor.generated.resources.camera_error_no_camera
+import logdate.client.feature.editor.generated.resources.camera_error_permission_required
+import logdate.client.feature.editor.generated.resources.camera_error_recording_failed
+import logdate.client.feature.editor.generated.resources.camera_error_unknown
+import logdate.client.feature.editor.generated.resources.camera_unavailable_on_this_device
+import logdate.client.feature.editor.generated.resources.capture
 import logdate.client.feature.editor.generated.resources.close
+import logdate.client.feature.editor.generated.resources.record
 import logdate.client.feature.editor.generated.resources.switch_camera_short
+import logdate.client.feature.editor.generated.resources.switch_to_photo
+import logdate.client.feature.editor.generated.resources.switch_to_video
 import logdate.client.ui.generated.resources.common_dismiss
+import logdate.client.ui.generated.resources.common_stop
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import platform.CoreGraphics.CGRectMake
@@ -159,9 +170,9 @@ actual fun CameraCaptureContent(
                     ) {
                         val (icon, label) =
                             when {
-                                isVideo && isRecording -> Icons.Default.Stop to "Stop"
-                                isVideo -> Icons.Default.FiberManualRecord to "Record"
-                                else -> Icons.Default.CameraAlt to "Capture"
+                                isVideo && isRecording -> Icons.Default.Stop to stringResource(UiRes.string.common_stop)
+                                isVideo -> Icons.Default.FiberManualRecord to stringResource(Res.string.record)
+                                else -> Icons.Default.CameraAlt to stringResource(Res.string.capture)
                             }
                         Icon(
                             icon,
@@ -178,7 +189,7 @@ actual fun CameraCaptureContent(
                     ) {
                         Icon(
                             imageVector = if (isVideo) Icons.Default.CameraAlt else Icons.Default.Videocam,
-                            contentDescription = if (isVideo) "Switch to photo" else "Switch to video",
+                            contentDescription = stringResource(if (isVideo) Res.string.switch_to_photo else Res.string.switch_to_video),
                             tint = Color.White,
                         )
                     }
@@ -207,7 +218,7 @@ private fun UnavailableCameraCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Camera unavailable on this device.",
+                    text = stringResource(Res.string.camera_unavailable_on_this_device),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -224,11 +235,11 @@ private fun UnavailableCameraCard(
 private fun ErrorOverlay(error: CameraCaptureError) {
     val message =
         when (error) {
-            CameraCaptureError.PermissionDenied -> "Camera permission required. Open Settings to enable."
-            CameraCaptureError.CameraNotAvailable -> "No camera available on this device."
-            CameraCaptureError.CaptureFailed -> "Couldn't capture photo. Try again."
-            CameraCaptureError.RecordingFailed -> "Couldn't record video. Try again."
-            is CameraCaptureError.Unknown -> "Camera error: ${error.message}"
+            CameraCaptureError.PermissionDenied -> stringResource(Res.string.camera_error_permission_required)
+            CameraCaptureError.CameraNotAvailable -> stringResource(Res.string.camera_error_no_camera)
+            CameraCaptureError.CaptureFailed -> stringResource(Res.string.camera_error_capture_failed)
+            CameraCaptureError.RecordingFailed -> stringResource(Res.string.camera_error_recording_failed)
+            is CameraCaptureError.Unknown -> stringResource(Res.string.camera_error_unknown, error.message)
         }
     Box(
         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),

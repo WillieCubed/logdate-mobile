@@ -67,7 +67,9 @@ import app.logdate.ui.workspace.WorkspaceDestination
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.LocalDate
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.action_create_journal
 import logdate.client.feature.core.generated.resources.create_new_entry
+import logdate.client.feature.core.generated.resources.workspace_add_a_memory
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -168,7 +170,14 @@ fun HomeScreen(
                 } else {
                     { if (currentDestination == HomeRouteDestination.Journals) onCreateJournal() else onNewEntry() }
                 },
-            createLabel = if (currentDestination == HomeRouteDestination.Journals) "Create journal" else "Add a memory",
+            createLabel =
+                stringResource(
+                    if (currentDestination == HomeRouteDestination.Journals) {
+                        Res.string.action_create_journal
+                    } else {
+                        Res.string.workspace_add_a_memory
+                    },
+                ),
             createEntryTransition = currentDestination != HomeRouteDestination.Journals,
             onSearch = onOpenSearch,
             actions = {

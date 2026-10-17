@@ -23,6 +23,14 @@ import app.logdate.ui.keyboard.KeyChord
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.desktop_menu_cancel_quit
+import logdate.app.composemain.generated.resources.desktop_menu_close_window
+import logdate.app.composemain.generated.resources.desktop_menu_file
+import logdate.app.composemain.generated.resources.desktop_menu_go
+import logdate.app.composemain.generated.resources.desktop_menu_quit
+import logdate.app.composemain.generated.resources.desktop_window_title
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 private val DEFAULT_MAIN_WINDOW_SIZE = DpSize(1024.dp, 720.dp)
@@ -60,23 +68,23 @@ internal fun MainWindow(
     Window(
         onCloseRequest = { appState.closeWindow(state) },
         state = windowState,
-        title = "LogDate",
+        title = stringResource(Res.string.desktop_window_title),
     ) {
         // Intercept Cmd+Q (and the platform equivalent) so it routes through the
         // same save-aware exit cascade as closing the main window — bypassing the
         // JVM's default Quit handler would skip every editor's save-before-close.
         MenuBar {
-            Menu(text = "File", mnemonic = 'F') {
+            Menu(text = stringResource(Res.string.desktop_menu_file), mnemonic = 'F') {
                 ShortcutItems(listOf(AppKeyboardShortcut.NewEntry, AppKeyboardShortcut.RecordVoice), shortcutRequests::request)
                 Separator()
                 Item(
-                    text = "Close window",
+                    text = stringResource(Res.string.desktop_menu_close_window),
                     shortcut = KeyChord(Key.W, primary = true).toKeyShortcut(),
                     onClick = { appState.closeWindow(state) },
                 )
                 Separator()
                 Item(
-                    text = "Quit LogDate",
+                    text = stringResource(Res.string.desktop_menu_quit),
                     shortcut = KeyChord(Key.Q, primary = true).toKeyShortcut(),
                     onClick = appState::exit,
                 )
@@ -84,13 +92,13 @@ internal fun MainWindow(
                 // menu both vanish back to normal once there's nothing to cancel.
                 if (appState.exitCascadeInFlight) {
                     Item(
-                        text = "Cancel quit",
+                        text = stringResource(Res.string.desktop_menu_cancel_quit),
                         shortcut = KeyChord(Key.Period, primary = true).toKeyShortcut(),
                         onClick = appState::cancelExit,
                     )
                 }
             }
-            Menu(text = "Go", mnemonic = 'G') {
+            Menu(text = stringResource(Res.string.desktop_menu_go), mnemonic = 'G') {
                 ShortcutItems(listOf(AppKeyboardShortcut.Search, AppKeyboardShortcut.Settings), shortcutRequests::request)
             }
         }

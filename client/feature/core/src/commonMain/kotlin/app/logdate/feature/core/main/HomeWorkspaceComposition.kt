@@ -10,6 +10,9 @@ import app.logdate.ui.workspace.AdaptiveWorkspaceLayout
 import app.logdate.ui.workspace.PanelConstraints
 import app.logdate.ui.workspace.WorkspaceDestination
 import app.logdate.ui.workspace.WorkspaceScaffold
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.workspace_add_a_memory
+import org.jetbrains.compose.resources.stringResource
 
 /** Home's shared navigation host and panel composition, used by live routes and populated scenes. */
 @Composable
@@ -19,7 +22,7 @@ fun HomeWorkspaceComposition(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     onCreate: (() -> Unit)? = null,
-    createLabel: String = "Add a memory",
+    createLabel: String = stringResource(Res.string.workspace_add_a_memory),
     createEntryTransition: Boolean = true,
     onSearch: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},

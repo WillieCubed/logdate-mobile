@@ -44,6 +44,7 @@ import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.timeline.generated.resources.Res
+import logdate.client.feature.timeline.generated.resources.cd_back_to_your_days
 import logdate.client.feature.timeline.generated.resources.close
 import logdate.client.feature.timeline.generated.resources.decorate
 import logdate.client.feature.timeline.generated.resources.rewind
@@ -110,9 +111,9 @@ fun TimelineDayDetailPanel(
             Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
                 Column(Modifier.widthIn(max = 720.dp).fillMaxSize()) {
                     PanelHeader(timestamp.toReadableDateShort(), actions = {
-                        IconButton(onClick = onExit) { Icon(PlatformIcons.back(), "Back to your days") }
-                        onDecorate?.let { IconButton(onClick = it) { Icon(PlatformIcons.brush(), "Decorate") } }
-                        onOpenRewind?.let { IconButton(onClick = it) { Icon(PlatformIcons.history(), "Rewind") } }
+                        IconButton(onClick = onExit) { Icon(PlatformIcons.back(), stringResource(Res.string.cd_back_to_your_days)) }
+                        onDecorate?.let { IconButton(onClick = it) { Icon(PlatformIcons.brush(), stringResource(Res.string.decorate)) } }
+                        onOpenRewind?.let { IconButton(onClick = it) { Icon(PlatformIcons.history(), stringResource(Res.string.rewind)) } }
                     })
                     TimelineDayDetailList(
                         uiState,

@@ -20,6 +20,13 @@ import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.library_settings
+import logdate.client.feature.core.generated.resources.library_settings_enable
+import logdate.client.feature.core.generated.resources.library_settings_general
+import logdate.client.feature.core.generated.resources.library_settings_tab_hidden
+import logdate.client.feature.core.generated.resources.library_settings_tab_visible
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -64,16 +71,16 @@ fun LibrarySettingsContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(
-                    text = "Your library",
+                    text = stringResource(Res.string.library_settings),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
                 Text(
                     text =
                         if (isLibraryEnabled) {
-                            "Library tab is visible in navigation"
+                            stringResource(Res.string.library_settings_tab_visible)
                         } else {
-                            "Library tab is hidden from navigation"
+                            stringResource(Res.string.library_settings_tab_hidden)
                         },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -98,7 +105,7 @@ fun LibrarySettingsContent(
         },
         standardContent = {
             SettingsScaffold(
-                title = "Your library",
+                title = stringResource(Res.string.library_settings),
                 onBack = onBack,
                 modifier = modifier,
             ) {
@@ -121,16 +128,16 @@ private fun LibraryGeneralSection(
     modifier: Modifier = Modifier,
 ) {
     SettingsSection(
-        title = "General",
+        title = stringResource(Res.string.library_settings_general),
         modifier = modifier,
     ) {
         ToggleSettingsItem(
-            title = "Enable Library",
+            title = stringResource(Res.string.library_settings_enable),
             description =
                 if (isLibraryEnabled) {
-                    "Library tab is visible in navigation"
+                    stringResource(Res.string.library_settings_tab_visible)
                 } else {
-                    "Library tab is hidden from navigation"
+                    stringResource(Res.string.library_settings_tab_hidden)
                 },
             checked = isLibraryEnabled,
             onCheckedChange = onSetLibraryEnabled,

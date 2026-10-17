@@ -47,7 +47,11 @@ import app.logdate.ui.foldable.rememberWindowOrigin
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.workspace_sheet_browse
+import logdate.client.ui.generated.resources.workspace_sheet_collapse
 import logdate.client.ui.generated.resources.workspace_sheet_expand
+import logdate.client.ui.generated.resources.workspace_sheet_full_view
+import logdate.client.ui.generated.resources.workspace_sheet_show_map
 import org.jetbrains.compose.resources.stringResource
 
 val LocalSupportingOverlap = staticCompositionLocalOf { 0.dp }
@@ -189,9 +193,9 @@ fun WorkspaceSupportingSheet(
                                     if (side == null) {
                                         val expandLabel =
                                             when (extent) {
-                                                SupportingExtent.Peek -> "Browse"
-                                                SupportingExtent.Browsing -> "Expand"
-                                                else -> "Collapse"
+                                                SupportingExtent.Peek -> stringResource(Res.string.workspace_sheet_browse)
+                                                SupportingExtent.Browsing -> stringResource(Res.string.workspace_sheet_expand)
+                                                else -> stringResource(Res.string.workspace_sheet_collapse)
                                             }
                                         IconTooltip(label = expandLabel) {
                                             IconButton(onClick = {
@@ -219,7 +223,12 @@ fun WorkspaceSupportingSheet(
                                                 )
                                             }
                                         }
-                                        val fullViewLabel = if (focused) "Show map" else "Full view"
+                                        val fullViewLabel =
+                                            if (focused) {
+                                                stringResource(Res.string.workspace_sheet_show_map)
+                                            } else {
+                                                stringResource(Res.string.workspace_sheet_full_view)
+                                            }
                                         IconTooltip(label = fullViewLabel) {
                                             IconButton(onClick = {
                                                 extent =
@@ -244,7 +253,13 @@ fun WorkspaceSupportingSheet(
                                             SupportingExtent.Peek
                                         }
                                 }) {
-                                    Text(if (extent == SupportingExtent.Peek) "Browse" else "Collapse")
+                                    Text(
+                                        if (extent == SupportingExtent.Peek) {
+                                            stringResource(Res.string.workspace_sheet_browse)
+                                        } else {
+                                            stringResource(Res.string.workspace_sheet_collapse)
+                                        },
+                                    )
                                 }
                                 if (extent ==
                                     SupportingExtent.Browsing
@@ -261,7 +276,13 @@ fun WorkspaceSupportingSheet(
                                             SupportingExtent.Focused
                                         }
                                 }) {
-                                    Text(if (focused) "Show map" else "Full view")
+                                    Text(
+                                        if (focused) {
+                                            stringResource(Res.string.workspace_sheet_show_map)
+                                        } else {
+                                            stringResource(Res.string.workspace_sheet_full_view)
+                                        },
+                                    )
                                 }
                             }
                         }

@@ -43,6 +43,7 @@ import logdate.client.ui.generated.resources.post_restore_welcome_back
 import logdate.client.ui.generated.resources.timeline_empty_action
 import logdate.client.ui.generated.resources.timeline_empty_message
 import logdate.client.ui.generated.resources.timeline_empty_title
+import logdate.client.ui.generated.resources.timeline_loading_older_days
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -60,7 +61,7 @@ internal fun TimelineAppendLoadingItem(modifier: Modifier = Modifier) {
             strokeWidth = 2.dp,
         )
         Text(
-            text = "Loading older days",
+            text = stringResource(Res.string.timeline_loading_older_days),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

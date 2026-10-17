@@ -24,6 +24,19 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.location.tracking.ActivityAwareLocationService
 import app.logdate.client.location.tracking.LocationTrackingManager
+import logdate.client.feature.location.timeline.generated.resources.Res
+import logdate.client.feature.location.timeline.generated.resources.history_access_activity_action
+import logdate.client.feature.location.timeline.generated.resources.history_access_activity_message
+import logdate.client.feature.location.timeline.generated.resources.history_access_background_action
+import logdate.client.feature.location.timeline.generated.resources.history_access_background_message
+import logdate.client.feature.location.timeline.generated.resources.history_access_location_action
+import logdate.client.feature.location.timeline.generated.resources.history_access_location_message
+import logdate.client.feature.location.timeline.generated.resources.history_access_location_services_action
+import logdate.client.feature.location.timeline.generated.resources.history_access_location_services_message
+import logdate.client.feature.location.timeline.generated.resources.history_access_notifications_action
+import logdate.client.feature.location.timeline.generated.resources.history_access_notifications_message
+import logdate.client.feature.location.timeline.generated.resources.history_access_ready_action
+import logdate.client.feature.location.timeline.generated.resources.history_access_ready_message
 import org.koin.compose.koinInject
 
 @Composable
@@ -49,8 +62,8 @@ internal actual fun rememberHistoryRecordingAccess(): HistoryRecordingAccess {
             when {
                 !granted(Manifest.permission.ACCESS_FINE_LOCATION) && !granted(Manifest.permission.ACCESS_COARSE_LOCATION) ->
                     HistoryRecordingAccess(
-                        message = "Allow location to record the places you visit. Your existing history stays available either way.",
-                        actionLabel = "Allow location",
+                        message = Res.string.history_access_location_message,
+                        actionLabel = Res.string.history_access_location_action,
                         reducedMotion = motion,
                         resolve = {
                             request.launch(
@@ -60,39 +73,37 @@ internal actual fun rememberHistoryRecordingAccess(): HistoryRecordingAccess {
                     )
                 context.getSystemService(LocationManager::class.java)?.isLocationEnabled != true ->
                     HistoryRecordingAccess(
-                        message = "Location services are off. Turn them on to record your day.",
-                        actionLabel = "Turn on location",
+                        message = Res.string.history_access_location_services_message,
+                        actionLabel = Res.string.history_access_location_services_action,
                         reducedMotion = motion,
                         resolve = { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) },
                     )
                 !granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION) ->
                     HistoryRecordingAccess(
-                        message =
-                            "For a complete day and recovery after interruptions, choose Permissions → " +
-                                "Location → Allow all the time in app settings.",
-                        actionLabel = "Open location settings",
+                        message = Res.string.history_access_background_message,
+                        actionLabel = Res.string.history_access_background_action,
                         reducedMotion = motion,
                         resolve = settings,
                     )
                 !granted(Manifest.permission.ACTIVITY_RECOGNITION) ->
                     HistoryRecordingAccess(
-                        message = "Allow physical activity to help distinguish walking and travelling. You can correct activities later.",
-                        actionLabel = "Allow activity",
+                        message = Res.string.history_access_activity_message,
+                        actionLabel = Res.string.history_access_activity_action,
                         reducedMotion = motion,
                         resolve = { request.launch(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION)) },
                     )
                 Build.VERSION.SDK_INT >= 33 && !granted(Manifest.permission.POST_NOTIFICATIONS) ->
                     HistoryRecordingAccess(
-                        message = "Allow notifications so you can see when recording is running and pause it at any time.",
-                        actionLabel = "Allow notifications",
+                        message = Res.string.history_access_notifications_message,
+                        actionLabel = Res.string.history_access_notifications_action,
                         reducedMotion = motion,
                         resolve = { request.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS)) },
                     )
                 else ->
                     HistoryRecordingAccess(
                         true,
-                        "Record visits and journeys in the background. This uses more battery and keeps a recording notification visible. You can pause at any time.",
-                        "Start recording",
+                        Res.string.history_access_ready_message,
+                        Res.string.history_access_ready_action,
                         motion,
                     )
             }

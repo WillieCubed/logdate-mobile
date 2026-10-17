@@ -2,4 +2,6 @@
 <resources>
     <string name="play_audio_note">Play audio note</string>
     <string name="pause_audio_note">Pause audio note</string>
+    <string name="audio_output">Audio output</string>
+    <string name="recording_playback_failed">Recording playback failed</string>
 </resources>
