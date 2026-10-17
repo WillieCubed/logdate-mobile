@@ -1,0 +1,45 @@
+package app.logdate
+
+import java.io.File
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class LexiconModelsPluginTest {
+    @Test
+    fun `the generator gets sorted inputs, the layout flag and the record index`() {
+        val arguments =
+            lexiconGeneratorArguments(
+                schemas = listOf(File("/repo/lexicons/community"), File("/repo/lexicons/app/logdate")),
+                outputDirectory = File("/repo/build/generated"),
+                basePackage = "app.logdate.lexicon",
+                namespaceLayout = true,
+                recordIndex = "LogDateRecords",
+            )
+
+        assertEquals(
+            listOf(
+                "/repo/lexicons/app/logdate${File.pathSeparator}/repo/lexicons/community",
+                "/repo/build/generated",
+                "app.logdate.lexicon",
+                "--namespace-layout",
+                "--record-index",
+                "LogDateRecords",
+            ),
+            arguments,
+        )
+    }
+
+    @Test
+    fun `a flat layout without an index passes only the positional arguments`() {
+        val arguments =
+            lexiconGeneratorArguments(
+                schemas = listOf(File("/repo/fixture.json")),
+                outputDirectory = File("/out"),
+                basePackage = "com.example.fixtures",
+                namespaceLayout = false,
+                recordIndex = null,
+            )
+
+        assertEquals(listOf("/repo/fixture.json", "/out", "com.example.fixtures"), arguments)
+    }
+}
