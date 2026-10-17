@@ -8,12 +8,12 @@ public object MediaLexicon {
 
 @Serializable
 public data class Media(
-    val blobCid: String?,
+    val blobCid: String? = null,
     val createdAt: Long,
-    val deviceId: String?,
-    val durationMs: Long?,
+    val deviceId: String? = null,
+    val durationMs: Long? = null,
     val entryId: String,
-    val fileName: String?,
+    val fileName: String? = null,
     val mediaId: String,
     val mimeType: String,
     val sizeBytes: Long,

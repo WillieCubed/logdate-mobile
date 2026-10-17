@@ -76,7 +76,8 @@ class LexiconParserTest {
         assertEquals(LexiconType.BLOB, outputSchema.properties.getValue("blob").type)
         assertTrue(generated.contains("public object UploadBlobLexicon"))
         assertTrue(generated.contains("public data class UploadBlobOutput("))
-        assertTrue(generated.contains("val blob: JsonElement"))
+        assertTrue(generated.contains("import studio.hypertext.atproto.lexicon.data.Blob"))
+        assertTrue(generated.contains("val blob: Blob"))
     }
 
     private companion object {

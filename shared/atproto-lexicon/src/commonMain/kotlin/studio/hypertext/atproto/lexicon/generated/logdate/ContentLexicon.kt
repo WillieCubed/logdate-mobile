@@ -8,12 +8,12 @@ public object ContentLexicon {
 
 @Serializable
 public data class Content(
-    val content: String?,
+    val content: String? = null,
     val createdAt: Long,
-    val deviceId: String?,
-    val durationMs: Long?,
-    val id: String?,
+    val deviceId: String? = null,
+    val durationMs: Long? = null,
+    val id: String? = null,
     val lastUpdated: Long,
-    val mediaUri: String?,
+    val mediaUri: String? = null,
     val type: String,
 )

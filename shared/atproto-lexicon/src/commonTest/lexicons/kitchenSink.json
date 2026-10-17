@@ -1,0 +1,34 @@
+{
+  "lexicon": 1,
+  "id": "com.example.kitchenSink",
+  "description": "Exercises the schema kinds LogDate's own schemas don't use yet, so generated code covers them too.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "required": ["pick", "attachment", "label"],
+        "nullable": ["label"],
+        "properties": {
+          "pick": {
+            "type": "union",
+            "closed": true,
+            "refs": ["#location", "app.logdate.defs#location", "app.logdate.journal.entry"],
+            "description": "A closed union with a record member and two members both called location."
+          },
+          "attachment": {"type": "cid-link"},
+          "label": {"type": "string", "description": "Required, but may be null."},
+          "object": {"type": "string", "description": "A property named with a Kotlin keyword."},
+          "digest": {"type": "bytes", "maxLength": 32},
+          "extra": {"type": "unknown"}
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {"name": {"type": "string"}}
+    }
+  }
+}

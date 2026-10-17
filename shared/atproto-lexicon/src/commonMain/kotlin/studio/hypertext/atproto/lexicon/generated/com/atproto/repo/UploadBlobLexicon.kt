@@ -1,7 +1,7 @@
 package studio.hypertext.atproto.lexicon.generated.com.atproto.repo
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
+import studio.hypertext.atproto.lexicon.data.Blob
 
 public object UploadBlobLexicon {
     public const val ID: String = "com.atproto.repo.uploadBlob"
@@ -9,5 +9,5 @@ public object UploadBlobLexicon {
 
 @Serializable
 public data class UploadBlobOutput(
-    val blob: JsonElement,
+    val blob: Blob,
 )

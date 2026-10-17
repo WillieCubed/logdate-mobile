@@ -8,11 +8,11 @@ public object ProfileLexicon {
 
 @Serializable
 public data class Profile(
-    val avatarCid: String?,
-    val bio: String?,
+    val avatarCid: String? = null,
+    val bio: String? = null,
     val createdAt: Long,
-    val did: String?,
+    val did: String? = null,
     val displayName: String,
-    val handle: String?,
+    val handle: String? = null,
     val lastUpdated: Long,
 )

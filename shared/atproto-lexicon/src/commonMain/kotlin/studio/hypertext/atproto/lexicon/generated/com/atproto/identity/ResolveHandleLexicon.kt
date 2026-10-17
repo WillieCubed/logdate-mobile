@@ -8,6 +8,7 @@ public object ResolveHandleLexicon {
 
 @Serializable
 public data class ResolveHandleParams(
+    /** The handle to resolve. */
     val handle: String,
 )
 

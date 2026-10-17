@@ -8,6 +8,8 @@ public object GetBlobLexicon {
 
 @Serializable
 public data class GetBlobParams(
+    /** The CID of the blob to fetch */
     val cid: String,
+    /** The DID of the account. */
     val did: String,
 )
