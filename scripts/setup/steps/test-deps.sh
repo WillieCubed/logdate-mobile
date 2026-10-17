@@ -33,14 +33,16 @@ test_deps_apply() {
     test_deps_install_lexicon_check
 }
 
-# Uses pnpm when it's installed, and otherwise the copy Node's corepack provides.
+# Uses pnpm when it's installed, and otherwise the version tools/lexicon-check/package.json pins,
+# run through npx. (corepack can't be used: it may fetch a different pnpm than the pin, which
+# pnpm then refuses to run under.)
 test_deps_install_lexicon_check() {
     command -v node >/dev/null 2>&1 || { printf 'Install Node.js, then re-run.\n'; return 2; }
     local pnpm=(pnpm)
     if ! command -v pnpm >/dev/null 2>&1; then
-        command -v corepack >/dev/null 2>&1 || { printf 'Install pnpm, then re-run.\n'; return 2; }
-        # corepack fetches the pnpm version tools/lexicon-check/package.json pins, without asking.
-        pnpm=(env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm)
+        local pinned
+        pinned="$(node -p 'require(process.argv[1]).packageManager' "$TEST_DEPS_LEXICON_CHECK/package.json")"
+        pnpm=(npx --yes "$pinned")
     fi
     "${pnpm[@]}" --dir "$TEST_DEPS_LEXICON_CHECK" install --frozen-lockfile --silent
 }
