@@ -337,18 +337,28 @@ write_header_file() {
     printf '%s: %s\n' "$name" "$value" >"$path"
 }
 
+# Bounds retries of requests that provably never reached the server: about 23 seconds.
+REQUEST_ATTEMPTS=6
+
+# Every LogDate server response carries X-Request-ID; the Cloud Run front end's own responses do
+# not. A front-end 404 means a new revision URL is not routed everywhere yet, so the request is
+# retried, as are connection failures before anything was sent. Anything after the request was
+# sent fails immediately, so a server that hangs or errors is reported rather than retried.
 http_request() {
     local method="$1"
     local url="$2"
     local output_file="$3"
     local extra_header_file="${4:-}"
     shift 4
+    local headers_file="$WORK_DIR/response-headers"
+    local described="$method ${url#"$SERVICE_URL"}"
     local -a args=(
         --silent
         --show-error
         --max-time 30
         --request "$method"
         --output "$output_file"
+        --dump-header "$headers_file"
         --write-out '%{http_code}'
     )
     if [[ "$USE_PRIVATE_HEADERS" == "1" ]]; then
@@ -357,7 +367,37 @@ http_request() {
     if [[ -n "$extra_header_file" ]]; then
         args+=(--header "@$extra_header_file")
     fi
-    curl "${args[@]}" "$@" "$url"
+    local attempt status curl_status problem
+    for ((attempt = 1; attempt <= REQUEST_ATTEMPTS; attempt++)); do
+        curl_status=0
+        status="$(curl "${args[@]}" "$@" "$url")" || curl_status=$?
+        case "$curl_status" in
+            0)
+                if [[ "$url" != "$SERVICE_URL/"* ]] || grep -qi '^x-request-id:' "$headers_file"; then
+                    printf '%s' "$status"
+                    return 0
+                fi
+                problem="returned HTTP $status from the Cloud Run front end, not the server"
+                if [[ "$status" != "404" ]]; then
+                    fail "$described $problem"
+                    return 1
+                fi
+                ;;
+            6 | 7 | 35)
+                problem="could not connect (curl exit $curl_status)"
+                ;;
+            *)
+                fail "$described failed before a response (curl exit $curl_status)"
+                return 1
+                ;;
+        esac
+        if ((attempt == REQUEST_ATTEMPTS)); then
+            fail "$described $problem (after $attempt attempts)"
+            return 1
+        fi
+        printf 'Retrying %s: %s (attempt %d of %d)\n' "$described" "$problem" "$attempt" "$REQUEST_ATTEMPTS" >&2
+        sleep $((attempt < 4 ? 1 << (attempt - 1) : 8))
+    done
 }
 
 is_token_safe() {
@@ -916,7 +956,7 @@ resume_cleanup() {
         status="$(http_request DELETE "$SERVICE_URL/api/v1/auth/me" "$body" "$AUTH_HEADER_FILE")"
         if [[ "$status" != "204" && "$status" != "404" ]] &&
             ! [[ "$account_deletion_started" == "true" && "$status" == "401" ]]; then
-            fail "account deletion did not return 204 or 404 (status=$status response=$(tr '\\n' ' ' <\"$body\" | cut -c1-400))"
+            fail "account deletion did not return 204 or 404 (status=$status)"
             return 1
         fi
         body="$WORK_DIR/account-after-delete.json"

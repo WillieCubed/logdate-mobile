@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Behavioral checks for the deployment journal merge proof."""
 
+import contextlib
 import copy
 import importlib.util
 import io
@@ -9,8 +10,6 @@ import tempfile
 import unittest
 import uuid
 from pathlib import Path
-from unittest.mock import patch
-from urllib.error import HTTPError
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -82,6 +81,127 @@ class JournalServer:
             links = [] if self.corruption == "membership" else self.links
             return 200, {"changes": [{"journalId": j, "contentId": c} for j, c in links], "deletions": [], "hasMore": False}
         raise AssertionError(f"Unexpected request {method} {path}")
+
+
+class Response:
+    def __init__(self, status, body=b"{}", request_id=None):
+        self.status = status
+        self.body = body
+        self.headers = {} if request_id is None else {"x-request-id": request_id}
+
+    def getheader(self, name, default=None):
+        return self.headers.get(name.lower(), default)
+
+    def read(self, limit):
+        return self.body[:limit]
+
+
+class Connection:
+    def __init__(self, outcome):
+        self.outcome = outcome
+        self.sent = []
+
+    def request(self, method, target, body=None, headers=None):
+        self.sent.append((method, target, body, headers))
+
+    def getresponse(self):
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+    def close(self):
+        pass
+
+
+class Network:
+    """Each outcome is a response, an exception raised after sending, or ("connect", exception)."""
+
+    def __init__(self, *outcomes):
+        self.outcomes = list(outcomes)
+        self.connections = []
+        self.delays = []
+        self.log = io.StringIO()
+
+    def connect(self, url):
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, tuple):
+            raise outcome[1]
+        connection = Connection(outcome)
+        self.connections.append(connection)
+        return connection
+
+    def request(self, method, url, body=None):
+        with contextlib.redirect_stderr(self.log):
+            return smoke.http_request(method, url, {}, body, connect=self.connect, sleep=self.delays.append)
+
+
+@contextlib.contextmanager
+def patch_transport(server, result):
+    original = server.request
+    server.request = lambda *_: result
+    try:
+        yield
+    finally:
+        server.request = original
+
+
+class HttpTransportTest(unittest.TestCase):
+    def test_unrouted_front_end_not_found_is_retried_until_the_server_answers(self):
+        network = Network(Response(404, b"<html>Page not found</html>"), Response(200, b'{"changes": []}', "app"))
+        self.assertEqual((200, {"changes": []}, "app"), network.request("GET", CANDIDATE + "/api/v1/contents?since=0"))
+        self.assertEqual([1], network.delays)
+        self.assertIn("GET /contents", network.log.getvalue())
+        self.assertEqual("/api/v1/contents?since=0", network.connections[-1].sent[0][1])
+
+    def test_persistent_front_end_not_found_never_satisfies_an_expected_not_found(self):
+        network = Network(*[Response(404, b"<html>Page not found</html>")] * smoke.TRANSPORT_ATTEMPTS)
+        probe = smoke.Probe(CANDIDATE, {"accessToken": ACCESS}, lambda *call: network.request(call[0], call[1], call[3]), None)
+        with self.assertRaisesRegex(
+            smoke.SmokeError,
+            r"Journal merge smoke GET /journals/missing returned HTTP 404 from the Cloud Run front end, not the server \(after 6 attempts\)",
+        ):
+            probe.request("GET", "/journals/missing", statuses=(404,))
+        self.assertEqual([1, 2, 4, 8, 8], network.delays)
+
+    def test_front_end_timeout_is_reported_without_retrying(self):
+        network = Network(Response(504, b"upstream request timeout"))
+        with self.assertRaisesRegex(smoke.SmokeError, r"POST /journals/a/merge returned HTTP 504 from the Cloud Run front end, not the server$"):
+            network.request("POST", CANDIDATE + "/api/v1/journals/a/merge", {"operationId": "op"})
+        self.assertEqual([], network.delays)
+
+    def test_connection_failures_before_sending_are_retried(self):
+        network = Network(("connect", ConnectionRefusedError()), ("connect", TimeoutError()), Response(201, b"{}", "app"))
+        self.assertEqual((201, {}, "app"), network.request("PUT", CANDIDATE + "/api/v1/journals/a", {"id": "a"}))
+        self.assertEqual([1, 2], network.delays)
+        self.assertEqual(1, len(network.connections))
+
+    def test_persistent_connection_failure_names_the_request_and_error(self):
+        network = Network(*[("connect", ConnectionRefusedError())] * smoke.TRANSPORT_ATTEMPTS)
+        with self.assertRaisesRegex(smoke.SmokeError, r"GET /server/info could not connect \(ConnectionRefusedError\) \(after 6 attempts\)"):
+            network.request("GET", CANDIDATE + "/api/v1/server/info")
+
+    def test_unanswered_request_is_reported_without_retrying(self):
+        network = Network(TimeoutError(), Response(200, b"{}", "app"))
+        with self.assertRaisesRegex(smoke.SmokeError, r"POST /journals/a/merge did not respond within 30 seconds"):
+            network.request("POST", CANDIDATE + "/api/v1/journals/a/merge", {"operationId": "op"})
+        self.assertEqual(1, len(network.connections))
+
+    def test_connection_lost_after_sending_is_reported_without_retrying(self):
+        network = Network(ConnectionResetError(), Response(200, b"{}", "app"))
+        with self.assertRaisesRegex(smoke.SmokeError, r"PUT /moments/m lost its connection before a response \(ConnectionResetError\)"):
+            network.request("PUT", CANDIDATE + "/api/v1/moments/m", {"id": "m"})
+        self.assertEqual(1, len(network.connections))
+
+    def test_server_errors_are_returned_for_the_probe_to_report(self):
+        network = Network(Response(500, b'{"error": "boom"}', "app-500"))
+        self.assertEqual((500, {"error": "boom"}, "app-500"), network.request("GET", CANDIDATE + "/api/v1/auth/me"))
+        self.assertEqual([], network.delays)
+
+    def test_redirects_and_plain_http_are_rejected(self):
+        with self.assertRaisesRegex(smoke.SmokeError, "GET /auth/me attempted a redirect"):
+            Network(Response(301, b"", "app")).request("GET", CANDIDATE + "/api/v1/auth/me")
+        with self.assertRaisesRegex(smoke.SmokeError, "HTTPS"):
+            smoke.http_request("GET", "http://candidate.example.test/api/v1/auth/me", {}, None)
 
 
 class JournalMergeSmokeTest(unittest.TestCase):
@@ -177,15 +297,12 @@ class JournalMergeSmokeTest(unittest.TestCase):
         self.assertFalse(any(call[0] != "GET" for call in self.server.calls))
 
     def test_plain_text_not_found_is_accepted_only_as_an_expected_status(self):
-        url = CANDIDATE + "/api/v1/journals/missing"
-        error = HTTPError(url, 404, "Not Found", {}, io.BytesIO(b"Not Found"))
-        with patch.object(smoke, "build_opener") as opener:
-            opener.return_value.open.side_effect = error
-            self.assertEqual((404, {}), smoke.http_request("GET", url, {}, None))
+        network = Network(Response(404, b"Not Found", request_id="app-request"))
+        self.assertEqual((404, {}, "app-request"), network.request("GET", CANDIDATE + "/api/v1/journals/missing"))
 
-        with patch.object(self.server, "request", return_value=(404, {})):
+        with patch_transport(self.server, (404, {}, "app-request")):
             probe = smoke.Probe(CANDIDATE, self.state, self.server.request, None)
-            with self.assertRaisesRegex(smoke.SmokeError, "HTTP 404"):
+            with self.assertRaisesRegex(smoke.SmokeError, r"GET /journals/missing returned HTTP 404 \(request app-request\)"):
                 probe.request("GET", "/journals/missing")
 
     def test_recovery_marks_only_bound_private_state_for_existing_account_cleanup(self):

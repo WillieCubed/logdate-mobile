@@ -83,6 +83,11 @@ class WearSmokeTest(unittest.TestCase):
         self.probe.finish(self.fixture)
         self.assertTrue(all(call[2]["X-Serverless-Authorization"] == "Bearer private-candidate" for call in self.calls))
 
+    def test_failures_name_the_wear_journey_and_server_request(self):
+        self.probe.transport = lambda *_: (404, {}, "wear-request")
+        with self.assertRaisesRegex(smoke.common.SmokeError, r"^Wear companion smoke GET /contents returned HTTP 404 \(request wear-request\)$"):
+            self.probe.request("GET", "/contents?since=0&limit=100")
+
 
 if __name__ == "__main__":
     unittest.main()

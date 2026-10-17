@@ -12,6 +12,8 @@ _spec.loader.exec_module(common)
 
 
 class WearProbe(common.Probe):
+    label = "Wear companion smoke"
+
     def verify_identity(self):
         super().verify_identity()
         descriptor = self.request("GET", "/server/info")["data"]
