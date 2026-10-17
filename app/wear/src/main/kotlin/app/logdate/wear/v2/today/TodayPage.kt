@@ -69,10 +69,13 @@ import app.logdate.wear.v2.ambient.currentAmbientMode
 import app.logdate.wear.v2.moments.formatClockDuration
 import app.logdate.wear.v2.moments.momentClockTime
 import app.logdate.wear.v2.moments.momentLabel
+import app.logdate.wear.v2.recorder.RecordButtonAction
 import app.logdate.wear.v2.recorder.RecordEdgeButton
 import app.logdate.wear.v2.recorder.RecorderState
 import app.logdate.wear.v2.recorder.RecordingRing
 import app.logdate.wear.v2.recorder.TodayRecorder
+import app.logdate.wear.v2.recorder.gesture.startLocked
+import app.logdate.wear.v2.recorder.recordButton
 import app.logdate.wear.v2.recorder.recorderItems
 import app.logdate.wear.v2.recorder.replacesSummary
 import app.logdate.wear.v2.recorder.showsRecordButton
@@ -96,6 +99,7 @@ object TodayTags {
     const val ACTIVITY_SUGGESTION = "today_activity_suggestion"
     const val MORNING_START = "today_morning_start"
     const val ACTIVITY_DISMISS = "today_activity_dismiss"
+    const val VOICE_FIRST = "today_voice_first"
 }
 
 /**
@@ -112,7 +116,8 @@ data class TodayControls(
 /**
  * Home: the date in the time text, the campfire, the day's summary line, the latest
  * moment and, when phone setup is unfinished, a card that opens the next step on the phone.
- * Record sits at the end as the edge button, with Mark and + above it. While the recorder has
+ * Record sits at the end as the edge button, with Mark and + above it; while the person is moving,
+ * a Record button also leads the list, so voice capture comes first. While the recorder has
  * something to show, it takes the summary's place: the live recording with Pause, Stop and
  * Discard, then the saved recording with Undo and the five feelings, or what went wrong.
  */
@@ -211,7 +216,16 @@ private fun TodayList(
 ) {
     val spec = rememberTransformationSpec()
     val recorder = controls.recorder?.takeIf { it.state.replacesSummary }
-    val padding = if (recorder == null && startsWithCampfire(state)) contentPadding else contentPadding.belowTimeText()
+    val voiceFirst = controls.recorder?.takeIf { recorder == null && leadsWithVoice(state, it) }
+    val padding =
+        if (recorder == null &&
+            voiceFirst == null &&
+            startsWithCampfire(state)
+        ) {
+            contentPadding
+        } else {
+            contentPadding.belowTimeText()
+        }
     TransformingLazyColumn(state = listState, contentPadding = padding, modifier = modifier.testTag(TodayTags.PAGE)) {
         if (recorder != null) {
             recorderItems(recorder)
@@ -221,6 +235,9 @@ private fun TodayList(
             TodayUiState.Loading -> Unit
             TodayUiState.Failed -> item { CenteredText(stringResource(R.string.wear_today_failed)) }
             is TodayUiState.Ready -> {
+                voiceFirst?.let { ready ->
+                    item { VoiceFirstButton(ready, Modifier.transformedHeight(this, spec), SurfaceTransformation(spec)) }
+                }
                 state.campfire?.let { campfire -> item { TodayCampfire(campfire) } }
                 item { CenteredText(summaryText(state.summary, state.feeling), Modifier.testTag(TodayTags.SUMMARY)) }
                 state.summary.latestMoment?.let { latest -> item { LatestMoment(latest, state.timeZone) } }
@@ -263,6 +280,27 @@ private fun TodayList(
 }
 
 private fun startsWithCampfire(state: TodayUiState): Boolean = state is TodayUiState.Ready && state.campfire != null
+
+private fun leadsWithVoice(
+    state: TodayUiState,
+    recorder: TodayRecorder,
+): Boolean = state is TodayUiState.Ready && state.activity.voiceFirst && recorder.state.recordButton().action == RecordButtonAction.START
+
+/** Starts a locked recording, the same as a tap on Record, at the top of Today while the person is moving. */
+@Composable
+private fun VoiceFirstButton(
+    recorder: TodayRecorder,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    Button(
+        onClick = { recorder.gesture.startLocked() },
+        modifier = modifier.fillMaxWidth().testTag(TodayTags.VOICE_FIRST),
+        transformation = transformation,
+        icon = { Icon(imageVector = LogDateGlyph.RECORD.vector(), contentDescription = null) },
+        label = { Text(stringResource(R.string.wear_today_voice_first)) },
+    )
+}
 
 /** Text is wider than the campfire, so a list that starts with text clears the curve of the time text. */
 @Composable
