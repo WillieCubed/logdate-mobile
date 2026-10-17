@@ -5,6 +5,9 @@ import androidx.core.content.edit
 import androidx.health.services.client.PassiveListenerService
 import androidx.health.services.client.data.UserActivityInfo
 import androidx.health.services.client.data.UserActivityState
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.ActivityTransition
 import app.logdate.wear.LogDateWearApplication
 import app.logdate.wear.launch.awaitWearStartup
 import io.github.aakira.napier.Napier
@@ -15,6 +18,7 @@ import kotlinx.coroutines.sync.withLock
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.time.Instant
+import app.logdate.client.domain.activity.ActivityKind as AwarenessKind
 
 /** The person's activity as reminders read it. */
 enum class ActivityKind {
@@ -38,6 +42,29 @@ fun workoutEndedAt(
     current: ActivityKind,
     changedAt: Instant,
 ): Instant? = changedAt.takeIf { previous == ActivityKind.EXERCISE && current == ActivityKind.PASSIVE }
+
+/**
+ * The activity awareness transitions for Health Services moving from [previous] to [current] at [at]:
+ * exercise is movement and asleep is sleep. An unknown reading changes nothing.
+ */
+fun awarenessTransitions(
+    previous: ActivityKind?,
+    current: ActivityKind,
+    at: Instant,
+): List<ActivityTransition> {
+    if (current == ActivityKind.UNKNOWN || previous == current) return emptyList()
+    return buildList {
+        previous?.awarenessKind()?.let { add(ActivityTransition(it, entered = false, at = at)) }
+        current.awarenessKind()?.let { add(ActivityTransition(it, entered = true, at = at)) }
+    }
+}
+
+private fun ActivityKind.awarenessKind(): AwarenessKind? =
+    when (this) {
+        ActivityKind.EXERCISE -> AwarenessKind.MOVING
+        ActivityKind.ASLEEP -> AwarenessKind.SLEEP
+        ActivityKind.PASSIVE, ActivityKind.UNKNOWN -> null
+    }
 
 /** The last activity Health Services reported, across the listener's short lives. */
 interface ActivityTransitionStore {
@@ -87,14 +114,19 @@ class SharedPreferencesActivityTransitionStore(
 }
 
 /**
- * Turns activity changes into workout reminders. An unknown reading is skipped, so it never hides the
- * end of a workout that it falls in the middle of.
+ * Turns activity changes into reminders. An unknown reading is skipped, so it never hides the end of a
+ * workout that it falls in the middle of.
+ *
+ * With activity awareness on, each change also feeds [tracker], and a workout that lasted long enough
+ * ends in the activity reminder instead of the workout one.
  */
 class WorkoutWatcher(
     private val transitions: ActivityTransitionStore,
     private val dispatcher: WatchReminderDispatcher,
     private val experienceEnabled: () -> Boolean = { true },
     private val awaitExperience: suspend () -> Unit = {},
+    private val tracker: ActivityTracker? = null,
+    private val awarenessEnabled: suspend () -> Boolean = { false },
 ) {
     private val activation = Mutex()
     private val events = Mutex()
@@ -116,10 +148,14 @@ class WorkoutWatcher(
     ): Boolean =
         events.withLock {
             if (!experienceEnabled() || kind == ActivityKind.UNKNOWN) return@withLock false
-            if (transitions.lastChangeAt()?.let { changedAt <= it } == true) return@withLock false
-            val endedAt = workoutEndedAt(transitions.last(), kind, changedAt)
+            val startedAt = transitions.lastChangeAt()
+            if (startedAt?.let { changedAt <= it } == true) return@withLock false
+            val previous = transitions.last()
+            val endedAt = workoutEndedAt(previous, kind, changedAt)
             transitions.record(kind, changedAt)
-            endedAt != null && dispatcher.onWorkoutEnded(endedAt)
+            if (tracker == null || !awarenessEnabled()) return@withLock endedAt != null && dispatcher.onWorkoutEnded(endedAt)
+            awarenessTransitions(previous, kind, changedAt).forEach { tracker.accept(it) }
+            endedAt != null && startedAt != null && dispatcher.onActivityEnded(Activity(AwarenessKind.MOVING, startedAt, endedAt))
         }
 }
 

@@ -1,15 +1,22 @@
 package app.logdate.wear.reminders
 
 import androidx.health.services.client.data.UserActivityState
+import app.logdate.client.domain.activity.Activity
+import app.logdate.client.domain.activity.ActivityLog
+import app.logdate.client.domain.activity.ActivityLogStore
+import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.ActivityTransition
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import app.logdate.client.domain.activity.ActivityKind as AwarenessKind
 
 class WorkoutWatcherTest {
     private val notifier = FakeNudgeNotifier()
@@ -97,6 +104,85 @@ class WorkoutWatcherTest {
             assertFalse(watcher.onActivity(ActivityKind.PASSIVE, berlin(10, 17, 50)))
             assertTrue(notifier.posted.isEmpty())
         }
+
+    @Test
+    fun `exercise and sleep become activity transitions`() {
+        val at = berlin(10, 17)
+
+        assertEquals(
+            listOf(ActivityTransition(AwarenessKind.MOVING, entered = true, at = at)),
+            awarenessTransitions(ActivityKind.PASSIVE, ActivityKind.EXERCISE, at),
+        )
+        assertEquals(
+            listOf(
+                ActivityTransition(AwarenessKind.MOVING, entered = false, at = at),
+                ActivityTransition(AwarenessKind.SLEEP, entered = true, at = at),
+            ),
+            awarenessTransitions(ActivityKind.EXERCISE, ActivityKind.ASLEEP, at),
+        )
+        assertEquals(emptyList(), awarenessTransitions(ActivityKind.EXERCISE, ActivityKind.UNKNOWN, at))
+        assertEquals(emptyList(), awarenessTransitions(null, ActivityKind.PASSIVE, at))
+    }
+
+    @Test
+    fun `with activity awareness a workout feeds the tracker and ends in the activity reminder`() =
+        runTest {
+            val tracker = tracker()
+            val aware = WorkoutWatcher(transitions, dispatcher, tracker = tracker, awarenessEnabled = { true })
+
+            aware.onActivity(ActivityKind.EXERCISE, berlin(10, 17))
+            assertTrue(aware.onActivity(ActivityKind.PASSIVE, berlin(10, 17, 50)))
+
+            assertEquals(listOf(WatchReminder.MOVING_ENDED), notifier.posted)
+            // The tracker's clock reads 18:00, past the end grace, so the walk has already ended there.
+            assertEquals(Activity(AwarenessKind.MOVING, berlin(10, 17), berlin(10, 17, 50)), tracker.local.value.lastEnded)
+        }
+
+    @Test
+    fun `with activity awareness a workout too short to count reminds of nothing`() =
+        runTest {
+            val aware = WorkoutWatcher(transitions, dispatcher, tracker = tracker(), awarenessEnabled = { true })
+
+            aware.onActivity(ActivityKind.EXERCISE, berlin(10, 17, 45))
+
+            assertFalse(aware.onActivity(ActivityKind.PASSIVE, berlin(10, 17, 50)))
+            assertTrue(notifier.posted.isEmpty())
+        }
+
+    @Test
+    fun `the evening reminder waits while the person is moving`() =
+        runTest {
+            val moving =
+                WatchReminderDispatcher(
+                    preferences = FakeReminderPreferences(),
+                    notifier = notifier,
+                    clock = FixedClock(berlin(10, 21)),
+                    timeZone = { REMINDER_ZONE },
+                    currentActivity = { Activity(AwarenessKind.MOVING, berlin(10, 20, 40), endedAt = null) },
+                )
+
+            assertFalse(moving.onEveningCheck(phoneReachable = false, momentsToday = 0))
+            assertTrue(notifier.posted.isEmpty())
+        }
+
+    private fun tracker() =
+        ActivityTracker(
+            store =
+                object : ActivityLogStore {
+                    var saved: ActivityLog? = null
+
+                    override suspend fun read() = saved
+
+                    override suspend fun write(log: ActivityLog) {
+                        saved = log
+                    }
+                },
+            peer = flowOf(null),
+            watchWorn = flowOf(true),
+            isPhone = false,
+            enabled = flowOf(true),
+            clock = FixedClock(berlin(10, 18)),
+        )
 
     @Test
     fun `health services states map to kinds`() =

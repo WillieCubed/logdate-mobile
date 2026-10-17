@@ -5,6 +5,8 @@ import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
+import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.toSnapshot
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.datalayer.v2.LinkNonceLedger
@@ -34,6 +36,7 @@ import app.logdate.wear.sync.v2.localNodeIdOrNull
 import app.logdate.wear.sync.v2.media.GoogleMediaRangeSource
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.combine
 import org.koin.core.parameter.parametersOf
 import org.koin.dsl.bind
 import org.koin.dsl.module
@@ -172,6 +175,10 @@ val wearSyncV2Module =
             WatchOwnState(
                 links = get<WatchLinkStore>().observe(),
                 features = watchSyncFeatures,
+                activity =
+                    combine(get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS), get<ActivityTracker>().local) { on, log ->
+                        log.toSnapshot().takeIf { on }
+                    },
             )
         }
     }
