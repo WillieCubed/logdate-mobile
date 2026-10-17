@@ -1,7 +1,13 @@
 package studio.hypertext.atproto.lexicon
 
+import studio.hypertext.atproto.syntax.Nsid
+
 /**
- * Deterministic Kotlin source generator for supported lexicon documents.
+ * Deterministic Kotlin source generator for lexicon documents.
+ *
+ * Each document becomes one file: an object holding its id, a data class per object, record,
+ * params, input and output, and a sealed interface with its own serializer per union. Optional
+ * fields default to null, so a record that omits them decodes and re-encodes unchanged.
  */
 public object LexiconCodegen {
     /**
@@ -10,108 +16,292 @@ public object LexiconCodegen {
     public fun generate(
         document: LexiconDocument,
         packageName: String = "studio.hypertext.atproto.lexicon.generated",
-    ): String {
-        val documentClassName = document.id.documentPrefix()
-        val generatedClasses =
-            linkedMapOf<String, GeneratedClass>()
-                .apply {
-                    document.definitions.values
-                        .sortedBy { if (it.name == MAIN_DEFINITION_NAME) "" else it.name }
-                        .forEach { definition ->
-                            when (definition.type) {
-                                LexiconType.OBJECT, LexiconType.PARAMS ->
-                                    put(
-                                        className(document.id, definition.name),
-                                        GeneratedClass(
-                                            name = className(document.id, definition.name),
-                                            properties = definition.properties,
-                                        ),
-                                    )
+    ): String = DocumentWriter(document, packageName).write()
 
-                                LexiconType.QUERY, LexiconType.PROCEDURE -> {
-                                    definition.parameters?.let { parameters ->
-                                        put(
-                                            "${documentClassName}Params",
-                                            GeneratedClass(
-                                                name = "${documentClassName}Params",
-                                                properties = parameters.properties,
-                                            ),
-                                        )
-                                    }
-                                    definition.input
-                                        ?.schema
-                                        ?.takeIf { it.type.isObjectLike() }
-                                        ?.let { input ->
-                                            put(
-                                                "${documentClassName}Input",
-                                                GeneratedClass(
-                                                    name = "${documentClassName}Input",
-                                                    properties = input.properties,
-                                                ),
-                                            )
-                                        }
-                                    definition.output
-                                        ?.schema
-                                        ?.takeIf { it.type.isObjectLike() }
-                                        ?.let { output ->
-                                            put(
-                                                "${documentClassName}Output",
-                                                GeneratedClass(
-                                                    name = "${documentClassName}Output",
-                                                    properties = output.properties,
-                                                ),
-                                            )
-                                        }
-                                }
+    private class DocumentWriter(
+        private val document: LexiconDocument,
+        private val packageName: String,
+    ) {
+        private val imports = mutableSetOf<String>()
+        private val declarations = mutableListOf<String>()
+        private val prefix = document.id.documentPrefix()
 
-                                else -> Unit
-                            }
-                        }
-                }.values
-                .toList()
+        fun write(): String {
+            document.definitions.values
+                .sortedBy { if (it.name == MAIN_DEFINITION_NAME) "" else it.name }
+                .forEach(::writeDefinition)
 
-        val needsJsonElement =
-            generatedClasses.any { generatedClass ->
-                generatedClass.properties.values.any { field -> kotlinType(field).contains("JsonElement") }
-            }
-
-        return buildString {
-            appendLine("package $packageName")
-            appendLine()
-            if (generatedClasses.isNotEmpty()) {
-                appendLine("import kotlinx.serialization.Serializable")
-            }
-            if (needsJsonElement) {
-                appendLine("import kotlinx.serialization.json.JsonElement")
-            }
-            if (generatedClasses.isNotEmpty() || needsJsonElement) {
-                appendLine()
-            }
-            appendLine("public object ${documentClassName}Lexicon {")
-            appendLine("    public const val ID: String = \"${document.id}\"")
-            appendLine("}")
-            generatedClasses.forEach { generatedClass ->
-                appendLine()
-                appendLine("@Serializable")
-                appendLine("public data class ${generatedClass.name}(")
-                val properties =
-                    generatedClass.properties.entries
-                        .sortedBy { it.key }
-                        .map { (name, field) ->
-                            "    val ${name.asIdentifier()}: ${kotlinType(field)}"
-                        }
-                if (properties.isEmpty()) {
-                    appendLine("    val unused: Boolean = true,")
-                } else {
-                    properties.forEach { appendLine("$it,") }
+            return buildString {
+                if (OPT_IN_SERIALIZATION in imports) {
+                    appendLine("@file:OptIn(ExperimentalSerializationApi::class)")
+                    appendLine()
                 }
-                appendLine(")")
+                appendLine("package $packageName")
+                appendLine()
+                imports.sorted().forEach { appendLine("import $it") }
+                if (imports.isNotEmpty()) appendLine()
+                appendLine("public object ${prefix}Lexicon {")
+                appendLine("    public const val ID: String = \"${document.id}\"")
+                appendLine("}")
+                declarations.forEach { declaration ->
+                    appendLine()
+                    append(declaration)
+                }
+            }
+        }
+
+        private fun writeDefinition(definition: LexiconDefinition) {
+            when (definition.type) {
+                LexiconType.OBJECT, LexiconType.PARAMS ->
+                    writeClass(className(document.id, definition.name), definition.description, definition.properties)
+
+                LexiconType.RECORD -> definition.record?.let { record -> writeRecord(definition, record) }
+
+                LexiconType.QUERY, LexiconType.PROCEDURE -> {
+                    definition.parameters?.let { writeClass("${prefix}Params", it.description, it.properties) }
+                    definition.input?.schema?.takeIf { it.type.isObjectLike() }?.let {
+                        writeClass("${prefix}Input", it.description, it.properties)
+                    }
+                    definition.output?.schema?.takeIf { it.type.isObjectLike() }?.let {
+                        writeClass("${prefix}Output", it.description, it.properties)
+                    }
+                }
+
+                else -> Unit
+            }
+        }
+
+        private fun writeClass(
+            name: String,
+            description: String?,
+            properties: Map<String, LexiconField>,
+        ) {
+            imports += SERIALIZABLE
+            val lines = propertyLines(name, properties).ifEmpty { listOf("    val unused: Boolean = true,") }
+            declarations +=
+                buildString {
+                    appendKdoc(description, indent = "")
+                    appendLine("@Serializable")
+                    appendLine("public data class $name(")
+                    lines.forEach(::appendLine)
+                    appendLine(")")
+                }
+        }
+
+        private fun writeRecord(
+            definition: LexiconDefinition,
+            record: LexiconField,
+        ) {
+            imports += listOf(SERIALIZABLE, SERIAL_NAME, ENCODE_DEFAULT, OPT_IN_SERIALIZATION, RECORD_KEY)
+            val name = className(document.id, definition.name)
+            val recordKey = requireNotNull(definition.recordKey) { "Record ${document.id} has no valid key rule" }
+            declarations +=
+                buildString {
+                    appendKdoc(definition.description ?: record.description, indent = "")
+                    appendLine("@Serializable")
+                    appendLine("public data class $name(")
+                    propertyLines(name, record.properties).forEach(::appendLine)
+                    appendLine("    @SerialName(\"\\\$type\")")
+                    appendLine("    @EncodeDefault")
+                    appendLine("    val lexiconType: String = TYPE,")
+                    appendLine(") {")
+                    appendLine("    public companion object {")
+                    appendLine("        public const val TYPE: String = \"${document.id}\"")
+                    appendLine("        public val KEY: LexiconRecordKey = ${recordKey.kotlin()}")
+                    appendLine("    }")
+                    appendLine("}")
+                }
+        }
+
+        private fun propertyLines(
+            owner: String,
+            properties: Map<String, LexiconField>,
+        ): List<String> =
+            properties.entries
+                .sortedBy { it.key }
+                .flatMap { (name, field) ->
+                    val type = kotlinType(field, unionName = owner + name.asPascalCase())
+                    val nullable = if (!field.required || field.nullable) "?" else ""
+                    val default = if (!field.required) " = null" else ""
+                    val declaration = "    val ${name.asIdentifier()}: $type$nullable$default,"
+                    buildList {
+                        field.description?.let { add(kdoc(it, indent = "    ")) }
+                        add(declaration)
+                    }
+                }
+
+        private fun kotlinType(
+            field: LexiconField,
+            unionName: String,
+        ): String =
+            when (field.type) {
+                LexiconType.STRING, LexiconType.TOKEN -> "String"
+                LexiconType.BOOLEAN -> "Boolean"
+                LexiconType.INTEGER -> "Long"
+                LexiconType.ARRAY -> {
+                    val items = requireNotNull(field.items)
+                    val itemType = kotlinType(items, unionName = "${unionName}Item")
+                    "List<$itemType${if (items.nullable) "?" else ""}>"
+                }
+                LexiconType.BLOB -> runtimeType(BLOB)
+                LexiconType.CID_LINK -> runtimeType(CID_LINK)
+                LexiconType.BYTES -> runtimeType(BYTES)
+                LexiconType.REF -> requireNotNull(field.reference).let { className(it.documentId, it.definitionName) }
+                LexiconType.UNION -> writeUnion(unionName, field)
+                else -> {
+                    imports += JSON_ELEMENT
+                    "JsonElement"
+                }
+            }
+
+        private fun runtimeType(qualifiedName: String): String {
+            imports += qualifiedName
+            return qualifiedName.substringAfterLast('.')
+        }
+
+        private fun writeUnion(
+            name: String,
+            field: LexiconField,
+        ): String {
+            imports +=
+                listOf(SERIALIZABLE, K_SERIALIZER, SERIAL_DESCRIPTOR, ENCODER, DECODER, LEXICON_UNIONS) +
+                if (field.closed) emptyList() else listOf(JSON_OBJECT)
+            val members = unionMembers(field.refs)
+            declarations +=
+                buildString {
+                    appendUnionInterface(name, field, members)
+                    appendLine()
+                    appendUnionSerializer(name, unionId = "${document.id}#$name", closed = field.closed, members = members)
+                }
+            return name
+        }
+
+        private fun StringBuilder.appendUnionInterface(
+            name: String,
+            field: LexiconField,
+            members: List<UnionMember>,
+        ) {
+            appendKdoc(field.description, indent = "")
+            appendLine("@Serializable(with = ${name}Serializer::class)")
+            appendLine("public sealed interface $name {")
+            // The value type is qualified: a member can share its name with the class it wraps.
+            members.forEachIndexed { index, member ->
+                if (index > 0) appendLine()
+                appendLine("    public data class ${member.name}(")
+                appendLine("        val value: $packageName.${member.valueType},")
+                appendLine("    ) : $name")
+            }
+            if (!field.closed) {
+                if (members.isNotEmpty()) appendLine()
+                appendLine("    /** A member this version of the schema doesn't define, kept as it was read. */")
+                appendLine("    public data class Unknown(")
+                appendLine("        val type: String,")
+                appendLine("        val value: JsonObject,")
+                appendLine("    ) : $name")
+            }
+            appendLine("}")
+        }
+
+        private fun StringBuilder.appendUnionSerializer(
+            name: String,
+            unionId: String,
+            closed: Boolean,
+            members: List<UnionMember>,
+        ) {
+            appendLine("public object ${name}Serializer : KSerializer<$name> {")
+            appendLine("    override val descriptor: SerialDescriptor = LexiconUnions.descriptor(\"$unionId\")")
+            appendLine()
+            appendLine("    override fun serialize(")
+            appendLine("        encoder: Encoder,")
+            appendLine("        value: $name,")
+            appendLine("    ) {")
+            appendLine("        when (value) {")
+            members.forEach { member ->
+                appendLine("            is $name.${member.name} ->")
+                appendLine("                LexiconUnions.encodeMember(")
+                appendLine("                    encoder,")
+                appendLine("                    \"${member.type}\",")
+                appendLine("                    ${member.valueType}.serializer(),")
+                appendLine("                    value.value,")
+                appendLine("                )")
+            }
+            if (!closed) appendLine("            is $name.Unknown -> LexiconUnions.encodeUnknown(encoder, value.type, value.value)")
+            appendLine("        }")
+            appendLine("    }")
+            appendLine()
+            appendLine("    override fun deserialize(decoder: Decoder): $name {")
+            appendLine("        val member = LexiconUnions.decodeMember(decoder)")
+            appendLine("        return when (member.type) {")
+            members.forEach { member ->
+                appendLine("            \"${member.type}\" ->")
+                appendLine("                $name.${member.name}(member.decode(${member.valueType}.serializer()))")
+            }
+            val fallback =
+                if (closed) "throw LexiconUnions.notAllowed(\"$unionId\", member.type)" else "$name.Unknown(member.type, member.value)"
+            appendLine("            else -> $fallback")
+            appendLine("        }")
+            appendLine("    }")
+            appendLine("}")
+        }
+
+        private fun unionMembers(refs: List<LexiconReference>): List<UnionMember> {
+            val shortNames = refs.map { it.memberName(qualified = false) }
+            return refs.map { reference ->
+                val shortName = reference.memberName(qualified = false)
+                UnionMember(
+                    name = if (shortNames.count { it == shortName } > 1) reference.memberName(qualified = true) else shortName,
+                    type = reference.typeName(),
+                    valueType = className(reference.documentId, reference.definitionName),
+                )
+            }
+        }
+
+        private fun StringBuilder.appendKdoc(
+            description: String?,
+            indent: String,
+        ) {
+            description?.let { appendLine(kdoc(it, indent)) }
+        }
+
+        private fun kdoc(
+            description: String,
+            indent: String,
+        ): String {
+            val words =
+                description
+                    .replace("*/", "*&#47;")
+                    .replace("/*", "&#47;*")
+                    .split(Regex("\\s+"))
+                    .filter(String::isNotEmpty)
+            val single = "$indent/** ${words.joinToString(" ")} */"
+            if (single.length <= KDOC_WIDTH) return single
+            val lines = mutableListOf<String>()
+            var line = StringBuilder()
+            words.forEach { word ->
+                if (line.isNotEmpty() && indent.length + 3 + line.length + 1 + word.length > KDOC_WIDTH) {
+                    lines += line.toString()
+                    line = StringBuilder()
+                }
+                if (line.isNotEmpty()) line.append(' ')
+                line.append(word)
+            }
+            if (line.isNotEmpty()) lines += line.toString()
+            return buildString {
+                append("$indent/**")
+                lines.forEach { append("\n$indent * $it") }
+                append("\n$indent */")
             }
         }
     }
 
+    private data class UnionMember(
+        val name: String,
+        val type: String,
+        val valueType: String,
+    )
+
     private fun className(
-        documentId: studio.hypertext.atproto.syntax.Nsid,
+        documentId: Nsid,
         definitionName: String,
     ): String {
         val documentPrefix = documentId.documentPrefix()
@@ -121,36 +311,25 @@ public object LexiconCodegen {
         }
     }
 
-    private fun kotlinType(field: LexiconField): String {
-        val baseType = baseKotlinType(field)
-        return if (field.required && !field.nullable) {
-            baseType
-        } else {
-            "$baseType?"
-        }
-    }
-
-    private fun baseKotlinType(field: LexiconField): String =
-        when (field.type) {
-            LexiconType.STRING, LexiconType.TOKEN -> "String"
-            LexiconType.BOOLEAN -> "Boolean"
-            LexiconType.INTEGER -> "Long"
-            LexiconType.ARRAY -> "List<${arrayElementType(requireNotNull(field.items))}>"
-            LexiconType.BLOB -> "JsonElement"
-            LexiconType.REF -> className(requireNotNull(field.reference).documentId, requireNotNull(field.reference).definitionName)
-            else -> "JsonElement"
+    private fun LexiconReference.memberName(qualified: Boolean): String =
+        when {
+            definitionName == MAIN_DEFINITION_NAME || qualified -> className(documentId, definitionName)
+            else -> definitionName.asPascalCase()
         }
 
-    private fun arrayElementType(field: LexiconField): String {
-        val baseType = baseKotlinType(field)
-        return if (field.nullable) {
-            "$baseType?"
-        } else {
-            baseType
-        }
-    }
+    /** The `$type` a member of this definition carries: the bare NSID for `main`. */
+    private fun LexiconReference.typeName(): String =
+        if (definitionName == MAIN_DEFINITION_NAME) documentId.toString() else "$documentId#$definitionName"
 
-    private fun studio.hypertext.atproto.syntax.Nsid.documentPrefix(): String =
+    private fun LexiconRecordKey.kotlin(): String =
+        when (this) {
+            LexiconRecordKey.Tid -> "LexiconRecordKey.Tid"
+            LexiconRecordKey.Nsid -> "LexiconRecordKey.Nsid"
+            LexiconRecordKey.Any -> "LexiconRecordKey.Any"
+            is LexiconRecordKey.Literal -> "LexiconRecordKey.Literal(\"$value\")"
+        }
+
+    private fun Nsid.documentPrefix(): String =
         toString()
             .substringAfterLast('.')
             .asPascalCase()
@@ -164,13 +343,54 @@ public object LexiconCodegen {
                 token.replaceFirstChar { char -> char.uppercase() }
             }
 
-    private fun String.asIdentifier(): String =
-        replaceFirstChar { char ->
-            char.lowercase()
-        }
+    private fun String.asIdentifier(): String = if (this in kotlinKeywords) "`$this`" else this
 
-    private data class GeneratedClass(
-        val name: String,
-        val properties: Map<String, LexiconField>,
-    )
+    private val kotlinKeywords =
+        setOf(
+            "as",
+            "break",
+            "class",
+            "continue",
+            "do",
+            "else",
+            "false",
+            "for",
+            "fun",
+            "if",
+            "in",
+            "interface",
+            "is",
+            "null",
+            "object",
+            "package",
+            "return",
+            "super",
+            "this",
+            "throw",
+            "true",
+            "try",
+            "typealias",
+            "typeof",
+            "val",
+            "var",
+            "when",
+            "while",
+        )
+
+    private const val KDOC_WIDTH = 120
+    private const val SERIALIZABLE = "kotlinx.serialization.Serializable"
+    private const val SERIAL_NAME = "kotlinx.serialization.SerialName"
+    private const val ENCODE_DEFAULT = "kotlinx.serialization.EncodeDefault"
+    private const val OPT_IN_SERIALIZATION = "kotlinx.serialization.ExperimentalSerializationApi"
+    private const val K_SERIALIZER = "kotlinx.serialization.KSerializer"
+    private const val SERIAL_DESCRIPTOR = "kotlinx.serialization.descriptors.SerialDescriptor"
+    private const val ENCODER = "kotlinx.serialization.encoding.Encoder"
+    private const val DECODER = "kotlinx.serialization.encoding.Decoder"
+    private const val JSON_ELEMENT = "kotlinx.serialization.json.JsonElement"
+    private const val JSON_OBJECT = "kotlinx.serialization.json.JsonObject"
+    private const val RECORD_KEY = "studio.hypertext.atproto.lexicon.LexiconRecordKey"
+    private const val LEXICON_UNIONS = "studio.hypertext.atproto.lexicon.data.LexiconUnions"
+    private const val BLOB = "studio.hypertext.atproto.lexicon.data.Blob"
+    private const val CID_LINK = "studio.hypertext.atproto.lexicon.data.CidLink"
+    private const val BYTES = "studio.hypertext.atproto.lexicon.data.Bytes"
 }

@@ -9,15 +9,19 @@ public object GetRecordLexicon {
 
 @Serializable
 public data class GetRecordParams(
-    val cid: String?,
+    /** The CID of the version of the record. If not specified, then return the most recent version. */
+    val cid: String? = null,
+    /** The NSID of the record collection. */
     val collection: String,
+    /** The handle or DID of the repo. */
     val repo: String,
+    /** The Record Key. */
     val rkey: String,
 )
 
 @Serializable
 public data class GetRecordOutput(
-    val cid: String?,
+    val cid: String? = null,
     val uri: String,
     val value: JsonElement,
 )

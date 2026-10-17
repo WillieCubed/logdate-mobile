@@ -8,6 +8,8 @@ public object GetRepoLexicon {
 
 @Serializable
 public data class GetRepoParams(
+    /** The DID of the repo. */
     val did: String,
-    val since: String?,
+    /** The revision ('rev') of the repo to create a diff from. */
+    val since: String? = null,
 )

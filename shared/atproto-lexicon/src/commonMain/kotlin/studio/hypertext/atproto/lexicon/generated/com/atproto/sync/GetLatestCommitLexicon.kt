@@ -8,6 +8,7 @@ public object GetLatestCommitLexicon {
 
 @Serializable
 public data class GetLatestCommitParams(
+    /** The DID of the repo. */
     val did: String,
 )
 

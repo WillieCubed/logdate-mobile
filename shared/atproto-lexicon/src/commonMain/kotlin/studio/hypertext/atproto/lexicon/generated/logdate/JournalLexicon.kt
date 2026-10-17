@@ -10,8 +10,8 @@ public object JournalLexicon {
 public data class Journal(
     val createdAt: Long,
     val description: String,
-    val deviceId: String?,
-    val id: String?,
+    val deviceId: String? = null,
+    val id: String? = null,
     val lastUpdated: Long,
     val title: String,
 )

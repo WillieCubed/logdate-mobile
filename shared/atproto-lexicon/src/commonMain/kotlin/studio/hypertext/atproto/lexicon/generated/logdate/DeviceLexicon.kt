@@ -8,12 +8,12 @@ public object DeviceLexicon {
 
 @Serializable
 public data class Device(
-    val appVersion: String?,
-    val capabilities: List<String>?,
+    val appVersion: String? = null,
+    val capabilities: List<String>? = null,
     val createdAt: Long,
     val deviceId: String,
-    val deviceName: String?,
+    val deviceName: String? = null,
     val lastSeenAt: Long,
-    val osVersion: String?,
+    val osVersion: String? = null,
     val platform: String,
 )

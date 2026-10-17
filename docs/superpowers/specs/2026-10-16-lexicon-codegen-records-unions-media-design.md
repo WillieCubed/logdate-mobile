@@ -23,7 +23,7 @@ generate code.
 | `blob` | Generated as raw JSON | Generated as a typed `Blob` |
 | `cid-link` | Treated as unknown | Generated as `CidLink` |
 | `bytes` | Treated as unknown | Generated as `Bytes` |
-| `unknown` | Generated as raw JSON | Generated as a JSON object |
+| `unknown` | Generated as raw JSON | Unchanged |
 | `subscription`, `permission-set` | Treated as unknown | Still unsupported; a later task |
 
 ## Decisions
@@ -49,6 +49,10 @@ A closed union rejects a `$type` outside its list.
 rule: a union member always carries `$type`, while an object reached through a plain `ref` does
 not. Records carry `$type` too, so a generated record class has a `$type` property with its
 collection's NSID as the default.
+
+**Optional fields default to null, and stay absent.** A field the schema doesn't require is
+nullable with a `null` default, so a record that omits it decodes, and re-encodes without it. A
+field that's required but `nullable` has no default and is always written, as `null` when it is.
 
 **Record keys are part of the schema model.** `record.key` is parsed into `tid`, `nsid`,
 `literal:<value>` or `any`, and the generated record class exposes it, so storage code can check

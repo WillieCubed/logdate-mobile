@@ -9,16 +9,20 @@ public object ListRecordsLexicon {
 
 @Serializable
 public data class ListRecordsParams(
+    /** The NSID of the record type. */
     val collection: String,
-    val cursor: String?,
-    val limit: Long?,
+    val cursor: String? = null,
+    /** The number of records to return. */
+    val limit: Long? = null,
+    /** The handle or DID of the repo. */
     val repo: String,
-    val reverse: Boolean?,
+    /** Flag to reverse the order of the returned records. */
+    val reverse: Boolean? = null,
 )
 
 @Serializable
 public data class ListRecordsOutput(
-    val cursor: String?,
+    val cursor: String? = null,
     val records: List<ListRecordsRecord>,
 )
 

@@ -1,5 +1,6 @@
 package studio.hypertext.atproto.lexicon
 
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -11,29 +12,28 @@ import kotlin.io.path.writeText
 import kotlin.streams.asSequence
 
 /**
- * Regenerates checked-in Kotlin models for a lexicon resource directory.
+ * Regenerates checked-in Kotlin models for lexicon documents.
+ *
+ * The first argument lists the inputs, separated by the platform path separator: each is a
+ * lexicon JSON file, or a directory whose JSON files (not its subdirectories) are all read.
  */
 public fun main(args: Array<String>) {
-    require(args.size >= 2) { "Expected inputDir and outputDir arguments" }
+    require(args.size >= 2) { "Expected inputs and outputDir arguments" }
 
-    val inputDir = Path.of(args[0])
+    val inputs = args[0].split(File.pathSeparatorChar).filter(String::isNotBlank).map(Path::of)
     val outputDir = Path.of(args[1])
     val packageName = args.getOrNull(2) ?: "studio.hypertext.atproto.lexicon.generated.logdate"
 
-    require(Files.isDirectory(inputDir)) { "Missing lexicon input directory: ${inputDir.invariantSeparatorsPathString}" }
+    inputs.forEach { input ->
+        require(Files.exists(input)) { "Missing lexicon input: ${input.invariantSeparatorsPathString}" }
+    }
     outputDir.createDirectories()
 
     val documents =
-        Files
-            .list(inputDir)
-            .use { paths ->
-                paths
-                    .asSequence()
-                    .filter { path -> path.extension == "json" }
-                    .sortedBy(Path::nameWithoutExtension)
-                    .map { path -> path to LexiconParser.parse(path.readText()) }
-                    .toList()
-            }
+        inputs
+            .flatMap(::lexiconFiles)
+            .sortedBy(Path::nameWithoutExtension)
+            .map { path -> path to LexiconParser.parse(path.readText()) }
     val registry = LexiconRegistry(documents.map { it.second })
     documents.forEach { (_, document) ->
         val validation = LexiconValidator.validate(document, registry)
@@ -52,3 +52,10 @@ public fun main(args: Array<String>) {
         outputFile.writeText(LexiconCodegen.generate(document, packageName))
     }
 }
+
+private fun lexiconFiles(input: Path): List<Path> =
+    if (Files.isDirectory(input)) {
+        Files.list(input).use { paths -> paths.asSequence().filter { it.extension == "json" }.toList() }
+    } else {
+        listOf(input)
+    }
