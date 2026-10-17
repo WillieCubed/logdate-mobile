@@ -43,4 +43,6 @@ data class TextNoteEntity(
     override val timeZoneId: String? = null,
     @ColumnInfo(name = "captured_on")
     override val capturedOn: String? = null,
+    @ColumnInfo(name = "captured_during")
+    override val capturedDuring: String? = null,
 ) : GenericNoteData()

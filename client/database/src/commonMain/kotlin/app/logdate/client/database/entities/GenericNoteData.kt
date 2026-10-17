@@ -41,4 +41,10 @@ abstract class GenericNoteData {
      * not recorded.
      */
     abstract val capturedOn: String?
+
+    /**
+     * The wire name of what the person was doing at capture (`moving` or `in_vehicle`), or null when it
+     * was not recorded.
+     */
+    abstract val capturedDuring: String?
 }

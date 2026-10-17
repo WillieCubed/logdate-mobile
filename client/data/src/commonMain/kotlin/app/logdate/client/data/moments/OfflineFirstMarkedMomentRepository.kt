@@ -3,6 +3,7 @@ package app.logdate.client.data.moments
 import app.logdate.client.database.dao.moments.MarkedMomentDao
 import app.logdate.client.database.entities.moments.MarkedMomentEntity
 import app.logdate.client.database.entities.moments.MarkedMomentState
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -201,6 +202,7 @@ internal fun MarkedMomentEntity.toModel(): MarkedMoment? {
         originDeviceId = originDeviceId,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
+        capturedDuring = CaptureActivity.fromWireName(capturedDuring),
     ).atMillisecondPrecision()
 }
 
@@ -225,4 +227,5 @@ private fun MarkedMoment.toEntity(): MarkedMomentEntity =
         originDeviceId = originDeviceId,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
+        capturedDuring = capturedDuring?.wireName,
     )

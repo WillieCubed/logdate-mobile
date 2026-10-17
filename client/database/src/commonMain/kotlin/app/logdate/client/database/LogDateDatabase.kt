@@ -150,6 +150,7 @@ import app.logdate.client.database.migrations.MIGRATION_50_51
 import app.logdate.client.database.migrations.MIGRATION_51_52
 import app.logdate.client.database.migrations.MIGRATION_52_53
 import app.logdate.client.database.migrations.MIGRATION_53_54
+import app.logdate.client.database.migrations.MIGRATION_54_55
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -226,7 +227,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         // Moments marked on the watch
         MarkedMomentEntity::class,
     ],
-    version = 54,
+    version = 55,
     exportSchema = true,
 )
 @TypeConverters(
@@ -440,4 +441,5 @@ private fun databaseMigrations() =
         MIGRATION_51_52,
         MIGRATION_52_53,
         MIGRATION_53_54,
+        MIGRATION_54_55,
     )
