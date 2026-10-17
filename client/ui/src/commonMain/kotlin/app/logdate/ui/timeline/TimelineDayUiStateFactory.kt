@@ -135,6 +135,7 @@ private fun synthesizeMoment(
         places = placesVisited,
         isHero = true,
         capturedOnWatch = sortedNotes.isNotEmpty() && sortedNotes.all { it.capturedOnWatch },
+        capturedDuring = sortedNotes.map { it.capturedDuring }.distinct().singleOrNull(),
     )
 }
 

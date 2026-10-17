@@ -1,5 +1,6 @@
 package app.logdate.feature.journals.ui.detail
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.PhotoPresentation
@@ -27,6 +28,23 @@ class EntryDisplayMappingTest {
 
         assertFalse(fromPhone.toEntryDisplayData().capturedOnWatch)
         assertFalse(unrecorded.toEntryDisplayData().capturedOnWatch)
+    }
+
+    @Test
+    fun `what the person was doing reaches the entry`() {
+        val video =
+            JournalNote.Video(
+                creationTimestamp = at,
+                lastUpdated = at,
+                mediaRef = "clip.mp4",
+                capturedDuring = CaptureActivity.IN_VEHICLE,
+            )
+
+        assertEquals(CaptureActivity.IN_VEHICLE, video.toEntryDisplayData().capturedDuring)
+        assertEquals(
+            null,
+            JournalNote.Text(creationTimestamp = at, lastUpdated = at, content = "Older").toEntryDisplayData().capturedDuring,
+        )
     }
 
     @Test

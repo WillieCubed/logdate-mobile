@@ -35,7 +35,7 @@
 | Server | `server/.../logdate/LogDateCollectionsRepository.kt`, `LogDateCollectionRecords.kt`, `routes/sync/SyncCollectionRoutes.kt`, `routes/sync/SyncHelpers.kt`, `openapi/schemadocs/SyncSchemaDocs.kt` |
 | Archives | `client/domain/.../export/{ExportModels,ExportUserDataUseCase}.kt`, `export/archive/{ArchiveData,ArchiveRecords,ArchiveSchemas}.kt`, `restore/{RestoreNoteDecoder,V2RestoreBundle}.kt` |
 | Stamping | `app/wear/.../recording/AudioMomentSaver.kt`, `capture/QuickNoteWriter.kt`, `presentation/quicktext/QuickTextHandler.kt`, `presentation/mood/MoodCheckInViewModel.kt`, `v2/mark/MarkMomentUseCase.kt`, `client/feature/editor/.../mapper/NoteMappers.kt`, `client/domain/.../moments/MarkedMomentEditorContext.kt` |
-| Display | `client/ui/.../provenance/CapturedOnWatch.kt`, `client/feature/core/.../main/HomeTimelineMapping.kt`, `client/feature/timeline/.../TimelineViewModel.kt`, `client/ui/.../timeline/HomeTimelineUiState.kt`, the journal detail cards, `client/feature/rewind/.../RewindPanelUiState.kt`, `client/screenshot-scenes/.../ProvenanceScreenshotScenes.kt` |
+| Display | `client/ui/.../provenance/CapturedOnWatch.kt`, `client/feature/core/.../main/HomeTimelineMapping.kt`, `client/feature/timeline/.../TimelineViewModel.kt`, `client/ui/.../timeline/HomeTimelineUiState.kt`, the journal detail cards, `client/screenshot-scenes/.../ProvenanceScreenshotScenes.kt` |
 
 ---
 
@@ -121,8 +121,8 @@ A moment started from Home's activity suggestion or the watch's Today card is st
 
 **Files:** as listed under Display.
 
-- [ ] **Step 1: Write the failing UI tests**: a note captured while moving shows "While moving" beside its time in the timeline, the journal detail and Rewind; a note with no activity shows nothing new; nothing shows while the flag is off.
-- [ ] **Step 2: Run and confirm failure.** `./gradlew :client:feature:timeline:desktopTest :client:feature:journal:desktopTest :client:feature:rewind:desktopTest`
+- [ ] **Step 1: Write the failing UI tests**: a note captured while moving shows "While moving" beside its time in the timeline's day detail and the journal detail, and a Home moment whose notes share an activity shows it after its label; a note with no activity shows nothing new; nothing shows while the flag is off. Rewind shows the same surfaces as the watch glyph, which it does not carry: its panels come from stored Rewind content, not from the notes.
+- [ ] **Step 2: Run and confirm failure.** `./gradlew :client:ui:desktopTest :client:feature:timeline:desktopTest :client:feature:journal:desktopTest :client:feature:core:desktopTest`
 - [ ] **Step 3: Implement.** Extend `CaptureTimeLabel` with an optional activity, add `LocalActivityContextVisible` provided from `LogDateNavDisplay` beside `LocalWatchProvenanceVisible`, and carry `capturedDuring` through the UI state mappers. Add the strings `captured_while_moving` ("While moving") and `captured_in_vehicle` ("In a vehicle") to `client/ui` resources.
 - [ ] **Step 4: Extend `ProvenanceScreenshotScenes`** with a moment captured while moving. Inspect the renders at phone, tablet, dark, RTL and 200% text, and have CI record the references (`render-host.txt`).
 - [ ] **Step 5: Commit** `feat(timeline): Show what you were doing when you captured a moment`, behind the flag.

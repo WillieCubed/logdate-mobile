@@ -17,11 +17,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.ui.glyphs.LogDateGlyph
 import app.logdate.ui.glyphs.vector
 import app.logdate.ui.theme.Spacing
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.captured_on_watch
+import logdate.client.ui.generated.resources.captured_time_with_activity
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -48,18 +50,23 @@ fun CapturedOnWatchGlyph(modifier: Modifier = Modifier) {
 }
 
 /**
- * A moment's time as the line above its card shows it, followed by the watch glyph when the moment was
- * captured on the watch. Without the glyph it is exactly the line the cards showed before.
+ * A moment's time as the line above its card shows it, then what the person was doing ("While moving")
+ * and the watch glyph when the moment was captured on the watch. Without either it is exactly the line
+ * the cards showed before.
  */
 @Composable
 fun CaptureTimeLabel(
     text: String,
     capturedOnWatch: Boolean,
     modifier: Modifier = Modifier,
+    capturedDuring: CaptureActivity? = null,
 ) {
+    val label =
+        captureActivityText(capturedDuring)?.let { activity -> stringResource(Res.string.captured_time_with_activity, text, activity) }
+            ?: text
     if (!showsWatchProvenance(capturedOnWatch)) {
         Text(
-            text = text,
+            text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = modifier.padding(bottom = 4.dp),
@@ -72,7 +79,7 @@ fun CaptureTimeLabel(
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         Text(
-            text = text,
+            text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
