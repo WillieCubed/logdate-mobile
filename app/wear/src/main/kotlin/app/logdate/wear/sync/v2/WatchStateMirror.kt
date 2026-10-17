@@ -79,12 +79,20 @@ class WatchStateMirror(
         if (sourceNodeId == localNodeId || !acceptsPhone()) return
         val document = peerStates.accept(sourceNodeId, decoded, PeerRole.PHONE) ?: return
         val phoneState = merger.merge(phone = document, watch = null).phone
+        if (phoneState != null) followActivityAwareness(phoneState.flags[FeatureFlag.ACTIVITY_AWARENESS.key] == true)
         val enabled = phoneState?.flags?.get(FeatureFlag.WATCH_EXPERIENCE_V2.key) ?: return
         if (featureFlags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) != enabled) {
             featureFlags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled)
             Napier.i("The redesigned watch app is now ${if (enabled) "on" else "off"}, as set in Labs on the phone")
         }
         adoptPhonePreferences(sourceNodeId, document)
+    }
+
+    /** Activity awareness is listed only while it is on, so a phone without it, old or new, turns it off. */
+    private suspend fun followActivityAwareness(enabled: Boolean) {
+        if (featureFlags.isEnabled(FeatureFlag.ACTIVITY_AWARENESS) == enabled) return
+        featureFlags.setEnabled(FeatureFlag.ACTIVITY_AWARENESS, enabled)
+        Napier.i("Activity awareness is now ${if (enabled) "on" else "off"}, as set in Labs on the phone")
     }
 
     private suspend fun publish(publication: Publication) {

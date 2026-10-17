@@ -173,6 +173,23 @@ class WatchStateMirrorTest {
         }
 
     @Test
+    fun `activity awareness follows the phone and is off when the phone does not list it`() =
+        runTest {
+            val aware =
+                StateDocument(
+                    role = PeerRole.PHONE,
+                    writtenAt = 1,
+                    phone = PhoneState(flags = mapOf(FLAG_KEY to true, FeatureFlag.ACTIVITY_AWARENESS.key to true)),
+                )
+
+            mirror.onPhoneDocument(PHONE_NODE, WATCH_NODE, Decoded.Supported(aware))
+            mirror.onPhoneDocument(PHONE_NODE, WATCH_NODE, Decoded.Supported(phoneDocument(switchOn = true)))
+
+            assertEquals(listOf(true, false), flags.activityWrites)
+            assertEquals(listOf(true), flags.writes)
+        }
+
+    @Test
     fun `a document from this watch's own node changes nothing`() =
         runTest {
             mirror.onPhoneDocument(WATCH_NODE, WATCH_NODE, Decoded.Supported(phoneDocument(switchOn = true)))
@@ -272,16 +289,24 @@ class WatchStateMirrorTest {
     private fun phoneDocument(switchOn: Boolean) =
         StateDocument(role = PeerRole.PHONE, writtenAt = 1, phone = PhoneState(flags = mapOf(FLAG_KEY to switchOn)))
 
+    /** [value] and [writes] are the redesigned watch app's switch; [activity] and [activityWrites] are activity awareness. */
     private class InMemoryFlags : FeatureFlagStore {
         val value = MutableStateFlow(false)
         val writes = mutableListOf<Boolean>()
+        val activity = MutableStateFlow(false)
+        val activityWrites = mutableListOf<Boolean>()
 
-        override fun observe(flag: FeatureFlag): Flow<Boolean> = value
+        override fun observe(flag: FeatureFlag): Flow<Boolean> = if (flag == FeatureFlag.ACTIVITY_AWARENESS) activity else value
 
         override suspend fun setEnabled(
             flag: FeatureFlag,
             enabled: Boolean,
         ) {
+            if (flag == FeatureFlag.ACTIVITY_AWARENESS) {
+                activityWrites += enabled
+                activity.value = enabled
+                return
+            }
             writes += enabled
             value.value = enabled
         }
