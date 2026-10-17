@@ -14,7 +14,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.sql.DataSource
 
-/** Session locks cover repo writes as well as merge state, across server instances. */
+/** Account locks cover repo writes as well as merge state, across server instances. */
 class PostgreSQLJournalMergeStore(
     dataSource: DataSource? = null,
 ) : JournalMergeStore {
@@ -34,21 +34,18 @@ class PostgreSQLJournalMergeStore(
             activeAccounts.withPermit {
                 withContext(Dispatchers.IO) {
                     source.connection.use { connection ->
-                        connection.autoCommit = true
+                        // A transaction-pooling proxy may run separate autocommit statements on different
+                        // backends, stranding a session lock. An open transaction keeps one backend.
+                        connection.autoCommit = false
                         val lockKey = userId.mostSignificantBits xor userId.leastSignificantBits
-                        connection.prepareStatement("SELECT pg_advisory_lock(?)").use { statement ->
+                        connection.prepareStatement("SELECT pg_advisory_xact_lock(?)").use { statement ->
                             statement.setLong(1, lockKey)
                             statement.execute()
                         }
                         try {
                             action()
                         } finally {
-                            withContext(NonCancellable + Dispatchers.IO) {
-                                connection.prepareStatement("SELECT pg_advisory_unlock(?)").use { statement ->
-                                    statement.setLong(1, lockKey)
-                                    statement.execute()
-                                }
-                            }
+                            withContext(NonCancellable + Dispatchers.IO) { connection.rollback() }
                         }
                     }
                 }
