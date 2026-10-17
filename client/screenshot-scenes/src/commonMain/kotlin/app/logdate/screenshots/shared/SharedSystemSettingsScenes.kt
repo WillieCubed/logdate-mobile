@@ -318,9 +318,16 @@ internal val systemSettingsScenes: List<SharedScreenshotSceneSpec> =
         },
         sharedScene(SharedScreenshotSceneId.LabsSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
             LabsSettingsContent(
-                uiState = LabsUiState.Ready(listOf(LabsFlag(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = true))),
+                uiState =
+                    LabsUiState.Ready(
+                        listOf(
+                            LabsFlag(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = true),
+                            LabsFlag(FeatureFlag.ACTIVITY_AWARENESS, enabled = true),
+                        ),
+                    ),
                 onBack = {},
                 onSetEnabled = { _, _ -> },
+                activityAllowed = false,
             )
         },
         sharedScene(SharedScreenshotSceneId.EventsSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
