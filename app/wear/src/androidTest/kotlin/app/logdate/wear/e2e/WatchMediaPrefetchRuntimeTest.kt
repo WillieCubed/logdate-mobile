@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import org.koin.java.KoinJavaComponent
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @RunWith(AndroidJUnit4::class)
@@ -27,21 +28,24 @@ class WatchMediaPrefetchRuntimeTest {
     private val koin = KoinJavaComponent.getKoin()
 
     @After fun cancelTestWork() {
-        manager.cancelUniqueWork(WatchMediaPrefetchWorker.UNIQUE_WORK_NAME).result.get()
+        PREFETCH_WORK.forEach { manager.cancelUniqueWork(it).result.get() }
     }
 
-    @Test fun workIsUniqueAndRequiresChargingAndUnmeteredNetwork() =
+    @Test fun wifiAndChargingDownloadsAreEachScheduledOnce() =
         runBlocking {
             val scheduler = WatchMediaPrefetchScheduler(manager, kotlinx.coroutines.flow.flowOf(false))
             scheduler.setEnabled(true).result.get()
             scheduler.setEnabled(true).result.get()
-            val waiting = manager.getWorkInfosForUniqueWork(WatchMediaPrefetchWorker.UNIQUE_WORK_NAME).get().filter { !it.state.isFinished }
-            assertEquals(1, waiting.size)
-            assertTrue(waiting.single().constraints.requiresCharging())
-            assertEquals(NetworkType.UNMETERED, waiting.single().constraints.requiredNetworkType)
-            assertEquals(TimeUnit.HOURS.toMillis(1), waiting.single().periodicityInfo?.repeatIntervalMillis)
+            val wifi = waiting(WatchMediaPrefetchScheduler.WIFI_WORK).single()
+            assertFalse(wifi.constraints.requiresCharging())
+            assertEquals(NetworkType.UNMETERED, wifi.constraints.requiredNetworkType)
+            assertEquals(TimeUnit.HOURS.toMillis(1), wifi.periodicityInfo?.repeatIntervalMillis)
+            val charging = waiting(WatchMediaPrefetchScheduler.CHARGING_WORK).single()
+            assertTrue(charging.constraints.requiresCharging())
+            assertEquals(NetworkType.CONNECTED, charging.constraints.requiredNetworkType)
+            assertEquals(TimeUnit.HOURS.toMillis(1), charging.periodicityInfo?.repeatIntervalMillis)
             scheduler.setEnabled(false).result.get()
-            assertTrue(manager.getWorkInfosForUniqueWork(WatchMediaPrefetchWorker.UNIQUE_WORK_NAME).get().all { it.state.isFinished })
+            assertTrue(PREFETCH_WORK.all { waiting(it).isEmpty() })
         }
 
     @Test fun installedWorkerCompletesWithoutFetchingWhenRedesignIsDisabled() =
@@ -64,19 +68,15 @@ class WatchMediaPrefetchRuntimeTest {
             try {
                 koin.get<WatchMediaPrefetchScheduler>()
                 flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, true)
-                waitUntil {
-                    manager
-                        .getWorkInfosForUniqueWork(
-                            WatchMediaPrefetchWorker.UNIQUE_WORK_NAME,
-                        ).get()
-                        .any { !it.state.isFinished }
-                }
+                waitUntil { PREFETCH_WORK.any { waiting(it).isNotEmpty() } }
                 flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, false)
-                waitUntil { manager.getWorkInfosForUniqueWork(WatchMediaPrefetchWorker.UNIQUE_WORK_NAME).get().all { it.state.isFinished } }
+                waitUntil { PREFETCH_WORK.all { waiting(it).isEmpty() } }
             } finally {
                 flags.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, previous)
             }
         }
+
+    private fun waiting(name: String) = manager.getWorkInfosForUniqueWork(name).get().filter { !it.state.isFinished }
 
     private fun waitUntil(predicate: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
@@ -84,5 +84,9 @@ class WatchMediaPrefetchRuntimeTest {
             check(System.nanoTime() < deadline) { "Prefetch scheduling did not follow the persisted flag" }
             Thread.sleep(50)
         }
+    }
+
+    private companion object {
+        val PREFETCH_WORK = listOf(WatchMediaPrefetchScheduler.WIFI_WORK, WatchMediaPrefetchScheduler.CHARGING_WORK)
     }
 }

@@ -91,8 +91,9 @@ class ChannelDataSourceRuntimeTest {
 
     @Test fun media3HonorsEndOfResourceAndPositionErrors() {
         val source = source()
+        // A range past the end reports the bytes the recording has, so the end reads as the end of the audio.
         assertEquals(
-            20L,
+            2L,
             source.open(
                 DataSpec
                     .Builder()
