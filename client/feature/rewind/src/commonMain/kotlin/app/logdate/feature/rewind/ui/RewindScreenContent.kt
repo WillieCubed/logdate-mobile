@@ -125,8 +125,23 @@ fun RewindScreenContent(
 ) {
     // Combine current and past rewinds into a single list, always showing at least current week placeholder
     val generationFailedMessage = stringResource(Res.string.rewind_generation_failed)
+    val generatingMessage = stringResource(Res.string.rewind_current_week_generating)
+    val emptyWeekMessage = stringResource(Res.string.rewind_current_week_empty)
+    val currentWeekLabel = stringResource(Res.string.rewind_current_week_label)
+    val currentWeekTitle = stringResource(Res.string.rewind_current_week_title)
+    val loadingMessage = stringResource(Res.string.rewind_loading_message)
+    val loadingTitle = stringResource(Res.string.rewind_loading_title)
     val rewindItems =
-        remember(state, generationFailedMessage) {
+        remember(
+            state,
+            generationFailedMessage,
+            generatingMessage,
+            emptyWeekMessage,
+            currentWeekLabel,
+            currentWeekTitle,
+            loadingMessage,
+            loadingTitle,
+        ) {
             when (state) {
                 is RewindOverviewScreenUiState.Ready -> {
                     listOf(state.mostRecentRewind) + state.pastRewinds.map { it.toPreview() }
@@ -137,15 +152,15 @@ fun RewindScreenContent(
                         RewindPreviewUiState(
                             message =
                                 if (state.isGeneratingRewind) {
-                                    "Putting your week together..."
+                                    generatingMessage
                                 } else if (state.generationFailed) {
                                     generationFailedMessage
                                 } else {
-                                    "No entries from last week yet."
+                                    emptyWeekMessage
                                 },
                             rewindId = Uuid.random(),
-                            label = "This Week",
-                            title = "This week's story",
+                            label = currentWeekLabel,
+                            title = currentWeekTitle,
                             start = weekStart,
                             end = weekEnd,
                             rewindAvailable = false,
@@ -157,10 +172,10 @@ fun RewindScreenContent(
                     val (weekStart, weekEnd) = lastWeekBounds()
                     listOf(
                         RewindPreviewUiState(
-                            message = "Loading your rewinds...",
+                            message = loadingMessage,
                             rewindId = Uuid.random(),
-                            label = "This Week",
-                            title = "Your stories",
+                            label = currentWeekLabel,
+                            title = loadingTitle,
                             start = weekStart,
                             end = weekEnd,
                             rewindAvailable = false,
@@ -210,7 +225,13 @@ fun RewindScreenContent(
                 )
                 if (state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && onRetryRewind != null) {
                     Button(onClick = onRetryRewind, modifier = Modifier.padding(Spacing.lg)) {
-                        Text(if (state.generationFailed) "Try Rewind again" else "Create this week's Rewind")
+                        Text(
+                            if (state.generationFailed) {
+                                stringResource(Res.string.rewind_retry_generation)
+                            } else {
+                                stringResource(Res.string.rewind_create_this_week)
+                            },
+                        )
                     }
                 }
             }
@@ -221,7 +242,7 @@ fun RewindScreenContent(
         topBar = {
             // Use our new collapsing app bar component
             CollapsingRewindAppBar(
-                title = "Rewind",
+                title = stringResource(Res.string.rewind_title),
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -233,7 +254,13 @@ fun RewindScreenContent(
                     onClick = onRetryRewind,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
                 ) {
-                    Text(if (state.generationFailed) "Try Rewind again" else "Create this week's Rewind")
+                    Text(
+                        if (state.generationFailed) {
+                            stringResource(Res.string.rewind_retry_generation)
+                        } else {
+                            stringResource(Res.string.rewind_create_this_week)
+                        },
+                    )
                 }
             }
         },

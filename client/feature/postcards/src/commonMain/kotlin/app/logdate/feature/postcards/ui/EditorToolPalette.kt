@@ -32,6 +32,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.focusableWithRing
+import logdate.client.feature.postcards.generated.resources.Res
+import logdate.client.feature.postcards.generated.resources.postcards_tool_ink
+import logdate.client.feature.postcards.generated.resources.postcards_tool_select
+import logdate.client.feature.postcards.generated.resources.postcards_tool_shape
+import logdate.client.feature.postcards.generated.resources.postcards_tool_sticker
+import logdate.client.feature.postcards.generated.resources.postcards_tool_text
+import org.jetbrains.compose.resources.stringResource
 
 private const val TOOL_SURFACE_ALPHA = 0.92f
 private const val TOOL_RAIL_WIDTH = 64
@@ -153,13 +160,14 @@ internal val CanvasTool.icon: ImageVector
         }
 
 internal val CanvasTool.label: String
+    @Composable
     get() =
         when (this) {
-            CanvasTool.SELECT -> "Select"
-            CanvasTool.INK -> "Ink"
-            CanvasTool.SHAPE -> "Shape"
-            CanvasTool.TEXT -> "Text"
-            CanvasTool.STICKER -> "Sticker"
+            CanvasTool.SELECT -> stringResource(Res.string.postcards_tool_select)
+            CanvasTool.INK -> stringResource(Res.string.postcards_tool_ink)
+            CanvasTool.SHAPE -> stringResource(Res.string.postcards_tool_shape)
+            CanvasTool.TEXT -> stringResource(Res.string.postcards_tool_text)
+            CanvasTool.STICKER -> stringResource(Res.string.postcards_tool_sticker)
         }
 
 internal val CanvasTool.shortcut: String

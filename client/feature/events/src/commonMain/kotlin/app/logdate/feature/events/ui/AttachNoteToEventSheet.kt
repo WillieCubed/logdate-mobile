@@ -27,6 +27,7 @@ import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.event_attach_capture_empty
 import logdate.client.feature.events.generated.resources.event_attach_capture_title
 import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
@@ -99,7 +100,7 @@ private fun AttachNoteList(
 ) {
     if (attachableNotes.isEmpty()) {
         Text(
-            text = "Nothing nearby in time. Captures from a day before or after the event show up here.",
+            text = stringResource(Res.string.event_attach_capture_empty),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(Spacing.lg),

@@ -23,6 +23,9 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.write_something_placeholder
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * A wrapper container for a note editor
@@ -80,7 +83,7 @@ internal fun TextNoteEditor(
     ) {
         if (textFieldState.text.isEmpty()) {
             Text(
-                "Write something…",
+                stringResource(Res.string.write_something_placeholder),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.offset(x = 16.dp, y = 16.dp),
             )

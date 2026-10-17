@@ -42,6 +42,9 @@ import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.audio_output
+import logdate.client.feature.editor.generated.resources.play_from_this_phrase
 import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -289,7 +292,7 @@ private fun ExpandedAudioContent(
                                         .semantics { selected = active }
                                         .clickable(
                                             enabled = block.duration > 0,
-                                            onClickLabel = "Play from this phrase",
+                                            onClickLabel = stringResource(Res.string.play_from_this_phrase),
                                         ) { onSeekTimestampClicked(utterance.startMs) },
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
@@ -306,7 +309,7 @@ private fun ExpandedAudioContent(
         }
         if (hasOutputChoice) {
             Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                MediaDeviceSelector(outputSelection, onOutputDeviceSelected, label = "Audio output")
+                MediaDeviceSelector(outputSelection, onOutputDeviceSelected, label = stringResource(Res.string.audio_output))
             }
         }
         Box(Modifier.padding(12.dp)) {

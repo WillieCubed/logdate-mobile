@@ -44,6 +44,7 @@ import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.journal_also_in
 import logdate.client.feature.journal.generated.resources.journal_empty_hint
 import logdate.client.feature.journal.generated.resources.no_entries_in_this_journal_yet
 import logdate.client.feature.journal.generated.resources.sort_newest_first
@@ -320,7 +321,7 @@ private fun JournalMembershipBadges(
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         Text(
-            text = "Also in",
+            text = stringResource(Res.string.journal_also_in),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.align(Alignment.CenterVertically),

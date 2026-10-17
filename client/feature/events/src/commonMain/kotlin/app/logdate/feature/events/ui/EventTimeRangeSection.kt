@@ -38,6 +38,11 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import logdate.client.feature.events.generated.resources.Res
+import logdate.client.feature.events.generated.resources.event_detail_ends_label
+import logdate.client.feature.events.generated.resources.event_detail_point_in_time
+import logdate.client.feature.events.generated.resources.event_detail_starts_label
+import logdate.client.feature.events.generated.resources.event_detail_when_heading
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_ok
 import org.jetbrains.compose.resources.stringResource
@@ -78,20 +83,20 @@ internal fun EventTimeRangeSection(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             Text(
-                text = "When",
+                text = stringResource(Res.string.event_detail_when_heading),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             DateTimeChipRow(
-                label = "Starts",
+                label = stringResource(Res.string.event_detail_starts_label),
                 instant = startTime,
                 onPick = onStartTimeChange,
             )
 
             if (endTime != null) {
                 DateTimeChipRow(
-                    label = "Ends",
+                    label = stringResource(Res.string.event_detail_ends_label),
                     instant = endTime,
                     onPick = { picked -> onEndTimeChange(picked) },
                 )
@@ -106,7 +111,7 @@ internal fun EventTimeRangeSection(
                     onCheckedChange = onTogglePointInTime,
                 )
                 Text(
-                    text = "Point in time",
+                    text = stringResource(Res.string.event_detail_point_in_time),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

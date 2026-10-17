@@ -21,6 +21,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_backup_description
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_backup_title
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_passkeys_description
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_passkeys_title
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_privacy_description
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_privacy_title
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_sync_description
+import logdate.client.feature.core.generated.resources.cloud_account_benefit_sync_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun CloudAccountWelcomeBenefits(modifier: Modifier = Modifier) {
@@ -30,23 +40,23 @@ internal fun CloudAccountWelcomeBenefits(modifier: Modifier = Modifier) {
     ) {
         FeatureItem(
             icon = Icons.Default.Sync,
-            title = "Sync across devices",
-            description = "Access your journals from any device that uses the same server.",
+            title = stringResource(Res.string.cloud_account_benefit_sync_title),
+            description = stringResource(Res.string.cloud_account_benefit_sync_description),
         )
         FeatureItem(
             icon = Icons.Default.Key,
-            title = "Secure with passkeys",
-            description = "Use your device biometrics or screen lock instead of a password.",
+            title = stringResource(Res.string.cloud_account_benefit_passkeys_title),
+            description = stringResource(Res.string.cloud_account_benefit_passkeys_description),
         )
         FeatureItem(
             icon = Icons.Default.Cloud,
-            title = "Server-based backup",
-            description = "Your selected server can keep your journals available across devices.",
+            title = stringResource(Res.string.cloud_account_benefit_backup_title),
+            description = stringResource(Res.string.cloud_account_benefit_backup_description),
         )
         FeatureItem(
             icon = Icons.Default.Lock,
-            title = "Privacy first",
-            description = "Server policies come from the server you choose.",
+            title = stringResource(Res.string.cloud_account_benefit_privacy_title),
+            description = stringResource(Res.string.cloud_account_benefit_privacy_description),
         )
     }
 }

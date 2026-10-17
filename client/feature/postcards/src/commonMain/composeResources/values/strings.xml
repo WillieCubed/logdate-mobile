@@ -4,6 +4,11 @@
     <string name="postcards_new">New Postcard</string>
     <string name="postcards_clear_selection">Clear selection</string>
     <string name="postcards_delete_selected">Delete selected</string>
+    <string name="postcards_selection_count">%1$d selected</string>
+    <string name="postcards_empty">No Postcards yet</string>
+    <string name="postcards_untitled">Untitled</string>
+    <string name="postcards_menu_open">Open</string>
+    <string name="postcards_menu_select">Select</string>
     <string name="postcards_viewer_load_error">Could not load Postcard</string>
     <string name="postcards_undo">Undo</string>
     <string name="postcards_undo_shortcut">Undo (Ctrl+Z)</string>
@@ -15,6 +20,13 @@
     <string name="postcards_shelf_photos">Photos</string>
     <string name="postcards_shelf_stickers">Stickers</string>
     <string name="postcards_shelf_browse">Browse</string>
+    <string name="postcards_shelf_photos_empty">Your photos will appear here</string>
+    <string name="postcards_shelf_stickers_empty">Extract stickers from photos in your library</string>
+    <string name="postcards_tool_select">Select</string>
+    <string name="postcards_tool_ink">Ink</string>
+    <string name="postcards_tool_shape">Shape</string>
+    <string name="postcards_tool_text">Text</string>
+    <string name="postcards_tool_sticker">Sticker</string>
     <string name="postcards_export_title">Export Postcard</string>
     <string name="postcards_export_and_share">Export &amp; Share</string>
     <string name="postcards_export_rendering">Rendering...</string>

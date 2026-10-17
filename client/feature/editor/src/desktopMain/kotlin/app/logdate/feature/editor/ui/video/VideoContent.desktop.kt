@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_video_to_your_entry
 import logdate.client.feature.editor.generated.resources.choose_from_gallery
+import logdate.client.feature.editor.generated.resources.editor_media_select_a_video_title
 import logdate.client.feature.editor.generated.resources.pause_video
 import logdate.client.feature.editor.generated.resources.play_video
 import org.jetbrains.compose.resources.stringResource
@@ -299,6 +300,7 @@ actual fun VideoPickerContent(
     modifier: Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val fileDialogTitle = stringResource(Res.string.editor_media_select_a_video_title)
 
     Card(
         modifier =
@@ -329,7 +331,7 @@ actual fun VideoPickerContent(
                 OutlinedButton(
                     onClick = {
                         scope.launch {
-                            openVideoDialog { file ->
+                            openVideoDialog(fileDialogTitle) { file ->
                                 file?.let { selected ->
                                     onVideoSelected(
                                         selected.toURI().toString(),
@@ -379,11 +381,14 @@ private fun openVideo(uri: String) {
     }
 }
 
-private fun openVideoDialog(callback: (File?) -> Unit) {
+private fun openVideoDialog(
+    dialogTitle: String,
+    callback: (File?) -> Unit,
+) {
     SwingUtilities.invokeLater {
         val fileDialog =
             FileDialog(Frame()).apply {
-                title = "Select a Video"
+                title = dialogTitle
                 mode = FileDialog.LOAD
                 isMultipleMode = false
                 setFilenameFilter { _, name ->

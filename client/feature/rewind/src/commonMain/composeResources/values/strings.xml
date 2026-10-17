@@ -58,6 +58,15 @@
     <string name="close_rewind">Close rewind</string>
     <string name="rewind_generation_failed">Your Rewind couldn&apos;t be finished. Try again.</string>
     <string name="rewind_detail_load_failed">This Rewind couldn&apos;t be loaded. Try again later.</string>
+    <string name="rewind_title">Rewind</string>
+    <string name="rewind_current_week_generating">Putting your week together...</string>
+    <string name="rewind_current_week_empty">No entries from last week yet.</string>
+    <string name="rewind_current_week_label">This Week</string>
+    <string name="rewind_current_week_title">This week&apos;s story</string>
+    <string name="rewind_loading_message">Loading your rewinds...</string>
+    <string name="rewind_loading_title">Your stories</string>
+    <string name="rewind_retry_generation">Try Rewind again</string>
+    <string name="rewind_create_this_week">Create this week&apos;s Rewind</string>
     <string name="delete_rewind">Delete this Rewind</string>
     <string name="delete_rewind_dialog_title">Delete this Rewind?</string>
     <string name="delete_rewind_dialog_message">The story, the photos and notes pulled into it, and any replies you typed back at it will all be removed from this device. Your original journal entries are not touched.</string>

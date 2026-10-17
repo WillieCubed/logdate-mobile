@@ -43,6 +43,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.pause
+import logdate.client.feature.editor.generated.resources.play
 import logdate.client.feature.editor.generated.resources.skip_back_10_seconds
 import logdate.client.feature.editor.generated.resources.skip_forward_10_seconds
 import org.jetbrains.compose.resources.stringResource
@@ -217,7 +219,7 @@ fun ElevatedAudioCard(
                             ) {
                                 Icon(
                                     painter = if (isPlaying) PlatformIcons.pause() else PlatformIcons.play(),
-                                    contentDescription = if (isPlaying) "Pause" else "Play",
+                                    contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
                                     tint = Color.White,
                                     modifier = Modifier.size(36.dp),
                                 )

@@ -32,6 +32,10 @@ import coil3.compose.AsyncImage
 import logdate.client.feature.events.generated.resources.Res
 import logdate.client.feature.events.generated.resources.cd_event_linked_note_detach
 import logdate.client.feature.events.generated.resources.cd_event_linked_photo
+import logdate.client.feature.events.generated.resources.event_attach_capture_title
+import logdate.client.feature.events.generated.resources.event_detail_attached_heading
+import logdate.client.feature.events.generated.resources.event_detail_attached_heading_count
+import logdate.client.feature.events.generated.resources.event_detail_no_attached_captures
 import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
@@ -61,14 +65,19 @@ internal fun EventLinkedNotesSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(
-            text = if (notes.isEmpty()) "Attached" else "Attached (${notes.size})",
+            text =
+                if (notes.isEmpty()) {
+                    stringResource(Res.string.event_detail_attached_heading)
+                } else {
+                    stringResource(Res.string.event_detail_attached_heading_count, notes.size)
+                },
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (notes.isEmpty()) {
             Text(
-                text = "No captures attached yet.",
+                text = stringResource(Res.string.event_detail_no_attached_captures),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -83,7 +92,7 @@ internal fun EventLinkedNotesSection(
 
         FilledTonalButton(onClick = onAddCapture) {
             Icon(painter = PlatformIcons.add(), contentDescription = null)
-            Text(text = "Attach a capture", modifier = Modifier.padding(start = Spacing.sm))
+            Text(text = stringResource(Res.string.event_attach_capture_title), modifier = Modifier.padding(start = Spacing.sm))
         }
     }
 }

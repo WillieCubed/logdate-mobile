@@ -31,6 +31,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.audio_transcribing
+import logdate.client.ui.generated.resources.playback_pause
+import logdate.client.ui.generated.resources.playback_play
 import logdate.client.ui.generated.resources.search_type_label_voice_note
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Instant
@@ -109,7 +111,12 @@ fun SpatialExpandedAudioBlock(
                     IconButton(onClick = onPlayPause) {
                         Icon(
                             painter = if (isPlaying) PlatformIcons.pause() else PlatformIcons.play(),
-                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            contentDescription =
+                                if (isPlaying) {
+                                    stringResource(Res.string.playback_pause)
+                                } else {
+                                    stringResource(Res.string.playback_play)
+                                },
                             tint = Color(palette.accentColor),
                             modifier = Modifier.size(32.dp),
                         )

@@ -27,6 +27,7 @@ import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.events.generated.resources.Res
 import logdate.client.feature.events.generated.resources.event_detail_choose_place
+import logdate.client.feature.events.generated.resources.event_place_picker_empty
 import logdate.client.feature.events.generated.resources.event_place_picker_no_place
 import logdate.client.ui.generated.resources.common_done
 import org.jetbrains.compose.resources.stringResource
@@ -110,7 +111,7 @@ private fun PlacePickerContent(
 ) {
     if (availablePlaces.isEmpty()) {
         Text(
-            text = "You don't have any saved places yet. Save one from your timeline first.",
+            text = stringResource(Res.string.event_place_picker_empty),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(Spacing.lg),

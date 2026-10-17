@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.theme.WorkspaceSurface
 import app.logdate.ui.theme.workspaceContainer
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.app_name
+import org.jetbrains.compose.resources.stringResource
 
 /** Frames direct links and nested details; a composed Home panel already has a host. */
 @Composable
@@ -41,7 +44,7 @@ fun WorkspaceRouteFrame(
                         if (focusConstraints.maximumWidth != null) {
                             BoxWithConstraints {
                                 WorkspaceAppBar(
-                                    "LogDate",
+                                    stringResource(Res.string.app_name),
                                     onSearch,
                                     Modifier
                                         .padding(start = if (maxWidth >= 600.dp) Spacing.lg else 0.dp)
@@ -49,7 +52,7 @@ fun WorkspaceRouteFrame(
                                 )
                             }
                         } else {
-                            WorkspaceAppBar("LogDate", onSearch)
+                            WorkspaceAppBar(stringResource(Res.string.app_name), onSearch)
                         }
                     }
                     if (composePanels) {

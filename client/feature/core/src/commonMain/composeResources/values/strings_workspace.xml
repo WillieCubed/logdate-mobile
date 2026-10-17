@@ -1,3 +1,4 @@
 <resources>
     <string name="workspace_journaling_streak">Journaling streak</string>
+    <string name="workspace_add_a_memory">Add a memory</string>
 </resources>

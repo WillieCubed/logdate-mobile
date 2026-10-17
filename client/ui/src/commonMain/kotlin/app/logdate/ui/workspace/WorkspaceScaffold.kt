@@ -52,6 +52,7 @@ import app.logdate.ui.theme.WorkspaceSurface
 import app.logdate.ui.theme.workspaceContainer
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.app_name
+import logdate.client.ui.generated.resources.workspace_create_label
 import org.jetbrains.compose.resources.stringResource
 
 data class WorkspaceDestination(
@@ -68,7 +69,7 @@ fun WorkspaceScaffold(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     onCreate: (() -> Unit)? = null,
-    createLabel: String = "Add a memory",
+    createLabel: String = stringResource(Res.string.workspace_create_label),
     createEntryTransition: Boolean = true,
     onSearch: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},

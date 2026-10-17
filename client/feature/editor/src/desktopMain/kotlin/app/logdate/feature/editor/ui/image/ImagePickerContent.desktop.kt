@@ -13,6 +13,9 @@ import app.logdate.client.media.MediaManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.editor_media_select_an_image_title
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import java.awt.FileDialog
 import java.awt.Frame
@@ -29,6 +32,7 @@ actual fun ImagePickerContent(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val mediaManager: MediaManager = koinInject()
+    val fileDialogTitle = stringResource(Res.string.editor_media_select_an_image_title)
 
     var reloadTrigger by remember { mutableIntStateOf(0) }
     var libraryState by remember { mutableStateOf<ImagePickerLibraryState>(ImagePickerLibraryState.Loading) }
@@ -61,7 +65,7 @@ actual fun ImagePickerContent(
         onImageSelected = onImageSelected,
         onBrowseLibrary = {
             coroutineScope.launch {
-                openFileDialog { file ->
+                openFileDialog(fileDialogTitle) { file ->
                     file?.let {
                         val uri = it.toURI().toString()
                         Napier.d("Desktop image selected: $uri")
@@ -75,11 +79,14 @@ actual fun ImagePickerContent(
     )
 }
 
-private fun openFileDialog(callback: (File?) -> Unit) {
+private fun openFileDialog(
+    dialogTitle: String,
+    callback: (File?) -> Unit,
+) {
     SwingUtilities.invokeLater {
         val fileDialog =
             FileDialog(Frame()).apply {
-                title = "Select an Image"
+                title = dialogTitle
                 mode = FileDialog.LOAD
                 isMultipleMode = false
 

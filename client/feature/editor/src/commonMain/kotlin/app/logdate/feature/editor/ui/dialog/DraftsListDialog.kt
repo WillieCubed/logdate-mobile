@@ -41,6 +41,8 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.clear_all
+import logdate.client.feature.editor.generated.resources.draft_item_count
+import logdate.client.feature.editor.generated.resources.empty_draft
 import logdate.client.feature.editor.generated.resources.loading_drafts
 import logdate.client.feature.editor.generated.resources.no_drafts_found
 import logdate.client.feature.editor.generated.resources.photo
@@ -269,7 +271,7 @@ private fun DraftListItemContent(
                     is JournalNote.Video -> stringResource(Res.string.video)
                     is JournalNote.Audio -> stringResource(Res.string.record_audio)
                 }
-            } ?: "Empty draft"
+            } ?: stringResource(Res.string.empty_draft)
 
         Text(
             text = previewText,
@@ -293,7 +295,7 @@ private fun DraftListItemContent(
             if (draft.notes.size > 1) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "• ${draft.notes.size} items",
+                    text = stringResource(Res.string.draft_item_count, draft.notes.size),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

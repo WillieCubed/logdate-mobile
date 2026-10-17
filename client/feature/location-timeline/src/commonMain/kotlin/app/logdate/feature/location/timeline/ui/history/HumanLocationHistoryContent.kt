@@ -71,6 +71,7 @@ import app.logdate.ui.workspace.WorkspaceSectionSwitch
 import app.logdate.ui.workspace.WorkspaceSupportingSheet
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_add_visit
+import logdate.client.feature.location.timeline.generated.resources.history_close_replay
 import logdate.client.feature.location.timeline.generated.resources.history_collapse_map
 import logdate.client.feature.location.timeline.generated.resources.history_details
 import logdate.client.feature.location.timeline.generated.resources.history_empty_day
@@ -80,6 +81,7 @@ import logdate.client.feature.location.timeline.generated.resources.history_hide
 import logdate.client.feature.location.timeline.generated.resources.history_next_day
 import logdate.client.feature.location.timeline.generated.resources.history_next_stop
 import logdate.client.feature.location.timeline.generated.resources.history_pause
+import logdate.client.feature.location.timeline.generated.resources.history_places_count
 import logdate.client.feature.location.timeline.generated.resources.history_play
 import logdate.client.feature.location.timeline.generated.resources.history_previous_day
 import logdate.client.feature.location.timeline.generated.resources.history_previous_stop
@@ -509,7 +511,9 @@ private fun HumanHistoryWorkspace(
             } else {
                 PanelContainment.Collection
             },
-        summary = state.recoveryMessage ?: if (state.tab == HistoryTab.Day) state.dateLabel else "${state.places.size} places",
+        summary =
+            state.recoveryMessage
+                ?: if (state.tab == HistoryTab.Day) state.dateLabel else stringResource(Res.string.history_places_count, state.places.size),
         modifier = modifier.fillMaxSize(),
         header = {
             WorkspaceSectionSwitch(
@@ -547,7 +551,7 @@ private fun HumanHistoryWorkspace(
                                 actions.onReplayPlaying?.invoke(false)
                             },
                             modifier = Modifier.padding(horizontal = Spacing.lg),
-                        ) { Text(if (replayVisible) "Close replay" else "Replay your day") }
+                        ) { Text(stringResource(if (replayVisible) Res.string.history_close_replay else Res.string.history_replay)) }
                         if (replayVisible) HistoryReplay(state, actions)
                     }
             }

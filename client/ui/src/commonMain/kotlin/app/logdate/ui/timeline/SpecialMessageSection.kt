@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.common_close
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The UI state for [SpecialMessageSection]
@@ -115,7 +118,7 @@ internal fun SpecialMessagePreviewCarousel(
         ) {
             Icon(
                 Icons.Default.Close,
-                "Close",
+                stringResource(Res.string.common_close),
             )
         }
     }

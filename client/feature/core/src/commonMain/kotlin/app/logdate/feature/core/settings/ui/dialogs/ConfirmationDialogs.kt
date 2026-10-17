@@ -29,6 +29,9 @@ import logdate.client.feature.core.generated.resources.account_data_clear_dialog
 import logdate.client.feature.core.generated.resources.action_reset_app
 import logdate.client.feature.core.generated.resources.clear_data_acknowledgement
 import logdate.client.feature.core.generated.resources.clear_data_warning_message
+import logdate.client.feature.core.generated.resources.reset_entire_app_acknowledgement
+import logdate.client.feature.core.generated.resources.reset_entire_app_dialog_message
+import logdate.client.feature.core.generated.resources.reset_entire_app_dialog_title
 import logdate.client.feature.core.generated.resources.yes_clear_all_data
 import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
@@ -50,15 +53,11 @@ fun ResetAppConfirmationDialog(
     DangerConfirmationDialog(
         onDismissRequest = onDismissRequest,
         onConfirmation = onConfirmation,
-        title = "Reset Entire App?",
-        message =
-            "This action cannot be undone.\n\n" +
-                "This will permanently delete all your journals, entries, photos, " +
-                "settings, and account data on this device.\n\n" +
-                "Before continuing, export and verify a backup from Data & Storage.",
+        title = stringResource(Res.string.reset_entire_app_dialog_title),
+        message = stringResource(Res.string.reset_entire_app_dialog_message),
         confirmButtonText = stringResource(Res.string.action_reset_app),
         icon = Icons.Default.WarningAmber,
-        acknowledgementLabel = "I understand that resetting may permanently remove encrypted local data.",
+        acknowledgementLabel = stringResource(Res.string.reset_entire_app_acknowledgement),
     )
 }
 

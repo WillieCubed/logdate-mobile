@@ -48,11 +48,15 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.timeline.generated.resources.*
 import logdate.client.feature.timeline.generated.resources.Res
+import logdate.client.feature.timeline.generated.resources.no_notes_from_today
 import logdate.client.feature.timeline.generated.resources.period_last_week
 import logdate.client.feature.timeline.generated.resources.period_months_ago
 import logdate.client.feature.timeline.generated.resources.period_this_week
 import logdate.client.feature.timeline.generated.resources.period_weeks_ago
 import logdate.client.feature.timeline.generated.resources.period_years_ago
+import logdate.client.feature.timeline.generated.resources.tap_to_view_content
+import logdate.client.feature.timeline.generated.resources.timeline_today
+import logdate.client.feature.timeline.generated.resources.timeline_yesterday
 import logdate.client.ui.generated.resources.common_delete
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -341,7 +345,7 @@ private fun TimelineContentItem(
                 else -> {
                     // Audio and image notes only appear in detail view
                     Text(
-                        "Tap to view ${item.type.name.lowercase()} content",
+                        stringResource(Res.string.tap_to_view_content, item.type.name.lowercase()),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -383,17 +387,18 @@ private fun determineHeaderTitle(date: Instant): String {
     }
 }
 
+@Composable
 private fun determineTitle(date: Instant): String {
     val localDateTime = date.toLocalDateTime(TimeZone.currentSystemDefault())
     val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
     return when (localDateTime.date) {
         // If the date is today, show "Today"
         today.date -> {
-            "Today"
+            stringResource(Res.string.timeline_today)
         }
         // If the date is yesterday, show "Yesterday"
         today.date.minus(DatePeriod(days = 1)) -> {
-            "Yesterday"
+            stringResource(Res.string.timeline_yesterday)
         }
         // If the date is within the last calendar week, show the day of the week
         in today.date.minus(DatePeriod(days = 7))..today.date -> {
@@ -453,7 +458,7 @@ fun LazyListScope.constructTimeline(
             item {
                 DefaultNewEntryBlock(
                     onNewEntry = onNewEntry,
-                    message = "No notes from today yet!",
+                    message = stringResource(Res.string.no_notes_from_today),
                 )
             }
         }
@@ -485,10 +490,10 @@ fun LazyListScope.constructTimeline(
 fun PinchableContainer(
     defaultContent: @Composable () -> Unit,
     expandedContent: @Composable () -> Unit,
-    label: String = "Pinchable Container",
+    animationLabel: String = "Pinchable Container",
 ) {
     var expanded by remember { mutableStateOf(false) }
-    AnimatedContent(targetState = expanded, label = label) { isExpanded ->
+    AnimatedContent(targetState = expanded, label = animationLabel) { isExpanded ->
         if (isExpanded) {
             expandedContent()
         } else {

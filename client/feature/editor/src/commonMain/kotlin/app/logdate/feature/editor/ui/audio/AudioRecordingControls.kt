@@ -34,10 +34,15 @@ import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberLogDateHaptics
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.microphone
+import logdate.client.feature.editor.generated.resources.ready_to_record
 import logdate.client.feature.editor.generated.resources.record
+import logdate.client.feature.editor.generated.resources.recording_in_progress
+import logdate.client.feature.editor.generated.resources.recording_starting
 import logdate.client.feature.editor.generated.resources.start_recording
 import logdate.client.feature.editor.generated.resources.stop
 import logdate.client.feature.editor.generated.resources.stop_recording
+import logdate.client.feature.editor.generated.resources.tap_record_to_begin
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 
@@ -226,12 +231,12 @@ private fun RecordingStateRow(
         Text(
             text =
                 when {
-                    recordingState == RecordingState.RECORDING -> "Recording in progress"
+                    recordingState == RecordingState.RECORDING -> stringResource(Res.string.recording_in_progress)
                     // The tap was accepted and the button is disabled, but without this the
                     // wait for the platform to confirm the recorder is running looked
                     // identical to nothing having happened at all.
-                    isStarting -> "Starting…"
-                    else -> "Ready to record"
+                    isStarting -> stringResource(Res.string.recording_starting)
+                    else -> stringResource(Res.string.ready_to_record)
                 },
             style = MaterialTheme.typography.titleMedium,
             color =
@@ -273,7 +278,7 @@ private fun RecordingInputSelector(
         MediaDeviceSelector(
             selection = selection,
             onDeviceSelected = onInputSelected,
-            label = "Microphone",
+            label = stringResource(Res.string.microphone),
             enabled = enabled,
             modifier = modifier.fillMaxWidth(),
         )
@@ -312,7 +317,7 @@ private fun RecordingWaveformBox(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 )
                 Text(
-                    text = "Tap record to begin",
+                    text = stringResource(Res.string.tap_record_to_begin),
                     style = MaterialTheme.typography.bodyMedium,
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),

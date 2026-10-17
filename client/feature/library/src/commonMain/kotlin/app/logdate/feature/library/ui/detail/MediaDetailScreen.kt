@@ -104,8 +104,29 @@ import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.cd_back_to_library
 import logdate.client.feature.library.generated.resources.cd_library_photo_full
+import logdate.client.feature.library.generated.resources.cd_pause_audio
+import logdate.client.feature.library.generated.resources.cd_play_audio
+import logdate.client.feature.library.generated.resources.cd_present
+import logdate.client.feature.library.generated.resources.cd_share_memory
+import logdate.client.feature.library.generated.resources.cd_stop_presenting
+import logdate.client.feature.library.generated.resources.cd_view_full_screen
+import logdate.client.feature.library.generated.resources.library_appears_in
+import logdate.client.feature.library.generated.resources.library_audio_output
 import logdate.client.feature.library.generated.resources.library_audio_recording
+import logdate.client.feature.library.generated.resources.library_details_title
+import logdate.client.feature.library.generated.resources.library_external_display_audio
+import logdate.client.feature.library.generated.resources.library_managed_by_android
+import logdate.client.feature.library.generated.resources.library_memory_details
+import logdate.client.feature.library.generated.resources.library_memory_title
+import logdate.client.feature.library.generated.resources.library_metadata_camera
+import logdate.client.feature.library.generated.resources.library_metadata_captured
+import logdate.client.feature.library.generated.resources.library_metadata_location
+import logdate.client.feature.library.generated.resources.library_metadata_type
+import logdate.client.feature.library.generated.resources.library_metadata_type_photo
+import logdate.client.feature.library.generated.resources.library_metadata_type_video
+import logdate.client.feature.library.generated.resources.library_recording_playback_title
 import logdate.client.feature.library.generated.resources.library_stop_presenting
 import logdate.client.ui.generated.resources.common_back
 import logdate.client.ui.generated.resources.common_go_back
@@ -141,6 +162,7 @@ fun MediaDetailScreen(
     val audioPlaybackManager: AudioPlaybackManager = koinInject()
     var audioProgress by remember { mutableFloatStateOf(0f) }
     var playingAudioUri by remember { mutableStateOf<String?>(null) }
+    val recordingPlaybackTitle = stringResource(Res.string.library_recording_playback_title)
 
     fun toggleAudio(
         uri: String,
@@ -153,7 +175,7 @@ fun MediaDetailScreen(
         } else {
             audioPlaybackManager.startPlayback(
                 uri = uri,
-                metadata = AudioPlaybackMetadata(title = "LogDate recording", noteId = noteId),
+                metadata = AudioPlaybackMetadata(title = recordingPlaybackTitle, noteId = noteId),
                 onProgressUpdated = { audioProgress = it },
                 onPlaybackCompleted = {
                     audioProgress = 0f
@@ -226,7 +248,12 @@ fun MediaDetailContent(
     if (LocalWorkspaceEnabled.current && state !is MediaDetailUiState.ImageContent && state !is MediaDetailUiState.VideoContent) {
         WorkspacePanel(modifier) {
             Column(Modifier.fillMaxSize()) {
-                PanelHeader("Memory", actions = { IconButton(onClick = onBack) { Icon(PlatformIcons.back(), "Back to library") } })
+                PanelHeader(
+                    stringResource(Res.string.library_memory_title),
+                    actions = {
+                        IconButton(onClick = onBack) { Icon(PlatformIcons.back(), stringResource(Res.string.cd_back_to_library)) }
+                    },
+                )
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     when (state) {
                         MediaDetailUiState.Loading -> CircularProgressIndicator()
@@ -404,7 +431,12 @@ private fun AudioMediaDetailContent(
                     } else {
                         PlatformIcons.play()
                     },
-                contentDescription = if (isPlaying) "Pause audio" else "Play audio",
+                contentDescription =
+                    if (isPlaying) {
+                        stringResource(Res.string.cd_pause_audio)
+                    } else {
+                        stringResource(Res.string.cd_play_audio)
+                    },
                 modifier = Modifier.size(32.dp),
             )
         }
@@ -466,14 +498,16 @@ private fun MediaDetailLayout(
         }
         stateHolder.SaveableStateProvider("workspace") {
             WorkspaceSupportingSheet(
-                "Memory details",
+                stringResource(Res.string.library_memory_details),
                 modifier,
                 focus = {
                     Column(Modifier.fillMaxSize()) {
-                        PanelHeader("Memory", actions = {
-                            IconButton(onClick = onBack) { Icon(PlatformIcons.back(), "Back to library") }
-                            IconButton(onClick = onShare) { Icon(PlatformIcons.share(), "Share memory") }
-                            IconButton(onClick = { immersive = true }) { Icon(Icons.Default.Fullscreen, "View full screen") }
+                        PanelHeader(stringResource(Res.string.library_memory_title), actions = {
+                            IconButton(onClick = onBack) { Icon(PlatformIcons.back(), stringResource(Res.string.cd_back_to_library)) }
+                            IconButton(onClick = onShare) { Icon(PlatformIcons.share(), stringResource(Res.string.cd_share_memory)) }
+                            IconButton(onClick = { immersive = true }) {
+                                Icon(Icons.Default.Fullscreen, stringResource(Res.string.cd_view_full_screen))
+                            }
                         })
                         WorkspaceMediaViewer(
                             mediaRef,
@@ -699,7 +733,12 @@ private fun MediaDetailTabletopControls(
                             } else {
                                 Icons.AutoMirrored.Filled.ScreenShare
                             },
-                        contentDescription = if (presenterState.isPresenting) "Stop presenting" else "Present",
+                        contentDescription =
+                            if (presenterState.isPresenting) {
+                                stringResource(Res.string.cd_stop_presenting)
+                            } else {
+                                stringResource(Res.string.cd_present)
+                            },
                     )
                 }
             }
@@ -949,7 +988,11 @@ private fun CompactMediaDetailViewer(
                                         Icons.AutoMirrored.Filled.ScreenShare
                                     },
                                 contentDescription =
-                                    if (presenterState.isPresenting) "Stop presenting" else "Present",
+                                    if (presenterState.isPresenting) {
+                                        stringResource(Res.string.cd_stop_presenting)
+                                    } else {
+                                        stringResource(Res.string.cd_present)
+                                    },
                             )
                         }
                     }
@@ -1033,19 +1076,19 @@ private fun ExternalDisplayAudioRouteControl(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "External display audio",
+            text = stringResource(Res.string.library_external_display_audio),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         MediaDeviceSelector(
             selection = outputSelection,
             onDeviceSelected = onOutputDeviceSelected,
-            label = "Audio output",
+            label = stringResource(Res.string.library_audio_output),
             modifier = Modifier.fillMaxWidth(),
         )
         if (!outputSelection.isSelectionControllable) {
             Text(
-                text = "Managed by Android",
+                text = stringResource(Res.string.library_managed_by_android),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1370,14 +1413,14 @@ private fun MetadataContent(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         Text(
-            text = "Details",
+            text = stringResource(Res.string.library_details_title),
             style = MaterialTheme.typography.titleLarge,
         )
 
         // Date
         MetadataRow(
             icon = { Icon(Icons.Filled.CalendarMonth, contentDescription = null) },
-            label = "Captured",
+            label = stringResource(Res.string.library_metadata_captured),
             value = createdAt.toReadableDateTimeShort(),
         )
 
@@ -1389,15 +1432,20 @@ private fun MetadataContent(
                     contentDescription = null,
                 )
             },
-            label = "Type",
-            value = if (isVideo) "Video" else "Photo",
+            label = stringResource(Res.string.library_metadata_type),
+            value =
+                if (isVideo) {
+                    stringResource(Res.string.library_metadata_type_video)
+                } else {
+                    stringResource(Res.string.library_metadata_type_photo)
+                },
         )
 
         // Location
         locationDisplayName?.let { name ->
             MetadataRow(
                 icon = { Icon(Icons.Filled.LocationOn, contentDescription = null) },
-                label = "Location",
+                label = stringResource(Res.string.library_metadata_location),
                 value = name,
             )
         }
@@ -1419,7 +1467,7 @@ private fun MetadataContent(
             if (cameraName != null || settings.isNotEmpty()) {
                 MetadataRow(
                     icon = { Icon(Icons.Filled.CameraAlt, contentDescription = null) },
-                    label = "Camera",
+                    label = stringResource(Res.string.library_metadata_camera),
                     value = listOfNotNull(cameraName, settings.ifEmpty { null }).joinToString("\n"),
                 )
             }
@@ -1446,7 +1494,7 @@ private fun AppearsInSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(
-            text = "Appears in",
+            text = stringResource(Res.string.library_appears_in),
             style = MaterialTheme.typography.titleMedium,
         )
         journals.forEach { journal ->
