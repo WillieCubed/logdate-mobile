@@ -17,6 +17,7 @@ import app.logdate.client.domain.export.ExportMetadata
 import app.logdate.client.domain.export.ExportNote
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -73,12 +74,18 @@ class ArchiveMediaRecoveryE2ETest {
         runBlocking {
             require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish")
             require(context.packageName.endsWith(".debug"))
+            ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
             val arguments = InstrumentationRegistry.getArguments()
             arguments.getString("archiveRecoveryFixture")?.let {
                 assertFalse(fixture.exists(), "Transferred test IDs must not replace an existing acceptance fixture")
                 fixture.writeText(it)
             }
-            when (arguments.getString("archiveRecoveryMode")) {
+            val mode = arguments.getString("archiveRecoveryMode")
+            org.junit.Assume.assumeTrue(
+                "Archive recovery runs through its multi-process acceptance harness",
+                mode in setOf("seed", "repair", "automatic", "waiting", "verify", "cleanup-rejected-fixture"),
+            )
+            when (mode) {
                 "seed" -> seed()
                 "repair" -> repair()
                 "automatic" -> automaticRepair()

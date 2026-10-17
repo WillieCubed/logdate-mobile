@@ -10,7 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import app.logdate.client.LogdateApplication
+import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.coroutines.flow.first
@@ -19,7 +19,7 @@ import studio.hypertext.logdate.R
 
 /** Attaches a responsive loading surface before resolving any storage-backed dependency. */
 internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
-    val startup = (application as LogdateApplication).startup
+    val startup = ApplicationStartupCoordinator.get(application)
     if (startup.state.value is ApplicationStartupState.Ready) {
         onReady()
         return

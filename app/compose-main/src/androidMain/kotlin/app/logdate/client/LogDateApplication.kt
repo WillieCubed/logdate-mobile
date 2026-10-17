@@ -11,6 +11,7 @@ import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.bubble.RecordingBubbleNotifier
 import app.logdate.client.calendar.CalendarImportScheduler
+import app.logdate.client.data.account.RestoreCredentialLifecycle
 import app.logdate.client.data.notes.NativeMediaQuarantine
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
@@ -55,8 +56,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.setResourceReaderAndroidContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import org.koin.core.context.GlobalContext
+import java.util.WeakHashMap
 
 /**
  * Application class for the LogDate Android app.
@@ -138,118 +143,7 @@ class LogdateApplication :
      * Starts the work that runs alongside the app: notification channels, migrations, and the
      * schedulers. Each part is isolated so one failing to start doesn't stop the others.
      */
-    private fun startBackgroundWork() {
-        startRestoreCredentialCleanup()
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            runCatching { get<IdentityKeyManager>().ensureExistingIdentityBackup() }
-                .onFailure { Napier.w("Native encryption recovery material needs attention", it) }
-        }
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            publishWidgetPreviews(this@LogdateApplication)
-        }
-        isolated("Failed to register notification channels on app startup") {
-            LogDateNotificationRegistrar(this).registerAllPhoneChannels()
-        }
-        isolated("Failed to start the media reference migration") {
-            get<StoredMediaReferenceMigrationLauncher>().start()
-        }
-        isolated("Failed to initialize ambient prompt scheduling") {
-            get<AmbientPromptSchedulingObserver>().start()
-            get<AmbientPromptScheduler>().enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
-        }
-        isolated("Failed to observe reminder signals") {
-            get<ReminderSignalObserver>().start()
-        }
-        isolated("Failed to start location tracking manager on app startup") {
-            get<LocationTrackingManager>().startTracking()
-        }
-        isolated("Failed to initialize rewind generation scheduling") {
-            val rewindScheduler = RewindGenerationScheduler(this)
-            rewindScheduler.schedulePeriodicGeneration()
-            rewindScheduler.disableAnnualGeneration()
-            rewindScheduler.enqueueImmediateCheck()
-        }
-        isolated("Failed to initialize event inference scheduling") {
-            val scheduler = EventInferenceScheduler(this)
-            if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicInference() else scheduler.disableForLaunch()
-        }
-        isolated("Failed to initialize calendar import scheduling") {
-            val scheduler = CalendarImportScheduler(this)
-            if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicImport() else scheduler.disableForLaunch()
-        }
-        isolated("Failed to initialize dynamic shortcut scheduling") {
-            val shortcutScheduler = get<DynamicShortcutScheduler>()
-            shortcutScheduler.schedulePeriodicRefresh()
-            shortcutScheduler.enqueueImmediateRefresh()
-            get<DynamicShortcutRefreshObserver>().start()
-        }
-        isolated("Failed to start syncing flag-gated components") {
-            get<PlatformComponentToggler>().start(get<CoroutineScope>())
-            get<RecordVoiceTileUpdater>().start(get<CoroutineScope>())
-            get<RecordingWindowTracker>().start(this, get<CoroutineScope>())
-            get<RecordingBubbleNotifier>().start(get<CoroutineScope>())
-            // Notification builders read these switches synchronously. Creating them now starts
-            // their flag reads, so the first recording after launch already sees the flags.
-            get<LiveUpdatesSwitch>()
-            get<RecordingBubbleSwitch>()
-        }
-        startPhoneStatePublishing()
-        startActivityAwareness()
-        startWatchLinking()
-        startWatchReceipts()
-        runCatching { get<WatchWindowPublisher>().start(get()) }
-            .onFailure { Napier.w("Failed to start publishing watch libraries", it) }
-    }
-
-    /** Tells watches when their notes are backed up; a failure here must not stop startup. */
-    private fun startWatchReceipts() {
-        runCatching {
-            get<WatchReceiptNotifier>().start(get(), get<SyncMetadataService>().observePendingCount())
-        }.onFailure { error ->
-            Napier.w("Failed to start telling watches which notes are backed up", error)
-        }
-    }
-
-    /** Links this phone's watches while the redesigned watch app is on; a failure here must not stop startup. */
-    private fun startWatchLinking() {
-        runCatching {
-            get<PhoneLinkInitiator>().start(get())
-        }.onFailure { error ->
-            Napier.w("Failed to start linking this phone's watches", error)
-        }
-    }
-
-    /** Follows the phone's activity while activity awareness is on; a failure here must not stop startup. */
-    private fun startActivityAwareness() {
-        runCatching {
-            get<PhoneActivityAwareness>().start(get())
-        }.onFailure { error ->
-            Napier.w("Failed to start following the phone's activity", error)
-        }
-    }
-
-    /** Publishes this phone's Labs watch switch to its watches; a failure here must not stop startup. */
-    private fun startPhoneStatePublishing() {
-        runCatching {
-            get<PhoneStatePublisher>().start(get())
-            get<WatchPresenceRegistration>().start(get())
-        }.onFailure { error ->
-            Napier.w("Failed to start publishing this phone's state to its watches", error)
-        }
-    }
-
-    /** Runs one part of startup, logging [failure] instead of letting it stop the parts after it. */
-    private fun startRestoreCredentialCleanup() =
-        isolated("Failed to start restore credential cleanup reconciliation") {
-            get<app.logdate.client.data.account.RestoreCredentialLifecycle>().start(get<CoroutineScope>())
-        }
-
-    private inline fun isolated(
-        failure: String,
-        start: () -> Unit,
-    ) {
-        runCatching(start).onFailure { error -> Napier.w(failure, error) }
-    }
+    private fun startBackgroundWork() = AndroidApplicationRuntime(this, GlobalContext.get()).start()
 
     /**
      * Surfaces main-thread disk reads / writes, network, slow custom calls, and leaked closables
@@ -285,7 +179,169 @@ class LogdateApplication :
     }
 }
 
+/** Starts the app's device-owned work from either the normal process or backup-agent process. */
+private class AndroidApplicationRuntime(
+    private val application: Application,
+    private val koin: org.koin.core.Koin,
+) {
+    fun start() {
+        isolated("Failed to start restore credential cleanup reconciliation") {
+            resolve<RestoreCredentialLifecycle>().start(resolve<CoroutineScope>())
+        }
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { resolve<IdentityKeyManager>().ensureExistingIdentityBackup() }
+                .onFailure { Napier.w("Native encryption recovery material needs attention", it) }
+        }
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            publishWidgetPreviews(application)
+        }
+        isolated("Failed to register notification channels on app startup") {
+            LogDateNotificationRegistrar(application).registerAllPhoneChannels()
+        }
+        isolated("Failed to start the media reference migration") {
+            resolve<StoredMediaReferenceMigrationLauncher>().start()
+        }
+        isolated("Failed to initialize ambient prompt scheduling") {
+            resolve<AmbientPromptSchedulingObserver>().start()
+            resolve<AmbientPromptScheduler>().enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
+        }
+        isolated("Failed to observe reminder signals") {
+            resolve<ReminderSignalObserver>().start()
+        }
+        isolated("Failed to start location tracking manager on app startup") {
+            resolve<LocationTrackingManager>().startTracking()
+        }
+        isolated("Failed to initialize rewind generation scheduling") {
+            val rewindScheduler = RewindGenerationScheduler(application)
+            rewindScheduler.schedulePeriodicGeneration()
+            rewindScheduler.disableAnnualGeneration()
+            rewindScheduler.enqueueImmediateCheck()
+        }
+        isolated("Failed to initialize event inference scheduling") {
+            val scheduler = EventInferenceScheduler(application)
+            if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicInference() else scheduler.disableForLaunch()
+        }
+        isolated("Failed to initialize calendar import scheduling") {
+            val scheduler = CalendarImportScheduler(application)
+            if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicImport() else scheduler.disableForLaunch()
+        }
+        isolated("Failed to initialize dynamic shortcut scheduling") {
+            val shortcutScheduler = resolve<DynamicShortcutScheduler>()
+            shortcutScheduler.schedulePeriodicRefresh()
+            shortcutScheduler.enqueueImmediateRefresh()
+            resolve<DynamicShortcutRefreshObserver>().start()
+        }
+        isolated("Failed to start syncing flag-gated components") {
+            resolve<PlatformComponentToggler>().start(resolve<CoroutineScope>())
+            resolve<RecordVoiceTileUpdater>().start(resolve<CoroutineScope>())
+            resolve<RecordingWindowTracker>().start(application, resolve<CoroutineScope>())
+            resolve<RecordingBubbleNotifier>().start(resolve<CoroutineScope>())
+            resolve<LiveUpdatesSwitch>()
+            resolve<RecordingBubbleSwitch>()
+        }
+        startPhoneStatePublishing()
+        startActivityAwareness()
+        startWatchLinking()
+        startWatchReceipts()
+        runCatching { resolve<WatchWindowPublisher>().start(resolve<CoroutineScope>()) }
+            .onFailure { Napier.w("Failed to start publishing watch libraries", it) }
+    }
+
+    private inline fun <reified T : Any> resolve(): T = koin.get()
+
+    private inline fun isolated(
+        failure: String,
+        start: () -> Unit,
+    ) {
+        runCatching(start).onFailure { error -> Napier.w(failure, error) }
+    }
+
+    private fun startWatchReceipts() {
+        runCatching {
+            resolve<WatchReceiptNotifier>().start(
+                resolve<CoroutineScope>(),
+                resolve<SyncMetadataService>().observePendingCount(),
+            )
+        }.onFailure { error ->
+            Napier.w("Failed to start telling watches which notes are backed up", error)
+        }
+    }
+
+    private fun startWatchLinking() {
+        runCatching {
+            resolve<PhoneLinkInitiator>().start(resolve<CoroutineScope>())
+        }.onFailure { error ->
+            Napier.w("Failed to start linking this phone's watches", error)
+        }
+    }
+
+    private fun startActivityAwareness() {
+        runCatching {
+            resolve<PhoneActivityAwareness>().start(resolve<CoroutineScope>())
+        }.onFailure { error ->
+            Napier.w("Failed to start following the phone's activity", error)
+        }
+    }
+
+    private fun startPhoneStatePublishing() {
+        runCatching {
+            resolve<PhoneStatePublisher>().start(resolve<CoroutineScope>())
+            resolve<WatchPresenceRegistration>().start(resolve<CoroutineScope>())
+        }.onFailure { error ->
+            Napier.w("Failed to start publishing this phone's state to its watches", error)
+        }
+    }
+}
+
 private const val APP_STARTUP_TAG = "LogDateStartup"
 private const val IMAGE_CACHE_DIR = "image_cache"
 private const val IMAGE_CACHE_MAX_BYTES = 250L * 1024 * 1024 // 250 MB
 private const val IMAGE_CROSSFADE_MS = 200
+
+/**
+ * Android may launch the activity in the base Application instance retained by a restore-agent
+ * process. Keep foreground startup usable in that process instead of crashing on an unsafe cast.
+ */
+internal object ApplicationStartupCoordinator {
+    private val fallbackStartups = WeakHashMap<Application, ApplicationStartup>()
+
+    @OptIn(ExperimentalResourceApi::class)
+    fun get(application: Application): ApplicationStartup {
+        if (application is LogdateApplication) return application.startup
+        return synchronized(fallbackStartups) {
+            fallbackStartups
+                .getOrPut(application) {
+                    setResourceReaderAndroidContext(application.applicationContext)
+                    if (GlobalContext.getOrNull() == null) {
+                        val isDebuggable = (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                        Napier.base(LogcatAntilog(isDebuggable = isDebuggable))
+                        Napier.base(CrashlyticsAntilog())
+                        application.initializeKoin()
+                    }
+                    ApplicationStartup(CoroutineScope(SupervisorJob() + Dispatchers.IO)) {
+                        try {
+                            val koin = GlobalContext.get()
+                            koin.get<LogDateDatabase>()
+                            val detector = PostRestoreDetector(application)
+                            val delivery = detector.pendingMediaQuarantineId()
+                            if (delivery != null) {
+                                koin.get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
+                                check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
+                            }
+                            koin.get<AndroidPlatformSearchIndexManager>()
+                            AndroidApplicationRuntime(application, koin).start()
+                            Napier.i("Encrypted storage and startup observers ready", tag = APP_STARTUP_TAG)
+                        } catch (error: Exception) {
+                            Napier.e("Application storage initialization failed", error, tag = APP_STARTUP_TAG)
+                            throw error
+                        }
+                    }
+                }.also { it.start() }
+        }
+    }
+}
+
+/** Initializes the foreground runtime when Android retained a restore-agent Application instance. */
+fun ensureLogDateApplicationStarted(application: Application) {
+    ApplicationStartupCoordinator.get(application)
+}

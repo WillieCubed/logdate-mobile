@@ -21,6 +21,7 @@ import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
@@ -87,10 +88,15 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
         require(context.packageName.endsWith(".debug"))
     }
 
+    private fun ensureApplicationStarted() {
+        ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
+    }
+
     @Test
     fun aSeedProviderCollisionForColdRestore() =
         runBlocking {
             requireEmulator()
+            ensureApplicationStarted()
             val uri =
                 requireNotNull(
                     context.contentResolver.insert(
@@ -154,6 +160,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
     fun bQuarantinedOriginalSurvivesProcessRestart() =
         runBlocking {
             requireEmulator()
+            ensureApplicationStarted()
             require(fixture.exists()) { "Run the collision fixture first" }
             withTimeout(30_000) {
                 while (PostRestoreDetector(context).pendingMediaQuarantineId() != null) delay(50)
@@ -181,6 +188,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
     fun cPrivateOriginalWorksWithoutLibraryOrNotificationPermission() =
         runBlocking {
             requireEmulator()
+            ensureApplicationStarted()
             for (permission in listOf(
                 Manifest.permission.READ_MEDIA_IMAGES,
                 Manifest.permission.READ_MEDIA_VIDEO,
@@ -198,6 +206,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
     fun dMeteredRecoveryResumesWhenPlatformAllowsMedia() =
         runBlocking {
             requireEmulator()
+            ensureApplicationStarted()
             val policy = koin.get<DataUsagePolicy>()
             val expectedMode =
                 if (InstrumentationRegistry.getArguments().getString("restoreNetworkPolicyExpected") ==
