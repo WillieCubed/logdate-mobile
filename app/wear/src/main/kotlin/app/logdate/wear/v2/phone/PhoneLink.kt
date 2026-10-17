@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
 
 /** Where the watch stands with the phone it is paired with. */
 sealed interface PhoneLink {
@@ -40,6 +42,9 @@ sealed interface PhoneLink {
  * Follows [PhoneLink] without polling: Play services announces each change to the phone's
  * [WearDataLayerClient.PHONE_CAPABILITY], and the link is looked up again on each one.
  * [phoneType] is `PhoneTypeHelper.getPhoneDeviceType(context)` outside tests.
+ *
+ * Every call to Play services is bounded by [LOOKUP_TIMEOUT], so a stalled Play services reports the
+ * phone as not connected instead of holding back the screens that show the link.
  */
 class PhoneLinkRepository(
     private val capabilityClient: CapabilityClient,
@@ -49,24 +54,27 @@ class PhoneLinkRepository(
 ) {
     fun observe(): Flow<PhoneLink> =
         callbackFlow {
-            val listener = CapabilityClient.OnCapabilityChangedListener { launch { send(current()) } }
-            val listening = startListening(listener)
             send(current())
+            val listener = CapabilityClient.OnCapabilityChangedListener { launch { send(current()) } }
+            // A change between the first lookup and the listener is caught by looking up once more.
+            if (startListening(listener)) send(current())
             awaitClose {
-                if (listening) capabilityClient.removeListener(listener, WearDataLayerClient.PHONE_CAPABILITY)
+                // A listener Play services added after the wait timed out is removed too.
+                capabilityClient.removeListener(listener, WearDataLayerClient.PHONE_CAPABILITY)
             }
         }.distinctUntilChanged()
 
     suspend fun current(): PhoneLink =
-        withContext(ioDispatcher) {
-            try {
-                lookUp()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Napier.e("Couldn't look up the paired phone; reporting it as not connected", e)
-                PhoneLink.NotConnected
-            }
+        try {
+            withTimeoutOrNull(LOOKUP_TIMEOUT) { withContext(ioDispatcher) { lookUp() } }
+                ?: PhoneLink.NotConnected.also {
+                    Napier.w("Play services didn't answer the phone lookup in time; reporting it as not connected")
+                }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Couldn't look up the paired phone; reporting it as not connected", e)
+            PhoneLink.NotConnected
         }
 
     private suspend fun lookUp(): PhoneLink {
@@ -87,12 +95,19 @@ class PhoneLinkRepository(
 
     private suspend fun startListening(listener: CapabilityClient.OnCapabilityChangedListener): Boolean =
         try {
-            capabilityClient.addListener(listener, WearDataLayerClient.PHONE_CAPABILITY).await()
-            true
+            withTimeoutOrNull(LOOKUP_TIMEOUT) {
+                capabilityClient.addListener(listener, WearDataLayerClient.PHONE_CAPABILITY).await()
+                true
+            } ?: false.also { Napier.w("Play services didn't add the phone listener in time; the phone link is reported as of now only") }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Napier.e("Couldn't follow the phone's LogDate install; the phone link is reported as of now only", e)
             false
         }
+
+    private companion object {
+        /** How long a Play services call may take before the phone counts as not connected. */
+        val LOOKUP_TIMEOUT = 5.seconds
+    }
 }

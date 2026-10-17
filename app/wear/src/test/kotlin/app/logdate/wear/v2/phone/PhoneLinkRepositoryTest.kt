@@ -3,6 +3,7 @@ package app.logdate.wear.v2.phone
 import androidx.wear.phone.interactions.PhoneTypeHelper
 import app.cash.turbine.test
 import app.logdate.wear.sync.WearDataLayerClient
+import com.google.android.gms.tasks.TaskCompletionSource
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.CapabilityInfo
@@ -11,6 +12,7 @@ import com.google.android.gms.wearable.NodeClient
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -97,6 +99,28 @@ class PhoneLinkRepositoryTest {
         }
 
     @Test
+    fun `a lookup Play services never answers is reported as not connected`() =
+        runTest {
+            every {
+                capabilityClient.getCapability(WearDataLayerClient.PHONE_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
+            } returns TaskCompletionSource<CapabilityInfo>().task
+
+            assertEquals(PhoneLink.NotConnected, repository(UnconfinedTestDispatcher(testScheduler)).current())
+        }
+
+    @Test
+    fun `the phone link is reported while Play services has not added the listener`() =
+        runTest {
+            connected(node("phone-1", "Pixel 9"))
+            every { capabilityClient.addListener(any(), WearDataLayerClient.PHONE_CAPABILITY) } returns TaskCompletionSource<Void>().task
+
+            repository(UnconfinedTestDispatcher(testScheduler)).observe().test {
+                assertEquals(PhoneLink.AppMissing(nodeId = "phone-1"), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `LogDate arriving on the phone is noticed without polling`() =
         runTest {
             connected(node("phone-1", "Pixel 9"))
@@ -111,6 +135,14 @@ class PhoneLinkRepositoryTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    private fun repository(dispatcher: CoroutineDispatcher) =
+        PhoneLinkRepository(
+            capabilityClient = capabilityClient,
+            nodeClient = nodeClient,
+            phoneType = { phoneType },
+            ioDispatcher = dispatcher,
+        )
 
     private fun reachable(vararg phones: Node) {
         val info = mockk<CapabilityInfo> { every { nodes } returns phones.toSet() }
