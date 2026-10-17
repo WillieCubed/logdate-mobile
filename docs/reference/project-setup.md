@@ -57,12 +57,12 @@ The exit status is `0` when everything is ok, `1` when something is wrong, and
 
 | Step | Makes sure that… |
 |---|---|
-| `tools` | git, Java, and jq are installed (plus gh, gcloud, curl, and keytool for environments). |
+| `tools` | git, Java, jq, and Node.js are installed (plus gh, gcloud, curl, and keytool for environments). |
 | `auth` | For environments: you are logged in to `gh` and `gcloud`. Setup never logs in for you. |
 | `hooks` | Git runs the repository's hooks in `.githooks`, which validate commit messages. |
 | `local-properties` | `local.properties` exists and points Gradle at your Android SDK. In a `git worktree` it is copied from the main checkout. |
 | `firebase-configs` | The real `google-services.json` files are in place. Without them Gradle writes a stub, and crash reporting silently does nothing. |
-| `test-deps` | The passkey verifier's Python venv is installed, so `scripts/tests/run-all.sh` can run. |
+| `test-deps` | The passkey verifier's Python venv and the lexicon checker's Node packages are installed, so `scripts/tests/run-all.sh` can run. |
 
 ### An environment (`./run setup staging|production`)
 
