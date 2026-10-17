@@ -12,6 +12,8 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.activity.ActivityPresenter
 import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.CaptureActivitySource
+import app.logdate.client.domain.activity.CurrentCaptureActivity
 import app.logdate.client.domain.activity.KeyValueActivityLogStore
 import app.logdate.client.domain.activity.SuggestionOutcomes
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
@@ -164,6 +166,7 @@ val wearV2Module =
                 notesRepository = get(),
                 locationCaptureCoordinator = get(),
                 captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
+                captureActivity = get(),
             )
         }
         single {
@@ -196,6 +199,7 @@ val wearV2Module =
                 deviceId = { devices.getDeviceId().value.toString() },
                 place = { location.captureForJournalEntry() },
                 heartRate = HeartRateSampler { koin.get<HeartRateSampler>().sample() },
+                captureActivity = get(),
             )
         }
         single { BackgroundMarker(featureFlags = get(), markMoment = get(), haptics = get()) }
@@ -211,6 +215,7 @@ val wearV2Module =
                 noteHealthAnnotator = get(),
                 captureGuard = get<app.logdate.wear.sync.v2.removal.WatchRemovalLock>(),
                 locationCaptureCoordinator = get(),
+                captureActivity = get(),
             )
         }
 
@@ -422,11 +427,19 @@ val wearV2Module =
             )
         }
         single<ReminderPermissions> { AndroidReminderPermissions(get()) }
+        single { SuggestionOutcomes(get<KeyValueStorage>()) }
+        single<CaptureActivitySource> {
+            CurrentCaptureActivity(
+                agreed = get<ActivityTracker>().agreed,
+                enabled = get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
+                outcomes = get<SuggestionOutcomes>().outcomes,
+            )
+        }
         single {
             val notes = get<JournalNotesRepository>()
             ActivityPresenter(
                 agreed = get<ActivityTracker>().agreed,
-                outcomes = SuggestionOutcomes(get<KeyValueStorage>()),
+                outcomes = get(),
                 capturedSince = { since -> notes.observeNotesInRange(since, Instant.DISTANT_FUTURE).map { it.isNotEmpty() } },
             )
         }

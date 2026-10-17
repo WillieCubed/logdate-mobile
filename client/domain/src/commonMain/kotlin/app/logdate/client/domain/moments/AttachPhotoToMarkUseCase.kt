@@ -32,6 +32,7 @@ class AttachPhotoToMarkUseCase(
                     lastUpdated = now,
                     mediaRef = managed,
                     timeZoneId = mark.timeZoneId,
+                    capturedDuring = mark.capturedDuring,
                     location =
                         mark.location?.let {
                             app.logdate.client.repository.journals.NoteLocation(
@@ -52,6 +53,7 @@ class AttachPhotoToMarkUseCase(
                             content = text,
                             timeZoneId = mark.timeZoneId,
                             location = note.location,
+                            capturedDuring = mark.capturedDuring,
                         ),
                     )
             }

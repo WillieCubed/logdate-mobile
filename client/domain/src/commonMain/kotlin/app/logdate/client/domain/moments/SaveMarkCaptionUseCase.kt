@@ -29,6 +29,7 @@ class SaveMarkCaptionUseCase(
                     lastUpdated = now,
                     content = text,
                     timeZoneId = mark.timeZoneId,
+                    capturedDuring = mark.capturedDuring,
                     location =
                         mark.location?.let {
                             app.logdate.client.repository.journals.NoteLocation(

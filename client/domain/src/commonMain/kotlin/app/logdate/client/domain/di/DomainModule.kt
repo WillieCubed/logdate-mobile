@@ -4,6 +4,7 @@ import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.activity.ActivityPresenter
 import app.logdate.client.domain.activity.ActivityUiState
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.domain.app.GetAppInfoUseCase
 import app.logdate.client.domain.dayboundary.DatastoreDayBoundaryPreferences
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
@@ -152,6 +153,7 @@ val domainModule: Module =
                 logCurrentLocationUseCase = get(),
                 settingsRepository = get(),
                 mediaManager = get(),
+                captureActivity = getOrNull<CaptureActivitySource>() ?: CaptureActivitySource.None,
             )
         }
         factory { FetchEntryUseCase(get()) }

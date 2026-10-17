@@ -1,5 +1,7 @@
 package app.logdate.wear.capture
 
+import app.logdate.client.domain.activity.CaptureActivitySource
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
@@ -42,6 +44,14 @@ class QuickNoteWriterTest {
         }
 
     @Test
+    fun `a check-in made in a vehicle records it`() =
+        runTest {
+            writer(activity = { CaptureActivity.IN_VEHICLE }).save(Feeling.GOOD)
+
+            assertEquals(CaptureActivity.IN_VEHICLE, created.captured.capturedDuring)
+        }
+
+    @Test
     fun `the place is saved with the check-in`() =
         runTest {
             val location = NoteLocation(coordinates = NoteCoordinates(latitude = 51.5, longitude = -0.12))
@@ -76,11 +86,12 @@ class QuickNoteWriterTest {
             coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
         }
 
-    private fun writer() =
+    private fun writer(activity: CaptureActivitySource = CaptureActivitySource.None) =
         QuickNoteWriter(
             notesRepository = notesRepository,
             locationCaptureCoordinator = locationCaptureCoordinator,
             clock = FixedClock(now),
+            captureActivity = activity,
         )
 
     private class FixedClock(

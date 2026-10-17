@@ -1,5 +1,6 @@
 package app.logdate.client.domain.notes
 
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
@@ -7,6 +8,7 @@ import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.withCapturedDuring
 import app.logdate.client.repository.location.LocationCaptureSource
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.async
@@ -18,7 +20,8 @@ import kotlin.uuid.Uuid
  * Adds a note to the repository.
  *
  * This also adds a location to the repository if the note has a location and
- * begins uploading any media attachments.
+ * begins uploading any media attachments. A note captured now also records what the person is doing,
+ * from [captureActivity], unless it already names an activity.
  *
  * Notes can be associated with multiple journals at creation time.
  */
@@ -29,6 +32,7 @@ class AddNoteUseCase(
     private val logCurrentLocationUseCase: LogCurrentLocationUseCase,
     private val settingsRepository: LocationTrackingSettingsRepository,
     private val mediaManager: MediaManager,
+    private val captureActivity: CaptureActivitySource = CaptureActivitySource.None,
 ) {
     suspend operator fun invoke(
         notes: List<JournalNote>,
@@ -52,8 +56,11 @@ class AddNoteUseCase(
     ) = coroutineScope {
         val shouldTrackLocation =
             captureCurrentLocation && runCatching { settingsRepository.getSettings().autoTrackForJournalEntries }.getOrDefault(true)
+        // A note written about another time (a visit, a mark) is not stamped with what is happening now.
+        val activity = if (captureCurrentLocation) captureActivity.now() else null
         val noteJobs =
-            notes.map { note ->
+            notes.map { original ->
+                val note = if (activity == null || original.capturedDuring != null) original else original.withCapturedDuring(activity)
                 async {
                     try {
                         // Create the note

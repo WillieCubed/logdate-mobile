@@ -1,5 +1,6 @@
 package app.logdate.wear.capture
 
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
@@ -37,6 +38,7 @@ class QuickNoteWriter(
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
     private val clock: Clock = Clock.System,
     private val captureGuard: WatchCaptureWriteGuard = WatchCaptureWriteGuard.Unrestricted,
+    private val captureActivity: CaptureActivitySource = CaptureActivitySource.None,
 ) : FeelingSaver,
     TextNoteSaver {
     override suspend fun save(feeling: Feeling): Boolean = write(MomentNoteCodec.encode(feeling)) != null
@@ -58,6 +60,7 @@ class QuickNoteWriter(
                     lastUpdated = now,
                     location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationCaptureCoordinator.captureForJournalEntry() },
                     timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                    capturedDuring = captureActivity.now(),
                 )
             captureGuard.write { notesRepository.create(note) }
             note.uid
