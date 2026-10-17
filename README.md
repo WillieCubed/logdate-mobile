@@ -2,7 +2,31 @@
 
 This is a Kotlin Multiplatform project targeting Android, iOS, Desktop, and Server platforms. LogDate is a comprehensive journaling application that combines modern UI design with intelligent features and cross-platform synchronization.
 
-## 🏗️ Architecture Overview
+## Purpose
+
+LogDate is a journal for the moments of your life. You write entries with text, audio, photos, and
+video, browse them on a timeline and in a media Library, and look back with weekly Rewind summaries
+that are made on your device. Everything works offline first. LogDate Cloud adds optional sync
+across your devices and an encrypted backup that you can restore on a new device.
+
+## First useful workflow
+
+Install the app on an Android emulator, write an entry with text and a photo or voice recording,
+save it, and find it on Home again after restarting the app. No account or network connection is
+needed. [Development](docs/DEVELOPMENT.md#inspect-the-first-workflow) walks through it step by step.
+
+## Development
+
+LogDate supports Android phones, tablets, and foldables (the primary target, distributed on Google
+Play), Wear OS, iOS (through TestFlight), desktop on macOS, Linux, and Windows (local packages
+only), and a Ktor server that runs on Google Cloud Run.
+
+- [Development](docs/DEVELOPMENT.md): toolchain, setup, and the commands to run, build, and test.
+- [Release and recovery](docs/RELEASE.md): how each platform ships and how to back out a release.
+- [Git guidelines](docs/reference/standards/git-guidelines.md): every change lands through a pull
+  request merged with a rebase.
+
+## Architecture Overview
 
 LogDate follows clean architecture principles with a modular, feature-based design:
 
@@ -26,7 +50,7 @@ LogDate Project
     └── Ktor-based backend
 ```
 
-## 🚀 Key Features
+## Key Features
 
 - **Cross-Platform**: Native apps for Android, iOS, Desktop, and Wear OS
 - **Offline-First**: Full functionality without internet connection
@@ -35,7 +59,7 @@ LogDate Project
 - **Real-Time Sync**: Seamless synchronization across all devices
 - **Privacy-Focused**: Local-first approach with optional cloud sync
 
-## 📋 Module Documentation
+## Module Documentation
 
 Each module contains detailed documentation in its respective `README.md` file:
 
@@ -69,7 +93,7 @@ Each module contains detailed documentation in its respective `README.md` file:
 ### Server
 - [`:server`](server/README.md) - Ktor-based backend API
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Frontend
 - **Kotlin Multiplatform**: Cross-platform business logic
@@ -89,7 +113,7 @@ Each module contains detailed documentation in its respective `README.md` file:
 - **OpenAI API**: Content analysis and summarization
 - **On-device ML**: Privacy-focused processing (planned)
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Android Studio (latest stable)
@@ -182,7 +206,7 @@ If you prefer to set up dependencies manually:
    - Let Gradle sync complete
    - Select your target platform and run
 
-## 🏗️ Build Commands
+## Build Commands
 
 From the project root, you can use these Gradle tasks:
 
@@ -290,7 +314,7 @@ The Docker server build includes `build-logic`, whose plugin repositories are de
 the Gradle Plugin Portal remains available for plugin markers. Root plugin repository settings
 do not apply to this included build.
 
-## 📖 Documentation
+## Documentation
 
 ### Testing
 Comprehensive testing guides for all test types:
@@ -314,7 +338,7 @@ Each module contains detailed documentation covering:
 - Usage patterns and examples
 - TODOs and future plans
 
-## 🏛️ Architecture Principles
+## Architecture Principles
 
 ### Clean Architecture
 - **Separation of Concerns**: Clear boundaries between UI, domain, and data layers
@@ -337,7 +361,7 @@ Each module contains detailed documentation covering:
 - **Integration**: Deep integration with platform services
 - **Wear OS**: Material 3 Expressive design for optimal wearable experience
 
-## 🔄 Data Flow
+## Data Flow
 
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
@@ -359,7 +383,7 @@ Each module contains detailed documentation covering:
                    └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Please read each module's README for specific contribution guidelines. General principles:
 
@@ -367,12 +391,16 @@ Please read each module's README for specific contribution guidelines. General p
 2. Write comprehensive tests for new functionality
 3. Update documentation for any API changes
 4. Ensure all platforms build and tests pass
+5. Land the change through a pull request merged with a rebase, as the
+   [Git guidelines](docs/reference/standards/git-guidelines.md#branch-and-pull-request-workflow) describe
 
-## 📝 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The repository has no license file for the LogDate app, so no open-source license is granted for its
+code. The standalone AT Protocol libraries are licensed under the Apache License 2.0; see
+[`shared/atproto-licensing`](shared/atproto-licensing/).
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html)
 - UI powered by [Compose Multiplatform](https://www.jetbrains.com/compose-multiplatform/)
