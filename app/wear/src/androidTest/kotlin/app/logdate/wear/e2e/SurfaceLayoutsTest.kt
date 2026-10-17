@@ -13,8 +13,13 @@ import androidx.wear.protolayout.testing.LayoutElementAssertionsProvider
 import androidx.wear.protolayout.testing.hasClickable
 import androidx.wear.protolayout.testing.hasText
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.wear.capture.Feeling
 import app.logdate.wear.launch.WearLaunchRequest
 import app.logdate.wear.tile.TodaySummary
+import app.logdate.wear.tile.quickCaptureAction
+import app.logdate.wear.tile.quickCaptureLayout
+import app.logdate.wear.tile.timelineLaunchAction
+import app.logdate.wear.tile.todaySummaryLayout
 import app.logdate.wear.v2.memories.OnThisDay
 import app.logdate.wear.v2.surfaces.OnThisDayTileIds
 import app.logdate.wear.v2.surfaces.SurfaceLaunchActions
@@ -104,6 +109,36 @@ class SurfaceLayoutsTest {
 
         layout.onElement(hasText("Nothing from this day in past years")).assertExists()
         layout.onElement(hasClickable(SurfaceLaunchActions.home(context), OnThisDayTileIds.OPEN)).assertExists()
+    }
+
+    @Test
+    fun quick_capture_opens_each_capture_screen_and_counts_today() {
+        val layout = layout { quickCaptureLayout(entryCount = 2) }
+
+        layout.onElement(hasText("2 entries today")).assertExists()
+        val buttons =
+            listOf(
+                Triple("Rec", "quick_record", WearLaunchRequest.Record),
+                Triple("Play", "memories", WearLaunchRequest.Memories),
+                Triple("Mood", "mood", WearLaunchRequest.MoodCheckIn),
+                Triple("Text", "quick_text", WearLaunchRequest.QuickText),
+            )
+        for ((label, route, request) in buttons) {
+            layout.onElement(hasText(label)).assertExists()
+            layout.onElement(hasClickable(quickCaptureAction(context, route), route)).assertExists()
+            assertEquals(request, quickCaptureAction(context, route).request())
+        }
+    }
+
+    @Test
+    fun the_current_today_tile_shows_the_feeling_and_opens_the_timeline() {
+        val layout = layout { todaySummaryLayout(TodaySummary(entryCount = 1, feeling = Feeling.GOOD, latestEntry = note)) }
+
+        layout.onElement(hasText("1 entry today")).assertExists()
+        layout.onElement(hasText("${Feeling.GOOD.emoji} Good")).assertExists()
+        layout.onElement(hasText("Breakfast by the window")).assertExists()
+        layout.onElement(hasClickable(timelineLaunchAction(context), "open_timeline")).assertExists()
+        assertEquals(WearLaunchRequest.Timeline, timelineLaunchAction(context).request())
     }
 
     private fun layout(content: MaterialScope.() -> LayoutElementBuilders.LayoutElement): LayoutElementAssertionsProvider =

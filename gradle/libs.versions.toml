@@ -139,7 +139,6 @@ wearToolingPreview = "1.0.0"
 wearCompose = "1.7.0"
 tiles = "1.6.2"
 protolayout = "1.4.2"
-horologistTiles = "0.8.3-alpha"
 wearRemoteInteractions = "1.2.0"
 androidxWear = "1.4.0"
 wearOngoing = "1.1.0"
@@ -432,11 +431,9 @@ androidx-tiles-renderer = { group = "androidx.wear.tiles", name = "tiles-rendere
 androidx-tiles-tooling-preview = { group = "androidx.wear.tiles", name = "tiles-tooling-preview", version.ref = "tiles" }
 androidx-protolayout = { group = "androidx.wear.protolayout", name = "protolayout", version.ref = "protolayout" }
 androidx-protolayout-expression = { group = "androidx.wear.protolayout", name = "protolayout-expression", version.ref = "protolayout" }
-androidx-protolayout-material = { group = "androidx.wear.protolayout", name = "protolayout-material", version.ref = "protolayout" }
 androidx-protolayout-material3 = { group = "androidx.wear.protolayout", name = "protolayout-material3", version.ref = "protolayout" }
 androidx-protolayout-testing = { group = "androidx.wear.protolayout", name = "protolayout-testing", version.ref = "protolayout" }
 androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
-horologist-tiles = { group = "com.google.android.horologist", name = "horologist-tiles", version.ref = "horologistTiles" }
 wear-remote-interactions = { group = "androidx.wear", name = "wear-remote-interactions", version.ref = "wearRemoteInteractions" }
 androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplicationsDataSourceKtx" }
 androidx-ui-android = { group = "androidx.compose.ui", name = "ui-android", version.ref = "uiAndroid" }

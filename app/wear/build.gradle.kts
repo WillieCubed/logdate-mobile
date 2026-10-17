@@ -193,14 +193,12 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
 
-    // Material 3 tiles follow the watch theme. Legacy layouts remain for the flag-off experience.
+    // Material 3 tiles follow the watch theme.
     implementation(libs.androidx.tiles)
     implementation(libs.androidx.tiles.tooling.preview)
     implementation(libs.androidx.protolayout)
     implementation(libs.androidx.protolayout.expression)
-    implementation(libs.androidx.protolayout.material)
     implementation(libs.androidx.protolayout.material3)
-    implementation(libs.horologist.tiles)
     implementation(libs.androidx.watchface.complications.data.source.ktx)
     implementation(libs.androidx.health.services.client)
 
