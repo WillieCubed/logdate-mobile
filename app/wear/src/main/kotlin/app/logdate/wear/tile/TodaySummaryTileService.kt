@@ -3,18 +3,16 @@ package app.logdate.wear.tile
 import android.content.ComponentName
 import android.content.Context
 import androidx.wear.protolayout.ActionBuilders
-import androidx.wear.protolayout.ColorBuilders.argb
-import androidx.wear.protolayout.DimensionBuilders.dp
-import androidx.wear.protolayout.DimensionBuilders.wrap
 import androidx.wear.protolayout.LayoutElementBuilders
-import androidx.wear.protolayout.ModifiersBuilders
-import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
-import androidx.wear.protolayout.material.Colors
-import androidx.wear.protolayout.material.Text
-import androidx.wear.protolayout.material.Typography
-import androidx.wear.protolayout.material.layouts.PrimaryLayout
 import androidx.wear.protolayout.material3.MaterialScope
+import androidx.wear.protolayout.material3.Typography
+import androidx.wear.protolayout.material3.materialScope
+import androidx.wear.protolayout.material3.primaryLayout
+import androidx.wear.protolayout.material3.text
+import androidx.wear.protolayout.material3.textEdgeButton
+import androidx.wear.protolayout.modifiers.clickable
+import androidx.wear.protolayout.types.layoutString
 import androidx.wear.tiles.Material3TileService
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
@@ -31,7 +29,9 @@ import app.logdate.wear.R
 import app.logdate.wear.capture.Feeling
 import app.logdate.wear.capture.MomentNoteCodec
 import app.logdate.wear.capture.MomentNoteKind
+import app.logdate.wear.launch.WearLaunchRequest
 import app.logdate.wear.launch.isWearStartupReady
+import app.logdate.wear.presentation.MainActivity
 import app.logdate.wear.v2.surfaces.todayTileLayout
 import app.logdate.wear.v2.today.DayClock
 import io.github.aakira.napier.Napier
@@ -43,7 +43,6 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
-private const val RESOURCES_VERSION = "1"
 private const val MAX_PREVIEW_LENGTH = 30
 private const val FRESHNESS_MINUTES = 15
 
@@ -57,7 +56,7 @@ class TodaySummaryTileService : Material3TileService() {
         if (!this@TodaySummaryTileService.isWearStartupReady()) return startupTile()
         val newApp = isNewAppEnabled()
         val summary = fetchTodaySummary(newApp)
-        if (!newApp) return todaySummaryTile(requestParams, this@TodaySummaryTileService, summary)
+        if (!newApp) return todaySummaryTile(summary)
         return tile(
             timeline = TimelineBuilders.Timeline.fromLayoutElement(todayTileLayout(summary)),
             freshness = FRESHNESS_MINUTES.minutes,
@@ -127,32 +126,11 @@ internal fun summarizeToday(notes: List<JournalNote>): TodaySummary =
                 .maxByOrNull(JournalNote::creationTimestamp),
     )
 
-internal fun todaySummaryTile(
-    requestParams: RequestBuilders.TileRequest,
-    context: Context,
-    summary: TodaySummary,
-): TileBuilders.Tile {
-    val timeline =
-        TimelineBuilders.Timeline
-            .Builder()
-            .addTimelineEntry(
-                TimelineBuilders.TimelineEntry
-                    .Builder()
-                    .setLayout(
-                        LayoutElementBuilders.Layout
-                            .Builder()
-                            .setRoot(todaySummaryLayout(requestParams, context, summary))
-                            .build(),
-                    ).build(),
-            ).build()
-
-    return TileBuilders.Tile
-        .Builder()
-        .setResourcesVersion(RESOURCES_VERSION)
-        .setTileTimeline(timeline)
-        .setFreshnessIntervalMillis(FRESHNESS_MINUTES.minutes.inWholeMilliseconds)
-        .build()
-}
+internal fun MaterialScope.todaySummaryTile(summary: TodaySummary): TileBuilders.Tile =
+    tile(
+        timeline = TimelineBuilders.Timeline.fromLayoutElement(todaySummaryLayout(summary)),
+        freshness = FRESHNESS_MINUTES.minutes,
+    )
 
 /** A short line for [note]: the start of its text, or what kind of moment it is. */
 internal fun latestEntryPreview(
@@ -166,152 +144,70 @@ internal fun latestEntryPreview(
         is JournalNote.Video -> context.getString(R.string.wear_tile_summary_video)
     }
 
-private fun todaySummaryLayout(
-    requestParams: RequestBuilders.TileRequest,
-    context: Context,
-    summary: TodaySummary,
-): LayoutElementBuilders.LayoutElement {
+internal fun MaterialScope.todaySummaryLayout(summary: TodaySummary): LayoutElementBuilders.LayoutElement {
     val entryLabel =
         context.resources.getQuantityString(
             R.plurals.wear_tile_entry_count,
             summary.entryCount,
             summary.entryCount,
         )
-
     val moodLine =
         summary.feeling?.let { feeling ->
             context.getString(R.string.wear_tile_summary_mood, feeling.emoji, context.getString(feeling.labelRes))
         }
-    val latestPreview = summary.latestEntry?.let { note -> latestEntryPreview(context, note) }
+    val latestLine =
+        summary.latestEntry?.let { note ->
+            context.getString(R.string.wear_tile_summary_latest, latestEntryPreview(context, note))
+        }
+    val openTimeline = clickable(timelineLaunchAction(context), "open_timeline")
 
-    return PrimaryLayout
-        .Builder(requestParams.deviceConfiguration)
-        .setResponsiveContentInsetEnabled(true)
-        .setPrimaryLabelTextContent(
-            Text
-                .Builder(context, context.getString(R.string.wear_tile_summary_title))
-                .setColor(argb(Colors.DEFAULT.primary))
-                .setTypography(Typography.TYPOGRAPHY_CAPTION1)
-                .build(),
-        ).setContent(
-            summaryContent(context, entryLabel, moodLine, latestPreview),
-        ).setSecondaryLabelTextContent(
-            Text
-                .Builder(context, context.getString(R.string.wear_tile_summary_open))
-                .setColor(argb(Colors.DEFAULT.onSurface))
-                .setTypography(Typography.TYPOGRAPHY_CAPTION2)
-                .setModifiers(
-                    ModifiersBuilders.Modifiers
-                        .Builder()
-                        .setClickable(
-                            ModifiersBuilders.Clickable
-                                .Builder()
-                                .setOnClick(createTimelineLaunchAction(context))
-                                .setId("open_timeline")
-                                .build(),
-                        ).build(),
-                ).build(),
-        ).build()
+    return primaryLayout(
+        titleSlot = { text(context.getString(R.string.wear_tile_summary_title).layoutString) },
+        mainSlot = {
+            val column =
+                LayoutElementBuilders.Column
+                    .Builder()
+                    .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+                    .addContent(text(entryLabel.layoutString, typography = Typography.TITLE_MEDIUM))
+            moodLine?.let { column.addContent(text(it.layoutString, typography = Typography.BODY_SMALL)) }
+            latestLine?.let { column.addContent(text(it.layoutString, typography = Typography.BODY_SMALL, maxLines = 2)) }
+            column.build()
+        },
+        bottomSlot = {
+            textEdgeButton(
+                onClick = openTimeline,
+                labelContent = { text(context.getString(R.string.wear_tile_summary_open).layoutString) },
+            )
+        },
+        onClick = openTimeline,
+    )
 }
 
-private fun summaryContent(
-    context: Context,
-    entryLabel: String,
-    moodLine: String?,
-    latestPreview: String?,
-): LayoutElementBuilders.LayoutElement {
-    val column =
-        LayoutElementBuilders.Column
-            .Builder()
-            .setWidth(wrap())
-            .setHeight(wrap())
-            .addContent(
-                Text
-                    .Builder(context, entryLabel)
-                    .setColor(argb(Colors.DEFAULT.onSurface))
-                    .setTypography(Typography.TYPOGRAPHY_BODY1)
-                    .build(),
-            )
-
-    if (moodLine != null) {
-        column
-            .addContent(spacer(4f))
-            .addContent(
-                Text
-                    .Builder(context, moodLine)
-                    .setColor(argb(Colors.DEFAULT.onSurface))
-                    .setTypography(Typography.TYPOGRAPHY_BODY2)
-                    .build(),
-            )
-    }
-
-    if (latestPreview != null) {
-        column
-            .addContent(spacer(4f))
-            .addContent(
-                Text
-                    .Builder(
-                        context,
-                        context.getString(R.string.wear_tile_summary_latest, latestPreview),
-                    ).setColor(argb(Colors.DEFAULT.onSurface))
-                    .setTypography(Typography.TYPOGRAPHY_CAPTION2)
-                    .setMaxLines(2)
-                    .build(),
-            )
-    }
-
-    return column.build()
-}
-
-private fun spacer(heightDp: Float): LayoutElementBuilders.LayoutElement =
-    LayoutElementBuilders.Spacer
-        .Builder()
-        .setHeight(dp(heightDp))
-        .build()
-
-private fun createTimelineLaunchAction(context: Context): ActionBuilders.LaunchAction =
-    ActionBuilders.LaunchAction
-        .Builder()
-        .setAndroidActivity(
-            ActionBuilders.AndroidActivity
-                .Builder()
-                .setPackageName(context.packageName)
-                .setClassName(
-                    ComponentName(context, "app.logdate.wear.presentation.MainActivity")
-                        .className,
-                ).addKeyToExtraMapping(
-                    "tile_route",
-                    ActionBuilders.AndroidStringExtra
-                        .Builder()
-                        .setValue("timeline")
-                        .build(),
-                ).build(),
-        ).build()
+internal fun timelineLaunchAction(context: Context): ActionBuilders.LaunchAction =
+    ActionBuilders.launchAction(
+        ComponentName(context, MainActivity::class.java),
+        mapOf(WearLaunchRequest.EXTRA_ROUTE to ActionBuilders.stringExtra("timeline")),
+    )
 
 @Preview(device = WearDevices.SMALL_ROUND)
 @Preview(device = WearDevices.LARGE_ROUND)
 fun todaySummaryTilePreview(context: Context) =
-    TilePreviewData(
-        onTileResourceRequest = {
-            ResourceBuilders.Resources
-                .Builder()
-                .setVersion(RESOURCES_VERSION)
-                .build()
-        },
-    ) {
-        todaySummaryTile(
-            it,
-            context,
-            TodaySummary(
-                entryCount = 5,
-                feeling = Feeling.GOOD,
-                latestEntry =
-                    JournalNote.Text(
-                        creationTimestamp = Instant.fromEpochMilliseconds(0),
-                        lastUpdated = Instant.fromEpochMilliseconds(0),
-                        content = "Had an amazing lunch...",
+    TilePreviewData(onTileResourceRequest = { previewResources() }) {
+        previewTile(
+            materialScope(context, it.deviceConfiguration) {
+                todaySummaryLayout(
+                    TodaySummary(
+                        entryCount = 5,
+                        feeling = Feeling.GOOD,
+                        latestEntry =
+                            JournalNote.Text(
+                                creationTimestamp = Instant.fromEpochMilliseconds(0),
+                                lastUpdated = Instant.fromEpochMilliseconds(0),
+                                content = "Had an amazing lunch...",
+                            ),
                     ),
-            ),
+                )
+            },
         )
     }
 
