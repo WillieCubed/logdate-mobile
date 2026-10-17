@@ -80,6 +80,7 @@ set -euo pipefail
 
 method="GET"
 output_file=""
+dump_header=""
 write_out=""
 url=""
 declare -a header_files=("")
@@ -98,6 +99,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --write-out|-w)
             write_out="$2"
+            shift 2
+            ;;
+        --dump-header|-D)
+            dump_header="$2"
             shift 2
             ;;
         --header|-H)
@@ -185,6 +190,25 @@ scenario="${SMOKE_SCENARIO:-ok}"
 status="200"
 body=""
 binary_file=""
+# The LogDate server stamps every response; the Cloud Run front end and the website do not.
+request_id="fake-request"
+if [[ "$request_origin" == "https://${FAKE_RP_ID:?}" ]]; then
+    request_id=""
+fi
+
+case "$scenario:$path" in
+    connect_refused_once:/health)
+        if [[ ! -f "${FAKE_HTTP_LOG}.once" ]]; then
+            : >"${FAKE_HTTP_LOG}.once"
+            echo "curl: (7) Failed to connect" >&2
+            exit 7
+        fi
+        ;;
+    server_hang:/api/v1/server/info)
+        echo "curl: (28) Operation timed out" >&2
+        exit 28
+        ;;
+esac
 
 case "$path" in
     /health)
@@ -397,6 +421,22 @@ case "$path" in
         ;;
 esac
 
+if [[ "$scenario" == "front_end_unrouted_once" && "$path" == /api/v1/server/info && ! -f "${FAKE_HTTP_LOG}.once" ]] ||
+    [[ "$scenario" == "front_end_unrouted" && "$path" == /api/v1/server/info ]] ||
+    [[ "$scenario" == "media_front_end_not_found" && "$path" == */binary && -f "${FAKE_MEDIA_DELETED:?}" ]]; then
+    : >"${FAKE_HTTP_LOG}.once"
+    status="404"
+    body="<html><title>404 Page not found</title></html>"
+    binary_file=""
+    request_id=""
+fi
+if [[ -n "$dump_header" ]]; then
+    printf 'HTTP/2 %s\r\n' "$status" >"$dump_header"
+    if [[ -n "$request_id" ]]; then
+        printf 'x-request-id: %s\r\n' "$request_id" >>"$dump_header"
+    fi
+fi
+
 if [[ -n "$output_file" ]]; then
     if [[ -n "$binary_file" ]]; then
         cp "$binary_file" "$output_file"
@@ -415,6 +455,12 @@ if [[ -n "$write_out" ]]; then
 fi
 STUB
 chmod +x "$tmp_dir/bin/curl"
+
+cat >"$tmp_dir/bin/sleep" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >>"${FAKE_HTTP_LOG:?}.sleeps"
+STUB
+chmod +x "$tmp_dir/bin/sleep"
 
 # Reject the old WORK_DIR -> STATE_FILE move. A durable handoff must write a
 # same-directory temporary and atomically replace the destination itself.
@@ -631,7 +677,7 @@ reset_http_state() {
         "$tmp_dir/http/refresh-checkpoint-attempt" "$tmp_dir/http/account-checkpoint-attempt" \
         "$tmp_dir/http/refresh-intent-checkpoint-attempt" \
         "$tmp_dir/http/account-intent-checkpoint-attempt" \
-        "$tmp_dir/http/legacy-passkey-log"
+        "$tmp_dir/http/legacy-passkey-log" "$tmp_dir/http/log.once" "$tmp_dir/http/log.sleeps"
 }
 
 run_smoke() {
@@ -950,6 +996,52 @@ for case_spec in "${negative_cases[@]}"; do
     assert_not_contains "$PRIVATE_TOKEN" "$case_output"
     assert_not_contains "$HEALTH_TOKEN" "$case_output"
 done
+
+# The Cloud Run front end answers a newly created revision URL with its own 404 until
+# the URL is routed everywhere. Such a response never reached the server, so it is
+# retried; requests that did reach it are never retried.
+reset_http_state
+: >"$state_file"
+chmod 600 "$state_file"
+set +e
+unrouted_once_output="$(run_smoke front_end_unrouted_once "$CANDIDATE_ORIGIN" health-only "$state_file" 1 "$invoker_token_file" 2>&1)"
+unrouted_once_status=$?
+set -e
+assert_exit_code 0 "$unrouted_once_status"
+assert_contains "Retrying GET /api/v1/server/info: returned HTTP 404 from the Cloud Run front end, not the server (attempt 1 of 6)" "$unrouted_once_output"
+assert_equals "2" "$(grep -c '^GET /api/v1/server/info ' "$tmp_dir/http/log")"
+
+reset_http_state
+: >"$state_file"
+chmod 600 "$state_file"
+set +e
+unrouted_output="$(run_smoke front_end_unrouted "$CANDIDATE_ORIGIN" health-only "$state_file" 1 "$invoker_token_file" 2>&1)"
+unrouted_status=$?
+set -e
+assert_exit_code 1 "$unrouted_status"
+assert_contains "GET /api/v1/server/info returned HTTP 404 from the Cloud Run front end, not the server (after 6 attempts)" "$unrouted_output"
+assert_equals "1 2 4 8 8" "$(tr '\n' ' ' <"$tmp_dir/http/log.sleeps" | sed 's/ $//')"
+
+reset_http_state
+: >"$state_file"
+chmod 600 "$state_file"
+set +e
+refused_output="$(run_smoke connect_refused_once "$CANDIDATE_ORIGIN" health-only "$state_file" 1 "$invoker_token_file" 2>&1)"
+refused_status=$?
+set -e
+assert_exit_code 0 "$refused_status"
+assert_contains "Retrying GET /health: could not connect (curl exit 7) (attempt 1 of 6)" "$refused_output"
+
+reset_http_state
+: >"$state_file"
+chmod 600 "$state_file"
+set +e
+hang_output="$(run_smoke server_hang "$CANDIDATE_ORIGIN" health-only "$state_file" 1 "$invoker_token_file" 2>&1)"
+hang_status=$?
+set -e
+assert_exit_code 1 "$hang_status"
+assert_contains "GET /api/v1/server/info failed before a response (curl exit 28)" "$hang_output"
+assert_equals "1" "$(grep -c '^GET /api/v1/server/info ' "$tmp_dir/http/log")"
 
 # A relying-party host may keep a separate statement for a retired package so
 # existing installs retain their credentials. The current package statement is
@@ -1352,6 +1444,7 @@ done
 for failure_spec in \
     "media_delete_failed|media deletion did not return 204" \
     "media_readable_after_delete|media remained readable after deletion" \
+    "media_front_end_not_found|returned HTTP 404 from the Cloud Run front end, not the server (after 6 attempts)" \
     "account_cleanup_failed|account deletion did not return 204"; do
     scenario="${failure_spec%%|*}"
     expected_error="${failure_spec#*|}"

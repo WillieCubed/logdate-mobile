@@ -2,17 +2,23 @@
 """Verify journal merges using the deployment's disposable passkey account."""
 
 import argparse
+import http.client
 import json
 import os
 import re
+import ssl
 import stat
+import sys
 import tempfile
 import time
 import uuid
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+REQUEST_TIMEOUT_SECONDS = 30
+RESPONSE_LIMIT = 2 * 1024 * 1024
+# Bounds retries of requests that provably never reached the server: about 23 seconds.
+TRANSPORT_ATTEMPTS = 6
 
 
 class SmokeError(RuntimeError):
@@ -53,31 +59,67 @@ def write_state(path, state):
             os.unlink(temporary)
 
 
-class NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, request, response, code, message, headers, new_url):
-        raise SmokeError("Smoke endpoint attempted a redirect")
+def connect(url):
+    parsed = urlsplit(url)
+    connection = http.client.HTTPSConnection(
+        parsed.hostname, parsed.port, timeout=REQUEST_TIMEOUT_SECONDS, context=ssl.create_default_context())
+    connection.connect()
+    return connection
 
 
-def http_request(method, url, headers, body):
+def http_request(method, url, headers, body, connect=connect, sleep=time.sleep):
+    """Returns (status, payload, request ID) for responses from the LogDate server itself.
+
+    The server stamps every response with X-Request-ID. A response without it came from the Cloud
+    Run front end: a 404 means a new revision URL is not routed everywhere yet, so the request is
+    retried. Connection failures before sending are retried too. Anything after the request was
+    sent fails immediately, so a server that hangs or errors is reported rather than retried.
+    """
+    parsed = urlsplit(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise SmokeError("Smoke requests must use HTTPS")
+    target = parsed.path + ("?" + parsed.query if parsed.query else "")
+    described = f"{method} {parsed.path.removeprefix('/api/v1')}"
     encoded = None if body is None else json.dumps(body).encode()
-    request = Request(url, data=encoded, headers=headers, method=method)
-    try:
-        response = build_opener(NoRedirect()).open(request, timeout=30)
-    except HTTPError as error:
-        response = error
-    except (URLError, TimeoutError, OSError):
-        raise SmokeError("Journal merge smoke network request failed") from None
-    with response:
-        raw = response.read(2 * 1024 * 1024 + 1)
-        if len(raw) > 2 * 1024 * 1024:
-            raise SmokeError("Journal merge smoke response exceeded its size limit")
+    for attempt in range(1, TRANSPORT_ATTEMPTS + 1):
         try:
-            payload = json.loads(raw) if raw else {}
-        except (ValueError, UnicodeError):
-            if response.code == 404:
-                return response.code, {}
-            raise SmokeError("Journal merge smoke returned invalid JSON") from None
-        return response.code, payload
+            connection = connect(url)
+        except OSError as error:
+            problem = f"could not connect ({type(error).__name__})"
+        else:
+            try:
+                connection.request(method, target, body=encoded, headers=headers)
+                response = connection.getresponse()
+                raw = response.read(RESPONSE_LIMIT + 1)
+            except TimeoutError:
+                raise SmokeError(f"{described} did not respond within {REQUEST_TIMEOUT_SECONDS} seconds") from None
+            except (OSError, http.client.HTTPException) as error:
+                raise SmokeError(f"{described} lost its connection before a response ({type(error).__name__})") from None
+            finally:
+                connection.close()
+            if 300 <= response.status < 400:
+                raise SmokeError(f"{described} attempted a redirect")
+            if len(raw) > RESPONSE_LIMIT:
+                raise SmokeError(f"{described} response exceeded its size limit")
+            request_id = response.getheader("X-Request-ID")
+            if request_id is not None:
+                return response.status, decode(described, response.status, raw), request_id
+            problem = f"returned HTTP {response.status} from the Cloud Run front end, not the server"
+            if response.status != 404:
+                raise SmokeError(f"{described} {problem}")
+        if attempt == TRANSPORT_ATTEMPTS:
+            raise SmokeError(f"{described} {problem} (after {attempt} attempts)")
+        print(f"Retrying {described}: {problem} (attempt {attempt} of {TRANSPORT_ATTEMPTS})", file=sys.stderr)
+        sleep(min(2 ** (attempt - 1), 8))
+
+
+def decode(described, status, raw):
+    try:
+        return json.loads(raw) if raw else {}
+    except (ValueError, UnicodeError):
+        if status == 404:
+            return {}
+        raise SmokeError(f"{described} returned invalid JSON") from None
 
 
 def load_bound_state(base, state_file, phase):
@@ -99,6 +141,8 @@ def load_bound_state(base, state_file, phase):
 
 
 class Probe:
+    label = "Journal merge smoke"
+
     def __init__(self, base, state, transport, private_token_file):
         self.base = base
         self.state = state
@@ -114,9 +158,13 @@ class Probe:
             self.headers["X-Serverless-Authorization"] = f"Bearer {token}"
 
     def request(self, method, path, body=None, statuses=(200,)):
-        status, payload = self.transport(method, self.base + "/api/v1" + path, self.headers, body)
+        try:
+            status, payload, *request_id = self.transport(method, self.base + "/api/v1" + path, self.headers, body)
+        except SmokeError as error:
+            raise SmokeError(f"{self.label} {error}") from None
         if status not in statuses:
-            raise SmokeError(f"Journal merge smoke {method} {path.split('?')[0]} returned HTTP {status}")
+            correlation = f" (request {request_id[0]})" if request_id else ""
+            raise SmokeError(f"{self.label} {method} {path.split('?')[0]} returned HTTP {status}{correlation}")
         return payload
 
     def verify_identity(self):
