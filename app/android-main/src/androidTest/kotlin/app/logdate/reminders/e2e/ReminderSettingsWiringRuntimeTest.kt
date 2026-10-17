@@ -1,5 +1,7 @@
 package app.logdate.reminders.e2e
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.isToggleable
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
+import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -97,6 +100,12 @@ class ReminderSettingsWiringRuntimeTest {
     }
 
     @Test fun notificationPermissionUsesTheSystemPromptAndRefreshesAfterGrant() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        // Revoking a runtime permission ends the app's process, so only a fresh install shows the prompt.
+        assumeFalse(
+            "An earlier test in this install already allowed notifications",
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+        )
         storage { shared.set(SharedPreferenceKey.RemindersEnabled, true) }
         compose.setContent { LogDateTheme { RecommendationSettingsScreen(onBack = {}) } }
         compose.onNodeWithText("Notification access is off").assertIsDisplayed()
