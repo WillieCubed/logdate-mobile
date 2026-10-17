@@ -21,23 +21,12 @@ import app.logdate.screenshots.common.BubbleWindowPreview
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
-import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
-import app.logdate.ui.audio.model.AudioPalette
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private const val sampleImageUri = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher"
 private const val sampleVideoUri = sampleImageUri
-
-private val editorAudioPalette =
-    AudioPalette(
-        waveformGradientStart = 0xFFE8A044,
-        waveformGradientEnd = 0xFFD4603A,
-        playedFillColor = 0xFFE8A044,
-        accentColor = 0xFFE8A044,
-        immersiveBackground = 0xFF1A0F05,
-    )
 
 private val editorCreatedAt = Instant.fromEpochMilliseconds(1_740_000_000_000L)
 
@@ -107,24 +96,6 @@ fun S02_EntryEditorListMixedContent() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S03_EntryEditorImmersiveAudio() {
-    EditorRouteFrame(
-        isImmersiveBlockActive = true,
-    ) {
-        SpatialExpandedAudioBlock(
-            amplitudes = ScreenshotTestData.mockAmplitudes,
-            progress = 0.58f,
-            isPlaying = true,
-            palette = editorAudioPalette,
-            durationMs = 185_000L,
-            createdAt = editorCreatedAt,
-        )
-    }
-}
-
-@PreviewTest
-@ScreenshotPreviewMatrix
-@Composable
 fun S04_EntryEditorExitDialog() {
     EditorRouteFrame {
         MainEditorContent(
@@ -163,19 +134,14 @@ fun S05_EntryEditorDraftsDialog() {
 }
 
 @Composable
-private fun EditorRouteFrame(
-    isImmersiveBlockActive: Boolean = false,
-    content: @Composable () -> Unit,
-) {
+private fun EditorRouteFrame(content: @Composable () -> Unit) {
     ScreenshotTheme {
         ImmersiveEditorLayout(
-            isImmersiveBlockActive = isImmersiveBlockActive,
             topBarContent = {
                 NoteEditorToolbar(
                     onBack = {},
                     onSave = {},
                     onShowDrafts = {},
-                    actionsVisible = !isImmersiveBlockActive,
                 )
             },
             editorContent = content,
