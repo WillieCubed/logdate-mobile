@@ -202,6 +202,8 @@
     <string name="play">Play</string>
     <string name="play_from_this_phrase">Play from this phrase</string>
     <string name="recording_in_progress">Recording in progress</string>
+    <string name="recording_recovering">Recovering recording…</string>
+    <string name="checking_recording">Checking your recording</string>
     <string name="recording_starting">Starting…</string>
     <string name="ready_to_record">Ready to record</string>
     <string name="tap_record_to_begin">Tap record to begin</string>

@@ -221,6 +221,7 @@ fun MainEditorContent(
                                             onBlockUpdated = uiState.onUpdateBlock,
                                             onBlockDeleted = uiState.onDeleteBlock,
                                             onAudioResolverReady = onAudioResolverReady,
+                                            onPersistAudioRecordingTarget = uiState.onPersistAudioRecordingTarget,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                     }
@@ -267,6 +268,7 @@ private fun BlockContentInner(
     onBlockUpdated: (EntryBlockUiState) -> Unit,
     onBlockDeleted: (Uuid) -> Unit,
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
+    onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
     modifier: Modifier = Modifier,
 ) {
     when (block) {
@@ -294,6 +296,7 @@ private fun BlockContentInner(
                 onBlockUpdated = onBlockUpdated,
                 onDeleteRequested = { onBlockDeleted(block.id) },
                 onResolverReady = onAudioResolverReady,
+                onPersistRecordingTarget = onPersistAudioRecordingTarget,
                 modifier = modifier,
             )
 

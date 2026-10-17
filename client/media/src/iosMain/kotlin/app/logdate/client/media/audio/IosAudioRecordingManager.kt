@@ -91,17 +91,24 @@ class IosAudioRecordingManager(
         }
     }
 
-    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean = startRecording(targetNoteId) { true }
+
+    override suspend fun startRecording(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean {
         try {
             Napier.d("Starting iOS recording")
+
+            val target = audioStorage.createRecordingTarget()
+            if (!onTargetReady(target.path)) return false
+            recordingTarget = target
+            recordingURL = NSURL.fileURLWithPath(target.path)
 
             if (!audioSessionController.setupAudioSessionForRecording()) {
                 Napier.e("Failed to configure audio session for recording")
                 return false
             }
-
-            recordingTarget = audioStorage.createRecordingTarget()
-            recordingURL = recordingTarget?.path?.let { NSURL.fileURLWithPath(it) }
 
             val settings = mutableMapOf<Any?, Any?>()
             settings[platform.AVFAudio.AVFormatIDKey] = platform.CoreAudioTypes.kAudioFormatMPEG4AAC

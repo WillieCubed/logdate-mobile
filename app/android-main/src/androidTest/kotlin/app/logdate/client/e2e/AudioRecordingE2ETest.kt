@@ -151,6 +151,14 @@ private class FakeAudioRecordingManager(
         return true
     }
 
+    override suspend fun startRecording(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean {
+        if (!onTargetReady(outputUri)) return false
+        return startRecording(targetNoteId)
+    }
+
     override suspend fun stopRecording(): String? {
         isRecording = false
         return outputUri

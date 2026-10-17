@@ -166,6 +166,36 @@ class PendingAudioDraftTest {
         }
 
     @Test
+    fun `replacement recording draft retains the previous take as a fallback`() =
+        runTest {
+            val recording =
+                AudioBlockUiState(
+                    timestamp = recordedAt,
+                    captureState =
+                        AudioCaptureState.Recording(
+                            filePath = "/audio/replacement.m4a",
+                            fallbackFilePath = "/audio/previous.m4a",
+                        ),
+                )
+            val id = assertNotNull(manager.autoSave(EditorState(blocks = listOf(recording))))
+
+            val loaded =
+                manager
+                    .loadDraft(id)
+                    .getOrThrow()
+                    .blocks
+                    .single() as AudioBlockUiState
+
+            assertEquals(
+                AudioCaptureState.Stopping(
+                    filePath = "/audio/replacement.m4a",
+                    fallbackFilePath = "/audio/previous.m4a",
+                ),
+                loaded.captureState,
+            )
+        }
+
+    @Test
     fun `ready recording caption and transcript survive draft note serialization`() =
         runTest {
             val recording =

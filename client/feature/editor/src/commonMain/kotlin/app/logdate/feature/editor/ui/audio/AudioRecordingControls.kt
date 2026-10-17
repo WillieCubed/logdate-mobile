@@ -38,7 +38,9 @@ import logdate.client.feature.editor.generated.resources.microphone
 import logdate.client.feature.editor.generated.resources.ready_to_record
 import logdate.client.feature.editor.generated.resources.record
 import logdate.client.feature.editor.generated.resources.recording_in_progress
+import logdate.client.feature.editor.generated.resources.recording_recovering
 import logdate.client.feature.editor.generated.resources.recording_starting
+import logdate.client.feature.editor.generated.resources.checking_recording
 import logdate.client.feature.editor.generated.resources.start_recording
 import logdate.client.feature.editor.generated.resources.stop
 import logdate.client.feature.editor.generated.resources.stop_recording
@@ -111,7 +113,7 @@ fun AudioRecordingControls(
                 RecordingInputSelector(
                     inputSelection = inputSelection,
                     onInputSelected = onInputSelected,
-                    enabled = recordingState != RecordingState.RECORDING,
+                    enabled = recordingState != RecordingState.RECORDING && recordingState != RecordingState.PROCESSING,
                 )
                 RecordingActionButton(
                     recordingState = recordingState,
@@ -123,7 +125,7 @@ fun AudioRecordingControls(
                         haptics.recordingFinished()
                         onStopRecording()
                     },
-                    enabled = !isStarting,
+                    enabled = !isStarting && recordingState != RecordingState.PROCESSING,
                     modifier = Modifier.fillMaxWidth(0.8f),
                 )
                 RecordingErrorText(errorMessage)
@@ -182,7 +184,7 @@ private fun AudioRecordingControlsColumn(
         RecordingInputSelector(
             inputSelection = inputSelection,
             onInputSelected = onInputSelected,
-            enabled = recordingState != RecordingState.RECORDING,
+            enabled = recordingState != RecordingState.RECORDING && recordingState != RecordingState.PROCESSING,
         )
 
         RecordingWaveformBox(
@@ -195,7 +197,7 @@ private fun AudioRecordingControlsColumn(
             recordingState = recordingState,
             onStartRecording = onStartRecording,
             onStopRecording = onStopRecording,
-            enabled = !isStarting,
+            enabled = !isStarting && recordingState != RecordingState.PROCESSING,
             modifier = Modifier.fillMaxWidth(0.8f),
         )
         RecordingErrorText(errorMessage)
@@ -232,6 +234,7 @@ private fun RecordingStateRow(
             text =
                 when {
                     recordingState == RecordingState.RECORDING -> stringResource(Res.string.recording_in_progress)
+                    recordingState == RecordingState.PROCESSING -> stringResource(Res.string.recording_recovering)
                     // The tap was accepted and the button is disabled, but without this the
                     // wait for the platform to confirm the recorder is running looked
                     // identical to nothing having happened at all.
@@ -242,6 +245,8 @@ private fun RecordingStateRow(
             color =
                 if (recordingState == RecordingState.RECORDING) {
                     MaterialTheme.colorScheme.error
+                } else if (recordingState == RecordingState.PROCESSING) {
+                    MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },
@@ -317,7 +322,12 @@ private fun RecordingWaveformBox(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                 )
                 Text(
-                    text = stringResource(Res.string.tap_record_to_begin),
+                    text =
+                        if (recordingState == RecordingState.PROCESSING) {
+                            stringResource(Res.string.checking_recording)
+                        } else {
+                            stringResource(Res.string.tap_record_to_begin)
+                        },
                     style = MaterialTheme.typography.bodyMedium,
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
@@ -348,7 +358,11 @@ private fun RecordingActionButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    if (recordingState == RecordingState.RECORDING) {
+    if (recordingState == RecordingState.PROCESSING) {
+        Button(onClick = {}, enabled = false, modifier = modifier) {
+            Text("Recovering…")
+        }
+    } else if (recordingState == RecordingState.RECORDING) {
         RecordingStopButton(
             label = stringResource(Res.string.stop),
             onStop = onStopRecording,

@@ -109,6 +109,7 @@ fun EntryEditorContent(
             },
             onDeleteBlock = viewModel::removeBlock,
             onUpdateJournalSelection = viewModel::setSelectedJournals,
+            onPersistAudioRecordingTarget = viewModel::persistAudioRecordingTarget,
         )
 
     // Only live camera capture takes over the entry chrome.

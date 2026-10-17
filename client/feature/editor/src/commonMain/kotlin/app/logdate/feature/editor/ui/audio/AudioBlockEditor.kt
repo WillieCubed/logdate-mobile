@@ -58,6 +58,7 @@ fun AudioBlockEditor(
     onBlockUpdated: (AudioBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
     onResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
+    onPersistRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
     modifier: Modifier = Modifier,
     inline: Boolean = false,
     selected: Boolean = false,
@@ -82,7 +83,7 @@ fun AudioBlockEditor(
     // from the first.
     val audioViewModel: AudioViewModel = koinViewModel(key = block.id.toString())
     LaunchedEffect(audioViewModel, block.id) {
-        audioViewModel.attachToRecording(block.id)
+        audioViewModel.attachToRecording(block.id, (block.captureState as? AudioCaptureState.Recording)?.fallbackFilePath)
         onResolverReady(block.id, audioViewModel)
     }
     val audioRouteRepository: AudioRouteRepository = koinInject()
@@ -99,6 +100,7 @@ fun AudioBlockEditor(
     val recordingState =
         when {
             isRecording -> RecordingState.RECORDING
+            block.captureState is AudioCaptureState.Stopping -> RecordingState.PROCESSING
             else -> RecordingState.INACTIVE
         }
 
@@ -136,11 +138,29 @@ fun AudioBlockEditor(
         }
     }
 
+    LaunchedEffect(audioUiState.pendingRecoveryFilePath, audioUiState.recordingFallbackFilePath, block.captureState) {
+        val pendingPath = audioUiState.pendingRecoveryFilePath ?: return@LaunchedEffect
+        val pendingState =
+            AudioCaptureState.Stopping(
+                filePath = pendingPath,
+                fallbackFilePath = audioUiState.recordingFallbackFilePath,
+            )
+        if (block.captureState != pendingState) {
+            onBlockUpdated(block.copy(captureState = pendingState))
+        }
+        when (val recovered = audioViewModel.resolvePending(block.id)) {
+            is AudioCaptureState.Ready -> onBlockUpdated(block.copy(captureState = recovered))
+            is AudioCaptureState.Recording -> onBlockUpdated(block.copy(captureState = recovered))
+            else -> Unit
+        }
+    }
+
     LaunchedEffect(
         audioUiState.isRecording,
         audioUiState.isStartingRecording,
         audioUiState.recordingTargetNoteId,
         audioUiState.recordingFilePath,
+        audioUiState.recordingFallbackFilePath,
         block.captureState,
     ) {
         val ownsActiveRecording =
@@ -148,10 +168,23 @@ fun AudioBlockEditor(
         if (!ownsActiveRecording) return@LaunchedEffect
         val livePath = audioUiState.recordingFilePath
         val current = block.captureState
+        if (livePath == null && current is AudioCaptureState.Recording && current.filePath != null) {
+            return@LaunchedEffect
+        }
         val needsUpdate =
-            current !is AudioCaptureState.Recording || current.filePath != livePath
+            current !is AudioCaptureState.Recording ||
+                current.filePath != livePath ||
+                current.fallbackFilePath != audioUiState.recordingFallbackFilePath
         if (needsUpdate) {
-            onBlockUpdated(block.copy(captureState = AudioCaptureState.Recording(filePath = livePath)))
+            onBlockUpdated(
+                block.copy(
+                    captureState =
+                        AudioCaptureState.Recording(
+                            filePath = livePath,
+                            fallbackFilePath = audioUiState.recordingFallbackFilePath,
+                        ),
+                ),
+            )
         }
     }
 
@@ -245,7 +278,11 @@ fun AudioBlockEditor(
                             (audioUiState.transcriptionState as? AudioUiState.TranscriptionState.Success)?.isRefining == true,
                         transcriptionHasError = audioUiState.transcriptionState is AudioUiState.TranscriptionState.Error,
                         isPaused = audioUiState.isPaused,
-                        onRestart = { audioViewModel.restartRecording() },
+                        onRestart = {
+                            audioViewModel.restartRecording { path, fallbackPath ->
+                                onPersistRecordingTarget(block.id, path, fallbackPath)
+                            }
+                        },
                         onPause = { audioViewModel.toggleRecordingPause() },
                         onFinish = { audioViewModel.stopRecording() },
                         modifier = Modifier.fillMaxSize(),
@@ -261,13 +298,19 @@ fun AudioBlockEditor(
                         if (!block.startOnOpen) return@LaunchedEffect
                         snapshotFlow { windowInfo.isWindowFocused }.first { it }
                         onBlockUpdated(block.copy(startOnOpen = false))
-                        audioViewModel.startRecording(targetNoteId = block.id)
+                        audioViewModel.startRecording(targetNoteId = block.id) { path, fallbackPath ->
+                            onPersistRecordingTarget(block.id, path, fallbackPath)
+                        }
                     }
                     AudioRecordingControls(
                         recordingState = recordingState,
                         audioLevels = audioLevels,
                         recordingDuration = audioUiState.duration,
-                        onStartRecording = { audioViewModel.startRecording(targetNoteId = block.id) },
+                        onStartRecording = {
+                            audioViewModel.startRecording(targetNoteId = block.id) { path, fallbackPath ->
+                                onPersistRecordingTarget(block.id, path, fallbackPath)
+                            }
+                        },
                         onStopRecording = { audioViewModel.stopRecording() },
                         modifier = Modifier.fillMaxSize(),
                         inputSelection = inputSelection,

@@ -61,6 +61,7 @@ internal fun MemoryBlockContent(
     onUpdate: (EntryBlockUiState) -> Unit,
     onRemove: () -> Unit,
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit,
+    onPersistAudioRecordingTarget: suspend (Uuid, String, String?) -> Boolean = { _, _, _ -> true },
     onPhotoAspectRatioLoaded: (Uuid, Float) -> Unit = { _, _ -> },
     focusedTextHeight: Dp = 0.dp,
     unfinishedRecordingHeight: Dp = 420.dp,
@@ -120,6 +121,7 @@ internal fun MemoryBlockContent(
                     onUpdate,
                     onRemove,
                     onAudioResolverReady,
+                    onPersistRecordingTarget = onPersistAudioRecordingTarget,
                     modifier =
                         Modifier.fillMaxWidth().then(
                             if (block.uri == null) {

@@ -211,13 +211,18 @@ class AndroidAudioRecordingManager(
         }
     }
 
-    override suspend fun startRecording(targetNoteId: Uuid?): Boolean =
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean = startRecording(targetNoteId) { true }
+
+    override suspend fun startRecording(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean =
         withContext(workDispatcher) {
             sessionMutex.withLock {
                 startInFlight = true
                 recordingStartingFlow.value = true
                 try {
-                    startSessionLocked(targetNoteId)
+                    startSessionLocked(targetNoteId, onTargetReady)
                 } finally {
                     startInFlight = false
                     recordingStartingFlow.value = false
@@ -225,7 +230,10 @@ class AndroidAudioRecordingManager(
             }
         }
 
-    private suspend fun startSessionLocked(targetNoteId: Uuid?): Boolean {
+    private suspend fun startSessionLocked(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean {
         if (recordingStateFlow.value || externallyRecordedPath != null) {
             Napier.w("Attempted to start recording while a session is active or awaiting handoff")
             return false
@@ -240,6 +248,19 @@ class AndroidAudioRecordingManager(
                 Napier.e("Could not create a recording target", e)
                 return false
             }
+        val targetAccepted =
+            try {
+                onTargetReady(target.path)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (e: Exception) {
+                Napier.e("Could not persist the recording target", e)
+                false
+            }
+        if (!targetAccepted) {
+            Napier.w("Recording was not started because its draft target could not be saved")
+            return false
+        }
         recordingTarget = target
         sessionTargetNoteId = targetNoteId
         recordingTranscriptSession =

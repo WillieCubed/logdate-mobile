@@ -83,11 +83,18 @@ class DesktopAudioRecordingManager(
         }
     }
 
-    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
+    override suspend fun startRecording(targetNoteId: Uuid?): Boolean = startRecording(targetNoteId) { true }
+
+    override suspend fun startRecording(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean {
         if (recordingActive) return false
 
         try {
-            recordingTarget = audioStorage.createRecordingTarget(extension = "wav")
+            val target = audioStorage.createRecordingTarget(extension = "wav")
+            if (!onTargetReady(target.path)) return false
+            recordingTarget = target
             // Set up audio format and data line
             val info = DataLine.Info(TargetDataLine::class.java, audioFormat)
 

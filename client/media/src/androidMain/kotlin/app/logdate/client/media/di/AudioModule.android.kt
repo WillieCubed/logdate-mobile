@@ -9,6 +9,7 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.audio.RecordingSessionOptions
 import app.logdate.client.media.audio.SpeechFeatureProviderLoader
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.tagging.InstallTimeAudioTaggingService
@@ -34,7 +35,11 @@ actual val audioModule: Module =
                 audioTaggingService = get(),
                 audioTagRepository = get(),
                 audioRouteRepository = get(),
-                serviceController = AndroidRecordingServiceController(androidContext()),
+                serviceController =
+                    AndroidRecordingServiceController(
+                        androidContext(),
+                        RecordingSessionOptions(crashSafe = true, excludeIncompleteFromBackup = true),
+                    ),
             )
         }
         single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get(), mediaFiles = get()) }

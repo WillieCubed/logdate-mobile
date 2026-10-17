@@ -223,6 +223,12 @@ class EntryEditorViewModel(
 
     suspend fun persistDraft(state: EditorState): Uuid? = persistDraftImpl(state)
 
+    suspend fun persistAudioRecordingTarget(
+        blockId: Uuid,
+        filePath: String,
+        fallbackFilePath: String? = null,
+    ): Boolean = persistAudioRecordingTargetImpl(blockId, filePath, fallbackFilePath)
+
     suspend fun saveAsDraft(state: EditorState): Boolean = saveAsDraftImpl(state)
 
     suspend fun discardAndExit(): Boolean = discardAndExitImpl()

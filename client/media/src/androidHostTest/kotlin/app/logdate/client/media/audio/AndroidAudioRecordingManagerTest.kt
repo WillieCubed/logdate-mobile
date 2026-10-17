@@ -99,6 +99,44 @@ class AndroidAudioRecordingManagerTest {
         }
 
     @Test
+    fun `start persists the allocated recording target before opening the recorder`() =
+        testScope.runTest {
+            val manager = buildManager()
+            val noteId = Uuid.random()
+            var persistedPath: String? = null
+            var targetWasPersistedBeforeCapture = false
+            val starter =
+                launch {
+                    assertTrue(
+                        manager.startRecording(noteId) { path ->
+                            persistedPath = path
+                            targetWasPersistedBeforeCapture = controller.startCalls == 0
+                            true
+                        },
+                    )
+                }
+            runCurrent()
+
+            assertTrue(targetWasPersistedBeforeCapture)
+            assertTrue(persistedPath.orEmpty().endsWith(".m4a"))
+            assertEquals(1, controller.startCalls)
+            controller.connect(RecordingServiceState(isRecording = true))
+            advanceUntilIdle()
+            starter.join()
+        }
+
+    @Test
+    fun `start does not open the recorder when target persistence fails`() =
+        testScope.runTest {
+            val manager = buildManager()
+            val result = manager.startRecording(Uuid.random()) { false }
+
+            assertFalse(result)
+            assertEquals(0, controller.startCalls)
+            assertFalse(controller.microphoneActive)
+        }
+
+    @Test
     fun `a service error during start fails the start and leaves the manager usable`() =
         testScope.runTest {
             val manager = buildManager()

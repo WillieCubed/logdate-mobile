@@ -95,6 +95,25 @@ class AudioRecordingResumptionTest {
         }
 
     @Test
+    fun `recover falls back to the previous take when replacement file is incomplete`() =
+        runTest {
+            val recoverer =
+                DefaultPendingAudioRecoverer(
+                    durationResolver = { path -> if (path == "/audio/previous.m4a") 4_200L else null },
+                )
+
+            val recovered =
+                recoverer.recover(
+                    AudioCaptureState.Stopping(
+                        filePath = "/audio/replacement.m4a",
+                        fallbackFilePath = "/audio/previous.m4a",
+                    ),
+                )
+
+            assertEquals(AudioCaptureState.Ready("/audio/previous.m4a", 4_200L), recovered)
+        }
+
+    @Test
     fun `recover with null file path returns failed`() =
         runTest {
             val recoverer =
@@ -135,6 +154,11 @@ private class RecoverableRecordingManager(
     override val currentRecordingPath: String get() = "/audio.m4a"
 
     override suspend fun startRecording(targetNoteId: Uuid?): Boolean = false
+
+    override suspend fun startRecording(
+        targetNoteId: Uuid?,
+        onTargetReady: suspend (String) -> Boolean,
+    ): Boolean = false
 
     override suspend fun stopRecording(): String {
         stopCalls++

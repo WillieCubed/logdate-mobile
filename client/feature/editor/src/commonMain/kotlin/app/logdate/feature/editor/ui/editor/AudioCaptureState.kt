@@ -35,6 +35,7 @@ sealed interface AudioCaptureState {
      */
     data class Recording(
         val filePath: String? = null,
+        val fallbackFilePath: String? = null,
     ) : AudioCaptureState
 
     /**
@@ -46,6 +47,7 @@ sealed interface AudioCaptureState {
      */
     data class Stopping(
         val filePath: String? = null,
+        val fallbackFilePath: String? = null,
     ) : AudioCaptureState
 
     /** Recording is finalized. [uri] points at the durable file; [durationMs] is the resolved length. */

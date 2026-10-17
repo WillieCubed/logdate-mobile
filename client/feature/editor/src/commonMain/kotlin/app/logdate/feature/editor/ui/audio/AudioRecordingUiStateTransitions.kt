@@ -12,6 +12,7 @@ internal fun AudioUiState.withAttachedRecording(
     filePath: String?,
     paused: Boolean,
     starting: Boolean = false,
+    fallbackFilePath: String? = null,
     clearRecordedUri: Boolean = false,
 ): AudioUiState =
     copy(
@@ -20,6 +21,8 @@ internal fun AudioUiState.withAttachedRecording(
         isPaused = paused,
         recordingTargetNoteId = targetNoteId,
         recordingFilePath = filePath,
+        recordingFallbackFilePath = fallbackFilePath,
+        pendingRecoveryFilePath = null,
         recordedAudioUri = if (clearRecordedUri) null else recordedAudioUri,
         failedRecordingTargetNoteId = if (clearRecordedUri) null else failedRecordingTargetNoteId,
         error = null,
@@ -29,6 +32,7 @@ internal fun AudioUiState.withStartedRecording(
     targetNoteId: Uuid?,
     filePath: String?,
     transcriptionAvailable: Boolean,
+    fallbackFilePath: String? = null,
 ): AudioUiState =
     copy(
         isRecording = true,
@@ -45,6 +49,8 @@ internal fun AudioUiState.withStartedRecording(
             },
         error = null,
         recordingFilePath = filePath,
+        recordingFallbackFilePath = fallbackFilePath,
+        pendingRecoveryFilePath = null,
         recordingTargetNoteId = targetNoteId,
     )
 
@@ -59,10 +65,22 @@ internal fun AudioUiState.withFailedRecordingStart(
         failedRecordingTargetNoteId = if (fallback == null) recordingTargetNoteId ?: lastTargetNoteId else null,
         recordingTargetNoteId = null,
         recordingFilePath = null,
+        recordingFallbackFilePath = null,
+        pendingRecoveryFilePath = null,
         recordedAudioUri = fallback?.recordedAudioUri ?: recordedAudioUri,
         duration = fallback?.duration ?: duration,
         transcriptionState = fallback?.transcriptionState ?: transcriptionState,
         error = message,
+    )
+
+internal fun AudioUiState.withCancelledRecordingStart(): AudioUiState =
+    copy(
+        isRecording = false,
+        isStartingRecording = false,
+        isPaused = false,
+        recordingTargetNoteId = null,
+        recordingFilePath = null,
+        recordingFallbackFilePath = null,
     )
 
 internal fun AudioUiState.withStoppedRecording(
@@ -77,6 +95,8 @@ internal fun AudioUiState.withStoppedRecording(
         isPaused = false,
         recordedAudioUri = if (publishRecording) uri else null,
         recordingFilePath = if (publishRecording) null else uri,
+        recordingFallbackFilePath = null,
+        pendingRecoveryFilePath = null,
         recordingTargetNoteId = if (publishRecording || uri == null) null else targetNoteId,
         duration = resolvedDuration ?: duration,
         transcriptionState =
@@ -89,14 +109,27 @@ internal fun AudioUiState.withStoppedRecording(
         error = if (uri == null) Res.string.capture_state_recording_could_not_be_saved else error,
     )
 
-internal fun AudioUiState.withFailedRecordingStop(targetNoteId: Uuid?): AudioUiState =
+internal fun AudioUiState.withFailedRecordingStop(
+    targetNoteId: Uuid?,
+    fallbackFilePath: String?,
+    fallbackDuration: Duration?,
+    pendingFilePath: String?,
+): AudioUiState =
     copy(
         isRecording = false,
         isPaused = false,
         recordingFilePath = null,
+        recordingFallbackFilePath = fallbackFilePath,
         recordingTargetNoteId = null,
-        failedRecordingTargetNoteId = targetNoteId,
-        error = Res.string.capture_state_recording_could_not_be_saved,
+        recordedAudioUri = if (pendingFilePath == null) fallbackFilePath else null,
+        pendingRecoveryFilePath = pendingFilePath,
+        duration = if (fallbackFilePath != null) fallbackDuration ?: duration else duration,
+        failedRecordingTargetNoteId = if (fallbackFilePath == null && pendingFilePath == null) targetNoteId else null,
+        error =
+            when {
+                fallbackFilePath != null || pendingFilePath != null -> null
+                else -> Res.string.capture_state_recording_could_not_be_saved
+            },
     )
 
 internal fun AudioUiState.withRestoredRecording(previous: AudioUiState): AudioUiState =
@@ -106,7 +139,9 @@ internal fun AudioUiState.withRestoredRecording(previous: AudioUiState): AudioUi
         isPaused = false,
         recordingTargetNoteId = null,
         recordingFilePath = null,
-        recordedAudioUri = previous.recordedAudioUri,
+        recordingFallbackFilePath = recordingFallbackFilePath ?: previous.recordingFallbackFilePath,
+        pendingRecoveryFilePath = pendingRecoveryFilePath ?: previous.pendingRecoveryFilePath,
+        recordedAudioUri = if (pendingRecoveryFilePath != null) null else previous.recordedAudioUri,
         duration = previous.duration,
         transcriptionState = previous.transcriptionState,
         failedRecordingTargetNoteId = null,
