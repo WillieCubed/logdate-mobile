@@ -151,6 +151,16 @@ class NativeBackupTransferProbeTest {
                     IdentityKeyFingerprint.of(identity.getIdentityKey(), koin.get<CryptoManager>()),
                     "Credentials-only restore must retain the journal identity",
                 )
+                assertContentEquals(
+                    "cloud media payload".encodeToByteArray(),
+                    koin.get<CryptoManager>().aesGcmDecrypt(
+                        koin.get<MediaPayloadKeyProvider>().getOrCreateKey(),
+                        Base64.decode(requireNotNull(arguments.getString("sourceMediaNonce"))),
+                        "native-transfer".encodeToByteArray(),
+                        Base64.decode(requireNotNull(arguments.getString("sourceMediaCiphertext"))),
+                    ),
+                    "Credentials-only restore must retain the key that decrypts the source media",
+                )
                 if (InstrumentationRegistry.getArguments().getString("nativeIdentityMode") == "account") {
                     assertNull(identity.getStoredRecoveryPhrase())
                 }
