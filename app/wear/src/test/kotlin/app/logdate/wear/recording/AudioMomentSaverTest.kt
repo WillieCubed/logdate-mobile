@@ -1,7 +1,9 @@
 package app.logdate.wear.recording
 
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.CrashSafeRecording
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
@@ -63,6 +65,14 @@ class AudioMomentSaverTest {
             assertEquals(4_200L, note.durationMs)
             assertEquals(now, note.creationTimestamp)
             assertEquals(note, created.captured)
+        }
+
+    @Test
+    fun `a recording made while moving records it`() =
+        runTest {
+            val result = saver(activity = { CaptureActivity.MOVING }).save("/files/audio_notes/walk.m4a", recorderElapsed = 9.seconds)
+
+            assertEquals(CaptureActivity.MOVING, (result as AudioSaveResult.Saved).note.capturedDuring)
         }
 
     @Test
@@ -138,7 +148,7 @@ class AudioMomentSaverTest {
             assertNull((result.await() as AudioSaveResult.Saved).note.location)
         }
 
-    private fun saver() =
+    private fun saver(activity: CaptureActivitySource = CaptureActivitySource.None) =
         AudioMomentSaver(
             notesRepository = notesRepository,
             durationResolver = durationResolver,
@@ -146,6 +156,7 @@ class AudioMomentSaverTest {
             locationCaptureCoordinator = locationCaptureCoordinator,
             clock = FixedClock(now),
             deleteFile = { deletedFiles += it },
+            captureActivity = activity,
         )
 
     /** A finished recording and the raw file a crash-safe session leaves beside it, as real files. */

@@ -1,5 +1,6 @@
 package app.logdate.client.domain.moments
 
+import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -21,5 +22,28 @@ class MarkedMomentEditorContextTest {
         assertEquals(mark.timeZoneId, saved.timeZoneId)
         assertEquals(note.uid, saved.uid)
         assertEquals(written, saved.lastUpdated)
+    }
+
+    @Test
+    fun `notes that fill a mark record the activity the mark was made during`() {
+        val captured = Instant.parse("2026-10-10T21:00:00Z")
+        val mark =
+            MarkedMoment(
+                Uuid.random(),
+                captured,
+                "UTC",
+                null,
+                null,
+                MarkState.OPEN,
+                "",
+                emptySet(),
+                "watch",
+                captured,
+                0,
+                capturedDuring = CaptureActivity.MOVING,
+            )
+        val note = JournalNote.Text(creationTimestamp = captured, lastUpdated = captured, content = "On the trail")
+
+        assertEquals(CaptureActivity.MOVING, listOf(note).withMarkedCapture(mark).single().capturedDuring)
     }
 }

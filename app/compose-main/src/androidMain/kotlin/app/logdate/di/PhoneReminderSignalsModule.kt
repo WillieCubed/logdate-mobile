@@ -7,6 +7,8 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.activity.ActivityPresenter
 import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.CaptureActivitySource
+import app.logdate.client.domain.activity.CurrentCaptureActivity
 import app.logdate.client.domain.activity.KeyValueActivityLogStore
 import app.logdate.client.domain.activity.SuggestionOutcomes
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
@@ -57,11 +59,19 @@ val phoneReminderSignalsModule =
                 enabled = get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
             )
         }
+        single { SuggestionOutcomes(get<KeyValueStorage>()) }
+        single<CaptureActivitySource> {
+            CurrentCaptureActivity(
+                agreed = get<ActivityTracker>().agreed,
+                enabled = get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
+                outcomes = get<SuggestionOutcomes>().outcomes,
+            )
+        }
         single {
             val notes = get<JournalNotesRepository>()
             ActivityPresenter(
                 agreed = get<ActivityTracker>().agreed,
-                outcomes = SuggestionOutcomes(get<KeyValueStorage>()),
+                outcomes = get(),
                 capturedSince = { since -> notes.observeNotesInRange(since, Instant.DISTANT_FUTURE).map { it.isNotEmpty() } },
             )
         }

@@ -12,7 +12,7 @@
 
 ## Before starting
 
-- **Database version.** `main` is on version 54. The stickers branch (`claude/sticker-creation-system-06221b`) already uses `MIGRATION_54_55` and is under active development. Start this plan after it lands, and use the next free version then. The tasks below write `N` for this version and `N-1` for the one before it.
+- **Database version.** This plan takes version 55 (`MIGRATION_54_55`). The stickers branch renumbers its own migration to 55→56 when it rebases onto a `main` with this one. The tasks below write `N` for this version and `N-1` for the one before it.
 - **Step 1 is merged.** `ActivityTracker`, `AgreedActivity` and `FeatureFlag.ACTIVITY_AWARENESS` exist.
 
 ## Global Constraints
@@ -97,29 +97,25 @@ fun JournalNote.withCapturedDuring(capturedDuring: CaptureActivity?): JournalNot
 
 ### Task 5: Stamping captures
 
-**Files:** as listed under Stamping. Add `CurrentCaptureActivity` to `client/domain/.../activity/`:
+**Files:** as listed under Stamping, plus `client/domain/.../notes/AddNoteUseCase.kt` (every new phone note goes through it) and `AttachPhotoToMarkUseCase`/`SaveMarkCaptionUseCase`. Add `CurrentCaptureActivity` to `client/domain/.../activity/`, behind a `CaptureActivitySource` interface that each capture site takes, defaulting to `CaptureActivitySource.None`:
 
 ```kotlin
-/** What a capture made now records, or null while activity awareness is off or nothing is under way. */
+/** What a capture made now records: the walk, ride or trip under way, or the one whose suggestion was acted on in the last 30 minutes. */
 class CurrentCaptureActivity(
-    private val tracker: ActivityTracker,
-) {
-    suspend fun now(): CaptureActivity? =
-        when (tracker.agreed.first().current?.kind) {
-            ActivityKind.MOVING -> CaptureActivity.MOVING
-            ActivityKind.IN_VEHICLE -> CaptureActivity.IN_VEHICLE
-            ActivityKind.SLEEP, null -> null
-        }
-}
+    private val agreed: Flow<AgreedActivity>,
+    private val enabled: Flow<Boolean>,
+    private val outcomes: Flow<List<SuggestionOutcome>>,
+    private val clock: Clock = Clock.System,
+) : CaptureActivitySource
 ```
 
-`tracker.agreed` is already empty while the flag is off.
+A moment started from Home's activity suggestion or the watch's Today card is stamped with that ended activity through the suggestion's ACTED_ON outcome, so no route carries it. A lookup that takes longer than two seconds records nothing, so a capture never waits on it.
 
-- [ ] **Step 1: Write the failing tests**: the watch's `AudioMomentSaver` and `QuickNoteWriter` stamp the current activity; `MarkMomentUseCase` stamps the mark; the phone editor's `toJournalNote` stamps new notes and never changes an existing note's value; `withMarkedCapture` copies the mark's value onto the notes that fill it; a moment started from Home's activity suggestion or the watch's Today card is stamped with that ended activity, passed through `EntryEditorRoute` on the phone; nothing is stamped with the flag off.
-- [ ] **Step 2: Run and confirm failure.** `./gradlew :app:wear:testDebugUnitTest :client:feature:editor:desktopTest :client:domain:jvmTest`
-- [ ] **Step 3: Implement**, injecting `CurrentCaptureActivity` beside each site's time zone stamp. Recovery (`WearRecordingRecovery`) does not stamp, because the activity at recovery time is not the activity at capture time.
+- [ ] **Step 1: Write the failing tests**: the watch's `AudioMomentSaver` and `QuickNoteWriter` stamp the current activity; `MarkMomentUseCase` stamps the mark, but not a mark saved more than two minutes after it was made; `AddNoteUseCase` stamps new notes captured now, never a note that already names one, and never a note written about another time (a visit or a mark); `withMarkedCapture` copies the mark's value onto the notes that fill it; a capture right after acting on a suggestion is stamped with that activity; nothing is stamped with the flag off.
+- [ ] **Step 2: Run and confirm failure.** `./gradlew :app:wear:testDebugUnitTest :client:domain:jvmTest`
+- [ ] **Step 3: Implement**, injecting the source beside each site's time zone stamp. Recovery (`WearRecordingRecovery`) does not stamp, because the activity at recovery time is not the activity at capture time.
 - [ ] **Step 4: Run the tests, then the Wear emulator suite** (`./gradlew :app:wear:wearDevicesGroupDebugAndroidTest`).
-- [ ] **Step 5: Commit** `chore(wear): Record the activity a moment was captured during`.
+- [ ] **Step 5: Commit** `chore(reminders): Record the activity a moment was captured during`.
 
 ### Task 6: Showing it
 
@@ -134,5 +130,5 @@ class CurrentCaptureActivity(
 ## Self-review
 
 - **Spec coverage:** storage, sync, display and the unknown-value rule are covered, plus stamping at every capture site the spec names: `AudioMomentSaver`, `QuickNoteWriter`, `MarkMomentUseCase` and the phone editor.
-- **Open dependency:** the database version waits for the stickers migration.
+- **Database version:** 55, agreed with the stickers work, which moves to 56.
 - **Type names:** `CaptureActivity`, `LenientCaptureActivitySerializer`, `withCapturedDuring`, `CurrentCaptureActivity`, `capturedDuring` / `captured_during` throughout.

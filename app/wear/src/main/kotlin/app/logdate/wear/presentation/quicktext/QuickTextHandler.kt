@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
+import app.logdate.client.domain.activity.CaptureActivitySource
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
@@ -29,6 +30,7 @@ fun QuickTextLauncher(
     notesRepository: JournalNotesRepository,
     locationCaptureCoordinator: WearLocationCaptureCoordinator,
     onDone: () -> Unit,
+    captureActivity: CaptureActivitySource = CaptureActivitySource.None,
 ) {
     val scope = rememberCoroutineScope()
 
@@ -48,6 +50,7 @@ fun QuickTextLauncher(
                             locationCaptureCoordinator = locationCaptureCoordinator,
                             spokenText = spokenText,
                             onDone = onDone,
+                            captureActivity = captureActivity,
                         )
                     }
                 } else {
@@ -84,6 +87,7 @@ internal suspend fun saveQuickTextAndComplete(
     locationCaptureCoordinator: WearLocationCaptureCoordinator,
     spokenText: String,
     onDone: () -> Unit,
+    captureActivity: CaptureActivitySource = CaptureActivitySource.None,
 ) {
     try {
         val now = Clock.System.now()
@@ -96,6 +100,7 @@ internal suspend fun saveQuickTextAndComplete(
                 lastUpdated = now,
                 location = noteLocation,
                 timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                capturedDuring = captureActivity.now(),
             )
         notesRepository.create(note)
         Napier.d("Quick text note saved: ${spokenText.take(30)}...")

@@ -135,6 +135,7 @@ fun WearApp(
                             notesRepository = notesRepository,
                             locationCaptureCoordinator = locationCaptureCoordinator,
                             onDone = navigateBack,
+                            captureActivity = koinInject(),
                         )
                     }
                     entry<WearTimelineRoute> {
