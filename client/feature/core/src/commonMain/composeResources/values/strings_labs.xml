@@ -7,5 +7,10 @@
     <string name="labs_section_unreleased">Unreleased features</string>
     <string name="labs_empty">No unreleased features to try.</string>
     <string name="labs_watch_experience_title">Redesigned watch app</string>
+    <string name="labs_activity_awareness_title">Activity awareness</string>
+    <string name="labs_activity_awareness_description">Reminders wait while you walk, ride or travel, and the end of one can be your reminder. Uses physical activity on this phone and your watch; it stays on your devices.</string>
+    <string name="labs_activity_permission_title">Allow physical activity</string>
+    <string name="labs_activity_permission_description">Activity awareness needs it to tell when you walk, ride or travel.</string>
+    <string name="labs_activity_permission_action">Allow</string>
     <string name="labs_watch_experience_description">The new watch app and its phone screens, on this phone and your watch.</string>
 </resources>

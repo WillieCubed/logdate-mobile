@@ -269,6 +269,11 @@
         </activity-alias>
 
         <receiver
+            android:name="app.logdate.client.activity.PhoneActivityTransitionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
             android:name="app.logdate.client.ambient.AmbientPromptAlarmReceiver"
             android:enabled="true"
             android:exported="false" />

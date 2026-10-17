@@ -65,7 +65,13 @@ class LabsSettingsViewModelTest {
 
         platformsWithoutWatch.forEach { platform ->
             assertFalse(FeatureFlag.WATCH_EXPERIENCE_V2 in labsFlags(platform), "$platform offers the watch switch")
+            assertFalse(FeatureFlag.ACTIVITY_AWARENESS in labsFlags(platform), "$platform offers activity awareness")
         }
+    }
+
+    @Test
+    fun `android phones can try activity awareness`() {
+        assertTrue(FeatureFlag.ACTIVITY_AWARENESS in labsFlags(PlatformKind.Android))
     }
 
     @Test

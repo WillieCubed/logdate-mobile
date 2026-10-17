@@ -2,6 +2,8 @@ package app.logdate.feature.core.settings.ui.labs
 
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.labs_activity_awareness_description
+import logdate.client.feature.core.generated.resources.labs_activity_awareness_title
 import logdate.client.feature.core.generated.resources.labs_watch_experience_description
 import logdate.client.feature.core.generated.resources.labs_watch_experience_title
 import org.jetbrains.compose.resources.StringResource
@@ -24,6 +26,11 @@ internal fun FeatureFlag.labsCopy(): LabsFlagCopy? =
             LabsFlagCopy(
                 title = Res.string.labs_watch_experience_title,
                 description = Res.string.labs_watch_experience_description,
+            )
+        FeatureFlag.ACTIVITY_AWARENESS ->
+            LabsFlagCopy(
+                title = Res.string.labs_activity_awareness_title,
+                description = Res.string.labs_activity_awareness_description,
             )
         else -> null
     }

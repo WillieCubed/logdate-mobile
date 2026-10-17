@@ -7,6 +7,8 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
+import app.logdate.client.domain.activity.ActivityTracker
+import app.logdate.client.domain.activity.toSnapshot
 import app.logdate.client.domain.reminders.LearnedReminderHours
 import app.logdate.client.domain.reminders.ReminderPostedHistory
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
@@ -120,12 +122,20 @@ val phoneWatchSyncV2Module =
                 },
                 features = phoneWatchFeatures,
                 parts =
-                    combine(sessions.getSessionFlow(), campfire(), hours.observe()) { session, fire, waking ->
+                    combine(
+                        sessions.getSessionFlow(),
+                        campfire(),
+                        hours.observe(),
+                        get<FeatureFlagStore>().observe(FeatureFlag.ACTIVITY_AWARENESS),
+                        get<ActivityTracker>().local,
+                    ) { session, fire, waking, aware, activity ->
                         PhoneStateParts(
                             cloud = cloudPresence(session),
                             dayStartHour = preferences.getPreferences().dayStartHour ?: DEFAULT_STREAK_DAY_START_HOUR,
                             campfire = fire?.toSnapshot(Clock.System.now()),
                             reminderHours = waking?.let { ReminderHours(it.wake.toSecondOfDay(), it.sleep.toSecondOfDay()) },
+                            activityAwareness = aware,
+                            activity = activity.toSnapshot(),
                         )
                     },
             )
