@@ -50,6 +50,18 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
+      - name: Fit Gradle memory to the runner
+        # The local defaults (an 8 GB Gradle daemon and a 6 GB Kotlin daemon) grow to about
+        # 14 GB on this 16 GB runner, beside the test JVMs, headless Chrome and the test
+        # services. When memory runs out the runner is shut down mid-job, so CI caps both.
+        run: |
+          gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+          mkdir -p "$gradle_home"
+          {
+            echo 'org.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=1536M -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED'
+            echo 'kotlin.daemon.jvmargs=-Xmx3g'
+          } >> "$gradle_home/gradle.properties"
+
       - name: Run tests
         # JVM/Android and multiplatform modules need both aggregates. Server/client e2e
         # tests belong to their dedicated job rather than running twice.
