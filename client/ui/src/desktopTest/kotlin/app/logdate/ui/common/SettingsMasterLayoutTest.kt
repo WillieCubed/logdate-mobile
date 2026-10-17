@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.isToggleable
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -19,7 +20,6 @@ import app.logdate.ui.theme.Spacing
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class SettingsMasterLayoutTest {
@@ -39,14 +39,19 @@ class SettingsMasterLayoutTest {
             onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) {
                 it(layouts)
             }
-            val layout = layouts.single()
-            val lines =
-                (0 until layout.lineCount).map {
-                    label.substring(layout.getLineStart(it), layout.getLineEnd(it)).trim()
-                }
-            assertFalse(lines.any { it == "s" }, "The switch must not force a word into a lone final letter: $lines")
-            assertTrue(lines.any { "recommendations" in it })
-            assertFalse(layout.hasVisualOverflow)
+            assertFalse(layouts.single().hasVisualOverflow)
+
+            // Where a word wraps depends on the platform's fonts, so check the geometry instead: at
+            // large text the switch moves below the label, and the label gets the toggle's whole
+            // inner width rather than sharing a row with the switch.
+            val labelWidth = onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width
+            val toggleWidth =
+                onAllNodes(isToggleable())
+                    .onFirst()
+                    .fetchSemanticsNode()
+                    .boundsInRoot.width
+            val innerWidth = toggleWidth - with(density) { (Spacing.lg * 2).toPx() }
+            assertEquals(innerWidth, labelWidth, absoluteTolerance = 1f, "The label must span the toggle's full inner width")
             onAllNodes(isToggleable()).assertCountEquals(1)
             onNodeWithText(label).performClick()
             runOnIdle { assertEquals(1, changes) }
