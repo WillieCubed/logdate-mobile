@@ -22,11 +22,16 @@ import androidx.compose.ui.window.Dialog
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.grant_permission
 import logdate.client.feature.editor.generated.resources.open_app_settings
+import logdate.client.feature.editor.generated.resources.permission_explanation_camera
+import logdate.client.feature.editor.generated.resources.permission_explanation_gallery
+import logdate.client.feature.editor.generated.resources.permission_explanation_microphone
+import logdate.client.feature.editor.generated.resources.permission_explanation_other
 import logdate.client.feature.editor.generated.resources.permission_permanently_denied_camera
 import logdate.client.feature.editor.generated.resources.permission_permanently_denied_gallery
 import logdate.client.feature.editor.generated.resources.permission_permanently_denied_microphone
 import logdate.client.feature.editor.generated.resources.permission_required
 import logdate.client.ui.generated.resources.common_not_now
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -81,7 +86,7 @@ fun PermissionRequestContent(
                             else -> stringResource(Res.string.permission_permanently_denied_gallery)
                         }
                     } else {
-                        getPermissionExplanation(permission)
+                        stringResource(permissionExplanation(permission))
                     }
 
                 Text(
@@ -127,22 +132,15 @@ fun PermissionRequestContent(
 /**
  * Returns a user-friendly explanation for why the app needs a specific permission.
  */
-private fun getPermissionExplanation(permission: String): String =
+private fun permissionExplanation(permission: String): StringResource =
     when (permission) {
-        Manifest.permission.CAMERA ->
-            "To take photos directly within the app, we need access to your camera. " +
-                "This allows you to capture moments without leaving the app."
+        Manifest.permission.CAMERA -> Res.string.permission_explanation_camera
 
         Manifest.permission.READ_EXTERNAL_STORAGE,
         "android.permission.READ_MEDIA_IMAGES",
-        ->
-            "To add existing photos from your device, we need access to your media library. " +
-                "This allows you to include your photos in journal entries."
+        -> Res.string.permission_explanation_gallery
 
-        Manifest.permission.RECORD_AUDIO ->
-            "To record audio notes, we need access to your microphone. " +
-                "This allows you to capture voice notes within your journal entries."
+        Manifest.permission.RECORD_AUDIO -> Res.string.permission_explanation_microphone
 
-        else ->
-            "This permission is required for the app to function properly."
+        else -> Res.string.permission_explanation_other
     }
