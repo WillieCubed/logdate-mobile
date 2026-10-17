@@ -59,6 +59,7 @@ fun summarizeDiagnostics(report: SyncDiagnosticReport): DiagnosticUiSummary {
         } ?: DiagnosticAction.NONE
     val retryCondition =
         when {
+            blocker?.reason == DiagnosticReason.NETWORK_POLICY -> DiagnosticRetryCondition.AUTOMATIC
             blocker?.reason == DiagnosticReason.OFFLINE -> DiagnosticRetryCondition.NETWORK
             blocker?.outcome == DiagnosticOutcome.RETRY_SCHEDULED -> DiagnosticRetryCondition.AUTOMATIC
             else ->
@@ -90,6 +91,7 @@ private fun recommendedDiagnosticAction(
     outcome: DiagnosticOutcome,
 ): DiagnosticAction =
     when (reason) {
+        DiagnosticReason.NETWORK_POLICY -> DiagnosticAction.NONE
         DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
         DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
         DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> DiagnosticAction.FREE_SPACE

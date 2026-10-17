@@ -91,11 +91,22 @@ class AndroidSyncManager(
                         is PeriodicSyncScheduleChange.Enable -> {
                             try {
                                 setupPeriodicSync(change.requirement)
+                                defaultSyncManager.releaseUploadBackoff()
                                 resumeScheduledSync()
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
                             } catch (_: Exception) {
                                 Napier.e("Could not schedule authenticated sync")
+                            }
+                        }
+                        PeriodicSyncScheduleChange.ResumeMedia -> {
+                            try {
+                                defaultSyncManager.releaseUploadBackoff()
+                                resumeScheduledSync()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                Napier.w("Media recovery scheduling remains pending")
                             }
                         }
                         PeriodicSyncScheduleChange.Disable -> disableBackgroundSync()

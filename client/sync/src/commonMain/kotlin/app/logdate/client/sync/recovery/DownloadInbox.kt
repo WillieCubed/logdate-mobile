@@ -392,11 +392,12 @@ class DownloadInbox(
         transactions.withTransaction {
             val row = dao.get(selected.owner, selected.origin, type, id) ?: return@withTransaction
             if (row.state == "APPLIED" || (version != null && row.version != version)) return@withTransaction
-            val attempt = (row.attempts + 1).coerceAtMost(30)
-            val delay = (1000L shl attempt.coerceAtMost(12)).coerceAtMost(60 * 60 * 1000L)
+            val policyDeferred = reason == DiagnosticReason.NETWORK_POLICY.name
+            val attempt = if (policyDeferred) row.attempts else (row.attempts + 1).coerceAtMost(30)
+            val delay = if (policyDeferred) 30_000L else (1000L shl attempt.coerceAtMost(12)).coerceAtMost(60 * 60 * 1000L)
             val updated =
                 row.copy(
-                    state = "FAILED",
+                    state = if (policyDeferred) "WAITING" else "FAILED",
                     attempts = attempt,
                     nextAttemptAt = now() + delay,
                     reason = DiagnosticReason.entries.firstOrNull { it.name == reason }?.name ?: DiagnosticReason.UNKNOWN.name,
@@ -409,7 +410,14 @@ class DownloadInbox(
             recordDiagnostic(
                 SyncDiagnosticEvent(
                     phase = if (type.startsWith("MEDIA_")) DiagnosticPhase.MEDIA else DiagnosticPhase.APPLY,
-                    outcome = DiagnosticOutcome.RETRY_SCHEDULED,
+                    outcome =
+                        if (classified ==
+                            DiagnosticReason.NETWORK_POLICY
+                        ) {
+                            DiagnosticOutcome.PAUSED
+                        } else {
+                            DiagnosticOutcome.RETRY_SCHEDULED
+                        },
                     reason = classified,
                     action = actionFor(classified),
                     operationId = row.operationId,
@@ -424,6 +432,7 @@ class DownloadInbox(
 
     private fun actionFor(reason: DiagnosticReason): DiagnosticAction =
         when (reason) {
+            DiagnosticReason.NETWORK_POLICY -> DiagnosticAction.NONE
             DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
             DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
             DiagnosticReason.LOCAL_STORAGE -> DiagnosticAction.RETRY

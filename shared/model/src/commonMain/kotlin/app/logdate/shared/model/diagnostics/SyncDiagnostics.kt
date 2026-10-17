@@ -12,6 +12,7 @@ enum class DiagnosticOutcome { QUEUED, STARTED, SUCCEEDED, FAILED, RETRY_SCHEDUL
 enum class DiagnosticReason {
     NONE,
     OFFLINE,
+    NETWORK_POLICY,
     SIGN_IN_REQUIRED,
     SERVER_UNAVAILABLE,
     RATE_LIMITED,

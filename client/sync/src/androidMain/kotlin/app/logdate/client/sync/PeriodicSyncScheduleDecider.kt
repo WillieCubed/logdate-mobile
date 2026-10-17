@@ -12,6 +12,8 @@ internal sealed interface PeriodicSyncScheduleChange {
         val requirement: PeriodicNetworkRequirement,
     ) : PeriodicSyncScheduleChange
 
+    data object ResumeMedia : PeriodicSyncScheduleChange
+
     data object Disable : PeriodicSyncScheduleChange
 
     data object Unchanged : PeriodicSyncScheduleChange
@@ -19,6 +21,7 @@ internal sealed interface PeriodicSyncScheduleChange {
 
 internal class PeriodicSyncScheduleDecider {
     private var initialized = false
+    private var lastMode: DataUsageMode? = null
     private var scheduledRequirement: PeriodicNetworkRequirement? = null
 
     fun next(
@@ -34,6 +37,7 @@ internal class PeriodicSyncScheduleDecider {
                 }
             initialized = true
             scheduledRequirement = null
+            lastMode = null
             return change
         }
 
@@ -45,12 +49,19 @@ internal class PeriodicSyncScheduleDecider {
             }
         val change =
             if (initialized && scheduledRequirement == requirement) {
-                PeriodicSyncScheduleChange.Unchanged
+                if (mode == DataUsageMode.Unrestricted &&
+                    lastMode != mode
+                ) {
+                    PeriodicSyncScheduleChange.ResumeMedia
+                } else {
+                    PeriodicSyncScheduleChange.Unchanged
+                }
             } else {
                 PeriodicSyncScheduleChange.Enable(requirement)
             }
         initialized = true
         scheduledRequirement = requirement
+        lastMode = mode
         return change
     }
 }

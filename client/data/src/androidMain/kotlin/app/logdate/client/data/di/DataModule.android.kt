@@ -15,6 +15,7 @@ import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
 import app.logdate.client.data.journals.LocalFirstDraftRepository
+import app.logdate.client.data.journals.NativeDraftMediaQuarantine
 import app.logdate.client.data.journals.NoOpJournalDataSource
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
@@ -27,6 +28,7 @@ import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
 import app.logdate.client.data.moments.OfflineFirstMarkedMomentRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
+import app.logdate.client.data.notes.NativeMediaQuarantine
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.notes.StoredMediaReferenceMigration
@@ -213,6 +215,16 @@ actual val dataModule: Module =
             )
         }
         single { StoredMediaReferenceMigrationLauncher { get() } }
+        single {
+            NativeDraftMediaQuarantine(
+                get(
+                    org.koin.core.qualifier
+                        .named("mainDataStore"),
+                ),
+                get(),
+            )
+        }
+        single { NativeMediaQuarantine(get(), get(), get(), get()) }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
             OfflineFirstJournalContentRepository(

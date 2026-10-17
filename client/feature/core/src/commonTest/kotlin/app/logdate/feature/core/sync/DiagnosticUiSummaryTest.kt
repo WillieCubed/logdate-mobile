@@ -12,6 +12,14 @@ import kotlin.test.assertNull
 
 class DiagnosticUiSummaryTest {
     @Test
+    fun `network policy wait resumes automatically without a user action`() {
+        val event = SyncDiagnosticEvent(DiagnosticPhase.MEDIA, DiagnosticOutcome.PAUSED, DiagnosticReason.NETWORK_POLICY)
+        val summary = summarizeDiagnostics(SyncDiagnosticReport("a", events = listOf(event)))
+        assertEquals(DiagnosticRetryCondition.AUTOMATIC, summary.nextRetryCondition)
+        assertEquals(DiagnosticAction.NONE, summary.nextAction)
+    }
+
+    @Test
     fun `summary shows last attempt and separates network wait from scheduled retry`() {
         val event = SyncDiagnosticEvent(DiagnosticPhase.MEDIA, DiagnosticOutcome.FAILED, DiagnosticReason.OFFLINE)
         val offline = summarizeDiagnostics(SyncDiagnosticReport("a", events = listOf(event)))

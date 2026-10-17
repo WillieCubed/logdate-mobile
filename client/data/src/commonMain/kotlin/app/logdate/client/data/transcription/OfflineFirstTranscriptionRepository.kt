@@ -7,6 +7,7 @@ import app.logdate.client.database.entities.TranscriptionEntity
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionPriority
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.repository.transcription.TranscriptDocumentStatus
 import app.logdate.client.repository.transcription.TranscriptionData
@@ -59,6 +60,7 @@ class OfflineFirstTranscriptionRepository(
         automaticJob =
             scope.launch {
                 val attempted = mutableSetOf<Triple<Uuid, String, Long>>()
+                val awaitingOriginal = mutableSetOf<Uuid>()
                 var initialSnapshot = true
                 audioNoteDao
                     .getAllNotes()
@@ -66,7 +68,18 @@ class OfflineFirstTranscriptionRepository(
                         notes to transcripts.associateBy { it.noteId }
                     }.collect { (notes, transcripts) ->
                         for (note in notes) {
-                            if (note.deletedAt != null || note.contentUri.isBlank() || note.contentUri.startsWith("http")) continue
+                            if (note.deletedAt != null ||
+                                note.contentUri.isBlank() ||
+                                note.contentUri.startsWith("http")
+                            ) {
+                                continue
+                            }
+                            if (UnavailableMediaReferences.isUnavailable(note.contentUri)) {
+                                awaitingOriginal.add(note.uid)
+                                continue
+                            }
+                            val recoveredOriginal = awaitingOriginal.remove(note.uid)
+                            val recovery = initialSnapshot || recoveredOriginal
                             val existing = transcripts[note.uid]
                             val mediaRevision = Triple(note.uid, note.contentUri, note.durationMs)
                             val matchesMedia = existing?.matchesMedia(note) != false
@@ -79,15 +92,15 @@ class OfflineFirstTranscriptionRepository(
                                 !final ||
                                 existing.status == DbTranscriptionStatus.PENDING ||
                                 existing.status == DbTranscriptionStatus.FAILED &&
-                                initialSnapshot ||
+                                recovery ||
                                 existing.status == DbTranscriptionStatus.IN_PROGRESS &&
-                                (initialSnapshot || now() - existing.lastUpdated >= staleAfter)
+                                (recovery || now() - existing.lastUpdated >= staleAfter)
                             ) {
                                 if (attempted.add(mediaRevision)) {
-                                    val priority = if (initialSnapshot) TranscriptionPriority.RECOVERY else TranscriptionPriority.FOREGROUND
+                                    val priority = if (recovery) TranscriptionPriority.RECOVERY else TranscriptionPriority.FOREGROUND
                                     requestTranscription(
                                         note.uid,
-                                        resumeActive = initialSnapshot,
+                                        resumeActive = recovery,
                                         priority = priority,
                                     )
                                 }
@@ -112,7 +125,7 @@ class OfflineFirstTranscriptionRepository(
         safely {
             mutate {
                 val note = audioNoteDao.getNoteOneOff(noteId)
-                if (note.deletedAt != null) return@mutate false
+                if (note.deletedAt != null || UnavailableMediaReferences.isUnavailable(note.contentUri)) return@mutate false
                 val existing = transcriptionDao.getTranscriptionByNoteId(noteId)
                 if (existing?.matchesMedia(note) == true && existing.hasValidFinalDocument()) return@mutate true
                 if (!resumeActive &&
@@ -194,7 +207,12 @@ class OfflineFirstTranscriptionRepository(
                 } catch (_: NoSuchElementException) {
                     return@mutate null
                 }
-            if (note.deletedAt != null || note.contentUri != audioUri) return@mutate null
+            if (note.deletedAt != null ||
+                note.contentUri != audioUri ||
+                UnavailableMediaReferences.isUnavailable(audioUri)
+            ) {
+                return@mutate null
+            }
             val existing = transcriptionDao.getTranscriptionByNoteId(noteId)
             if (existing?.matchesMedia(note) == true && existing.hasValidFinalDocument()) return@mutate null
             val row = prepareWorkRow(note, existing, DbTranscriptionStatus.IN_PROGRESS)

@@ -118,6 +118,7 @@ object DiagnosticReportBundles {
 internal fun recommendedAction(reason: DiagnosticReason): DiagnosticAction =
     when (reason) {
         DiagnosticReason.NONE -> DiagnosticAction.NONE
+        DiagnosticReason.NETWORK_POLICY -> DiagnosticAction.NONE
         DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
         DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
         DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> DiagnosticAction.FREE_SPACE

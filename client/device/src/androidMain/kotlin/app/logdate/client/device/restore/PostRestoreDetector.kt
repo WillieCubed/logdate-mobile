@@ -14,10 +14,24 @@ class PostRestoreDetector(
     fun recordRestoreCompleted() =
         synchronized(lock) {
             val id = Uuid.random().toString()
+            writeAtomically(mediaQuarantineFile(), id)
             writeAtomically(pendingRestoreFile(), "delivery-pending:$id")
             writeAtomically(accountRecoveryFile(), id)
             deleteIfPresent(accountResolvedFile())
             writeAtomically(pendingRestoreFile(), "${if (hasDatabase()) CONTENT_PRESENT else CONTENT_MISSING}:$id")
+        }
+
+    fun pendingMediaQuarantineId(): String? =
+        synchronized(lock) {
+            val file = mediaQuarantineFile()
+            if (!file.exists()) null else readIdentifier(file) ?: Uuid.random().toString().also { writeAtomically(file, it) }
+        }
+
+    fun acknowledgeMediaQuarantine(id: String): Boolean =
+        synchronized(lock) {
+            if (readIdentifier(mediaQuarantineFile()) != id) return@synchronized false
+            deleteIfPresent(mediaQuarantineFile())
+            true
         }
 
     fun pendingContentRecoveryId(): String? =
@@ -125,6 +139,8 @@ class PostRestoreDetector(
     private fun initializedFile() = File(context.noBackupFilesDir, ".logdate_device_initialized")
 
     private fun pendingRestoreFile() = File(context.noBackupFilesDir, ".logdate_native_restore_pending")
+
+    private fun mediaQuarantineFile() = File(context.noBackupFilesDir, ".logdate_media_quarantine_pending")
 
     private fun accountRecoveryFile() = File(context.noBackupFilesDir, ".logdate_account_restore_pending")
 

@@ -24,6 +24,9 @@ interface ImageNoteDao {
     @Query("SELECT * FROM image_notes WHERE uid = :uid")
     suspend fun getNoteOneOff(uid: Uuid): ImageNoteEntity
 
+    @Query("SELECT * FROM image_notes WHERE uid = :uid")
+    suspend fun findNoteOneOff(uid: Uuid): ImageNoteEntity?
+
     /**
      * Returns a flow of all [ImageNoteEntity]s.
      */

@@ -43,7 +43,10 @@ internal class NativeMediaRecovery(
     }
 
     private suspend fun isMissingLocal(reference: String?): Boolean =
-        !reference.isNullOrBlank() && !reference.startsWith("https://") && !reference.startsWith("http://") && !media.exists(reference)
+        !reference.isNullOrBlank() &&
+            !reference.startsWith("https://") &&
+            !reference.startsWith("http://") &&
+            !transfer.originalAvailable(reference)
 
     private suspend fun recoverNotes(
         accessToken: String,
