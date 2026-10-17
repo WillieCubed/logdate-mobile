@@ -30,6 +30,19 @@ data class CampfireSnapshot(
 )
 
 /**
+ * A device's activity under way and the last one that ended, as epoch milliseconds. Kinds travel as
+ * names, so a kind a newer device adds reads as no activity instead of making the document unreadable.
+ */
+@Serializable
+data class ActivitySnapshot(
+    val kind: String? = null,
+    val startedAt: Long? = null,
+    val lastEndedKind: String? = null,
+    val lastStartedAt: Long? = null,
+    val lastEndedAt: Long? = null,
+)
+
+/**
  * Fields only the phone writes.
  *
  * @property flags Feature flag values by [app.logdate.client.datastore.featureflags.FeatureFlag.key].
@@ -45,6 +58,7 @@ data class PhoneState(
     val openMarks: Int = 0,
     val features: Set<String> = emptySet(),
     val reminderHours: ReminderHours? = null,
+    val activity: ActivitySnapshot? = null,
 )
 
 @Serializable
@@ -86,6 +100,7 @@ data class WatchState(
     val linkProblem: String? = null,
     val linkId: String? = null,
     val sessionId: String? = null,
+    val activity: ActivitySnapshot? = null,
 )
 
 /**
