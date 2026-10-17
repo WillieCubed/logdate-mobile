@@ -54,7 +54,7 @@ internal class SyncDraftMediaRecovery(
             }
             started = true
             inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.STARTED, source)
-            val result = transfer.hydrateDraftMedia(accessToken, current)
+            val result = transfer.hydrateDraftMedia(accessToken, current) { scope == inbox.currentScope() }
             return applyHydration(scope, draftScope, row, id, current, result, attemptId, source)
         } catch (cancelled: CancellationException) {
             if (started) inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.INTERRUPTED, source)

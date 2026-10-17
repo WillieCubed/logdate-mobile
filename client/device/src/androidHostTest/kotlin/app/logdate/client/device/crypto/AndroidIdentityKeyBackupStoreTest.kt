@@ -3,6 +3,10 @@ package app.logdate.client.device.crypto
 import android.content.Context
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.io.encoding.Base64
@@ -31,6 +35,27 @@ class AndroidIdentityKeyBackupStoreTest {
             every { it.filesDir } returns tempDir
         }
     private val store = AndroidIdentityKeyBackupStore(context)
+
+    @Test
+    fun `concurrent backup agents retain every media identity binding`() =
+        runTest {
+            val identities =
+                (0 until 32).map { index ->
+                    MediaIdentityBackup(Base64.encode(ByteArray(32) { index.toByte() }), ByteArray(32) { (index + 64).toByte() })
+                }
+
+            coroutineScope {
+                identities
+                    .map { identity ->
+                        async(Dispatchers.IO) { AndroidIdentityKeyBackupStore(context).writeMediaIdentity(identity) }
+                    }.awaitAll()
+            }
+
+            val reopened = AndroidIdentityKeyBackupStore(context)
+            identities.forEach { identity ->
+                assertContentEquals(identity.key, reopened.readMediaIdentity(identity.identityBinding)?.key)
+            }
+        }
 
     @Test
     fun `paired account identity and independent media key survive one portable write`() =
@@ -107,6 +132,36 @@ class AndroidIdentityKeyBackupStoreTest {
             file.writeText(corrupted)
 
             assertFailsWith<IllegalStateException> { store.readAccountIdentity() }
+
+            assertEquals(corrupted, file.readText())
+        }
+
+    @Test
+    fun `valid length corrupted paired media key fails integrity validation and preserves the file`() =
+        runTest {
+            val mediaKey = ByteArray(32) { 8 }
+            store.writeAccountIdentity(AccountIdentityBackup("fixture-account", ByteArray(32) { 7 }, mediaKey))
+            val file = File(tempDir, "identity_recovery/account_key_backup")
+            val corrupted = file.readText().replace(Base64.encode(mediaKey), Base64.encode(ByteArray(32) { 9 }))
+            assertTrue(corrupted != file.readText())
+            file.writeText(corrupted)
+
+            assertFailsWith<IllegalStateException> { store.readAccountIdentity() }
+
+            assertEquals(corrupted, file.readText())
+        }
+
+    @Test
+    fun `valid length corrupted bound media key fails integrity validation and preserves the file`() =
+        runTest {
+            val identity = MediaIdentityBackup(Base64.encode(ByteArray(32) { 6 }), ByteArray(32) { 8 })
+            store.writeMediaIdentity(identity)
+            val file = File(tempDir, "identity_recovery/media_key_backup")
+            val corrupted = file.readText().replace(Base64.encode(identity.key), Base64.encode(ByteArray(32) { 9 }))
+            assertTrue(corrupted != file.readText())
+            file.writeText(corrupted)
+
+            assertFailsWith<IllegalStateException> { store.readMediaIdentity(identity.identityBinding) }
 
             assertEquals(corrupted, file.readText())
         }

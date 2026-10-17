@@ -33,6 +33,19 @@ internal class ArchiveMediaRecoveryEngine(
         }.use { sources ->
             val pending = record.pending.map { it.copy(archivePath = sources.path(it)) }
             store.replacePending(record.id, pending)
+            val baseSummary = requireNotNull(record.summary)
+            store.updateProgress(
+                record.id,
+                pending,
+                baseSummary.copy(
+                    recoveryId = record.id,
+                    unavailableOriginals = pending.count { it.role == RecoveryMediaRole.ORIGINAL },
+                    unavailablePreviews = pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
+                    mediaRecoveryChecked = 0,
+                    mediaRecoveryTotal = pending.size,
+                    recoveringMedia = pending.isNotEmpty(),
+                ),
+            )
             val importer =
                 object : MediaImporter {
                     override suspend fun isAvailable(reference: String) =
@@ -69,7 +82,20 @@ internal class ArchiveMediaRecoveryEngine(
                 RepairArchiveMediaUseCase(koin.get(), koin.get()).repair(
                     pending,
                     importer,
-                    onPendingChanged = { store.replacePending(record.id, it) },
+                    onProgress = { progress ->
+                        val summary =
+                            baseSummary.copy(
+                                recoveryId = record.id,
+                                mediaImported = baseSummary.mediaImported + progress.imported,
+                                unavailableOriginals = progress.pending.count { it.role == RecoveryMediaRole.ORIGINAL },
+                                unavailablePreviews = progress.pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
+                                mediaRecoveryChecked = progress.checked,
+                                mediaRecoveryTotal = progress.total,
+                                recoveringMedia = progress.pending.isNotEmpty(),
+                            )
+                        store.updateProgress(record.id, progress.pending, summary)
+                        koin.get<RestoreLauncher>().updateRecovery(summary)
+                    },
                     expectedNoteScope = JournalMergeScope(scope.ownerId, scope.serverOrigin),
                 )
             check(currentArchiveRecoveryScope(koin) == scope) { "Archive recovery account changed" }
@@ -87,6 +113,8 @@ internal class ArchiveMediaRecoveryEngine(
                     unavailableOriginals = result.pending.count { it.role == RecoveryMediaRole.ORIGINAL },
                     unavailablePreviews = result.pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
                     recoveringMedia = retrying,
+                    mediaRecoveryChecked = pending.size,
+                    mediaRecoveryTotal = pending.size,
                 )
             store.finish(record.id, summary)
             return summary

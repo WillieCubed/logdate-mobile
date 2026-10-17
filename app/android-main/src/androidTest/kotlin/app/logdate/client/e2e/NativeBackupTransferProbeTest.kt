@@ -10,6 +10,8 @@ import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.IdentityKeyFingerprint
@@ -24,21 +26,27 @@ import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingSessionOptions
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.sync.AutomaticMediaRecovery
+import app.logdate.client.sync.AutomaticMediaRecoveryResult
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.UploadScope
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
+import app.logdate.shared.model.diagnostics.DiagnosticReason
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -58,6 +66,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -84,6 +93,10 @@ class NativeBackupTransferProbeTest {
                         "quota-cleanup",
                         "missing-keys",
                         "credentials-only",
+                        "source-account-session",
+                        "source-account-session-cleanup",
+                        "data-only",
+                        "partial-media",
                         "compact-transfer",
                         "recording-policy",
                     ),
@@ -97,6 +110,20 @@ class NativeBackupTransferProbeTest {
             }
             ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
             val koin = GlobalContext.get()
+            if (mode == "source-account-session") {
+                val sessions = koin.get<SessionStorage>()
+                assertNull(sessions.getSession(), "Data-only acceptance requires a signed-out synthetic source")
+                val owner = koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId()
+                sessions.saveSession(UserSession("native-acceptance-access", "native-acceptance-refresh", owner))
+                assertEquals(owner, sessions.getSession()?.accountId)
+                return@runBlocking
+            }
+            if (mode == "source-account-session-cleanup") {
+                val sessions = koin.get<SessionStorage>()
+                sessions.clearSession()
+                assertNull(sessions.getSession(), "Synthetic data-only source session was not cleared")
+                return@runBlocking
+            }
             if (mode == "missing-keys") {
                 verifyMissingRecoveryKeys(context, koin)
                 return@runBlocking
@@ -134,12 +161,19 @@ class NativeBackupTransferProbeTest {
                 assertTrue(database.videoNoteDao().getAll().isEmpty(), "Credentials-only restore must not recreate video notes")
                 assertTrue(database.audioNoteDao().getAll().isEmpty(), "Credentials-only restore must not recreate audio notes")
                 assertTrue(
-                    koin.get<JournalRepository>().getAllDrafts().isEmpty(),
-                    "Credentials-only restore must not recreate unfinished drafts",
+                    koin.get<JournalRepository>().getAllDrafts().none { draft ->
+                        draft.blocks
+                            .filterIsInstance<SerializableTextBlock>()
+                            .any { it.content == "Unfinished native-transfer draft" }
+                    },
+                    "Credentials-only restore must not recreate the source's unfinished draft",
                 )
                 return@runBlocking
             }
             val fixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
+            if (mode == "data-only") {
+                assertNull(koin.get<SessionStorage>().getSession(), "Native app-data restore must not invent an account session")
+            }
             if (mode == "compact-transfer") {
                 require(File(context.noBackupFilesDir, "native-backup-fixture.json").isFile) {
                     "Synthetic source fixture required before removing the quota-only row"
@@ -292,6 +326,10 @@ class NativeBackupTransferProbeTest {
                 )
                 if (arguments.getString("sourceRecordingTransferFixture") == "true") {
                     verifyRecordingTransferFixture(context)
+                }
+                if (mode == "partial-media") {
+                    fixture.verifyPartialTransfer(requireNotNull(arguments.getString("expectedMissingMediaPath")))
+                    return@runBlocking
                 }
                 fixture.verifyAndEdit()
             }
@@ -522,6 +560,84 @@ private class NativeJournalFixture(
         verifyMedia(assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri), "proof.png")
         verifyMedia(assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri), "proof.wav")
         verifyMedia(assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri), "proof.mp4")
+    }
+
+    suspend fun verifyPartialTransfer(expectedMissingMediaPath: String) {
+        assertEquals("Native transfer journal", journals.getJournalById(id(1))?.title)
+        assertEquals("Second transferred journal", journals.getJournalById(id(2))?.title)
+        assertEquals("Text retained through native backup", (notes.getNoteById(id(3)) as? JournalNote.Text)?.content)
+        assertNull(notes.getNoteById(id(7)), "deleted content reappeared")
+        val image = assertNotNull(notes.getNoteById(id(4)) as? JournalNote.Image)
+        val audio = assertNotNull(notes.getNoteById(id(5)) as? JournalNote.Audio)
+        val video = assertNotNull(notes.getNoteById(id(6)) as? JournalNote.Video)
+        val draft = assertNotNull(journals.getDraft(id(10)))
+        assertEquals("Unfinished native-transfer draft", (draft.blocks[0] as? SerializableTextBlock)?.content)
+
+        val mediaReferences =
+            listOf(
+                image.mediaRef to "proof.png",
+                audio.mediaRef to "proof.wav",
+                video.mediaRef to "proof.mp4",
+                assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri) to "proof.png",
+                assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri) to "proof.wav",
+                assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri) to "proof.mp4",
+            )
+        val missingFile =
+            File(
+                InstrumentationRegistry.getInstrumentation().targetContext.filesDir,
+                expectedMissingMediaPath.removePrefix("files/"),
+            )
+        assertFalse(missingFile.exists(), "The native transport unexpectedly delivered its deliberately omitted original")
+        withTimeout(30_000) {
+            while (
+                mediaReferences.any { (reference, _) ->
+                    !media.exists(reference) && !UnavailableMediaReferences.isUnavailable(reference)
+                }
+            ) {
+                delay(50)
+            }
+        }
+        val unavailable = mediaReferences.filter { (reference, _) -> UnavailableMediaReferences.isUnavailable(reference) }
+        val available = mediaReferences.filterNot { (reference, _) -> UnavailableMediaReferences.isUnavailable(reference) }
+        assertTrue(unavailable.isNotEmpty(), "The omitted original was not retained as recoverable media")
+        assertTrue(available.isNotEmpty(), "The partial restore incorrectly marked every original unavailable")
+        unavailable.forEach { (reference, _) ->
+            assertNotNull(UnavailableMediaReferences.nativeSource(reference), "Missing original lost its source reference")
+        }
+        available.forEach { (reference, name) -> verifyMedia(reference, name) }
+
+        assertNull(GlobalContext.get().get<SessionStorage>().getSession(), "Partial native restore unexpectedly recovered sign-in")
+        val missingNote =
+            listOf(
+                Triple(image.uid, "image", image.mediaRef),
+                Triple(audio.uid, "audio", audio.mediaRef),
+                Triple(video.uid, "video", video.mediaRef),
+            ).first { (_, _, reference) -> UnavailableMediaReferences.isUnavailable(reference) }
+        val owner =
+            GlobalContext
+                .get()
+                .get<CanonicalOwnerProvider>()
+                .getCanonicalOwnerId()
+        val origin =
+            GlobalContext
+                .get()
+                .get<LogDateConfigRepository>()
+                .getCurrentBackendUrl()
+                .trimEnd('/')
+        val result =
+            GlobalContext.get().get<AutomaticMediaRecovery>().recover(
+                missingNote.first,
+                null,
+                missingNote.second,
+                missingNote.third,
+                missingNote.third,
+                UploadScope(owner, origin),
+            )
+        assertEquals(
+            DiagnosticReason.SIGN_IN_REQUIRED,
+            assertIs<AutomaticMediaRecoveryResult.Pending>(result).reason,
+            "Unavailable originals must remain pending until their cloud recovery scope is available",
+        )
     }
 
     private suspend fun save(

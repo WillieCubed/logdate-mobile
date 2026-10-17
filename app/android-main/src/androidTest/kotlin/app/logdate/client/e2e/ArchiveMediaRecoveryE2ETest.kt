@@ -244,6 +244,8 @@ class ArchiveMediaRecoveryE2ETest {
             assertEquals(0, repaired.unavailableOriginals)
             assertEquals(0, repaired.unavailablePreviews)
             assertEquals(3, repaired.mediaImported)
+            assertEquals(2, repaired.mediaRecoveryChecked)
+            assertEquals(2, repaired.mediaRecoveryTotal)
             verifyEdits(state)
             verifyOriginals(state)
             assertFalse(

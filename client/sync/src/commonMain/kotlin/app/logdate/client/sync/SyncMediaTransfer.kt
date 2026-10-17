@@ -144,6 +144,7 @@ internal class SyncMediaTransfer(
     suspend fun hydrateDraftMedia(
         accessToken: String,
         draft: EditorDraft,
+        isStillCurrent: (() -> Boolean)? = null,
     ): DraftMediaHydrationResult {
         val mappings = mutableListOf<DraftAssetMapping>()
         val blocks = draft.blocks.toMutableList()
@@ -155,7 +156,7 @@ internal class SyncMediaTransfer(
             reference: String?,
         ): String? =
             try {
-                hydrateDraftAsset(accessToken, draft.id, blockId, kind, reference, mappings)
+                hydrateDraftAsset(accessToken, draft.id, blockId, kind, reference, mappings, isStillCurrent)
             } catch (error: DraftMediaFailure) {
                 failures += error.reason
                 reference
@@ -202,8 +203,10 @@ internal class SyncMediaTransfer(
         kind: String,
         uri: String?,
         mappings: MutableList<DraftAssetMapping>,
+        isStillCurrent: (() -> Boolean)? = null,
     ): String? {
         if (uri == null) return null
+        if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
         if (originalAvailable(uri)) return uri
         val cached = mediaSyncRefStore.getDraftAsset(draftId, blockId, kind)
         val remote = if (isRemoteRef(uri)) uri else cached?.takeIf { matchesLocalFile(it, uri) }?.remoteUrl
@@ -232,11 +235,16 @@ internal class SyncMediaTransfer(
                 )
             }
         if (downloaded.contentId != blockId) throw DraftMediaFailure(DiagnosticReason.CORRUPT_PAYLOAD)
+        if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
         val localUri =
             try {
-                mediaManager.saveMedia(
-                    MediaPayload(downloaded.fileName, downloaded.mimeType, downloaded.data.size.toLong(), downloaded.data),
-                )
+                val payload = MediaPayload(downloaded.fileName, downloaded.mimeType, downloaded.data.size.toLong(), downloaded.data)
+                if (isStillCurrent == null) {
+                    mediaManager.saveMedia(payload)
+                } else {
+                    val conditionalSaver = mediaManager as? ConditionalMediaSaver ?: error("Conditional media saver unavailable")
+                    conditionalSaver.saveMedia(payload) { isStillCurrent() }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

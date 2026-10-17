@@ -93,6 +93,7 @@
     <string name="last_export_path">Last export: %1$s</string>
     <string name="warnings_count">Warnings: %1$d</string>
     <string name="restore_recovering_description">Your journal is ready to use while files recover.</string>
+    <string name="restore_media_recovery_progress">Checked %1$d of %2$d media items.</string>
     <string name="restore_recovering_media">Recovering files</string>
     <string name="restore_resuming_title">Finishing your import</string>
     <string name="restore_resuming_description">Your saved entries are available while the import continues.</string>

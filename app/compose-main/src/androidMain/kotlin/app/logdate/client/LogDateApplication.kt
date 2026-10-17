@@ -95,8 +95,8 @@ class LogdateApplication :
     private suspend fun quarantineRestoredMedia() {
         val detector = PostRestoreDetector(this)
         val delivery = detector.pendingMediaQuarantineId() ?: return
-        get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
-        check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
+        val checksComplete = get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
+        if (checksComplete) check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
     }
 
     override fun newImageLoader(context: Context): ImageLoader =
@@ -330,8 +330,11 @@ internal object ApplicationStartupCoordinator {
                             val detector = PostRestoreDetector(application)
                             val delivery = detector.pendingMediaQuarantineId()
                             if (delivery != null) {
-                                koin.get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
-                                check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
+                                val checksComplete =
+                                    koin.get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
+                                if (checksComplete) {
+                                    check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
+                                }
                             }
                             koin.get<AndroidPlatformSearchIndexManager>()
                             AndroidApplicationRuntime(application, koin).start()

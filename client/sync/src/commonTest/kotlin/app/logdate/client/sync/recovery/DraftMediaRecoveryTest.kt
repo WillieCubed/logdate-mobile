@@ -1,6 +1,8 @@
 package app.logdate.client.sync.recovery
 
+import app.logdate.client.media.ConditionalMediaSaver
 import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.sync.InMemoryKeyValueStorage
 import app.logdate.client.sync.SyncMediaTransfer
 import app.logdate.client.sync.cloud.CloudMediaDataSource
@@ -12,17 +14,90 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.DraftChange
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class DraftMediaRecoveryTest {
+    @Test
+    fun `an account switch during sync draft media save leaves bytes and retry work uncommitted`() =
+        runTest {
+            val database = DownloadInboxTest.Database()
+            var scope = DownloadScope("owner", "origin")
+            val inbox = DownloadInbox(database, database, { scope }, { 1L })
+            val timestamp = Instant.fromEpochMilliseconds(1)
+            val blockId = Uuid.random()
+            val draft =
+                EditorDraft(
+                    Uuid.random(),
+                    listOf(SerializableImageBlock(blockId, timestamp, uri = "https://example.invalid/media/original")),
+                    createdAt = timestamp,
+                    lastModifiedAt = timestamp,
+                )
+            val drafts = FakeJournalRepository()
+            drafts.saveDraftFromSync(draft)
+            inbox.stage("DRAFT", 1, listOf(WireDownload(draft.id.toString(), 1, false, "")), scope)
+            inbox.applied("DRAFT", draft.id.toString(), 1, scope)
+            inbox.stage("MEDIA_DRAFT", 1, listOf(WireDownload(draft.id.toString(), 1, false, "")), scope)
+            val saveStarted = CompletableDeferred<Unit>()
+            val finishSave = CompletableDeferred<Unit>()
+            val media =
+                object : InMemoryMediaManager(), ConditionalMediaSaver {
+                    override suspend fun saveMedia(payload: MediaPayload): String {
+                        saveStarted.complete(Unit)
+                        finishSave.await()
+                        return super.saveMedia(payload)
+                    }
+
+                    override suspend fun saveMedia(
+                        payload: MediaPayload,
+                        canCommit: () -> Boolean,
+                    ): String {
+                        saveStarted.complete(Unit)
+                        finishSave.await()
+                        if (!canCommit()) throw CancellationException("Media hydration scope changed")
+                        return super.saveMedia(payload)
+                    }
+                }
+            val cloud =
+                object : CloudMediaDataSource {
+                    override suspend fun uploadMedia(
+                        accessToken: String,
+                        contentId: Uuid,
+                        media: app.logdate.client.media.MediaFileSource,
+                    ): Result<MediaUploadResult> = error("No upload expected")
+
+                    override suspend fun downloadMedia(
+                        accessToken: String,
+                        mediaId: String,
+                    ): Result<MediaFile> = Result.success(MediaFile(blockId, "original.jpg", "image/jpeg", 1, byteArrayOf(1)))
+                }
+            val refs = KeyValueMediaSyncRefStore(InMemoryKeyValueStorage(), { scope.origin }, { scope.owner })
+            val recovery = SyncDraftMediaRecovery(inbox, drafts, SyncMediaTransfer(media, refs, cloud), refs, database)
+
+            val inFlight = async { recovery.recover("token") }
+            saveStarted.await()
+            scope = DownloadScope("replacement-owner", "replacement-origin")
+            finishSave.complete(Unit)
+
+            assertFailsWith<CancellationException> { inFlight.await() }
+            assertFalse(media.exists("file:///tmp/original.jpg"))
+            assertEquals(draft, drafts.getDraft(draft.id))
+            assertEquals("WAITING", database.get("owner", "origin", "MEDIA_DRAFT", draft.id.toString())?.state)
+            assertEquals(null, refs.getDraftAsset(draft.id, blockId, "image"))
+        }
+
     @Test
     fun `completed draft attachments remain linked when a later attachment fails`() =
         runTest {

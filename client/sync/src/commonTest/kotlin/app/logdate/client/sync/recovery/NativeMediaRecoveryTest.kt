@@ -279,6 +279,41 @@ class NativeMediaRecoveryTest {
         }
 
     @Test
+    fun `an account switch during draft media save does not commit old-scope bytes`() =
+        runTest {
+            val source = "content://media/external/images/media/890"
+            val quarantined = UnavailableMediaReferences.nativeRestore(source)
+            val block = SerializableImageBlock(Uuid.random(), timestamp, uri = quarantined, caption = "Retained")
+            val draft = EditorDraft(Uuid.random(), listOf(block), createdAt = timestamp, lastModifiedAt = timestamp)
+            owner = block.id
+            drafts.saveDraftFromSync(draft)
+            refs.upsertDraftAsset(
+                draft.id,
+                block.id,
+                "image",
+                mapping(block.id).copy(localUri = source, localAliases = listOf(quarantined)),
+            )
+
+            val saveStarted = CompletableDeferred<Unit>()
+            val finishSave = CompletableDeferred<Unit>()
+            media.onSave = {
+                saveStarted.complete(Unit)
+                finishSave.await()
+            }
+            val inFlight = async { recovery().recover("token", EntityType.DRAFT) }
+
+            saveStarted.await()
+            selectedScope = DownloadScope("replacement-owner", "replacement-origin")
+            finishSave.complete(Unit)
+
+            assertFailsWith<CancellationException> { inFlight.await() }
+            assertFalse(media.exists("file:///tmp/original.jpg"), "Old-scope media must not become durable after an account switch")
+            assertEquals(draft, drafts.getDraft(draft.id))
+            assertEquals("WAITING", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_DRAFT", draft.id.toString())?.state)
+            assertNull(refs.getDraftAssetScoped(draft.id, block.id, "image", UploadScope("replacement-owner", "replacement-origin")))
+        }
+
+    @Test
     fun `a scope switch after media commit finishes recovery under the captured scope`() =
         runTest {
             val source = "content://media/external/images/media/101"
