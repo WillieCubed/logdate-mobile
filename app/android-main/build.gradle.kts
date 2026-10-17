@@ -401,13 +401,33 @@ kotlin {
     }
 }
 
+// The preview renderer keeps native memory for every preview it renders until its process exits.
+// CI runners have far less memory than a development machine, so CI restarts the renderer for
+// each preview class, uses a smaller heap, and splits the previews across runners with
+// comma-separated test patterns.
+val screenshotTestMaxHeap = providers.gradleProperty("logdate.screenshotTest.maxHeap").orElse("12g")
+val screenshotTestForkEvery = providers.gradleProperty("logdate.screenshotTest.forkEvery").map(String::toLong)
+val screenshotTestInclude = providers.gradleProperty("logdate.screenshotTest.include")
+val screenshotTestExclude = providers.gradleProperty("logdate.screenshotTest.exclude")
+
+fun patterns(property: Provider<String>): List<String> =
+    property.orNull
+        ?.split(',')
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        .orEmpty()
+
 tasks.withType<Test>().configureEach {
-    maxHeapSize =
-        if (name.contains("Screenshot", ignoreCase = true)) {
-            "12g"
-        } else {
-            "4g"
+    if (name.contains("Screenshot", ignoreCase = true)) {
+        maxHeapSize = screenshotTestMaxHeap.get()
+        screenshotTestForkEvery.orNull?.let { forkEvery = it }
+        filter {
+            patterns(screenshotTestInclude).forEach { includeTestsMatching(it) }
+            patterns(screenshotTestExclude).forEach { excludeTestsMatching(it) }
         }
+    } else {
+        maxHeapSize = "4g"
+    }
 }
 
 tasks.configureEach {
