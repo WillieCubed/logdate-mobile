@@ -176,8 +176,13 @@ val wearSyncV2Module =
         }
     }
 
+/**
+ * What this watch build implements. It reads the activity reminder triggers; reminders reach the watch
+ * only once it also lists [WearFeatures.REMINDERS], which waits for paired delivery to be verified.
+ */
 internal val watchSyncFeatures =
     setOf(
+        WearFeatures.ACTIVITY_REMINDERS,
         WearFeatures.LIVE,
         WearFeatures.LINK_CLOUD,
         WearFeatures.RECEIPTS,

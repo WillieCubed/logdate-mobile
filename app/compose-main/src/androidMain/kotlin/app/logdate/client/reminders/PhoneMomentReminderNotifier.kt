@@ -133,6 +133,8 @@ class PhoneMomentReminderNotifier(
 
     private fun content(trigger: ReminderTrigger): Pair<Int, Int> =
         when (trigger) {
+            ReminderTrigger.MOVING_ENDED -> R.string.moment_reminder_moving_title to R.string.moment_reminder_moving_body
+            ReminderTrigger.TRIP_ENDED -> R.string.moment_reminder_trip_title to R.string.moment_reminder_trip_body
             ReminderTrigger.WORKOUT_ENDED -> R.string.moment_reminder_workout_title to R.string.moment_reminder_workout_body
             ReminderTrigger.ARRIVED_SOMEWHERE_NEW -> R.string.moment_reminder_arrival_title to R.string.moment_reminder_arrival_body
             ReminderTrigger.CAMPFIRE_EMBERS -> R.string.moment_reminder_campfire_title to R.string.moment_reminder_campfire_body
