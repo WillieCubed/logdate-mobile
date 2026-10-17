@@ -42,16 +42,35 @@ permissions:
 
 jobs:
   android-wear-screenshots:
-    name: ${{ matrix.platform }} screenshots
+    name: ${{ matrix.platform }} screenshots${{ matrix.shard && format(' ({0})', matrix.shard) || '' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
+        # The phone previews are split across runners so that each one finishes within its
+        # memory and time limits. The last shard takes everything the others do not, so new
+        # preview packages are always validated.
         include:
           - platform: Android
+            shard: audit
             module: android-main
+            include: app.logdate.screenshots.audit.*
             # Match the rendering host used for the committed pixel-exact references.
+            runner: macos-latest
+            distribution: jetbrains
+            java-version: '21'
+          - platform: Android
+            shard: components
+            module: android-main
+            include: app.logdate.screenshots.components.*
+            runner: macos-latest
+            distribution: jetbrains
+            java-version: '21'
+          - platform: Android
+            shard: remaining
+            module: android-main
+            exclude: app.logdate.screenshots.audit.*,app.logdate.screenshots.components.*
             runner: macos-latest
             distribution: jetbrains
             java-version: '21'
@@ -86,19 +105,49 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Fit Gradle memory to the runner
+        # macOS runners have about 7 GB of memory, which cannot hold the local defaults: an
+        # 8 GB Gradle daemon, a 6 GB Kotlin daemon and a 12 GB preview renderer. The renderer
+        # also keeps native memory for every preview until its process exits, and it was
+        # killed partway through the previews. CI compiles first, stops both daemons, and then
+        # renders with a smaller heap in a fresh renderer for each preview class.
+        run: |
+          gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+          mkdir -p "$gradle_home"
+          {
+            echo 'org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1536M -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED'
+            echo 'kotlin.daemon.jvmargs=-Xmx3g'
+            echo 'logdate.screenshotTest.maxHeap=3g'
+            echo 'logdate.screenshotTest.forkEvery=1'
+          } >> "$gradle_home/gradle.properties"
+
+      - name: Compile ${{ matrix.platform }} screenshot tests
+        run: ./gradlew :app:${{ matrix.module }}:compileDebugScreenshotTestKotlin
+
+      - name: Release compiler memory
+        run: |
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
+
       - name: Validate ${{ matrix.platform }} screenshots
         timeout-minutes: 40
         env:
           # Fixture instants were recorded in this zone; keep date/time labels reproducible.
           TZ: America/Los_Angeles
           JAVA_TOOL_OPTIONS: -Duser.timezone=America/Los_Angeles
-        run: ./gradlew :app:${{ matrix.module }}:validateDebugScreenshotTest --continue
+          SCREENSHOT_INCLUDE: ${{ matrix.include }}
+          SCREENSHOT_EXCLUDE: ${{ matrix.exclude }}
+        run: |
+          shard_args=()
+          if [ -n "$SCREENSHOT_INCLUDE" ]; then shard_args+=("-Plogdate.screenshotTest.include=$SCREENSHOT_INCLUDE"); fi
+          if [ -n "$SCREENSHOT_EXCLUDE" ]; then shard_args+=("-Plogdate.screenshotTest.exclude=$SCREENSHOT_EXCLUDE"); fi
+          ./gradlew :app:${{ matrix.module }}:validateDebugScreenshotTest --continue "${shard_args[@]}"
 
       - name: Upload ${{ matrix.platform }} screenshot reports
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: ${{ matrix.module }}-screenshot-report
+          name: ${{ matrix.module }}${{ matrix.shard && format('-{0}', matrix.shard) || '' }}-screenshot-report
           path: |
             app/${{ matrix.module }}/build/outputs/screenshotTest-results/
             app/${{ matrix.module }}/build/test-results/validateDebugScreenshotTest/
