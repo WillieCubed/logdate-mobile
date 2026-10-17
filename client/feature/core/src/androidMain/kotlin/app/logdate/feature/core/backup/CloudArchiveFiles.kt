@@ -49,6 +49,20 @@ internal suspend fun pruneAbandonedCloudArchives(context: Context) {
                         }
                     }
                 }
+                workManager.getWorkInfosByTag(CloudRestoreWorker.WORK_TAG).get().forEach { work ->
+                    if (!work.state.isFinished) {
+                        if (work.tags.contains(CloudRestoreWorker.WORK_TAG)) {
+                            names += "cloud-restore-${work.id}.zip"
+                            names += "cloud-restore-${work.id}.plain.part"
+                            names += "cloud-restore-${work.id}.encrypted.part"
+                            context.noBackupFilesDir
+                                .listFiles()
+                                .orEmpty()
+                                .filter { it.name.startsWith("cloud-restore-") && it.name.endsWith(".zip") }
+                                .forEach { names += it.name }
+                        }
+                    }
+                }
                 names
             }
         } catch (cancellation: CancellationException) {

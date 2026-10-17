@@ -7,9 +7,11 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.restore.PostRestoreDetector
 import io.github.aakira.napier.Napier
+import java.security.MessageDigest
 
 /** Schedules an authenticated cloud restore without affecting local/offline data. */
 class CloudRestoreScheduler(
@@ -31,12 +33,34 @@ class CloudRestoreScheduler(
                         .Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
                         .build(),
-                ).build()
+                ).addTag(CloudRestoreWorker.WORK_TAG)
+                .build()
         workManager.enqueueUniqueWork(
-            CloudRestoreWorker.WORK_NAME,
+            workName(session, delivery),
             ExistingWorkPolicy.KEEP,
             request,
         )
         Napier.d("Enqueued LogDate Cloud restore")
+    }
+
+    companion object {
+        fun workName(
+            session: OriginBoundSession?,
+            deliveryId: String? = null,
+        ): String = "${CloudRestoreWorker.WORK_NAME}:${scopeDigest(session, deliveryId)}"
+
+        fun deliveryWorkTag(
+            deliveryId: String,
+            session: OriginBoundSession,
+        ): String = "${CloudRestoreWorker.WORK_TAG}:delivery:${scopeDigest(session, deliveryId)}"
+
+        private fun scopeDigest(
+            session: OriginBoundSession?,
+            deliveryId: String?,
+        ): String {
+            val scope = "${session?.let { "${it.origin}\n${it.session.accountId}" } ?: "no-session"}\n${deliveryId.orEmpty()}"
+            val digest = MessageDigest.getInstance("SHA-256").digest(scope.encodeToByteArray())
+            return digest.joinToString("") { byte -> (byte.toInt() and 0xff).toString(16).padStart(2, '0') }
+        }
     }
 }

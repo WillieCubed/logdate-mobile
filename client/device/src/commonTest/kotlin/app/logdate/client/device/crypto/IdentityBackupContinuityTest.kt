@@ -175,6 +175,24 @@ class IdentityBackupContinuityTest {
         }
 
     @Test
+    fun `unreadable retained phrase cannot be mistaken for an empty store and replaced by a new identity`() =
+        runTest {
+            val unreadable =
+                object : IdentityKeyBackupStore by backup {
+                    override suspend fun readPhrase(): String? = null
+
+                    override suspend fun hasBackup(): Boolean = true
+                }
+            val freshStorage = InMemorySecureStorage()
+            val freshManager = IdentityKeyManager(freshStorage, crypto, unreadable)
+
+            assertFailsWith<IllegalStateException> { freshManager.ensureIdentityKey() }
+
+            assertFalse(freshManager.hasIdentityKey())
+            assertTrue(unreadable.hasBackup())
+        }
+
+    @Test
     fun `primary phrase cannot overwrite a different valid retained phrase`() =
         runTest {
             val phrase = manager.setupNewIdentity()

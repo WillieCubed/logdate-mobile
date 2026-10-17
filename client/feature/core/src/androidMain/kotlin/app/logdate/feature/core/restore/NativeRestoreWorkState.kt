@@ -24,8 +24,21 @@ class NativeRestoreWorkState(
         return current.session.accountId == owner && current.origin == origin
     }
 
-    fun complete() {
-        if (deliveryId != null && isCurrent()) detector.acknowledgeContentRecovery(deliveryId)
+    suspend fun complete(expectedSession: OriginBoundSession? = sessions.getOriginBoundSession()): Boolean {
+        if (deliveryId == null || !detector.isContentRecoveryCurrent(deliveryId)) return true
+        val owner = input.getString(OWNER_KEY)
+        val origin = input.getString(ORIGIN_KEY)
+        if ((owner != null || origin != null) &&
+            (expectedSession?.session?.accountId != owner || expectedSession?.origin != origin)
+        ) {
+            return false
+        }
+        var acknowledged = false
+        val sessionCurrent =
+            sessions.runIfSessionCurrent(expectedSession) {
+                acknowledged = detector.acknowledgeContentRecovery(deliveryId)
+            }
+        return sessionCurrent || !detector.isContentRecoveryCurrent(deliveryId) || acknowledged
     }
 
     companion object {

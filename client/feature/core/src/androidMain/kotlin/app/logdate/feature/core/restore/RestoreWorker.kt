@@ -223,7 +223,7 @@ class RestoreWorker(
         if (summary.unavailableOriginals + summary.unavailablePreviews > 0) {
             ArchiveRecoveryScheduler.enqueue(context, requireNotNull(store.read(recoveryId)))
         }
-        attempt.native.complete()
+        if (!attempt.native.complete()) return Result.retry()
         trySetForeground(notificationHelper.createCompletionInfo(summary.unavailableOriginals + summary.unavailablePreviews))
         completeRestore(RestoreOutcome.Success(summary))
         reportDiagnostic(DiagnosticOutcome.SUCCEEDED, attempt.source, attempt.diagnosticId)

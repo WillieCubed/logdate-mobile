@@ -120,6 +120,43 @@ class ArchiveRecoveryReadinessTest {
         }
 
     @Test
+    fun `readiness changes replace a delayed retry without duplicating queued or running work`() =
+        runTest {
+            val gate = ArchiveRecoveryScheduleGate()
+            var delayedRetry = true
+            var waiting = true
+            var replacements = 0
+            var enqueues = 0
+
+            gate.enqueue(
+                hasWaiting = { waiting },
+                enqueueSuccessor = { enqueues++ },
+                isDelayedRetry = { delayedRetry },
+                replaceDelayedRetry = {
+                    replacements++
+                    delayedRetry = false
+                },
+            )
+            gate.enqueue(
+                hasWaiting = { waiting },
+                enqueueSuccessor = { enqueues++ },
+                isDelayedRetry = { delayedRetry },
+                replaceDelayedRetry = { replacements++ },
+            )
+
+            assertEquals(1, replacements)
+            assertEquals(0, enqueues)
+            waiting = false
+            gate.enqueue(
+                hasWaiting = { waiting },
+                enqueueSuccessor = { enqueues++ },
+                isDelayedRetry = { delayedRetry },
+                replaceDelayedRetry = { replacements++ },
+            )
+            assertEquals(1, enqueues)
+        }
+
+    @Test
     fun `unchanged unavailable or corrupt content waits for readiness rather than spinning`() {
         listOf(
             DiagnosticReason.MISSING_MEDIA,

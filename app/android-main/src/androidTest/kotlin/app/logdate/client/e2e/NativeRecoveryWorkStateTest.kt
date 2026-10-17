@@ -16,6 +16,7 @@ import app.logdate.feature.core.restore.NativeRestoreWorkState
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.koin.androidx.workmanager.factory.KoinWorkerFactory
 import java.io.File
@@ -48,41 +49,45 @@ class NativeRecoveryWorkStateTest {
     }
 
     @Test
-    fun `successful import acknowledges its native delivery and cannot replay at restart`() {
-        detector.recordRestoreCompleted()
-        val delivery = assertNotNull(detector.pendingContentRecoveryId())
-        val data = NativeRestoreWorkState.bind(Data.Builder(), delivery, sessions.getOriginBoundSession()).build()
-        val work = NativeRestoreWorkState(context, data, sessions)
-        assertTrue(work.isCurrent())
-        work.complete()
-        assertFalse(work.isCurrent())
-        assertEquals(PostRestoreType.NONE, PostRestoreDetector(context).detect(true))
-    }
+    fun `successful import acknowledges its native delivery and cannot replay at restart`() =
+        runTest {
+            detector.recordRestoreCompleted()
+            val delivery = assertNotNull(detector.pendingContentRecoveryId())
+            val data = NativeRestoreWorkState.bind(Data.Builder(), delivery, sessions.getOriginBoundSession()).build()
+            val work = NativeRestoreWorkState(context, data, sessions)
+            assertTrue(work.isCurrent())
+            work.complete()
+            assertFalse(work.isCurrent())
+            assertEquals(PostRestoreType.NONE, PostRestoreDetector(context).detect(true))
+        }
 
     @Test
-    fun `changed account cannot apply or acknowledge queued native recovery`() {
-        detector.recordRestoreCompleted()
-        val delivery = assertNotNull(detector.pendingContentRecoveryId())
-        val data = NativeRestoreWorkState.bind(Data.Builder(), delivery, sessions.getOriginBoundSession()).build()
-        sessions.current = UserSession("synthetic-access", "synthetic-refresh", "another-owner")
-        val work = NativeRestoreWorkState(context, data, sessions)
-        assertFalse(work.isCurrent())
-        work.complete()
-        assertEquals(delivery, detector.pendingContentRecoveryId())
-    }
+    fun `changed account cannot apply or acknowledge queued native recovery`() =
+        runTest {
+            detector.recordRestoreCompleted()
+            val delivery = assertNotNull(detector.pendingContentRecoveryId())
+            val data = NativeRestoreWorkState.bind(Data.Builder(), delivery, sessions.getOriginBoundSession()).build()
+            sessions.current = UserSession("synthetic-access", "synthetic-refresh", "another-owner")
+            val work = NativeRestoreWorkState(context, data, sessions)
+            assertFalse(work.isCurrent())
+            work.complete()
+            assertEquals(delivery, detector.pendingContentRecoveryId())
+        }
 
     @Test
-    fun `a newer delivery cannot be completed by an older queued worker`() {
-        detector.recordRestoreCompleted()
-        val old = assertNotNull(detector.pendingContentRecoveryId())
-        val data = NativeRestoreWorkState.bind(Data.Builder(), old, sessions.getOriginBoundSession()).build()
-        detector.recordRestoreCompleted()
-        val current = detector.pendingContentRecoveryId()
-        val work = NativeRestoreWorkState(context, data, sessions)
-        assertFalse(work.isCurrent())
-        work.complete()
-        assertEquals(current, detector.pendingContentRecoveryId())
-    }
+    fun `a newer delivery cannot be completed by an older queued worker`() =
+        runTest {
+            detector.recordRestoreCompleted()
+            val old = assertNotNull(detector.pendingContentRecoveryId())
+            val data = NativeRestoreWorkState.bind(Data.Builder(), old, sessions.getOriginBoundSession()).build()
+            context.getDatabasePath("logdate").writeBytes(byteArrayOf(1, 2, 3))
+            detector.recordRestoreCompleted()
+            val current = detector.pendingContentRecoveryId()
+            val work = NativeRestoreWorkState(context, data, sessions)
+            assertFalse(work.isCurrent())
+            work.complete()
+            assertEquals(current, detector.pendingContentRecoveryId())
+        }
 
     @Test
     fun `the production dependency graph constructs the cloud restore worker`() {

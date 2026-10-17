@@ -62,6 +62,7 @@ open class NativeBackupAgent : BackupAgent() {
             runBlocking(Dispatchers.IO) {
                 withTimeoutOrNull(15_000) {
                     resetRestoredInstallationState(preferences)
+                    PostRestoreDetector(this@NativeBackupAgent).refreshRestoreFingerprint()
                     restoreAccount(preferences)
                 }
             }
@@ -71,6 +72,18 @@ open class NativeBackupAgent : BackupAgent() {
             scope.cancel()
             runBlocking { job.join() }
         }
+    }
+
+    override fun onRestoreFile(
+        data: ParcelFileDescriptor,
+        size: Long,
+        destination: File,
+        type: Int,
+        mode: Long,
+        mtime: Long,
+    ) {
+        super.onRestoreFile(data, size, destination, type, mode, mtime)
+        PostRestoreDetector(this).markNativeRestorePayloadReceived()
     }
 
     protected open suspend fun restoreAccount(preferences: DataStore<Preferences>) = Unit

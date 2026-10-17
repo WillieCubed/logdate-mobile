@@ -1,6 +1,7 @@
 package app.logdate.client.device.restore
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import io.mockk.every
 import io.mockk.mockk
 import java.io.File
@@ -16,11 +17,17 @@ import kotlin.test.assertTrue
 class PostRestoreDetectorTest {
     private val directory = createTempDirectory("native-restore").toFile()
     private val noBackup = File(directory, "no-backup").apply { mkdirs() }
+    private val files = File(directory, "files").apply { mkdirs() }
+    private val appData = File(directory, "app-data").apply { mkdirs() }
     private val database = File(directory, "logdate")
     private val context =
         mockk<Context>().also {
             every { it.noBackupFilesDir } returns noBackup
+            every { it.filesDir } returns files
+            every { it.applicationInfo } returns ApplicationInfo().apply { dataDir = appData.absolutePath }
             every { it.getDatabasePath("logdate") } returns database
+            every { it.getDatabasePath("logdate-wal") } returns File(directory, "logdate-wal")
+            every { it.getDatabasePath("logdate-shm") } returns File(directory, "logdate-shm")
         }
     private val detector = PostRestoreDetector(context)
 
@@ -31,6 +38,7 @@ class PostRestoreDetectorTest {
         detector.markDeviceInitialized()
         detector.acknowledgeAccountRecovery()
         assertEquals(first, PostRestoreDetector(context).pendingMediaQuarantineId())
+        database.writeBytes(byteArrayOf(4, 5, 6))
         detector.recordRestoreCompleted()
         val second = assertNotNull(detector.pendingMediaQuarantineId())
         assertFalse(detector.acknowledgeMediaQuarantine(first))
@@ -54,9 +62,115 @@ class PostRestoreDetectorTest {
     }
 
     @Test
+    fun `duplicate restore callback preserves the active delivery and recovery work`() {
+        detector.recordRestoreCompleted()
+        val content = assertNotNull(detector.pendingContentRecoveryId())
+        val account = assertNotNull(detector.pendingAccountRecoveryId())
+        val media = assertNotNull(detector.pendingMediaQuarantineId())
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(content, detector.pendingContentRecoveryId())
+        assertEquals(account, detector.pendingAccountRecoveryId())
+        assertEquals(media, detector.pendingMediaQuarantineId())
+    }
+
+    @Test
+    fun `duplicate callback cannot turn a missing-content delivery complete after startup creates a database`() {
+        detector.recordRestoreCompleted()
+        val content = assertNotNull(detector.pendingContentRecoveryId())
+        database.writeBytes(byteArrayOf(1, 2, 3))
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(content, detector.pendingContentRecoveryId())
+        assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(isOnboarded = true))
+    }
+
+    @Test
+    fun `later native payload supersedes an incomplete content delivery`() {
+        detector.recordRestoreCompleted()
+        val old = assertNotNull(detector.pendingContentRecoveryId())
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        detector.markNativeRestorePayloadReceived()
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(PostRestoreType.CONTENT_RESTORED, detector.detect(isOnboarded = true))
+        assertEquals(null, detector.pendingContentRecoveryId())
+        val current = assertNotNull(detector.pendingMediaQuarantineId())
+        assertNotEquals(old, current)
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(current, detector.pendingMediaQuarantineId())
+    }
+
+    @Test
+    fun `changed native widget preferences create a new restore delivery`() {
+        val widgetPreferences =
+            File(appData, "shared_prefs/logdate_widget_instances.xml").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(1, 2, 3))
+            }
+        detector.recordRestoreCompleted()
+        val old = assertNotNull(detector.pendingMediaQuarantineId())
+        val content = assertNotNull(detector.pendingContentRecoveryId())
+        assertTrue(detector.acknowledgeContentRecovery(content))
+        detector.acknowledgeAccountRecovery()
+        assertTrue(detector.acknowledgeMediaQuarantine(old))
+        widgetPreferences.writeBytes(byteArrayOf(4, 5, 6))
+
+        detector.recordRestoreCompleted()
+
+        assertNotEquals(old, detector.pendingMediaQuarantineId())
+    }
+
+    @Test
+    fun `duplicate restore callback after empty-cloud recovery does not reopen acknowledged work`() {
+        detector.recordRestoreCompleted()
+        val content = assertNotNull(detector.pendingContentRecoveryId())
+        val account = assertNotNull(detector.pendingAccountRecoveryId())
+        val media = assertNotNull(detector.pendingMediaQuarantineId())
+        assertTrue(detector.acknowledgeContentRecovery(content))
+        detector.acknowledgeAccountRecovery(account)
+        assertTrue(detector.acknowledgeMediaQuarantine(media))
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(null, detector.pendingContentRecoveryId())
+        assertFalse(detector.isAccountRecoveryPending())
+        assertEquals(null, detector.pendingMediaQuarantineId())
+    }
+
+    @Test
+    fun `same-length media replacement creates a new restore delivery`() {
+        val media =
+            File(files, "media/objects/photo.bin").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(1, 2, 3))
+            }
+        detector.recordRestoreCompleted()
+        val first = assertNotNull(detector.pendingMediaQuarantineId())
+        val content = assertNotNull(detector.pendingContentRecoveryId())
+        assertTrue(detector.acknowledgeContentRecovery(content))
+        detector.acknowledgeAccountRecovery()
+        assertTrue(detector.acknowledgeMediaQuarantine(first))
+
+        media.writeBytes(byteArrayOf(4, 5, 6))
+        detector.markNativeRestorePayloadReceived()
+        detector.recordRestoreCompleted()
+
+        assertNotEquals(first, detector.pendingMediaQuarantineId())
+    }
+
+    @Test
     fun `an older archive completion cannot acknowledge a later native delivery`() {
         detector.recordRestoreCompleted()
         val old = assertNotNull(detector.pendingContentRecoveryId())
+        assertTrue(detector.acknowledgeContentRecovery(old))
+        detector.markDeviceInitialized()
+        File(files, "logdate.preferences_pb").writeBytes(byteArrayOf(7, 8, 9))
         detector.recordRestoreCompleted()
         val current = assertNotNull(detector.pendingContentRecoveryId())
         assertNotEquals(old, current)

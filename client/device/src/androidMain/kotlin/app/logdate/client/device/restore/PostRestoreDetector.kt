@@ -5,6 +5,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import kotlin.uuid.Uuid
 
 /** Durable native delivery state; content and account completion are acknowledged independently. */
@@ -13,12 +14,34 @@ class PostRestoreDetector(
 ) {
     fun recordRestoreCompleted() =
         synchronized(lock) {
+            val payloadReceived = restorePayloadReceivedFile().readTextOrNull() == RESTORE_PAYLOAD_RECEIVED
+            // App startup can create an empty SQLite database after the callback. Keep an
+            // unacknowledged missing-content delivery pending unless Android delivered new files.
+            if (!payloadReceived && readDelivery()?.let { it.first == CONTENT_MISSING && it.second != null } == true) return@synchronized
+            val fingerprint = restoreFingerprint()
+            if (!payloadReceived && fingerprint != null && fingerprint in readRestoreFingerprints()) return@synchronized
             val id = Uuid.random().toString()
             writeAtomically(mediaQuarantineFile(), id)
             writeAtomically(pendingRestoreFile(), "delivery-pending:$id")
             writeAtomically(accountRecoveryFile(), id)
             deleteIfPresent(accountResolvedFile())
             writeAtomically(pendingRestoreFile(), "${if (hasDatabase()) CONTENT_PRESENT else CONTENT_MISSING}:$id")
+            if (fingerprint != null) writeRestoreFingerprints(listOf(fingerprint))
+            if (payloadReceived) deleteIfPresent(restorePayloadReceivedFile())
+        }
+
+    /** Records Android delivering a backed-up file, distinguishing a retry from a duplicate callback. */
+    fun markNativeRestorePayloadReceived() =
+        synchronized(lock) {
+            if (restorePayloadReceivedFile().exists()) return@synchronized
+            writeAtomically(restorePayloadReceivedFile(), RESTORE_PAYLOAD_RECEIVED)
+        }
+
+    /** Includes the post-callback normalization (such as removing the copied device id). */
+    fun refreshRestoreFingerprint() =
+        synchronized(lock) {
+            val fingerprint = restoreFingerprint() ?: return@synchronized
+            writeRestoreFingerprints((readRestoreFingerprints() + fingerprint).distinct().takeLast(MAX_RESTORE_FINGERPRINTS))
         }
 
     fun pendingMediaQuarantineId(): String? =
@@ -51,6 +74,7 @@ class PostRestoreDetector(
             if (!isContentRecoveryCurrent(deliveryId)) return@synchronized false
             writeAtomically(pendingRestoreFile(), "content-complete:$deliveryId")
             markDeviceInitialized()
+            refreshRestoreFingerprintLocked()
             true
         }
 
@@ -77,6 +101,7 @@ class PostRestoreDetector(
             if (expectedId != null && readIdentifier(accountRecoveryFile()) != expectedId) return@synchronized
             writeAtomically(accountResolvedFile(), expectedId ?: "resolved")
             deleteIfPresent(accountRecoveryFile())
+            refreshRestoreFingerprintLocked()
         }
 
     fun detect(isOnboarded: Boolean): PostRestoreType =
@@ -112,10 +137,92 @@ class PostRestoreDetector(
 
     private fun readIdentifier(file: File): String? = readSmallFile(file)?.takeIf { runCatching { Uuid.parse(it) }.isSuccess }
 
+    private fun refreshRestoreFingerprintLocked() {
+        val fingerprint = restoreFingerprint() ?: return
+        writeRestoreFingerprints((readRestoreFingerprints() + fingerprint).distinct().takeLast(MAX_RESTORE_FINGERPRINTS))
+    }
+
+    /** Fingerprints compact state; large databases and media use file metadata, with payload receipts for new transfers. */
+    private fun restoreFingerprint(): String? =
+        runCatching {
+            val digest = MessageDigest.getInstance("SHA-256")
+            val files = context.filesDir
+            val entries = mutableListOf<Pair<String, Pair<File, Boolean>>>()
+
+            fun add(
+                path: String,
+                hashContents: Boolean,
+            ) {
+                val root = File(files, path)
+                if (!root.exists()) return
+                if (root.isFile) {
+                    entries += path to (root to hashContents)
+                    return
+                }
+                root
+                    .walkTopDown()
+                    .filter { file ->
+                        file.isFile &&
+                            !file.relativeTo(files).invariantSeparatorsPath.contains("/staging/") &&
+                            !file.name.endsWith(".part")
+                    }.forEach { file ->
+                        entries += file.relativeTo(files).invariantSeparatorsPath to (file to hashContents)
+                    }
+            }
+
+            listOf("logdate", "logdate-wal", "logdate-shm").forEach { name ->
+                val file = context.getDatabasePath(name)
+                if (file.isFile) entries += "database/$name" to (file to false)
+            }
+            add("logdate.preferences_pb", true)
+            File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
+                .takeIf { it.isFile }
+                ?.let { entries += "shared_prefs/logdate_widget_instances.xml" to (it to true) }
+            add("datastore", true)
+            add("db_recovery", true)
+            add("identity_recovery", true)
+            add("archive_recovery/records", true)
+            add("archive_recovery/sources", false)
+            add("media", false)
+            add("user_media", false)
+            add("audio_notes", false)
+            add("camera-captures", false)
+            entries.sortedBy { it.first }.forEach { (path, entry) ->
+                val (file, hashContents) = entry
+                digest.update(path.encodeToByteArray())
+                digest.update(0.toByte())
+                digest.update(file.length().toString().encodeToByteArray())
+                digest.update(0.toByte())
+                digest.update(file.lastModified().toString().encodeToByteArray())
+                digest.update(0.toByte())
+                if (hashContents) {
+                    file.inputStream().use { stream ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val count = stream.read(buffer)
+                            if (count < 0) break
+                            digest.update(buffer, 0, count)
+                        }
+                    }
+                }
+            }
+            digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+        }.getOrNull()
+
+    private fun readRestoreFingerprints(): List<String> =
+        runCatching {
+            restoreFingerprintFile().readLines().filter { it.matches(Regex("[0-9a-f]{64}")) }
+        }.getOrDefault(emptyList())
+
+    private fun writeRestoreFingerprints(fingerprints: List<String>) =
+        writeAtomically(restoreFingerprintFile(), fingerprints.joinToString("\n"))
+
     private fun readSmallFile(file: File): String? =
         runCatching {
             if (file.length() in 1..128) file.readText() else null
         }.getOrNull()
+
+    private fun File.readTextOrNull(): String? = runCatching { if (isFile) readText() else null }.getOrNull()
 
     private fun writeAtomically(
         file: File,
@@ -146,10 +253,16 @@ class PostRestoreDetector(
 
     private fun accountResolvedFile() = File(context.noBackupFilesDir, ".logdate_account_restore_resolved")
 
+    private fun restoreFingerprintFile() = File(context.noBackupFilesDir, ".logdate_native_restore_fingerprints")
+
+    private fun restorePayloadReceivedFile() = File(context.noBackupFilesDir, ".logdate_native_restore_payload_received")
+
     private companion object {
         val lock = Any()
         const val CONTENT_PRESENT = "content-present"
         const val CONTENT_MISSING = "content-missing"
+        const val RESTORE_PAYLOAD_RECEIVED = "received"
+        const val MAX_RESTORE_FINGERPRINTS = 4
     }
 }
 

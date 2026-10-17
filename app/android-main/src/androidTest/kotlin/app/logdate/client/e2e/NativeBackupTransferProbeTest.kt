@@ -1,5 +1,6 @@
 package app.logdate.client.e2e
 
+import android.Manifest
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.os.Build
@@ -20,6 +21,9 @@ import app.logdate.client.device.storage.putBytes
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.audio.AndroidRecordingServiceController
+import app.logdate.client.media.audio.CrashSafeRecording
+import app.logdate.client.media.audio.RecordingSessionOptions
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -35,7 +39,11 @@ import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -67,15 +75,68 @@ class NativeBackupTransferProbeTest {
             val mode = InstrumentationRegistry.getArguments().getString("nativeBackupMode")
             assumeTrue(
                 "requires the native backup acceptance harness",
-                mode in setOf("seed", "verify", "quota", "quota-cleanup", "missing-keys", "compact-transfer"),
+                mode in
+                    setOf(
+                        "seed",
+                        "snapshot",
+                        "verify",
+                        "quota",
+                        "quota-cleanup",
+                        "missing-keys",
+                        "credentials-only",
+                        "compact-transfer",
+                        "recording-policy",
+                    ),
             )
             require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") { "Emulator required" }
             require(instrumentation.targetContext.packageName.endsWith(".debug")) { "Isolated debug application required" }
             val context = instrumentation.targetContext
+            if (mode == "recording-policy") {
+                verifyPhoneRecordingBackupPolicy(instrumentation, context)
+                return@runBlocking
+            }
             ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
             val koin = GlobalContext.get()
             if (mode == "missing-keys") {
                 verifyMissingRecoveryKeys(context, koin)
+                return@runBlocking
+            }
+            if (mode == "credentials-only") {
+                val arguments = InstrumentationRegistry.getArguments()
+                val identity = koin.get<IdentityKeyManager>()
+                identity.restoreFromBackupIfAvailable()
+                assertTrue(PassphraseBackupStore(context).hasBackup(), "Credentials-only restore lost the journal recovery key")
+                assertTrue(AndroidIdentityKeyBackupStore(context).hasBackup(), "Credentials-only restore lost portable identity material")
+                assertEquals(arguments.getString("sourceOwner"), koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId())
+                val destinationDeviceId =
+                    koin
+                        .get<DeviceIdProvider>()
+                        .getDeviceId()
+                        .value
+                        .toString()
+                assertNotEquals(
+                    arguments.getString("sourceDevice"),
+                    destinationDeviceId,
+                    "A replacement device must create its own device id",
+                )
+                assertEquals(
+                    arguments.getString("sourceFingerprint"),
+                    IdentityKeyFingerprint.of(identity.getIdentityKey(), koin.get<CryptoManager>()),
+                    "Credentials-only restore must retain the journal identity",
+                )
+                if (InstrumentationRegistry.getArguments().getString("nativeIdentityMode") == "account") {
+                    assertNull(identity.getStoredRecoveryPhrase())
+                }
+                val database = koin.get<LogDateDatabase>()
+                assertTrue(database.journalDao().getAll().isEmpty(), "Credentials-only restore must not recreate journals")
+                assertTrue(database.textNoteDao().getAll().isEmpty(), "Credentials-only restore must not recreate text notes")
+                assertTrue(database.imageNoteDao().getAll().isEmpty(), "Credentials-only restore must not recreate image notes")
+                assertTrue(database.videoNoteDao().getAll().isEmpty(), "Credentials-only restore must not recreate video notes")
+                assertTrue(database.audioNoteDao().getAll().isEmpty(), "Credentials-only restore must not recreate audio notes")
+                assertTrue(
+                    koin.get<JournalRepository>().getAllDrafts().isEmpty(),
+                    "Credentials-only restore must not recreate unfinished drafts",
+                )
                 return@runBlocking
             }
             val fixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
@@ -120,14 +181,15 @@ class NativeBackupTransferProbeTest {
                     identity.ensureIdentityKey()
                 }
                 val mediaKey = sourceMediaKey ?: koin.get<MediaPayloadKeyProvider>().getOrCreateKey()
+                val mediaNonce = crypto.generateRandomBytes(12)
                 val mediaCiphertext =
                     crypto.aesGcmEncrypt(
                         mediaKey,
-                        ByteArray(12),
+                        mediaNonce,
                         "native-transfer".encodeToByteArray(),
                         "cloud media payload".encodeToByteArray(),
                     )
-                fixture.seed()
+                fixture.seed(context)
                 koin.get<UserStateRepository>().setIsOnboardingComplete(true)
                 val metadata =
                     JSONObject()
@@ -140,7 +202,9 @@ class NativeBackupTransferProbeTest {
                                 .value
                                 .toString(),
                         ).put("fingerprint", IdentityKeyFingerprint.of(identity.getIdentityKey(), crypto))
+                        .put("mediaNonce", Base64.encode(mediaNonce))
                         .put("mediaCiphertext", Base64.encode(mediaCiphertext))
+                        .put("recordingTransferFixture", true)
                 File(instrumentation.targetContext.noBackupFilesDir, "native-backup-fixture.json").writeText(metadata.toString())
                 if (legacyAccount) {
                     assertFalse(
@@ -148,6 +212,57 @@ class NativeBackupTransferProbeTest {
                         "Legacy upgrade source must have no portable identity or media backup before Android backs it up",
                     )
                 }
+            } else if (mode == "snapshot") {
+                assertTrue(PassphraseBackupStore(context).hasBackup(), "Synthetic source is missing its journal recovery key")
+                assertTrue(AndroidIdentityKeyBackupStore(context).hasBackup(), "Synthetic source is missing portable identity keys")
+                fixture.verifyFixture()
+                val mediaKey = koin.get<MediaPayloadKeyProvider>().getOrCreateKey()
+                val marker = File(context.noBackupFilesDir, "native-backup-fixture.json")
+                val owner = koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId()
+                val device =
+                    koin
+                        .get<DeviceIdProvider>()
+                        .getDeviceId()
+                        .value
+                        .toString()
+                val fingerprint = IdentityKeyFingerprint.of(identity.getIdentityKey(), crypto)
+                if (marker.exists()) {
+                    val retained = JSONObject(marker.readText())
+                    assertEquals(owner, retained.getString("owner"))
+                    assertEquals(device, retained.getString("device"))
+                    assertEquals(fingerprint, retained.getString("fingerprint"))
+                    assertContentEquals(
+                        "cloud media payload".encodeToByteArray(),
+                        crypto.aesGcmDecrypt(
+                            mediaKey,
+                            Base64.decode(
+                                retained.optString("mediaNonce").ifEmpty { "AAAAAAAAAAAAAAAA" },
+                            ),
+                            "native-transfer".encodeToByteArray(),
+                            Base64.decode(retained.getString("mediaCiphertext")),
+                        ),
+                    )
+                } else {
+                    val mediaNonce = crypto.generateRandomBytes(12)
+                    val mediaCiphertext =
+                        crypto.aesGcmEncrypt(
+                            mediaKey,
+                            mediaNonce,
+                            "native-transfer".encodeToByteArray(),
+                            "cloud media payload".encodeToByteArray(),
+                        )
+                    val metadata =
+                        JSONObject()
+                            .put("owner", owner)
+                            .put(
+                                "device",
+                                device,
+                            ).put("fingerprint", fingerprint)
+                            .put("mediaNonce", Base64.encode(mediaNonce))
+                            .put("mediaCiphertext", Base64.encode(mediaCiphertext))
+                    marker.writeText(metadata.toString())
+                }
+                return@runBlocking
             } else {
                 val arguments = InstrumentationRegistry.getArguments()
                 identity.restoreFromBackupIfAvailable()
@@ -169,15 +284,63 @@ class NativeBackupTransferProbeTest {
                     "cloud media payload".encodeToByteArray(),
                     crypto.aesGcmDecrypt(
                         koin.get<MediaPayloadKeyProvider>().getOrCreateKey(),
-                        ByteArray(12),
+                        Base64.decode(requireNotNull(arguments.getString("sourceMediaNonce"))),
                         "native-transfer".encodeToByteArray(),
                         Base64.decode(requireNotNull(arguments.getString("sourceMediaCiphertext"))),
                     ),
                     "Transferred encryption keys cannot decrypt the original Cloud media payload",
                 )
+                if (arguments.getString("sourceRecordingTransferFixture") == "true") {
+                    verifyRecordingTransferFixture(context)
+                }
                 fixture.verifyAndEdit()
             }
         }
+}
+
+private suspend fun verifyPhoneRecordingBackupPolicy(
+    instrumentation: android.app.Instrumentation,
+    context: android.content.Context,
+) {
+    ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
+    val permissions =
+        buildList {
+            add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    permissions.forEach { permission ->
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, permission)
+    }
+    val final = File(context.filesDir, "audio_notes/native-recording-policy-${Uuid.random()}.m4a")
+    val staged = CrashSafeRecording.inFlightFile(final, isolateForBackup = true)
+    val controller =
+        AndroidRecordingServiceController(
+            context,
+            RecordingSessionOptions(crashSafe = true, excludeIncompleteFromBackup = true),
+        )
+    try {
+        assertTrue(controller.start(final.absolutePath, inputDeviceId = null), "Recording service refused to start")
+        val state =
+            withTimeout(10_000) {
+                controller.serviceState.filterNotNull().first { it.isRecording || it.error != null }
+            }
+        assertTrue(state.isRecording, state.error ?: "Recording service did not start")
+        withTimeout(5_000) {
+            while (!staged.isFile) delay(25)
+        }
+        assertFalse(final.exists(), "The in-flight phone recording was visible in the transferable media directory")
+        delay(2_500)
+        assertEquals(final.absolutePath, controller.stopRecordingNow())
+        assertTrue(final.isFile && final.length() > 0L, "The finalized phone recording was not published")
+        assertFalse(staged.exists(), "The finalized phone recording left its staging file behind")
+    } finally {
+        try {
+            controller.shutdown()
+        } finally {
+            final.delete()
+            staged.delete()
+        }
+    }
 }
 
 private suspend fun verifyMissingRecoveryKeys(
@@ -209,6 +372,15 @@ private suspend fun verifyMissingRecoveryKeys(
         MessageDigest.getInstance("SHA-256").digest(databaseFile.readBytes()),
         "Recovery handling changed the retained encrypted journal",
     )
+}
+
+private fun verifyRecordingTransferFixture(context: android.content.Context) {
+    val final = File(context.filesDir, "audio_notes/transfer-recording.m4a")
+    val inFlight = CrashSafeRecording.inFlightFile(final, isolateForBackup = true)
+    val remux = CrashSafeRecording.remuxStagingFile(inFlight, final)
+    assertTrue(final.isFile && final.readBytes().contentEquals("committed recording".encodeToByteArray()))
+    assertFalse(inFlight.exists(), "An interrupted raw recording must not transfer as committed audio")
+    assertFalse(remux.exists(), "An unfinished remux temporary must not transfer")
 }
 
 private class NativeJournalFixture(
@@ -276,7 +448,7 @@ private class NativeJournalFixture(
         }
     }
 
-    suspend fun seed() {
+    suspend fun seed(context: android.content.Context) {
         assertNull(journals.getJournalById(id(1)), "fixture already exists; use fresh emulator data")
         journals.create(Journal(id = id(1), title = "Native transfer journal"))
         journals.create(Journal(id = id(2), title = "Second transferred journal"))
@@ -286,6 +458,7 @@ private class NativeJournalFixture(
         val image = save("proof.png", "image/png")
         val audio = save("proof.wav", "audio/wav")
         val video = save("proof.mp4", "video/mp4")
+        seedRecordingTransferFixture(context)
         notes.create(JournalNote.Image(id(4), now, now, image, caption = "Original photo"), id(1))
         notes.create(JournalNote.Audio(uid = id(5), creationTimestamp = now, lastUpdated = now, mediaRef = audio, durationMs = 500L), id(2))
         notes.create(JournalNote.Video(id(6), now, now, video, caption = "Original video"), id(1))
@@ -306,7 +479,26 @@ private class NativeJournalFixture(
         )
     }
 
+    private fun seedRecordingTransferFixture(context: android.content.Context) {
+        val final = File(context.filesDir, "audio_notes/transfer-recording.m4a")
+        check(final.parentFile?.mkdirs() == true || final.parentFile?.isDirectory == true)
+        check(final.createNewFile()) { "Recording transfer fixture already exists" }
+        final.writeBytes("committed recording".encodeToByteArray())
+        val inFlight = CrashSafeRecording.inFlightFile(final, isolateForBackup = true)
+        inFlight.writeBytes("unfinished raw recording".encodeToByteArray())
+        CrashSafeRecording.remuxStagingFile(inFlight, final).writeBytes("unfinished remux".encodeToByteArray())
+    }
+
     suspend fun verifyAndEdit() {
+        verifyFixture()
+        val now = Clock.System.now()
+        if (notes.getNoteById(id(8)) == null) {
+            notes.create(JournalNote.Text(id(8), now, now, "Written offline on replacement phone"), id(2))
+        }
+        assertEquals("Written offline on replacement phone", (notes.getNoteById(id(8)) as? JournalNote.Text)?.content)
+    }
+
+    suspend fun verifyFixture() {
         assertEquals("Native transfer journal", journals.getJournalById(id(1))?.title)
         assertEquals("Second transferred journal", journals.getJournalById(id(2))?.title)
         assertEquals("Text retained through native backup", (notes.getNoteById(id(3)) as? JournalNote.Text)?.content)
@@ -330,11 +522,6 @@ private class NativeJournalFixture(
         verifyMedia(assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri), "proof.png")
         verifyMedia(assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri), "proof.wav")
         verifyMedia(assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri), "proof.mp4")
-        val now = Clock.System.now()
-        if (notes.getNoteById(id(8)) == null) {
-            notes.create(JournalNote.Text(id(8), now, now, "Written offline on replacement phone"), id(2))
-        }
-        assertEquals("Written offline on replacement phone", (notes.getNoteById(id(8)) as? JournalNote.Text)?.content)
     }
 
     private suspend fun save(
