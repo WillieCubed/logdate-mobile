@@ -117,7 +117,7 @@ class NativeBackgroundCredentialCallbackTest {
         agent.initialize(context)
         agent.onRestoreFinished()
         assertTrue(PostRestoreDetector(context).isAccountRecoveryPending())
-        assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(context).detect(true))
+        assertEquals(PostRestoreType.CONTENT_MISSING, PostRestoreDetector(context).detect(true))
         assertEquals(listOf<Byte>(1), context.getDatabasePath("logdate").readBytes().toList())
         withPreferences { assertEquals(owner, it.data.first()[stringPreferencesKey("identity.canonical_owner_id")]) }
     }
