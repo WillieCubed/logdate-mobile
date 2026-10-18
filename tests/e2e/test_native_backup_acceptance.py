@@ -20,6 +20,37 @@ WORK_SPEC.loader.exec_module(NATIVE_RESTORE_WORK_ACCEPTANCE)
 
 
 class RestoreSnapshotValidationTest(unittest.TestCase):
+    def test_snapshot_ignores_firebase_backup_heartbeat_file(self):
+        before = {
+            "databases/logdate": {"bytes": 1, "sha256": "journal"},
+            "files/datastore/FirebaseHeartBeatW0RFRkFVTFRd.preferences_pb": {
+                "bytes": 1,
+                "sha256": "before",
+            },
+        }
+        after = {
+            "databases/logdate": {"bytes": 1, "sha256": "journal"},
+            "files/datastore/FirebaseHeartBeatW0RFRkFVTFRd.preferences_pb": {
+                "bytes": 1,
+                "sha256": "after",
+            },
+        }
+
+        NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(before, after)
+
+    def test_snapshot_still_rejects_changes_to_logdate_datastore(self):
+        before = {
+            "databases/logdate": {"bytes": 1, "sha256": "journal"},
+            "files/datastore/logdate.preferences_pb": {"bytes": 1, "sha256": "before"},
+        }
+        after = {
+            "databases/logdate": {"bytes": 1, "sha256": "journal"},
+            "files/datastore/logdate.preferences_pb": {"bytes": 1, "sha256": "after"},
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data: files/datastore/logdate.preferences_pb"):
+            NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(before, after)
+
     def test_credentials_only_snapshot_accepts_absent_database_and_media(self):
         restored = {
             "files/db_recovery/passphrase_backup": {"bytes": 32, "sha256": "passphrase"},
