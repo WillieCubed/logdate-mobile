@@ -61,12 +61,20 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertEqual(("shell", "svc", "wifi", "enable"), adb.call_args_list[1].args[1:])
 
     def test_prepare_leaves_network_state_for_the_scenario_to_control(self):
-        with patch.object(HARNESS, "adb", side_effect=[b"1", b"", b"", b"", b"0", b"", b""]) as adb, patch.object(
+        with patch.object(
+            HARNESS,
+            "adb",
+            side_effect=[b"1", b"", b"", b"", b"0", b"0", b"", b"1", b"", b""],
+        ) as adb, patch.object(
             HARNESS,
             "wait_for_package_manager",
         ), patch.object(HARNESS, "select_local_transport"):
             HARNESS.prepare("emulator-5582")
 
+        self.assertIn(
+            ("shell", "settings", "put", "secure", "user_setup_complete", "1"),
+            [call.args[1:] for call in adb.call_args_list],
+        )
         self.assertFalse(
             any(call.args[2:4] in (("cmd", "connectivity"), ("svc", "wifi")) for call in adb.call_args_list),
             "Transport preparation must not force a cold app launch to happen offline",
@@ -209,13 +217,33 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 HARNESS.canonical_preferences(field(1, entry))
 
     def test_preinstalled_empty_emulator_can_contain_sdk_state_without_journal_data(self):
-        with patch.object(HARNESS, "adb", side_effect=[b"1", f"package:{HARNESS.PACKAGE}".encode(), b"./shared_prefs/com.google.firebase.crashlytics.xml", b"", b"", b"0", b"", b""]) as adb, patch.object(
+        with patch.object(
+            HARNESS,
+            "adb",
+            side_effect=[
+                b"1",
+                f"package:{HARNESS.PACKAGE}".encode(),
+                b"./shared_prefs/com.google.firebase.crashlytics.xml",
+                b"",
+                b"",
+                b"0",
+                b"0",
+                b"",
+                b"1",
+                b"",
+                b"",
+            ],
+        ) as adb, patch.object(
             HARNESS,
             "wait_for_package_manager",
         ), patch.object(HARNESS, "select_local_transport"):
             HARNESS.prepare("emulator-5582", allow_preinstalled_empty=True)
 
         self.assertIn(("shell", "run-as", HARNESS.PACKAGE, "find", ".", "-type", "f"), [call.args[1:] for call in adb.call_args_list])
+        self.assertIn(
+            ("shell", "settings", "put", "secure", "user_setup_complete", "1"),
+            [call.args[1:] for call in adb.call_args_list],
+        )
 
     def test_preinstalled_emulator_with_journal_or_media_data_is_rejected(self):
         with patch.object(HARNESS, "adb", side_effect=[b"1", f"package:{HARNESS.PACKAGE}".encode(), b"./files/media/objects/retained.jpg"]) as adb, patch.object(
