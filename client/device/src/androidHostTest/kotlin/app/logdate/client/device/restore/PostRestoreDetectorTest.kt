@@ -103,6 +103,18 @@ class PostRestoreDetectorTest {
     }
 
     @Test
+    fun `completed delivery remains identifiable after content acknowledgement`() {
+        detector.recordRestoreCompleted()
+        detector.markDeviceInitialized()
+
+        assertTrue(detector.hasCompletedNativeRestoreDelivery())
+
+        detector.beginNativeRestoreSession()
+
+        assertFalse(detector.hasCompletedNativeRestoreDelivery())
+    }
+
+    @Test
     fun `duplicate callback cannot turn a missing-content delivery complete after startup creates a database`() {
         detector.recordRestoreCompleted()
         val content = assertNotNull(detector.pendingContentRecoveryId())

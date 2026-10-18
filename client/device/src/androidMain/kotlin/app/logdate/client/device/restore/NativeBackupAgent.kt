@@ -64,7 +64,10 @@ open class NativeBackupAgent : BackupAgent() {
         try {
             val duplicateCompletion =
                 synchronized(callbackLock) {
-                    if (restoreCompletionRecorded && !nativeRestoreSession.isStarted()) {
+                    if (restoreCompletionRecorded) {
+                        true
+                    } else if (!nativeRestoreSession.isStarted() && PostRestoreDetector(this).hasCompletedNativeRestoreDelivery()) {
+                        restoreCompletionRecorded = true
                         true
                     } else {
                         beginNativeRestoreSessionOnce()
