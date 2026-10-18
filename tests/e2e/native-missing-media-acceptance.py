@@ -40,11 +40,11 @@ def set_metered(serial, network, mode):
         raise RuntimeError("Metered-network configuration did not match the requested state")
 
 
-def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None):
+def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None, timeout=120):
     safe_target(serial)
     command = shlex.join(["am", "instrument", "-w", "-r", "-e", "class", selector, *extras, RUNNER])
     process = subprocess.Popen(["adb", "-s", serial, "shell", command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    timer = threading.Timer(120, process.kill)
+    timer = threading.Timer(timeout, process.kill)
     timer.start()
     output = bytearray()
     released = False
@@ -85,12 +85,14 @@ def restore_environment(serial, network, original, saver, airplane, wifi, grants
         except Exception as error:
             errors.append(f"{label}: {type(error).__name__}")
     safe_target(serial)
-    steps = [
-        ("metered override", lambda: set_metered(serial, network, "undefined" if original == "none" else original)),
+    steps = []
+    if original is not None:
+        steps.append(("metered override", lambda: set_metered(serial, network, "undefined" if original == "none" else original)))
+    steps.extend([
         ("Data Saver", lambda: adb(serial, "shell", "cmd", "netpolicy", "set", "restrict-background", str(saver).lower())),
         ("airplane mode", lambda: adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable" if airplane else "disable")),
         ("Wi-Fi", lambda: adb(serial, "shell", "svc", "wifi", "disable" if wifi == b"0" else "enable")),
-    ]
+    ])
     for label, operation in steps:
         attempt(label, operation)
     def restore_grant(permission, granted):
