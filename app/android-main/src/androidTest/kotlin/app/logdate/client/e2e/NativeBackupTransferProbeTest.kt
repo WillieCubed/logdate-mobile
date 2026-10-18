@@ -114,7 +114,7 @@ class NativeBackupTransferProbeTest {
                 val sessions = koin.get<SessionStorage>()
                 assertNull(sessions.getSession(), "Data-only acceptance requires a signed-out synthetic source")
                 val owner = koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId()
-                sessions.saveSession(UserSession("native-acceptance-access", "native-acceptance-refresh", owner))
+                sessions.saveExplicitSession(UserSession("native-acceptance-access", "native-acceptance-refresh", owner))
                 assertEquals(owner, sessions.getSession()?.accountId)
                 return@runBlocking
             }

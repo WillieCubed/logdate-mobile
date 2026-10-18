@@ -26,6 +26,7 @@ import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
 import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -325,7 +326,12 @@ class RestoreWorkerTest {
                     mockk { coEvery { getCanonicalOwnerId() } returns "synthetic-archive-worker" }
                 }
                 single<app.logdate.shared.config.LogDateConfigRepository> {
-                    mockk { coEvery { getCurrentBackendUrl() } returns "https://example.test" }
+                    mockk {
+                        every { backendUrl } returns MutableStateFlow("https://example.test")
+                        every { apiVersion } returns MutableStateFlow("v1")
+                        every { serverDescriptor } returns MutableStateFlow<app.logdate.shared.model.ServerDescriptor?>(null)
+                        every { getCurrentBackendUrl() } returns "https://example.test"
+                    }
                 }
                 single<SessionStorage> { mockk(relaxed = true) }
                 single<RestoreDiagnosticEvents> { diagnostics ?: RecordingRestoreDiagnostics() }

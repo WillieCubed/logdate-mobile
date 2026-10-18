@@ -2,6 +2,7 @@ package app.logdate.client.database
 
 import android.content.Context
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
+import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,39 @@ sealed interface DatabaseStartupState {
         val reason: String,
         val detail: String,
     ) : DatabaseStartupState
+}
+
+class NativeRestoreInProgressException : IllegalStateException("Native restore delivery is incomplete")
+
+internal suspend fun <T> openDatabaseAfterNativeRestoreCheck(
+    deliveryGate: NativeRestoreDeliveryGate,
+    restoreInProgress: () -> Boolean,
+    openDatabase: () -> T,
+): T =
+    deliveryGate.withLock {
+        if (restoreInProgress()) throw NativeRestoreInProgressException()
+        openDatabase()
+    }
+
+internal data class OpenedDatabase<T>(
+    val database: T,
+    val passphrase: ByteArray,
+)
+
+internal fun <T> openDatabaseWithPassphraseCandidates(
+    candidates: List<ByteArray>,
+    openDatabase: (ByteArray) -> T,
+): OpenedDatabase<T> {
+    require(candidates.isNotEmpty()) { "No database passphrase candidates are available" }
+    var lastError: Exception? = null
+    candidates.forEach { candidate ->
+        try {
+            return OpenedDatabase(openDatabase(candidate), candidate)
+        } catch (error: Exception) {
+            lastError = error
+        }
+    }
+    throw requireNotNull(lastError)
 }
 
 class DatabaseStartupMonitor {
@@ -76,6 +110,7 @@ class DatabaseRecoveryController(
 private fun classifyRecoveryReason(message: String): String {
     val normalized = message.lowercase()
     return when {
+        "native restore delivery is incomplete" in normalized -> "Android device transfer is still finishing."
         "file is not a database" in normalized -> "Encrypted database could not be decrypted with the current key."
         "hmac check failed" in normalized -> "Encrypted database integrity check failed for the active key."
         "decrypting page" in normalized -> "Encrypted database pages could not be decrypted."

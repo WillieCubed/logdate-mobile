@@ -32,6 +32,8 @@ import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.client.notifications.RecordingBubbleSwitch
 import app.logdate.client.platform.PlatformComponentToggler
+import app.logdate.client.restore.NativeMediaQuarantineScheduler
+import app.logdate.client.restore.awaitNativeMediaQuarantine
 import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
@@ -82,7 +84,13 @@ class LogdateApplication :
                     if (recovered > 0) Napier.i("Recovered $recovered completed audio recording(s)", tag = APP_STARTUP_TAG)
                 }.onFailure { Napier.w("Completed audio recordings remain queued for recovery", it, tag = APP_STARTUP_TAG) }
                 get<LogDateDatabase>()
-                quarantineRestoredMedia()
+                val detector = PostRestoreDetector(this@LogdateApplication)
+                awaitNativeMediaQuarantine(
+                    detector::pendingMediaQuarantineId,
+                    get<NativeMediaQuarantine>()::run,
+                    detector::acknowledgeMediaQuarantine,
+                    { NativeMediaQuarantineScheduler.enqueue(this@LogdateApplication, it) },
+                )
                 get<AndroidPlatformSearchIndexManager>()
                 startBackgroundWork()
                 Napier.i("Encrypted storage and startup observers ready", tag = APP_STARTUP_TAG)
@@ -91,13 +99,6 @@ class LogdateApplication :
                 throw error
             }
         }
-
-    private suspend fun quarantineRestoredMedia() {
-        val detector = PostRestoreDetector(this)
-        val delivery = detector.pendingMediaQuarantineId() ?: return
-        val checksComplete = get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
-        if (checksComplete) check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
-    }
 
     override fun newImageLoader(context: Context): ImageLoader =
         ImageLoader
@@ -141,7 +142,6 @@ class LogdateApplication :
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
-        startup.start()
     }
 
     /**
@@ -311,6 +311,11 @@ private const val IMAGE_CACHE_DIR = "image_cache"
 private const val IMAGE_CACHE_MAX_BYTES = 250L * 1024 * 1024 // 250 MB
 private const val IMAGE_CROSSFADE_MS = 200
 
+/** Starts the application runtime only when an activity or foreground service requests it. */
+internal fun startApplicationRuntime(startup: ApplicationStartup) {
+    startup.start()
+}
+
 /**
  * Android may launch the activity in the base Application instance retained by a restore-agent
  * process. Keep foreground startup usable in that process instead of crashing on an unsafe cast.
@@ -320,7 +325,7 @@ internal object ApplicationStartupCoordinator {
 
     @OptIn(ExperimentalResourceApi::class)
     fun get(application: Application): ApplicationStartup {
-        if (application is LogdateApplication) return application.startup
+        if (application is LogdateApplication) return application.startup.also(::startApplicationRuntime)
         return synchronized(fallbackStartups) {
             fallbackStartups
                 .getOrPut(application) {
@@ -331,19 +336,18 @@ internal object ApplicationStartupCoordinator {
                         Napier.base(CrashlyticsAntilog())
                         application.initializeKoin()
                     }
-                    ApplicationStartup(CoroutineScope(SupervisorJob() + Dispatchers.IO)) {
+                    val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+                    ApplicationStartup(startupScope) {
                         try {
                             val koin = GlobalContext.get()
                             koin.get<LogDateDatabase>()
                             val detector = PostRestoreDetector(application)
-                            val delivery = detector.pendingMediaQuarantineId()
-                            if (delivery != null) {
-                                val checksComplete =
-                                    koin.get<NativeMediaQuarantine>().run { detector.pendingMediaQuarantineId() == delivery }
-                                if (checksComplete) {
-                                    check(detector.acknowledgeMediaQuarantine(delivery)) { "Native media delivery changed" }
-                                }
-                            }
+                            awaitNativeMediaQuarantine(
+                                detector::pendingMediaQuarantineId,
+                                koin.get<NativeMediaQuarantine>()::run,
+                                detector::acknowledgeMediaQuarantine,
+                                { NativeMediaQuarantineScheduler.enqueue(application, it) },
+                            )
                             koin.get<AndroidPlatformSearchIndexManager>()
                             AndroidApplicationRuntime(application, koin).start()
                             Napier.i("Encrypted storage and startup observers ready", tag = APP_STARTUP_TAG)
@@ -352,7 +356,7 @@ internal object ApplicationStartupCoordinator {
                             throw error
                         }
                     }
-                }.also { it.start() }
+                }.also(::startApplicationRuntime)
         }
     }
 }

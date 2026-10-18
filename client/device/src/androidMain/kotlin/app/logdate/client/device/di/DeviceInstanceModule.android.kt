@@ -10,6 +10,8 @@ import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
+import app.logdate.client.device.restore.AndroidNativeRestoreDeliveryGate
+import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.storage.AndroidSecureStorage
 import app.logdate.client.device.storage.SecureSessionStorage
@@ -43,6 +45,7 @@ actual val deviceInstanceModule: Module =
         single<SecureStorage> { AndroidSecureStorage(androidContext()) }
 
         single { PostRestoreDetector(androidContext()) }
+        single<NativeRestoreDeliveryGate> { AndroidNativeRestoreDeliveryGate }
 
         single {
             SecureSessionStorage(

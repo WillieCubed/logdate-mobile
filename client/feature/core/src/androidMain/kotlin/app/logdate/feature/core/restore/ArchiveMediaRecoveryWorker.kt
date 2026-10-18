@@ -2,6 +2,7 @@ package app.logdate.feature.core.restore
 
 import android.content.Context
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
@@ -14,6 +15,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
+import java.util.concurrent.TimeUnit
 
 /** Keeps accepted entries usable while their originals recover independently. */
 class ArchiveMediaRecoveryWorker(
@@ -22,10 +24,10 @@ class ArchiveMediaRecoveryWorker(
 ) : CoroutineWorker(context, params),
     KoinComponent {
     override suspend fun doWork(): Result {
-        val id = inputData.getString(RestoreWorker.RECOVERY_ID_KEY) ?: return Result.success()
-        return ArchiveRecoveryLocks.withLock(id) {
+        val recoveryId = inputData.getString(RestoreWorker.RECOVERY_ID_KEY) ?: return Result.success()
+        return ArchiveRecoveryLocks.withLock(recoveryId) {
             try {
-                val record = context.archiveRecoveryStore().read(id) ?: return@withLock Result.success()
+                val record = context.archiveRecoveryStore().read(recoveryId) ?: return@withLock Result.success()
                 if (record.pausedByUser ||
                     record.scope != currentArchiveRecoveryScope(getKoin()) ||
                     !record.metadataApplied ||
@@ -49,23 +51,76 @@ class ArchiveMediaRecoveryWorker(
                 }
                 val summary = ArchiveMediaRecoveryEngine(context, getKoin()).repair(record)
                 getKoin().get<RestoreLauncher>().updateRecovery(summary)
-                if (summary.shouldRetryMediaRecovery()) Result.retry() else Result.success()
+                if (!summary.shouldRetryMediaRecovery()) {
+                    Result.success()
+                } else {
+                    scheduleRetry(recoveryId)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 Napier.w("Attachment recovery retained its checkpoint and will retry")
-                Result.retry()
+                scheduleRetry(recoveryId)
             }
         }
     }
+
+    private suspend fun scheduleRetry(recoveryId: String): Result =
+        if (
+            enqueueArchiveMediaRetry {
+                ArchiveRecoveryScheduler.enqueueRetry(context, recoveryId, inputData)
+            }
+        ) {
+            Result.success()
+        } else {
+            Result.retry()
+        }
 }
+
+internal suspend fun enqueueArchiveMediaRetry(enqueue: suspend () -> Unit): Boolean =
+    try {
+        enqueue()
+        true
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
+    }
 
 internal object ArchiveRecoveryScheduler {
     private val gate = ArchiveRecoveryScheduleGate()
 
+    suspend fun enqueueRetry(
+        context: Context,
+        id: String,
+        inputData: androidx.work.Data,
+    ) = withContext(Dispatchers.IO) {
+        val attempt = inputData.getInt(RETRY_ATTEMPT_KEY, 0) + 1
+        val retryData =
+            Data
+                .Builder()
+                .putAll(inputData.keyValueMap)
+                .putInt(RETRY_ATTEMPT_KEY, attempt)
+                .build()
+        val request =
+            OneTimeWorkRequestBuilder<ArchiveMediaRecoveryWorker>()
+                .setInputData(retryData)
+                .addTag(RETRY_DELAYED_TAG)
+                .setInitialDelay(retryDelayMillis(attempt), TimeUnit.MILLISECONDS)
+                .build()
+        WorkManager
+            .getInstance(context)
+            .enqueueUniqueWork(workName(id, media = true), ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+            .result
+            .get()
+    }
+
+    internal fun retryDelayMillis(attempt: Int) = minOf(900_000L, 30_000L shl (attempt - 1).coerceIn(0, 4))
+
     suspend fun enqueueAll(
         context: Context,
         koin: org.koin.core.Koin,
+        change: ArchiveRecoveryReadinessChange,
     ) {
         val scope = currentArchiveRecoveryScope(koin)
         val records = context.archiveRecoveryStore().pending(scope)
@@ -74,18 +129,37 @@ internal object ArchiveRecoveryScheduler {
             val manager = WorkManager.getInstance(context)
             records.forEach { record ->
                 val uniqueName = workName(record.id, record.metadataApplied)
-                val workInfos = manager.getWorkInfosForUniqueWork(uniqueName).get()
-                val hasRunning = workInfos.any { it.state == WorkInfo.State.RUNNING }
+                var workStates: List<ArchiveRecoveryWorkState>? = null
+
+                suspend fun currentWorkStates(): List<ArchiveRecoveryWorkState> =
+                    workStates ?: manager
+                        .getWorkInfosForUniqueWork(uniqueName)
+                        .get()
+                        .map { workInfo ->
+                            ArchiveRecoveryWorkState(
+                                phase =
+                                    when (workInfo.state) {
+                                        WorkInfo.State.RUNNING -> ArchiveRecoveryWorkPhase.RUNNING
+                                        WorkInfo.State.ENQUEUED -> ArchiveRecoveryWorkPhase.ENQUEUED
+                                        WorkInfo.State.BLOCKED -> ArchiveRecoveryWorkPhase.BLOCKED
+                                        WorkInfo.State.SUCCEEDED,
+                                        WorkInfo.State.FAILED,
+                                        WorkInfo.State.CANCELLED,
+                                        -> ArchiveRecoveryWorkPhase.FINISHED
+                                    },
+                                runAttemptCount = workInfo.runAttemptCount,
+                                explicitDelay = RETRY_DELAYED_TAG in workInfo.tags,
+                            )
+                        }.also { workStates = it }
                 gate.enqueue(
-                    hasWaiting = {
-                        hasRunning ||
-                            workInfos.any {
-                                it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED
-                            }
-                    },
-                    isDelayedRetry = {
-                        !hasRunning &&
-                            workInfos.any { it.state == WorkInfo.State.ENQUEUED && it.runAttemptCount > 0 }
+                    hasQueuedWork = { currentWorkStates().hasQueuedArchiveRecoveryWork() },
+                    hasRunningWork = { currentWorkStates().hasRunningArchiveRecoveryWork() },
+                    change = change,
+                    isDelayedRetry = { currentWorkStates().hasDelayedArchiveRecoveryRetry() },
+                    replaceRunningWork = {
+                        if (currentArchiveRecoveryScope(koin) == scope) {
+                            enqueue(context, record, ExistingWorkPolicy.REPLACE)?.result?.get()
+                        }
                     },
                     replaceDelayedRetry = {
                         if (currentArchiveRecoveryScope(koin) == scope) {
@@ -106,6 +180,9 @@ internal object ArchiveRecoveryScheduler {
         id: String,
         media: Boolean,
     ) = "archive_${if (media) "media" else "metadata"}_recovery_$id"
+
+    private const val RETRY_ATTEMPT_KEY = "archive_media_retry_attempt"
+    internal const val RETRY_DELAYED_TAG = "archive_media_retry_delayed"
 
     fun cancel(
         context: Context,

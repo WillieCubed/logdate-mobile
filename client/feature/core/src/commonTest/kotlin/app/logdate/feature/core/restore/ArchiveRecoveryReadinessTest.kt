@@ -22,19 +22,122 @@ class ArchiveRecoveryReadinessTest {
         runTest {
             val network = MutableStateFlow<Any>("metered")
             var attempts = 0
+            val changedStates = mutableListOf<ArchiveRecoveryReadinessChange>()
             backgroundScope.launch {
                 observeArchiveRecoveryReadiness(
                     MutableStateFlow("origin"),
                     MutableStateFlow("session"),
                     networkChanges = network,
-                ) { attempts++ }
+                ) { changed ->
+                    attempts++
+                    changedStates += changed
+                }
             }
             runCurrent()
             val deferred = attempts
             network.value = "unrestricted"
             runCurrent()
             assertEquals(deferred + 1, attempts)
+            assertEquals(
+                listOf(
+                    ArchiveRecoveryReadinessChange(),
+                    ArchiveRecoveryReadinessChange(restartRunningWork = true),
+                ),
+                changedStates,
+            )
             assertTrue(DiagnosticReason.NETWORK_POLICY.shouldRetryArchiveMedia())
+        }
+
+    @Test
+    fun `media inventory changes do not cancel useful running recovery`() =
+        runTest {
+            val inventory = MutableStateFlow(0L)
+            val changes = mutableListOf<ArchiveRecoveryReadinessChange>()
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(
+                    MutableStateFlow("origin"),
+                    MutableStateFlow("session"),
+                    inventory = inventory,
+                ) { changes += it }
+            }
+            runCurrent()
+            inventory.value = 1L
+            runCurrent()
+
+            assertEquals(
+                listOf(
+                    ArchiveRecoveryReadinessChange(),
+                    ArchiveRecoveryReadinessChange(mediaInventoryChanged = true),
+                ),
+                changes,
+            )
+        }
+
+    @Test
+    fun `cancelled readiness enqueue retains its hard change for the next event`() =
+        runTest {
+            val session = MutableStateFlow("session-1")
+            val inventory = MutableStateFlow(0L)
+            val changes = mutableListOf<ArchiveRecoveryReadinessChange>()
+            val hardEnqueueStarted = CompletableDeferred<Unit>()
+            var holdHardEnqueue = true
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(
+                    MutableStateFlow("origin"),
+                    session,
+                    inventory = inventory,
+                ) { change ->
+                    changes += change
+                    if (change.restartRunningWork && holdHardEnqueue) {
+                        holdHardEnqueue = false
+                        hardEnqueueStarted.complete(Unit)
+                        CompletableDeferred<Unit>().await()
+                    }
+                }
+            }
+            runCurrent()
+
+            session.value = "session-2"
+            runCurrent()
+            assertTrue(hardEnqueueStarted.isCompleted)
+
+            inventory.value = 1L
+            runCurrent()
+
+            assertEquals(
+                ArchiveRecoveryReadinessChange(restartRunningWork = true, mediaInventoryChanged = true),
+                changes.last(),
+            )
+        }
+
+    @Test
+    fun `change during the initial enqueue retains the new readiness state`() =
+        runTest {
+            val session = MutableStateFlow("session-1")
+            val initialEnqueueStarted = CompletableDeferred<Unit>()
+            val changes = mutableListOf<ArchiveRecoveryReadinessChange>()
+            var holdInitialEnqueue = true
+            backgroundScope.launch {
+                observeArchiveRecoveryReadiness(
+                    MutableStateFlow("origin"),
+                    session,
+                ) { change ->
+                    changes += change
+                    if (holdInitialEnqueue) {
+                        holdInitialEnqueue = false
+                        initialEnqueueStarted.complete(Unit)
+                        CompletableDeferred<Unit>().await()
+                    }
+                }
+            }
+            runCurrent()
+            assertTrue(initialEnqueueStarted.isCompleted)
+
+            session.value = "session-2"
+            runCurrent()
+
+            assertEquals(ArchiveRecoveryReadinessChange(), changes.first())
+            assertEquals(ArchiveRecoveryReadinessChange(restartRunningWork = true), changes.last())
         }
 
     @Test
@@ -55,7 +158,7 @@ class ArchiveRecoveryReadinessTest {
                     MutableStateFlow("a"),
                     MutableStateFlow("same-session"),
                     identityChanges = keys,
-                ) { attempts++ }
+                ) { _ -> attempts++ }
             }
             runCurrent()
             val beforeRecovery = attempts
@@ -74,7 +177,7 @@ class ArchiveRecoveryReadinessTest {
                     MutableStateFlow("a"),
                     MutableStateFlow("same-session"),
                     inventory = inventory,
-                ) { attempts++ }
+                ) { _ -> attempts++ }
             }
             runCurrent()
             val beforeRecovery = attempts
@@ -92,7 +195,7 @@ class ArchiveRecoveryReadinessTest {
             var enqueues = 0
             val first =
                 launch {
-                    gate.enqueue({ waiting }) {
+                    gate.enqueue(change = ArchiveRecoveryReadinessChange(), hasQueuedWork = { waiting }, hasRunningWork = { false }) {
                         enqueues++
                         release.await()
                         waiting = true
@@ -101,7 +204,7 @@ class ArchiveRecoveryReadinessTest {
             runCurrent()
             val second =
                 launch {
-                    gate.enqueue({ waiting }) {
+                    gate.enqueue(change = ArchiveRecoveryReadinessChange(), hasQueuedWork = { waiting }, hasRunningWork = { false }) {
                         enqueues++
                         waiting = true
                     }
@@ -112,7 +215,7 @@ class ArchiveRecoveryReadinessTest {
             second.join()
             assertEquals(1, enqueues)
             waiting = false
-            gate.enqueue({ waiting }) {
+            gate.enqueue(change = ArchiveRecoveryReadinessChange(), hasQueuedWork = { waiting }, hasRunningWork = { false }) {
                 enqueues++
                 waiting = true
             }
@@ -129,7 +232,9 @@ class ArchiveRecoveryReadinessTest {
             var enqueues = 0
 
             gate.enqueue(
-                hasWaiting = { waiting },
+                change = ArchiveRecoveryReadinessChange(restartRunningWork = true),
+                hasQueuedWork = { waiting },
+                hasRunningWork = { false },
                 enqueueSuccessor = { enqueues++ },
                 isDelayedRetry = { delayedRetry },
                 replaceDelayedRetry = {
@@ -138,7 +243,9 @@ class ArchiveRecoveryReadinessTest {
                 },
             )
             gate.enqueue(
-                hasWaiting = { waiting },
+                change = ArchiveRecoveryReadinessChange(restartRunningWork = true),
+                hasQueuedWork = { waiting },
+                hasRunningWork = { false },
                 enqueueSuccessor = { enqueues++ },
                 isDelayedRetry = { delayedRetry },
                 replaceDelayedRetry = { replacements++ },
@@ -148,13 +255,111 @@ class ArchiveRecoveryReadinessTest {
             assertEquals(0, enqueues)
             waiting = false
             gate.enqueue(
-                hasWaiting = { waiting },
+                change = ArchiveRecoveryReadinessChange(restartRunningWork = true),
+                hasQueuedWork = { waiting },
+                hasRunningWork = { false },
                 enqueueSuccessor = { enqueues++ },
                 isDelayedRetry = { delayedRetry },
                 replaceDelayedRetry = { replacements++ },
             )
             assertEquals(1, enqueues)
         }
+
+    @Test
+    fun `startup leaves running recovery alone but new readiness replaces its retry chain`() =
+        runTest {
+            val gate = ArchiveRecoveryScheduleGate()
+            val running = true
+            var queued = true
+            var enqueues = 0
+            var replacements = 0
+
+            suspend fun schedule(change: ArchiveRecoveryReadinessChange) =
+                gate.enqueue(
+                    change = change,
+                    hasQueuedWork = { queued },
+                    hasRunningWork = { running },
+                    replaceRunningWork = {
+                        replacements++
+                        queued = false
+                    },
+                    enqueueSuccessor = {
+                        enqueues++
+                        queued = true
+                    },
+                )
+
+            schedule(ArchiveRecoveryReadinessChange())
+            assertEquals(0, enqueues, "Startup must not queue a duplicate behind active work")
+            assertEquals(0, replacements)
+            schedule(ArchiveRecoveryReadinessChange(restartRunningWork = true))
+            schedule(ArchiveRecoveryReadinessChange(restartRunningWork = true))
+            assertEquals(2, replacements, "Each later readiness change must interrupt stale work and clear its chain")
+            assertEquals(0, enqueues)
+        }
+
+    @Test
+    fun `inventory readiness queues one follow-up without replacing running recovery`() =
+        runTest {
+            val gate = ArchiveRecoveryScheduleGate()
+            var queued = false
+            var enqueues = 0
+            var replacements = 0
+
+            suspend fun schedule() =
+                gate.enqueue(
+                    change = ArchiveRecoveryReadinessChange(mediaInventoryChanged = true),
+                    hasQueuedWork = { queued },
+                    hasRunningWork = { true },
+                    replaceRunningWork = { replacements++ },
+                    enqueueSuccessor = {
+                        enqueues++
+                        queued = true
+                    },
+                )
+
+            schedule()
+            schedule()
+
+            assertEquals(0, replacements)
+            assertEquals(1, enqueues)
+        }
+
+    @Test
+    fun `startup coalesces queued work while no active recovery is running`() =
+        runTest {
+            val gate = ArchiveRecoveryScheduleGate()
+            var queued = true
+            var enqueues = 0
+            var replacements = 0
+
+            gate.enqueue(
+                change = ArchiveRecoveryReadinessChange(restartRunningWork = true),
+                hasQueuedWork = { queued },
+                hasRunningWork = { false },
+                replaceRunningWork = { replacements++ },
+                enqueueSuccessor = { enqueues++ },
+            )
+
+            assertEquals(0, enqueues)
+            assertEquals(0, replacements)
+        }
+
+    @Test
+    fun `a delayed retry can be replaced only when no worker is running`() {
+        val delayed = ArchiveRecoveryWorkState(ArchiveRecoveryWorkPhase.ENQUEUED, runAttemptCount = 1)
+        val running = ArchiveRecoveryWorkState(ArchiveRecoveryWorkPhase.RUNNING, runAttemptCount = 0)
+
+        assertTrue(listOf(delayed).hasDelayedArchiveRecoveryRetry())
+        assertFalse(listOf(running, delayed).hasDelayedArchiveRecoveryRetry())
+    }
+
+    @Test
+    fun `a newly appended delayed successor is recognized before its first attempt`() {
+        val queuedRetry = ArchiveRecoveryWorkState(ArchiveRecoveryWorkPhase.ENQUEUED, runAttemptCount = 0, explicitDelay = true)
+
+        assertTrue(listOf(queuedRetry).hasDelayedArchiveRecoveryRetry())
+    }
 
     @Test
     fun `unchanged unavailable or corrupt content waits for readiness rather than spinning`() {
@@ -186,7 +391,7 @@ class ArchiveRecoveryReadinessTest {
             val readiness = MutableStateFlow("signed-in-a" to 0)
             var attempts = 0
             backgroundScope.launch {
-                observeArchiveRecoveryReadiness(MutableStateFlow("a"), readiness) { attempts++ }
+                observeArchiveRecoveryReadiness(MutableStateFlow("a"), readiness) { _ -> attempts++ }
             }
             runCurrent()
             readiness.value = "signed-in-a" to 1
@@ -201,7 +406,7 @@ class ArchiveRecoveryReadinessTest {
             val session = MutableStateFlow<String?>(null)
             val scheduled = mutableListOf<Pair<String, String?>>()
             backgroundScope.launch {
-                observeArchiveRecoveryReadiness(origin, session) { scheduled += origin.value to session.value }
+                observeArchiveRecoveryReadiness(origin, session) { _ -> scheduled += origin.value to session.value }
             }
             runCurrent()
             origin.value = "b"
@@ -218,7 +423,7 @@ class ArchiveRecoveryReadinessTest {
         runTest {
             var attempts = 0
             backgroundScope.launch {
-                observeArchiveRecoveryReadiness(MutableStateFlow("a"), MutableStateFlow<String?>(null)) {
+                observeArchiveRecoveryReadiness(MutableStateFlow("a"), MutableStateFlow<String?>(null)) { _ ->
                     attempts++
                     if (attempts == 1) error("storage temporarily unavailable")
                 }
@@ -235,7 +440,7 @@ class ArchiveRecoveryReadinessTest {
         runTest {
             var attempts = 0
             backgroundScope.launch {
-                observeArchiveRecoveryReadiness(MutableStateFlow("a"), MutableStateFlow<String?>(null)) {
+                observeArchiveRecoveryReadiness(MutableStateFlow("a"), MutableStateFlow<String?>(null)) { _ ->
                     attempts++
                     throw CancellationException("cancelled")
                 }

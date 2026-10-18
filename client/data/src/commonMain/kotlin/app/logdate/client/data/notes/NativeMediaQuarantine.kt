@@ -2,6 +2,7 @@ package app.logdate.client.data.notes
 
 import app.logdate.client.data.journals.NativeDraftMediaQuarantine
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.transcription.TranscriptionRepository
@@ -18,38 +19,40 @@ class NativeMediaQuarantine(
     private val drafts: NativeDraftMediaQuarantine,
     private val transactions: SyncTransactionManager,
     private val transcriptions: TranscriptionRepository,
+    private val deliveryGate: NativeRestoreDeliveryGate = ImmediateNativeRestoreDeliveryGate,
     private val mediaExists: suspend (String) -> Boolean,
 ) {
-    suspend fun run(isCurrent: () -> Boolean): Boolean {
-        var availabilityChecksComplete = true
-        val quarantine: suspend (String) -> String? = { reference ->
-            quarantined(reference) { availabilityChecksComplete = false }
-        }
-        check(isCurrent()) { "Native media delivery changed" }
-        transactions.withTransaction {
-            database.imageNoteDao().getAll().forEach { note ->
-                quarantine(note.contentUri)?.let { database.imageNoteDao().updateContentUriIfUnchanged(note.uid, note.contentUri, it) }
-            }
-            database.audioNoteDao().getAll().forEach { note ->
-                quarantine(note.contentUri)?.let {
-                    database.audioNoteDao().updateContentUriIfUnchanged(note.uid, note.contentUri, it)
-                    transcriptions.rebindMediaReference(note.uid, note.contentUri, it)
-                }
-            }
-            database.videoNoteDao().getAll().forEach { note ->
-                quarantine(note.contentUri)?.let { database.videoNoteDao().updateContentUriIfUnchanged(note.uid, note.contentUri, it) }
-            }
-            database.journalDao().getAll().forEach { journal ->
-                journal.coverImageUri?.let { previous ->
-                    quarantine(previous)?.let { database.journalDao().updateCoverImageUriIfUnchanged(journal.id, previous, it) }
-                }
+    suspend fun run(isCurrent: () -> Boolean): Boolean =
+        deliveryGate.withLock {
+            var availabilityChecksComplete = true
+            val quarantine: suspend (String) -> String? = { reference ->
+                quarantined(reference) { availabilityChecksComplete = false }
             }
             check(isCurrent()) { "Native media delivery changed" }
+            transactions.withTransaction {
+                database.imageNoteDao().getAll().forEach { note ->
+                    quarantine(note.contentUri)?.let { database.imageNoteDao().updateContentUriIfUnchanged(note.uid, note.contentUri, it) }
+                }
+                database.audioNoteDao().getAll().forEach { note ->
+                    quarantine(note.contentUri)?.let {
+                        database.audioNoteDao().updateContentUriIfUnchanged(note.uid, note.contentUri, it)
+                        transcriptions.rebindMediaReference(note.uid, note.contentUri, it)
+                    }
+                }
+                database.videoNoteDao().getAll().forEach { note ->
+                    quarantine(note.contentUri)?.let { database.videoNoteDao().updateContentUriIfUnchanged(note.uid, note.contentUri, it) }
+                }
+                database.journalDao().getAll().forEach { journal ->
+                    journal.coverImageUri?.let { previous ->
+                        quarantine(previous)?.let { database.journalDao().updateCoverImageUriIfUnchanged(journal.id, previous, it) }
+                    }
+                }
+                check(isCurrent()) { "Native media delivery changed" }
+            }
+            drafts.run(isCurrent, quarantine)
+            check(isCurrent()) { "Native media delivery changed" }
+            availabilityChecksComplete
         }
-        drafts.run(isCurrent, quarantine)
-        check(isCurrent()) { "Native media delivery changed" }
-        return availabilityChecksComplete
-    }
 
     private suspend fun quarantined(
         reference: String,
@@ -71,10 +74,17 @@ class NativeMediaQuarantine(
                 throw cancelled
             } catch (_: Exception) {
                 onUnknown()
-                return null
+                // Keep the source reference inside the unavailable marker so a later retry can
+                // resolve it, while preventing restored UI from treating an unchecked URI as
+                // present during startup.
+                return UnavailableMediaReferences.nativeRestore(reference)
             }
         return if (available) null else UnavailableMediaReferences.nativeRestore(reference)
     }
+}
+
+private object ImmediateNativeRestoreDeliveryGate : NativeRestoreDeliveryGate {
+    override suspend fun <T> withLock(block: suspend () -> T): T = block()
 }
 
 internal suspend fun quarantineNativeDraft(

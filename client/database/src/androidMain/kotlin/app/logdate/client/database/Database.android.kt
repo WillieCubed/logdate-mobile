@@ -117,23 +117,14 @@ fun migratePlaintextDatabaseIfNeeded(
             return
         }
 
-        val plaintextBackup = findLatestPlaintextBackup(dbFile)
-        if (plaintextBackup != null && isPlaintextSqliteDatabase(plaintextBackup)) {
-            val unreadableBackup = File(dbFile.parentFile, "$DATABASE_NAME.unreadable-backup-${System.currentTimeMillis()}")
-            Napier.w(
-                "Database is neither plaintext nor openable with key. Restoring latest plaintext backup ${plaintextBackup.name} to recover safely.",
-                tag = DB_MIGRATION_TAG,
-            )
-            moveReplacing(dbFile, unreadableBackup)
-            moveReplacing(plaintextBackup, dbFile)
-            Napier.i("Restored plaintext backup. Unreadable DB preserved at ${unreadableBackup.absolutePath}", tag = DB_MIGRATION_TAG)
-        } else {
-            Napier.e(
-                "Existing database is not plaintext and cannot be opened with SQLCipher key; no plaintext backup available for safe recovery",
-                tag = DB_MIGRATION_TAG,
-            )
-            return
-        }
+        // An unreadable encrypted file may have a valid later key candidate. Replacing it with
+        // an older plaintext migration backup here would destroy the journal before the caller
+        // has tried every retained key. Preserve both files and let the ordered opener decide.
+        Napier.w(
+            "Existing encrypted database did not open with this key candidate; preserving it for remaining candidates",
+            tag = DB_MIGRATION_TAG,
+        )
+        return
     }
     Napier.w("Detected plaintext SQLite DB. Starting one-time SQLCipher migration", tag = DB_MIGRATION_TAG)
 
@@ -304,10 +295,7 @@ private fun createLegacySqlCipherHook(): SQLiteDatabaseHook =
     object : SQLiteDatabaseHook {
         override fun preKey(database: SQLiteConnection) {
             val cancellationSignal = CancellationSignal()
-            database.execute("PRAGMA cipher_default_page_size = 1024", emptyArray(), cancellationSignal)
-            database.execute("PRAGMA cipher_default_kdf_iter = 4000", emptyArray(), cancellationSignal)
-            database.execute("PRAGMA cipher_default_hmac_algorithm = HMAC_SHA1", emptyArray(), cancellationSignal)
-            database.execute("PRAGMA cipher_default_kdf_algorithm = PBKDF2_HMAC_SHA1", emptyArray(), cancellationSignal)
+            database.execute("PRAGMA cipher_compatibility = 3", emptyArray(), cancellationSignal)
         }
 
         override fun postKey(database: SQLiteConnection) {
