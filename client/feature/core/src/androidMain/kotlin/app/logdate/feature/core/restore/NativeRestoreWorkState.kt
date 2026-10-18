@@ -12,17 +12,26 @@ class NativeRestoreWorkState(
     private val input: Data,
     private val sessions: SessionStorage,
 ) {
+    enum class Validation {
+        CURRENT,
+        STALE,
+        WAITING_FOR_SESSION,
+    }
+
     private val detector = PostRestoreDetector(context)
     private val deliveryId = input.getString(DELIVERY_KEY)
 
-    fun isCurrent(): Boolean {
-        if (deliveryId != null && !detector.isContentRecoveryCurrent(deliveryId)) return false
+    suspend fun validation(): Validation {
+        if (deliveryId != null && !detector.isContentRecoveryCurrent(deliveryId)) return Validation.STALE
         val owner = input.getString(OWNER_KEY)
         val origin = input.getString(ORIGIN_KEY)
-        if (owner == null && origin == null) return true
-        val current = sessions.getOriginBoundSession() ?: return false
-        return current.session.accountId == owner && current.origin == origin
+        if (owner == null && origin == null) return Validation.CURRENT
+        if (!sessions.hasValidSession()) return Validation.WAITING_FOR_SESSION
+        val current = sessions.getOriginBoundSession() ?: return Validation.WAITING_FOR_SESSION
+        return if (current.session.accountId == owner && current.origin == origin) Validation.CURRENT else Validation.STALE
     }
+
+    suspend fun isCurrent(): Boolean = validation() == Validation.CURRENT
 
     suspend fun complete(expectedSession: OriginBoundSession? = sessions.getOriginBoundSession()): Boolean {
         if (deliveryId == null || !detector.isContentRecoveryCurrent(deliveryId)) return true

@@ -20,6 +20,7 @@ import app.logdate.feature.core.restore.CloudRestoreWorker
 import app.logdate.feature.core.restore.NativeRestoreWorkState
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import java.io.File
@@ -45,6 +46,24 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
         }
 
     @Test
+    fun `unbound cloud restore completes quietly without an authenticated session`() =
+        runTest {
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val worker =
+                CloudRestoreWorker(
+                    context,
+                    workerParameters(),
+                    cloud,
+                    UnavailableSessionStorage,
+                    archiveCipher,
+                )
+
+            assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+            assertTrue(cloud.listAccessTokens.isEmpty())
+            assertEquals(0, cloud.fileDownloadCalls)
+        }
+
+    @Test
     fun `cloud restore ignores an obsolete delivery before network access`() =
         verifyObsoleteWork(Data.Builder().putString(NativeRestoreWorkState.DELIVERY_KEY, "obsolete-delivery").build())
 
@@ -57,6 +76,84 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                 .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://sync.example")
                 .build(),
         )
+
+    @Test
+    fun `cloud restore retries while the persisted session owner is unavailable`() =
+        runTest {
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val params = workerParameters()
+            every { params.inputData } returns
+                Data
+                    .Builder()
+                    .putString(NativeRestoreWorkState.OWNER_KEY, "retained-owner")
+                    .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://sync.example")
+                    .build()
+            val worker =
+                CloudRestoreWorker(
+                    context,
+                    params,
+                    cloud,
+                    UnavailableSessionStorage,
+                    archiveCipher,
+                    enqueueRestore = { error("Restore must wait for the persisted session") },
+                )
+
+            assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+            assertTrue(cloud.listAccessTokens.isEmpty())
+            assertEquals(0, cloud.fileDownloadCalls)
+        }
+
+    @Test
+    fun `cloud restore retries when persisted session validation temporarily fails`() =
+        runTest {
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val params = workerParameters()
+            every { params.inputData } returns
+                Data
+                    .Builder()
+                    .putString(NativeRestoreWorkState.OWNER_KEY, "retained-owner")
+                    .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://sync.example")
+                    .build()
+            val worker =
+                CloudRestoreWorker(
+                    context,
+                    params,
+                    cloud,
+                    FailingSessionStorage,
+                    archiveCipher,
+                    enqueueRestore = { error("Restore must wait for session validation") },
+                )
+
+            assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+            assertTrue(cloud.listAccessTokens.isEmpty())
+            assertEquals(0, cloud.fileDownloadCalls)
+        }
+
+    @Test
+    fun `cloud restore retries when session becomes unavailable after owner validation`() =
+        runTest {
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val params = workerParameters()
+            every { params.inputData } returns
+                Data
+                    .Builder()
+                    .putString(NativeRestoreWorkState.OWNER_KEY, "retained-owner")
+                    .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://sync.example")
+                    .build()
+            val worker =
+                CloudRestoreWorker(
+                    context,
+                    params,
+                    cloud,
+                    SessionStorageBecomesUnavailable,
+                    archiveCipher,
+                    enqueueRestore = { error("Restore must wait for the owner session") },
+                )
+
+            assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+            assertTrue(cloud.listAccessTokens.isEmpty())
+            assertEquals(0, cloud.fileDownloadCalls)
+        }
 
     @Test
     fun `cloud restore work is unique per account and origin`() {
@@ -219,6 +316,55 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
             assertTrue(cloud.listAccessTokens.isEmpty())
             assertEquals(0, cloud.fileDownloadCalls)
         }
+
+    private object UnavailableSessionStorage : SessionStorage {
+        override fun getSession(): UserSession? = null
+
+        override fun getOriginBoundSession(): OriginBoundSession? = null
+
+        override fun getSessionFlow() = MutableStateFlow<UserSession?>(null)
+
+        override suspend fun hasValidSession() = false
+
+        override suspend fun saveSession(session: UserSession) = Unit
+
+        override suspend fun clearSession() = Unit
+    }
+
+    private object FailingSessionStorage : SessionStorage {
+        override fun getSession(): UserSession? = null
+
+        override fun getOriginBoundSession(): OriginBoundSession? = null
+
+        override fun getSessionFlow() = MutableStateFlow<UserSession?>(null)
+
+        override suspend fun hasValidSession(): Boolean = error("Temporary secure storage read failure")
+
+        override suspend fun saveSession(session: UserSession) = Unit
+
+        override suspend fun clearSession() = Unit
+    }
+
+    private object SessionStorageBecomesUnavailable : SessionStorage {
+        private val session = UserSession("access", "refresh", "retained-owner")
+        private var validationReads = 0
+
+        override fun getSession(): UserSession? = if (validationReads == 1) session else null
+
+        override fun getOriginBoundSession(): OriginBoundSession? =
+            if (validationReads == 1) OriginBoundSession("https://sync.example", session) else null
+
+        override fun getSessionFlow() = MutableStateFlow<UserSession?>(getSession())
+
+        override suspend fun hasValidSession(): Boolean {
+            validationReads++
+            return validationReads == 1
+        }
+
+        override suspend fun saveSession(session: UserSession) = Unit
+
+        override suspend fun clearSession() = Unit
+    }
 
     @Test
     fun `downloads and authenticates a one gibibyte archive through the Android restore worker`() =

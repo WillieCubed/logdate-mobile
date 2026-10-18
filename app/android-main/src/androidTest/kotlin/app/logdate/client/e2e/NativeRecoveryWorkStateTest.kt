@@ -98,6 +98,70 @@ class NativeRecoveryWorkStateTest {
         assertIs<CloudRestoreWorker>(KoinWorkerFactory().createWorker(application, CloudRestoreWorker::class.java.name, params))
     }
 
+    @Test
+    fun `queued recovery waits for persisted session to load before checking its owner`() =
+        runTest {
+            val persistedSession = UserSession("synthetic-access", "synthetic-refresh", "retained-owner")
+            val delayedSessions = DelayedSessions(persistedSession)
+            val input =
+                Data
+                    .Builder()
+                    .putString(NativeRestoreWorkState.OWNER_KEY, persistedSession.accountId)
+                    .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://example.invalid")
+                    .build()
+
+            assertTrue(NativeRestoreWorkState(context, input, delayedSessions).isCurrent())
+            assertEquals(1, delayedSessions.loadCount)
+        }
+
+    @Test
+    fun `queued recovery retries while its persisted owner is temporarily unavailable`() =
+        runTest {
+            val persistedSession = UserSession("synthetic-access", "synthetic-refresh", "retained-owner")
+            val delayedSessions = DelayedSessions(persistedSession, canLoad = false)
+            val input =
+                Data
+                    .Builder()
+                    .putString(NativeRestoreWorkState.OWNER_KEY, persistedSession.accountId)
+                    .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://example.invalid")
+                    .build()
+
+            assertEquals(
+                NativeRestoreWorkState.Validation.WAITING_FOR_SESSION,
+                NativeRestoreWorkState(context, input, delayedSessions).validation(),
+            )
+            assertEquals(1, delayedSessions.loadCount)
+        }
+
+    private class DelayedSessions(
+        private val persisted: UserSession,
+        private val canLoad: Boolean = true,
+    ) : SessionStorage {
+        private var loaded: UserSession? = null
+        var loadCount = 0
+            private set
+
+        override fun getSession() = loaded
+
+        override fun getOriginBoundSession() = loaded?.let { OriginBoundSession("https://example.invalid", it) }
+
+        override fun getSessionFlow() = MutableStateFlow<UserSession?>(loaded)
+
+        override suspend fun hasValidSession(): Boolean {
+            loadCount++
+            if (canLoad) loaded = persisted
+            return canLoad
+        }
+
+        override suspend fun saveSession(session: UserSession) {
+            loaded = session
+        }
+
+        override suspend fun clearSession() {
+            loaded = null
+        }
+    }
+
     private class TestSessions : SessionStorage {
         var current = UserSession("synthetic-access", "synthetic-refresh", "retained-owner")
 

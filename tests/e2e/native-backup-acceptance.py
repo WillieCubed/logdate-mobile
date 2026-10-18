@@ -515,7 +515,14 @@ def timeline_is_open(hierarchy):
     return "Search your log" in texts and "Timeline" in texts
 
 
+def wake_emulator(serial):
+    """Make the replacement app visible before asserting its post-restore destination."""
+    adb(serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
+    adb(serial, "shell", "wm", "dismiss-keyguard")
+
+
 def wait_for_timeline(serial, output, timeout_seconds=60):
+    wake_emulator(serial)
     deadline = time.monotonic() + timeout_seconds
     ui_path = output / "destination-ui.xml"
     screenshot_path = output / "destination-journal.png"

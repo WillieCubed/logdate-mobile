@@ -1,7 +1,9 @@
+import argparse
 import importlib.util
 import io
 from pathlib import Path
 import tarfile
+import tempfile
 import unittest
 from unittest.mock import call, patch
 
@@ -10,6 +12,10 @@ SCRIPT = Path(__file__).with_name("native-backup-acceptance.py")
 SPEC = importlib.util.spec_from_file_location("native_backup_acceptance", SCRIPT)
 NATIVE_BACKUP_ACCEPTANCE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(NATIVE_BACKUP_ACCEPTANCE)
+WORK_SCRIPT = Path(__file__).with_name("native-restore-work-restart-acceptance.py")
+WORK_SPEC = importlib.util.spec_from_file_location("native_restore_work_acceptance", WORK_SCRIPT)
+NATIVE_RESTORE_WORK_ACCEPTANCE = importlib.util.module_from_spec(WORK_SPEC)
+WORK_SPEC.loader.exec_module(NATIVE_RESTORE_WORK_ACCEPTANCE)
 
 
 class RestoreSnapshotValidationTest(unittest.TestCase):
@@ -113,6 +119,50 @@ class EmulatorSetupStateTest(unittest.TestCase):
             "secure",
             "user_setup_complete",
         )
+
+
+class EmulatorWakeStateTest(unittest.TestCase):
+    @patch.object(NATIVE_BACKUP_ACCEPTANCE, "adb")
+    def test_wakes_destination_and_dismisses_keyguard_before_timeline_assertion(self, adb):
+        NATIVE_BACKUP_ACCEPTANCE.wake_emulator("emulator-5554")
+
+        self.assertEqual(
+            [
+                call("emulator-5554", "shell", "input", "keyevent", "KEYCODE_WAKEUP"),
+                call("emulator-5554", "shell", "wm", "dismiss-keyguard"),
+            ],
+            adb.call_args_list,
+        )
+
+
+class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (1 test)")
+    def test_targets_only_the_explicit_emulator_and_records_probe_output(self, adb):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "after-process-restart.log"
+
+            NATIVE_RESTORE_WORK_ACCEPTANCE.probe("emulator-5554", "verify", output)
+
+            self.assertEqual(b"OK (1 test)", output.read_bytes())
+            adb.assert_called_once_with(
+                "emulator-5554",
+                "shell",
+                "am",
+                "instrument",
+                "-w",
+                "-r",
+                "-e",
+                "class",
+                NATIVE_RESTORE_WORK_ACCEPTANCE.PROBE,
+                "-e",
+                "cloudRestoreWorkMode",
+                "verify",
+                NATIVE_RESTORE_WORK_ACCEPTANCE.RUNNER,
+            )
+
+    def test_refuses_physical_device_serials(self):
+        with self.assertRaisesRegex(argparse.ArgumentTypeError, "explicit emulator-NNNN serial"):
+            NATIVE_RESTORE_WORK_ACCEPTANCE.emulator_serial("R5CT123456")
 
 
 class PartialNativeTransportTest(unittest.TestCase):
