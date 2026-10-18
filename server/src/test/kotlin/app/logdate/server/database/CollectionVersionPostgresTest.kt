@@ -35,6 +35,7 @@ class CollectionVersionPostgresTest {
             val owner = Uuid.random().toJavaUUID()
             try {
                 TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)
+                insertTestAccountRow(owner)
                 val store = PostgreSQLLogDateCollectionsMetadataStore()
                 val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
                 store.upsert(owner, did, LogDateCollectionKind.ENTRY, "seed")
@@ -107,6 +108,7 @@ class CollectionVersionPostgresTest {
                     LogDateCollectionRecordsTable.deleteWhere { userId eq owner }
                     LogDateCollectionStatesTable.deleteWhere { userId eq owner }
                 }
+                deleteTestAccountRow(owner)
                 source.close()
                 TransactionManager.defaultDatabase = previous
             }

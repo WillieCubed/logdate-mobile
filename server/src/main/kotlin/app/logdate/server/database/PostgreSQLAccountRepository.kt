@@ -245,6 +245,7 @@ class PostgreSQLAccountRepository : AccountRepository {
             RestoreCredentialsTable.deleteWhere { RestoreCredentialsTable.accountId eq id }
             ResourceRoutesTable.deleteWhere { ResourceRoutesTable.accountId eq id }
             AccountEntitlementsTable.deleteWhere { AccountEntitlementsTable.accountId eq id }
+            deleteAccountRepositories(id)
             val deletedRows = AccountsTable.deleteWhere { AccountsTable.id eq id }
             deletedRows > 0
         }

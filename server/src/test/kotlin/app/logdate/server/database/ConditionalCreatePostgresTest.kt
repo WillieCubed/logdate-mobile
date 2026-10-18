@@ -68,6 +68,7 @@ class ConditionalCreatePostgresTest {
                         ),
                     )
                 val owner = account.id.toJavaUUID()
+                insertTestAccountRow(owner)
                 val backing = PostgreSQLLogDateCollectionsMetadataStore()
                 val blocks = PostgreSQLRepoBlockStore()
                 val canonical = RepoBackedLogDateCollectionsRepository(accounts, identity, signing, blocks, backing)
@@ -160,6 +161,7 @@ class ConditionalCreatePostgresTest {
                             ),
                         ),
                     )
+                insertTestAccountRow(account.id.toJavaUUID())
                 val backing = PostgreSQLLogDateCollectionsMetadataStore()
                 val failing =
                     object : LogDateCollectionsMetadataStore by backing {
@@ -227,6 +229,7 @@ class ConditionalCreatePostgresTest {
                         accounts.save(Account(id = owner, username = username, displayName = "Race", createdAt = Clock.System.now())),
                     )
                 did = account.did
+                insertTestAccountRow(ownerId)
                 val repository =
                     RepoBackedLogDateCollectionsRepository(
                         accounts,
@@ -258,6 +261,7 @@ class ConditionalCreatePostgresTest {
                         AtprotoRepoBlockLinksTable.deleteWhere { repoDid eq repo }
                     }
                 }
+                deleteTestAccountRow(ownerId)
                 source.close()
                 TransactionManager.defaultDatabase = previous
             }
