@@ -68,6 +68,57 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
         verifyObsoleteWork(Data.Builder().putString(NativeRestoreWorkState.DELIVERY_KEY, "obsolete-delivery").build())
 
     @Test
+    fun `stale delivery resolves archive ownership before cleanup`() =
+        runTest {
+            val folder = File(context.cacheDir, "stale-cloud-restore-${UUID.randomUUID()}").apply { mkdirs() }
+            val isolatedContext =
+                object : ContextWrapper(context) {
+                    override fun getNoBackupFilesDir() = File(folder, "no_backup").apply { mkdirs() }
+
+                    override fun getDatabasePath(name: String) = File(folder, "databases/$name")
+                }
+            val detector = PostRestoreDetector(isolatedContext)
+            detector.recordRestoreCompleted()
+            val obsoleteDelivery = requireNotNull(detector.pendingContentRecoveryId())
+            detector.recordRestoreCompleted()
+            val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
+            val input = NativeRestoreWorkState.bind(Data.Builder(), obsoleteDelivery, session.getOriginBoundSession()).build()
+
+            try {
+                for (activeChild in listOf(true, false)) {
+                    val workId = UUID.randomUUID()
+                    val params = workerParameters(workId)
+                    val archive = File(isolatedContext.noBackupFilesDir, "cloud-restore-$workId.zip")
+                    archive.writeBytes(byteArrayOf('P'.code.toByte(), 'K'.code.toByte()))
+                    every { params.inputData } returns input
+                    val worker =
+                        CloudRestoreWorker(
+                            isolatedContext,
+                            params,
+                            FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L))),
+                            session,
+                            archiveCipher,
+                            hasActiveRestore = { deliveryId, accountId, origin ->
+                                assertEquals(obsoleteDelivery, deliveryId)
+                                assertEquals("account", accountId)
+                                assertEquals("https://sync.example", origin)
+                                activeChild
+                            },
+                        )
+
+                    assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+                    assertEquals(
+                        activeChild,
+                        archive.exists(),
+                        "Stale work must retain an archive for an active child and remove an unowned archive",
+                    )
+                }
+            } finally {
+                folder.deleteRecursively()
+            }
+        }
+
+    @Test
     fun `cloud restore ignores a queued request for a different owner`() =
         verifyObsoleteWork(
             Data
@@ -88,6 +139,8 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                     .putString(NativeRestoreWorkState.OWNER_KEY, "retained-owner")
                     .putString(NativeRestoreWorkState.ORIGIN_KEY, "https://sync.example")
                     .build()
+            val handedOffArchive = File(context.noBackupFilesDir, "cloud-restore-${params.id}.zip")
+            handedOffArchive.writeBytes(byteArrayOf('P'.code.toByte(), 'K'.code.toByte()))
             val worker =
                 CloudRestoreWorker(
                     context,
@@ -98,9 +151,57 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                     enqueueRestore = { error("Restore must wait for the persisted session") },
                 )
 
-            assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
-            assertTrue(cloud.listAccessTokens.isEmpty())
-            assertEquals(0, cloud.fileDownloadCalls)
+            try {
+                assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+                assertTrue(cloud.listAccessTokens.isEmpty())
+                assertEquals(0, cloud.fileDownloadCalls)
+                assertTrue(handedOffArchive.isFile, "Temporary session loss must not delete an archive owned by restore work")
+            } finally {
+                handedOffArchive.delete()
+            }
+        }
+
+    @Test
+    fun `cloud restore preserves a handed off archive when active restore lookup fails`() =
+        runTest {
+            val folder = File(context.cacheDir, "restore-lookup-failure-${UUID.randomUUID()}").apply { mkdirs() }
+            val isolatedContext =
+                object : ContextWrapper(context) {
+                    override fun getNoBackupFilesDir() = File(folder, "no_backup").apply { mkdirs() }
+
+                    override fun getDatabasePath(name: String) = File(folder, "databases/$name")
+                }
+            val detector = PostRestoreDetector(isolatedContext)
+            val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
+            detector.recordRestoreCompleted()
+            val delivery = requireNotNull(detector.pendingContentRecoveryId())
+            val input = NativeRestoreWorkState.bind(Data.Builder(), delivery, session.getOriginBoundSession()).build()
+            val workId = UUID.randomUUID()
+            val params = workerParameters(workId)
+            val handedOffArchive = File(isolatedContext.noBackupFilesDir, "cloud-restore-$workId.zip")
+            handedOffArchive.writeBytes(byteArrayOf('P'.code.toByte(), 'K'.code.toByte()))
+            every { params.inputData } returns input
+            val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+            val worker =
+                CloudRestoreWorker(
+                    isolatedContext,
+                    params,
+                    cloud,
+                    session,
+                    archiveCipher,
+                    hasActiveRestore = { _, _, _ -> error("WorkManager query temporarily failed") },
+                )
+
+            try {
+                assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+                assertTrue(cloud.listAccessTokens.isEmpty())
+                assertTrue(
+                    handedOffArchive.isFile,
+                    "A failed WorkManager query cannot establish that an active restore released its archive",
+                )
+            } finally {
+                folder.deleteRecursively()
+            }
         }
 
     @Test
@@ -269,7 +370,10 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
             detector.recordRestoreCompleted()
             val delivery = requireNotNull(detector.pendingContentRecoveryId())
             val input = NativeRestoreWorkState.bind(Data.Builder(), delivery, session.getOriginBoundSession()).build()
-            val params = workerParameters()
+            val workId = UUID.randomUUID()
+            val params = workerParameters(workId)
+            val handedOffArchive = File(isolatedContext.noBackupFilesDir, "cloud-restore-$workId.zip")
+            handedOffArchive.writeBytes(byteArrayOf('P'.code.toByte(), 'K'.code.toByte()))
             every { params.inputData } returns input
             val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
             var handedOff = false
@@ -280,9 +384,10 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                     cloud,
                     session,
                     archiveCipher,
-                    hasActiveRestore = { taggedDelivery, taggedSession ->
+                    hasActiveRestore = { taggedDelivery, taggedAccount, taggedOrigin ->
                         assertEquals(delivery, taggedDelivery)
-                        assertEquals(session.getOriginBoundSession(), taggedSession)
+                        assertEquals("account", taggedAccount)
+                        assertEquals("https://sync.example", taggedOrigin)
                         true
                     },
                     enqueueRestore = { handedOff = true },
@@ -294,7 +399,12 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
                 assertEquals(0, cloud.fileDownloadCalls)
                 assertFalse(handedOff)
                 assertEquals(delivery, detector.pendingContentRecoveryId())
+                assertTrue(
+                    handedOffArchive.isFile,
+                    "A resumed cloud worker must preserve the archive still owned by the active RestoreWorker",
+                )
             } finally {
+                handedOffArchive.delete()
                 folder.deleteRecursively()
             }
         }

@@ -52,13 +52,25 @@ class CloudRestoreScheduler(
         fun deliveryWorkTag(
             deliveryId: String,
             session: OriginBoundSession,
-        ): String = "${CloudRestoreWorker.WORK_TAG}:delivery:${scopeDigest(session, deliveryId)}"
+        ): String = deliveryWorkTag(deliveryId, session.session.accountId, session.origin)
+
+        fun deliveryWorkTag(
+            deliveryId: String,
+            accountId: String,
+            origin: String,
+        ): String = "${CloudRestoreWorker.WORK_TAG}:delivery:${scopeDigest(origin, accountId, deliveryId)}"
 
         private fun scopeDigest(
             session: OriginBoundSession?,
             deliveryId: String?,
+        ): String = scopeDigest(session?.origin, session?.session?.accountId, deliveryId)
+
+        private fun scopeDigest(
+            origin: String?,
+            accountId: String?,
+            deliveryId: String?,
         ): String {
-            val scope = "${session?.let { "${it.origin}\n${it.session.accountId}" } ?: "no-session"}\n${deliveryId.orEmpty()}"
+            val scope = "${if (origin == null || accountId == null) "no-session" else "$origin\n$accountId"}\n${deliveryId.orEmpty()}"
             val digest = MessageDigest.getInstance("SHA-256").digest(scope.encodeToByteArray())
             return digest.joinToString("") { byte -> (byte.toInt() and 0xff).toString(16).padStart(2, '0') }
         }
