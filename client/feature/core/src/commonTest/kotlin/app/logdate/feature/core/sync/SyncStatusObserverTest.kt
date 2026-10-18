@@ -81,6 +81,36 @@ class SyncStatusObserverTest {
     }
 
     @Test
+    fun `missing identity key asks the user to recover the key`() {
+        val status =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 1,
+                isSyncing = false,
+                hasErrors = true,
+                lastError = SyncError(SyncErrorType.KEY_RECOVERY_ERROR, "Missing key"),
+            )
+
+        assertEquals(SyncPresentation.NeedsRecovery, status.toPresentation())
+    }
+
+    @Test
+    fun `oversized media has a specific actionable status`() {
+        val status =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 1,
+                isSyncing = false,
+                hasErrors = true,
+                lastError = SyncError(SyncErrorType.MEDIA_TOO_LARGE_ERROR, "File exceeds upload limit"),
+            )
+
+        assertEquals(SyncPresentation.MediaTooLarge, status.toPresentation())
+    }
+
+    @Test
     fun `a run in flight reports its progress in steps rather than per item`() {
         val status =
             SyncStatus(

@@ -92,6 +92,7 @@ internal object DiagnosticSchemaDocs {
                             "ARCHIVE" to "Uploading or downloading a backup archive.",
                             "RESTORE" to "Restoring from a backup.",
                             "RECOVERY" to "Recovering missing media or keys.",
+                            "UNKNOWN" to "A future or unclassified part of sync.",
                         ),
                 ),
             "DiagnosticOutcome" to
@@ -107,6 +108,7 @@ internal object DiagnosticSchemaDocs {
                             "INTERRUPTED" to "No result was recorded, for example because the app was closed. Not proof of an error.",
                             "CONFLICT" to "Another device changed the same record.",
                             "PAUSED" to "Work is waiting, for example for a network connection.",
+                            "UNKNOWN" to "A future or unclassified outcome.",
                         ),
                 ),
             "DiagnosticReason" to
@@ -120,6 +122,7 @@ internal object DiagnosticSchemaDocs {
                             "SERVER_UNAVAILABLE" to "The server did not answer or answered with a server error.",
                             "RATE_LIMITED" to "The server asked the app to slow down.",
                             "QUOTA_EXCEEDED" to "The account is out of storage.",
+                            "MEDIA_TOO_LARGE" to "One media attachment exceeds the per-file upload limit.",
                             "LOCAL_STORAGE" to "The device is out of space or could not write.",
                             "MISSING_MEDIA" to "A media file was missing.",
                             "CORRUPT_PAYLOAD" to "Data could not be decrypted or parsed.",
@@ -141,6 +144,8 @@ internal object DiagnosticSchemaDocs {
                             "CONNECT" to "Connect to the internet, then retry.",
                             "SIGN_IN" to "Sign in again to the same account and server.",
                             "FREE_SPACE" to "Free up space on the device.",
+                            "MANAGE_STORAGE" to "Manage the account's cloud storage.",
+                            "REPLACE_MEDIA" to "Remove or replace the oversized attachment.",
                             "RECOVER_KEY" to "Recover the account's encryption key.",
                             "UPDATE_SERVER" to "The server needs an update.",
                             "UPDATE_APP" to "The app needs an update.",

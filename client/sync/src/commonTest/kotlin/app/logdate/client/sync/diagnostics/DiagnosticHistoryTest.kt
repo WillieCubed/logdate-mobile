@@ -78,6 +78,35 @@ class DiagnosticHistoryTest {
         }
 
     @Test
+    fun `future optional enum values do not erase retained diagnostic history`() =
+        runTest {
+            val storage = Storage()
+            storage.data =
+                """{"events":[{"capturedAt":1,"event":{"phase":"FETCH","outcome":"FAILED","reason":"FUTURE_REASON","action":"FUTURE_ACTION"}}],"dropped":0}"""
+
+            val report = DiagnosticHistory(storage, { 2L }).report()
+
+            assertEquals(1, report.events.size)
+            assertEquals(DiagnosticOutcome.FAILED, report.events.single().outcome)
+            assertEquals(0, report.droppedEvents)
+        }
+
+    @Test
+    fun `future required enum values do not erase retained diagnostic history`() =
+        runTest {
+            val storage = Storage()
+            storage.data =
+                """{"events":[{"capturedAt":1,"event":{"phase":"FUTURE_PHASE","outcome":"FUTURE_OUTCOME"}}],"dropped":0}"""
+
+            val report = DiagnosticHistory(storage, { 2L }).report()
+
+            assertEquals(1, report.events.size)
+            assertEquals(DiagnosticPhase.UNKNOWN, report.events.single().phase)
+            assertEquals(DiagnosticOutcome.UNKNOWN, report.events.single().outcome)
+            assertEquals(0, report.droppedEvents)
+        }
+
+    @Test
     fun `bounded history evicts oldest events and reports dropped counts`() =
         runTest {
             val history = DiagnosticHistory(Storage(), { 1L }, maxBytes = 1024)

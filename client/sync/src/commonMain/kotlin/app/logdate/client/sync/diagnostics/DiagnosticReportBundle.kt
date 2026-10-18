@@ -121,7 +121,9 @@ internal fun recommendedAction(reason: DiagnosticReason): DiagnosticAction =
         DiagnosticReason.NETWORK_POLICY -> DiagnosticAction.NONE
         DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
         DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
-        DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> DiagnosticAction.FREE_SPACE
+        DiagnosticReason.QUOTA_EXCEEDED -> DiagnosticAction.MANAGE_STORAGE
+        DiagnosticReason.MEDIA_TOO_LARGE -> DiagnosticAction.REPLACE_MEDIA
+        DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> DiagnosticAction.RETRY
         DiagnosticReason.KEY_RECOVERY_REQUIRED -> DiagnosticAction.RECOVER_KEY
         DiagnosticReason.INCOMPATIBLE_SERVER -> DiagnosticAction.UPDATE_SERVER
         DiagnosticReason.UNSUPPORTED_FORMAT -> DiagnosticAction.UPDATE_APP

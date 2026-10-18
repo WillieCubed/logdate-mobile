@@ -44,6 +44,7 @@ import app.logdate.ui.common.BannerContent
 import app.logdate.ui.common.MessageBanner
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.last_sync_failed
+import logdate.client.feature.core.generated.resources.sync_account_media_too_large
 import logdate.client.feature.core.generated.resources.sync_banner_conflicts
 import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_banner_manage
@@ -99,6 +100,7 @@ fun SyncStatusButton(
         SyncPresentation.AuthError,
         SyncPresentation.NeedsRecovery,
         is SyncPresentation.StorageError,
+        SyncPresentation.MediaTooLarge,
         is SyncPresentation.ConflictError,
         -> return
 
@@ -272,6 +274,16 @@ private fun SyncPresentation.toBannerVisual(): BannerVisual? {
                 containerColor = scheme.errorContainer,
                 contentColor = scheme.onErrorContainer,
                 action = stringResource(Res.string.sync_banner_enter_recovery_phrase) to SyncAction.EnterRecoveryPhrase,
+                dismissible = false,
+            )
+
+        SyncPresentation.MediaTooLarge ->
+            BannerVisual(
+                message = stringResource(Res.string.sync_account_media_too_large),
+                icon = Icons.Filled.CloudUpload,
+                containerColor = scheme.tertiaryContainer,
+                contentColor = scheme.onTertiaryContainer,
+                action = stringResource(Res.string.sync_banner_review) to SyncAction.ReviewIssues,
                 dismissible = false,
             )
 

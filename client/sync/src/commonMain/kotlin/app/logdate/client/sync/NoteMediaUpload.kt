@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingUpload
@@ -79,11 +80,7 @@ internal class NoteMediaUpload(
                         // and sends the user to a billing page for a local
                         // problem. Only a real server-side storage refusal
                         // earns that message.
-                        if (error is MissingMediaException) {
-                            SyncErrorType.UNKNOWN_ERROR
-                        } else {
-                            SyncErrorType.STORAGE_ERROR
-                        },
+                        mediaUploadSyncErrorType(error),
                         "Failed to upload media for note ${note.uid}: ${error.message}",
                         error,
                         retryable = !movedToDeadLetter,
@@ -98,3 +95,14 @@ internal class NoteMediaUpload(
         }
     }
 }
+
+internal fun mediaUploadSyncErrorType(error: Throwable): SyncErrorType =
+    when {
+        error is MissingMediaException -> SyncErrorType.UNKNOWN_ERROR
+        error is MediaTooLargeException -> SyncErrorType.MEDIA_TOO_LARGE_ERROR
+        error is CloudApiException && error.errorCode in CLOUD_QUOTA_ERROR_CODES -> SyncErrorType.STORAGE_ERROR
+        else -> SyncErrorType.UNKNOWN_ERROR
+    }
+
+private val CLOUD_QUOTA_ERROR_CODES =
+    setOf("QUOTA_EXCEEDED", "STORAGE_LIMIT_EXCEEDED", "STORAGE_QUOTA_EXCEEDED")

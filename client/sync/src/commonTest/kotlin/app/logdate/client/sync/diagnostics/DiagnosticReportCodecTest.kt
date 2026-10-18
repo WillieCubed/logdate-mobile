@@ -1,7 +1,9 @@
 package app.logdate.client.sync.diagnostics
 
+import app.logdate.shared.model.diagnostics.DiagnosticAction
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
+import app.logdate.shared.model.diagnostics.DiagnosticReason
 import app.logdate.shared.model.diagnostics.DiagnosticReportCodec
 import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import app.logdate.shared.model.diagnostics.SyncDiagnosticReport
@@ -81,6 +83,28 @@ class DiagnosticReportCodecTest {
         )) {
             assertFailsWith<IllegalArgumentException> { DiagnosticReportCodec.decode(payload) }
         }
+    }
+
+    @Test
+    fun `unknown optional enum values degrade safely for older and newer peers`() {
+        val report =
+            DiagnosticReportCodec.decode(
+                """{"reportId":"$id","events":[{"phase":"FETCH","outcome":"FAILED","reason":"FUTURE_REASON","action":"FUTURE_ACTION"}]}""",
+            )
+
+        assertEquals(DiagnosticReason.NONE, report.events.single().reason)
+        assertEquals(DiagnosticAction.NONE, report.events.single().action)
+    }
+
+    @Test
+    fun `unknown required enum values retain the event with explicit unknown classifications`() {
+        val report =
+            DiagnosticReportCodec.decode(
+                """{"reportId":"$id","events":[{"phase":"FUTURE_PHASE","outcome":"FUTURE_OUTCOME"}]}""",
+            )
+
+        assertEquals(DiagnosticPhase.UNKNOWN, report.events.single().phase)
+        assertEquals(DiagnosticOutcome.UNKNOWN, report.events.single().outcome)
     }
 
     @Test

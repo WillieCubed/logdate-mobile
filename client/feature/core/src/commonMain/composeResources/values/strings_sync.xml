@@ -265,6 +265,7 @@
     <string name="sync_account_connection_unavailable">Sync paused: unable to connect to LogDate. Retrying automatically.</string>
     <string name="sync_account_signed_out">Sync paused: sign-in has expired.</string>
     <string name="sync_account_storage_full">Sync paused: your cloud storage is full.</string>
+    <string name="sync_account_recovery_required">This device needs your recovery phrase to keep syncing.</string>
     <string name="sync_account_wifi">Photos and recordings will sync when this device is on Wi-Fi.</string>
     <string name="sync_account_background">Sync paused: background network access is restricted on this device.</string>
     <string name="sync_account_device_access">Sync paused while this device gets access to your journal.</string>

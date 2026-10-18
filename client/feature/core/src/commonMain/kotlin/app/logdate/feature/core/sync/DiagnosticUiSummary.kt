@@ -13,6 +13,8 @@ enum class DiagnosticRetryCondition {
     SIGN_IN,
     KEY_RECOVERY,
     FREE_SPACE,
+    MANAGE_STORAGE,
+    REPLACE_MEDIA,
     UPDATE_APP,
     UPDATE_SERVER,
     REVIEW_CONFLICT,
@@ -61,6 +63,7 @@ fun summarizeDiagnostics(report: SyncDiagnosticReport): DiagnosticUiSummary {
         when {
             blocker?.reason == DiagnosticReason.NETWORK_POLICY -> DiagnosticRetryCondition.AUTOMATIC
             blocker?.reason == DiagnosticReason.OFFLINE -> DiagnosticRetryCondition.NETWORK
+            action == DiagnosticAction.FREE_SPACE -> DiagnosticRetryCondition.FREE_SPACE
             blocker?.outcome == DiagnosticOutcome.RETRY_SCHEDULED -> DiagnosticRetryCondition.AUTOMATIC
             else ->
                 when (action) {
@@ -68,6 +71,8 @@ fun summarizeDiagnostics(report: SyncDiagnosticReport): DiagnosticUiSummary {
                     DiagnosticAction.SIGN_IN -> DiagnosticRetryCondition.SIGN_IN
                     DiagnosticAction.RECOVER_KEY -> DiagnosticRetryCondition.KEY_RECOVERY
                     DiagnosticAction.FREE_SPACE -> DiagnosticRetryCondition.FREE_SPACE
+                    DiagnosticAction.MANAGE_STORAGE -> DiagnosticRetryCondition.MANAGE_STORAGE
+                    DiagnosticAction.REPLACE_MEDIA -> DiagnosticRetryCondition.REPLACE_MEDIA
                     DiagnosticAction.UPDATE_APP -> DiagnosticRetryCondition.UPDATE_APP
                     DiagnosticAction.UPDATE_SERVER -> DiagnosticRetryCondition.UPDATE_SERVER
                     DiagnosticAction.REVIEW_CONFLICT -> DiagnosticRetryCondition.REVIEW_CONFLICT
@@ -94,7 +99,9 @@ private fun recommendedDiagnosticAction(
         DiagnosticReason.NETWORK_POLICY -> DiagnosticAction.NONE
         DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
         DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
-        DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> DiagnosticAction.FREE_SPACE
+        DiagnosticReason.QUOTA_EXCEEDED -> DiagnosticAction.MANAGE_STORAGE
+        DiagnosticReason.MEDIA_TOO_LARGE -> DiagnosticAction.REPLACE_MEDIA
+        DiagnosticReason.LOCAL_STORAGE, DiagnosticReason.PERSISTENCE_FAILED -> DiagnosticAction.RETRY
         DiagnosticReason.KEY_RECOVERY_REQUIRED -> DiagnosticAction.RECOVER_KEY
         DiagnosticReason.INCOMPATIBLE_SERVER -> DiagnosticAction.UPDATE_SERVER
         DiagnosticReason.UNSUPPORTED_FORMAT -> DiagnosticAction.UPDATE_APP

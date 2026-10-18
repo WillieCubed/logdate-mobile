@@ -3,10 +3,10 @@ package app.logdate.shared.model.diagnostics
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class DiagnosticPhase { SCHEDULING, IDENTITY, UPLOAD, FETCH, PERSIST, APPLY, MEDIA, ARCHIVE, RESTORE, RECOVERY }
+enum class DiagnosticPhase { SCHEDULING, IDENTITY, UPLOAD, FETCH, PERSIST, APPLY, MEDIA, ARCHIVE, RESTORE, RECOVERY, UNKNOWN }
 
 @Serializable
-enum class DiagnosticOutcome { QUEUED, STARTED, SUCCEEDED, FAILED, RETRY_SCHEDULED, INTERRUPTED, CONFLICT, PAUSED }
+enum class DiagnosticOutcome { QUEUED, STARTED, SUCCEEDED, FAILED, RETRY_SCHEDULED, INTERRUPTED, CONFLICT, PAUSED, UNKNOWN }
 
 @Serializable
 enum class DiagnosticReason {
@@ -17,6 +17,7 @@ enum class DiagnosticReason {
     SERVER_UNAVAILABLE,
     RATE_LIMITED,
     QUOTA_EXCEEDED,
+    MEDIA_TOO_LARGE,
     LOCAL_STORAGE,
     MISSING_MEDIA,
     CORRUPT_PAYLOAD,
@@ -35,6 +36,8 @@ enum class DiagnosticAction {
     CONNECT,
     SIGN_IN,
     FREE_SPACE,
+    MANAGE_STORAGE,
+    REPLACE_MEDIA,
     RECOVER_KEY,
     UPDATE_SERVER,
     UPDATE_APP,
@@ -45,8 +48,8 @@ enum class DiagnosticAction {
 /** Only finite classifications, counters and random correlation references cross this boundary. */
 @Serializable
 data class SyncDiagnosticEvent(
-    val phase: DiagnosticPhase,
-    val outcome: DiagnosticOutcome,
+    val phase: DiagnosticPhase = DiagnosticPhase.UNKNOWN,
+    val outcome: DiagnosticOutcome = DiagnosticOutcome.UNKNOWN,
     val reason: DiagnosticReason = DiagnosticReason.NONE,
     val action: DiagnosticAction = DiagnosticAction.NONE,
     val elapsedMs: Long = 0,

@@ -376,7 +376,7 @@ def credentials_only_from_full_backup(payload):
                         raise RuntimeError("credentials-only fixture is missing owner preferences")
                     replacements[item.name] = canonical_preferences(
                         preferences.read(),
-                        allowed_names={"identity.canonical_owner_id"},
+                        allowed_names={"identity.canonical_owner_id", "identity.canonical_owner_bound"},
                     )
     has_identity_key = bool(found.intersection(identity_keys - {prefix + "identity_recovery/media_key_backup"}))
     required = {database_key, prefix + "identity_recovery/media_key_backup"}
