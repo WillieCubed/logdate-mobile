@@ -27,6 +27,7 @@ open class NativeBackupAgent : BackupAgent() {
     private val nativeRestoreSession = NativeRestoreSessionBoundary { PostRestoreDetector(this).beginNativeRestoreSession() }
     private val callbackLock = Any()
     private var restoreCompletionRecorded = false
+    private var installationStateReset = false
 
     override fun onCreate() {
         super.onCreate()
@@ -86,8 +87,7 @@ open class NativeBackupAgent : BackupAgent() {
                     val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferencesFile })
                     runBlocking(Dispatchers.IO) {
                         withTimeoutOrNull(15_000) {
-                            resetRestoredInstallationState(preferences)
-                            PostRestoreDetector(this@NativeBackupAgent).refreshRestoreFingerprint()
+                            prepareRestoredInstallationState(preferences)
                             restoreAccount(preferences)
                         }
                     }
@@ -117,6 +117,7 @@ open class NativeBackupAgent : BackupAgent() {
         try {
             synchronized(callbackLock) {
                 restoreCompletionRecorded = false
+                installationStateReset = false
                 beginNativeRestoreSessionOnce()
             }
             super.onRestoreFile(data, size, destination, type, mode, mtime)
@@ -144,7 +145,10 @@ open class NativeBackupAgent : BackupAgent() {
         try {
             val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferencesFile })
             runBlocking(Dispatchers.IO) {
-                withTimeoutOrNull(15_000) { restoreAccount(preferences) }
+                withTimeoutOrNull(15_000) {
+                    prepareRestoredInstallationState(preferences)
+                    restoreAccount(preferences)
+                }
             }
         } catch (_: Exception) {
             Napier.w("Background native account recovery remains pending")
@@ -152,6 +156,13 @@ open class NativeBackupAgent : BackupAgent() {
             scope.cancel()
             runBlocking { job.join() }
         }
+    }
+
+    private suspend fun prepareRestoredInstallationState(preferences: DataStore<Preferences>) {
+        if (synchronized(callbackLock) { installationStateReset }) return
+        resetRestoredInstallationState(preferences)
+        PostRestoreDetector(this).refreshRestoreFingerprint()
+        synchronized(callbackLock) { installationStateReset = true }
     }
 
     protected open suspend fun restoreAccount(preferences: DataStore<Preferences>) = Unit

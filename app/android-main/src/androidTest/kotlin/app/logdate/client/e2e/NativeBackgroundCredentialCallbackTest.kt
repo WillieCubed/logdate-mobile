@@ -100,6 +100,39 @@ class NativeBackgroundCredentialCallbackTest {
     }
 
     @Test
+    fun `duplicate completion retries an interrupted installation identity reset`() {
+        val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
+        withPreferences { preferences ->
+            preferences.edit { values -> values[stringPreferencesKey("device.id")] = "source-device" }
+        }
+        preferencesFile.writeBytes(byteArrayOf(0xFF.toByte()))
+        val observedDeviceIds = mutableListOf<String?>()
+        val agent =
+            object : NativeBackupAgent() {
+                override suspend fun restoreAccount(preferences: DataStore<Preferences>) {
+                    observedDeviceIds += preferences.data.first()[stringPreferencesKey("device.id")]
+                }
+            }
+        agent.initialize(context)
+
+        agent.onRestoreFinished()
+        val content = assertNotNull(PostRestoreDetector(context).pendingContentRecoveryId())
+        val account = assertNotNull(PostRestoreDetector(context).pendingAccountRecoveryId())
+        val media = assertNotNull(PostRestoreDetector(context).pendingMediaQuarantineId())
+
+        preferencesFile.delete()
+        withPreferences { preferences ->
+            preferences.edit { values -> values[stringPreferencesKey("device.id")] = "source-device" }
+        }
+        agent.onRestoreFinished()
+
+        assertEquals(listOf<String?>(null), observedDeviceIds)
+        assertEquals(content, PostRestoreDetector(context).pendingContentRecoveryId())
+        assertEquals(account, PostRestoreDetector(context).pendingAccountRecoveryId())
+        assertEquals(media, PostRestoreDetector(context).pendingMediaQuarantineId())
+    }
+
+    @Test
     fun `corrupt restored server leaves local content and account recovery pending`() {
         val owner = Uuid.random().toString()
         withPreferences {
