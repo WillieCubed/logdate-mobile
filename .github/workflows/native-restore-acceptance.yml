@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   native-transfer:
-    name: Restore partial media between emulators
+    name: Exercise Android native restore and quota on emulators
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -111,6 +111,7 @@ jobs:
             --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
             --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
             --output "$RUNNER_TEMP/native-restore-partial-media" \
+            --exercise-quota \
             --exercise-partial-media \
             --exercise-duplicate-restore
 
