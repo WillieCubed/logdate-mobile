@@ -8,6 +8,7 @@ import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.client.device.crypto.AndroidCryptoManager
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -163,7 +165,10 @@ open class NativeBackupAgent : BackupAgent() {
 
     private suspend fun prepareRestoredInstallationState(preferences: DataStore<Preferences>) {
         if (synchronized(callbackLock) { installationStateReset }) return
-        resetRestoredInstallationState(preferences)
+        val deviceIdKey = stringPreferencesKey("device.id")
+        val currentDeviceId = preferences.data.first()[deviceIdKey]
+        val sourceDeviceId = NativeInstallationResetMarker(noBackupFilesDir).sourceDeviceId(currentDeviceId)
+        resetRestoredInstallationState(preferences, sourceDeviceId)
         PostRestoreDetector(this).refreshRestoreFingerprint()
         synchronized(callbackLock) { installationStateReset = true }
     }

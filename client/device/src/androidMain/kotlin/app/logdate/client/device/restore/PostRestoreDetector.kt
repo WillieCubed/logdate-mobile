@@ -75,6 +75,7 @@ class PostRestoreDetector(
     /** A new BackupAgent instance starts a new delivery boundary; abandoned receipts cannot cross it. */
     fun beginNativeRestoreSession() =
         synchronized(lock) {
+            NativeInstallationResetMarker(context.noBackupFilesDir).clear()
             val sessionId = Uuid.random().toString()
             // Publish the new generation first. If deletion is interrupted, prior receipts still
             // carry the old generation and cannot establish that this delivery contained a file.
