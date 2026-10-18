@@ -6,13 +6,31 @@ import app.logdate.client.database.dao.sync.DownloadInboxDao
 import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.getRoomDatabase
+import app.logdate.client.media.ConditionalMediaSaver
+import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.MediaPayload
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.sync.InMemoryKeyValueStorage
 import app.logdate.client.sync.RoomSyncTransactionManager
+import app.logdate.client.sync.SyncMediaTransfer
+import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.MediaFile
+import app.logdate.client.sync.cloud.MediaUploadResult
+import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
+import app.logdate.client.sync.metadata.MediaSyncRef
+import app.logdate.client.sync.test.FakeJournalNotesRepository
+import app.logdate.client.sync.test.FakeJournalRepository
 import app.logdate.shared.model.diagnostics.DiagnosticReason
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class RoomDownloadInboxTest {
     @Test
@@ -121,6 +139,111 @@ class RoomDownloadInboxTest {
                 assertEquals(1, inbox.count(), "Only the record this version can still finish counts")
                 now += 60 * 60 * 1_000L
                 assertEquals(setOf("newer-kind", "storage-failure"), inbox.pending("NOTE").map { it.entityId }.toSet())
+            } finally {
+                database.close()
+                Files.deleteIfExists(path)
+                Files.deleteIfExists(path.resolveSibling("${path.fileName}-wal"))
+                Files.deleteIfExists(path.resolveSibling("${path.fileName}-shm"))
+            }
+        }
+
+    @Test
+    fun `native media low-storage recovery resumes after reopening the database`() =
+        runTest {
+            val path = Files.createTempFile("logdate-native-media-storage-retry", ".db")
+            Files.delete(path)
+
+            fun open() = getRoomDatabase(Room.databaseBuilder<LogDateDatabase>(path.toString()))
+            var database = open()
+            try {
+                var now = 1L
+                val selected = DownloadScope("owner", "server")
+                val scope = { selected }
+                val transactions = { RoomSyncTransactionManager(database) }
+                val notes = FakeJournalNotesRepository()
+                val drafts = FakeJournalRepository()
+                val media =
+                    object : InMemoryMediaManager(), ConditionalMediaSaver {
+                        var lowStorage = true
+
+                        override suspend fun saveMedia(
+                            payload: MediaPayload,
+                            canCommit: () -> Boolean,
+                        ): String {
+                            if (lowStorage) error("No space left on device")
+                            return super.saveMedia(payload, canCommit)
+                        }
+                    }
+                val local = "logdate-media://library/old-path.jpg"
+                val timestamp = Instant.fromEpochMilliseconds(4)
+                val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = local)
+                notes.create(note)
+                val storage = InMemoryKeyValueStorage()
+                val refs = KeyValueMediaSyncRefStore(storage, { selected.origin }, { selected.owner })
+                refs.upsert(MediaSyncRef(note.uid.toString(), local, "https://example.invalid/media/original", "original", 1))
+                val downloads = mutableListOf<String>()
+                val cloud =
+                    object : CloudMediaDataSource {
+                        override suspend fun uploadMedia(
+                            accessToken: String,
+                            contentId: Uuid,
+                            media: app.logdate.client.media.MediaFileSource,
+                        ): Result<MediaUploadResult> = error("no upload")
+
+                        override suspend fun downloadMedia(
+                            accessToken: String,
+                            mediaId: String,
+                        ): Result<MediaFile> {
+                            downloads += mediaId
+                            return Result.success(MediaFile(note.uid, "$mediaId.jpg", "image/jpeg", 1, byteArrayOf(1)))
+                        }
+                    }
+
+                fun recovery(): NativeMediaRecovery {
+                    val transactionManager = transactions()
+                    return NativeMediaRecovery(
+                        DownloadInbox(database.downloadInboxDao(), transactionManager, scope, { now }),
+                        notes,
+                        drafts,
+                        media,
+                        SyncMediaTransfer(media, refs, cloud),
+                        refs,
+                        transactionManager,
+                    )
+                }
+
+                recovery().recover("token", EntityType.NOTE)
+
+                val failed =
+                    requireNotNull(
+                        database
+                            .downloadInboxDao()
+                            .get(selected.owner, selected.origin, "MEDIA_NATIVE_NOTE", note.uid.toString()),
+                    )
+
+                assertEquals("FAILED", failed.state)
+                assertEquals(1, failed.attempts)
+                assertEquals(DiagnosticReason.LOCAL_STORAGE.name, failed.reason)
+                database.close()
+
+                database = open()
+                now = failed.nextAttemptAt - 1
+                assertEquals(
+                    emptyList(),
+                    DownloadInbox(database.downloadInboxDao(), transactions(), scope, { now }).pending("MEDIA_NATIVE_NOTE"),
+                    "A retry must honor its persisted deadline",
+                )
+                now = failed.nextAttemptAt
+                media.lowStorage = false
+                recovery().recover("token", EntityType.NOTE)
+
+                val repaired = assertIs<JournalNote.Image>(notes.getNoteById(note.uid))
+                assertTrue(media.exists(repaired.mediaRef))
+                assertEquals(listOf("original", "original"), downloads)
+                assertEquals(
+                    "APPLIED",
+                    database.downloadInboxDao().get(selected.owner, selected.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.state,
+                )
             } finally {
                 database.close()
                 Files.deleteIfExists(path)

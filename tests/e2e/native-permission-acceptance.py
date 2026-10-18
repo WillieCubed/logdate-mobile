@@ -73,7 +73,7 @@ def main():
     parser.add_argument("--synthetic-data", action="store_true", required=True)
     args = parser.parse_args()
     os.umask(0o077)
-    args.output.mkdir(mode=0o700)
+    args.output.mkdir(mode=0o700, parents=True)
     results = [run(args, serial) for serial in args.emulator]
     (args.output / "acceptance.json").write_text(json.dumps(results, indent=2) + "\n")
     print(json.dumps(results))

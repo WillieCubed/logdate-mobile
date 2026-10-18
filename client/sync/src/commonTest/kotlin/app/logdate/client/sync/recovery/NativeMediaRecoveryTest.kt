@@ -185,6 +185,62 @@ class NativeMediaRecoveryTest {
         }
 
     @Test
+    fun `low storage keeps missing original retryable without replacing its reference`() =
+        runTest {
+            val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = local)
+            notes.create(note)
+            owner = note.uid
+            refs.upsert(mapping(note.uid))
+            media.onSave = { error("No space left on device") }
+
+            recovery().recover("token", EntityType.NOTE)
+
+            val failed = requireNotNull(db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString()))
+            assertEquals("FAILED", failed.state)
+            assertEquals("LOCAL_STORAGE", failed.reason)
+            assertEquals(1, failed.attempts)
+            assertEquals(note, notes.getNoteById(note.uid))
+            assertFalse(media.exists("file:///tmp/original.jpg"))
+
+            media.onSave = {}
+            epochMillis = failed.nextAttemptAt
+            recovery().recover("token", EntityType.NOTE)
+
+            val repaired = assertIs<JournalNote.Image>(notes.getNoteById(note.uid))
+            assertTrue(media.exists(repaired.mediaRef))
+            assertEquals("APPLIED", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_NOTE", note.uid.toString())?.state)
+            assertEquals(2, downloads.size, "A retry after space becomes available should fetch and save the original")
+        }
+
+    @Test
+    fun `low storage keeps unfinished draft media retryable without changing the draft`() =
+        runTest {
+            val block = SerializableImageBlock(Uuid.random(), timestamp, uri = local, caption = "Keep this draft")
+            val draft = EditorDraft(Uuid.random(), listOf(block), createdAt = timestamp, lastModifiedAt = timestamp)
+            owner = block.id
+            drafts.saveDraftFromSync(draft)
+            refs.upsertDraftAsset(draft.id, block.id, "image", mapping(block.id))
+            media.onSave = { error("No space left on device") }
+
+            recovery().recover("token", EntityType.DRAFT)
+
+            val failed = requireNotNull(db.get(scope.owner, scope.origin, "MEDIA_NATIVE_DRAFT", draft.id.toString()))
+            assertEquals("FAILED", failed.state)
+            assertEquals("LOCAL_STORAGE", failed.reason)
+            assertEquals(draft, drafts.getDraft(draft.id))
+            assertFalse(media.exists("file:///tmp/original.jpg"))
+
+            media.onSave = {}
+            epochMillis = failed.nextAttemptAt
+            recovery().recover("token", EntityType.DRAFT)
+
+            val repaired = requireNotNull(drafts.getDraft(draft.id))
+            assertTrue(media.exists(requireNotNull(assertIs<SerializableImageBlock>(repaired.blocks.single()).uri)))
+            assertEquals("APPLIED", db.get(scope.owner, scope.origin, "MEDIA_NATIVE_DRAFT", draft.id.toString())?.state)
+            assertEquals(2, downloads.size, "A retry after space becomes available should fetch and save the original")
+        }
+
+    @Test
     fun `a quarantined content URI retries across recovery instances and scopes without crossing scopes`() =
         runTest {
             val source = "content://media/external/images/media/123"
