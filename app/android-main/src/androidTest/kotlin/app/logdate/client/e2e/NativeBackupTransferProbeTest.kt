@@ -370,9 +370,9 @@ private suspend fun verifyPhoneRecordingBackupPolicy(
         assertTrue(controller.start(final.absolutePath, inputDeviceId = null), "Recording service refused to start")
         val state =
             withTimeout(10_000) {
-                controller.serviceState.filterNotNull().first { it.isRecording || it.error != null }
+                controller.serviceState.filterNotNull().first { it.isRecording || it.failureMessage != null }
             }
-        assertTrue(state.isRecording, state.error ?: "Recording service did not start")
+        assertTrue(state.isRecording, state.failureMessage ?: "Recording service did not start")
         withTimeout(5_000) {
             while (!staged.isFile) delay(25)
         }

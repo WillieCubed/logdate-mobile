@@ -4,8 +4,8 @@ import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch

@@ -34,13 +34,13 @@ import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.rememberLogDateHaptics
 import logdate.client.feature.editor.generated.resources.Res
+import logdate.client.feature.editor.generated.resources.checking_recording
 import logdate.client.feature.editor.generated.resources.microphone
 import logdate.client.feature.editor.generated.resources.ready_to_record
 import logdate.client.feature.editor.generated.resources.record
 import logdate.client.feature.editor.generated.resources.recording_in_progress
 import logdate.client.feature.editor.generated.resources.recording_recovering
 import logdate.client.feature.editor.generated.resources.recording_starting
-import logdate.client.feature.editor.generated.resources.checking_recording
 import logdate.client.feature.editor.generated.resources.start_recording
 import logdate.client.feature.editor.generated.resources.stop
 import logdate.client.feature.editor.generated.resources.stop_recording

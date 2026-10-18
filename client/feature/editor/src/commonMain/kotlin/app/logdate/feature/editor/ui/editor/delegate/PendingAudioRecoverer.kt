@@ -47,7 +47,15 @@ class DefaultPendingAudioRecoverer(
                         fallbackFilePath = state.fallbackFilePath,
                     )
                 }
-                path = manager.stopRecording() ?: path
+                path =
+                    try {
+                        manager.stopRecording() ?: path
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Napier.w("Could not hand off the interrupted recording", error)
+                        path
+                    }
             }
             path?.let { resolvePath(it) }?.let { return it }
             state.fallbackFilePath
@@ -72,5 +80,4 @@ class DefaultPendingAudioRecoverer(
             Napier.w("Could not resolve recovered audio", error)
             null
         }
-
 }
