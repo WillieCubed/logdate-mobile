@@ -43,8 +43,6 @@
              requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="audio_notes/"
              requireFlags="deviceToDeviceTransfer"/>
-    <include domain="file" path="camera-captures/"
-             requireFlags="deviceToDeviceTransfer"/>
     <include domain="database" path="logdate"
              requireFlags="deviceToDeviceTransfer"/>
     <include domain="database" path="logdate-wal"
@@ -53,6 +51,7 @@
              requireFlags="deviceToDeviceTransfer"/>
     <exclude domain="file" path="media/staging/"/>
     <exclude domain="file" path="audio_notes/staging/"/>
+    <exclude domain="file" path="camera-captures/"/>
     <exclude domain="file" path="db_recovery/passphrase_backup.part"/>
     <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
     <exclude domain="file" path="identity_recovery/account_key_backup.part"/>

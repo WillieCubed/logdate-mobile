@@ -53,6 +53,12 @@ class NativeBackupPolicyTest(unittest.TestCase):
                 with self.subTest(modern=modern, path=path):
                     self.assertTrue(included("file", path, modern=modern, transfer=True))
 
+    def test_direct_transfer_excludes_unfinished_camera_capture_outputs(self):
+        for modern in (False, True):
+            for path in ("camera-captures/logdate-camera-photo.jpg", "camera-captures/logdate-camera-video.mp4"):
+                with self.subTest(modern=modern, path=path):
+                    self.assertFalse(included("file", path, modern=modern, transfer=True))
+
     def test_placed_widget_choices_survive_restore_before_launcher_id_remapping(self):
         # WidgetInstanceSettings.remap needs the old IDs' chosen entry and presentation
         # preferences; restoring only the journal cannot reconstruct those choices.
