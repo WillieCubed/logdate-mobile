@@ -39,7 +39,7 @@ class CloudRestoreWorker(
     private val cloudBackupDataSource: CloudBackupDataSource,
     private val sessionStorage: SessionStorage,
     private val cloudArchiveCipher: CloudArchiveCipher,
-    private val hasActiveRestore: (suspend (String, OriginBoundSession) -> Boolean)? = null,
+    private val hasActiveRestore: (suspend (String, String, String) -> Boolean)? = null,
     private val enqueueRestore: (suspend (File) -> Unit)? = null,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
@@ -63,10 +63,15 @@ class CloudRestoreWorker(
     ): Result {
         when (workState.validation()) {
             NativeRestoreWorkState.Validation.CURRENT -> Unit
-            NativeRestoreWorkState.Validation.STALE -> return Result.success()
-            NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> return Result.retry()
+            NativeRestoreWorkState.Validation.STALE -> {
+                resolveExistingArchiveOwnership(files)
+                return Result.success()
+            }
+            NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> {
+                resolveExistingArchiveOwnership(files)
+                return Result.retry()
+            }
         }
-        pruneAbandonedCloudArchives(context)
         val sessionAvailable = sessionStorage.hasValidSession()
         val sessionBoundWork =
             inputData.getString(NativeRestoreWorkState.OWNER_KEY) != null ||
@@ -75,7 +80,12 @@ class CloudRestoreWorker(
             sessionStorage.getOriginBoundSession()
                 ?: return if (sessionAvailable || sessionBoundWork) Result.retry() else Result.success()
         val deliveryId = inputData.getString(NativeRestoreWorkState.DELIVERY_KEY)
-        if (deliveryId != null && hasActiveRestoreForDelivery(deliveryId, expectedSession)) return Result.success()
+        if (deliveryId != null && hasActiveRestoreForDelivery(deliveryId, expectedSession.session.accountId, expectedSession.origin)) {
+            files.preserveArchive = true
+            return Result.success()
+        }
+        files.archiveOwnershipResolved = true
+        pruneAbandonedCloudArchives(context)
         val tokenRefresher = CloudBackupTokenRefresher(sessionStorage, cloudBackupDataSource)
         val listResult = tokenRefresher.execute(expectedSession) { accessToken -> cloudBackupDataSource.listBackups(accessToken) }
         expectedSession = listResult.session
@@ -151,15 +161,28 @@ class CloudRestoreWorker(
         enqueueResult.result.awaitResult()
     }
 
+    private suspend fun resolveExistingArchiveOwnership(files: CloudRestoreFiles) {
+        if (!files.archive.isFile) return
+        val deliveryId = inputData.getString(NativeRestoreWorkState.DELIVERY_KEY) ?: return
+        val owner = inputData.getString(NativeRestoreWorkState.OWNER_KEY) ?: return
+        val origin = inputData.getString(NativeRestoreWorkState.ORIGIN_KEY) ?: return
+        if (hasActiveRestoreForDelivery(deliveryId, owner, origin)) {
+            files.preserveArchive = true
+        } else {
+            files.archiveOwnershipResolved = true
+        }
+    }
+
     private suspend fun hasActiveRestoreForDelivery(
         deliveryId: String,
-        session: OriginBoundSession,
+        accountId: String,
+        origin: String,
     ): Boolean {
         val injectedCheck = hasActiveRestore
-        if (injectedCheck != null) return injectedCheck(deliveryId, session)
+        if (injectedCheck != null) return injectedCheck(deliveryId, accountId, origin)
         return WorkManager
             .getInstance(context)
-            .getWorkInfosByTag(CloudRestoreScheduler.deliveryWorkTag(deliveryId, session))
+            .getWorkInfosByTag(CloudRestoreScheduler.deliveryWorkTag(deliveryId, accountId, origin))
             .awaitResult()
             .any { it.id != id && !it.state.isFinished }
     }
@@ -210,6 +233,7 @@ private class CloudRestoreFiles(
     val plaintextPart = File(directory, "cloud-restore-$workerId.plain.part")
     val archive = cloudArchiveFile(context, "cloud-restore", workerId)
     var preserveArchive = false
+    var archiveOwnershipResolved = false
 
     fun clearBeforeDownload() {
         encrypted.delete()
@@ -220,7 +244,7 @@ private class CloudRestoreFiles(
     fun cleanup() {
         encrypted.delete()
         plaintextPart.delete()
-        if (!preserveArchive) archive.delete()
+        if (!preserveArchive && archiveOwnershipResolved) archive.delete()
     }
 }
 
