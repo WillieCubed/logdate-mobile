@@ -360,7 +360,7 @@ private fun RecordingActionButton(
 ) {
     if (recordingState == RecordingState.PROCESSING) {
         Button(onClick = {}, enabled = false, modifier = modifier) {
-            Text("Recovering…")
+            Text(stringResource(Res.string.recording_recovering))
         }
     } else if (recordingState == RecordingState.RECORDING) {
         RecordingStopButton(
