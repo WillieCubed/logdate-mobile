@@ -332,6 +332,25 @@ file is gone, accepts a replacement archive with different media paths, and veri
 bytes and offline playback across another process restart. Test IDs travel as instrumentation
 arguments; the application's recovery record and source ZIP must arrive through native backup.
 
+## Android platform testing methods
+
+Follow Android's [backup and restore testing guide](https://developer.android.com/identity/data/testingbackup)
+when choosing what each emulator run proves. Cloud backup can be exercised on one device; a
+comprehensive device-to-device transfer uses a source device and a separate, fresh target.
+
+The two-emulator `native-backup-acceptance.py` scenario calls Android's Backup Manager on the
+source and target with the encrypted local transport. It verifies real native callbacks, selected
+files, and destination recovery across two app installations. That transport run does not prove
+Google's D2D transport or the setup wizard.
+
+`native-d2d-acceptance.py` follows the guide's repeatable single-device GMS `D2dTransport` test-mode
+flow on an API 31+ Google Play emulator. It backs up a synthetic journal, changes that journal after
+the backup, then runs `bmgr restore` and verifies that the saved journal returns. The repository
+forbids uninstalling or clearing LogDate app data, so the harness restores explicitly instead of
+using the guide's uninstall/reinstall step. Passing it proves the GMS test transport, callbacks, and
+restored content; it does not prove source-to-fresh-target setup-wizard transfer. That broader
+acceptance remains a separate device-transfer test and must use a new target.
+
 The local transport exercises file selection, native callbacks, and application recovery using
 test encryption and direct-transfer flags. Google credential delivery and setup transfer require
 the corresponding providers and a dedicated test account. Cross-platform transfer requires a

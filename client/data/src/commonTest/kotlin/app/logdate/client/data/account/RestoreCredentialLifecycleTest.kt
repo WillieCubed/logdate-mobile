@@ -238,6 +238,7 @@ class RestoreCredentialLifecycleTest {
         runTest {
             val f = Fixture(backgroundScope)
             f.sessions.saveExplicitSession(f.account)
+            runCurrent()
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             f.policyRead = {
