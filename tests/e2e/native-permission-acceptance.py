@@ -20,6 +20,11 @@ def run(args, serial):
     h.safe_target(serial)
     directory = args.output / serial
     directory.mkdir(mode=0o700)
+    power_before = h.adb(serial, "shell", "dumpsys", "power").stdout.decode()
+    wakefulness_match = re.search(r"mWakefulness=(Awake|Asleep|Dozing)", power_before)
+    if wakefulness_match is None:
+        raise RuntimeError("Could not determine the emulator's original wakefulness")
+    original_wakefulness = wakefulness_match.group(1)
     for apk in [args.app_apk, args.test_apk]:
         h.safe_target(serial)
         h.adb(serial, "install", "-r", "-t", apk)
@@ -34,10 +39,16 @@ def run(args, serial):
     if wifi not in [b"0", b"1", b"2"]:
         raise RuntimeError("Original Wi-Fi state is unavailable")
     (directory / "environment-before.json").write_text(json.dumps({"grants": grants, "metered": original,
-        "dataSaver": saver, "airplane": airplane, "wifi": wifi.decode()}, indent=2))
+        "dataSaver": saver, "airplane": airplane, "wifi": wifi.decode(), "wakefulness": original_wakefulness}, indent=2))
     def probe(method, name, **kwargs):
         h.instrument(serial, TEST + "#" + method, directory / name, extras=EXTRAS, timeout=240, **kwargs)
     try:
+        h.safe_target(serial)
+        h.adb(serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
+        h.adb(serial, "shell", "wm", "dismiss-keyguard")
+        awake = h.adb(serial, "shell", "dumpsys", "power").stdout.decode()
+        if "mWakefulness=Awake" not in awake:
+            raise RuntimeError("The emulator did not wake for the permission acceptance run")
         probe("restoreOriginalTrackingSettings", "initial-settings-cleanup.log")
         for permission in PERMISSIONS:
             result = h.adb(serial, "shell", "pm", "revoke", h.PACKAGE, "android.permission." + permission, check=False)
@@ -60,7 +71,16 @@ def run(args, serial):
         try:
             probe("restoreOriginalTrackingSettings", "final-settings-cleanup.log")
         finally:
-            h.restore_environment(serial, "AndroidWifi", original, saver, airplane, wifi, grants)
+            try:
+                h.restore_environment(serial, "AndroidWifi", original, saver, airplane, wifi, grants)
+            finally:
+                if original_wakefulness != "Awake":
+                    h.safe_target(serial)
+                    h.adb(serial, "shell", "input", "keyevent", "KEYCODE_SLEEP")
+                    restored_power = h.adb(serial, "shell", "dumpsys", "power").stdout.decode()
+                    restored_asleep = "mWakefulness=Asleep" in restored_power or "mWakefulness=Dozing" in restored_power
+                    if not restored_asleep:
+                        raise RuntimeError("The emulator's original wakefulness was not restored")
     return {"serial": serial, "locationAndMotionGrantRecovery": True, "widgetRemapping": True, "environmentRestored": True}
 
 
