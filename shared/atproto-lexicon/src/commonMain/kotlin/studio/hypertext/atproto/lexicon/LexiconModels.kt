@@ -1,5 +1,6 @@
 package studio.hypertext.atproto.lexicon
 
+import kotlinx.serialization.json.JsonPrimitive
 import studio.hypertext.atproto.syntax.Nsid
 
 /**
@@ -37,6 +38,13 @@ public data class LexiconDefinition(
     val minLength: Long? = null,
     val maxLength: Long? = null,
     val unsupportedType: String? = null,
+    val format: String? = null,
+    val minGraphemes: Long? = null,
+    val maxGraphemes: Long? = null,
+    val minimum: Long? = null,
+    val maximum: Long? = null,
+    val closedValues: List<String>? = null,
+    val constValue: JsonPrimitive? = null,
 ) {
     /** The record-key rule of a `record` definition, or null when it's missing or malformed. */
     val recordKey: LexiconRecordKey?
@@ -62,6 +70,13 @@ public data class LexiconField(
     val minLength: Long? = null,
     val maxLength: Long? = null,
     val unsupportedType: String? = null,
+    val format: String? = null,
+    val minGraphemes: Long? = null,
+    val maxGraphemes: Long? = null,
+    val minimum: Long? = null,
+    val maximum: Long? = null,
+    val closedValues: List<String>? = null,
+    val constValue: JsonPrimitive? = null,
 )
 
 /**

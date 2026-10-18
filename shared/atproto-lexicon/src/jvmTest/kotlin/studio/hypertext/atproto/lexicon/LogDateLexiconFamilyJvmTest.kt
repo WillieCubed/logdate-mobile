@@ -1,5 +1,11 @@
 package studio.hypertext.atproto.lexicon
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import studio.hypertext.atproto.syntax.Nsid
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.extension
@@ -39,6 +45,31 @@ class LogDateLexiconFamilyJvmTest {
 
         assertTrue(records.isNotEmpty())
         assertTrue(records.all { it.recordKey != null && it.record?.type == LexiconType.OBJECT })
+    }
+
+    @Test
+    fun `every example record passes the record validator and a corrupted copy fails`() {
+        val validator = LexiconRecordValidator(LexiconRegistry(schemaFiles().map { LexiconParser.parse(it.readText()) }))
+        val examples =
+            Files.walk(moduleRoot().resolve("../../tools/lexicon-check/examples").normalize()).use { paths ->
+                paths
+                    .asSequence()
+                    .filter { it.extension == "json" }
+                    .sorted()
+                    .toList()
+            }
+        assertTrue(examples.isNotEmpty())
+
+        examples.forEach { path ->
+            val example = Json.parseToJsonElement(path.readText()).jsonObject
+            val collection = Nsid.require(example.getValue("collection").jsonPrimitive.content)
+            val record = example.getValue("record").jsonObject
+
+            assertEquals(emptyList(), validator.validateRecord(collection, record).issues, path.name)
+
+            val corrupted = JsonObject(record + ("\$type" to JsonPrimitive("app.logdate.not.this")))
+            assertTrue(validator.validateRecord(collection, corrupted).issues.isNotEmpty(), "${path.name} with a wrong \$type")
+        }
     }
 
     private fun schemaFiles(): List<Path> {

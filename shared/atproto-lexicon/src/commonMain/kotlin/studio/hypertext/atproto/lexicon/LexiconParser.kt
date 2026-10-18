@@ -83,6 +83,13 @@ public object LexiconParser {
             minLength = source.long("minLength"),
             maxLength = source.long("maxLength"),
             unsupportedType = source.unsupportedTypeName(),
+            format = source["format"]?.jsonPrimitive?.contentOrNull,
+            minGraphemes = source.long("minGraphemes"),
+            maxGraphemes = source.long("maxGraphemes"),
+            minimum = source.long("minimum"),
+            maximum = source.long("maximum"),
+            closedValues = (source["enum"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull },
+            constValue = source["const"] as? JsonPrimitive,
         )
     }
 
@@ -114,6 +121,13 @@ public object LexiconParser {
             minLength = source.long("minLength"),
             maxLength = source.long("maxLength"),
             unsupportedType = source.unsupportedTypeName(),
+            format = source["format"]?.jsonPrimitive?.contentOrNull,
+            minGraphemes = source.long("minGraphemes"),
+            maxGraphemes = source.long("maxGraphemes"),
+            minimum = source.long("minimum"),
+            maximum = source.long("maximum"),
+            closedValues = (source["enum"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull },
+            constValue = source["const"] as? JsonPrimitive,
         )
 
     private fun parseProperties(
