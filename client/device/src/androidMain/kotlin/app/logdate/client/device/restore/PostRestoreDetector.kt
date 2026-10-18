@@ -1,6 +1,7 @@
 package app.logdate.client.device.restore
 
 import android.content.Context
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -12,29 +13,74 @@ import kotlin.uuid.Uuid
 class PostRestoreDetector(
     private val context: Context,
 ) {
-    fun recordRestoreCompleted() =
+    fun recordRestoreCompleted() {
+        runBlocking {
+            AndroidNativeRestoreDeliveryGate.withLock {
+                recordRestoreCompletedUnderDeliveryLock()
+            }
+        }
+    }
+
+    internal fun recordRestoreCompletedUnderDeliveryLock() {
         synchronized(lock) {
-            val payloadReceived = restorePayloadReceivedFile().readTextOrNull() == RESTORE_PAYLOAD_RECEIVED
+            val delivery = readDelivery()
+            val restoreSessionId = delivery?.takeIf { it.first == RESTORE_IN_PROGRESS }?.second
+            val payloadReceived = wasReceivedForSession(restorePayloadReceivedFile(), restoreSessionId, RESTORE_PAYLOAD_RECEIVED)
+            val databaseReceived = wasReceivedForSession(restoreDatabaseReceivedFile(), restoreSessionId, RESTORE_DATABASE_RECEIVED)
+            val restoreInProgress = restoreSessionId != null
             // App startup can create an empty SQLite database after the callback. Keep an
-            // unacknowledged missing-content delivery pending unless Android delivered new files.
-            if (!payloadReceived && readDelivery()?.let { it.first == CONTENT_MISSING && it.second != null } == true) return@synchronized
+            // unacknowledged missing-content delivery pending unless Android delivered the database.
+            if ((!payloadReceived || !databaseReceived) &&
+                readDelivery()?.let { it.first == CONTENT_MISSING && it.second != null } == true
+            ) {
+                return@synchronized
+            }
             val fingerprint = restoreFingerprint()
-            if (!payloadReceived && fingerprint != null && fingerprint in readRestoreFingerprints()) return@synchronized
+            if (!restoreInProgress && !payloadReceived && fingerprint != null && fingerprint in readRestoreFingerprints()) {
+                return@synchronized
+            }
             val id = Uuid.random().toString()
             writeAtomically(mediaQuarantineFile(), id)
             writeAtomically(pendingRestoreFile(), "delivery-pending:$id")
             writeAtomically(accountRecoveryFile(), id)
             deleteIfPresent(accountResolvedFile())
-            writeAtomically(pendingRestoreFile(), "${if (hasDatabase()) CONTENT_PRESENT else CONTENT_MISSING}:$id")
+            val contentPresent =
+                if (restoreInProgress) {
+                    databaseReceived && hasDatabase()
+                } else {
+                    (!payloadReceived || databaseReceived) && hasDatabase()
+                }
+            writeAtomically(pendingRestoreFile(), "${if (contentPresent) CONTENT_PRESENT else CONTENT_MISSING}:$id")
             if (fingerprint != null) writeRestoreFingerprints(listOf(fingerprint))
-            if (payloadReceived) deleteIfPresent(restorePayloadReceivedFile())
+            if (payloadReceived) {
+                deleteIfPresent(restorePayloadReceivedFile())
+                deleteIfPresent(restoreDatabaseReceivedFile())
+            }
         }
+    }
 
     /** Records Android delivering a backed-up file, distinguishing a retry from a duplicate callback. */
-    fun markNativeRestorePayloadReceived() =
+    fun markNativeRestorePayloadReceived(databaseDelivered: Boolean) =
         synchronized(lock) {
-            if (restorePayloadReceivedFile().exists()) return@synchronized
-            writeAtomically(restorePayloadReceivedFile(), RESTORE_PAYLOAD_RECEIVED)
+            val restoreSessionId = readDelivery()?.takeIf { it.first == RESTORE_IN_PROGRESS }?.second
+            val receipt = { value: String -> restoreSessionId?.let { "$value:$it" } ?: value }
+            if (!wasReceivedForSession(restorePayloadReceivedFile(), restoreSessionId, RESTORE_PAYLOAD_RECEIVED)) {
+                writeAtomically(restorePayloadReceivedFile(), receipt(RESTORE_PAYLOAD_RECEIVED))
+            }
+            if (databaseDelivered && !wasReceivedForSession(restoreDatabaseReceivedFile(), restoreSessionId, RESTORE_DATABASE_RECEIVED)) {
+                writeAtomically(restoreDatabaseReceivedFile(), receipt(RESTORE_DATABASE_RECEIVED))
+            }
+        }
+
+    /** A new BackupAgent instance starts a new delivery boundary; abandoned receipts cannot cross it. */
+    fun beginNativeRestoreSession() =
+        synchronized(lock) {
+            val sessionId = Uuid.random().toString()
+            // Publish the new generation first. If deletion is interrupted, prior receipts still
+            // carry the old generation and cannot establish that this delivery contained a file.
+            writeAtomically(pendingRestoreFile(), "$RESTORE_IN_PROGRESS:$sessionId")
+            deleteIfPresent(restorePayloadReceivedFile())
+            deleteIfPresent(restoreDatabaseReceivedFile())
         }
 
     /** Includes the post-callback normalization (such as removing the copied device id). */
@@ -67,6 +113,16 @@ class PostRestoreDetector(
     fun isContentRecoveryCurrent(deliveryId: String): Boolean =
         synchronized(lock) {
             readDelivery() == (CONTENT_MISSING to deliveryId)
+        }
+
+    fun isNativeRestoreDeliveryComplete(): Boolean =
+        synchronized(lock) {
+            val marker = pendingRestoreFile()
+            if (!marker.exists()) return@synchronized true
+            when (readDelivery()?.first) {
+                CONTENT_PRESENT, CONTENT_MISSING, CONTENT_COMPLETE -> true
+                else -> false
+            }
         }
 
     fun acknowledgeContentRecovery(deliveryId: String): Boolean =
@@ -112,6 +168,7 @@ class PostRestoreDetector(
             when (readDelivery()?.first) {
                 CONTENT_PRESENT, "content-complete" -> PostRestoreType.CONTENT_RESTORED
                 CONTENT_MISSING -> PostRestoreType.CONTENT_MISSING
+                RESTORE_IN_PROGRESS -> PostRestoreType.RECOVERY_REQUIRED
                 else ->
                     when {
                         hasDatabase() -> PostRestoreType.CONTENT_RESTORED
@@ -136,6 +193,15 @@ class PostRestoreDetector(
     }
 
     private fun readIdentifier(file: File): String? = readSmallFile(file)?.takeIf { runCatching { Uuid.parse(it) }.isSuccess }
+
+    private fun wasReceivedForSession(
+        file: File,
+        sessionId: String?,
+        receipt: String,
+    ): Boolean {
+        val saved = file.readTextOrNull() ?: return false
+        return if (sessionId == null) saved == receipt else saved == "$receipt:$sessionId"
+    }
 
     private fun refreshRestoreFingerprintLocked() {
         val fingerprint = restoreFingerprint() ?: return
@@ -257,11 +323,16 @@ class PostRestoreDetector(
 
     private fun restorePayloadReceivedFile() = File(context.noBackupFilesDir, ".logdate_native_restore_payload_received")
 
+    private fun restoreDatabaseReceivedFile() = File(context.noBackupFilesDir, ".logdate_native_restore_database_received")
+
     private companion object {
         val lock = Any()
         const val CONTENT_PRESENT = "content-present"
         const val CONTENT_MISSING = "content-missing"
+        const val CONTENT_COMPLETE = "content-complete"
+        const val RESTORE_IN_PROGRESS = "restore-in-progress"
         const val RESTORE_PAYLOAD_RECEIVED = "received"
+        const val RESTORE_DATABASE_RECEIVED = "received"
         const val MAX_RESTORE_FINGERPRINTS = 4
     }
 }

@@ -3,6 +3,7 @@ import io
 from pathlib import Path
 import tarfile
 import unittest
+from unittest.mock import call, patch
 
 
 SCRIPT = Path(__file__).with_name("native-backup-acceptance.py")
@@ -47,6 +48,70 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
             },
             {},
             credentials_only=True,
+        )
+
+
+class RuntimePermissionGrantParsingTest(unittest.TestCase):
+    def test_parses_android_34_runtime_permission_without_flags(self):
+        package_state = (
+            "      requested permissions:\n        android.permission.RECORD_AUDIO\n"
+            "      runtime permissions:\n"
+        )
+
+        self.assertFalse(
+            NATIVE_BACKUP_ACCEPTANCE.runtime_permission_grant(
+                package_state,
+                "android.permission.RECORD_AUDIO",
+            )
+        )
+
+    def test_parses_runtime_permission_with_flags(self):
+        package_state = (
+            "      requested permissions:\n        android.permission.POST_NOTIFICATIONS\n"
+            "      runtime permissions:\n"
+            "        android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET ]\n"
+        )
+
+        self.assertTrue(
+            NATIVE_BACKUP_ACCEPTANCE.runtime_permission_grant(
+                package_state,
+                "android.permission.POST_NOTIFICATIONS",
+            )
+        )
+
+    def test_rejects_permission_missing_from_package_state(self):
+        with self.assertRaisesRegex(RuntimeError, "Android did not report the runtime grant"):
+            NATIVE_BACKUP_ACCEPTANCE.runtime_permission_grant(
+                "      requested permissions:\n        android.permission.CAMERA\n      runtime permissions:\n",
+                "android.permission.RECORD_AUDIO",
+            )
+
+
+class EmulatorSetupStateTest(unittest.TestCase):
+    @patch.object(NATIVE_BACKUP_ACCEPTANCE, "adb", side_effect=[b"0", b"", b"1"])
+    def test_marks_emulator_setup_complete_before_backup(self, adb):
+        NATIVE_BACKUP_ACCEPTANCE.ensure_emulator_setup_complete("emulator-5554")
+
+        self.assertEqual(
+            [
+                call("emulator-5554", "shell", "settings", "get", "secure", "user_setup_complete"),
+                call("emulator-5554", "shell", "settings", "put", "secure", "user_setup_complete", "1"),
+                call("emulator-5554", "shell", "settings", "get", "secure", "user_setup_complete"),
+            ],
+            adb.call_args_list,
+        )
+
+    @patch.object(NATIVE_BACKUP_ACCEPTANCE, "adb", side_effect=[b"1"])
+    def test_preserves_already_completed_setup(self, adb):
+        NATIVE_BACKUP_ACCEPTANCE.ensure_emulator_setup_complete("emulator-5554")
+
+        adb.assert_called_once_with(
+            "emulator-5554",
+            "shell",
+            "settings",
+            "get",
+            "secure",
+            "user_setup_complete",
         )
 
 

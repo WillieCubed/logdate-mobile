@@ -2,6 +2,7 @@ package app.logdate.client.database.encryption
 
 import app.logdate.client.device.storage.SecureStorage
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -15,8 +16,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  *    Included in both D2D transfers and cloud backups. Lets us recover the
  *    passphrase and open the encrypted database even when the KeyStore is gone.
  *
- * Resolution order: valid primary → valid backup → generate only for a new database.
- * After any resolution, both locations are synced.
+ * Existing keys are offered to the database opener without mutation. The selected key is copied
+ * between stores only after SQLCipher has confirmed that it opens the retained database.
  */
 @OptIn(ExperimentalEncodingApi::class)
 class DatabasePassphraseProvider(
@@ -24,31 +25,23 @@ class DatabasePassphraseProvider(
     private val backupStore: PassphraseBackupStore,
     private val hasExistingDatabase: () -> Boolean = { false },
 ) {
-    suspend fun getOrCreatePassphrase(): ByteArray {
-        // 1. Try the primary (hardware-backed) store.
-        val primary = secureStorage.getString(DB_KEY_STORAGE_KEY)
+    suspend fun getPassphraseCandidates(): List<ByteArray> {
+        val primary =
+            try {
+                secureStorage.getString(DB_KEY_STORAGE_KEY)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Napier.w("Primary database key could not be read; trying portable recovery material")
+                null
+            }
         val primaryKey =
             primary?.let { encoded ->
                 runCatching { Base64.decode(encoded) }.getOrNull()?.takeIf { it.size == KEY_LENGTH_BYTES }
             }
-        if (primaryKey != null) {
-            val backup = backupStore.read()?.takeIf { it.size == KEY_LENGTH_BYTES }
-            check(!backupStore.hasBackup() || (backup != null && primaryKey.contentEquals(backup))) {
-                "The retained journal has conflicting database recovery keys"
-            }
-            // Ensure the backup is in sync.
-            backupStore.write(primaryKey)
-            return primaryKey
-        }
-
-        // 2. Primary is empty (fresh install or post-restore). Try the backup.
-        val backup = backupStore.read()
-        if (backup != null && backup.size == KEY_LENGTH_BYTES) {
-            Napier.i("Database passphrase recovered from backup store")
-            // Re-populate the primary store so subsequent reads are fast.
-            secureStorage.putString(DB_KEY_STORAGE_KEY, Base64.encode(backup))
-            return backup
-        }
+        val backup = backupStore.read()?.takeIf { it.size == KEY_LENGTH_BYTES }
+        val candidates = listOfNotNull(primaryKey, backup?.takeUnless { primaryKey?.contentEquals(it) == true })
+        if (candidates.isNotEmpty()) return candidates
 
         check(!backupStore.hasBackup() && !hasExistingDatabase()) {
             "The retained journal database needs its original encryption key"
@@ -59,7 +52,14 @@ class DatabasePassphraseProvider(
         val generated = generateDatabaseKey(KEY_LENGTH_BYTES)
         backupStore.write(generated)
         secureStorage.putString(DB_KEY_STORAGE_KEY, Base64.encode(generated))
-        return generated
+        return listOf(generated)
+    }
+
+    /** Persist only a key that SQLCipher has already accepted for the retained database. */
+    suspend fun confirmOpenedDatabasePassphrase(passphrase: ByteArray) {
+        require(passphrase.size == KEY_LENGTH_BYTES) { "Database passphrase has an invalid length" }
+        backupStore.write(passphrase)
+        secureStorage.putString(DB_KEY_STORAGE_KEY, Base64.encode(passphrase))
     }
 
     suspend fun clearPassphrase() {

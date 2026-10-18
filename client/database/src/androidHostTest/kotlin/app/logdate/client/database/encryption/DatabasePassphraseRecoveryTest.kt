@@ -30,15 +30,19 @@ class DatabasePassphraseRecoveryTest {
     }
 
     @Test
-    fun `valid primary cannot overwrite malformed portable recovery material`() =
+    fun `valid primary remains available when portable recovery material is malformed`() =
         runTest {
+            val primary = ByteArray(32) { 7 }
             val file =
                 File(directory, "db_recovery/passphrase_backup").apply {
                     parentFile?.mkdirs()
                     writeText("truncated-key")
                 }
-            coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(ByteArray(32) { 7 })
-            assertFailsWith<IllegalStateException> { DatabasePassphraseProvider(secureStorage, store) { true }.getOrCreatePassphrase() }
+            coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(primary)
+
+            val candidates = DatabasePassphraseProvider(secureStorage, store) { true }.getPassphraseCandidates()
+
+            assertContentEquals(primary, candidates.single())
             assertEquals("truncated-key", file.readText())
         }
 
@@ -51,7 +55,7 @@ class DatabasePassphraseRecoveryTest {
                     writeText("truncated-key")
                 }
             coEvery { secureStorage.getString("db_encryption_key") } returns null
-            assertFailsWith<IllegalStateException> { DatabasePassphraseProvider(secureStorage, store).getOrCreatePassphrase() }
+            assertFailsWith<IllegalStateException> { DatabasePassphraseProvider(secureStorage, store).getPassphraseCandidates() }
             assertEquals("truncated-key", file.readText())
             coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
         }
@@ -63,7 +67,7 @@ class DatabasePassphraseRecoveryTest {
             val original = File(directory, "retained-database").apply { writeBytes(byteArrayOf(8, 9, 10)) }
             val provider = DatabasePassphraseProvider(secureStorage, store) { original.exists() }
 
-            assertFailsWith<IllegalStateException> { provider.getOrCreatePassphrase() }
+            assertFailsWith<IllegalStateException> { provider.getPassphraseCandidates() }
 
             assertContentEquals(byteArrayOf(8, 9, 10), original.readBytes())
             assertFalse(File(directory, "db_recovery/passphrase_backup").exists())
@@ -78,7 +82,10 @@ class DatabasePassphraseRecoveryTest {
             coEvery { secureStorage.getString("db_encryption_key") } returns "not-valid-base64!!"
             val provider = DatabasePassphraseProvider(secureStorage, store) { true }
 
-            assertContentEquals(expected, provider.getOrCreatePassphrase())
+            val candidate = provider.getPassphraseCandidates().single()
+            assertContentEquals(expected, candidate)
+            coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
+            provider.confirmOpenedDatabasePassphrase(candidate)
             assertContentEquals(expected, store.read())
             coVerify { secureStorage.putString("db_encryption_key", Base64.encode(expected)) }
         }
@@ -91,12 +98,12 @@ class DatabasePassphraseRecoveryTest {
             coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(byteArrayOf(1, 2))
             val provider = DatabasePassphraseProvider(secureStorage, store) { true }
 
-            assertContentEquals(expected, provider.getOrCreatePassphrase())
+            assertContentEquals(expected, provider.getPassphraseCandidates().single())
             assertContentEquals(expected, store.read())
         }
 
     @Test
-    fun `conflicting valid keys preserve both copies for a retained database`() =
+    fun `conflicting valid keys are both tried without changing either copy`() =
         runTest {
             val backup = ByteArray(32) { 7 }
             val primary = ByteArray(32) { 8 }
@@ -104,8 +111,11 @@ class DatabasePassphraseRecoveryTest {
             coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(primary)
             val provider = DatabasePassphraseProvider(secureStorage, store) { true }
 
-            assertFailsWith<IllegalStateException> { provider.getOrCreatePassphrase() }
+            val candidates = provider.getPassphraseCandidates()
 
+            assertEquals(2, candidates.size)
+            assertContentEquals(primary, candidates[0])
+            assertContentEquals(backup, candidates[1])
             assertContentEquals(backup, store.read())
             coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
         }
@@ -120,4 +130,57 @@ class DatabasePassphraseRecoveryTest {
 
         assertContentEquals(original, store.read())
     }
+
+    @Test
+    fun `valid key candidates are tried without changing either recovery copy`() =
+        runTest {
+            val primary = ByteArray(32) { 7 }
+            val backup = ByteArray(32) { 8 }
+            store.write(backup)
+            coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(primary)
+            val provider = DatabasePassphraseProvider(secureStorage, store) { true }
+
+            val candidates = provider.getPassphraseCandidates()
+
+            assertEquals(2, candidates.size)
+            assertContentEquals(primary, candidates[0])
+            assertContentEquals(backup, candidates[1])
+            assertContentEquals(backup, store.read())
+            coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
+        }
+
+    @Test
+    fun `malformed portable key does not block opening with an intact primary`() =
+        runTest {
+            val primary = ByteArray(32) { 7 }
+            val file =
+                File(directory, "db_recovery/passphrase_backup").apply {
+                    parentFile?.mkdirs()
+                    writeText("truncated-key")
+                }
+            coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(primary)
+            val provider = DatabasePassphraseProvider(secureStorage, store) { true }
+
+            val candidates = provider.getPassphraseCandidates()
+
+            assertEquals(1, candidates.size)
+            assertContentEquals(primary, candidates.single())
+            assertEquals("truncated-key", file.readText())
+        }
+
+    @Test
+    fun `selected database key updates both stores only after the database opens`() =
+        runTest {
+            val primary = ByteArray(32) { 7 }
+            val backup = ByteArray(32) { 8 }
+            store.write(backup)
+            coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(primary)
+            val provider = DatabasePassphraseProvider(secureStorage, store) { true }
+            val candidates = provider.getPassphraseCandidates()
+
+            provider.confirmOpenedDatabasePassphrase(candidates[1])
+
+            assertContentEquals(backup, store.read())
+            coVerify { secureStorage.putString("db_encryption_key", Base64.encode(backup)) }
+        }
 }

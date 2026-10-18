@@ -32,6 +32,33 @@ class PostRestoreDetectorTest {
     private val detector = PostRestoreDetector(context)
 
     @Test
+    fun `database startup remains blocked until the active delivery is finalized`() {
+        detector.beginNativeRestoreSession()
+
+        assertFalse(detector.isNativeRestoreDeliveryComplete())
+
+        detector.markNativeRestorePayloadReceived(databaseDelivered = true)
+        detector.recordRestoreCompleted()
+
+        assertTrue(detector.isNativeRestoreDeliveryComplete())
+    }
+
+    @Test
+    fun `database startup remains blocked when delivery finalization was interrupted`() {
+        File(noBackup, ".logdate_native_restore_pending")
+            .writeText("delivery-pending:123e4567-e89b-12d3-a456-426614174000")
+
+        assertFalse(detector.isNativeRestoreDeliveryComplete())
+    }
+
+    @Test
+    fun `database startup fails closed when the pending delivery marker is malformed`() {
+        File(noBackup, ".logdate_native_restore_pending").writeText("restore-in-progress:truncated")
+
+        assertFalse(detector.isNativeRestoreDeliveryComplete())
+    }
+
+    @Test
     fun `media quarantine survives content and account acknowledgement and rejects older delivery`() {
         detector.recordRestoreCompleted()
         val first = assertNotNull(detector.pendingMediaQuarantineId())
@@ -92,7 +119,7 @@ class PostRestoreDetectorTest {
         detector.recordRestoreCompleted()
         val old = assertNotNull(detector.pendingContentRecoveryId())
         database.writeBytes(byteArrayOf(1, 2, 3))
-        detector.markNativeRestorePayloadReceived()
+        detector.markNativeRestorePayloadReceived(databaseDelivered = true)
 
         detector.recordRestoreCompleted()
 
@@ -104,6 +131,95 @@ class PostRestoreDetectorTest {
         detector.recordRestoreCompleted()
 
         assertEquals(current, detector.pendingMediaQuarantineId())
+    }
+
+    @Test
+    fun `metadata-only native delivery cannot treat a startup database as restored content`() {
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        detector.markDeviceInitialized()
+        detector.markNativeRestorePayloadReceived(databaseDelivered = false)
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(isOnboarded = true))
+        assertNotNull(detector.pendingContentRecoveryId())
+    }
+
+    @Test
+    fun `metadata-only delivery cannot reuse a database receipt left by interrupted delivery`() {
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        detector.markDeviceInitialized()
+        detector.beginNativeRestoreSession()
+        detector.markNativeRestorePayloadReceived(databaseDelivered = true)
+
+        // A later BackupAgent instance starts another transfer before a finish callback ran.
+        detector.beginNativeRestoreSession()
+        detector.markNativeRestorePayloadReceived(databaseDelivered = false)
+        detector.recordRestoreCompleted()
+
+        assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(isOnboarded = true))
+        assertNotNull(detector.pendingContentRecoveryId())
+    }
+
+    @Test
+    fun `receipt from an older generation cannot complete a new delivery after cleanup is interrupted`() {
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        detector.markDeviceInitialized()
+        detector.beginNativeRestoreSession()
+        val previousSession =
+            File(noBackup, ".logdate_native_restore_pending")
+                .readText()
+                .substringAfter(':')
+        File(noBackup, ".logdate_native_restore_database_received").writeText("received:$previousSession")
+
+        // Simulate process death after publishing the new marker but before deleting old receipts.
+        val currentSession =
+            kotlin.uuid.Uuid
+                .random()
+                .toString()
+        File(noBackup, ".logdate_native_restore_pending").writeText("restore-in-progress:$currentSession")
+        detector.markNativeRestorePayloadReceived(databaseDelivered = false)
+        detector.recordRestoreCompleted()
+
+        assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(isOnboarded = true))
+        assertNotNull(detector.pendingContentRecoveryId())
+    }
+
+    @Test
+    fun `a restore interrupted during a file write remains pending before any receipt is recorded`() {
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        detector.markDeviceInitialized()
+
+        detector.beginNativeRestoreSession()
+
+        assertEquals(PostRestoreType.RECOVERY_REQUIRED, PostRestoreDetector(context).detect(isOnboarded = true))
+    }
+
+    @Test
+    fun `a new restore with no file callbacks cannot reuse an interrupted database receipt`() {
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        detector.markDeviceInitialized()
+        detector.beginNativeRestoreSession()
+        detector.markNativeRestorePayloadReceived(databaseDelivered = true)
+
+        // A new BackupAgent instance reaches onRestoreFinished without receiving files.
+        detector.beginNativeRestoreSession()
+        detector.recordRestoreCompleted()
+
+        assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(isOnboarded = true))
+        assertNotNull(detector.pendingContentRecoveryId())
+    }
+
+    @Test
+    fun `restore completion without a database receipt cannot bless an older database`() {
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        detector.markDeviceInitialized()
+        detector.beginNativeRestoreSession()
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(isOnboarded = true))
+        assertNotNull(detector.pendingContentRecoveryId())
     }
 
     @Test
@@ -158,7 +274,7 @@ class PostRestoreDetectorTest {
         assertTrue(detector.acknowledgeMediaQuarantine(first))
 
         media.writeBytes(byteArrayOf(4, 5, 6))
-        detector.markNativeRestorePayloadReceived()
+        detector.markNativeRestorePayloadReceived(databaseDelivered = true)
         detector.recordRestoreCompleted()
 
         assertNotEquals(first, detector.pendingMediaQuarantineId())

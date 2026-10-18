@@ -24,6 +24,12 @@ import java.io.IOException
 
 /** Records platform callbacks without opening the database or starting application services. */
 open class NativeBackupAgent : BackupAgent() {
+    private val nativeRestoreSession = NativeRestoreSessionBoundary { PostRestoreDetector(this).beginNativeRestoreSession() }
+
+    override fun onCreate() {
+        super.onCreate()
+    }
+
     override fun onBackup(
         oldState: ParcelFileDescriptor?,
         data: BackupDataOutput,
@@ -52,25 +58,37 @@ open class NativeBackupAgent : BackupAgent() {
     }
 
     override fun onRestoreFinished() {
-        super.onRestoreFinished()
-        PostRestoreDetector(this).recordRestoreCompleted()
-        val preferencesFile = File(filesDir, "logdate.preferences_pb")
-        val job = SupervisorJob()
-        val scope = CoroutineScope(job + Dispatchers.IO)
         try {
-            val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferencesFile })
-            runBlocking(Dispatchers.IO) {
-                withTimeoutOrNull(15_000) {
-                    resetRestoredInstallationState(preferences)
-                    PostRestoreDetector(this@NativeBackupAgent).refreshRestoreFingerprint()
-                    restoreAccount(preferences)
+            // This instance may be the first one handling a new, empty, or resumed delivery.
+            // Start a fresh generation even when the transport supplied no file callbacks.
+            beginNativeRestoreSessionOnce()
+            super.onRestoreFinished()
+            AndroidNativeRestoreDeliveryGate.beginRestoreCompletion()
+            try {
+                PostRestoreDetector(this).recordRestoreCompletedUnderDeliveryLock()
+                val preferencesFile = File(filesDir, "logdate.preferences_pb")
+                val job = SupervisorJob()
+                val scope = CoroutineScope(job + Dispatchers.IO)
+                try {
+                    val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferencesFile })
+                    runBlocking(Dispatchers.IO) {
+                        withTimeoutOrNull(15_000) {
+                            resetRestoredInstallationState(preferences)
+                            PostRestoreDetector(this@NativeBackupAgent).refreshRestoreFingerprint()
+                            restoreAccount(preferences)
+                        }
+                    }
+                } catch (_: Exception) {
+                    Napier.w("Background native account recovery remains pending")
+                } finally {
+                    scope.cancel()
+                    runBlocking { job.join() }
                 }
+            } finally {
+                AndroidNativeRestoreDeliveryGate.endRestore()
             }
-        } catch (_: Exception) {
-            Napier.w("Background native account recovery remains pending")
         } finally {
-            scope.cancel()
-            runBlocking { job.join() }
+            nativeRestoreSession.finish()
         }
     }
 
@@ -82,9 +100,26 @@ open class NativeBackupAgent : BackupAgent() {
         mode: Long,
         mtime: Long,
     ) {
-        super.onRestoreFile(data, size, destination, type, mode, mtime)
-        PostRestoreDetector(this).markNativeRestorePayloadReceived()
+        AndroidNativeRestoreDeliveryGate.beginRestoreCallback()
+        try {
+            beginNativeRestoreSessionOnce()
+            super.onRestoreFile(data, size, destination, type, mode, mtime)
+            val databaseDelivered =
+                runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
+                    .getOrDefault(false)
+            PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered)
+        } finally {
+            AndroidNativeRestoreDeliveryGate.endRestoreCallback()
+        }
     }
+
+    override fun onDestroy() {
+        nativeRestoreSession.finish()
+        AndroidNativeRestoreDeliveryGate.endRestore()
+        super.onDestroy()
+    }
+
+    private fun beginNativeRestoreSessionOnce() = nativeRestoreSession.beginIfNeeded()
 
     protected open suspend fun restoreAccount(preferences: DataStore<Preferences>) = Unit
 
@@ -96,4 +131,24 @@ open class NativeBackupAgent : BackupAgent() {
         NativeBackupQuotaStore(noBackupFilesDir).record(backupDataBytes, quotaBytes)
         Napier.w("Android native backup exceeded the transport quota")
     }
+}
+
+internal class NativeRestoreSessionBoundary(
+    private val begin: () -> Unit,
+) {
+    private val lock = Any()
+    private var started = false
+
+    fun beginIfNeeded() =
+        synchronized(lock) {
+            if (!started) {
+                begin()
+                started = true
+            }
+        }
+
+    fun finish() =
+        synchronized(lock) {
+            started = false
+        }
 }

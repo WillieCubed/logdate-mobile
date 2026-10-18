@@ -221,7 +221,11 @@ class RestoreWorker(
         summary: RestoreSummary,
     ): Result {
         if (summary.unavailableOriginals + summary.unavailablePreviews > 0) {
-            ArchiveRecoveryScheduler.enqueue(context, requireNotNull(store.read(recoveryId)))
+            ArchiveRecoveryScheduler.enqueueAll(
+                context,
+                getKoin(),
+                ArchiveRecoveryReadinessChange(restartRunningWork = true),
+            )
         }
         if (!attempt.native.complete()) return Result.retry()
         trySetForeground(notificationHelper.createCompletionInfo(summary.unavailableOriginals + summary.unavailablePreviews))

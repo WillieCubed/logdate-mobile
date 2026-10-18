@@ -81,6 +81,8 @@ class NativeRecoveryWorkStateTest {
             val old = assertNotNull(detector.pendingContentRecoveryId())
             val data = NativeRestoreWorkState.bind(Data.Builder(), old, sessions.getOriginBoundSession()).build()
             context.getDatabasePath("logdate").writeBytes(byteArrayOf(1, 2, 3))
+            detector.beginNativeRestoreSession()
+            detector.markNativeRestorePayloadReceived(databaseDelivered = true)
             detector.recordRestoreCompleted()
             val current = detector.pendingContentRecoveryId()
             val work = NativeRestoreWorkState(context, data, sessions)

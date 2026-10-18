@@ -225,7 +225,9 @@ actual val dataModule: Module =
                 get(),
             )
         }
-        single { NativeMediaQuarantine(get(), get(), get(), get()) { reference -> get<MediaManager>().exists(reference) } }
+        single {
+            NativeMediaQuarantine(get(), get(), get(), get(), get()) { reference -> get<MediaManager>().exists(reference) }
+        }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
             OfflineFirstJournalContentRepository(

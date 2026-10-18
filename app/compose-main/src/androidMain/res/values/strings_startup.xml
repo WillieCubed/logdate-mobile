@@ -2,5 +2,6 @@
 <resources>
     <string name="application_startup_failed_title">Couldn’t open LogDate</string>
     <string name="application_startup_failed_message">LogDate couldn’t open your saved journal. Try opening it again.</string>
+    <string name="native_restore_startup_incomplete_message">Android’s transfer did not finish. LogDate has kept the received files untouched and has not opened the journal. Finish device setup, then try again.</string>
     <string name="application_startup_retry">Try again</string>
 </resources>

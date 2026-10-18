@@ -43,6 +43,7 @@ import app.logdate.client.platform.FeatureFlagState
 import app.logdate.client.platform.PackageManagerComponentSwitch
 import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.repository.journals.EntryDraftRepository
+import app.logdate.client.restore.NativeMediaQuarantineWorker
 import app.logdate.client.rewind.MilestoneRewindCoordinator
 import app.logdate.client.rewind.RewindGenerationWorker
 import app.logdate.client.rewind.RewindNotificationCoordinator
@@ -183,6 +184,7 @@ actual val appModule: Module =
         single { CloudBackupScheduler(androidContext()) }
         single { CloudRestoreScheduler(androidContext(), get()) }
         workerOf(::CloudBackupWorker)
+        workerOf(::NativeMediaQuarantineWorker)
 
         single {
             val fetchMostRecentDraft: FetchMostRecentDraftUseCase = get()

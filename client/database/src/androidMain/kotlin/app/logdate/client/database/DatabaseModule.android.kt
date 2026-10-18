@@ -2,7 +2,10 @@ package app.logdate.client.database
 
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import app.logdate.client.device.restore.NativeRestoreDeliveryGate
+import app.logdate.client.device.restore.PostRestoreDetector
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -25,25 +28,44 @@ actual val databaseModule: Module =
             Napier.i("Startup: encrypted database initialization starting")
 
             runCatching {
-                val passphrase = runBlocking { get<DatabasePassphraseProvider>().getOrCreatePassphrase() }
-                migratePlaintextDatabaseIfNeeded(context, passphrase)
-                val database =
-                    getRoomDatabase(
-                        getDatabaseBuilder(context, passphrase),
-                        driver = null,
-                    )
-
-                // Open eagerly so key/migration errors are detected up front.
-                try {
-                    database.openHelper.writableDatabase
-                    protectDatabaseFile(context)
-                } catch (error: Exception) {
-                    database.close()
-                    throw error
+                runBlocking {
+                    openDatabaseAfterNativeRestoreCheck(
+                        deliveryGate = get<NativeRestoreDeliveryGate>(),
+                        restoreInProgress = { !PostRestoreDetector(context).isNativeRestoreDeliveryComplete() },
+                    ) {
+                        val passphraseProvider = get<DatabasePassphraseProvider>()
+                        val candidates = runBlocking { passphraseProvider.getPassphraseCandidates() }
+                        migratePlaintextDatabaseIfNeeded(context, candidates.first())
+                        val opened =
+                            openDatabaseWithPassphraseCandidates(candidates) { passphrase ->
+                                val database =
+                                    getRoomDatabase(
+                                        getDatabaseBuilder(context, passphrase),
+                                        driver = null,
+                                    )
+                                try {
+                                    database.openHelper.writableDatabase
+                                    protectDatabaseFile(context)
+                                    database
+                                } catch (error: Exception) {
+                                    database.close()
+                                    throw error
+                                }
+                            }
+                        try {
+                            runBlocking { passphraseProvider.confirmOpenedDatabasePassphrase(opened.passphrase) }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // An accepted key remains in at least one source. Startup can still open
+                            // the journal and retry portable-key synchronization on its next launch.
+                            Napier.w("Portable database recovery material could not be refreshed; will retry on next launch")
+                        }
+                        startupMonitor.markReady()
+                        Napier.i("Startup: encrypted database opened and protections applied")
+                        opened.database
+                    }
                 }
-                startupMonitor.markReady()
-                Napier.i("Startup: encrypted database opened and protections applied")
-                database
             }.onFailure { error ->
                 startupMonitor.markRecoveryRequired(error)
                 Napier.e("Startup: encrypted database unavailable; journal access is paused", error)

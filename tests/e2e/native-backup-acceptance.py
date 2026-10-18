@@ -468,6 +468,15 @@ def select_local_transport(serial, attempts=30):
     raise RuntimeError("Android's local backup transport did not become selected")
 
 
+def ensure_emulator_setup_complete(serial):
+    setting = ("shell", "settings", "get", "secure", "user_setup_complete")
+    if adb(serial, *setting).strip() == b"1":
+        return
+    adb(serial, "shell", "settings", "put", "secure", "user_setup_complete", "1")
+    if adb(serial, *setting).strip() != b"1":
+        raise RuntimeError("Android setup is incomplete; native backup is unavailable")
+
+
 def prepare(serial, allow_existing=False, allow_preinstalled_empty=False):
     if adb(serial, "shell", "getprop", "ro.kernel.qemu").strip() != b"1":
         raise RuntimeError("target did not identify itself as an emulator")
@@ -486,6 +495,7 @@ def prepare(serial, allow_existing=False, allow_preinstalled_empty=False):
     adb(serial, "wait-for-device")
     if adb(serial, "shell", "id", "-u").strip() != b"0":
         raise RuntimeError("a rootable Google APIs emulator is required for the local transport")
+    ensure_emulator_setup_complete(serial)
     adb(serial, "shell", "bmgr", "enable", "true")
     select_local_transport(serial)
     adb(serial, "shell", "settings", "put", "secure", "backup_local_transport_parameters",
@@ -577,6 +587,26 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
         raise RuntimeError(f"native {mode} probe failed; inspect {output}")
 
 
+def runtime_permission_grant(package_state, permission):
+    requested = re.search(
+        rf"^\s*{re.escape(permission)}\s*$",
+        package_state,
+        re.MULTILINE,
+    )
+    if requested is None:
+        raise RuntimeError(f"Android did not report the runtime grant for {permission}")
+    state = re.search(
+        rf"^\s*{re.escape(permission)}: granted=(true|false)(?:, flags=\[[^\]]*\])?\s*$",
+        package_state,
+        re.MULTILINE,
+    )
+    if state is None:
+        if re.search(rf"^\s*{re.escape(permission)}:", package_state, re.MULTILINE):
+            raise RuntimeError(f"Android reported an invalid runtime grant for {permission}")
+        return False
+    return state.group(1) == "true"
+
+
 def recording_policy_probe(serial, output):
     permissions = ["android.permission.RECORD_AUDIO"]
     sdk = int(adb(serial, "shell", "getprop", "ro.build.version.sdk").strip())
@@ -585,10 +615,7 @@ def recording_policy_probe(serial, output):
     original = {}
     package_state = adb(serial, "shell", "dumpsys", "package", PACKAGE).decode()
     for permission in permissions:
-        state = re.search(rf"^\s*{re.escape(permission)}: granted=(true|false), flags=", package_state, re.MULTILINE)
-        if state is None:
-            raise RuntimeError(f"Android did not report the runtime grant for {permission}")
-        original[permission] = state.group(1) == "true"
+        original[permission] = runtime_permission_grant(package_state, permission)
     probe_error = None
     try:
         probe(serial, "recording-policy", output)
@@ -599,15 +626,12 @@ def recording_policy_probe(serial, output):
         for permission, was_granted in original.items():
             try:
                 current_state = adb(serial, "shell", "dumpsys", "package", PACKAGE).decode()
-                state = re.search(rf"^\s*{re.escape(permission)}: granted=(true|false), flags=", current_state, re.MULTILINE)
-                if state is None:
-                    raise RuntimeError(f"Android did not report the runtime grant for {permission} during cleanup")
-                if (state.group(1) == "true") != was_granted:
+                current_grant = runtime_permission_grant(current_state, permission)
+                if current_grant != was_granted:
                     action = "grant" if was_granted else "revoke"
                     adb(serial, "shell", "pm", action, "--user", "0", PACKAGE, permission)
                 restored_state = adb(serial, "shell", "dumpsys", "package", PACKAGE).decode()
-                restored = re.search(rf"^\s*{re.escape(permission)}: granted=(true|false), flags=", restored_state, re.MULTILINE)
-                if restored is None or (restored.group(1) == "true") != was_granted:
+                if runtime_permission_grant(restored_state, permission) != was_granted:
                     raise RuntimeError(f"Android did not restore the original runtime grant for {permission}")
             except Exception as error:
                 cleanup_errors.append(f"{permission}: {error}")
