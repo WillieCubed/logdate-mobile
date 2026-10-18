@@ -11,6 +11,8 @@ of record LogDate stores. Each file's path matches its id: `app/logdate/journal/
   Don't edit them here; update the copy from upstream instead.
 - `activity-streams.json` maps every LogDate record type to its Activity Streams 2.0 type, or to
   `null` when a record has no Activity Streams form.
+- `published.json` lists the LogDate schemas that are published. Those can only change compatibly;
+  the lint refuses anything else.
 
 Check everything with:
 
