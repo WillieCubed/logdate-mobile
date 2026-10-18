@@ -235,7 +235,7 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Moving to a new key-encryption key**: running instances keep serving during a deploy, so the new value has to be readable everywhere before anything is encrypted with it. Use two deploys:
   1. Create the new value as a new version of the secret. Deploy with `ATPROTO_SIGNING_KEY_KEK` unchanged and `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` set to the **new** value. Nothing is re-encrypted yet, but every instance can now read keys encrypted with the new value.
   2. Deploy with `ATPROTO_SIGNING_KEY_KEK` set to the new value and `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` set to the **old** value. Instances re-encrypt every stored key under the new value at startup, and instances still running the first deploy can read the result.
-  3. Once every instance logs `SERVER_SIGNING_KEYS_REWRAPPED` or `SERVER_SIGNING_KEYS_CURRENT`, and none logs an error, unset `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` in a later deploy.
+  3. Once every instance logs `SERVER_SIGNING_KEYS_REWRAPPED` or `SERVER_SIGNING_KEYS_CURRENT`, and none logs an error, remove `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` from the tfvars (and, for staging, `staging-contract-template.json`). The deploy workflow only adds or updates secret mappings, so also remove it from each running service: `gcloud run services update <service> --region <region> --project <project> --remove-secrets ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY`.
   4. Keep the old version of the secret until no database backup still holds keys encrypted with it. Restoring such a backup without the old value loses every key in it.
 - **Security**: Store in a secret manager; never commit.
 
