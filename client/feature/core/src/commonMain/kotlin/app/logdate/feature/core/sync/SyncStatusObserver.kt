@@ -41,6 +41,9 @@ fun observeSyncPresentation(
 
 internal fun SyncStatus.toPresentation(): SyncPresentation {
     if (isSyncing || requestState == BackupRequestState.RUNNING) {
+        if (pendingDownloads > 0) {
+            return SyncPresentation.Recovering(pendingCount = pendingDownloads)
+        }
         return SyncPresentation.Syncing(
             progressPercent = SyncPresentation.Syncing.progressPercent(completedInRun, totalForRun),
         )
@@ -75,6 +78,10 @@ internal fun SyncStatus.toPresentation(): SyncPresentation {
 
     if (requestState == BackupRequestState.FAILED) {
         return SyncPresentation.NetworkError(pendingCount = pendingUploads)
+    }
+
+    if (pendingDownloads > 0) {
+        return SyncPresentation.Recovering(pendingCount = pendingDownloads)
     }
 
     return if (pendingUploads > 0 || requestState == BackupRequestState.QUEUED || requestState == BackupRequestState.RETRYING) {

@@ -51,6 +51,40 @@ class SyncStatusObserverTest {
     }
 
     @Test
+    fun `pending restored downloads stay visible without being reported as an error`() {
+        val status =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = true,
+                pendingDownloads = 2,
+            )
+
+        assertEquals(SyncPresentation.Recovering(pendingCount = 2), status.toPresentation())
+    }
+
+    @Test
+    fun `active restored downloads show recovery progress instead of backup progress`() {
+        val status =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 3,
+                isSyncing = true,
+                hasErrors = false,
+                pendingDownloads = 2,
+            )
+
+        assertEquals(SyncPresentation.Recovering(pendingCount = 2), status.toPresentation())
+        assertEquals(
+            SyncPresentation.Recovering(pendingCount = 2),
+            status.copy(isSyncing = false, requestState = BackupRequestState.RUNNING).toPresentation(),
+        )
+    }
+
+    @Test
     fun `an unknown error with pending items is not indistinguishable from a healthy backlog`() {
         val status =
             SyncStatus(
@@ -89,6 +123,22 @@ class SyncStatusObserverTest {
                 pendingUploads = 1,
                 isSyncing = false,
                 hasErrors = true,
+                lastError = SyncError(SyncErrorType.KEY_RECOVERY_ERROR, "Missing key"),
+            )
+
+        assertEquals(SyncPresentation.NeedsRecovery, status.toPresentation())
+    }
+
+    @Test
+    fun `an actionable key failure takes priority over pending downloads`() {
+        val status =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 0,
+                isSyncing = false,
+                hasErrors = true,
+                pendingDownloads = 2,
                 lastError = SyncError(SyncErrorType.KEY_RECOVERY_ERROR, "Missing key"),
             )
 

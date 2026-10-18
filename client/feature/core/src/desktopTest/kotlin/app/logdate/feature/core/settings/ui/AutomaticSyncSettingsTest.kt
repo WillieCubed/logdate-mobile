@@ -24,7 +24,7 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class AutomaticSyncSettingsTest {
     @Test
-    fun backupFailuresDoNotCreateTroubleshootingChores() =
+    fun keyRecoveryStatusStaysSpecificWithoutTroubleshootingChores() =
         runDesktopComposeUiTest(width = 720, height = 900) {
             setContent {
                 LogDateTheme(darkTheme = false) {
@@ -45,10 +45,32 @@ class AutomaticSyncSettingsTest {
             onNodeWithText("Enter recovery phrase").assertDoesNotExist()
             onNodeWithText("Entry sync").assertDoesNotExist()
             onNodeWithText("Encrypted Cloud archive").assertDoesNotExist()
-            onAllNodesWithText("Sync couldn't finish").assertCountEquals(1)
-            onNodeWithText("LogDate will try again automatically.").assertExists()
+            onAllNodesWithText("This device needs your recovery phrase to keep syncing.").assertCountEquals(1)
+            onNodeWithText("LogDate will try again automatically.").assertDoesNotExist()
             onNodeWithText("Sync paused while this device gets access to your journal.").assertDoesNotExist()
             saveScreenshot("tablet-journal-access", onRoot().captureToImage())
+        }
+
+    @Test
+    fun incompleteMediaRecoveryCannotLookComplete() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            setContent {
+                LogDateTheme(darkTheme = false) {
+                    SyncSettingsContent(
+                        onBack = {},
+                        syncStatus = SyncStatus(true, null, 3, true, false, pendingDownloads = 2),
+                        cloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.COMPLETE, 123L),
+                        isAuthenticated = true,
+                        onSyncNow = {},
+                        onNavigateToSignIn = {},
+                        quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 B", formattedUsed = "0 B"),
+                        isQuotaAvailable = true,
+                        snackbarHostState = SnackbarHostState(),
+                    )
+                }
+            }
+            onNodeWithText("Finishing journal recovery…").assertExists()
+            onNodeWithText("Everything is backed up").assertDoesNotExist()
         }
 
     @Test

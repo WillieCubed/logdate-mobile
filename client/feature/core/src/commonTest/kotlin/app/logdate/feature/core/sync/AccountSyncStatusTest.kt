@@ -32,9 +32,35 @@ class AccountSyncStatusTest {
     }
 
     @Test
+    fun `pending restored downloads are reported as recovery in progress`() {
+        assertEquals(AccountSyncStatus.RECOVERING, accountSyncStatus(clear.copy(pendingDownloads = 2, hasErrors = true)))
+        assertEquals(
+            AccountSyncStatus.KEY_RECOVERY_REQUIRED,
+            accountSyncStatus(
+                clear.copy(
+                    pendingDownloads = 2,
+                    lastError = SyncError(SyncErrorType.KEY_RECOVERY_ERROR, "missing key"),
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `actual syncing takes priority over an earlier failure`() {
         assertEquals(AccountSyncStatus.SYNCING, accountSyncStatus(clear.copy(isSyncing = true, hasErrors = true)))
         assertEquals(AccountSyncStatus.SYNCING, accountSyncStatus(clear.copy(requestState = BackupRequestState.RUNNING)))
+    }
+
+    @Test
+    fun `active restored downloads remain labeled as recovery`() {
+        assertEquals(
+            AccountSyncStatus.RECOVERING,
+            accountSyncStatus(clear.copy(isSyncing = true, pendingDownloads = 2)),
+        )
+        assertEquals(
+            AccountSyncStatus.RECOVERING,
+            accountSyncStatus(clear.copy(requestState = BackupRequestState.RUNNING, pendingDownloads = 2)),
+        )
     }
 
     @Test

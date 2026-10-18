@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MergeType
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Storage
@@ -58,6 +59,7 @@ import logdate.client.feature.core.generated.resources.sync_status_not_backed_up
 import logdate.client.feature.core.generated.resources.sync_status_open
 import logdate.client.feature.core.generated.resources.sync_status_progress_percent
 import logdate.client.feature.core.generated.resources.sync_status_queued
+import logdate.client.feature.core.generated.resources.sync_status_recovering
 import logdate.client.feature.core.generated.resources.sync_status_retry_scheduled
 import logdate.client.feature.core.generated.resources.sync_status_unavailable
 import logdate.client.feature.core.generated.resources.sync_status_waiting
@@ -123,6 +125,12 @@ fun SyncStatusButton(
                     else -> pluralStringResource(Res.plurals.sync_status_waiting, presentation.pendingCount, presentation.pendingCount)
                 }
             glyph = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = scheme.onSurfaceVariant) }
+            badgeCount = presentation.pendingCount
+        }
+
+        is SyncPresentation.Recovering -> {
+            description = pluralStringResource(Res.plurals.sync_status_recovering, presentation.pendingCount, presentation.pendingCount)
+            glyph = { Icon(Icons.Filled.CloudDownload, contentDescription = null, tint = scheme.primary) }
             badgeCount = presentation.pendingCount
         }
 
@@ -248,6 +256,7 @@ private fun SyncPresentation.toBannerVisual(): BannerVisual? {
         SyncPresentation.StatusUnavailable,
         is SyncPresentation.Syncing,
         is SyncPresentation.Pending,
+        is SyncPresentation.Recovering,
         -> null
 
         // Entries that cannot sync used to render a chip and nothing else, and the only route to

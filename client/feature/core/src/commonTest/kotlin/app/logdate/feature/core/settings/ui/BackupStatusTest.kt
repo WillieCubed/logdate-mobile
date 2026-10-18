@@ -19,6 +19,14 @@ class BackupStatusTest {
     }
 
     @Test
+    fun `incomplete media recovery remains visible ahead of archive completion`() {
+        assertEquals(
+            AccountSyncStatus.RECOVERING,
+            backupStatus(synced.copy(pendingDownloads = 2, hasErrors = true), saved),
+        )
+    }
+
+    @Test
     fun `archive activity and failures feed the same status`() {
         assertEquals(AccountSyncStatus.SYNCING, backupStatus(synced, CloudArchiveStatus(CloudArchivePhase.RUNNING)))
         assertEquals(AccountSyncStatus.RETRYING, backupStatus(synced, CloudArchiveStatus(CloudArchivePhase.RETRYING)))

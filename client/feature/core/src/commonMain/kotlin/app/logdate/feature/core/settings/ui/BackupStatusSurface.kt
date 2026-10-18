@@ -85,6 +85,7 @@ internal fun BackupStatusItem(
                         val icon =
                             when (status) {
                                 AccountSyncStatus.UP_TO_DATE -> Icons.Rounded.CloudDone
+                                AccountSyncStatus.RECOVERING -> Icons.Rounded.CloudSync
                                 AccountSyncStatus.WAITING_FOR_WIFI -> Icons.Rounded.Wifi
                                 AccountSyncStatus.OFFLINE -> Icons.Rounded.CloudOff
                                 AccountSyncStatus.BACKGROUND_RESTRICTED -> Icons.Rounded.DataSaverOn

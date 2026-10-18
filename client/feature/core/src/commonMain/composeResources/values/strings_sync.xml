@@ -35,6 +35,10 @@
         <item quantity="one">%1$d item waiting to back up</item>
         <item quantity="other">%1$d items waiting to back up</item>
     </plurals>
+    <plurals name="sync_status_recovering">
+        <item quantity="one">Finishing recovery · %1$d item left</item>
+        <item quantity="other">Finishing recovery · %1$d items left</item>
+    </plurals>
     <plurals name="sync_status_not_backed_up">
         <item quantity="one">%1$d item hasn't backed up yet</item>
         <item quantity="other">%1$d items haven't backed up yet</item>
@@ -259,6 +263,7 @@
     <string name="sync_account_retrying">Sync is retrying automatically.</string>
     <string name="sync_account_mobile_data">Sync using mobile data</string>
     <string name="sync_account_checking">Preparing to sync…</string>
+    <string name="sync_account_recovering">Finishing journal recovery…</string>
     <string name="sync_account_waiting">Sync is scheduled.</string>
     <string name="sync_account_offline">Sync paused: this device is offline. It resumes automatically when connected.</string>
     <string name="sync_account_server_unavailable">Sync paused: LogDate’s cloud service is unavailable. Retrying automatically.</string>
