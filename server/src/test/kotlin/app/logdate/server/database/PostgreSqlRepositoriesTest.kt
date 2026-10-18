@@ -14,6 +14,8 @@ import app.logdate.server.identity.StoredSigningKey
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
+import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +28,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlin.uuid.toJavaUuid
 
 /**
  * Comprehensive integration tests for core PostgreSQL-backed identity and session repositories.
@@ -109,6 +112,39 @@ class PostgreSqlRepositoriesTest {
 
             assertTrue(repository.deleteAccount(account.id))
             assertFalse(repository.deleteAccount(account.id))
+        }
+    }
+
+    @Test
+    fun `deleting an account removes its journal repository and sync index`() {
+        withAccountTables {
+            val repository = PostgreSQLAccountRepository()
+            val owner = sampleAccount(Uuid.random(), username = "leaving").copy(did = "did:plc:leaving")
+            val other = sampleAccount(Uuid.random(), username = "staying").copy(did = "did:plc:staying")
+            repository.save(owner)
+            repository.save(other)
+            // The moment store falls back to a synthetic repository DID that only the sync state records.
+            insertRepository(owner.id, accountDid = "did:plc:leaving", syncRepoDid = "did:web:sync-leaving.logdate.internal")
+            insertRepository(other.id, accountDid = "did:plc:staying", syncRepoDid = "did:plc:staying")
+
+            assertTrue(repository.deleteAccount(owner.id))
+
+            transaction {
+                val remainingRepos =
+                    AtprotoRepoHeadsTable.selectAll().map { it[AtprotoRepoHeadsTable.repoDid] }.toSet() +
+                        AtprotoRepoCommitsTable.selectAll().map { it[AtprotoRepoCommitsTable.repoDid] } +
+                        AtprotoRepoBlockLinksTable.selectAll().map { it[AtprotoRepoBlockLinksTable.repoDid] }
+                assertEquals(setOf("did:plc:staying"), remainingRepos)
+                assertEquals(
+                    setOf("shared", "only-did:plc:staying"),
+                    AtprotoRepoBlocksTable.selectAll().map { it[AtprotoRepoBlocksTable.cid] }.toSet(),
+                )
+                assertEquals(
+                    setOf(other.id.toJavaUuid()),
+                    LogDateCollectionStatesTable.selectAll().map { it[LogDateCollectionStatesTable.userId] }.toSet() +
+                        LogDateCollectionRecordsTable.selectAll().map { it[LogDateCollectionRecordsTable.userId] },
+                )
+            }
         }
     }
 
@@ -444,8 +480,70 @@ class PostgreSqlRepositoriesTest {
             RestoreCredentialsTable,
             ResourceRoutesTable,
             AccountEntitlementsTable,
+            AtprotoRepoHeadsTable,
+            AtprotoRepoBlocksTable,
+            AtprotoRepoBlockLinksTable,
+            AtprotoRepoCommitsTable,
+            LogDateCollectionStatesTable,
+            LogDateCollectionRecordsTable,
         ) {
             runBlocking { block() }
+        }
+    }
+
+    /**
+     * Writes a small repository for [accountDid], with one block shared with every other repository,
+     * plus sync state under [syncRepoDid] and one indexed record.
+     */
+    private fun insertRepository(
+        accountId: Uuid,
+        accountDid: String,
+        syncRepoDid: String,
+    ) {
+        transaction {
+            for (did in setOf(accountDid, syncRepoDid)) {
+                AtprotoRepoHeadsTable.insert {
+                    it[repoDid] = did
+                    it[rootCid] = "root"
+                    it[commitCid] = "commit"
+                    it[revision] = 1
+                    it[updatedAt] = Clock.System.now()
+                }
+                AtprotoRepoCommitsTable.insert {
+                    it[repoDid] = did
+                    it[revision] = 1
+                    it[cid] = "commit"
+                    it[rootCid] = "root"
+                    it[prevCid] = null
+                    it[createdAtEpochMillis] = 1
+                    it[recordCount] = 1
+                    it[signature] = "signature"
+                }
+                for (blockCid in listOf("shared", "only-$did")) {
+                    AtprotoRepoBlocksTable.insertIgnore {
+                        it[cid] = blockCid
+                        it[bytes] = byteArrayOf(1)
+                    }
+                    AtprotoRepoBlockLinksTable.insert {
+                        it[repoDid] = did
+                        it[cid] = blockCid
+                    }
+                }
+            }
+            LogDateCollectionStatesTable.insert {
+                it[userId] = accountId.toJavaUuid()
+                it[repoDid] = syncRepoDid
+                it[lastVersion] = 1
+                it[updatedAt] = Clock.System.now()
+            }
+            LogDateCollectionRecordsTable.insert {
+                it[userId] = accountId.toJavaUuid()
+                it[collection] = "entry"
+                it[recordKey] = "entry-1"
+                it[serverVersion] = 1
+                it[deleted] = false
+                it[deletedAt] = null
+            }
         }
     }
 

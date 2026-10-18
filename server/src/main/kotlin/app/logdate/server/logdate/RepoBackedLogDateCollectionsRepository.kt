@@ -421,8 +421,6 @@ internal class RepoBackedLogDateCollectionsRepository(
         return null
     }
 
-    private fun syntheticRepoDid(userId: UUID): String = "did:web:sync-${userId.toString().replace("-", "")}.logdate.internal"
-
     internal fun repoRecordIdForAssociation(
         repoDid: AtprotoDid,
         recordKey: String,
@@ -432,3 +430,6 @@ internal class RepoBackedLogDateCollectionsRepository(
         recordKey = RecordKey.require(recordKey),
     )
 }
+
+/** The repository DID sync uses for an account that has no DID of its own. */
+internal fun syntheticRepoDid(userId: UUID): String = "did:web:sync-${userId.toString().replace("-", "")}.logdate.internal"
