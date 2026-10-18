@@ -4,6 +4,7 @@ import io
 from pathlib import Path
 import tarfile
 import tempfile
+import time
 import unittest
 from unittest.mock import call, patch
 
@@ -163,6 +164,33 @@ class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
     def test_refuses_physical_device_serials(self):
         with self.assertRaisesRegex(argparse.ArgumentTypeError, "explicit emulator-NNNN serial"):
             NATIVE_RESTORE_WORK_ACCEPTANCE.emulator_serial("R5CT123456")
+
+    @patch.object(time, "sleep")
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "radio_state", side_effect=[(True, b"0"), (False, b"1")])
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb")
+    def test_waits_for_android_to_apply_restored_radio_state(self, adb, radio_state, sleep):
+        original = (False, b"1")
+
+        NATIVE_RESTORE_WORK_ACCEPTANCE.restore_radio_state("emulator-5554", original)
+
+        self.assertEqual(2, radio_state.call_count)
+        sleep.assert_called_once()
+        self.assertEqual(
+            [
+                call("emulator-5554", "shell", "cmd", "connectivity", "airplane-mode", "disable"),
+                call("emulator-5554", "shell", "svc", "wifi", "enable"),
+            ],
+            adb.call_args_list,
+        )
+
+    @patch.object(time, "sleep")
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "radio_state", return_value=(True, b"0"))
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb")
+    def test_fails_if_radio_state_does_not_return_to_original(self, adb, radio_state, sleep):
+        with self.assertRaisesRegex(RuntimeError, "Could not restore the emulator's original network state"):
+            NATIVE_RESTORE_WORK_ACCEPTANCE.restore_radio_state("emulator-5554", (False, b"1"))
+
+        self.assertGreater(radio_state.call_count, 1)
 
 
 class PartialNativeTransportTest(unittest.TestCase):
