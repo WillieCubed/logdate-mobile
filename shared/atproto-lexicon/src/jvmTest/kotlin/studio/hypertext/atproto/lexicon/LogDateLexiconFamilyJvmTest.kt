@@ -46,7 +46,7 @@ class LogDateLexiconFamilyJvmTest {
         return Files.walk(root).use { paths ->
             paths
                 .asSequence()
-                .filter { it.extension == "json" && it.name != "activity-streams.json" }
+                .filter { it.extension == "json" && it.name !in setOf("activity-streams.json", "published.json") }
                 .sorted()
                 .toList()
         }

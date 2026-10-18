@@ -1,0 +1,4 @@
+{
+  "$comment": "LogDate schemas that are published. Once listed, a schema can only change compatibly, and can't be removed from this list. See 'Changing a schema' in docs/reference/lexicon-style.md.",
+  "published": []
+}

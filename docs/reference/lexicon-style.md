@@ -108,6 +108,12 @@ rules for evolution:
 - **Experiments stay unpublished.** A schema being tried out stays a draft in this folder until it's
   stable.
 
+A schema counts as published once its NSID is listed in
+[`lexicons/published.json`](../../lexicons/published.json). From then on, `./run lint:lexicons`,
+which CI also runs, compares it with its version where your branch left `main`, and fails on any
+change these rules don't allow, naming the field and the rule. A listed schema can't be removed from
+the list. Drafts aren't listed, so they can still change freely.
+
 ## Checking your work
 
 Run the check before you commit:

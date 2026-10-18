@@ -6,3 +6,4 @@ set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
 node "$root/tools/lexicon-check/check.mjs"
+node --test "$root/tools/lexicon-check/compat.test.mjs"
