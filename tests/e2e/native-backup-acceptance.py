@@ -515,6 +515,31 @@ def timeline_is_open(hierarchy):
     return "Search your log" in texts and "Timeline" in texts
 
 
+def bluetooth_crash_dialog_close_target(hierarchy):
+    """Return the close-button center only for Android's unrelated Bluetooth crash dialog."""
+    try:
+        nodes = list(ET.fromstring(hierarchy).iter("node"))
+    except ET.ParseError:
+        return None
+    has_bluetooth_crash = any(
+        node.get("package") == "android"
+        and node.get("resource-id") == "android:id/alertTitle"
+        and node.get("text") == "Bluetooth keeps stopping"
+        for node in nodes
+    )
+    if not has_bluetooth_crash:
+        return None
+    for node in nodes:
+        if node.get("package") != "android" or node.get("resource-id") != "android:id/aerr_close":
+            continue
+        bounds = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
+        if bounds is None:
+            return None
+        left, top, right, bottom = map(int, bounds.groups())
+        return ((left + right) // 2, (top + bottom) // 2)
+    return None
+
+
 def wake_emulator(serial):
     """Make the replacement app visible before asserting its post-restore destination."""
     adb(serial, "shell", "input", "keyevent", "KEYCODE_WAKEUP")
@@ -535,6 +560,11 @@ def wait_for_timeline(serial, output, timeout_seconds=60):
             overwrite_private_file(screenshot_path, screenshot)
             if timeline_is_open(hierarchy):
                 return
+            close_target = bluetooth_crash_dialog_close_target(hierarchy)
+            if close_target is not None:
+                print("Dismissing Android's unrelated Bluetooth crash dialog over the restored Timeline", flush=True)
+                adb(serial, "shell", "input", "tap", str(close_target[0]), str(close_target[1]))
+                time.sleep(0.25)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise RuntimeError("replacement app did not open its Timeline after verifying restored records and media")
