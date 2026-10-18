@@ -1,7 +1,7 @@
 # Private and shared storage
 
 Part of the Private and shared repos project in the LogDate on the AT Protocol initiative. This is
-the outcome of the storage-layout spike. It decides:
+the outcome of the storage-layout research. It decides:
 
 - how each account's data is split between a public repository and private spaces;
 - what a sealed record looks like;
@@ -279,7 +279,7 @@ Nothing is published yet, so these renames are free.
 
 ## Found along the way
 
-These were found during the spike and are tracked separately:
+These were found during this research and are tracked separately:
 
 - **Account deletion leaves repository data behind.** Deleting an account doesn't remove its
   `atproto_repo_*` or `logdate_collection_*` rows. Those tables have no foreign key to `accounts`.
