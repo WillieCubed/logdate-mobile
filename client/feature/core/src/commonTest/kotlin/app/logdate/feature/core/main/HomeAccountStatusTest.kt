@@ -24,6 +24,7 @@ class HomeAccountStatusTest {
                 SyncPresentation.StorageError(0),
                 SyncPresentation.ConflictError(1),
                 SyncPresentation.NetworkError(0),
+                SyncPresentation.MediaTooLarge,
             )
         blocked.forEach { assertEquals(WorkspaceAccountIndicator.Waiting, it.accountIndicator()) }
         assertEquals(WorkspaceAccountIndicator.Attention, SyncPresentation.AuthError.accountIndicator())

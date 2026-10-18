@@ -264,7 +264,7 @@ internal class SyncRetryCoordinator(
                 SyncDeadLetterReason.SERVER_UNAVAILABLE -> DiagnosticReason.SERVER_UNAVAILABLE
                 SyncDeadLetterReason.SIGN_IN_REQUIRED -> DiagnosticReason.SIGN_IN_REQUIRED
                 SyncDeadLetterReason.NETWORK_UNAVAILABLE -> DiagnosticReason.OFFLINE
-                SyncDeadLetterReason.FILE_TOO_LARGE -> DiagnosticReason.QUOTA_EXCEEDED
+                SyncDeadLetterReason.FILE_TOO_LARGE -> DiagnosticReason.MEDIA_TOO_LARGE
                 SyncDeadLetterReason.UNKNOWN -> DiagnosticReason.UNKNOWN
             }
         val action =
@@ -272,6 +272,7 @@ internal class SyncRetryCoordinator(
                 DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
                 DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
                 DiagnosticReason.MISSING_MEDIA -> DiagnosticAction.RETRY
+                DiagnosticReason.MEDIA_TOO_LARGE -> DiagnosticAction.REPLACE_MEDIA
                 else -> DiagnosticAction.RETRY
             }
         safelyReport(

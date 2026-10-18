@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.sync.cloud.CloudApiException
+import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -129,5 +130,28 @@ class UploadDiagnosticInstrumentationTest {
                 )
             assertEquals(null, throwing.beginUpload(EntityType.NOTE, pending))
             throwing.markUploadSettled(EntityType.NOTE, pending, Instant.fromEpochMilliseconds(10), 2)
+        }
+
+    @Test
+    fun `oversized media is distinguished from cloud quota and points to replacing the attachment`() =
+        runTest {
+            val events = mutableListOf<SyncDiagnosticEvent>()
+            val coordinator =
+                SyncRetryCoordinator(
+                    InMemorySyncRetryScheduleStore(),
+                    metadata,
+                    InMemorySyncDeadLetterStore(),
+                    SyncBackoff(),
+                    { _, _, _, _, _, _, _ -> },
+                    { DiagnosticSource(requireNotNull(pending.scope), "epoch") },
+                    { event, _ -> events += event },
+                )
+
+            coordinator.beginUpload(EntityType.NOTE, pending)
+            coordinator.handleRetryFailure(EntityType.NOTE, pending, MediaTooLargeException("too large"), permanent = true)
+
+            val failure = events.single { it.outcome == DiagnosticOutcome.PAUSED }
+            assertEquals(DiagnosticReason.MEDIA_TOO_LARGE, failure.reason)
+            assertEquals(DiagnosticAction.REPLACE_MEDIA, failure.action)
         }
 }

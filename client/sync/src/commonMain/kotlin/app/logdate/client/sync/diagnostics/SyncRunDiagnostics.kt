@@ -38,7 +38,9 @@ internal class SyncRunDiagnostics(
                     SyncErrorType.AUTHENTICATION_ERROR -> DiagnosticReason.SIGN_IN_REQUIRED
                     SyncErrorType.SERVER_ERROR -> DiagnosticReason.SERVER_UNAVAILABLE
                     SyncErrorType.CONFLICT_ERROR -> DiagnosticReason.CONFLICT
-                    SyncErrorType.STORAGE_ERROR -> DiagnosticReason.LOCAL_STORAGE
+                    SyncErrorType.KEY_RECOVERY_ERROR -> DiagnosticReason.KEY_RECOVERY_REQUIRED
+                    SyncErrorType.MEDIA_TOO_LARGE_ERROR -> DiagnosticReason.MEDIA_TOO_LARGE
+                    SyncErrorType.STORAGE_ERROR -> DiagnosticReason.QUOTA_EXCEEDED
                     SyncErrorType.UNKNOWN_ERROR -> DiagnosticReason.UNKNOWN
                     null -> if (result.success) DiagnosticReason.NONE else DiagnosticReason.UNKNOWN
                 }
@@ -47,6 +49,9 @@ internal class SyncRunDiagnostics(
                     DiagnosticReason.NONE -> DiagnosticAction.NONE
                     DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
                     DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
+                    DiagnosticReason.KEY_RECOVERY_REQUIRED -> DiagnosticAction.RECOVER_KEY
+                    DiagnosticReason.MEDIA_TOO_LARGE -> DiagnosticAction.REPLACE_MEDIA
+                    DiagnosticReason.QUOTA_EXCEEDED -> DiagnosticAction.MANAGE_STORAGE
                     DiagnosticReason.CONFLICT -> DiagnosticAction.REVIEW_CONFLICT
                     DiagnosticReason.LOCAL_STORAGE -> DiagnosticAction.RETRY
                     else -> DiagnosticAction.RETRY

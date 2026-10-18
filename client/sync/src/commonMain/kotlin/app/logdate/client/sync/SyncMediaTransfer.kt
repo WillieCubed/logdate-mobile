@@ -59,13 +59,20 @@ internal class SyncMediaTransfer(
     suspend fun originalAvailable(
         reference: String,
         source: String = reference,
-    ): Boolean =
-        canReuseOriginal(reference, source) &&
+    ): Boolean {
+        if (!canReuseOriginal(reference, source)) return false
+        return try {
             if (MediaReference.parse(mediaReferences.storedReference(reference)) is MediaReference.Owned) {
                 mediaManager.isRecoveredOriginal(reference, mediaReferences)
             } else {
                 mediaManager.exists(reference)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     fun isRemoteRef(mediaRef: String): Boolean = mediaRef.startsWith("http://") || mediaRef.startsWith("https://")
 

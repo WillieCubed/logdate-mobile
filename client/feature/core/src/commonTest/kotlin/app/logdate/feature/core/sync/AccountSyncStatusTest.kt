@@ -48,6 +48,14 @@ class AccountSyncStatusTest {
             AccountSyncStatus.CONNECTION_UNAVAILABLE,
             accountSyncStatus(clear.copy(lastError = SyncError(SyncErrorType.NETWORK_ERROR, "private details"))),
         )
+        assertEquals(
+            AccountSyncStatus.KEY_RECOVERY_REQUIRED,
+            accountSyncStatus(clear.copy(lastError = SyncError(SyncErrorType.KEY_RECOVERY_ERROR, "private details"))),
+        )
+        assertEquals(
+            AccountSyncStatus.MEDIA_TOO_LARGE,
+            accountSyncStatus(clear.copy(lastError = SyncError(SyncErrorType.MEDIA_TOO_LARGE_ERROR, "private details"))),
+        )
     }
 
     @Test

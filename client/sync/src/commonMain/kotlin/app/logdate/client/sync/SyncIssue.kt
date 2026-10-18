@@ -19,10 +19,14 @@ sealed interface SyncIssue {
 
         data object JournalAccess : Failure
 
+        data object KeyRecovery : Failure
+
         /** A linked watch waits for its phone to set it up again; nothing on the watch can fix it. */
         data object DeviceLink : Failure
 
         data object CloudStorage : Failure
+
+        data object MediaTooLarge : Failure
 
         data object Conflict : Failure
 
@@ -52,6 +56,8 @@ fun SyncStatus.issue(): SyncIssue? {
     if (requestState == BackupRequestState.RETRYING) return SyncIssue.Waiting.RetryBackoff
     when (lastError?.type) {
         SyncErrorType.AUTHENTICATION_ERROR -> return SyncIssue.Failure.SignIn
+        SyncErrorType.KEY_RECOVERY_ERROR -> return SyncIssue.Failure.KeyRecovery
+        SyncErrorType.MEDIA_TOO_LARGE_ERROR -> return SyncIssue.Failure.MediaTooLarge
         SyncErrorType.STORAGE_ERROR -> return SyncIssue.Failure.CloudStorage
         SyncErrorType.CONFLICT_ERROR -> return SyncIssue.Failure.Conflict
         SyncErrorType.NETWORK_ERROR -> return SyncIssue.Failure.Connection

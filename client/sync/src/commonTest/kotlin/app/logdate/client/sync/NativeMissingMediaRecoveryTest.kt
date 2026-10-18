@@ -92,6 +92,25 @@ class NativeMissingMediaRecoveryTest {
         }
 
     @Test
+    fun `a revoked provider permission recovers through the retained cloud reference`() =
+        runTest {
+            val stale = "file:///data/user/0/app/files/private-image.jpg"
+            val inaccessible =
+                object : InMemoryMediaManager() {
+                    override suspend fun exists(mediaId: String): Boolean =
+                        if (mediaId == stale) throw SecurityException("Permission revoked") else super.exists(mediaId)
+                }
+            val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = stale)
+            downloadedOwner = note.uid
+            refs.upsert(mapping(note.uid).copy(localUri = stale))
+
+            val result = assertIs<MediaHydrationResult.Available>(SyncMediaTransfer(inaccessible, refs, cloud).hydrate("token", note))
+
+            assertTrue(result.note.mediaRefOrNull() != stale)
+            assertEquals(1, downloads.size)
+        }
+
+    @Test
     fun `pending caption edits retain the Cloud original instead of uploading a native quarantine marker`() =
         runTest {
             val original = "content://media/external/video/media/123"

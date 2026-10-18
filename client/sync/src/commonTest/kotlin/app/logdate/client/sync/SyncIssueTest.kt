@@ -26,6 +26,14 @@ class SyncIssueTest {
         assertIs<SyncIssue.Failure>(status.copy(hasErrors = true).issue())
         assertEquals(SyncIssue.Failure.JournalAccess, status.copy(unreadableCloudCount = 1).issue())
         assertEquals(SyncIssue.Failure.JournalAccess, status.copy(pausedReason = SyncPausedReason.NEEDS_RECOVERY_PHRASE).issue())
+        assertEquals(
+            SyncIssue.Failure.KeyRecovery,
+            status.copy(lastError = SyncError(SyncErrorType.KEY_RECOVERY_ERROR, "Missing key")).issue(),
+        )
+        assertEquals(
+            SyncIssue.Failure.MediaTooLarge,
+            status.copy(lastError = SyncError(SyncErrorType.MEDIA_TOO_LARGE_ERROR, "Oversized media")).issue(),
+        )
         assertIs<SyncIssue.Failure>(status.copy(requestState = BackupRequestState.FAILED).issue())
     }
 

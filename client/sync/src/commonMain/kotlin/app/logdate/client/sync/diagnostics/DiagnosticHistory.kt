@@ -43,7 +43,7 @@ class DiagnosticHistory(
     }
 
     private val mutex = Mutex()
-    private val json = Json
+    private val json = Json { coerceInputValues = true }
     private var history: StoredHistory? = null
 
     suspend fun append(

@@ -11,11 +11,13 @@ import logdate.client.feature.core.generated.resources.sync_diagnostic_outcome_q
 import logdate.client.feature.core.generated.resources.sync_diagnostic_outcome_retry_scheduled
 import logdate.client.feature.core.generated.resources.sync_diagnostic_outcome_started
 import logdate.client.feature.core.generated.resources.sync_diagnostic_outcome_succeeded
+import logdate.client.feature.core.generated.resources.sync_diagnostic_outcome_unknown
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_conflict
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_corrupt_payload
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_incompatible_server
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_key_recovery_required
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_local_storage
+import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_media_too_large
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_missing_media
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_network_policy
 import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_none
@@ -30,7 +32,9 @@ import logdate.client.feature.core.generated.resources.sync_diagnostic_reason_un
 import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_automatic
 import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_free_space
 import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_key_recovery
+import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_manage_storage
 import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_network
+import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_replace_media
 import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_review_conflict
 import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_sign_in
 import logdate.client.feature.core.generated.resources.sync_diagnostic_retry_unknown
@@ -49,6 +53,7 @@ internal fun DiagnosticOutcome.outcomeResource(): StringResource =
         DiagnosticOutcome.INTERRUPTED -> Res.string.sync_diagnostic_outcome_interrupted
         DiagnosticOutcome.CONFLICT -> Res.string.sync_diagnostic_outcome_conflict
         DiagnosticOutcome.PAUSED -> Res.string.sync_diagnostic_outcome_paused
+        DiagnosticOutcome.UNKNOWN -> Res.string.sync_diagnostic_outcome_unknown
     }
 
 internal fun DiagnosticReason.reasonResource(): StringResource =
@@ -60,6 +65,7 @@ internal fun DiagnosticReason.reasonResource(): StringResource =
         DiagnosticReason.SERVER_UNAVAILABLE -> Res.string.sync_diagnostic_reason_server_unavailable
         DiagnosticReason.RATE_LIMITED -> Res.string.sync_diagnostic_reason_rate_limited
         DiagnosticReason.QUOTA_EXCEEDED -> Res.string.sync_diagnostic_reason_quota_exceeded
+        DiagnosticReason.MEDIA_TOO_LARGE -> Res.string.sync_diagnostic_reason_media_too_large
         DiagnosticReason.LOCAL_STORAGE -> Res.string.sync_diagnostic_reason_local_storage
         DiagnosticReason.MISSING_MEDIA -> Res.string.sync_diagnostic_reason_missing_media
         DiagnosticReason.CORRUPT_PAYLOAD -> Res.string.sync_diagnostic_reason_corrupt_payload
@@ -79,6 +85,8 @@ internal fun DiagnosticRetryCondition.retryResource(): StringResource =
         DiagnosticRetryCondition.SIGN_IN -> Res.string.sync_diagnostic_retry_sign_in
         DiagnosticRetryCondition.KEY_RECOVERY -> Res.string.sync_diagnostic_retry_key_recovery
         DiagnosticRetryCondition.FREE_SPACE -> Res.string.sync_diagnostic_retry_free_space
+        DiagnosticRetryCondition.MANAGE_STORAGE -> Res.string.sync_diagnostic_retry_manage_storage
+        DiagnosticRetryCondition.REPLACE_MEDIA -> Res.string.sync_diagnostic_retry_replace_media
         DiagnosticRetryCondition.UPDATE_APP -> Res.string.sync_diagnostic_retry_update_app
         DiagnosticRetryCondition.UPDATE_SERVER -> Res.string.sync_diagnostic_retry_update_server
         DiagnosticRetryCondition.REVIEW_CONFLICT -> Res.string.sync_diagnostic_retry_review_conflict

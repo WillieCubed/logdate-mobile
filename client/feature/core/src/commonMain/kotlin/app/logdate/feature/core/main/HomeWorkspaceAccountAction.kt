@@ -120,8 +120,9 @@ internal fun SyncPresentation.accountSummaryResource(): StringResource? =
         is SyncPresentation.Pending -> AccountSyncStatus.CHECKING.messageResource()
         SyncPresentation.StatusUnavailable -> AccountSyncStatus.LOCAL_DATA_UNAVAILABLE.messageResource()
         SyncPresentation.AuthError -> AccountSyncStatus.SIGN_IN_REQUIRED.messageResource()
-        SyncPresentation.NeedsRecovery -> AccountSyncStatus.DEVICE_ACCESS_REQUIRED.messageResource()
+        SyncPresentation.NeedsRecovery -> AccountSyncStatus.KEY_RECOVERY_REQUIRED.messageResource()
         is SyncPresentation.StorageError -> AccountSyncStatus.STORAGE_FULL.messageResource()
+        SyncPresentation.MediaTooLarge -> AccountSyncStatus.MEDIA_TOO_LARGE.messageResource()
         is SyncPresentation.ConflictError -> AccountSyncStatus.CONFLICT.messageResource()
         is SyncPresentation.NetworkError -> AccountSyncStatus.CONNECTION_UNAVAILABLE.messageResource()
     }

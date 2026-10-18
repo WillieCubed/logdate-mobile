@@ -64,6 +64,9 @@ sealed class SyncPresentation {
         val pendingCount: Int,
     ) : SyncPresentation()
 
+    /** A specific attachment cannot upload until the person replaces it with a smaller file. */
+    data object MediaTooLarge : SyncPresentation()
+
     /** Edit conflicts present. Banner with a "Review conflicts" action. */
     data class ConflictError(
         val conflictCount: Int,

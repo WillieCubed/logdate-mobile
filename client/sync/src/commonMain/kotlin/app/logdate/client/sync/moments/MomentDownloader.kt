@@ -75,7 +75,7 @@ internal class MomentDownloader(
             applyPage(page, selected, request, tally)
             ensureScope(selected, request)
             if (inbox.retained(TYPE, selected).isNotEmpty() && tally.errors.isEmpty()) {
-                tally.errors += SyncError(SyncErrorType.STORAGE_ERROR, "Marked moments are saved for recovery")
+                tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Marked moments are saved for recovery")
             }
             val fetchFailed = inbox.fetchFailure(TYPE, selected) != DiagnosticReason.NONE
             if (fetchFailed) {
@@ -124,7 +124,7 @@ internal class MomentDownloader(
             inbox.failed(TYPE, id.toString(), DiagnosticReason.KEY_RECOVERY_REQUIRED.name, version, selected)
             unreadable.record(EntityType.MOMENT, listOf(id))
             ensureScope(selected, request)
-            tally.errors += SyncError(SyncErrorType.STORAGE_ERROR, "A marked moment needs its original identity key")
+            tally.errors += SyncError(SyncErrorType.KEY_RECOVERY_ERROR, "A marked moment needs its original identity key")
         }
         for (failure in page.failures) {
             ensureScope(selected, request)
@@ -156,7 +156,7 @@ internal class MomentDownloader(
         } catch (_: Exception) {
             ensureScope(selected, request)
             inbox.failed(TYPE, id.toString(), DiagnosticReason.LOCAL_STORAGE.name, version, selected)
-            tally.errors += SyncError(SyncErrorType.STORAGE_ERROR, "A marked moment could not be saved")
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be saved")
         }
     }
 

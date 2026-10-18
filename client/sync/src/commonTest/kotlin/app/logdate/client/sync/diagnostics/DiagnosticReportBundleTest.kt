@@ -88,4 +88,67 @@ class DiagnosticReportBundleTest {
             )
         assertTrue(interrupted.summary.contains("- RETRY"))
     }
+
+    @Test
+    fun `local persistence failure does not claim that device storage is full`() {
+        val report =
+            SyncDiagnosticReport(
+                Uuid.random().toString(),
+                events =
+                    listOf(
+                        SyncDiagnosticEvent(
+                            DiagnosticPhase.APPLY,
+                            DiagnosticOutcome.RETRY_SCHEDULED,
+                            reason = DiagnosticReason.LOCAL_STORAGE,
+                        ),
+                    ),
+            )
+
+        val bundle = DiagnosticReportBundles.prepare(report)
+
+        assertTrue(bundle.summary.contains("- RETRY"))
+        assertTrue(!bundle.summary.contains("- FREE_SPACE"))
+    }
+
+    @Test
+    fun `cloud quota failure recommends managing cloud storage`() {
+        val report =
+            SyncDiagnosticReport(
+                Uuid.random().toString(),
+                events =
+                    listOf(
+                        SyncDiagnosticEvent(
+                            DiagnosticPhase.UPLOAD,
+                            DiagnosticOutcome.FAILED,
+                            reason = DiagnosticReason.QUOTA_EXCEEDED,
+                        ),
+                    ),
+            )
+
+        val bundle = DiagnosticReportBundles.prepare(report)
+
+        assertTrue(bundle.summary.contains("- MANAGE_STORAGE"))
+        assertTrue(!bundle.summary.contains("- RETRY"))
+    }
+
+    @Test
+    fun `oversized attachment recommends replacing media rather than managing cloud quota`() {
+        val report =
+            SyncDiagnosticReport(
+                Uuid.random().toString(),
+                events =
+                    listOf(
+                        SyncDiagnosticEvent(
+                            DiagnosticPhase.UPLOAD,
+                            DiagnosticOutcome.PAUSED,
+                            reason = DiagnosticReason.MEDIA_TOO_LARGE,
+                        ),
+                    ),
+            )
+
+        val bundle = DiagnosticReportBundles.prepare(report)
+
+        assertTrue(bundle.summary.contains("- REPLACE_MEDIA"))
+        assertTrue(!bundle.summary.contains("- MANAGE_STORAGE"))
+    }
 }

@@ -249,6 +249,7 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
                     NATIVE_BACKUP_ACCEPTANCE.length_delimited_field(1, self.preference_entry(name, value))
                     for name, value in [
                         ("identity.canonical_owner_id", "native-test-owner"),
+                        ("identity.canonical_owner_bound", "true"),
                         ("editor_drafts_anonymous", '{"drafts":["unfinished"]}'),
                     ]
                 ),
@@ -277,7 +278,7 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         for _, _, _, entry in NATIVE_BACKUP_ACCEPTANCE.protobuf_fields(preferences):
             fields = list(NATIVE_BACKUP_ACCEPTANCE.protobuf_fields(entry))
             names.add(next(payload for number, wire, _, payload in fields if number == 1 and wire == 2).decode())
-        self.assertEqual({"identity.canonical_owner_id"}, names)
+        self.assertEqual({"identity.canonical_owner_id", "identity.canonical_owner_bound"}, names)
 
     def test_rejects_credentials_only_archive_without_android_manifest(self):
         package = NATIVE_BACKUP_ACCEPTANCE.PACKAGE

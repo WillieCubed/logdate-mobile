@@ -5,7 +5,9 @@ import logdate.client.feature.core.generated.resources.sync_account_background
 import logdate.client.feature.core.generated.resources.sync_account_checking
 import logdate.client.feature.core.generated.resources.sync_account_device_link
 import logdate.client.feature.core.generated.resources.sync_account_disabled
+import logdate.client.feature.core.generated.resources.sync_account_media_too_large
 import logdate.client.feature.core.generated.resources.sync_account_offline
+import logdate.client.feature.core.generated.resources.sync_account_recovery_required
 import logdate.client.feature.core.generated.resources.sync_account_retrying
 import logdate.client.feature.core.generated.resources.sync_account_signed_out
 import logdate.client.feature.core.generated.resources.sync_account_storage_full
@@ -28,13 +30,14 @@ internal fun AccountSyncStatus.messageResource(): StringResource =
         AccountSyncStatus.CONNECTION_UNAVAILABLE -> Res.string.sync_account_unknown
         AccountSyncStatus.SIGN_IN_REQUIRED -> Res.string.sync_account_signed_out
         AccountSyncStatus.STORAGE_FULL -> Res.string.sync_account_storage_full
+        AccountSyncStatus.KEY_RECOVERY_REQUIRED -> Res.string.sync_account_recovery_required
         AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_account_wifi
         AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_account_background
         AccountSyncStatus.DEVICE_ACCESS_REQUIRED -> Res.string.sync_account_unknown
         AccountSyncStatus.DEVICE_LINK_REQUIRED -> Res.string.sync_account_device_link
         AccountSyncStatus.CONFLICT -> Res.string.sync_account_unknown
         AccountSyncStatus.LOCAL_DATA_UNAVAILABLE -> Res.string.sync_account_unknown
-        AccountSyncStatus.MEDIA_TOO_LARGE -> Res.string.sync_account_unknown
+        AccountSyncStatus.MEDIA_TOO_LARGE -> Res.string.sync_account_media_too_large
         AccountSyncStatus.UNKNOWN -> Res.string.sync_account_unknown
         AccountSyncStatus.DISABLED -> Res.string.sync_account_disabled
     }

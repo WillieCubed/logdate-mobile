@@ -8,7 +8,11 @@ import kotlin.uuid.Uuid
 object DiagnosticReportCodec {
     const val MAX_REPORT_BYTES = 256 * 1024
     const val MAX_EVENTS = 512
-    private val json = Json { encodeDefaults = true }
+    private val json =
+        Json {
+            encodeDefaults = true
+            coerceInputValues = true
+        }
 
     fun decode(value: String): SyncDiagnosticReport {
         require(value.length <= MAX_REPORT_BYTES && value.encodeToByteArray().size <= MAX_REPORT_BYTES) { "Diagnostic report too large" }

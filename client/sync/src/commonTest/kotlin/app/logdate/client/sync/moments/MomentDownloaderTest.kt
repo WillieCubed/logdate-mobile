@@ -140,6 +140,7 @@ class MomentDownloaderTest {
             val result = f.downloader().download()
             assertFalse(result.success)
             assertEquals(1, result.downloadedItems)
+            assertTrue(result.errors.any { it.type == app.logdate.client.sync.SyncErrorType.KEY_RECOVERY_ERROR })
             assertEquals(good, f.repository.getMark(good.id))
             assertEquals(1, f.unreadable.count())
             assertEquals(null, f.metadata.getLastSyncTime(EntityType.MOMENT))

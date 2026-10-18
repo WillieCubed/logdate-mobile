@@ -13,6 +13,8 @@ internal fun List<SyncError>.mostSevere(): SyncError? = SEVERITY_ORDER.firstNotN
 private val SEVERITY_ORDER =
     listOf(
         SyncErrorType.AUTHENTICATION_ERROR,
+        SyncErrorType.KEY_RECOVERY_ERROR,
+        SyncErrorType.MEDIA_TOO_LARGE_ERROR,
         SyncErrorType.STORAGE_ERROR,
         SyncErrorType.CONFLICT_ERROR,
         SyncErrorType.SERVER_ERROR,
