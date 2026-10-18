@@ -6,8 +6,9 @@
    Cloud backup: DataStore preferences, the database-passphrase backup, the
    identity-recovery-phrase backup, and the encrypted database (all require
    clientSideEncryption so they're encrypted in the cloud).
-   Device-to-device includes committed media. Device-bound preferences,
-   background jobs, and incomplete media staging are not portable content.
+   Device-to-device includes only paths in its explicit include list; temporary
+   camera-capture output is omitted along with device-bound preferences,
+   background jobs, and incomplete media staging.
 -->
 <full-backup-content>
     <include domain="sharedpref" path="logdate_widget_instances.xml" requireFlags="clientSideEncryption"/>
@@ -51,7 +52,6 @@
              requireFlags="deviceToDeviceTransfer"/>
     <exclude domain="file" path="media/staging/"/>
     <exclude domain="file" path="audio_notes/staging/"/>
-    <exclude domain="file" path="camera-captures/"/>
     <exclude domain="file" path="db_recovery/passphrase_backup.part"/>
     <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
     <exclude domain="file" path="identity_recovery/account_key_backup.part"/>
