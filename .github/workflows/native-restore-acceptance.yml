@@ -1,0 +1,136 @@
+name: Native Android restore acceptance
+run-name: Native Android restore acceptance for ${{ github.sha }}
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - '.github/workflows/native-restore-acceptance.yml'
+      - 'app/android-main/src/androidTest/**/NativeBackupTransferProbeTest.kt'
+      - 'app/android-main/src/main/**'
+      - 'client/database/**'
+      - 'client/device/**'
+      - 'client/media/**'
+      - 'client/sync/**'
+      - 'scripts/tests/native-backup/**'
+      - 'tests/e2e/native-backup-acceptance.py'
+      - 'build.gradle.kts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-transfer:
+    name: Restore partial media between emulators
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.avd
+      LOGDATE_NATIVE_ACCEPTANCE_PACKAGE: studio.hypertext.logdate.debug
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Materialize Android Firebase config
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK and two fresh API 34 emulators
+        shell: bash
+        run: |
+          mkdir -p "$ANDROID_AVD_HOME"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          {
+            echo "$ANDROID_HOME/cmdline-tools/latest/bin"
+            echo "$ANDROID_HOME/platform-tools"
+            echo "$ANDROID_HOME/emulator"
+          } >> "$GITHUB_PATH"
+          set +o pipefail
+          yes | sdkmanager --licenses >/dev/null
+          set -o pipefail
+          sdkmanager \
+            'platform-tools' 'platforms;android-34' 'emulator' \
+            'system-images;android-34;google_apis;x86_64'
+          avdmanager create avd \
+            --name logdate-restore-source \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-destination \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          for config in "$ANDROID_AVD_HOME"/*.avd/config.ini; do
+            sed -i 's/^disk.dataPartition.size=.*/disk.dataPartition.size=2G/' "$config"
+          done
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Build debug app and instrumentation APKs
+        uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Assemble acceptance APKs
+        run: >-
+          ./gradlew :app:android-main:assembleDebug
+          :app:android-main:assembleDebugAndroidTest
+          --no-daemon --console=plain
+
+      - name: Boot source and destination emulators
+        shell: bash
+        run: |
+          emulator -avd logdate-restore-source -port 5554 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/source-emulator.log" 2>&1 &
+          emulator -avd logdate-restore-destination -port 5556 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/destination-emulator.log" 2>&1 &
+          for serial in emulator-5554 emulator-5556; do
+            adb -s "$serial" wait-for-device
+            for _ in $(seq 1 120); do
+              if [[ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+                break
+              fi
+              sleep 2
+            done
+            test "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+            test "$(adb -s "$serial" shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          done
+
+      - name: Exercise native transfer with a partially delivered original
+        run: |
+          python3 tests/e2e/native-backup-acceptance.py \
+            --source emulator-5554 \
+            --destination emulator-5556 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-restore-partial-media" \
+            --exercise-partial-media \
+            --exercise-duplicate-restore
+
+      - name: Upload native restore acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: native-restore-acceptance-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-restore-partial-media/*.log
+            ${{ runner.temp }}/native-restore-partial-media/*fixture.json
+            ${{ runner.temp }}/native-restore-partial-media/*files*.json
+            ${{ runner.temp }}/source-emulator.log
+            ${{ runner.temp }}/destination-emulator.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop emulators
+        if: always()
+        shell: bash
+        run: |
+          adb -s emulator-5554 emu kill || true
+          adb -s emulator-5556 emu kill || true

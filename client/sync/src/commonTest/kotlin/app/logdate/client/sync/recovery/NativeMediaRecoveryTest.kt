@@ -400,7 +400,7 @@ class NativeMediaRecoveryTest {
         }
 
     @Test
-    fun `an editor caption change during a legacy media download remains recoverable on retry`() =
+    fun `an editor caption change during a legacy media download keeps the edit and repairs media`() =
         runTest {
             val legacy = "file:///old-install/audio_notes/source.jpg"
             val block = SerializableImageBlock(Uuid.random(), timestamp, uri = legacy, caption = "Original")
@@ -427,14 +427,43 @@ class NativeMediaRecoveryTest {
                 onDownload = {}
             }
             recovery().recover("token", EntityType.DRAFT)
-            assertEquals(edited, drafts.getDraft(original.id))
-            recovery().recover("token", EntityType.DRAFT)
             val repaired = requireNotNull(drafts.getDraft(original.id))
             val repairedBlock = assertIs<SerializableImageBlock>(repaired.blocks.single())
             assertTrue(media.exists(requireNotNull(repairedBlock.uri)))
             assertEquals("Edited during download", repairedBlock.caption)
             assertEquals(edited.lastModifiedAt, repaired.lastModifiedAt)
             assertEquals(1, downloads.size)
+            recovery().recover("token", EntityType.DRAFT)
+            assertEquals(1, downloads.size, "A repeat recovery must reuse the repaired draft")
+        }
+
+    @Test
+    fun `an attachment changed during native recovery does not retain the old media mapping`() =
+        runTest {
+            val block = SerializableImageBlock(Uuid.random(), timestamp, uri = local, caption = "Original")
+            val original = EditorDraft(Uuid.random(), listOf(block), createdAt = timestamp, lastModifiedAt = timestamp)
+            val oldMapping = mapping(block.id).copy(ownerId = scope.owner, serverOrigin = scope.origin)
+            val edited =
+                original.copy(
+                    blocks = listOf(block.copy(uri = "logdate-media://library/replacement.jpg", caption = "Replacement")),
+                    lastModifiedAt = Instant.fromEpochMilliseconds(2),
+                )
+            owner = block.id
+            drafts.saveDraftFromSync(original)
+            refs.upsertDraftAsset(original.id, block.id, "image", oldMapping)
+            onDownload = {
+                drafts.saveDraftFromSync(edited)
+                onDownload = {}
+            }
+
+            recovery().recover("token", EntityType.DRAFT)
+
+            assertEquals(edited, drafts.getDraft(original.id))
+            assertEquals(
+                oldMapping,
+                refs.getDraftAssetScoped(original.id, block.id, "image", UploadScope(scope.owner, scope.origin)),
+                "A rejected stale-draft patch must not publish its downloaded media mapping",
+            )
         }
 
     private fun mapping(id: Uuid) = MediaSyncRef(id.toString(), local, "https://example.invalid/media/original", "original", 1)

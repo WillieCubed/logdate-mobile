@@ -1,16 +1,20 @@
 package app.logdate.client.sync.recovery
 
+import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.media.MediaManager
+import app.logdate.client.repository.journals.DraftRecoveryScope
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.mediaRefOrNull
+import app.logdate.client.sync.DraftAssetMapping
 import app.logdate.client.sync.DraftMediaHydrationResult
 import app.logdate.client.sync.MediaHydrationResult
 import app.logdate.client.sync.SyncMediaTransfer
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.MediaSyncRefStore
+import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableImageBlock
@@ -98,6 +102,14 @@ internal class NativeMediaRecovery(
         scope: DownloadScope,
     ) {
         val type = "MEDIA_NATIVE_DRAFT"
+        enqueueMissingDraftMedia(type, scope)
+        recoverPendingDraftMedia(accessToken, type, scope)
+    }
+
+    private suspend fun enqueueMissingDraftMedia(
+        type: String,
+        scope: DownloadScope,
+    ) {
         for (draft in drafts.getAllDraftsForSync()) {
             if (scope != inbox.currentScope()) return
             val references =
@@ -114,43 +126,139 @@ internal class NativeMediaRecovery(
                 inbox.enqueueNativeMedia(type, draft.id.toString(), draft.lastModifiedAt.toEpochMilliseconds(), "draft", scope)
             }
         }
+    }
+
+    private suspend fun recoverPendingDraftMedia(
+        accessToken: String,
+        type: String,
+        scope: DownloadScope,
+    ) {
         for (row in inbox.pending(type, scope)) {
             if (scope != inbox.currentScope()) return
-            try {
-                val id = Uuid.parse(row.entityId)
-                val draftScope = drafts.getDraftRecoveryScope()
-                val original = drafts.getDraftForRestore(id)
-                if (original == null) {
-                    inbox.applied(type, row.entityId, row.version, scope)
-                    continue
-                }
-                val result = transfer.hydrateDraftMedia(accessToken, original) { scope == inbox.currentScope() }
-                val (updated, mappings) =
-                    when (result) {
-                        is DraftMediaHydrationResult.Available -> result.draft to result.mappings
-                        is DraftMediaHydrationResult.Pending -> result.draft to result.mappings
-                    }
-                if (scope != inbox.currentScope()) return
-                mappings.forEach { mapping ->
-                    refs.upsertDraftAsset(
-                        mapping.draftId,
-                        mapping.blockId,
-                        mapping.kind,
-                        mapping.ref.copy(ownerId = scope.owner, serverOrigin = scope.origin),
-                    )
-                }
-                if (scope != inbox.currentScope()) return
-                if (!drafts.compareAndSetDraftForRestore(id, original, updated, draftScope, enqueue = false)) continue
-                if (scope != inbox.currentScope()) return
+            recoverDraftRow(accessToken, type, row, scope)
+        }
+    }
+
+    private suspend fun recoverDraftRow(
+        accessToken: String,
+        type: String,
+        row: DownloadInboxEntity,
+        scope: DownloadScope,
+    ) {
+        try {
+            val id = Uuid.parse(row.entityId)
+            val original = drafts.getDraftForRestore(id)
+            if (original == null) {
+                inbox.applied(type, row.entityId, row.version, scope)
+                return
+            }
+            val draftScope = drafts.getDraftRecoveryScope()
+            val result = transfer.hydrateDraftMedia(accessToken, original) { scope == inbox.currentScope() }
+            if (scope != inbox.currentScope()) return
+            val (updated, mappings) =
                 when (result) {
-                    is DraftMediaHydrationResult.Available -> inbox.applied(type, row.entityId, row.version, scope)
-                    is DraftMediaHydrationResult.Pending -> inbox.failed(type, row.entityId, result.reason.name, row.version, scope)
+                    is DraftMediaHydrationResult.Available -> result.draft to result.mappings
+                    is DraftMediaHydrationResult.Pending -> result.draft to result.mappings
                 }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                inbox.failed(type, row.entityId, DiagnosticReason.LOCAL_STORAGE.name, row.version, scope)
+            persistDraftHydration(id, original, draftScope, updated, mappings, result, row, type, scope)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            inbox.failed(type, row.entityId, DiagnosticReason.LOCAL_STORAGE.name, row.version, scope)
+        }
+    }
+
+    private suspend fun persistDraftHydration(
+        id: Uuid,
+        original: EditorDraft,
+        draftScope: DraftRecoveryScope?,
+        updated: EditorDraft,
+        mappings: List<DraftAssetMapping>,
+        result: DraftMediaHydrationResult,
+        row: DownloadInboxEntity,
+        type: String,
+        scope: DownloadScope,
+    ) {
+        transactions.withTransaction {
+            if (scope != inbox.currentScope() || !inbox.isCurrentVersion(type, row.entityId, row.version, scope)) {
+                return@withTransaction
+            }
+            val currentDraft = drafts.getDraftForRestore(id) ?: return@withTransaction
+            val draftToPersist = resolveDraftAfterHydration(original, currentDraft, updated, mappings) ?: return@withTransaction
+            mappings.forEach { mapping ->
+                if (scope != inbox.currentScope()) return@withTransaction
+                refs.upsertDraftAsset(
+                    mapping.draftId,
+                    mapping.blockId,
+                    mapping.kind,
+                    mapping.ref.copy(ownerId = scope.owner, serverOrigin = scope.origin),
+                )
+            }
+            if (!drafts.compareAndSetDraftForRestore(id, currentDraft, draftToPersist, draftScope, enqueue = false)) {
+                return@withTransaction
+            }
+            if (scope != inbox.currentScope() || !inbox.isCurrentVersion(type, row.entityId, row.version, scope)) {
+                return@withTransaction
+            }
+            when (result) {
+                is DraftMediaHydrationResult.Available -> inbox.applied(type, row.entityId, row.version, scope)
+                is DraftMediaHydrationResult.Pending -> inbox.failed(type, row.entityId, result.reason.name, row.version, scope)
             }
         }
+    }
+
+    private fun resolveDraftAfterHydration(
+        original: EditorDraft,
+        current: EditorDraft,
+        updated: EditorDraft,
+        mappings: List<DraftAssetMapping>,
+    ): EditorDraft? {
+        if (current == original) return updated
+        if (
+            mappings.isEmpty() ||
+            mappings.any { mapping ->
+                val originalReference = attachmentReference(original, mapping.blockId, mapping.kind)
+                originalReference.isNullOrBlank() || originalReference != attachmentReference(current, mapping.blockId, mapping.kind)
+            }
+        ) {
+            return null
+        }
+        return mappings.fold(current, ::applyRecoveredAttachment)
+    }
+
+    private fun attachmentReference(
+        draft: EditorDraft,
+        blockId: Uuid,
+        kind: String,
+    ): String? {
+        val block = draft.blocks.firstOrNull { it.id == blockId } ?: return null
+        return when (kind) {
+            "image" -> (block as? SerializableImageBlock)?.uri
+            "video" -> (block as? SerializableVideoBlock)?.uri
+            "thumbnail" -> (block as? SerializableVideoBlock)?.thumbnailUri
+            "audio" -> (block as? SerializableAudioBlock)?.uri
+            "camera" -> (block as? SerializableCameraBlock)?.uri
+            else -> null
+        }
+    }
+
+    private fun applyRecoveredAttachment(
+        draft: EditorDraft,
+        mapping: DraftAssetMapping,
+    ): EditorDraft {
+        val blocks = draft.blocks.toMutableList()
+        val index = blocks.indexOfFirst { it.id == mapping.blockId }
+        if (index < 0) return draft
+        val block = blocks[index]
+        blocks[index] =
+            when (mapping.kind) {
+                "image" -> (block as? SerializableImageBlock)?.copy(uri = mapping.ref.localUri) ?: block
+                "video" -> (block as? SerializableVideoBlock)?.copy(uri = mapping.ref.localUri) ?: block
+                "thumbnail" -> (block as? SerializableVideoBlock)?.copy(thumbnailUri = mapping.ref.localUri) ?: block
+                "audio" -> (block as? SerializableAudioBlock)?.copy(uri = mapping.ref.localUri) ?: block
+                "camera" -> (block as? SerializableCameraBlock)?.copy(uri = mapping.ref.localUri) ?: block
+                else -> block
+            }
+        return draft.copy(blocks = blocks)
     }
 }

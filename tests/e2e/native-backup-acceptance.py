@@ -44,6 +44,7 @@ USER_CONTENT_PATHS = (
     "./shared_prefs/logdate_widget_instances.xml",
 )
 RUNTIME_ONLY_PREFERENCES = {"android_platform_search_index_generation"}
+RUNTIME_ONLY_SNAPSHOT_PREFIXES = ("files/datastore/FirebaseHeartBeat",)
 
 
 def read_varint(data, offset):
@@ -245,9 +246,13 @@ def package_file_snapshot(serial):
 
 
 def assert_snapshot_preserved(before, after, *, require_database=True):
-    volatile_files = {"databases/logdate-wal", "databases/logdate-shm"}
-    before_durable = {path: value for path, value in before.items() if path not in volatile_files}
-    after_durable = {path: value for path, value in after.items() if path not in volatile_files}
+    def is_volatile(path):
+        return path in {"databases/logdate-wal", "databases/logdate-shm"} or path.startswith(
+            RUNTIME_ONLY_SNAPSHOT_PREFIXES
+        )
+
+    before_durable = {path: value for path, value in before.items() if not is_volatile(path)}
+    after_durable = {path: value for path, value in after.items() if not is_volatile(path)}
     if require_database and before.get("databases/logdate") is None:
         raise RuntimeError("snapshot has no journal database to preserve")
     if before_durable != after_durable:

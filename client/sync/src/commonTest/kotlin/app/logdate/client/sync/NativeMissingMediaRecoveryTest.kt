@@ -98,7 +98,7 @@ class NativeMissingMediaRecoveryTest {
             val inaccessible =
                 object : InMemoryMediaManager() {
                     override suspend fun exists(mediaId: String): Boolean =
-                        if (mediaId == stale) throw SecurityException("Permission revoked") else super.exists(mediaId)
+                        if (mediaId == stale) throw IllegalStateException("Permission revoked") else super.exists(mediaId)
                 }
             val note = JournalNote.Image(creationTimestamp = timestamp, lastUpdated = timestamp, mediaRef = stale)
             downloadedOwner = note.uid
