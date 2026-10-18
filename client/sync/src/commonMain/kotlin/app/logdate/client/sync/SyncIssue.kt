@@ -48,11 +48,12 @@ fun SyncStatus.issue(): SyncIssue? {
         SyncPausedReason.BACKGROUND_DATA_OFF -> return SyncIssue.Waiting.BackgroundData
         SyncPausedReason.MEDIA_WAITING_FOR_WIFI ->
             return if (backgroundWorkLimited) SyncIssue.Waiting.BackgroundData else SyncIssue.Waiting.WiFi
-        SyncPausedReason.NEEDS_RECOVERY_PHRASE -> return SyncIssue.Failure.JournalAccess
+        SyncPausedReason.NEEDS_RECOVERY_PHRASE -> return SyncIssue.Failure.KeyRecovery
         SyncPausedReason.NEEDS_DEVICE_LINK -> return SyncIssue.Failure.DeviceLink
         null -> Unit
     }
     if (!queueReadable) return SyncIssue.Failure.LocalData
+    if (lastError?.type == SyncErrorType.KEY_RECOVERY_ERROR) return SyncIssue.Failure.KeyRecovery
     if (requestState == BackupRequestState.RETRYING) return SyncIssue.Waiting.RetryBackoff
     when (lastError?.type) {
         SyncErrorType.AUTHENTICATION_ERROR -> return SyncIssue.Failure.SignIn
