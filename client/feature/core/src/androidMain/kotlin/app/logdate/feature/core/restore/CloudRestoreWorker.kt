@@ -42,17 +42,26 @@ class CloudRestoreWorker(
     private val enqueueRestore: (suspend (File) -> Unit)? = null,
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        if (!NativeRestoreWorkState(context, inputData, sessionStorage).isCurrent()) return Result.success()
-        pruneAbandonedCloudArchives(context)
-        var expectedSession =
-            sessionStorage.getOriginBoundSession()
-                ?: return if (sessionStorage.getSession() == null) Result.success() else Result.retry()
+        val workState = NativeRestoreWorkState(context, inputData, sessionStorage)
         val directory = context.noBackupFilesDir
         val encrypted = File(directory, "cloud-restore-$id.encrypted.part")
         val plaintextPart = File(directory, "cloud-restore-$id.plain.part")
         val archive = cloudArchiveFile(context, "cloud-restore", id)
         var preserveArchive = false
         return try {
+            when (workState.validation()) {
+                NativeRestoreWorkState.Validation.CURRENT -> Unit
+                NativeRestoreWorkState.Validation.STALE -> return Result.success()
+                NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> return Result.retry()
+            }
+            pruneAbandonedCloudArchives(context)
+            val sessionAvailable = sessionStorage.hasValidSession()
+            val sessionBoundWork =
+                inputData.getString(NativeRestoreWorkState.OWNER_KEY) != null ||
+                    inputData.getString(NativeRestoreWorkState.ORIGIN_KEY) != null
+            var expectedSession =
+                sessionStorage.getOriginBoundSession()
+                    ?: return if (sessionAvailable || sessionBoundWork) Result.retry() else Result.success()
             val deliveryId = inputData.getString(NativeRestoreWorkState.DELIVERY_KEY)
             if (deliveryId != null && hasActiveRestoreForDelivery(deliveryId, expectedSession)) return Result.success()
             val tokenRefresher = CloudBackupTokenRefresher(sessionStorage, cloudBackupDataSource)
@@ -82,7 +91,11 @@ class CloudRestoreWorker(
 
             try {
                 if (sessionStorage.getOriginBoundSession() != expectedSession) return Result.retry()
-                if (!NativeRestoreWorkState(context, inputData, sessionStorage).isCurrent()) return Result.success()
+                when (workState.validation()) {
+                    NativeRestoreWorkState.Validation.CURRENT -> Unit
+                    NativeRestoreWorkState.Validation.STALE -> return Result.success()
+                    NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> return Result.retry()
+                }
                 val custom = enqueueRestore
                 if (custom != null) custom(archive) else enqueueArchive(archive, expectedSession)
                 preserveArchive = true
