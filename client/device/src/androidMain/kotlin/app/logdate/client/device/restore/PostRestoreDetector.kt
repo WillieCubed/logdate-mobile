@@ -125,6 +125,16 @@ class PostRestoreDetector(
             }
         }
 
+    /** Detects a finished delivery when Android recreates the agent for a duplicate callback. */
+    fun hasCompletedNativeRestoreDelivery(): Boolean =
+        synchronized(lock) {
+            when (readDelivery()?.first) {
+                CONTENT_PRESENT, CONTENT_MISSING, CONTENT_COMPLETE -> true
+                RESTORE_IN_PROGRESS -> false
+                else -> !pendingRestoreFile().exists() && readRestoreFingerprints().isNotEmpty()
+            }
+        }
+
     fun acknowledgeContentRecovery(deliveryId: String): Boolean =
         synchronized(lock) {
             if (!isContentRecoveryCurrent(deliveryId)) return@synchronized false

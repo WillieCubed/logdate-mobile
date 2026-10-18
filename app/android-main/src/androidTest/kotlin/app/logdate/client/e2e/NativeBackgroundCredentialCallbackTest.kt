@@ -100,6 +100,31 @@ class NativeBackgroundCredentialCallbackTest {
     }
 
     @Test
+    fun `recreated backup agent retains tickets after a duplicate completion callback`() {
+        val observedAccountRecoveries = mutableListOf<String?>()
+
+        fun agent() =
+            object : NativeBackupAgent() {
+                override suspend fun restoreAccount(preferences: DataStore<Preferences>) {
+                    observedAccountRecoveries += PostRestoreDetector(context).pendingAccountRecoveryId()
+                }
+            }.also { it.initialize(context) }
+
+        val firstAgent = agent()
+
+        firstAgent.onRestoreFinished()
+        val delivery = assertNotNull(PostRestoreDetector(context).pendingContentRecoveryId())
+        val account = assertNotNull(PostRestoreDetector(context).pendingAccountRecoveryId())
+        val media = assertNotNull(PostRestoreDetector(context).pendingMediaQuarantineId())
+        agent().onRestoreFinished()
+
+        assertEquals(listOf<String?>(account, account), observedAccountRecoveries)
+        assertEquals(delivery, PostRestoreDetector(context).pendingContentRecoveryId())
+        assertEquals(account, PostRestoreDetector(context).pendingAccountRecoveryId())
+        assertEquals(media, PostRestoreDetector(context).pendingMediaQuarantineId())
+    }
+
+    @Test
     fun `duplicate completion retries an interrupted installation identity reset`() {
         val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
         withPreferences { preferences ->
