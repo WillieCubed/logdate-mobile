@@ -20,6 +20,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.io.files.Path
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.Executor
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
@@ -43,77 +44,84 @@ class CloudRestoreWorker(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val workState = NativeRestoreWorkState(context, inputData, sessionStorage)
-        val directory = context.noBackupFilesDir
-        val encrypted = File(directory, "cloud-restore-$id.encrypted.part")
-        val plaintextPart = File(directory, "cloud-restore-$id.plain.part")
-        val archive = cloudArchiveFile(context, "cloud-restore", id)
-        var preserveArchive = false
+        val files = CloudRestoreFiles(context, id)
         return try {
-            when (workState.validation()) {
-                NativeRestoreWorkState.Validation.CURRENT -> Unit
-                NativeRestoreWorkState.Validation.STALE -> return Result.success()
-                NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> return Result.retry()
-            }
-            pruneAbandonedCloudArchives(context)
-            val sessionAvailable = sessionStorage.hasValidSession()
-            val sessionBoundWork =
-                inputData.getString(NativeRestoreWorkState.OWNER_KEY) != null ||
-                    inputData.getString(NativeRestoreWorkState.ORIGIN_KEY) != null
-            var expectedSession =
-                sessionStorage.getOriginBoundSession()
-                    ?: return if (sessionAvailable || sessionBoundWork) Result.retry() else Result.success()
-            val deliveryId = inputData.getString(NativeRestoreWorkState.DELIVERY_KEY)
-            if (deliveryId != null && hasActiveRestoreForDelivery(deliveryId, expectedSession)) return Result.success()
-            val tokenRefresher = CloudBackupTokenRefresher(sessionStorage, cloudBackupDataSource)
-            val listResult = tokenRefresher.execute(expectedSession) { accessToken -> cloudBackupDataSource.listBackups(accessToken) }
-            expectedSession = listResult.session
-            val backup =
-                listResult.result
-                    .getOrElse {
-                        Napier.w("CloudRestoreWorker: unable to list backups")
-                        return Result.retry()
-                    }.maxByOrNull { it.createdAt }
-            if (backup == null) {
-                return if (NativeRestoreWorkState(context, inputData, sessionStorage).complete(expectedSession)) {
-                    Result.success()
-                } else {
-                    Result.retry()
-                }
-            }
-
-            encrypted.delete()
-            plaintextPart.delete()
-            archive.delete()
-            if (sessionStorage.getOriginBoundSession() != expectedSession) return Result.retry()
-            expectedSession =
-                downloadAndDecrypt(tokenRefresher, expectedSession, backup.id, encrypted, plaintextPart, archive)
-                    ?: return Result.retry()
-
-            try {
-                if (sessionStorage.getOriginBoundSession() != expectedSession) return Result.retry()
-                when (workState.validation()) {
-                    NativeRestoreWorkState.Validation.CURRENT -> Unit
-                    NativeRestoreWorkState.Validation.STALE -> return Result.success()
-                    NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> return Result.retry()
-                }
-                val custom = enqueueRestore
-                if (custom != null) custom(archive) else enqueueArchive(archive, expectedSession)
-                preserveArchive = true
-            } catch (cancellation: CancellationException) {
-                preserveArchive = true
-                throw cancellation
-            }
-            Result.success()
+            restoreLatestArchive(workState, files)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Throwable) {
             Napier.w("CloudRestoreWorker: restore handoff failed")
             Result.retry()
         } finally {
-            encrypted.delete()
-            plaintextPart.delete()
-            if (!preserveArchive) archive.delete()
+            files.cleanup()
         }
+    }
+
+    private suspend fun restoreLatestArchive(
+        workState: NativeRestoreWorkState,
+        files: CloudRestoreFiles,
+    ): Result {
+        when (workState.validation()) {
+            NativeRestoreWorkState.Validation.CURRENT -> Unit
+            NativeRestoreWorkState.Validation.STALE -> return Result.success()
+            NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> return Result.retry()
+        }
+        pruneAbandonedCloudArchives(context)
+        val sessionAvailable = sessionStorage.hasValidSession()
+        val sessionBoundWork =
+            inputData.getString(NativeRestoreWorkState.OWNER_KEY) != null ||
+                inputData.getString(NativeRestoreWorkState.ORIGIN_KEY) != null
+        var expectedSession =
+            sessionStorage.getOriginBoundSession()
+                ?: return if (sessionAvailable || sessionBoundWork) Result.retry() else Result.success()
+        val deliveryId = inputData.getString(NativeRestoreWorkState.DELIVERY_KEY)
+        if (deliveryId != null && hasActiveRestoreForDelivery(deliveryId, expectedSession)) return Result.success()
+        val tokenRefresher = CloudBackupTokenRefresher(sessionStorage, cloudBackupDataSource)
+        val listResult = tokenRefresher.execute(expectedSession) { accessToken -> cloudBackupDataSource.listBackups(accessToken) }
+        expectedSession = listResult.session
+        val backup =
+            listResult.result
+                .getOrElse {
+                    Napier.w("CloudRestoreWorker: unable to list backups")
+                    return Result.retry()
+                }.maxByOrNull { it.createdAt }
+        if (backup == null) return acknowledgeEmptyBackupList(expectedSession)
+
+        files.clearBeforeDownload()
+        if (sessionStorage.getOriginBoundSession() != expectedSession) return Result.retry()
+        expectedSession =
+            downloadAndDecrypt(tokenRefresher, expectedSession, backup.id, files.encrypted, files.plaintextPart, files.archive)
+                ?: return Result.retry()
+        return handoffArchive(workState, files, expectedSession)
+    }
+
+    private suspend fun acknowledgeEmptyBackupList(session: OriginBoundSession): Result =
+        if (NativeRestoreWorkState(context, inputData, sessionStorage).complete(session)) {
+            Result.success()
+        } else {
+            Result.retry()
+        }
+
+    private suspend fun handoffArchive(
+        workState: NativeRestoreWorkState,
+        files: CloudRestoreFiles,
+        session: OriginBoundSession,
+    ): Result {
+        try {
+            if (sessionStorage.getOriginBoundSession() != session) return Result.retry()
+            when (workState.validation()) {
+                NativeRestoreWorkState.Validation.CURRENT -> Unit
+                NativeRestoreWorkState.Validation.STALE -> return Result.success()
+                NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> return Result.retry()
+            }
+            val custom = enqueueRestore
+            if (custom != null) custom(files.archive) else enqueueArchive(files.archive, session)
+            files.preserveArchive = true
+        } catch (cancellation: CancellationException) {
+            files.preserveArchive = true
+            throw cancellation
+        }
+        return Result.success()
     }
 
     private suspend fun enqueueArchive(
@@ -190,6 +198,29 @@ class CloudRestoreWorker(
     companion object {
         const val WORK_NAME = "logdate:cloud:restore"
         const val WORK_TAG = "logdate:cloud:restore"
+    }
+}
+
+private class CloudRestoreFiles(
+    context: Context,
+    workerId: UUID,
+) {
+    private val directory = context.noBackupFilesDir
+    val encrypted = File(directory, "cloud-restore-$workerId.encrypted.part")
+    val plaintextPart = File(directory, "cloud-restore-$workerId.plain.part")
+    val archive = cloudArchiveFile(context, "cloud-restore", workerId)
+    var preserveArchive = false
+
+    fun clearBeforeDownload() {
+        encrypted.delete()
+        plaintextPart.delete()
+        archive.delete()
+    }
+
+    fun cleanup() {
+        encrypted.delete()
+        plaintextPart.delete()
+        if (!preserveArchive) archive.delete()
     }
 }
 

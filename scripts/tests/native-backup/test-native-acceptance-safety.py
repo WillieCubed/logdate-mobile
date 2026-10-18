@@ -581,7 +581,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
     def test_credentials_only_acceptance_detects_nested_media_file_paths(self):
         self.assertTrue(HARNESS.contains_media_files({"files/media/objects/sha256/photo.jpg": {"bytes": 1}}))
         self.assertTrue(HARNESS.contains_media_files({b"./files/audio_notes/recording.m4a": {"bytes": 1}}))
-        self.assertTrue(HARNESS.contains_media_files({"files/camera-captures/original.jpg": {"bytes": 1}}))
+        self.assertTrue(HARNESS.contains_media_files({"files/camera-captures/logdate-camera-unfinished.mp4": {"bytes": 1}}))
         self.assertFalse(HARNESS.contains_media_files({"files/datastore/preferences": {"bytes": 1}}))
 
     def test_credentials_only_fixture_rejects_missing_database_recovery_key(self):

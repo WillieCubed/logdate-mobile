@@ -337,6 +337,7 @@ class NativeBackupTransferProbeTest {
                 if (arguments.getString("sourceRecordingTransferFixture") == "true") {
                     verifyRecordingTransferFixture(context)
                 }
+                fixture.assertNoUnfinishedCameraCaptureTransferred(context)
                 if (mode == "partial-media") {
                     fixture.verifyPartialTransfer(requireNotNull(arguments.getString("expectedMissingMediaPath")))
                     return@runBlocking
@@ -503,6 +504,9 @@ private class NativeJournalFixture(
         val now = Clock.System.now()
         notes.create(JournalNote.Text(id(3), now, now, "Text retained through native backup"), id(1))
         links.addContentToJournal(id(3), id(2))
+        val unfinishedCapture = File(context.filesDir, "camera-captures/logdate-camera-unfinished.mp4")
+        check(unfinishedCapture.parentFile?.mkdirs() == true || unfinishedCapture.parentFile?.isDirectory == true)
+        unfinishedCapture.writeBytes("unfinished camera output".encodeToByteArray())
         val image = save("proof.png", "image/png")
         val audio = save("proof.wav", "audio/wav")
         val video = save("proof.mp4", "video/mp4")
@@ -570,6 +574,13 @@ private class NativeJournalFixture(
         verifyMedia(assertNotNull((draft.blocks[1] as? SerializableImageBlock)?.uri), "proof.png")
         verifyMedia(assertNotNull((draft.blocks[2] as? SerializableAudioBlock)?.uri), "proof.wav")
         verifyMedia(assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri), "proof.mp4")
+    }
+
+    fun assertNoUnfinishedCameraCaptureTransferred(context: android.content.Context) {
+        assertFalse(
+            File(context.filesDir, "camera-captures/logdate-camera-unfinished.mp4").exists(),
+            "unfinished CameraX output was transferred",
+        )
     }
 
     suspend fun verifyPartialTransfer(expectedMissingMediaPath: String) {
