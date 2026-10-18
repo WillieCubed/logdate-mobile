@@ -239,28 +239,7 @@ class AndroidAudioRecordingManager(
             return false
         }
         sessionGeneration++
-        val target =
-            try {
-                audioStorage.createRecordingTarget()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Napier.e("Could not create a recording target", e)
-                return false
-            }
-        val targetAccepted =
-            try {
-                onTargetReady(target.path)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (e: Exception) {
-                Napier.e("Could not persist the recording target", e)
-                false
-            }
-        if (!targetAccepted) {
-            Napier.w("Recording was not started because its draft target could not be saved")
-            return false
-        }
+        val target = prepareRecordingTarget(audioStorage, onTargetReady) ?: return false
         recordingTarget = target
         sessionTargetNoteId = targetNoteId
         recordingTranscriptSession =
@@ -773,4 +752,31 @@ class AndroidAudioRecordingManager(
          */
         val DEFAULT_START_TIMEOUT: Duration = 10.seconds
     }
+}
+
+private suspend fun prepareRecordingTarget(
+    audioStorage: AudioStorage,
+    onTargetReady: suspend (String) -> Boolean,
+): AudioRecordingTarget? {
+    val target =
+        try {
+            audioStorage.createRecordingTarget()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.e("Could not create a recording target", error)
+            return null
+        }
+    val accepted =
+        try {
+            onTargetReady(target.path)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.e("Could not persist the recording target", error)
+            false
+        }
+    if (accepted) return target
+    Napier.w("Recording was not started because its draft target could not be saved")
+    return null
 }

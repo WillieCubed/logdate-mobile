@@ -270,9 +270,13 @@ class ArchiveMediaRecoveryE2ETest {
                 .single()
                 .uri
         val mediaObjectsBeforeReplay = mediaObjectPaths()
+        val recordedMediaImported =
+            JSONObject(context.filesDir.resolve("archive_recovery/records/${state.getString("recoveryId")}.json").readText())
+                .getJSONObject("summary")
+                .getInt("mediaImported")
         val completed = summary(worker(File(state.getString("originalSource")), state.getString("recoveryId")).doWork())
         assertEquals(0, completed.unavailableOriginals)
-        assertEquals(0, completed.mediaImported, "replaying completed recovery must not import attachments again")
+        assertEquals(recordedMediaImported, completed.mediaImported, "replay must not change the cumulative imported-media count")
         assertEquals(photoBeforeReplay, assertIs<JournalNote.Image>(notes.getNoteById(state.id("note"))).mediaRef)
         assertEquals(
             videoBeforeReplay,

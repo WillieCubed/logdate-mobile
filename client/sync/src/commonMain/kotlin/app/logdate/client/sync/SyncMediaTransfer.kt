@@ -217,22 +217,9 @@ internal class SyncMediaTransfer(
         if (!mayDownload()) throw DraftMediaFailure(DiagnosticReason.NETWORK_POLICY)
         val mediaId = extractMediaId(remote) ?: throw DraftMediaFailure(DiagnosticReason.MISSING_MEDIA)
         val downloaded =
-            try {
-                cloudMediaDataSource.downloadMedia(accessToken, mediaId).getOrThrow()
-            } catch (
-                cancelled: CancellationException,
-            ) {
-                throw cancelled
-            } catch (error: Exception) {
-                throw DraftMediaFailure(
-                    when {
-                        error is IdentityKeyNotFoundException -> DiagnosticReason.KEY_RECOVERY_REQUIRED
-                        error is CloudApiException && error.statusCode == 404 -> DiagnosticReason.MISSING_MEDIA
-                        error is CloudApiException && error.statusCode == 401 -> DiagnosticReason.SIGN_IN_REQUIRED
-                        error is app.logdate.client.sync.cloud.MediaDecryptionException -> DiagnosticReason.CORRUPT_PAYLOAD
-                        else -> DiagnosticReason.UNKNOWN
-                    },
-                )
+            downloadMedia(accessToken, mediaId).getOrElse { error ->
+                if (error is CancellationException) throw error
+                throw DraftMediaFailure(mediaFailureReason(error))
             }
         if (downloaded.contentId != blockId) throw DraftMediaFailure(DiagnosticReason.CORRUPT_PAYLOAD)
         if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
@@ -383,20 +370,9 @@ internal class SyncMediaTransfer(
         if (!mayDownload()) return MediaHydrationResult.Pending(DiagnosticReason.NETWORK_POLICY)
         val mediaId = extractMediaId(remote) ?: return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
         val downloaded =
-            try {
-                cloudMediaDataSource.downloadMedia(accessToken, mediaId).getOrThrow()
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                val reason =
-                    when {
-                        error is IdentityKeyNotFoundException -> DiagnosticReason.KEY_RECOVERY_REQUIRED
-                        error is CloudApiException && error.statusCode == 404 -> DiagnosticReason.MISSING_MEDIA
-                        error is CloudApiException && error.statusCode == 401 -> DiagnosticReason.SIGN_IN_REQUIRED
-                        error is app.logdate.client.sync.cloud.MediaDecryptionException -> DiagnosticReason.CORRUPT_PAYLOAD
-                        else -> DiagnosticReason.UNKNOWN
-                    }
-                return MediaHydrationResult.Pending(reason)
+            downloadMedia(accessToken, mediaId).getOrElse { error ->
+                if (error is CancellationException) throw error
+                return MediaHydrationResult.Pending(mediaFailureReason(error))
             }
         if (downloaded.contentId != note.uid) return MediaHydrationResult.Pending(DiagnosticReason.CORRUPT_PAYLOAD)
         if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
@@ -443,6 +419,20 @@ internal class SyncMediaTransfer(
             ?.takeIf { it.remoteUrl == reference || matchesLocalFile(it, reference) }
             ?.localUri
             ?.takeIf { originalAvailable(it, reference) }
+
+    private suspend fun downloadMedia(
+        accessToken: String,
+        mediaId: String,
+    ) = cloudMediaDataSource.downloadMedia(accessToken, mediaId)
+
+    private fun mediaFailureReason(error: Throwable): DiagnosticReason =
+        when {
+            error is IdentityKeyNotFoundException -> DiagnosticReason.KEY_RECOVERY_REQUIRED
+            error is CloudApiException && error.statusCode == 404 -> DiagnosticReason.MISSING_MEDIA
+            error is CloudApiException && error.statusCode == 401 -> DiagnosticReason.SIGN_IN_REQUIRED
+            error is app.logdate.client.sync.cloud.MediaDecryptionException -> DiagnosticReason.CORRUPT_PAYLOAD
+            else -> DiagnosticReason.UNKNOWN
+        }
 
     private fun matchesLocalFile(
         mapping: MediaSyncRef,

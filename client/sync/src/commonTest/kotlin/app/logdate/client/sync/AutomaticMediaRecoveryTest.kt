@@ -18,9 +18,11 @@ import app.logdate.client.sync.test.FakeSessionStorage
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.diagnostics.DiagnosticReason
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -32,6 +34,7 @@ class AutomaticMediaRecoveryTest {
     private val media = InMemoryMediaManager()
     private val id = Uuid.random()
     private var downloads = 0
+    private var cancelDownload = false
     private var rejectExpired = false
     private var refreshes = 0
     private val accounts =
@@ -64,6 +67,7 @@ class AutomaticMediaRecoveryTest {
                 mediaId: String,
             ): Result<MediaFile> {
                 downloads++
+                if (cancelDownload) throw CancellationException("media recovery cancelled")
                 if (rejectExpired && accessToken == "test-access-token") {
                     return Result.failure(
                         app.logdate.client.sync.cloud
@@ -213,6 +217,16 @@ class AutomaticMediaRecoveryTest {
                 recovery().recover(id, null, "image", "$origin/media/original", "missing", scope),
             )
             assertEquals(0, downloads)
+        }
+
+    @Test
+    fun `cancellation stops missing media recovery instead of reporting a retryable failure`() =
+        runTest {
+            cancelDownload = true
+            assertFailsWith<CancellationException> {
+                recovery().recover(id, null, "image", "$origin/media/original", "missing", scope)
+            }
+            assertEquals(1, downloads)
         }
 
     @Test
