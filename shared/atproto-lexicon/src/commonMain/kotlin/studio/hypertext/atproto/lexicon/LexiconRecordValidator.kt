@@ -8,13 +8,21 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
+import studio.hypertext.atproto.lexicon.data.BLOB_TYPE
+import studio.hypertext.atproto.lexicon.data.BYTES_KEY
+import studio.hypertext.atproto.lexicon.data.LINK_KEY
+import studio.hypertext.atproto.lexicon.data.TYPE_KEY
+import studio.hypertext.atproto.lexicon.data.bytesBase64
+import studio.hypertext.atproto.lexicon.data.singleString
+import studio.hypertext.atproto.lexicon.data.string
 import studio.hypertext.atproto.syntax.AtUri
+import studio.hypertext.atproto.syntax.Datetime
 import studio.hypertext.atproto.syntax.Did
 import studio.hypertext.atproto.syntax.Handle
+import studio.hypertext.atproto.syntax.LanguageTag
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 import studio.hypertext.atproto.syntax.Tid
-import kotlin.io.encoding.Base64
 
 /**
  * Checks records against their lexicon schemas.
@@ -31,16 +39,16 @@ public class LexiconRecordValidator(
         collection: Nsid,
         record: JsonObject,
     ): LexiconValidationResult {
-        val issues = mutableListOf<LexiconValidationIssue>()
         val definition = registry.resolve(LexiconReference(collection, MAIN_DEFINITION_NAME))
-        val schema = definition?.record
-        if (definition?.type != LexiconType.RECORD || schema == null) {
-            issues += LexiconValidationIssue("", "$collection isn't a known record type")
-            return LexiconValidationResult(issues)
-        }
-        val type = record[TYPE_KEY]
-        if (type != null && type.stringOrNull() != collection.toString()) {
-            issues += LexiconValidationIssue(TYPE_KEY, "${type.stringOrNull() ?: type.display()} doesn't match the collection $collection")
+        val schema =
+            definition?.record?.takeIf { definition.type == LexiconType.RECORD }
+                ?: return LexiconValidationResult(listOf(LexiconValidationIssue("", "$collection isn't a known record type")))
+        val issues = mutableListOf<LexiconValidationIssue>()
+        record[TYPE_KEY]?.let { type ->
+            val name = type.stringOrNull()
+            if (name != collection.toString()) {
+                issues += LexiconValidationIssue(TYPE_KEY, "${name ?: type.display()} doesn't match the collection $collection")
+            }
         }
         Check(issues).value("", record, schema)
         return LexiconValidationResult(issues)
@@ -92,16 +100,14 @@ public class LexiconRecordValidator(
             field: LexiconField,
         ) {
             val text = value.stringOrNull() ?: return report(path, "expected a string")
-            val bytes = text.encodeToByteArray().size.toLong()
-            field.maxLength?.let { if (bytes > it) report(path, "longer than $it bytes") }
-            field.minLength?.let { if (bytes < it) report(path, "shorter than $it bytes") }
+            if (field.maxLength != null || field.minLength != null) byteLength(path, utf8Length(text), field)
             if (field.maxGraphemes != null || field.minGraphemes != null) {
                 val graphemes = graphemeCount(text).toLong()
                 field.maxGraphemes?.let { if (graphemes > it) report(path, "longer than $it graphemes") }
                 field.minGraphemes?.let { if (graphemes < it) report(path, "shorter than $it graphemes") }
             }
             field.format?.let { format -> if (!matchesFormat(format, text)) report(path, "not a valid $format") }
-            closedValues(path, value, field)
+            closedValues(path, value as JsonPrimitive, field)
         }
 
         private fun integerValue(
@@ -109,11 +115,11 @@ public class LexiconRecordValidator(
             value: JsonElement,
             field: LexiconField,
         ) {
-            val number = (value as? JsonPrimitive)?.takeIf { !it.isString && it.content.all { c -> c.isDigit() || c == '-' } }?.longOrNull
-            if (number == null) return report(path, "expected an integer")
+            val primitive = value as? JsonPrimitive
+            val number = primitive?.takeUnless { it.isString }?.content?.toLongOrNull() ?: return report(path, "expected an integer")
             field.minimum?.let { if (number < it) report(path, "less than the minimum of $it") }
             field.maximum?.let { if (number > it) report(path, "more than the maximum of $it") }
-            closedValues(path, value, field)
+            closedValues(path, primitive, field)
         }
 
         private fun booleanValue(
@@ -121,16 +127,17 @@ public class LexiconRecordValidator(
             value: JsonElement,
             field: LexiconField,
         ) {
-            if ((value as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull == null) return report(path, "expected a boolean")
-            closedValues(path, value, field)
+            val primitive = value as? JsonPrimitive
+            if (primitive?.takeUnless { it.isString }?.booleanOrNull == null) return report(path, "expected a boolean")
+            closedValues(path, primitive, field)
         }
 
         private fun closedValues(
             path: String,
-            value: JsonElement,
+            value: JsonPrimitive,
             field: LexiconField,
         ) {
-            val content = (value as JsonPrimitive).content
+            val content = value.content
             field.closedValues?.let { allowed ->
                 if (content !in allowed) report(path, "${value.display()} isn't one of the allowed values")
             }
@@ -158,20 +165,21 @@ public class LexiconRecordValidator(
             value: JsonElement,
             field: LexiconField,
         ) {
-            val blob = value as? JsonObject
-            val mimeType = blob?.get("mimeType")?.stringOrNull()
-            val size = (blob?.get("size") as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull
-            val valid =
-                blob?.get(TYPE_KEY)?.stringOrNull() == BLOB_TYPE &&
-                    blob["ref"]?.singleString(LINK_KEY) != null &&
-                    !mimeType.isNullOrEmpty() &&
-                    size != null &&
-                    size >= 0
-            if (!valid) return report(path, "not a valid blob")
-            if (field.accept.isNotEmpty() && field.accept.none { mimeMatches(it, mimeType!!) }) {
+            val blob = value as? JsonObject ?: return report(path, "not a valid blob")
+            val mimeType = blob.string("mimeType")
+            val size = (blob["size"] as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull
+            if (blob.string(TYPE_KEY) != BLOB_TYPE ||
+                blob["ref"]?.singleString(LINK_KEY) == null ||
+                mimeType.isNullOrEmpty() ||
+                size == null ||
+                size < 0
+            ) {
+                return report(path, "not a valid blob")
+            }
+            if (field.accept.isNotEmpty() && field.accept.none { mimeMatches(it, mimeType) }) {
                 report(path, "$mimeType isn't an accepted type")
             }
-            field.maxSize?.let { if (size!! > it) report(path, "$size bytes is more than the maximum of $it") }
+            field.maxSize?.let { if (size > it) report(path, "$size bytes is more than the maximum of $it") }
         }
 
         private fun bytesValue(
@@ -182,8 +190,16 @@ public class LexiconRecordValidator(
             val decoded =
                 value.singleString(BYTES_KEY)?.let { encoded -> runCatching { bytesBase64.decode(encoded) }.getOrNull() }
                     ?: return report(path, "not valid bytes")
-            field.maxLength?.let { if (decoded.size > it) report(path, "longer than $it bytes") }
-            field.minLength?.let { if (decoded.size < it) report(path, "shorter than $it bytes") }
+            byteLength(path, decoded.size.toLong(), field)
+        }
+
+        private fun byteLength(
+            path: String,
+            length: Long,
+            field: LexiconField,
+        ) {
+            field.maxLength?.let { if (length > it) report(path, "longer than $it bytes") }
+            field.minLength?.let { if (length < it) report(path, "shorter than $it bytes") }
         }
 
         private fun refValue(
@@ -191,8 +207,8 @@ public class LexiconRecordValidator(
             value: JsonElement,
             reference: LexiconReference,
         ) {
-            val target = registry.resolve(reference) ?: return report(path, "the schema refers to ${reference.label()}, which isn't known")
-            value(path, value, target.asField())
+            val target = registry.resolve(reference) ?: return report(path, "the schema refers to ${reference.label}, which isn't known")
+            value(path, value, if (target.type == LexiconType.RECORD) requireNotNull(target.record) else target.asField)
         }
 
         private fun unionValue(
@@ -202,7 +218,7 @@ public class LexiconRecordValidator(
         ) {
             if (value !is JsonObject) return report(path, "expected an object")
             val type = value[TYPE_KEY]?.stringOrNull() ?: return report(path, "a union member must have a $TYPE_KEY")
-            val member = field.refs.firstOrNull { it.unionTypeId() == type }
+            val member = field.refs.firstOrNull { it.isUnionType(type) }
             when {
                 member != null -> refValue(path, value, member)
                 field.closed -> report(path, "$TYPE_KEY $type isn't allowed in this closed union")
@@ -216,50 +232,9 @@ public class LexiconRecordValidator(
             issues += LexiconValidationIssue(path, message)
         }
     }
-
-    private companion object {
-        const val TYPE_KEY = "\$type"
-        const val LINK_KEY = "\$link"
-        const val BYTES_KEY = "\$bytes"
-        const val BLOB_TYPE = "blob"
-        val bytesBase64 = Base64.Default.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
-    }
 }
 
-private fun LexiconDefinition.asField(): LexiconField =
-    when (type) {
-        LexiconType.RECORD -> requireNotNull(record)
-        else ->
-            LexiconField(
-                type = type,
-                properties = properties,
-                items = items,
-                reference = reference,
-                knownValues = knownValues,
-                refs = refs,
-                closed = closed,
-                accept = accept,
-                maxSize = maxSize,
-                minLength = minLength,
-                maxLength = maxLength,
-                format = format,
-                minGraphemes = minGraphemes,
-                maxGraphemes = maxGraphemes,
-                minimum = minimum,
-                maximum = maximum,
-                closedValues = closedValues,
-                constValue = constValue,
-            )
-    }
-
-private fun LexiconReference.label(): String = "$documentId#$definitionName"
-
-private fun LexiconReference.unionTypeId(): String =
-    if (definitionName == MAIN_DEFINITION_NAME) documentId.toString() else "$documentId#$definitionName"
-
 private fun JsonElement.stringOrNull(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
-
-private fun JsonElement.singleString(key: String): String? = (this as? JsonObject)?.takeIf { it.size == 1 }?.get(key)?.stringOrNull()
 
 private fun JsonElement.display(): String = if (this is JsonPrimitive && isString) "\"$content\"" else toString()
 
@@ -268,12 +243,7 @@ private fun mimeMatches(
     mimeType: String,
 ): Boolean = pattern == "*/*" || pattern == mimeType || (pattern.endsWith("/*") && mimeType.startsWith(pattern.dropLast(1)))
 
-private val datetimePattern =
-    Regex(
-        "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:([0-5]\\d|60)(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$",
-    )
 private val uriPattern = Regex("^[A-Za-z][A-Za-z0-9+.-]*:\\S+$")
-private val languagePattern = Regex("^[A-Za-z]{1,8}(-[A-Za-z0-9]{1,8})*$")
 private val cidPattern = Regex("^[A-Za-z0-9+=]{8,256}$")
 
 private fun matchesFormat(
@@ -281,16 +251,15 @@ private fun matchesFormat(
     value: String,
 ): Boolean =
     when (format) {
-        // RFC 3339 with a time zone, as the AT Protocol requires; "-00:00" means "unknown" and isn't allowed.
-        "datetime" -> datetimePattern.matches(value) && !value.endsWith("-00:00")
+        "datetime" -> Datetime.isValid(value)
         "uri" -> uriPattern.matches(value)
         "at-uri" -> AtUri.isValid(value)
         "did" -> Did.isValid(value)
         "handle" -> Handle.isValid(value)
-        "at-identifier" -> Did.isValid(value) || Handle.isValid(value)
+        "at-identifier" -> if (value.startsWith("did:")) Did.isValid(value) else Handle.isValid(value)
         "nsid" -> Nsid.isValid(value)
         "cid" -> cidPattern.matches(value)
-        "language" -> languagePattern.matches(value)
+        "language" -> LanguageTag.isValid(value)
         "tid" -> Tid.isValid(value)
         "record-key" -> RecordKey.isValid(value)
         // A format this version doesn't know, from a newer schema, isn't held against the record.
@@ -302,19 +271,13 @@ private fun matchesFormat(
  * zero-width-joined emoji sequences, emoji modifiers and variation selectors, tag sequences,
  * regional-indicator flag pairs, and CRLF each stay part of the character before them.
  */
-internal fun graphemeCount(text: String): Int {
+private fun graphemeCount(text: String): Int {
     var count = 0
     var index = 0
     var previous = -1
     var regionalRun = 0
     while (index < text.length) {
-        val high = text[index]
-        val codePoint =
-            if (high.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate()) {
-                ((high.code - 0xD800) shl 10) + (text[index + 1].code - 0xDC00) + 0x10000
-            } else {
-                high.code
-            }
+        val codePoint = codePointAt(text, index)
         index += if (codePoint > 0xFFFF) 2 else 1
 
         val regional = codePoint in 0x1F1E6..0x1F1FF
@@ -341,8 +304,36 @@ private fun extendsCharacter(codePoint: Int): Boolean =
         codePoint in 0xFE00..0xFE0F || codePoint in 0xE0100..0xE01EF -> true
         codePoint in 0x1F3FB..0x1F3FF -> true
         codePoint in 0xE0020..0xE007F -> true
-        codePoint <= 0xFFFF ->
-            codePoint.toChar().category in
-                setOf(CharCategory.NON_SPACING_MARK, CharCategory.ENCLOSING_MARK, CharCategory.COMBINING_SPACING_MARK)
+        codePoint <= 0xFFFF -> codePoint.toChar().category in markCategories
         else -> false
     }
+
+private val markCategories = setOf(CharCategory.NON_SPACING_MARK, CharCategory.ENCLOSING_MARK, CharCategory.COMBINING_SPACING_MARK)
+
+// commonMain has no String.codePointAt.
+private fun codePointAt(
+    text: String,
+    index: Int,
+): Int {
+    val high = text[index]
+    if (!high.isHighSurrogate() || index + 1 >= text.length || !text[index + 1].isLowSurrogate()) return high.code
+    return ((high.code - 0xD800) shl 10) + (text[index + 1].code - 0xDC00) + 0x10000
+}
+
+// The UTF-8 length of the text, counted without encoding it.
+private fun utf8Length(text: String): Long {
+    var bytes = 0L
+    var index = 0
+    while (index < text.length) {
+        val codePoint = codePointAt(text, index)
+        index += if (codePoint > 0xFFFF) 2 else 1
+        bytes +=
+            when {
+                codePoint < 0x80 -> 1
+                codePoint < 0x800 -> 2
+                codePoint <= 0xFFFF -> 3
+                else -> 4
+            }
+    }
+    return bytes
+}

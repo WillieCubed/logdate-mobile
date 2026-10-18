@@ -48,3 +48,17 @@ public class InvalidTidException(
 public class InvalidAtUriException(
     value: String,
 ) : AtprotoSyntaxException("Invalid AT URI: $value")
+
+/**
+ * Thrown when a datetime isn't in the AT Protocol's RFC 3339 form.
+ */
+public class InvalidDatetimeException(
+    value: String,
+) : AtprotoSyntaxException("Invalid datetime: $value")
+
+/**
+ * Thrown when a language tag isn't a well-formed BCP 47 tag.
+ */
+public class InvalidLanguageTagException(
+    value: String,
+) : AtprotoSyntaxException("Invalid language tag: $value")

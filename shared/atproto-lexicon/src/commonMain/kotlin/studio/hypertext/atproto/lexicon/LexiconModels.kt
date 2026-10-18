@@ -49,6 +49,32 @@ public data class LexiconDefinition(
     /** The record-key rule of a `record` definition, or null when it's missing or malformed. */
     val recordKey: LexiconRecordKey?
         get() = keyRule?.let(LexiconRecordKey::parse)
+
+    /** This definition's value shape as a field, for code that checks fields and named definitions alike. */
+    internal val asField: LexiconField by lazy {
+        LexiconField(
+            type = type,
+            description = description,
+            properties = properties,
+            items = items,
+            reference = reference,
+            knownValues = knownValues,
+            refs = refs,
+            closed = closed,
+            accept = accept,
+            maxSize = maxSize,
+            minLength = minLength,
+            maxLength = maxLength,
+            unsupportedType = unsupportedType,
+            format = format,
+            minGraphemes = minGraphemes,
+            maxGraphemes = maxGraphemes,
+            minimum = minimum,
+            maximum = maximum,
+            closedValues = closedValues,
+            constValue = constValue,
+        )
+    }
 }
 
 /**
@@ -169,6 +195,24 @@ public data class LexiconReference(
     val documentId: Nsid,
     val definitionName: String,
 ) {
+    /** `nsid#name`, for messages. */
+    internal val label: String
+        get() = "$documentId#$definitionName"
+
+    /** The `$type` a union member of this definition carries: the bare NSID for `main`. */
+    internal val unionTypeId: String
+        get() = if (definitionName == MAIN_DEFINITION_NAME) documentId.toString() else label
+
+    /** Whether [type], a union member's `$type`, names this definition, without building a string. */
+    internal fun isUnionType(type: String): Boolean {
+        val document = documentId.toString()
+        if (definitionName == MAIN_DEFINITION_NAME) return type == document
+        return type.length == document.length + 1 + definitionName.length &&
+            type.startsWith(document) &&
+            type[document.length] == '#' &&
+            type.endsWith(definitionName)
+    }
+
     public companion object {
         /**
          * Parses [value] relative to [owner].

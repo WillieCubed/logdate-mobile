@@ -175,14 +175,14 @@ private fun JsonElement.toCidLink(): CidLink {
     return CidLink(Cid.require(value))
 }
 
-private fun JsonElement.singleString(key: String): String? = (this as? JsonObject)?.takeIf { it.size == 1 }?.string(key)
+internal fun JsonElement.singleString(key: String): String? = (this as? JsonObject)?.takeIf { it.size == 1 }?.string(key)
 
-private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+internal fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
 
-private const val LINK_KEY = "\$link"
-private const val BYTES_KEY = "\$bytes"
-private const val TYPE_KEY = "\$type"
-private const val BLOB_TYPE = "blob"
+internal const val LINK_KEY = "\$link"
+internal const val BYTES_KEY = "\$bytes"
+internal const val TYPE_KEY = "\$type"
+internal const val BLOB_TYPE = "blob"
 
 // The data model encodes bytes with the standard base64 alphabet; padding is optional on read.
-private val bytesBase64 = Base64.Default.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
+internal val bytesBase64 = Base64.Default.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
