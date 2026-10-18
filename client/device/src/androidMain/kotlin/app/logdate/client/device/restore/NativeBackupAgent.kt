@@ -25,6 +25,8 @@ import java.io.IOException
 /** Records platform callbacks without opening the database or starting application services. */
 open class NativeBackupAgent : BackupAgent() {
     private val nativeRestoreSession = NativeRestoreSessionBoundary { PostRestoreDetector(this).beginNativeRestoreSession() }
+    private val callbackLock = Any()
+    private var restoreCompletionRecorded = false
 
     override fun onCreate() {
         super.onCreate()
@@ -59,13 +61,24 @@ open class NativeBackupAgent : BackupAgent() {
 
     override fun onRestoreFinished() {
         try {
-            // This instance may be the first one handling a new, empty, or resumed delivery.
-            // Start a fresh generation even when the transport supplied no file callbacks.
-            beginNativeRestoreSessionOnce()
+            val duplicateCompletion =
+                synchronized(callbackLock) {
+                    if (restoreCompletionRecorded && !nativeRestoreSession.isStarted()) {
+                        true
+                    } else {
+                        beginNativeRestoreSessionOnce()
+                        false
+                    }
+                }
             super.onRestoreFinished()
+            if (duplicateCompletion) {
+                retryAccountRecovery()
+                return
+            }
             AndroidNativeRestoreDeliveryGate.beginRestoreCompletion()
             try {
                 PostRestoreDetector(this).recordRestoreCompletedUnderDeliveryLock()
+                synchronized(callbackLock) { restoreCompletionRecorded = true }
                 val preferencesFile = File(filesDir, "logdate.preferences_pb")
                 val job = SupervisorJob()
                 val scope = CoroutineScope(job + Dispatchers.IO)
@@ -102,7 +115,10 @@ open class NativeBackupAgent : BackupAgent() {
     ) {
         AndroidNativeRestoreDeliveryGate.beginRestoreCallback()
         try {
-            beginNativeRestoreSessionOnce()
+            synchronized(callbackLock) {
+                restoreCompletionRecorded = false
+                beginNativeRestoreSessionOnce()
+            }
             super.onRestoreFile(data, size, destination, type, mode, mtime)
             val databaseDelivered =
                 runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
@@ -120,6 +136,23 @@ open class NativeBackupAgent : BackupAgent() {
     }
 
     private fun beginNativeRestoreSessionOnce() = nativeRestoreSession.beginIfNeeded()
+
+    private fun retryAccountRecovery() {
+        val preferencesFile = File(filesDir, "logdate.preferences_pb")
+        val job = SupervisorJob()
+        val scope = CoroutineScope(job + Dispatchers.IO)
+        try {
+            val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferencesFile })
+            runBlocking(Dispatchers.IO) {
+                withTimeoutOrNull(15_000) { restoreAccount(preferences) }
+            }
+        } catch (_: Exception) {
+            Napier.w("Background native account recovery remains pending")
+        } finally {
+            scope.cancel()
+            runBlocking { job.join() }
+        }
+    }
 
     protected open suspend fun restoreAccount(preferences: DataStore<Preferences>) = Unit
 
@@ -151,4 +184,6 @@ internal class NativeRestoreSessionBoundary(
         synchronized(lock) {
             started = false
         }
+
+    fun isStarted(): Boolean = synchronized(lock) { started }
 }
