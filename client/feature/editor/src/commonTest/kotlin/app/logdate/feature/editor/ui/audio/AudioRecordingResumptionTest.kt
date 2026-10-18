@@ -52,6 +52,30 @@ class AudioRecordingResumptionTest {
         }
 
     @Test
+    fun `failed recorder handoff still recovers the previous take`() =
+        runTest {
+            val manager =
+                RecoverableRecordingManager(active = false).apply {
+                    stopFailure = IllegalStateException("Recorder handoff failed")
+                }
+            val recoverer =
+                DefaultPendingAudioRecoverer(
+                    durationResolver = { path -> if (path == "/audio/previous.m4a") 4_200L else null },
+                    recordingManager = manager,
+                )
+
+            val recovered =
+                recoverer.recover(
+                    AudioCaptureState.Stopping(
+                        filePath = manager.currentRecordingPath,
+                        fallbackFilePath = "/audio/previous.m4a",
+                    ),
+                )
+
+            assertEquals(AudioCaptureState.Ready("/audio/previous.m4a", 4_200L), recovered)
+        }
+
+    @Test
     fun `cancellation does not mark an intact recording as lost`() =
         runTest {
             val recoverer = DefaultPendingAudioRecoverer({ throw CancellationException("Cancelled recovery") })
@@ -149,6 +173,7 @@ private class RecoverableRecordingManager(
     private val starting: Boolean = false,
 ) : AudioRecordingManager {
     var stopCalls = 0
+    var stopFailure: Exception? = null
     override val isRecording: Boolean get() = active
     override val isStartingRecording: Boolean get() = starting
     override val currentRecordingPath: String get() = "/audio.m4a"
@@ -162,6 +187,7 @@ private class RecoverableRecordingManager(
 
     override suspend fun stopRecording(): String {
         stopCalls++
+        stopFailure?.let { throw it }
         return "file:///audio.m4a"
     }
 
