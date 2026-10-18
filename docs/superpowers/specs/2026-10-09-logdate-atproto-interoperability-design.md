@@ -126,7 +126,7 @@ All homes store the same lexicon-typed records. Moving between homes uses AT Pro
 | Personal space | The private journal: entries, journals, places, people, Rewinds, drafts | Never | Yes, end to end |
 | Circle spaces | Items shared with a circle | Only to circle members | Yes, to circle members' keys |
 
-All three use the same MST repo engine and the same lexicons. Private records are wrapped in a sealed envelope, so the server sees neither the inner record type nor its timestamps. This closes today's metadata leak by design rather than only by access control.
+All three use the same lexicons. The public repo uses the MST repo engine; personal, circle and group spaces use a space store that follows the Atproto Spaces layout, one repository per author per space, without signed MST commits ([Private and shared storage](./2026-10-18-private-and-shared-storage-design.md)). Private records are wrapped in a sealed envelope, so the server sees neither the inner record type nor its timestamps. This closes today's metadata leak by design rather than only by access control.
 
 The circle space is declared as an AT Protocol space type (`"type": "space"`), so the data layout already matches Atproto Spaces. Circles first ship on LogDate's own encrypted sync. They move to the Spaces sync protocol once it stabilizes, with LogDate's encryption layer on top, because Spaces provides access control, not confidentiality.
 
@@ -280,3 +280,4 @@ Every user-visible project ships behind a feature flag until its acceptance crit
 | 2026-10-09 | New lexicons use the `app.logdate.*` namespace |
 | 2026-10-10 | Every LogDate record has a defined Activity Streams 2.0 shape. ActivityPub, if added, publishes only deliberately published records, generated from the same lexicon records |
 | 2026-10-10 | Published stories are not followable on either protocol: they are links people hand out, and LogDate rejects follow and subscription requests |
+| 2026-10-18 | Private spaces use a space store that follows the Atproto Spaces layout instead of the MST engine; only the public repo is an MST. Private records are sealed whole, replacing field-level encryption, and existing accounts move over on a device because only devices have the keys ([Private and shared storage](./2026-10-18-private-and-shared-storage-design.md)) |
