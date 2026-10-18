@@ -20,6 +20,10 @@ SPEC.loader.exec_module(HARNESS)
 
 
 class NativeAcceptanceSafetyTest(unittest.TestCase):
+    def test_native_restore_ci_exercises_the_real_cloud_quota_rejection_callback(self):
+        workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
+        self.assertIn("--exercise-quota", workflow)
+
     @staticmethod
     def credentials_backup(*, omit=(), extra=()):
         prefix = f"apps/{HARNESS.PACKAGE}"
