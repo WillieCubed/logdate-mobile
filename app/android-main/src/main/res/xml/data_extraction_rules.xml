@@ -12,9 +12,9 @@
      LogDate Cloud, or a user-created archive.
 
    Device-to-device transfer:
-     Includes committed media, but excludes Keystore-bound ciphertext,
-     installation state, incomplete media and camera-capture staging, and
-     cloned background jobs.
+     Includes committed media, but omits temporary camera-capture output from
+     its explicit include list. It also excludes Keystore-bound ciphertext,
+     installation state, incomplete media staging, and cloned background jobs.
 -->
 <data-extraction-rules>
     <cloud-backup disableIfNoEncryptionCapabilities="true">
@@ -48,7 +48,6 @@
         <include domain="database" path="logdate-shm"/>
         <exclude domain="file" path="media/staging/"/>
         <exclude domain="file" path="audio_notes/staging/"/>
-        <exclude domain="file" path="camera-captures/"/>
         <exclude domain="file" path="db_recovery/passphrase_backup.part"/>
         <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
         <exclude domain="file" path="identity_recovery/account_key_backup.part"/>
