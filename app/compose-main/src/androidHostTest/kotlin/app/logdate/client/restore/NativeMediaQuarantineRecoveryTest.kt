@@ -8,11 +8,168 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NativeMediaQuarantineRecoveryTest {
+    @Test
+    fun `startup stops blocking after repeated quarantine failures and schedules durable recovery`() =
+        runTest {
+            var attempts = 0
+            var pending: String? = "delivery-1"
+            val scheduled = mutableListOf<String>()
+
+            val failure =
+                assertFailsWith<IllegalStateException> {
+                    awaitNativeMediaQuarantine(
+                        pendingDelivery = { pending },
+                        quarantine = {
+                            attempts++
+                            attempts >= 4
+                        },
+                        acknowledge = {
+                            pending = null
+                            true
+                        },
+                        enqueue = { scheduled += it },
+                    )
+                }
+
+            assertEquals(3, attempts)
+            assertEquals(listOf("delivery-1"), scheduled)
+            assertEquals("delivery-1", pending)
+            assertEquals("Native media recovery is still pending", failure.message)
+        }
+
+    @Test
+    fun `startup preserves the storage failure for an actionable recovery message`() =
+        runTest {
+            var pending: String? = "delivery-1"
+            val scheduled = mutableListOf<String>()
+            val failure =
+                assertFailsWith<NativeMediaQuarantinePendingException> {
+                    awaitNativeMediaQuarantine(
+                        pendingDelivery = { pending },
+                        quarantine = { throw IllegalStateException("database or disk is full") },
+                        acknowledge = { error("A failed quarantine cannot be acknowledged") },
+                        enqueue = { scheduled += it },
+                    )
+                }
+
+            assertEquals("database or disk is full", failure.cause?.message)
+            assertEquals(listOf("delivery-1"), scheduled)
+            assertEquals("delivery-1", pending)
+        }
+
+    @Test
+    fun `startup returns when a worker clears the marker during the final foreground attempt`() =
+        runTest {
+            var attempts = 0
+            var pending: String? = "delivery-1"
+            val scheduled = mutableListOf<String>()
+
+            awaitNativeMediaQuarantine(
+                pendingDelivery = { pending },
+                quarantine = {
+                    attempts++
+                    if (attempts == 3) pending = null
+                    false
+                },
+                acknowledge = { error("Incomplete checks cannot be acknowledged") },
+                enqueue = { scheduled += it },
+            )
+
+            assertEquals(3, attempts)
+            assertTrue(scheduled.isEmpty())
+            assertEquals(null, pending)
+        }
+
+    @Test
+    fun `startup returns when a worker clears the marker during the final durable handoff`() =
+        runTest {
+            var attempts = 0
+            var pending: String? = "delivery-1"
+            val scheduled = mutableListOf<String>()
+
+            awaitNativeMediaQuarantine(
+                pendingDelivery = { pending },
+                quarantine = {
+                    attempts++
+                    false
+                },
+                acknowledge = { error("Incomplete checks cannot be acknowledged") },
+                enqueue = { delivery ->
+                    scheduled += delivery
+                    pending = null
+                },
+            )
+
+            assertEquals(3, attempts)
+            assertEquals(listOf("delivery-1"), scheduled)
+            assertEquals(null, pending)
+        }
+
+    @Test
+    fun `startup hands a newer marker to recovery when it changes at the retry boundary`() =
+        runTest {
+            var reads = 0
+            var pending: String? = "delivery-1"
+            var oldAttempts = 0
+            val reconciled = mutableListOf<String>()
+            val scheduled = mutableListOf<String>()
+
+            awaitNativeMediaQuarantine(
+                pendingDelivery = {
+                    reads++
+                    if (reads == 10) pending = "delivery-2"
+                    pending
+                },
+                quarantine = {
+                    val delivery = requireNotNull(pending)
+                    reconciled += delivery
+                    if (delivery == "delivery-1") {
+                        oldAttempts++
+                        false
+                    } else {
+                        true
+                    }
+                },
+                acknowledge = { delivery ->
+                    if (delivery == pending) {
+                        pending = null
+                        true
+                    } else {
+                        false
+                    }
+                },
+                enqueue = { scheduled += it },
+            )
+
+            assertEquals(3, oldAttempts)
+            assertEquals(listOf("delivery-1", "delivery-1", "delivery-1", "delivery-2"), reconciled)
+            assertEquals(listOf("delivery-2"), scheduled)
+            assertEquals(null, pending)
+        }
+
+    @Test
+    fun `enqueue storage failure takes precedence over an earlier recovery error`() =
+        runTest {
+            val failure =
+                assertFailsWith<NativeMediaQuarantinePendingException> {
+                    awaitNativeMediaQuarantine(
+                        pendingDelivery = { "delivery-1" },
+                        quarantine = { throw IllegalStateException("temporary database failure") },
+                        acknowledge = { error("A failed quarantine cannot be acknowledged") },
+                        enqueue = { throw IllegalStateException("WorkManager database or disk is full") },
+                    )
+                }
+
+            assertEquals("WorkManager database or disk is full", failure.cause?.message)
+            assertEquals("temporary database failure", failure.suppressed.single().message)
+        }
+
     @Test
     fun `startup reconciliation cannot finish before restored references are checked`() =
         runTest {

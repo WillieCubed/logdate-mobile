@@ -7,13 +7,20 @@ on:
     paths:
       - '.github/workflows/native-restore-acceptance.yml'
       - 'app/android-main/src/androidTest/**/NativeBackupTransferProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeBackgroundCredentialCallbackTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeMissingMediaE2ETest.kt'
+      - 'app/android-main/src/androidTest/**/ArchiveMediaRecoveryE2ETest.kt'
+      - 'app/android-main/src/androidTest/**/CloudArchiveWorkerFixture.kt'
       - 'app/android-main/src/main/**'
-      - 'client/database/**'
-      - 'client/device/**'
-      - 'client/media/**'
-      - 'client/sync/**'
+      - 'app/compose-main/src/androidMain/**'
+      - 'client/**'
       - 'scripts/tests/native-backup/**'
+      - 'shared/model/**'
       - 'tests/e2e/native-backup-acceptance.py'
+      - 'tests/e2e/native-d2d-acceptance.py'
+      - 'tests/e2e/native-missing-media-acceptance.py'
+      - 'tests/e2e/native-permission-acceptance.py'
+      - 'tests/e2e/native-restore-work-restart-acceptance.py'
       - 'build.gradle.kts'
   workflow_dispatch:
 
@@ -24,7 +31,7 @@ jobs:
   native-transfer:
     name: Exercise Android native restore and quota on emulators
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       ANDROID_AVD_HOME: ${{ github.workspace }}/.avd
       LOGDATE_NATIVE_ACCEPTANCE_PACKAGE: studio.hypertext.logdate.debug
@@ -46,7 +53,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK and two fresh API 34 emulators
+      - name: Set up Android SDK and fresh API 34 emulators
         shell: bash
         run: |
           mkdir -p "$ANDROID_AVD_HOME"
@@ -60,9 +67,28 @@ jobs:
           set +o pipefail
           yes | sdkmanager --licenses >/dev/null
           set -o pipefail
-          sdkmanager \
-            'platform-tools' 'platforms;android-34' 'emulator' \
-            'system-images;android-34;google_apis;x86_64'
+          install_android_sdk_packages() {
+            local attempt
+            for attempt in $(seq 1 3); do
+              if sdkmanager \
+                'platform-tools' 'platforms;android-34' 'emulator' \
+                'system-images;android-34;google_apis;x86_64' \
+                'system-images;android-34;google_apis_playstore;x86_64'; then
+                return 0
+              fi
+              if (( attempt == 3 )); then
+                echo 'Android SDK packages could not be downloaded after three attempts' >&2
+                return 1
+              fi
+              echo "Android SDK package download attempt $attempt failed; removing partial system images before retry" >&2
+              rm -rf \
+                "$ANDROID_HOME/system-images/android-34/google_apis/x86_64" \
+                "$ANDROID_HOME/system-images/android-34/google_apis_playstore/x86_64" \
+                "$ANDROID_HOME/.temp"
+              sleep 5
+            done
+          }
+          install_android_sdk_packages
           avdmanager create avd \
             --name logdate-restore-source \
             --package 'system-images;android-34;google_apis;x86_64' \
@@ -71,8 +97,32 @@ jobs:
             --name logdate-restore-destination \
             --package 'system-images;android-34;google_apis;x86_64' \
             --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-data-only \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-missing-keys \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-credentials-only \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-work-restart \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-permissions \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-d2d \
+            --package 'system-images;android-34;google_apis_playstore;x86_64' \
+            --device pixel_2 --force <<< 'no'
           for config in "$ANDROID_AVD_HOME"/*.avd/config.ini; do
-            sed -i 's/^disk.dataPartition.size=.*/disk.dataPartition.size=2G/' "$config"
+            sed -i -E 's/^disk\.dataPartition\.size[[:space:]]*=.*/disk.dataPartition.size=2147483648/' "$config"
           done
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -91,7 +141,8 @@ jobs:
         run: |
           emulator -avd logdate-restore-source -port 5554 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/source-emulator.log" 2>&1 &
           emulator -avd logdate-restore-destination -port 5556 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/destination-emulator.log" 2>&1 &
-          for serial in emulator-5554 emulator-5556; do
+          emulator -avd logdate-restore-data-only -port 5558 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/data-only-emulator.log" 2>&1 &
+          for serial in emulator-5554 emulator-5556 emulator-5558; do
             adb -s "$serial" wait-for-device
             for _ in $(seq 1 120); do
               if [[ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
@@ -115,6 +166,189 @@ jobs:
             --exercise-partial-media \
             --exercise-duplicate-restore
 
+      - name: Exercise populated restore without an account
+        run: |
+          python3 tests/e2e/native-backup-acceptance.py \
+            --source emulator-5554 \
+            --destination emulator-5558 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-restore-data-only" \
+            --snapshot-existing-source \
+            --exercise-data-only
+
+      - name: Exercise missing-media and network recovery
+        run: |
+          python3 tests/e2e/native-missing-media-acceptance.py \
+            --emulator emulator-5558 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-missing-media-recovery" \
+            --synthetic-data
+
+      - name: Replace used transfer emulators with clean recovery destinations
+        shell: bash
+        run: |
+          stop_emulator() {
+            local serial="$1"
+            adb -s "$serial" emu kill
+            for _ in $(seq 1 60); do
+              if ! adb devices | grep -q "^${serial}[[:space:]]"; then
+                return
+              fi
+              sleep 1
+            done
+            echo "Emulator $serial did not stop" >&2
+            return 1
+          }
+          stop_emulator emulator-5556
+          stop_emulator emulator-5558
+          emulator -avd logdate-restore-missing-keys -port 5556 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/missing-keys-emulator.log" 2>&1 &
+          emulator -avd logdate-restore-credentials-only -port 5558 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/credentials-only-emulator.log" 2>&1 &
+          for serial in emulator-5556 emulator-5558; do
+            adb -s "$serial" wait-for-device
+            for _ in $(seq 1 120); do
+              if [[ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+                break
+              fi
+              sleep 2
+            done
+            test "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+            test "$(adb -s "$serial" shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          done
+
+      - name: Verify missing portable keys preserve encrypted content safely
+        run: |
+          python3 tests/e2e/native-backup-acceptance.py \
+            --source emulator-5554 \
+            --destination emulator-5556 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-restore-missing-keys" \
+            --snapshot-existing-source \
+            --exercise-missing-keys
+
+      - name: Verify credentials-only recovery retains keys without content
+        run: |
+          python3 tests/e2e/native-backup-acceptance.py \
+            --source emulator-5554 \
+            --destination emulator-5558 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-restore-credentials-only" \
+            --snapshot-existing-source \
+            --exercise-credentials-only
+
+      - name: Run restart-safe restore work and native callback checks
+        shell: bash
+        run: |
+          stop_emulator() {
+            local serial="$1"
+            adb -s "$serial" emu kill
+            for _ in $(seq 1 60); do
+              if ! adb devices | grep -q "^${serial}[[:space:]]"; then
+                return
+              fi
+              sleep 1
+            done
+            echo "Emulator $serial did not stop" >&2
+            return 1
+          }
+          stop_emulator emulator-5556
+          stop_emulator emulator-5558
+          emulator -avd logdate-restore-work-restart -port 5556 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/work-restart-emulator.log" 2>&1 &
+          adb -s emulator-5556 wait-for-device
+          for _ in $(seq 1 120); do
+            if [[ "$(adb -s emulator-5556 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(adb -s emulator-5556 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          test "$(adb -s emulator-5556 shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          python3 tests/e2e/native-restore-work-restart-acceptance.py \
+            --emulator emulator-5556 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-restore-work-restart"
+          adb -s emulator-5556 shell am instrument -w -r \
+            -e class app.logdate.client.e2e.NativeBackgroundCredentialCallbackTest \
+            studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
+            > "$RUNNER_TEMP/native-background-credential-callbacks.log"
+          grep -Eq '^OK \([0-9]+ tests?\)$' "$RUNNER_TEMP/native-background-credential-callbacks.log"
+
+      - name: Verify permission recovery on a clean emulator
+        shell: bash
+        run: |
+          adb -s emulator-5556 emu kill
+          for _ in $(seq 1 60); do
+            if ! adb devices | grep -q '^emulator-5556[[:space:]]'; then
+              break
+            fi
+            sleep 1
+          done
+          if adb devices | grep -q '^emulator-5556[[:space:]]'; then
+            echo 'Emulator emulator-5556 did not stop' >&2
+            exit 1
+          fi
+          emulator -avd logdate-restore-permissions -port 5556 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/permissions-emulator.log" 2>&1 &
+          adb -s emulator-5556 wait-for-device
+          for _ in $(seq 1 120); do
+            if [[ "$(adb -s emulator-5556 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(adb -s emulator-5556 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          test "$(adb -s emulator-5556 shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          python3 tests/e2e/native-permission-acceptance.py \
+            --emulator emulator-5556 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-permission-recovery" \
+            --synthetic-data
+
+      - name: Replace restore emulators with a Google Play D2D test device
+        shell: bash
+        run: |
+          stop_emulator() {
+            local serial="$1"
+            if ! adb devices | grep -q "^${serial}[[:space:]]"; then
+              return
+            fi
+            adb -s "$serial" emu kill
+            for _ in $(seq 1 60); do
+              if ! adb devices | grep -q "^${serial}[[:space:]]"; then
+                return
+              fi
+              sleep 1
+            done
+            echo "Emulator $serial did not stop" >&2
+            return 1
+          }
+          stop_emulator emulator-5554
+          stop_emulator emulator-5556
+          stop_emulator emulator-5558
+          emulator -avd logdate-restore-d2d -port 5554 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/d2d-emulator.log" 2>&1 &
+          adb -s emulator-5554 wait-for-device
+          for _ in $(seq 1 120); do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(adb -s emulator-5554 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          test "$(adb -s emulator-5554 shell getprop ro.build.version.sdk | tr -d '\r')" = '34'
+          test "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" = '1'
+
+      - name: Exercise Android's single-device D2D test-mode simulation
+        run: |
+          python3 tests/e2e/native-d2d-acceptance.py \
+            --emulator emulator-5554 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-d2d-acceptance"
+
       - name: Upload native restore acceptance evidence
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -124,8 +358,31 @@ jobs:
             ${{ runner.temp }}/native-restore-partial-media/*.log
             ${{ runner.temp }}/native-restore-partial-media/*fixture.json
             ${{ runner.temp }}/native-restore-partial-media/*files*.json
+            ${{ runner.temp }}/native-restore-data-only/*.log
+            ${{ runner.temp }}/native-restore-data-only/*fixture.json
+            ${{ runner.temp }}/native-restore-data-only/*files*.json
+            ${{ runner.temp }}/native-restore-data-only/destination-ui.xml
+            ${{ runner.temp }}/native-restore-data-only/destination-journal.png
+            ${{ runner.temp }}/native-missing-media-recovery/**/*.log
+            ${{ runner.temp }}/native-missing-media-recovery/**/environment-before.json
+            ${{ runner.temp }}/native-missing-media-recovery/acceptance.json
+            ${{ runner.temp }}/native-restore-missing-keys/*.log
+            ${{ runner.temp }}/native-restore-missing-keys/*fixture.json
+            ${{ runner.temp }}/native-restore-missing-keys/*files*.json
+            ${{ runner.temp }}/native-restore-credentials-only/*.log
+            ${{ runner.temp }}/native-restore-credentials-only/*fixture.json
+            ${{ runner.temp }}/native-restore-credentials-only/*files*.json
+            ${{ runner.temp }}/native-restore-work-restart/*.log
+            ${{ runner.temp }}/native-background-credential-callbacks.log
+            ${{ runner.temp }}/native-permission-recovery/**/*.log
+            ${{ runner.temp }}/native-permission-recovery/**/environment-before.json
+            ${{ runner.temp }}/native-permission-recovery/acceptance.json
+            ${{ runner.temp }}/native-d2d-acceptance/*.log
+            ${{ runner.temp }}/native-d2d-acceptance/*.json
+            ${{ runner.temp }}/d2d-emulator.log
             ${{ runner.temp }}/source-emulator.log
             ${{ runner.temp }}/destination-emulator.log
+            ${{ runner.temp }}/data-only-emulator.log
           if-no-files-found: warn
           retention-days: 14
 
@@ -135,3 +392,177 @@ jobs:
         run: |
           adb -s emulator-5554 emu kill || true
           adb -s emulator-5556 emu kill || true
+          adb -s emulator-5558 emu kill || true
+
+  native-transfer-api-36-1:
+    name: Verify Android 16 QPR2 restore callback on emulators
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.avd-api-36-1
+      LOGDATE_NATIVE_ACCEPTANCE_PACKAGE: studio.hypertext.logdate.debug
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Materialize Android Firebase config
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK and fresh API 36.1 emulator
+        shell: bash
+        run: |
+          mkdir -p "$ANDROID_AVD_HOME"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          {
+            echo "$ANDROID_HOME/cmdline-tools/latest/bin"
+            echo "$ANDROID_HOME/platform-tools"
+            echo "$ANDROID_HOME/emulator"
+          } >> "$GITHUB_PATH"
+          set +o pipefail
+          yes | sdkmanager --licenses >/dev/null
+          set -o pipefail
+          sdkmanager \
+            'platform-tools' 'platforms;android-36.1' 'platforms;android-37.0' 'emulator' \
+            'system-images;android-36.1;google_apis;x86_64'
+          avdmanager create avd \
+            --name logdate-restore-api36-1-callback \
+            --package 'system-images;android-36.1;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          for config in "$ANDROID_AVD_HOME"/*.avd/config.ini; do
+            sed -i 's/^disk.dataPartition.size=.*/disk.dataPartition.size=2G/' "$config"
+          done
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Assemble debug app and instrumentation APKs
+        uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Build acceptance APKs
+        run: >-
+          ./gradlew :app:android-main:assembleDebug
+          :app:android-main:assembleDebugAndroidTest
+          --no-daemon --console=plain
+
+      - name: Boot API 36.1 emulator
+        shell: bash
+        run: |
+          emulator -avd logdate-restore-api36-1-callback -port 5562 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/api36-1-callback-emulator.log" 2>&1 &
+          adb -s emulator-5562 wait-for-device
+          for _ in $(seq 1 120); do
+            if [[ "$(adb -s emulator-5562 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(adb -s emulator-5562 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          test "$(adb -s emulator-5562 shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          test "$(adb -s emulator-5562 shell getprop ro.build.version.sdk | tr -d '\r')" = '36'
+          for _ in $(seq 1 180); do
+            device_provisioned="$(adb -s emulator-5562 shell settings get global device_provisioned 2>/dev/null | tr -d '\r' || true)"
+            if [[ "$device_provisioned" == '0' || "$device_provisioned" == '1' ]]; then
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$device_provisioned" != '0' && "$device_provisioned" != '1' ]]; then
+            adb -s emulator-5562 logcat -d -b all -t 4000 > "$RUNNER_TEMP/api36-1-settings-provider-wait.log" 2>&1 || true
+            echo 'Android Settings provider did not become ready after system boot' >&2
+            exit 1
+          fi
+          package_manager_ready=false
+          for _ in $(seq 1 60); do
+            if adb -s emulator-5562 shell pm list packages >/dev/null 2>&1; then
+              package_manager_ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$package_manager_ready" != 'true' ]]; then
+            adb -s emulator-5562 logcat -d -b all -t 4000 > "$RUNNER_TEMP/api36-1-package-manager-wait.log" 2>&1 || true
+            echo 'Android Package Manager did not become ready after system boot' >&2
+            exit 1
+          fi
+
+      - name: Exercise Android 16 QPR2 full restore callback
+        run: |
+          install_api36_apk() {
+            local label="$1"
+            local apk="$2"
+            local package_name="$3"
+            for attempt in $(seq 1 12); do
+              local device_provisioned
+              local install_session
+              local install_session_id
+              device_provisioned="$(adb -s emulator-5562 shell settings get global device_provisioned 2>/dev/null | tr -d '\r' || true)"
+              if { [[ "$device_provisioned" == '0' || "$device_provisioned" == '1' ]]; } && \
+                adb -s emulator-5562 shell pm list packages >/dev/null 2>&1; then
+                install_session="$(adb -s emulator-5562 shell pm install-create -r 2>&1 | tr -d '\r' || true)"
+                install_session_id="$(sed -nE 's/.*created install session \[([0-9]+)\].*/\1/p' <<< "$install_session")"
+                if [[ -n "$install_session_id" ]]; then
+                  if adb -s emulator-5562 shell pm install-abandon "$install_session_id" >/dev/null 2>&1; then
+                    if adb -s emulator-5562 install -r "$apk"; then
+                      for _ in $(seq 1 60); do
+                        if adb -s emulator-5562 shell pm path "$package_name" 2>/dev/null | grep -q '^package:'; then
+                          return 0
+                        fi
+                        sleep 1
+                      done
+                    fi
+                  fi
+                  adb -s emulator-5562 shell pm install-abandon "$install_session_id" >/dev/null 2>&1 || true
+                else
+                  printf '%s\n' "$install_session" \
+                    > "$RUNNER_TEMP/api36-1-${label}-install-session-attempt-${attempt}.log"
+                fi
+              fi
+              if (( attempt % 3 == 0 )); then
+                adb -s emulator-5562 logcat -d -b all -t 4000 \
+                  > "$RUNNER_TEMP/api36-1-${label}-install-attempt-${attempt}.log" 2>&1 || true
+              fi
+              sleep 5
+            done
+            return 1
+          }
+          install_api36_apk app app/android-main/build/outputs/apk/debug/android-main-debug.apk studio.hypertext.logdate.debug
+          install_api36_apk android-test app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk studio.hypertext.logdate.debug.test
+          adb -s emulator-5562 shell am instrument --user 0 -w -r \
+            -e class app.logdate.client.e2e.NativeBackgroundCredentialCallbackTest#modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable \
+            studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
+            > "$RUNNER_TEMP/native-restore-api36-1-callback.log"
+          grep -Eq '^OK \(1 test\)$' "$RUNNER_TEMP/native-restore-api36-1-callback.log"
+
+      - name: Upload API 36.1 restore acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: native-restore-api36-1-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-restore-api36-1/**
+            ${{ runner.temp }}/native-restore-api36-1-callback.log
+            ${{ runner.temp }}/api36-1-callback-emulator.log
+            ${{ runner.temp }}/api36-1-settings-provider-wait.log
+            ${{ runner.temp }}/api36-1-package-manager-wait.log
+            ${{ runner.temp }}/api36-1-target-package.log
+            ${{ runner.temp }}/api36-1-target-launch.log
+            ${{ runner.temp }}/api36-1-*-install-session-attempt-*.log
+            ${{ runner.temp }}/api36-1-*-install-attempt-*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop API 36.1 emulators
+        if: always()
+        shell: bash
+        run: |
+          adb -s emulator-5562 emu kill || true

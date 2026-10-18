@@ -1,5 +1,6 @@
 package app.logdate.client.launch
 
+import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
@@ -15,6 +16,28 @@ import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ApplicationStartupTest {
+    @Test
+    fun `native media recovery offers a storage-specific retry when the database is full`() {
+        val failure = NativeMediaQuarantinePendingException(IllegalStateException("database or disk is full"))
+
+        assertEquals(ApplicationStartupFailureMessage.STORAGE_FULL, applicationStartupFailureMessage(failure))
+    }
+
+    @Test
+    fun `native media recovery keeps its failure message actionable without a storage error`() {
+        val failure = NativeMediaQuarantinePendingException()
+
+        assertEquals(ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING, applicationStartupFailureMessage(failure))
+    }
+
+    @Test
+    fun `native media recovery recognizes a storage failure suppressed by a later enqueue failure`() {
+        val failure = NativeMediaQuarantinePendingException(IllegalStateException("WorkManager enqueue failed"))
+        failure.addSuppressed(IllegalStateException("database or disk is full"))
+
+        assertEquals(ApplicationStartupFailureMessage.STORAGE_FULL, applicationStartupFailureMessage(failure))
+    }
+
     @Test
     fun `callers cannot access the graph until initialization completes`() =
         runTest {

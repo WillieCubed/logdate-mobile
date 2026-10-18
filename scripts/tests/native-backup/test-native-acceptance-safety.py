@@ -17,12 +17,223 @@ ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location("native_acceptance", ROOT / "tests/e2e/native-backup-acceptance.py")
 HARNESS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(HARNESS)
+D2D_SPEC = importlib.util.spec_from_file_location(
+    "native_d2d_acceptance",
+    ROOT / "tests/e2e/native-d2d-acceptance.py",
+)
+D2D = importlib.util.module_from_spec(D2D_SPEC)
+D2D_SPEC.loader.exec_module(D2D)
 
 
 class NativeAcceptanceSafetyTest(unittest.TestCase):
+    def test_d2d_acceptance_refuses_non_emulators_before_device_access(self):
+        for serial in ("38191FDJG00FNY", "192.0.2.1:5555", "adb-phone._tcp"):
+            with self.subTest(serial=serial), patch.object(D2D.HARNESS, "adb") as adb:
+                with self.assertRaisesRegex(RuntimeError, "explicit emulator"):
+                    D2D.verify_emulator(serial)
+                adb.assert_not_called()
+
+    def test_d2d_restore_set_parser_accepts_decimal_and_hex_tokens(self):
+        self.assertEqual("1", D2D.restore_set_token("Available restore sets:\n  1 : device"))
+        self.assertEqual("0x29f", D2D.restore_set_token("Available restore sets:\n  0x29f : device"))
+
+    def test_d2d_transport_requires_registration_selection_and_initialization(self):
+        transport = D2D.D2D_TRANSPORT.encode()
+        responses = [b"  " + transport, b"selected", b"initialized", b"* " + transport]
+        with patch.object(D2D.HARNESS, "adb", side_effect=responses) as adb, patch.object(D2D.HARNESS.time, "sleep"):
+            D2D.select_d2d_transport("emulator-5582", attempts=1)
+
+        calls = [call.args[1:] for call in adb.call_args_list]
+        self.assertEqual(("shell", "bmgr", "transport", D2D.D2D_TRANSPORT), calls[1])
+        self.assertEqual(("shell", "bmgr", "init", D2D.D2D_TRANSPORT), calls[2])
+
+    def test_d2d_transport_missing_from_emulator_fails_before_app_install(self):
+        with patch.object(D2D.HARNESS, "adb", return_value=b"* other") as adb, patch.object(
+            D2D.HARNESS.time,
+            "sleep",
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Google D2D transport"):
+                D2D.select_d2d_transport("emulator-5582", attempts=1)
+
+        self.assertEqual(1, adb.call_count)
+
+    def test_d2d_cleanup_restores_existing_transport_mode_and_disabled_backup(self):
+        with patch.object(D2D.HARNESS, "adb") as adb:
+            D2D.restore_device_settings("emulator-5582", "old.transport", b"0", False)
+
+        commands = [call.args[1:] for call in adb.call_args_list]
+        self.assertIn(("shell", "settings", "put", "secure", D2D.D2D_TEST_MODE, "0"), commands)
+        self.assertEqual(("shell", "bmgr", "transport", "old.transport"), commands[1])
+        self.assertIn(("shell", "bmgr", "enable", "false"), commands)
+
+    def test_d2d_cleanup_selects_google_backup_when_emulator_had_no_transport(self):
+        with patch.object(D2D.HARNESS, "adb") as adb:
+            D2D.restore_device_settings("emulator-5582", None, b"null", False)
+
+        commands = [call.args[1:] for call in adb.call_args_list]
+        self.assertIn(
+            ("shell", "bmgr", "transport", D2D.GMS_BACKUP_TRANSPORT),
+            commands,
+        )
+        self.assertIn(("shell", "bmgr", "enable", "false"), commands)
+
+    def test_native_restore_workflow_runs_separate_gms_d2d_test_mode(self):
+        workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
+        d2d_harness = (ROOT / "tests/e2e/native-d2d-acceptance.py").read_text()
+        self.assertIn("system-images;android-34;google_apis_playstore;x86_64", workflow)
+        self.assertIn(r"disk\.dataPartition\.size[[:space:]]*=.*/disk.dataPartition.size=2147483648/", workflow)
+        self.assertIn("native-d2d-acceptance.py", workflow)
+        self.assertIn("single-device D2D test-mode simulation", d2d_harness)
+        self.assertIn("does not prove setup-wizard transfer", d2d_harness)
+        self.assertIn("https://developer.android.com/identity/data/testingbackup", d2d_harness)
+        self.assertIn("backup_enable_d2d_test_mode", d2d_harness)
+        self.assertIn(D2D.D2D_TRANSPORT, d2d_harness)
+        self.assertIn('"native-restore-status"', d2d_harness)
+        probe = (ROOT / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackupTransferProbeTest.kt").read_text()
+        self.assertIn("PostRestoreType.CONTENT_RESTORED", probe)
+        self.assertIn("native-transfer-api-36-1:", workflow)
+        self.assertIn("platforms;android-36.1", workflow)
+        self.assertIn(
+            "NativeBackgroundCredentialCallbackTest#modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable",
+            workflow,
+        )
+
+    def test_d2d_acceptance_never_uses_package_uninstall_or_clear(self):
+        source = (ROOT / "tests/e2e/native-d2d-acceptance.py").read_text()
+        self.assertNotIn("pm uninstall", source)
+        self.assertNotIn("pm clear", source)
+
+    def test_native_backup_stops_when_source_activity_launch_fails(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            HARNESS,
+            "package_file_snapshot",
+        ) as snapshot, patch.object(HARNESS, "adb", return_value=b"Error: Activity class does not exist"):
+            with self.assertRaisesRegex(RuntimeError, "source app did not start before native backup"):
+                HARNESS.backup_source("emulator-5576", Path(temporary) / "backup.log")
+
+        snapshot.assert_not_called()
+
+    def test_native_backup_waits_for_timeline_after_android_start_timeout(self):
+        retained = {"databases/logdate": {"sha256": "journal"}}
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            HARNESS,
+            "package_file_snapshot",
+            return_value=retained,
+        ), patch.object(
+            HARNESS,
+            "adb",
+            side_effect=[
+                b"Status: timeout",
+                b"Backup Manager now enabled",
+                b"Backup Manager currently enabled",
+                f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+            ],
+        ) as adb, patch.object(HARNESS, "wait_for_timeline") as wait_for_timeline:
+            output = Path(temporary) / "native-backup.log"
+            HARNESS.backup_source("emulator-5576", output)
+            wait_for_timeline.assert_called_once_with("emulator-5576", Path(temporary), timeout_seconds=120, prefix="source")
+            self.assertEqual(
+                b"Status: timeout",
+                (Path(temporary) / "source-launch-before-native-backup.log").read_bytes(),
+            )
+            self.assertIn(
+                ("shell", "bmgr", "backupnow", HARNESS.PACKAGE),
+                [arguments.args[1:] for arguments in adb.call_args_list],
+            )
+
+    def test_api_36_1_waits_for_package_manager_before_installing_apks(self):
+        workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
+        scenario = workflow.split("- name: Boot API 36.1 emulator", 1)[1]
+        scenario = scenario.split("- name: Exercise Android 16 QPR2 full restore callback", 1)[0]
+        self.assertIn("-gpu swiftshader_indirect", scenario)
+        self.assertIn("settings get global device_provisioned", scenario)
+        self.assertIn("device_provisioned\" == '0'", scenario)
+        self.assertIn("for _ in $(seq 1 180)", scenario)
+        self.assertIn("package_manager_ready=false", scenario)
+        self.assertIn("for _ in $(seq 1 60)", scenario)
+        self.assertIn("api36-1-package-manager-wait.log", scenario)
+        self.assertIn("adb -s emulator-5562 shell pm list packages", scenario)
+        callback = workflow.split("- name: Exercise Android 16 QPR2 full restore callback", 1)[1]
+        self.assertIn("for attempt in $(seq 1 12)", callback)
+        self.assertIn("adb -s emulator-5562 shell pm list packages", callback)
+        self.assertIn("adb -s emulator-5562 shell settings get global device_provisioned", callback)
+        self.assertIn("device_provisioned\" == '0'", callback)
+        self.assertIn("shell pm install-create -r", callback)
+        self.assertIn("shell pm install-abandon", callback)
+        self.assertIn("install-session-attempt-${attempt}.log", callback)
+        self.assertIn("sleep 5", callback)
+        self.assertIn("adb -s emulator-5562 logcat -d -b all", callback)
+        self.assertIn("install_api36_apk app", callback)
+        self.assertIn("install_api36_apk android-test", callback)
+        self.assertIn("shell am instrument --user 0 -w -r", callback)
+        self.assertIn("NativeBackgroundCredentialCallbackTest#modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable", callback)
+        self.assertIn("api36-1-*-install-attempt-*.log", workflow)
+
+    def test_api_36_restore_probe_fails_if_full_restore_callback_is_missing(self):
+        probe = (
+            ROOT
+            / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundCredentialCallbackTest.kt"
+        ).read_text()
+        self.assertIn("Build.VERSION.SDK_INT < 36", probe)
+        self.assertIn("assertNotNull(", probe)
+        self.assertIn("android.app.backup.FullRestoreDataInput", probe)
+
+    def test_background_restore_callback_checks_do_not_launch_an_activity(self):
+        workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
+        scenario = workflow.split("- name: Run restart-safe restore work and native callback checks", 1)[1]
+        scenario = scenario.split("- name: Verify permission recovery", 1)[0]
+        self.assertIn("am instrument", scenario)
+        self.assertNotIn("am start", scenario)
+        callback_test = (
+            ROOT
+            / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundCredentialCallbackTest.kt"
+        ).read_text()
+        self.assertIn("application.noBackupFilesDir", callback_test)
+
     def test_native_restore_ci_exercises_the_real_cloud_quota_rejection_callback(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
         self.assertIn("--exercise-quota", workflow)
+
+    def test_native_backup_integrity_probe_preserves_session_owner(self):
+        probe = (
+            ROOT
+            / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackupTransferProbeTest.kt"
+        ).read_text()
+        self.assertIn('assertEquals(arguments.getString("sourceOwner"), session.accountId)', probe)
+        self.assertIn('arguments.getString("sourceHasSession") == "true"', probe)
+        self.assertIn("assertFalse(\n                        sessions.hasValidSession()", probe)
+
+    def test_native_backup_verifies_source_keys_for_every_transfer(self):
+        harness = (ROOT / "tests/e2e/native-backup-acceptance.py").read_text()
+        self.assertIn('"source-backup-integrity"', harness)
+        self.assertIn("verify_after_backup=validate_source_integrity", harness)
+        self.assertIn("source_has_session=exercise_data_only", harness)
+
+    def test_native_restore_ci_checks_a_populated_signed_out_destination(self):
+        workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
+        scenario = workflow.split("- name: Exercise populated restore without an account", 1)[1]
+        scenario = scenario.split("- name: Upload native restore acceptance evidence", 1)[0]
+        self.assertIn("--source emulator-5554", scenario)
+        self.assertIn("--destination emulator-5558", scenario)
+        self.assertIn("--snapshot-existing-source", scenario)
+        self.assertIn("--exercise-data-only", scenario)
+        self.assertIn('adb -s emulator-5558 emu kill || true', workflow)
+        self.assertIn("native-restore-data-only/destination-ui.xml", workflow)
+        self.assertIn("native-restore-data-only/destination-journal.png", workflow)
+
+    def test_native_restore_ci_runs_missing_media_and_network_recovery(self):
+        workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
+        scenario = workflow.split("- name: Exercise missing-media and network recovery", 1)[1]
+        scenario = scenario.split("- name: Upload native restore acceptance evidence", 1)[0]
+        self.assertIn("native-missing-media-acceptance.py", scenario)
+        self.assertIn("--emulator emulator-5558", scenario)
+        self.assertIn("--synthetic-data", scenario)
+        self.assertIn("native-missing-media-recovery/", workflow)
+        self.assertIn("ArchiveMediaRecoveryE2ETest.kt", workflow)
+        self.assertIn("CloudArchiveWorkerFixture.kt", workflow)
+        self.assertIn("app/compose-main/src/androidMain/", workflow)
+        self.assertIn("client/**", workflow)
+        self.assertIn("shared/model/**", workflow)
 
     @staticmethod
     def credentials_backup(*, omit=(), extra=()):
@@ -94,30 +305,89 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
 
         self.assertEqual(2, adb.call_count)
 
-    def test_snapshot_source_is_installed_and_snapshotted_without_reseeding_or_compaction(self):
-        with tempfile.TemporaryDirectory() as temporary, patch.object(HARNESS, "adb") as adb, patch.object(
+    def test_snapshot_source_reads_the_existing_fixture_without_launching_the_app(self):
+        marker = f"/data/user/0/{HARNESS.PACKAGE}/no_backup/native-backup-fixture.json"
+
+        def respond_to_adb(_serial, *args, **_kwargs):
+            if args == ("shell", "run-as", HARNESS.PACKAGE, "find", ".", "-type", "f"):
+                return b"\n".join(
+                    (
+                        b"./files/db_recovery/passphrase_backup",
+                        b"./files/identity_recovery/phrase_backup",
+                        b"./files/identity_recovery/media_key_backup",
+                    )
+                )
+            if args == ("exec-out", "cat", marker):
+                fixture = {
+                    "owner": "owner",
+                    "device": "device",
+                    "fingerprint": "fingerprint",
+                    "mediaNonce": "nonce",
+                    "mediaCiphertext": "ciphertext",
+                }
+                return HARNESS.json.dumps(fixture).encode()
+            return b""
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            HARNESS,
+            "adb",
+            side_effect=respond_to_adb,
+        ) as adb, patch.object(
             HARNESS,
             "probe",
-        ) as probe, patch.object(
-            HARNESS,
-            "package_file_snapshot",
-            return_value={"databases/logdate": {"sha256": "stable"}},
-        ):
+        ) as probe:
+            output = Path(temporary) / "output"
+            output.mkdir()
             HARNESS.prepare_source(
                 "emulator-5576",
                 Path(temporary) / "app.apk",
                 Path(temporary) / "test.apk",
-                Path(temporary),
+                output,
                 "phrase",
                 seed_source=False,
                 snapshot_source=True,
             )
+            self.assertEqual("owner", HARNESS.json.loads((output / "source-existing-fixture.json").read_text())["owner"])
 
         installs = [call.args[1:3] for call in adb.call_args_list if call.args[1:2] == ("install",)]
         self.assertEqual([("install", "-r"), ("install", "-r")], [item[:2] for item in installs])
-        self.assertEqual(["snapshot"], [call.args[1] for call in probe.call_args_list])
-        self.assertNotIn("seed", [call.args[1] for call in probe.call_args_list])
-        self.assertNotIn("compact-transfer", [call.args[1] for call in probe.call_args_list])
+        self.assertIn(("shell", "run-as", HARNESS.PACKAGE, "test", "-s", marker), [call.args[1:] for call in adb.call_args_list])
+        self.assertIn(("exec-out", "cat", marker), [call.args[1:] for call in adb.call_args_list])
+        self.assertIn(
+            ("shell", "run-as", HARNESS.PACKAGE, "find", ".", "-type", "f"),
+            [call.args[1:] for call in adb.call_args_list],
+        )
+        probe.assert_not_called()
+
+    def test_snapshot_source_requires_portable_recovery_keys(self):
+        marker = f"/data/user/0/{HARNESS.PACKAGE}/no_backup/native-backup-fixture.json"
+
+        def respond_to_adb(_serial, *args, **_kwargs):
+            if args == ("shell", "run-as", HARNESS.PACKAGE, "find", ".", "-type", "f"):
+                return b"./files/db_recovery/passphrase_backup"
+            if args == ("exec-out", "cat", marker):
+                return HARNESS.json.dumps(
+                    {"owner": "owner", "device": "device", "fingerprint": "fingerprint", "mediaCiphertext": "ciphertext"},
+                ).encode()
+            return b""
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            HARNESS,
+            "adb",
+            side_effect=respond_to_adb,
+        ):
+            output = Path(temporary) / "output"
+            output.mkdir()
+            with self.assertRaisesRegex(RuntimeError, "missing portable recovery keys"):
+                HARNESS.prepare_source(
+                    "emulator-5576",
+                    Path(temporary) / "app.apk",
+                    Path(temporary) / "test.apk",
+                    output,
+                    "phrase",
+                    seed_source=False,
+                    snapshot_source=True,
+                )
 
     def test_probe_passes_fresh_media_nonce_with_transfer_metadata(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(
@@ -157,6 +427,25 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
             HARNESS.assert_snapshot_preserved(original, {**unchanged, "files/logdate.preferences_pb": {"sha256": "settings-after"}})
 
+    def test_snapshot_ignores_firebase_session_datastore_temporary_files_only(self):
+        original = {
+            "databases/logdate": {"sha256": "journal"},
+            "files/datastore/firebaseSessions/sessionDataStore.data.tmp": {"sha256": "partial-write"},
+            "files/datastore/firebaseSessions/sessionDataStore.data": {"sha256": "durable-session"},
+        }
+        after_temporary_write = {
+            **original,
+            "files/datastore/firebaseSessions/sessionDataStore.data.tmp": {"sha256": "new-partial-write"},
+        }
+        after_durable_session_change = {
+            **original,
+            "files/datastore/firebaseSessions/sessionDataStore.data": {"sha256": "changed-session"},
+        }
+
+        HARNESS.assert_snapshot_preserved(original, after_temporary_write)
+        with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
+            HARNESS.assert_snapshot_preserved(original, after_durable_session_change)
+
     def test_native_backup_checks_source_data_before_and_after_transport_backup(self):
         retained = {"databases/logdate": {"sha256": "journal"}, "files/media/original.jpg": {"sha256": "media"}}
         with tempfile.TemporaryDirectory() as temporary, patch.object(
@@ -166,14 +455,31 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         ) as snapshot, patch.object(
             HARNESS,
             "adb",
-            return_value=f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+            side_effect=[
+                b"Status: ok",
+                b"Backup Manager now enabled",
+                b"Backup Manager currently enabled",
+                f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+            ],
         ) as adb:
             result, before = HARNESS.backup_source("emulator-5576", Path(temporary) / "backup.log")
-
-        self.assertIn(b"with result: Success", result)
-        self.assertEqual(retained, before)
-        self.assertEqual(2, snapshot.call_count)
-        self.assertIn(("shell", "bmgr", "backupnow", HARNESS.PACKAGE), [call.args[1:] for call in adb.call_args_list])
+            self.assertIn(b"with result: Success", result)
+            self.assertEqual(retained, before)
+            self.assertEqual(2, snapshot.call_count)
+            adb_calls = [arguments.args[1:] for arguments in adb.call_args_list]
+            self.assertLess(
+                adb_calls.index(("shell", "am", "start", "-W", "-n", f"{HARNESS.PACKAGE}/app.logdate.client.MainActivity")),
+                adb_calls.index(("shell", "bmgr", "backupnow", HARNESS.PACKAGE)),
+            )
+            self.assertEqual(
+                HARNESS.json.loads((Path(temporary) / "source-files-before-native-backup.json").read_text()),
+                retained,
+            )
+            self.assertEqual(
+                HARNESS.json.loads((Path(temporary) / "source-files-after-native-backup.json").read_text()),
+                retained,
+            )
+            self.assertIn(("shell", "bmgr", "backupnow", HARNESS.PACKAGE), [call.args[1:] for call in adb.call_args_list])
 
     def test_native_backup_fails_if_source_journal_changes_during_backup(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(
@@ -183,10 +489,133 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         ), patch.object(
             HARNESS,
             "adb",
-            return_value=f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+            side_effect=[
+                b"Status: ok",
+                b"Backup Manager now enabled",
+                b"Backup Manager currently enabled",
+                f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+            ],
         ):
             with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
                 HARNESS.backup_source("emulator-5576", Path(temporary) / "backup.log")
+
+    def test_native_backup_validates_identity_before_allowing_secure_storage_rewrite(self):
+        before = {
+            "databases/logdate": {"sha256": "journal"},
+            "shared_prefs/logdate_secure_storage.xml": {"sha256": "before"},
+        }
+        after = {**before, "shared_prefs/logdate_secure_storage.xml": {"sha256": "after"}}
+        verified = []
+
+        def verify_after_backup():
+            self.assertEqual(
+                ("emulator-5576", "shell", "am", "force-stop", HARNESS.PACKAGE),
+                adb.call_args_list[-1].args,
+            )
+            verified.append(True)
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            HARNESS,
+            "package_file_snapshot",
+            side_effect=[before, after],
+        ), patch.object(
+            HARNESS,
+            "adb",
+            side_effect=[
+                b"Status: ok",
+                b"Backup Manager now enabled",
+                b"Backup Manager currently enabled",
+                f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+                b"",
+            ],
+        ) as adb:
+            HARNESS.backup_source(
+                "emulator-5576",
+                Path(temporary) / "backup.log",
+                verify_after_backup=verify_after_backup,
+            )
+
+        self.assertEqual([True], verified)
+
+    def test_native_backup_still_rejects_other_data_changes_after_secure_validation(self):
+        before = {
+            "databases/logdate": {"sha256": "journal-before"},
+            "shared_prefs/logdate_secure_storage.xml": {"sha256": "before"},
+        }
+        after = {
+            "databases/logdate": {"sha256": "journal-after"},
+            "shared_prefs/logdate_secure_storage.xml": {"sha256": "after"},
+        }
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            HARNESS,
+            "package_file_snapshot",
+            side_effect=[before, after],
+        ), patch.object(
+            HARNESS,
+            "adb",
+            side_effect=[
+                b"Status: ok",
+                b"Backup Manager now enabled",
+                b"Backup Manager currently enabled",
+                f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+                b"",
+            ],
+        ) as adb:
+            with self.assertRaisesRegex(RuntimeError, "databases/logdate"):
+                HARNESS.backup_source(
+                    "emulator-5576",
+                    Path(temporary) / "backup.log",
+                    verify_after_backup=lambda: None,
+                )
+            adb.assert_any_call(
+                "emulator-5576",
+                "shell",
+                "am",
+                "force-stop",
+                HARNESS.PACKAGE,
+            )
+
+    def test_native_backup_failure_records_platform_eligibility_state(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            HARNESS,
+            "package_file_snapshot",
+            return_value={"databases/logdate": {"sha256": "journal"}},
+        ), patch.object(
+            HARNESS,
+            "adb",
+            side_effect=[
+                b"Status: ok",
+                b"Backup Manager now enabled",
+                b"Backup Manager currently enabled",
+                f"Package {HARNESS.PACKAGE} with result: Backup is not allowed".encode(),
+                b"enabled=false setupComplete=true",
+            ],
+        ) as adb:
+            with self.assertRaisesRegex(RuntimeError, "Android did not complete the native backup"):
+                HARNESS.backup_source("emulator-5576", Path(temporary) / "backup.log")
+
+            diagnostic = Path(temporary) / "backup-platform-diagnostics.log"
+            self.assertIn(b"enabled=false setupComplete=true", diagnostic.read_bytes())
+            self.assertIn(
+                ("shell", "dumpsys", "backup"),
+                [arguments.args[1:] for arguments in adb.call_args_list],
+            )
+
+    def test_native_backup_reenables_and_verifies_the_platform_service_before_request(self):
+        with patch.object(
+            HARNESS,
+            "adb",
+            side_effect=[b"Backup Manager now enabled", b"Backup Manager currently enabled"],
+        ) as adb:
+            HARNESS.enable_backup("emulator-5576")
+
+        self.assertEqual(
+            [
+                ("shell", "bmgr", "enable", "true"),
+                ("shell", "bmgr", "enabled"),
+            ],
+            [call.args[1:] for call in adb.call_args_list],
+        )
 
     def test_preference_snapshot_ignores_only_runtime_search_index_generation(self):
         def field(number, value):
@@ -644,6 +1073,13 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "local backup transport"):
                 HARNESS.select_local_transport("emulator-5582", attempts=2)
         self.assertTrue(all(call.args[2:] == ("bmgr", "list", "transports") for call in adb.call_args_list))
+
+    def test_transport_selection_failure_reports_android_transport_output(self):
+        transport = HARNESS.TRANSPORT.encode()
+        responses = [b"  " + transport, b"selection failed", b"  " + transport]
+        with patch.object(HARNESS, "adb", side_effect=responses), patch.object(HARNESS.time, "sleep"):
+            with self.assertRaisesRegex(RuntimeError, "selection failed"):
+                HARNESS.select_local_transport("emulator-5582", attempts=1)
 
     def test_transport_service_startup_timeout_is_retried(self):
         transport = HARNESS.TRANSPORT.encode()

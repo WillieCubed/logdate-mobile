@@ -1,20 +1,25 @@
 package app.logdate.client.e2e
 
+import android.app.backup.BackupAgent
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
+import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.data.restore.NativeAccountBackupAgent
 import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
+import io.mockk.every
+import io.mockk.mockkClass
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,10 +37,25 @@ import kotlin.uuid.Uuid
 
 @RunWith(AndroidJUnit4::class)
 class NativeBackgroundCredentialCallbackTest {
-    private val application = ApplicationProvider.getApplicationContext<Context>()
-    private val folder = File(application.cacheDir, "background-restore-probe-${Uuid.random()}").apply { mkdirs() }
+    private val application = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+    private val noBackupRoot =
+        application.noBackupFilesDir.apply {
+            check(mkdirs() || isDirectory) {
+                "Could not create the app's no-backup directory " +
+                    "(path=$absolutePath, parentExists=${parentFile?.isDirectory}, parentWritable=${parentFile?.canWrite()})"
+            }
+        }
+    private val folder =
+        File(noBackupRoot, "background-restore-probe-${Uuid.random()}").apply {
+            check(mkdirs() || isDirectory) {
+                "Could not create isolated restore probe directory " +
+                    "(parent=${parentFile?.absolutePath}, parentExists=${parentFile?.isDirectory}, parentWritable=${parentFile?.canWrite()})"
+            }
+        }
     private val context =
         object : ContextWrapper(application) {
+            override fun getCacheDir(): File = File(folder, "cache").apply { mkdirs() }
+
             override fun getFilesDir(): File = File(folder, "files").apply { mkdirs() }
 
             override fun getNoBackupFilesDir(): File = File(folder, "private").apply { mkdirs() }
@@ -52,6 +72,54 @@ class NativeBackgroundCredentialCallbackTest {
     fun `manifest selects the account-capable native backup agent`() {
         val info = application.packageManager.getApplicationInfo(application.packageName, 0)
         assertEquals(NativeAccountBackupAgent::class.java.name, info.backupAgentName)
+    }
+
+    @Test
+    fun modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable() {
+        assertTrue(context.cacheDir.isDirectory, "The callback's isolated cache directory must exist")
+        assertTrue(context.cacheDir.canWrite(), "The callback's isolated cache directory must be writable")
+        if (Build.VERSION.SDK_INT < 36) return
+        val inputType =
+            assertNotNull(
+                try {
+                    Class.forName("android.app.backup.FullRestoreDataInput")
+                } catch (_: ClassNotFoundException) {
+                    null
+                },
+                "API 36+ must provide FullRestoreDataInput for native full restore",
+            )
+
+        val content = "modern Android full restore callback".encodeToByteArray()
+        val source = File(folder, "modern-restore-source").apply { writeBytes(content) }
+        val destination = context.getDatabasePath("logdate")
+        destination.parentFile?.mkdirs()
+        val descriptor = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY)
+        val input = mockkClass(inputType.kotlin, relaxed = true)
+        every { inputType.getMethod("getData").invoke(input) } returns descriptor
+        every { inputType.getMethod("getDestination").invoke(input) } returns destination
+        every { inputType.getMethod("getSize").invoke(input) } returns content.size.toLong()
+        every { inputType.getMethod("getType").invoke(input) } returns BackupAgent.TYPE_FILE
+        every { inputType.getMethod("getMode").invoke(input) } returns 0x1A4L
+        every { inputType.getMethod("getModificationTimeSeconds").invoke(input) } returns 1L
+
+        var accountRecoveryStarted = false
+        val agent =
+            object : NativeBackupAgent() {
+                override suspend fun restoreAccount(preferences: DataStore<Preferences>) {
+                    accountRecoveryStarted = true
+                }
+            }
+        agent.initialize(context)
+        try {
+            NativeBackupAgent::class.java.getDeclaredMethod("onRestoreFile", inputType).invoke(agent, input)
+        } finally {
+            descriptor.close()
+        }
+        agent.onRestoreFinished()
+
+        assertEquals(content.toList(), destination.readBytes().toList())
+        assertEquals(PostRestoreType.CONTENT_RESTORED, PostRestoreDetector(context).detect(true))
+        assertTrue(accountRecoveryStarted)
     }
 
     @Test

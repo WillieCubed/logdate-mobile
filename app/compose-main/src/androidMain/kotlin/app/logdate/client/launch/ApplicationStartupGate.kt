@@ -12,6 +12,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.client.database.NativeRestoreInProgressException
+import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.coroutines.flow.first
@@ -36,15 +37,7 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
                         onDismissRequest = {},
                         title = { Text(stringResource(R.string.application_startup_failed_title)) },
                         text = {
-                            Text(
-                                stringResource(
-                                    if (failure.cause.hasNativeRestoreInProgress()) {
-                                        R.string.native_restore_startup_incomplete_message
-                                    } else {
-                                        R.string.application_startup_failed_message
-                                    },
-                                ),
-                            )
+                            Text(stringResource(applicationStartupFailureMessage(failure.cause).stringResource()))
                         },
                         confirmButton = {
                             TextButton(onClick = startup::start) {
@@ -62,5 +55,51 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
     }
 }
 
-private fun Throwable.hasNativeRestoreInProgress(): Boolean =
-    generateSequence(this) { it.cause }.any { it is NativeRestoreInProgressException }
+internal enum class ApplicationStartupFailureMessage {
+    GENERIC,
+    NATIVE_RESTORE_PENDING,
+    NATIVE_MEDIA_PENDING,
+    STORAGE_FULL,
+}
+
+internal fun applicationStartupFailureMessage(cause: Throwable): ApplicationStartupFailureMessage =
+    when {
+        cause.hasNativeMediaQuarantinePending() && cause.hasStorageFullCause() -> ApplicationStartupFailureMessage.STORAGE_FULL
+        cause.hasNativeMediaQuarantinePending() -> ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING
+        cause.hasNativeRestoreInProgress() -> ApplicationStartupFailureMessage.NATIVE_RESTORE_PENDING
+        else -> ApplicationStartupFailureMessage.GENERIC
+    }
+
+private fun ApplicationStartupFailureMessage.stringResource(): Int =
+    when (this) {
+        ApplicationStartupFailureMessage.GENERIC -> R.string.application_startup_failed_message
+        ApplicationStartupFailureMessage.NATIVE_RESTORE_PENDING -> R.string.native_restore_startup_incomplete_message
+        ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING -> R.string.native_media_quarantine_pending_message
+        ApplicationStartupFailureMessage.STORAGE_FULL -> R.string.native_media_quarantine_storage_message
+    }
+
+private fun Throwable.hasNativeRestoreInProgress(): Boolean = causesAndSuppressed().any { it is NativeRestoreInProgressException }
+
+private fun Throwable.hasNativeMediaQuarantinePending(): Boolean = causesAndSuppressed().any { it is NativeMediaQuarantinePendingException }
+
+private fun Throwable.hasStorageFullCause(): Boolean =
+    causesAndSuppressed().any { cause ->
+        cause.javaClass.simpleName in setOf("SQLiteFullException", "SQLiteDiskIOException") ||
+            cause.message
+                ?.lowercase()
+                ?.let { "no space left" in it || "disk is full" in it || "database or disk is full" in it } == true
+    }
+
+private fun Throwable.causesAndSuppressed(): Sequence<Throwable> =
+    sequence {
+        val pending = ArrayDeque<Throwable>()
+        val visited = mutableSetOf<Throwable>()
+        pending.addLast(this@causesAndSuppressed)
+        while (pending.isNotEmpty()) {
+            val current = pending.removeFirst()
+            if (!visited.add(current)) continue
+            yield(current)
+            current.cause?.let(pending::addLast)
+            current.suppressed.forEach(pending::addLast)
+        }
+    }

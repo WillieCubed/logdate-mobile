@@ -245,14 +245,17 @@ def package_file_snapshot(serial):
     return snapshot
 
 
-def assert_snapshot_preserved(before, after, *, require_database=True):
+def assert_snapshot_preserved(before, after, *, require_database=True, ignored_paths=()):
     def is_volatile(path):
-        return path in {"databases/logdate-wal", "databases/logdate-shm"} or path.startswith(
+        if path in {"databases/logdate-wal", "databases/logdate-shm"} or path.startswith(
             RUNTIME_ONLY_SNAPSHOT_PREFIXES
-        )
+        ):
+            return True
+        return path.startswith("files/datastore/firebaseSessions/") and path.endswith(".tmp")
 
-    before_durable = {path: value for path, value in before.items() if not is_volatile(path)}
-    after_durable = {path: value for path, value in after.items() if not is_volatile(path)}
+    ignored_paths = set(ignored_paths)
+    before_durable = {path: value for path, value in before.items() if not is_volatile(path) and path not in ignored_paths}
+    after_durable = {path: value for path, value in after.items() if not is_volatile(path) and path not in ignored_paths}
     if require_database and before.get("databases/logdate") is None:
         raise RuntimeError("snapshot has no journal database to preserve")
     if before_durable != after_durable:
@@ -264,16 +267,51 @@ def assert_snapshot_preserved(before, after, *, require_database=True):
         raise RuntimeError("snapshot changed durable data: " + ", ".join(changed_paths))
 
 
-def backup_source(serial, output):
+def enable_backup(serial, attempts=3):
+    state = b""
+    for attempt in range(attempts):
+        adb(serial, "shell", "bmgr", "enable", "true")
+        state = adb(serial, "shell", "bmgr", "enabled")
+        if b"Backup Manager currently enabled" in state:
+            return
+        if attempt + 1 < attempts:
+            time.sleep(1)
+    raise RuntimeError("Android backup service remained disabled after enable request: " + state.decode().strip())
+
+
+def backup_source(serial, output, *, verify_after_backup=None):
     """Back up a retained fixture and prove Android's backup did not change it."""
+    launch = adb(serial, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
+    private_file(output.with_name("source-launch-before-native-backup.log"), launch)
+    if b"Status: ok" not in launch:
+        if b"Status: timeout" not in launch:
+            raise RuntimeError("The source app did not start before native backup")
+        wait_for_timeline(serial, output.parent, timeout_seconds=120, prefix="source")
     before = package_file_snapshot(serial)
     if before.get("databases/logdate") is None:
         raise RuntimeError("The synthetic source has no database to back up")
+    enable_backup(serial)
     backup = adb(serial, "shell", "bmgr", "backupnow", PACKAGE)
     private_file(output, backup)
     if f"Package {PACKAGE} with result: Success".encode() not in backup:
-        raise RuntimeError("Android did not complete the native backup")
-    assert_snapshot_preserved(before, package_file_snapshot(serial))
+        try:
+            diagnostics = adb(serial, "shell", "dumpsys", "backup", timeout=60)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            diagnostics = f"Backup service diagnostics unavailable: {type(error).__name__}".encode()
+        diagnostic_path = output.with_name("backup-platform-diagnostics.log")
+        private_file(diagnostic_path, diagnostics)
+        raise RuntimeError(f"Android did not complete the native backup; inspect {diagnostic_path}")
+    after = package_file_snapshot(serial)
+    private_file(output.with_name("source-files-before-native-backup.json"), json.dumps(before, indent=2).encode())
+    private_file(output.with_name("source-files-after-native-backup.json"), json.dumps(after, indent=2).encode())
+    if verify_after_backup is not None:
+        adb(serial, "shell", "am", "force-stop", PACKAGE)
+        verify_after_backup()
+    assert_snapshot_preserved(
+        before,
+        after,
+        ignored_paths={"shared_prefs/logdate_secure_storage.xml"} if verify_after_backup is not None else (),
+    )
     return backup, before
 
 
@@ -457,11 +495,14 @@ def without_portable_recovery_keys_from_full_backup(payload):
 
 
 def select_local_transport(serial, attempts=30):
+    registered = None
+    selection = None
+    selected = None
     for attempt in range(attempts):
         try:
-            transports = adb(serial, "shell", "bmgr", "list", "transports", timeout=60).decode().splitlines()
-            if any(line.lstrip("* ").strip() == TRANSPORT for line in transports):
-                adb(serial, "shell", "bmgr", "transport", TRANSPORT, timeout=60)
+            registered = adb(serial, "shell", "bmgr", "list", "transports", timeout=60).decode().splitlines()
+            if any(line.lstrip("* ").strip() == TRANSPORT for line in registered):
+                selection = adb(serial, "shell", "bmgr", "transport", TRANSPORT, timeout=60).decode().strip()
                 selected = adb(serial, "shell", "bmgr", "list", "transports", timeout=60).decode().splitlines()
                 if any(line.strip() == "* " + TRANSPORT for line in selected):
                     return
@@ -470,7 +511,10 @@ def select_local_transport(serial, attempts=30):
                 raise RuntimeError("Android local backup transport could not be selected") from error
         if attempt + 1 < attempts:
             time.sleep(1)
-    raise RuntimeError("Android's local backup transport did not become selected")
+    raise RuntimeError(
+        "Android's local backup transport did not become selected; "
+        f"registered={registered!r}, selection={selection!r}, selected={selected!r}"
+    )
 
 
 def ensure_emulator_setup_complete(serial):
@@ -520,6 +564,59 @@ def timeline_is_open(hierarchy):
     return "Search your log" in texts and "Timeline" in texts
 
 
+def system_ui_unresponsive_dialog_present(hierarchy):
+    """Detect Android's transient System UI ANR even when its Wait control is absent."""
+    try:
+        nodes = ET.fromstring(hierarchy).iter("node")
+    except ET.ParseError:
+        return False
+    return any(
+        node.get("package") == "android"
+        and node.get("resource-id") == "android:id/alertTitle"
+        and node.get("text") == "System UI isn't responding"
+        for node in nodes
+    )
+
+
+def system_ui_unresponsive_wait_target(hierarchy):
+    """Return Android's Wait button only for its transient System UI ANR dialog."""
+    try:
+        nodes = list(ET.fromstring(hierarchy).iter("node"))
+    except ET.ParseError:
+        return None
+    has_system_ui_anr = any(
+        node.get("package") == "android"
+        and node.get("resource-id") == "android:id/alertTitle"
+        and node.get("text") == "System UI isn't responding"
+        for node in nodes
+    )
+    if not has_system_ui_anr:
+        return None
+    for node in nodes:
+        if node.get("package") != "android" or node.get("resource-id") != "android:id/aerr_wait":
+            continue
+        bounds = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", ""))
+        if bounds is None:
+            return None
+        left, top, right, bottom = map(int, bounds.groups())
+        return ((left + right) // 2, (top + bottom) // 2)
+    return None
+
+
+def bluetooth_crash_dialog_present(hierarchy):
+    """Detect Android's unrelated Bluetooth crash dialog even without a close control."""
+    try:
+        nodes = ET.fromstring(hierarchy).iter("node")
+    except ET.ParseError:
+        return False
+    return any(
+        node.get("package") == "android"
+        and node.get("resource-id") == "android:id/alertTitle"
+        and node.get("text") == "Bluetooth keeps stopping"
+        for node in nodes
+    )
+
+
 def bluetooth_crash_dialog_close_target(hierarchy):
     """Return the close-button center only for Android's unrelated Bluetooth crash dialog."""
     try:
@@ -551,11 +648,11 @@ def wake_emulator(serial):
     adb(serial, "shell", "wm", "dismiss-keyguard")
 
 
-def wait_for_timeline(serial, output, timeout_seconds=60):
+def wait_for_timeline(serial, output, timeout_seconds=60, prefix="destination"):
     wake_emulator(serial)
     deadline = time.monotonic() + timeout_seconds
-    ui_path = output / "destination-ui.xml"
-    screenshot_path = output / "destination-journal.png"
+    ui_path = output / f"{prefix}-ui.xml"
+    screenshot_path = output / f"{prefix}-journal.png"
     while True:
         dumped = adb(serial, "shell", "uiautomator", "dump", "/data/local/tmp/logdate-native-acceptance-ui.xml")
         if b"dumped to:" in dumped:
@@ -563,13 +660,21 @@ def wait_for_timeline(serial, output, timeout_seconds=60):
             screenshot = adb(serial, "exec-out", "screencap", "-p")
             overwrite_private_file(ui_path, hierarchy)
             overwrite_private_file(screenshot_path, screenshot)
-            if timeline_is_open(hierarchy):
-                return
-            close_target = bluetooth_crash_dialog_close_target(hierarchy)
-            if close_target is not None:
-                print("Dismissing Android's unrelated Bluetooth crash dialog over the restored Timeline", flush=True)
-                adb(serial, "shell", "input", "tap", str(close_target[0]), str(close_target[1]))
+            wait_target = system_ui_unresponsive_wait_target(hierarchy)
+            if wait_target is not None:
+                print("Waiting for Android System UI to recover over the restored Timeline", flush=True)
+                adb(serial, "shell", "input", "tap", str(wait_target[0]), str(wait_target[1]))
                 time.sleep(0.25)
+            elif system_ui_unresponsive_dialog_present(hierarchy):
+                pass
+            elif bluetooth_crash_dialog_present(hierarchy):
+                close_target = bluetooth_crash_dialog_close_target(hierarchy)
+                if close_target is not None:
+                    print("Dismissing Android's unrelated Bluetooth crash dialog over the restored Timeline", flush=True)
+                    adb(serial, "shell", "input", "tap", str(close_target[0]), str(close_target[1]))
+                    time.sleep(0.25)
+            elif timeline_is_open(hierarchy):
+                return
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise RuntimeError("replacement app did not open its Timeline after verifying restored records and media")
@@ -607,7 +712,7 @@ def restore_radio_state(serial, original):
     raise RuntimeError(f"Could not restore emulator radio state: {detail}")
 
 
-def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None):
+def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False):
     arguments = ["shell", "am", "instrument", "-w", "-r", "-e", "class", PROBE,
                  "-e", "nativeBackupMode", mode, "-e", "nativeIdentityMode", identity]
     if metadata:
@@ -620,6 +725,8 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
             arguments.extend(("-e", name, value))
         if metadata.get("recordingTransferFixture"):
             arguments.extend(("-e", "sourceRecordingTransferFixture", "true"))
+    if mode == "source-backup-integrity":
+        arguments.extend(("-e", "sourceHasSession", "true" if source_has_session else "false"))
     if missing_media_path:
         arguments.extend(("-e", "expectedMissingMediaPath", missing_media_path))
     arguments.append(RUNNER)
@@ -708,23 +815,50 @@ def prepare_source(serial, app_apk, test_apk, output, identity, seed_source=True
         recording_policy_probe(serial, output / "source-recording-policy.log")
     else:
         if snapshot_source:
-            print("Recording a synthetic source's existing journal fixture", flush=True)
+            print("Reading the retained synthetic source fixture without launching the app", flush=True)
         else:
-            marker = f"/data/user/0/{PACKAGE}/no_backup/native-backup-fixture.json"
-            adb(serial, "shell", "run-as", PACKAGE, "test", "-s", marker)
             print("Resuming the existing synthetic source journal", flush=True)
+        marker = f"/data/user/0/{PACKAGE}/no_backup/native-backup-fixture.json"
+        adb(serial, "shell", "run-as", PACKAGE, "test", "-s", marker)
     # The backup agent's file-based restore mode is a manifest contract. Update a resumed fixture
     # without clearing its synthetic content so the source actually writes that format.
     if not seed_source:
         adb(serial, "install", "-r", "-t", str(app_apk))
         adb(serial, "install", "-r", "-t", str(test_apk))
-        mode = "snapshot" if snapshot_source else "compact-transfer"
         if snapshot_source:
-            before = package_file_snapshot(serial)
-            probe(serial, mode, output / f"source-{mode}.log", identity=identity)
-            assert_snapshot_preserved(before, package_file_snapshot(serial))
+            source_files = set(package_user_files(serial))
+            recovery_prefix = b"./files/"
+            identity_backup = {
+                "phrase": b"identity_recovery/phrase_backup",
+                "account": b"identity_recovery/account_key_backup",
+                "legacy-account": b"identity_recovery/account_key_backup",
+            }[identity]
+            required_source_files = {
+                recovery_prefix + b"db_recovery/passphrase_backup",
+                recovery_prefix + identity_backup,
+                recovery_prefix + b"identity_recovery/media_key_backup",
+            }
+            missing_source_files = required_source_files - source_files
+            if missing_source_files:
+                raise RuntimeError(
+                    "The retained synthetic source is missing portable recovery keys: "
+                    + ", ".join(path.decode() for path in sorted(missing_source_files))
+                )
+            raw_fixture = adb(serial, "exec-out", "cat", marker)
+            try:
+                metadata = json.loads(raw_fixture)
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise RuntimeError("The retained synthetic source fixture is invalid") from error
+            required = {"owner", "device", "fingerprint", "mediaCiphertext"}
+            if not isinstance(metadata, dict) or not required.issubset(metadata):
+                raise RuntimeError("The retained synthetic source fixture is incomplete")
+            if not all(metadata[key] for key in required):
+                raise RuntimeError("The retained synthetic source fixture is incomplete")
+            private_file(output / "source-existing-fixture.json", raw_fixture)
         else:
-            probe(serial, mode, output / f"source-{mode}.log")
+            probe(serial, "compact-transfer", output / "source-compact-transfer.log")
+
+
 def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False,
              exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False,
              exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False):
@@ -758,7 +892,19 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         if exercise_data_only:
             print("Seeding a synthetic source session for data-only restore acceptance", flush=True)
             probe(source, "source-account-session", output / "source-account-session.log")
-        backup, source_files = backup_source(source, output / "native-backup.log")
+        validate_source_integrity = lambda: probe(
+            source,
+            "source-backup-integrity",
+            output / "source-backup-integrity.log",
+            metadata,
+            identity,
+            source_has_session=exercise_data_only,
+        )
+        backup, source_files = backup_source(
+            source,
+            output / "native-backup.log",
+            verify_after_backup=validate_source_integrity,
+        )
     finally:
         if exercise_data_only:
             probe(source, "source-account-session-cleanup", output / "source-account-session-cleanup.log")

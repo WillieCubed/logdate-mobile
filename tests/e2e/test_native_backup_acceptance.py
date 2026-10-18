@@ -17,6 +17,7 @@ WORK_SCRIPT = Path(__file__).with_name("native-restore-work-restart-acceptance.p
 WORK_SPEC = importlib.util.spec_from_file_location("native_restore_work_acceptance", WORK_SCRIPT)
 NATIVE_RESTORE_WORK_ACCEPTANCE = importlib.util.module_from_spec(WORK_SPEC)
 WORK_SPEC.loader.exec_module(NATIVE_RESTORE_WORK_ACCEPTANCE)
+D2D_SCRIPT = Path(__file__).with_name("native-d2d-acceptance.py")
 
 
 class RestoreSnapshotValidationTest(unittest.TestCase):
@@ -87,6 +88,33 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
             {},
             credentials_only=True,
         )
+
+
+class NativeD2DRestoreEvidenceTest(unittest.TestCase):
+    def test_single_device_simulation_changes_fixture_after_backup_before_restore(self):
+        harness = D2D_SCRIPT.read_text()
+        probe_path = (
+            SCRIPT.parents[2]
+            / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackupTransferProbeTest.kt"
+        )
+        probe = probe_path.read_text()
+
+        backup_call = harness.index('HARNESS.adb(serial, "shell", "bmgr", "backupnow"')
+        mutation_probe = harness.index('HARNESS.probe(serial, "post-backup-mutation"')
+        restore_call = harness.index('HARNESS.adb(serial, "shell", "bmgr", "restore"')
+
+        self.assertLess(backup_call, mutation_probe)
+        self.assertLess(mutation_probe, restore_call)
+        verification = harness.index('HARNESS.probe(serial, "verify"')
+        self.assertLess(restore_call, verification)
+        self.assertIn('"post-backup-mutation"', probe)
+        self.assertIn("Mutated after native D2D backup", probe)
+        self.assertIn('"Native transfer journal"', probe)
+        marker_check = probe.index('File(context.noBackupFilesDir, "native-backup-fixture.json")')
+        title_check = probe.index('assertEquals("Native transfer journal"')
+        mutation_write = probe.index("journals.update(journal.copy(title = \"Mutated after native D2D backup\"))")
+        self.assertLess(marker_check, mutation_write)
+        self.assertLess(title_check, mutation_write)
 
 
 class RuntimePermissionGrantParsingTest(unittest.TestCase):
@@ -178,6 +206,119 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
         target = NATIVE_BACKUP_ACCEPTANCE.bluetooth_crash_dialog_close_target(hierarchy)
 
         self.assertEqual((540, 1091), target)
+
+    def test_finds_wait_button_only_for_the_system_ui_not_responding_dialog(self):
+        hierarchy = (
+            '<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            'text="System UI isn&#x27;t responding"/><node package="android" '
+            'resource-id="android:id/aerr_wait" bounds="[70,1028][1010,1154]"/></hierarchy>'
+        )
+
+        target = NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(hierarchy)
+
+        self.assertEqual((540, 1091), target)
+
+    def test_detects_system_ui_dialog_when_wait_control_is_missing(self):
+        hierarchy = (
+            '<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            'text="System UI isn&#x27;t responding"/><node text="Search your log"/>'
+            '<node text="Timeline"/></hierarchy>'
+        )
+
+        self.assertTrue(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_dialog_present(hierarchy))
+        self.assertIsNone(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(hierarchy))
+
+    def test_ignores_other_anr_dialogs(self):
+        hierarchy = (
+            '<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            'text="LogDate isn&#x27;t responding"/><node package="android" '
+            'resource-id="android:id/aerr_wait" bounds="[70,1028][1010,1154]"/></hierarchy>'
+        )
+
+        target = NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(hierarchy)
+
+        self.assertIsNone(target)
+
+    def test_timeline_poll_waits_for_system_ui_recovery_then_rechecks_content(self):
+        system_ui_dialog = (
+            b'<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            b'text="System UI isn&#x27;t responding"/><node package="android" '
+            b'resource-id="android:id/aerr_wait" bounds="[70,1028][1010,1154]"/>'
+            b'<node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        )
+        timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE,
+            "adb",
+            side_effect=[
+                b"",
+                b"",
+                b"UI hierarchy dumped to: /data/local/tmp/ui.xml",
+                system_ui_dialog,
+                b"dialog screenshot",
+                b"",
+                b"UI hierarchy dumped to: /data/local/tmp/ui.xml",
+                timeline,
+                b"restored journal screenshot",
+            ],
+        ) as adb, patch.object(NATIVE_BACKUP_ACCEPTANCE.time, "sleep"):
+            NATIVE_BACKUP_ACCEPTANCE.wait_for_timeline("emulator-5582", Path(temporary), timeout_seconds=5)
+
+            adb.assert_any_call("emulator-5582", "shell", "input", "tap", "540", "1091")
+            self.assertEqual(timeline, (Path(temporary) / "destination-ui.xml").read_bytes())
+            self.assertEqual(b"restored journal screenshot", (Path(temporary) / "destination-journal.png").read_bytes())
+
+    def test_timeline_poll_does_not_accept_anr_overlay_without_a_usable_wait_control(self):
+        blocked_timeline = (
+            b'<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            b'text="System UI isn&#x27;t responding"/><node text="Search your log"/>'
+            b'<node text="Timeline"/></hierarchy>'
+        )
+        timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE,
+            "adb",
+            side_effect=[
+                b"",
+                b"",
+                b"UI hierarchy dumped to: /data/local/tmp/ui.xml",
+                blocked_timeline,
+                b"blocked screenshot",
+                b"UI hierarchy dumped to: /data/local/tmp/ui.xml",
+                timeline,
+                b"restored journal screenshot",
+            ],
+        ) as adb, patch.object(NATIVE_BACKUP_ACCEPTANCE.time, "sleep"):
+            NATIVE_BACKUP_ACCEPTANCE.wait_for_timeline("emulator-5582", Path(temporary), timeout_seconds=5)
+
+            self.assertEqual(8, adb.call_count)
+            self.assertEqual(timeline, (Path(temporary) / "destination-ui.xml").read_bytes())
+
+    def test_timeline_poll_does_not_accept_bluetooth_overlay_without_a_usable_close_control(self):
+        blocked_timeline = (
+            b'<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            b'text="Bluetooth keeps stopping"/><node text="Search your log"/>'
+            b'<node text="Timeline"/></hierarchy>'
+        )
+        timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE,
+            "adb",
+            side_effect=[
+                b"",
+                b"",
+                b"UI hierarchy dumped to: /data/local/tmp/ui.xml",
+                blocked_timeline,
+                b"blocked screenshot",
+                b"UI hierarchy dumped to: /data/local/tmp/ui.xml",
+                timeline,
+                b"restored journal screenshot",
+            ],
+        ) as adb, patch.object(NATIVE_BACKUP_ACCEPTANCE.time, "sleep"):
+            NATIVE_BACKUP_ACCEPTANCE.wait_for_timeline("emulator-5582", Path(temporary), timeout_seconds=5)
+
+            self.assertEqual(8, adb.call_count)
+            self.assertEqual(timeline, (Path(temporary) / "destination-ui.xml").read_bytes())
 
     def test_ignores_other_system_crash_dialogs(self):
         hierarchy = (

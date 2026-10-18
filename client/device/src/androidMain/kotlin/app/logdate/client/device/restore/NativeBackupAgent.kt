@@ -1,9 +1,12 @@
 package app.logdate.client.device.restore
 
+import android.annotation.TargetApi
 import android.app.backup.BackupAgent
 import android.app.backup.BackupDataInput
 import android.app.backup.BackupDataOutput
 import android.app.backup.FullBackupDataOutput
+import android.app.backup.FullRestoreDataInput
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -118,6 +121,22 @@ open class NativeBackupAgent : BackupAgent() {
         mode: Long,
         mtime: Long,
     ) {
+        restoreNativeFile(destination) {
+            super.onRestoreFile(data, size, destination, type, mode, mtime)
+        }
+    }
+
+    @TargetApi(Build.VERSION_CODES.BAKLAVA)
+    override fun onRestoreFile(data: FullRestoreDataInput) {
+        restoreNativeFile(data.destination) {
+            super.onRestoreFile(data)
+        }
+    }
+
+    private inline fun restoreNativeFile(
+        destination: File,
+        restore: () -> Unit,
+    ) {
         AndroidNativeRestoreDeliveryGate.beginRestoreCallback()
         try {
             synchronized(callbackLock) {
@@ -125,7 +144,7 @@ open class NativeBackupAgent : BackupAgent() {
                 installationStateReset = false
                 beginNativeRestoreSessionOnce()
             }
-            super.onRestoreFile(data, size, destination, type, mode, mtime)
+            restore()
             val databaseDelivered =
                 runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
                     .getOrDefault(false)

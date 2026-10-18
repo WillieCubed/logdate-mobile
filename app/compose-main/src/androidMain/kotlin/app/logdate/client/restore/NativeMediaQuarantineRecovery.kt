@@ -9,7 +9,13 @@ internal enum class NativeMediaQuarantineResult {
     RETRY,
 }
 
-/** Holds foreground startup until the latest durable native-restore delivery is reconciled. */
+internal class NativeMediaQuarantinePendingException(
+    cause: Throwable? = null,
+) : IllegalStateException("Native media recovery is still pending", cause)
+
+private const val MAX_FOREGROUND_ATTEMPTS = 3
+
+/** Reconciles restored media before opening the journal, then leaves durable retries to WorkManager. */
 internal suspend fun awaitNativeMediaQuarantine(
     pendingDelivery: () -> String?,
     quarantine: suspend (isCurrent: () -> Boolean) -> Boolean,
@@ -17,31 +23,92 @@ internal suspend fun awaitNativeMediaQuarantine(
     enqueue: suspend (String) -> Unit,
 ) {
     var backoff = 1_000L
+    var failedAttempts = 0
     while (true) {
         val delivery =
             try {
                 pendingDelivery()
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                failedAttempts++
+                if (failedAttempts >= MAX_FOREGROUND_ATTEMPTS) throw NativeMediaQuarantinePendingException(error)
                 delay(backoff)
                 backoff = (backoff * 2).coerceAtMost(30_000L)
                 continue
             } ?: return
-        val result =
+        val recovery =
             NativeMediaQuarantineRecovery(
                 pendingDelivery = pendingDelivery,
                 quarantine = quarantine,
                 acknowledge = acknowledge,
                 enqueue = enqueue,
-            ).run(delivery)
+            )
+        val result = recovery.run(delivery)
         when (result) {
             NativeMediaQuarantineResult.COMPLETE -> return
-            NativeMediaQuarantineResult.HANDED_OFF -> continue
+            NativeMediaQuarantineResult.HANDED_OFF -> {
+                failedAttempts = 0
+                backoff = 1_000L
+            }
             NativeMediaQuarantineResult.RETRY -> {
+                failedAttempts++
+                if (failedAttempts >= MAX_FOREGROUND_ATTEMPTS) {
+                    if (finishOrContinueAtHandoffBoundary(delivery, recovery, pendingDelivery, enqueue)) return
+                    failedAttempts = 0
+                    backoff = 1_000L
+                    continue
+                }
                 delay(backoff)
                 backoff = (backoff * 2).coerceAtMost(30_000L)
             }
+        }
+    }
+}
+
+private suspend fun finishOrContinueAtHandoffBoundary(
+    delivery: String,
+    recovery: NativeMediaQuarantineRecovery,
+    pendingDelivery: () -> String?,
+    enqueue: suspend (String) -> Unit,
+): Boolean {
+    val latestDelivery =
+        try {
+            pendingDelivery()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            throw NativeMediaQuarantinePendingException(error)
+        } ?: return true
+    if (latestDelivery != delivery) {
+        enqueueHandoff(latestDelivery, recovery, enqueue)
+        return false
+    }
+    enqueueHandoff(latestDelivery, recovery, enqueue)
+    val afterEnqueue =
+        try {
+            pendingDelivery()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            throw NativeMediaQuarantinePendingException(error)
+        } ?: return true
+    if (afterEnqueue != latestDelivery) return false
+    throw NativeMediaQuarantinePendingException(recovery.lastFailure)
+}
+
+private suspend fun enqueueHandoff(
+    delivery: String,
+    recovery: NativeMediaQuarantineRecovery,
+    enqueue: suspend (String) -> Unit,
+) {
+    try {
+        enqueue(delivery)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        throw NativeMediaQuarantinePendingException(error).also {
+            recovery.lastFailure?.let(it::addSuppressed)
         }
     }
 }
@@ -53,8 +120,12 @@ internal class NativeMediaQuarantineRecovery(
     private val acknowledge: (String) -> Boolean,
     private val enqueue: suspend (String) -> Unit,
 ) {
+    var lastFailure: Throwable? = null
+        private set
+
     suspend fun run(expectedDelivery: String): NativeMediaQuarantineResult =
         try {
+            lastFailure = null
             val currentDelivery = pendingDelivery() ?: return NativeMediaQuarantineResult.COMPLETE
             if (currentDelivery != expectedDelivery) {
                 enqueue(currentDelivery)
@@ -65,7 +136,8 @@ internal class NativeMediaQuarantineRecovery(
             retryOrScheduleCurrent(expectedDelivery)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            lastFailure = error
             retryOrScheduleCurrent(expectedDelivery)
         }
 
@@ -80,7 +152,8 @@ internal class NativeMediaQuarantineRecovery(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            lastFailure = error
             NativeMediaQuarantineResult.RETRY
         }
 }

@@ -18,7 +18,10 @@ import app.logdate.client.device.crypto.IdentityKeyFingerprint
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.PostRestoreType
 import app.logdate.client.device.storage.SecureStorage
+import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
@@ -87,7 +90,6 @@ class NativeBackupTransferProbeTest {
                 mode in
                     setOf(
                         "seed",
-                        "snapshot",
                         "verify",
                         "quota",
                         "quota-cleanup",
@@ -95,15 +97,26 @@ class NativeBackupTransferProbeTest {
                         "credentials-only",
                         "source-account-session",
                         "source-account-session-cleanup",
+                        "source-backup-integrity",
                         "data-only",
                         "partial-media",
                         "compact-transfer",
                         "recording-policy",
+                        "post-backup-mutation",
+                        "native-restore-status",
                     ),
             )
             require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") { "Emulator required" }
             require(instrumentation.targetContext.packageName.endsWith(".debug")) { "Isolated debug application required" }
             val context = instrumentation.targetContext
+            if (mode == "native-restore-status") {
+                assertEquals(
+                    PostRestoreType.CONTENT_RESTORED,
+                    PostRestoreDetector(context).detect(true),
+                    "Android must deliver the journal through the native restore callback before app verification",
+                )
+                return@runBlocking
+            }
             if (mode == "recording-policy") {
                 verifyPhoneRecordingBackupPolicy(instrumentation, context)
                 return@runBlocking
@@ -122,6 +135,48 @@ class NativeBackupTransferProbeTest {
                 val sessions = koin.get<SessionStorage>()
                 sessions.clearSession()
                 assertNull(sessions.getSession(), "Synthetic data-only source session was not cleared")
+                return@runBlocking
+            }
+            if (mode == "source-backup-integrity") {
+                val arguments = InstrumentationRegistry.getArguments()
+                val identity = koin.get<IdentityKeyManager>()
+                val crypto = koin.get<CryptoManager>()
+                assertEquals(
+                    arguments.getString("sourceFingerprint"),
+                    IdentityKeyFingerprint.of(identity.getIdentityKey(), crypto),
+                    "Native backup must not replace the source identity key",
+                )
+                val mediaKey =
+                    requireNotNull(koin.get<SecureStorage>().getBytes("media_payload_key_v1")) {
+                        "Native backup removed the source media encryption key"
+                    }
+                assertContentEquals(
+                    "cloud media payload".encodeToByteArray(),
+                    crypto.aesGcmDecrypt(
+                        mediaKey,
+                        Base64.decode(requireNotNull(arguments.getString("sourceMediaNonce"))),
+                        "native-transfer".encodeToByteArray(),
+                        Base64.decode(requireNotNull(arguments.getString("sourceMediaCiphertext"))),
+                    ),
+                    "Native backup changed the key for original Cloud media",
+                )
+                val sessions = koin.get<SessionStorage>()
+                if (arguments.getString("sourceHasSession") == "true") {
+                    assertTrue(
+                        sessions.hasValidSession(),
+                        "Persisted synthetic source session did not reload after native backup",
+                    )
+                    val session = requireNotNull(sessions.getSession())
+                    assertEquals("native-acceptance-access", session.accessToken)
+                    assertEquals("native-acceptance-refresh", session.refreshToken)
+                    assertEquals(arguments.getString("sourceOwner"), session.accountId)
+                } else {
+                    assertFalse(
+                        sessions.hasValidSession(),
+                        "Native backup restored a source account session that should be absent",
+                    )
+                    assertNull(sessions.getSession(), "Native backup unexpectedly created a source account session")
+                }
                 return@runBlocking
             }
             if (mode == "missing-keys") {
@@ -181,6 +236,24 @@ class NativeBackupTransferProbeTest {
                 return@runBlocking
             }
             val fixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
+            if (mode == "post-backup-mutation") {
+                val fixtureFile =
+                    assertNotNull(
+                        File(context.noBackupFilesDir, "native-backup-fixture.json").takeIf(File::isFile),
+                        "Only the synthetic native backup fixture may be mutated",
+                    )
+                val fixtureMetadata = JSONObject(fixtureFile.readText())
+                assertTrue(fixtureMetadata.optBoolean("recordingTransferFixture"))
+                assertTrue(fixtureMetadata.optString("owner").isNotBlank())
+                assertTrue(fixtureMetadata.optString("device").isNotBlank())
+                val journals = koin.get<JournalRepository>()
+                val journalId = Uuid.parse("00000000-0000-0000-0000-000000000001")
+                val journal = requireNotNull(journals.getJournalById(journalId)) { "Synthetic journal fixture is missing" }
+                assertEquals("Native transfer journal", journal.title, "Only the expected synthetic journal may be mutated")
+                journals.update(journal.copy(title = "Mutated after native D2D backup"))
+                assertEquals("Mutated after native D2D backup", journals.getJournalById(journalId)?.title)
+                return@runBlocking
+            }
             if (mode == "data-only") {
                 assertNull(koin.get<SessionStorage>().getSession(), "Native app-data restore must not invent an account session")
             }
@@ -256,57 +329,6 @@ class NativeBackupTransferProbeTest {
                         "Legacy upgrade source must have no portable identity or media backup before Android backs it up",
                     )
                 }
-            } else if (mode == "snapshot") {
-                assertTrue(PassphraseBackupStore(context).hasBackup(), "Synthetic source is missing its journal recovery key")
-                assertTrue(AndroidIdentityKeyBackupStore(context).hasBackup(), "Synthetic source is missing portable identity keys")
-                fixture.verifyFixture()
-                val mediaKey = koin.get<MediaPayloadKeyProvider>().getOrCreateKey()
-                val marker = File(context.noBackupFilesDir, "native-backup-fixture.json")
-                val owner = koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId()
-                val device =
-                    koin
-                        .get<DeviceIdProvider>()
-                        .getDeviceId()
-                        .value
-                        .toString()
-                val fingerprint = IdentityKeyFingerprint.of(identity.getIdentityKey(), crypto)
-                if (marker.exists()) {
-                    val retained = JSONObject(marker.readText())
-                    assertEquals(owner, retained.getString("owner"))
-                    assertEquals(device, retained.getString("device"))
-                    assertEquals(fingerprint, retained.getString("fingerprint"))
-                    assertContentEquals(
-                        "cloud media payload".encodeToByteArray(),
-                        crypto.aesGcmDecrypt(
-                            mediaKey,
-                            Base64.decode(
-                                retained.optString("mediaNonce").ifEmpty { "AAAAAAAAAAAAAAAA" },
-                            ),
-                            "native-transfer".encodeToByteArray(),
-                            Base64.decode(retained.getString("mediaCiphertext")),
-                        ),
-                    )
-                } else {
-                    val mediaNonce = crypto.generateRandomBytes(12)
-                    val mediaCiphertext =
-                        crypto.aesGcmEncrypt(
-                            mediaKey,
-                            mediaNonce,
-                            "native-transfer".encodeToByteArray(),
-                            "cloud media payload".encodeToByteArray(),
-                        )
-                    val metadata =
-                        JSONObject()
-                            .put("owner", owner)
-                            .put(
-                                "device",
-                                device,
-                            ).put("fingerprint", fingerprint)
-                            .put("mediaNonce", Base64.encode(mediaNonce))
-                            .put("mediaCiphertext", Base64.encode(mediaCiphertext))
-                    marker.writeText(metadata.toString())
-                }
-                return@runBlocking
             } else {
                 val arguments = InstrumentationRegistry.getArguments()
                 identity.restoreFromBackupIfAvailable()

@@ -1,5 +1,6 @@
 package app.logdate.client.device.storage
 
+import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.UserSession
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -24,6 +25,28 @@ class SecureSessionStorageVaultTest {
             assertFalse(storage.hasValidSession())
             storage.saveSession(sessionA)
             assertEquals(sessionA, storage.getSession())
+        }
+
+    @Test
+    fun `a cached unavailable session is reloaded when native restore authorization becomes available`() =
+        runTest {
+            val backing = FakeSecureStorage()
+            val sourcePolicyValues = mutableMapOf<String, String>()
+            val sourcePolicy = NativeRestorePolicy({ sourcePolicyValues[it] }, { key, value -> sourcePolicyValues[key] = value })
+            val selected = config(serverA)
+            SecureSessionStorage(backing, selected, backgroundScope, nativeRestorePolicy = sourcePolicy)
+                .saveExplicitSession(sessionA)
+
+            val targetPolicyValues = mutableMapOf<String, String>()
+            val targetPolicy = NativeRestorePolicy({ targetPolicyValues[it] }, { key, value -> targetPolicyValues[key] = value })
+            targetPolicy.setAllowed(serverA, false)
+            val restored = SecureSessionStorage(backing, selected, backgroundScope, nativeRestorePolicy = targetPolicy)
+            runCurrent()
+
+            targetPolicy.setAllowed(serverA, true)
+
+            assertEquals(true, restored.hasValidSession())
+            assertEquals(sessionA, restored.getSession())
         }
 
     @Test
