@@ -193,13 +193,8 @@ private class AndroidApplicationRuntime(
         isolated("Failed to start restore credential cleanup reconciliation") {
             resolve<RestoreCredentialLifecycle>().start(resolve<CoroutineScope>())
         }
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            runCatching { resolve<IdentityKeyManager>().ensureExistingIdentityBackup() }
-                .onFailure { Napier.w("Native encryption recovery material needs attention", it) }
-        }
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            publishWidgetPreviews(application)
-        }
+        preserveExistingIdentityBackup()
+        publishWidgetPreviewsInBackground()
         isolated("Failed to register notification channels on app startup") {
             LogDateNotificationRegistrar(application).registerAllPhoneChannels()
         }
@@ -250,6 +245,19 @@ private class AndroidApplicationRuntime(
         startWatchReceipts()
         runCatching { resolve<WatchWindowPublisher>().start(resolve<CoroutineScope>()) }
             .onFailure { Napier.w("Failed to start publishing watch libraries", it) }
+    }
+
+    private fun preserveExistingIdentityBackup() {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { resolve<IdentityKeyManager>().ensureExistingIdentityBackup() }
+                .onFailure { Napier.w("Native encryption recovery material needs attention", it) }
+        }
+    }
+
+    private fun publishWidgetPreviewsInBackground() {
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            publishWidgetPreviews(application)
+        }
     }
 
     private inline fun <reified T : Any> resolve(): T = koin.get()

@@ -2,6 +2,7 @@ package app.logdate.feature.core.restore
 
 import android.content.Context
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.domain.restore.ArchiveMediaRepairProgress
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RecoveryMediaRole
 import app.logdate.client.domain.restore.RepairArchiveMediaUseCase
@@ -33,68 +34,15 @@ internal class ArchiveMediaRecoveryEngine(
         }.use { sources ->
             val pending = record.pending.map { it.copy(archivePath = sources.path(it)) }
             store.replacePending(record.id, pending)
-            val baseSummary = requireNotNull(record.summary)
-            store.updateProgress(
-                record.id,
-                pending,
-                baseSummary.copy(
-                    recoveryId = record.id,
-                    unavailableOriginals = pending.count { it.role == RecoveryMediaRole.ORIGINAL },
-                    unavailablePreviews = pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
-                    mediaRecoveryChecked = 0,
-                    mediaRecoveryTotal = pending.size,
-                    recoveringMedia = pending.isNotEmpty(),
-                ),
-            )
-            val importer =
-                object : MediaImporter {
-                    override suspend fun isAvailable(reference: String) =
-                        media.isRecoveredOriginal(reference, koin.get<StoredMediaReferences>())
-
-                    override suspend fun importMedia(exportPath: String) = sources.importMedia(exportPath)
-
-                    override suspend fun recoverMedia(asset: UnavailableMediaAsset): String? {
-                        val original = asset.sourceReference ?: return null
-                        val draftId = asset.blockId?.let { Uuid.parse(asset.entityId) }
-                        val entityId = Uuid.parse(asset.blockId ?: asset.entityId)
-                        val kind = if (asset.role == RecoveryMediaRole.THUMBNAIL) "thumbnail" else asset.kind ?: "image"
-                        return when (
-                            val result =
-                                cloud?.recover(
-                                    entityId,
-                                    draftId,
-                                    kind,
-                                    original,
-                                    asset.reference,
-                                    UploadScope(scope.ownerId, scope.serverOrigin),
-                                )
-                        ) {
-                            is AutomaticMediaRecoveryResult.Available -> result.reference
-                            is AutomaticMediaRecoveryResult.Pending -> {
-                                reasons[asset.reference] = result.reason
-                                null
-                            }
-                            null -> null
-                        }
-                    }
-                }
+            val baseSummary = initialProgress(record, pending)
+            store.updateProgress(record.id, pending, baseSummary)
+            val importer = createImporter(scope, sources, media, cloud, reasons)
             val result =
                 RepairArchiveMediaUseCase(koin.get(), koin.get()).repair(
                     pending,
                     importer,
                     onProgress = { progress ->
-                        val summary =
-                            baseSummary.copy(
-                                recoveryId = record.id,
-                                mediaImported = baseSummary.mediaImported + progress.imported,
-                                unavailableOriginals = progress.pending.count { it.role == RecoveryMediaRole.ORIGINAL },
-                                unavailablePreviews = progress.pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
-                                mediaRecoveryChecked = progress.checked,
-                                mediaRecoveryTotal = progress.total,
-                                recoveringMedia = progress.pending.isNotEmpty(),
-                            )
-                        store.updateProgress(record.id, progress.pending, summary)
-                        koin.get<RestoreLauncher>().updateRecovery(summary)
+                        publishProgress(record.id, baseSummary, progress, store)
                     },
                     expectedNoteScope = JournalMergeScope(scope.ownerId, scope.serverOrigin),
                 )
@@ -118,6 +66,83 @@ internal class ArchiveMediaRecoveryEngine(
                 )
             store.finish(record.id, summary)
             return summary
+        }
+    }
+
+    private fun initialProgress(
+        record: ArchiveRecoveryRecord,
+        pending: List<UnavailableMediaAsset>,
+    ): RestoreSummary =
+        requireNotNull(record.summary).copy(
+            recoveryId = record.id,
+            unavailableOriginals = pending.count { it.role == RecoveryMediaRole.ORIGINAL },
+            unavailablePreviews = pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
+            mediaRecoveryChecked = 0,
+            mediaRecoveryTotal = pending.size,
+            recoveringMedia = pending.isNotEmpty(),
+        )
+
+    private fun publishProgress(
+        recoveryId: String,
+        baseSummary: RestoreSummary,
+        progress: ArchiveMediaRepairProgress,
+        store: ArchiveRecoveryStore,
+    ) {
+        val summary =
+            baseSummary.copy(
+                mediaImported = baseSummary.mediaImported + progress.imported,
+                unavailableOriginals = progress.pending.count { it.role == RecoveryMediaRole.ORIGINAL },
+                unavailablePreviews = progress.pending.count { it.role == RecoveryMediaRole.THUMBNAIL },
+                mediaRecoveryChecked = progress.checked,
+                mediaRecoveryTotal = progress.total,
+                recoveringMedia = progress.pending.isNotEmpty(),
+            )
+        store.updateProgress(recoveryId, progress.pending, summary)
+        koin.get<RestoreLauncher>().updateRecovery(summary)
+    }
+
+    private fun createImporter(
+        scope: ArchiveRecoveryScope,
+        sources: RetainedArchiveMediaSources,
+        media: MediaManager,
+        cloud: AutomaticMediaRecovery?,
+        reasons: MutableMap<String, DiagnosticReason>,
+    ): MediaImporter =
+        object : MediaImporter {
+            override suspend fun isAvailable(reference: String) = media.isRecoveredOriginal(reference, koin.get<StoredMediaReferences>())
+
+            override suspend fun importMedia(exportPath: String) = sources.importMedia(exportPath)
+
+            override suspend fun recoverMedia(asset: UnavailableMediaAsset): String? = recoverFromCloud(scope, asset, cloud, reasons)
+        }
+
+    private suspend fun recoverFromCloud(
+        scope: ArchiveRecoveryScope,
+        asset: UnavailableMediaAsset,
+        cloud: AutomaticMediaRecovery?,
+        reasons: MutableMap<String, DiagnosticReason>,
+    ): String? {
+        val original = asset.sourceReference ?: return null
+        val draftId = asset.blockId?.let { Uuid.parse(asset.entityId) }
+        val entityId = Uuid.parse(asset.blockId ?: asset.entityId)
+        val kind = if (asset.role == RecoveryMediaRole.THUMBNAIL) "thumbnail" else asset.kind ?: "image"
+        return when (
+            val result =
+                cloud?.recover(
+                    entityId,
+                    draftId,
+                    kind,
+                    original,
+                    asset.reference,
+                    UploadScope(scope.ownerId, scope.serverOrigin),
+                )
+        ) {
+            is AutomaticMediaRecoveryResult.Available -> result.reference
+            is AutomaticMediaRecoveryResult.Pending -> {
+                reasons[asset.reference] = result.reason
+                null
+            }
+            null -> null
         }
     }
 }

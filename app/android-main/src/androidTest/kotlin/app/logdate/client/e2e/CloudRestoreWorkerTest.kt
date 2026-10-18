@@ -25,7 +25,9 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -279,29 +281,64 @@ class CloudRestoreWorkerTest : CloudArchiveWorkerFixture() {
     fun `retries a restore after a mid-download no-space failure and removes partial files`() =
         runTest {
             val workId = UUID.randomUUID()
-            val backup = restoreBackupMetadata("no-space")
-            val cloud =
-                FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L))).apply {
-                    backups = listOf(backup)
-                    fileDownloadOverride = { destination ->
-                        destination.writeBytes(byteArrayOf(0x4c, 0x44, 0x43, 0x42, 0x32))
-                        Result.failure(IOException("No space left on device"))
-                    }
+            val source = File(context.cacheDir, "cloud-restore-no-space-source.zip")
+            val encrypted = File(context.cacheDir, "cloud-restore-no-space-source.encrypted")
+            var restored: File? = null
+            try {
+                ZipOutputStream(source.outputStream()).use { zip ->
+                    zip.putNextEntry(ZipEntry("manifest.json"))
+                    zip.write("{\"schemaVersion\":\"2.0\"}".encodeToByteArray())
+                    zip.closeEntry()
                 }
-            val params = workerParameters(workId)
-            var handoffCalled = false
-            val worker =
-                CloudRestoreWorker(
-                    context,
-                    params,
-                    cloud,
-                    FakeSessionStorage(UserSession("access", "refresh", "account")),
-                    archiveCipher,
-                ) { handoffCalled = true }
+                archiveCipher.encrypt(source, encrypted)
+                val backup = restoreBackupMetadata("no-space").copy(sizeBytes = encrypted.length())
+                val cloud =
+                    FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L))).apply {
+                        backups = listOf(backup)
+                        downloadedFile = encrypted
+                        fileDownloadOverride = { destination ->
+                            destination.writeBytes(byteArrayOf(0x4c, 0x44, 0x43, 0x42, 0x32))
+                            Result.failure(IOException("No space left on device"))
+                        }
+                    }
+                val params = workerParameters(workId)
+                var handoffCalled = false
+                val worker =
+                    CloudRestoreWorker(
+                        context,
+                        params,
+                        cloud,
+                        FakeSessionStorage(UserSession("access", "refresh", "account")),
+                        archiveCipher,
+                    ) { handoffCalled = true }
 
-            assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
-            assertEquals(1, cloud.fileDownloadCalls)
-            assertFalse(handoffCalled)
+                assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+                assertEquals(1, cloud.fileDownloadCalls)
+                assertFalse(handoffCalled)
+                assertRestoreArtifactsRemoved(workId)
+
+                val retry =
+                    CloudRestoreWorker(
+                        context,
+                        workerParameters(workId),
+                        cloud,
+                        FakeSessionStorage(UserSession("access", "refresh", "account")),
+                        archiveCipher,
+                    ) { archive -> restored = archive }
+                assertTrue(retry.doWork() is androidx.work.ListenableWorker.Result.Success)
+                assertEquals(2, cloud.fileDownloadCalls)
+                assertTrue(requireNotNull(restored).isFile)
+                ZipFile(requireNotNull(restored)).use { zip ->
+                    assertEquals(
+                        "{\"schemaVersion\":\"2.0\"}",
+                        zip.getInputStream(zip.getEntry("manifest.json")).bufferedReader().use { it.readText() },
+                    )
+                }
+            } finally {
+                source.delete()
+                encrypted.delete()
+                restored?.delete()
+            }
             assertRestoreArtifactsRemoved(workId)
         }
 

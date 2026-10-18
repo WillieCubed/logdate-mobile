@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
@@ -41,6 +42,7 @@ import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -77,6 +79,7 @@ class NativeRestoredSettingsE2ETest {
                 output.fd.sync()
             }
             val registered = MutableStateFlow(false)
+            val locationEvents = CopyOnWriteArrayList<String>()
             val registrationSink =
                 object : Antilog() {
                     override fun performLog(
@@ -86,6 +89,7 @@ class NativeRestoredSettingsE2ETest {
                         message: String?,
                     ) {
                         if (message == "Activity transition updates registered") registered.value = true
+                        if (message?.contains("location", ignoreCase = true) == true) locationEvents += message
                     }
                 }
             Napier.base(registrationSink)
@@ -100,6 +104,8 @@ class NativeRestoredSettingsE2ETest {
                     assertEquals(PackageManager.PERMISSION_DENIED, context.checkSelfPermission(permission))
                 }
                 settings.updateSettings(original.copy(backgroundTrackingEnabled = true, captureMode = LocationCaptureMode.ACTIVE))
+                assertEquals(true, settings.getSettings().backgroundTrackingEnabled)
+                assertEquals(LocationCaptureMode.ACTIVE, settings.getSettings().captureMode)
                 withContext(Dispatchers.Main) { koin.get<LocationTrackingManager>().startTracking() }
                 delay(1_500)
                 assertNull(ActivityAwareLocationService.instance)
@@ -113,7 +119,17 @@ class NativeRestoredSettingsE2ETest {
                 }
                 val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
                 activity = launchResumedActivity(intent)
-                withTimeout(30_000) { ActivityAwareLocationService.captureStatus.first { it == LocationCaptureStatus.Running } }
+                val firstStatus =
+                    withTimeoutOrNull(30_000) {
+                        ActivityAwareLocationService.captureStatus.first {
+                            it == LocationCaptureStatus.Running || it == LocationCaptureStatus.Failed
+                        }
+                    }
+                val recentLocationEvents = locationEvents.takeLast(12)
+                val statusDetails =
+                    "Location recovery did not start: service=${ActivityAwareLocationService.instance != null}, " +
+                        "current=${ActivityAwareLocationService.captureStatus.value}, events=$recentLocationEvents"
+                assertEquals(LocationCaptureStatus.Running, firstStatus, statusDetails)
                 val service = assertNotNull(ActivityAwareLocationService.instance)
                 val transitions =
                     ActivityAwareLocationService::class.java.getDeclaredField("activityTransitionPendingIntent").apply {
