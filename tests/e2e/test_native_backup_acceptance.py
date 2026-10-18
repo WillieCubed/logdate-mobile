@@ -136,6 +136,30 @@ class EmulatorWakeStateTest(unittest.TestCase):
         )
 
 
+class NativeTimelineSystemDialogTest(unittest.TestCase):
+    def test_finds_only_the_close_button_for_the_known_bluetooth_system_crash_dialog(self):
+        hierarchy = (
+            '<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            'text="Bluetooth keeps stopping"/><node package="android" '
+            'resource-id="android:id/aerr_close" bounds="[70,1028][1010,1154]"/></hierarchy>'
+        )
+
+        target = NATIVE_BACKUP_ACCEPTANCE.bluetooth_crash_dialog_close_target(hierarchy)
+
+        self.assertEqual((540, 1091), target)
+
+    def test_ignores_other_system_crash_dialogs(self):
+        hierarchy = (
+            '<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            'text="LogDate keeps stopping"/><node package="android" '
+            'resource-id="android:id/aerr_close" bounds="[70,1028][1010,1154]"/></hierarchy>'
+        )
+
+        target = NATIVE_BACKUP_ACCEPTANCE.bluetooth_crash_dialog_close_target(hierarchy)
+
+        self.assertIsNone(target)
+
+
 class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
     @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (1 test)")
     def test_targets_only_the_explicit_emulator_and_records_probe_output(self, adb):
