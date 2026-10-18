@@ -30,6 +30,7 @@ class AccountSyncPresentationTest {
             SyncPresentation.ConflictError(1) to AccountSyncStatus.CONFLICT,
             SyncPresentation.NetworkError(1) to AccountSyncStatus.CONNECTION_UNAVAILABLE,
             SyncPresentation.MediaTooLarge to AccountSyncStatus.MEDIA_TOO_LARGE,
+            SyncPresentation.Recovering(2) to AccountSyncStatus.RECOVERING,
         )) {
             assertEquals(status.messageResource(), presentation.accountSummaryResource())
             assertEquals(null, presentation.accountRecoveryAction())

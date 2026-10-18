@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -67,6 +68,10 @@ class NativeRestoredSettingsE2ETest {
         instrumentation.sendStatus(0, Bundle().apply { putString("restorePermission", value) })
     }
 
+    // The instrumentation process has its own UID; query the app-under-test UID explicitly.
+    private fun targetPermission(permission: String): Int =
+        context.checkPermission(permission, Process.myPid(), context.applicationInfo.uid)
+
     @Test
     fun locationResumesAfterExternalGrants() =
         runBlocking {
@@ -103,7 +108,7 @@ class NativeRestoredSettingsE2ETest {
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACTIVITY_RECOGNITION,
                 )) {
-                    assertEquals(PackageManager.PERMISSION_DENIED, context.checkSelfPermission(permission))
+                    assertEquals(PackageManager.PERMISSION_DENIED, targetPermission(permission))
                 }
                 settings.updateSettings(original.copy(backgroundTrackingEnabled = true, captureMode = LocationCaptureMode.ACTIVE))
                 assertEquals(true, settings.getSettings().backgroundTrackingEnabled)
@@ -112,13 +117,22 @@ class NativeRestoredSettingsE2ETest {
                 delay(1_500)
                 assertNull(ActivityAwareLocationService.instance)
                 status("RESTORE_LOCATION_GRANT_REQUIRED")
-                withTimeout(20_000) {
-                    while (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) !=
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
-                        delay(50)
+                val locationPermissionGranted =
+                    withTimeoutOrNull(20_000) {
+                        while (targetPermission(Manifest.permission.ACCESS_FINE_LOCATION) !=
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            delay(50)
+                        }
+                        true
                     }
-                }
+                assertEquals(
+                    true,
+                    locationPermissionGranted,
+                    "Location permission was not granted to ${context.packageName}; " +
+                        "package manager=${targetPermission(Manifest.permission.ACCESS_FINE_LOCATION)}, " +
+                        "test context=${instrumentation.context.packageName}",
+                )
                 val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
                 activity = launchResumedActivity(intent)
                 val firstStatus =
@@ -151,7 +165,7 @@ class NativeRestoredSettingsE2ETest {
                 assertEquals(false, appRemainsResumed, "LogDate must leave the foreground before the motion grant")
                 status("RESTORE_MOTION_GRANT_REQUIRED")
                 withTimeout(20_000) {
-                    while (context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) !=
+                    while (targetPermission(Manifest.permission.ACTIVITY_RECOGNITION) !=
                         PackageManager.PERMISSION_GRANTED
                     ) {
                         delay(50)

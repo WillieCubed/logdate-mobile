@@ -7,6 +7,7 @@ import logdate.client.feature.core.generated.resources.sync_account_device_link
 import logdate.client.feature.core.generated.resources.sync_account_disabled
 import logdate.client.feature.core.generated.resources.sync_account_media_too_large
 import logdate.client.feature.core.generated.resources.sync_account_offline
+import logdate.client.feature.core.generated.resources.sync_account_recovering
 import logdate.client.feature.core.generated.resources.sync_account_recovery_required
 import logdate.client.feature.core.generated.resources.sync_account_retrying
 import logdate.client.feature.core.generated.resources.sync_account_signed_out
@@ -24,6 +25,7 @@ internal fun AccountSyncStatus.messageResource(): StringResource =
         AccountSyncStatus.CHECKING -> Res.string.sync_account_checking
         AccountSyncStatus.UP_TO_DATE -> Res.string.sync_feedback_up_to_date
         AccountSyncStatus.SYNCING -> Res.string.syncing
+        AccountSyncStatus.RECOVERING -> Res.string.sync_account_recovering
         AccountSyncStatus.WAITING -> Res.string.sync_account_waiting
         AccountSyncStatus.OFFLINE -> Res.string.sync_account_offline
         AccountSyncStatus.SERVER_UNAVAILABLE -> Res.string.sync_account_unknown

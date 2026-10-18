@@ -11,6 +11,7 @@ enum class AccountSyncStatus {
     RETRYING,
     UP_TO_DATE,
     SYNCING,
+    RECOVERING,
     WAITING,
     OFFLINE,
     SERVER_UNAVAILABLE,
@@ -34,7 +35,9 @@ internal fun accountSyncStatus(
     status: SyncStatus,
     reasons: Set<SyncDeadLetterReason> = emptySet(),
 ): AccountSyncStatus {
-    if (status.isSyncing || status.requestState == BackupRequestState.RUNNING) return AccountSyncStatus.SYNCING
+    if (status.isSyncing || status.requestState == BackupRequestState.RUNNING) {
+        return if (status.pendingDownloads > 0) AccountSyncStatus.RECOVERING else AccountSyncStatus.SYNCING
+    }
     when (status.issue()) {
         SyncIssue.Waiting.Network -> return AccountSyncStatus.OFFLINE
         SyncIssue.Waiting.WiFi -> return AccountSyncStatus.WAITING_FOR_WIFI
@@ -64,11 +67,17 @@ internal fun accountSyncStatus(
     )) {
         if (reason in reasons) return state
     }
+    if (status.pendingDownloads > 0 &&
+        status.lastError == null &&
+        status.queueReadable &&
+        status.requestState != BackupRequestState.FAILED
+    ) {
+        return AccountSyncStatus.RECOVERING
+    }
     if (status.hasErrors || status.lastError != null || reasons.isNotEmpty() || status.requestState == BackupRequestState.FAILED) {
         return AccountSyncStatus.UNKNOWN
     }
     return if (status.pendingUploads > 0 ||
-        status.pendingDownloads > 0 ||
         status.requestState == BackupRequestState.QUEUED ||
         status.requestState == BackupRequestState.RETRYING
     ) {

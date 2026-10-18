@@ -51,6 +51,11 @@ sealed class SyncPresentation {
         val requestState: BackupRequestState = BackupRequestState.NONE,
     ) : SyncPresentation()
 
+    /** Downloaded journal items still need local recovery, such as restoring their media files. */
+    data class Recovering(
+        val pendingCount: Int,
+    ) : SyncPresentation()
+
     /** The local queue could not be read, so a healthy count cannot be claimed. */
     data object StatusUnavailable : SyncPresentation()
 

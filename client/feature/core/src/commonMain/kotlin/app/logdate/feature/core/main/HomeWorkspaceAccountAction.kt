@@ -118,6 +118,7 @@ internal fun SyncPresentation.accountSummaryResource(): StringResource? =
         SyncPresentation.Hidden -> null
         is SyncPresentation.Syncing -> AccountSyncStatus.SYNCING.messageResource()
         is SyncPresentation.Pending -> AccountSyncStatus.CHECKING.messageResource()
+        is SyncPresentation.Recovering -> AccountSyncStatus.RECOVERING.messageResource()
         SyncPresentation.StatusUnavailable -> AccountSyncStatus.LOCAL_DATA_UNAVAILABLE.messageResource()
         SyncPresentation.AuthError -> AccountSyncStatus.SIGN_IN_REQUIRED.messageResource()
         SyncPresentation.NeedsRecovery -> AccountSyncStatus.KEY_RECOVERY_REQUIRED.messageResource()

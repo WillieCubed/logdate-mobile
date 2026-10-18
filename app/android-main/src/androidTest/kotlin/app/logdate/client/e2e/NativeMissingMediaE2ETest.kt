@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import android.provider.MediaStore
 import android.util.Base64
 import androidx.datastore.core.DataStore
@@ -87,6 +88,10 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
         require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish")
         require(context.packageName.endsWith(".debug"))
     }
+
+    // The instrumentation process has its own UID; query the app-under-test UID explicitly.
+    private fun targetPermission(permission: String): Int =
+        context.checkPermission(permission, Process.myPid(), context.applicationInfo.uid)
 
     private fun ensureApplicationStarted() {
         ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
@@ -215,7 +220,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
                 Manifest.permission.READ_MEDIA_AUDIO,
                 Manifest.permission.POST_NOTIFICATIONS,
             )) {
-                assertEquals(PackageManager.PERMISSION_DENIED, context.checkSelfPermission(permission), permission)
+                assertEquals(PackageManager.PERMISSION_DENIED, targetPermission(permission), permission)
             }
             val local = media.saveMedia(MediaPayload("denied-permissions.png", "image/png", png.size.toLong(), png))
             assertTrue(media.isRecoveredOriginal(local, references))
