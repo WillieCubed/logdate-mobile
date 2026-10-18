@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import time
 
 
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.transfer.debug")
@@ -69,8 +70,11 @@ def restore_radio_state(serial, original):
     airplane, wifi = original
     adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable" if airplane else "disable")
     adb(serial, "shell", "svc", "wifi", "disable" if wifi == b"0" else "enable")
-    if radio_state(serial) != original:
-        raise RuntimeError("Could not restore the emulator's original network state")
+    for _ in range(20):
+        if radio_state(serial) == original:
+            return
+        time.sleep(0.25)
+    raise RuntimeError("Could not restore the emulator's original network state")
 
 
 def main():
