@@ -125,6 +125,25 @@ class NativeBackgroundCredentialCallbackTest {
     }
 
     @Test
+    fun `duplicate completion after app launch preserves the new installation identity`() {
+        withPreferences { preferences ->
+            preferences.edit { values -> values[stringPreferencesKey("device.id")] = "source-device" }
+        }
+        val firstAgent = object : NativeBackupAgent() {}.also { it.initialize(context) }
+        firstAgent.onRestoreFinished()
+
+        withPreferences { preferences ->
+            preferences.edit { values -> values[stringPreferencesKey("device.id")] = "destination-device" }
+        }
+        val recreatedAgent = object : NativeBackupAgent() {}.also { it.initialize(context) }
+        recreatedAgent.onRestoreFinished()
+
+        withPreferences { preferences ->
+            assertEquals("destination-device", preferences.data.first()[stringPreferencesKey("device.id")])
+        }
+    }
+
+    @Test
     fun `duplicate completion retries an interrupted installation identity reset`() {
         val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
         withPreferences { preferences ->

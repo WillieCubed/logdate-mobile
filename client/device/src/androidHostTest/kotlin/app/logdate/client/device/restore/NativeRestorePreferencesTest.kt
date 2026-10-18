@@ -17,6 +17,38 @@ import kotlin.test.assertNotEquals
 
 class NativeRestorePreferencesTest {
     @Test
+    fun `installation reset marker keeps the original identity until a new restore session`() {
+        val directory = createTempDirectory("installation-reset-marker").toFile()
+        val marker = NativeInstallationResetMarker(directory)
+        try {
+            assertEquals("source-device", marker.sourceDeviceId("source-device"))
+            assertEquals("source-device", marker.sourceDeviceId("destination-device"))
+            marker.clear()
+            assertEquals("destination-device", marker.sourceDeviceId("destination-device"))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `installation reset marker repairs either damaged copy`() {
+        val directory = createTempDirectory("installation-reset-marker-repair").toFile()
+        val marker = NativeInstallationResetMarker(directory)
+        val primary = directory.resolve(".logdate_installation_reset_source")
+        val backup = directory.resolve(".logdate_installation_reset_source_backup")
+        try {
+            marker.sourceDeviceId("source-device")
+            primary.writeText("damaged")
+            assertEquals("source-device", marker.sourceDeviceId("destination-device"))
+
+            backup.writeText("damaged")
+            assertEquals("source-device", marker.sourceDeviceId("destination-device"))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `native restore keeps the journal owner but makes a distinct device`() =
         runTest {
             val directory = createTempDirectory("restored-preferences").toFile()
@@ -33,7 +65,7 @@ class NativeRestorePreferencesTest {
                 storage.putString("identity.canonical_owner_bound", "true")
                 storage.putString("unrelated.preference", "keep this")
 
-                resetRestoredInstallationState(preferences)
+                resetRestoredInstallationState(preferences, sourceDevice.toString())
 
                 assertEquals(sourceOwner, DefaultCanonicalOwnerProvider(storage).getCanonicalOwnerId())
                 assertEquals("keep this", storage.getString("unrelated.preference"))
