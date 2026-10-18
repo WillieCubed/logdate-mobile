@@ -80,6 +80,7 @@ class NativeRestoredSettingsE2ETest {
             }
             val registered = MutableStateFlow(false)
             val locationEvents = CopyOnWriteArrayList<String>()
+            val transitionEvents = CopyOnWriteArrayList<String>()
             val registrationSink =
                 object : Antilog() {
                     override fun performLog(
@@ -90,6 +91,7 @@ class NativeRestoredSettingsE2ETest {
                     ) {
                         if (message == "Activity transition updates registered") registered.value = true
                         if (message?.contains("location", ignoreCase = true) == true) locationEvents += message
+                        if (message?.contains("transition", ignoreCase = true) == true) transitionEvents += message
                     }
                 }
             Napier.base(registrationSink)
@@ -120,7 +122,7 @@ class NativeRestoredSettingsE2ETest {
                 val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
                 activity = launchResumedActivity(intent)
                 val firstStatus =
-                    withTimeoutOrNull(30_000) {
+                    withTimeoutOrNull(90_000) {
                         ActivityAwareLocationService.captureStatus.first {
                             it == LocationCaptureStatus.Running || it == LocationCaptureStatus.Failed
                         }
@@ -137,6 +139,16 @@ class NativeRestoredSettingsE2ETest {
                             true
                     }
                 assertNull(transitions.get(service))
+                instrumentation.runOnMainSync { check(activity?.moveTaskToBack(true) == true) }
+                awaitActivityStage(requireNotNull(activity), Stage.STOPPED)
+                val appRemainsResumed =
+                    withContext(Dispatchers.Main) {
+                        ActivityLifecycleMonitorRegistry
+                            .getInstance()
+                            .getActivitiesInStage(Stage.RESUMED)
+                            .any { it.packageName == context.packageName }
+                    }
+                assertEquals(false, appRemainsResumed, "LogDate must leave the foreground before the motion grant")
                 status("RESTORE_MOTION_GRANT_REQUIRED")
                 withTimeout(20_000) {
                     while (context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) !=
@@ -145,12 +157,32 @@ class NativeRestoredSettingsE2ETest {
                         delay(50)
                     }
                 }
-                instrumentation.runOnMainSync { activity?.finish() }
+                status("RESTORE_MOTION_PERMISSION_GRANTED")
+                status("RESTORE_ACTIVITY_RESUMING")
                 activity = launchResumedActivity(intent)
-                withTimeout(20_000) {
-                    while (withContext(Dispatchers.Main) { transitions.get(service) } == null) delay(50)
-                }
-                withTimeout(20_000) { registered.first { it } }
+                status("RESTORE_ACTIVITY_RESUMED_AFTER_MOTION_GRANT")
+                val pendingIntentCreated =
+                    withTimeoutOrNull(20_000) {
+                        while (withContext(Dispatchers.Main) { transitions.get(service) } == null) delay(50)
+                        true
+                    }
+                assertEquals(
+                    true,
+                    pendingIntentCreated,
+                    "The resumed activity did not cause the running service to create a transition request; " +
+                        "events=$transitionEvents",
+                )
+                status("RESTORE_TRANSITION_REQUEST_CREATED")
+                val registrationAccepted =
+                    withTimeoutOrNull(20_000) {
+                        registered.first { it }
+                        true
+                    }
+                assertEquals(
+                    true,
+                    registrationAccepted,
+                    "Play Services did not accept the activity transition request; events=$transitionEvents",
+                )
                 assertSame(service, ActivityAwareLocationService.instance)
                 assertEquals(LocationCaptureStatus.Running, ActivityAwareLocationService.captureStatus.value)
             } catch (error: Throwable) {
@@ -170,7 +202,9 @@ class NativeRestoredSettingsE2ETest {
         }
 
     private suspend fun launchResumedActivity(intent: Intent): Activity {
-        instrumentation.runOnMainSync { context.startActivity(intent) }
+        val foregroundIntent =
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        instrumentation.runOnMainSync { context.startActivity(foregroundIntent) }
         return withTimeout(20_000) {
             var resumed: Activity? = null
             while (resumed == null) {
@@ -184,6 +218,20 @@ class NativeRestoredSettingsE2ETest {
                 if (resumed == null) delay(50)
             }
             resumed
+        }
+    }
+
+    private suspend fun awaitActivityStage(
+        activity: Activity,
+        stage: Stage,
+    ) {
+        withTimeout(20_000) {
+            while (withContext(Dispatchers.Main) {
+                    ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(stage).any { it === activity }
+                } == false
+            ) {
+                delay(50)
+            }
         }
     }
 

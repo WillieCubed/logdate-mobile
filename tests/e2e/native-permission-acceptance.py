@@ -26,7 +26,8 @@ def run(args, serial):
     package = h.adb(serial, "shell", "dumpsys", "package", h.PACKAGE).stdout.decode()
     grants = {permission: bool(re.search(r"android\.permission\." + permission + r": granted=true", package)) for permission in PERMISSIONS}
     rows = h.adb(serial, "shell", "cmd", "netpolicy", "list", "wifi-networks").stdout.decode().splitlines()
-    original = next(line.rsplit(";", 1)[1] for line in rows if line.rsplit(";", 1)[0] == "AndroidWifi")
+    wifi_rows = [line for line in rows if line.rsplit(";", 1)[0] == "AndroidWifi"]
+    original = wifi_rows[0].rsplit(";", 1)[1] if wifi_rows else None
     saver = b"enabled" in h.adb(serial, "shell", "cmd", "netpolicy", "get", "restrict-background").stdout
     airplane = h.adb(serial, "shell", "settings", "get", "global", "airplane_mode_on").stdout.strip() == b"1"
     wifi = h.adb(serial, "shell", "settings", "get", "global", "wifi_on").stdout.strip()
@@ -35,7 +36,7 @@ def run(args, serial):
     (directory / "environment-before.json").write_text(json.dumps({"grants": grants, "metered": original,
         "dataSaver": saver, "airplane": airplane, "wifi": wifi.decode()}, indent=2))
     def probe(method, name, **kwargs):
-        h.instrument(serial, TEST + "#" + method, directory / name, extras=EXTRAS, **kwargs)
+        h.instrument(serial, TEST + "#" + method, directory / name, extras=EXTRAS, timeout=240, **kwargs)
     try:
         probe("restoreOriginalTrackingSettings", "initial-settings-cleanup.log")
         for permission in PERMISSIONS:
