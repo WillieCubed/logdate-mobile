@@ -56,7 +56,7 @@ public object LexiconValidator {
                 report(path, "${definition.type.lexiconName()} definitions must be named main")
             }
             if (definition.type == LexiconType.RECORD) checkRecord(path, definition)
-            checkField(path, definition.asField(), requiredNames = definition.required)
+            checkField(path, definition.asField, requiredNames = definition.required)
             definition.parameters?.let { checkField("$path.parameters", it) }
             definition.input?.schema?.let { checkField("$path.input", it) }
             definition.output?.schema?.let { checkField("$path.output", it) }
@@ -111,7 +111,7 @@ public object LexiconValidator {
                 report(path, "ref definitions must include a ref target")
                 return
             }
-            if (resolve(reference) == null) report(path, "Unresolved ref target ${reference.label()}")
+            if (resolve(reference) == null) report(path, "Unresolved ref target ${reference.label}")
         }
 
         private fun checkUnion(
@@ -122,9 +122,9 @@ public object LexiconValidator {
             field.refs.forEach { reference ->
                 val target = resolve(reference)
                 when {
-                    target == null -> report(path, "Unresolved ref target ${reference.label()}")
+                    target == null -> report(path, "Unresolved ref target ${reference.label}")
                     target.type != LexiconType.OBJECT && target.type != LexiconType.RECORD ->
-                        report(path, "Union member ${reference.label()} must be an object or a record")
+                        report(path, "Union member ${reference.label} must be an object or a record")
                 }
             }
         }
@@ -165,23 +165,6 @@ public object LexiconValidator {
             issues += LexiconValidationIssue(path = path, message = message)
         }
     }
-
-    private fun LexiconDefinition.asField(): LexiconField =
-        LexiconField(
-            type = type,
-            properties = properties,
-            items = items,
-            reference = reference,
-            refs = refs,
-            closed = closed,
-            accept = accept,
-            maxSize = maxSize,
-            minLength = minLength,
-            maxLength = maxLength,
-            unsupportedType = unsupportedType,
-        )
-
-    private fun LexiconReference.label(): String = "$documentId#$definitionName"
 
     private fun LexiconType.lexiconName(): String = name.lowercase().replace('_', '-')
 

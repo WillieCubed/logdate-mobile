@@ -324,7 +324,7 @@ public object LexiconCodegen {
                 val shortName = reference.memberName(qualified = false)
                 UnionMember(
                     name = if (shortNames.count { it == shortName } > 1) reference.memberName(qualified = true) else shortName,
-                    type = reference.unionTypeId(),
+                    type = reference.unionTypeId,
                     valueType = typeName(reference),
                     qualifiedValueType = qualifiedTypeName(reference),
                 )
@@ -392,10 +392,6 @@ public object LexiconCodegen {
             definitionName == MAIN_DEFINITION_NAME || qualified -> className(documentId, definitionName)
             else -> definitionName.asPascalCase()
         }
-
-    /** The `$type` a member of this definition carries: the bare NSID for `main`. */
-    private fun LexiconReference.unionTypeId(): String =
-        if (definitionName == MAIN_DEFINITION_NAME) documentId.toString() else "$documentId#$definitionName"
 
     private fun LexiconRecordKey.kotlin(): String =
         when (this) {

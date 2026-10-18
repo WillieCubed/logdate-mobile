@@ -60,7 +60,7 @@ public object LexiconParser {
             properties = properties,
             items = source["items"]?.jsonObject?.let { parseField(owner = owner, source = it) },
             reference = source["ref"]?.jsonPrimitive?.contentOrNull?.let { LexiconReference.parse(owner, it) },
-            knownValues = source.enumValues(),
+            knownValues = source.strings("knownValues"),
             parameters = source["parameters"]?.jsonObject?.let { parseField(owner = owner, source = it) },
             input = source["input"]?.jsonObject?.let { parseBody(owner = owner, source = it) },
             output = source["output"]?.jsonObject?.let { parseBody(owner = owner, source = it) },
@@ -88,7 +88,7 @@ public object LexiconParser {
             maxGraphemes = source.long("maxGraphemes"),
             minimum = source.long("minimum"),
             maximum = source.long("maximum"),
-            closedValues = (source["enum"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull },
+            closedValues = source["enum"]?.let { source.strings("enum") },
             constValue = source["const"] as? JsonPrimitive,
         )
     }
@@ -113,7 +113,7 @@ public object LexiconParser {
                 ),
             items = source["items"]?.jsonObject?.let { parseField(owner = owner, source = it) },
             reference = source["ref"]?.jsonPrimitive?.contentOrNull?.let { LexiconReference.parse(owner, it) },
-            knownValues = source.enumValues(),
+            knownValues = source.strings("knownValues"),
             refs = source.references(owner),
             closed = source.boolean("closed"),
             accept = source.strings("accept"),
@@ -126,7 +126,7 @@ public object LexiconParser {
             maxGraphemes = source.long("maxGraphemes"),
             minimum = source.long("minimum"),
             maximum = source.long("maximum"),
-            closedValues = (source["enum"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull },
+            closedValues = source["enum"]?.let { source.strings("enum") },
             constValue = source["const"] as? JsonPrimitive,
         )
 
@@ -195,18 +195,6 @@ public object LexiconParser {
             "permission-set" to LexiconType.PERMISSION_SET,
             "permission" to LexiconType.PERMISSION,
         )
-
-    private fun JsonObject.enumValues(): List<String> =
-        (
-            (this["enum"] as? JsonArray)?.mapNotNull { element ->
-                (element as? JsonPrimitive)?.contentOrNull
-            } ?: emptyList()
-        ) +
-            (
-                (this["knownValues"] as? JsonArray)?.mapNotNull { element ->
-                    (element as? JsonPrimitive)?.contentOrNull
-                } ?: emptyList()
-            )
 
     private fun JsonObject.stringSet(key: String): Set<String> =
         this[key]

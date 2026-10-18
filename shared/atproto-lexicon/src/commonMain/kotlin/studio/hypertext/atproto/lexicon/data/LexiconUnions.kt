@@ -71,8 +71,6 @@ public object LexiconUnions {
         this as? JsonEncoder ?: throw SerializationException("Lexicon unions encode only through JSON; use LexiconData for DAG-CBOR")
 
     private fun JsonObject.withType(type: String): JsonObject = JsonObject(mapOf(TYPE_KEY to JsonPrimitive(type)) + (this - TYPE_KEY))
-
-    private const val TYPE_KEY = "\$type"
 }
 
 /**
