@@ -27,6 +27,8 @@ dependencies {
     testImplementation(libs.exposed.jdbc)
     testImplementation(projects.shared.config)
     testImplementation(projects.shared.model)
+    testImplementation(projects.shared.space)
+    testImplementation(projects.shared.atprotoXrpc)
 
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -55,6 +57,8 @@ tasks.register("writeAndroidHistoryHarnessClasspath") {
 }
 
 tasks.withType<Test>().configureEach {
+    // The server reads its feature flags from the environment, so the in-process test server needs this one set.
+    environment("LOGDATE_PERSONAL_SPACE_ENABLED", "true")
     if (System.getenv("LOGDATE_LARGE_BACKUP_TEST") == "1") {
         maxHeapSize = "512m"
     }
