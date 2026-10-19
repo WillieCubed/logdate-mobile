@@ -136,13 +136,36 @@ class AtprotoOAuthClientFlowTest {
         }
 
     @Test
-    fun rejectsACallbackWithoutTheIssuerWhenTheServerPromisedIt() =
+    fun rejectsACallbackWithoutTheIssuer() =
         runTest {
             val harness = OAuthTestHarness()
             val redirect = harness.client.authorize("alice.example.com")
             val parameters = harness.atmosphere.approve(redirect.url) - "iss"
 
             val error = assertFailsWith<OAuthCallbackException> { harness.client.callback(parameters) }
+
+            assertEquals(OAuthCallbackException.Reason.MISSING_ISSUER, error.reason)
+        }
+
+    @Test
+    fun checksTheIssuerBeforeReportingAnErrorCallback() =
+        runTest {
+            val harness = OAuthTestHarness()
+            val redirect = harness.client.authorize("alice.example.com")
+            val denied = harness.atmosphere.deny(redirect.url)
+
+            assertFailsWith<OAuthIssuerMismatchException> {
+                harness.client.callback(denied + ("iss" to "https://evil.example.com"))
+            }
+        }
+
+    @Test
+    fun rejectsAnErrorCallbackWithoutTheIssuer() =
+        runTest {
+            val harness = OAuthTestHarness()
+            val redirect = harness.client.authorize("alice.example.com")
+
+            val error = assertFailsWith<OAuthCallbackException> { harness.client.callback(harness.atmosphere.deny(redirect.url) - "iss") }
 
             assertEquals(OAuthCallbackException.Reason.MISSING_ISSUER, error.reason)
         }

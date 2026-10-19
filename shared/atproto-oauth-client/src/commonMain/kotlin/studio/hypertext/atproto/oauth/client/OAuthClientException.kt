@@ -118,7 +118,7 @@ public class OAuthCallbackException(
         /** The `code` parameter is missing. */
         MISSING_CODE,
 
-        /** The `iss` parameter is missing although the server promised to send it. */
+        /** The `iss` parameter (RFC 9207) is missing. */
         MISSING_ISSUER,
 
         /** The response uses JWT-secured responses (JARM), which this client does not request. */

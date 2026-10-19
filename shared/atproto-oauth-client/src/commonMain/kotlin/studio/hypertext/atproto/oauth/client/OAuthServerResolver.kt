@@ -154,7 +154,7 @@ public class OAuthServerResolver(
         if (metadata.issuer != issuer) {
             throw OAuthServerMetadataException(url, "issuer is ${metadata.issuer}, expected $issuer")
         }
-        val violations = atprotoProfileViolations(metadata)
+        val violations = atprotoProfileViolations(metadata, allowHttp)
         if (violations.isNotEmpty()) {
             throw OAuthServerMetadataException(url, "not an AT Protocol OAuth server: ${violations.joinToString("; ")}")
         }

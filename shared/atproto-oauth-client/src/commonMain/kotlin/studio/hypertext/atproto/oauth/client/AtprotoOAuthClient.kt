@@ -201,8 +201,9 @@ public class AtprotoOAuthClient(
     /**
      * Completes a sign-in from the query parameters of the redirect back to the client.
      *
-     * Before the session is saved, the client verifies that `iss` matches the authorization server
-     * the request went to, that `sub` is the account the sign-in started for, and that the
+     * The `iss` parameter must be present and match the authorization server the request went to;
+     * it is checked before an `error` response is reported. Before the session is saved, the client
+     * also verifies that `sub` is the account the sign-in started for, and that the
      * account's current data server still names that authorization server.
      *
      * @throws OAuthConsentDeniedException if the person declined.
@@ -215,14 +216,6 @@ public class AtprotoOAuthClient(
         val (pending, code) = takePendingRequest(parameters)
 
         val metadata = resolver.authorizationServerMetadata(pending.issuer)
-        val issuerParameter = parameters["iss"]
-        if (issuerParameter != null && issuerParameter != pending.issuer) {
-            throw OAuthIssuerMismatchException(pending.issuer, issuerParameter)
-        }
-        if (issuerParameter == null && metadata.authorizationResponseIssParameterSupported) {
-            throw OAuthCallbackException(OAuthCallbackException.Reason.MISSING_ISSUER, "The callback has no iss parameter")
-        }
-
         val clientKey =
             config.key(pending.clientKeyId)
                 ?: throw IllegalStateException("Client key ${pending.clientKeyId} was removed while the sign-in was pending")
@@ -306,6 +299,12 @@ public class AtprotoOAuthClient(
         if (clock.now() - pending.createdAt > stateLifetime) {
             throw OAuthCallbackException(OAuthCallbackException.Reason.EXPIRED_STATE, "The sign-in request expired; start again")
         }
+
+        // RFC 9207: check the issuer before trusting anything else in the response, errors included.
+        val issuer =
+            parameters["iss"]
+                ?: throw OAuthCallbackException(OAuthCallbackException.Reason.MISSING_ISSUER, "The callback has no iss parameter")
+        if (issuer != pending.issuer) throw OAuthIssuerMismatchException(pending.issuer, issuer)
 
         parameters["error"]?.let { error ->
             val description = parameters["error_description"]

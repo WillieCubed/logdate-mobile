@@ -69,6 +69,73 @@ class OAuthServerResolverTest {
         }
 
     @Test
+    fun rejectsAServerThatDoesNotSendTheIssuerInCallbacks() =
+        runTest {
+            atmosphere.authorizationServerMetadataOverride = { JsonObject(it - "authorization_response_iss_parameter_supported") }
+
+            val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+            assertTrue(error.message!!.contains("authorization_response_iss_parameter_supported"))
+        }
+
+    @Test
+    fun rejectsAServerThatDoesNotRequirePushedRequests() =
+        runTest {
+            atmosphere.authorizationServerMetadataOverride = {
+                JsonObject(it + ("require_pushed_authorization_requests" to JsonPrimitive(false)))
+            }
+
+            val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+            assertTrue(error.message!!.contains("require_pushed_authorization_requests"))
+        }
+
+    @Test
+    fun requiresEs256ClientAssertionsAndRejectsUnsignedOnes() =
+        runTest {
+            val cases =
+                mapOf(
+                    "token_endpoint_auth_signing_alg_values_supported is missing" to { metadata: JsonObject ->
+                        JsonObject(metadata - "token_endpoint_auth_signing_alg_values_supported")
+                    },
+                    "client assertion algorithm ES256" to { metadata: JsonObject ->
+                        JsonObject(metadata + ("token_endpoint_auth_signing_alg_values_supported" to strings("RS256")))
+                    },
+                    "allows \"none\"" to { metadata: JsonObject ->
+                        JsonObject(metadata + ("token_endpoint_auth_signing_alg_values_supported" to strings("ES256", "none")))
+                    },
+                )
+            cases.forEach { (expected, override) ->
+                atmosphere.authorizationServerMetadataOverride = override
+
+                val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+                assertTrue(error.message!!.contains(expected), "expected \"$expected\" in ${error.message}")
+            }
+        }
+
+    @Test
+    fun rejectsEndpointsOffTheIssuersOriginOrWithoutHttps() =
+        runTest {
+            val cases =
+                listOf(
+                    "token_endpoint is not at the issuer's origin" to ("token_endpoint" to "https://collector.example.org/token"),
+                    "token_endpoint is not at the issuer's origin" to ("token_endpoint" to "https://auth.example.com:8443/oauth/token"),
+                    "authorization_endpoint must use https://" to ("authorization_endpoint" to "http://auth.example.com/oauth/authorize"),
+                    "pushed_authorization_request_endpoint is not a valid URL" to ("pushed_authorization_request_endpoint" to "/oauth/par"),
+                    "revocation_endpoint is not at the issuer's origin" to
+                        ("revocation_endpoint" to "https://auth.example.com.evil.net/revoke"),
+                )
+            cases.forEach { (expected, endpoint) ->
+                atmosphere.authorizationServerMetadataOverride = { JsonObject(it + (endpoint.first to JsonPrimitive(endpoint.second))) }
+
+                val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+                assertTrue(error.message!!.contains(expected), "expected \"$expected\" in ${error.message}")
+            }
+        }
+
+    @Test
     fun rejectsMetadataForAnotherIssuer() =
         runTest {
             atmosphere.authorizationServerMetadataOverride = { JsonObject(it + ("issuer" to JsonPrimitive("https://evil.example.com"))) }
@@ -108,4 +175,6 @@ class OAuthServerResolverTest {
 
             assertEquals(atmosphere.issuer, resolved.metadata.issuer)
         }
+
+    private fun strings(vararg values: String) = buildJsonArray { values.forEach { add(JsonPrimitive(it)) } }
 }

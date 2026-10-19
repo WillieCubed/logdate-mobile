@@ -32,13 +32,29 @@ The full flow, end to end:
 
 | Step | What the client does | Standard |
 | --- | --- | --- |
-| Resolve | Handle → DID → DID document (handle checked in both directions) → PDS → authorization server metadata, checked against the AT Protocol profile | AT Protocol identity, RFC 9728, RFC 8414 |
+| Resolve | Handle → DID → DID document (handle checked in both directions) → PDS → authorization server metadata, checked against the AT Protocol profile (see below) | AT Protocol identity, RFC 9728, RFC 8414 |
 | Push the request | POSTs the request parameters to the PAR endpoint with a PKCE challenge, a DPoP proof, and a signed client assertion | RFC 9126, RFC 7636 (S256), RFC 9449, RFC 7523 |
 | Redirect | Returns `authorization_endpoint?client_id=…&request_uri=…` for you to redirect the browser to | RFC 9126 |
-| Callback | Checks `state` and `iss`, exchanges the code with the PKCE verifier, then confirms that `sub` is the expected DID and that the DID's PDS really uses this authorization server | AT Protocol OAuth "Identity Authentication" |
+| Callback | Checks `state`, then requires `iss` to match the server the request went to, even on an error response. Exchanges the code with the PKCE verifier, then confirms that `sub` is the expected DID and that the DID's PDS really uses this authorization server | RFC 9207, AT Protocol OAuth "Identity Authentication" |
 | Use | Adds `Authorization: DPoP <token>` and a proof with an `ath` hash to every data server request | RFC 9449 |
 | Refresh | Re-verifies the account's authorization server, then trades the single-use refresh token for new tokens with the same DPoP key and client key | RFC 6749, AT Protocol OAuth "Tokens" |
 | Sign out | Revokes the refresh token and deletes the stored session | RFC 7009 |
+
+### Which authorization servers the client accepts
+
+Before it sends anything to an authorization server, the client checks the server's metadata and
+refuses the server unless all of these hold:
+
+- It supports client metadata documents, pushed authorization requests, and **requires** them
+  (`require_pushed_authorization_requests`).
+- It sends `iss` in every authorization response (`authorization_response_iss_parameter_supported`),
+  so a callback cannot be passed off as coming from a different server (a "mix-up" attack).
+- It supports the `authorization_code` and `refresh_token` grants, the `code` response type, PKCE
+  `S256`, DPoP with ES256, the `atproto` scope, and `private_key_jwt` client authentication with
+  ES256. A server that lists `none` among its client assertion algorithms is refused.
+- Every endpoint is an `https://` URL at the issuer's own origin (same host and port). The AT
+  Protocol does not spell this out, but the reference server and every known deployment work this
+  way, and it stops a tampered metadata document from pointing token requests at another server.
 
 ## Setting up a client
 
