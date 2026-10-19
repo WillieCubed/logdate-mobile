@@ -641,7 +641,7 @@ resource "google_monitoring_alert_policy" "handle_resolution_failing" {
     }
   }
   documentation {
-    content   = "P1: other AT Protocol apps cannot verify logdate.app handles while this fires. Run `./scripts/check-handle-resolution.sh --handle ${var.handle_resolution_monitor.handle} --service-url ${lookup(var.cloud_run_env, "LOGDATE_PUBLIC_ORIGIN", "")}` to see which step fails. See docs/reference/handle-resolution.md."
+    content   = "P1: other AT Protocol apps cannot verify logdate.app handles while this fires. Run `./scripts/check-handle-resolution.sh --handle ${var.handle_resolution_monitor.handle} --service-url ${lookup(var.cloud_run_env, "LOGDATE_PUBLIC_ORIGIN", "")}` to see which step fails. See docs/runbook/handle-resolution.md."
     mime_type = "text/markdown"
   }
 
