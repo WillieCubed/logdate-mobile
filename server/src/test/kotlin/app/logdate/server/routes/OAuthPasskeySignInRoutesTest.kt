@@ -494,7 +494,15 @@ class OAuthPasskeySignInRoutesTest {
     private companion object {
         const val CLIENT_ID = "https://viewer.example.com/client.json"
         const val REDIRECT_URI = "https://viewer.example.com/callback"
-        const val CODE_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-        const val CODE_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+        const val CODE_VERIFIER = "example-code-verifier-for-journal-viewer-tests"
+        val CODE_CHALLENGE: String =
+            java.util.Base64
+                .getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(
+                    java.security.MessageDigest
+                        .getInstance("SHA-256")
+                        .digest(CODE_VERIFIER.toByteArray()),
+                )
     }
 }

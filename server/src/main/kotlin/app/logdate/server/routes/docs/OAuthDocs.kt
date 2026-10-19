@@ -360,9 +360,9 @@ internal object OAuthDocs {
             ok(
                 "The WebAuthn request options. Byte values are base64url without padding.",
                 OAuthPasskeyOptionsResponse(
-                    challenge = "kZ3Xn8yq1o0wQm1c7l9eYb2s8vR4tPq6uH0jK5aD3fE",
+                    challenge = "example-challenge",
                     rpId = "logdate.app",
-                    allowCredentials = listOf("AdK1nE3sR9w8bQ2x7cV5mL0pT4yU6iO1aS3dF8gH2jK"),
+                    allowCredentials = listOf("example-credential-id"),
                     timeout = 300_000,
                     userVerification = "required",
                 ),
@@ -396,16 +396,16 @@ internal object OAuthDocs {
                     value =
                         OAuthPasskeyApprovalRequest(
                             requestUri = REQUEST_URI,
-                            challenge = "kZ3Xn8yq1o0wQm1c7l9eYb2s8vR4tPq6uH0jK5aD3fE",
+                            challenge = "example-challenge",
                             credential =
                                 PasskeyAssertionResponse(
-                                    id = "AdK1nE3sR9w8bQ2x7cV5mL0pT4yU6iO1aS3dF8gH2jK",
-                                    rawId = "AdK1nE3sR9w8bQ2x7cV5mL0pT4yU6iO1aS3dF8gH2jK",
+                                    id = "example-credential-id",
+                                    rawId = "example-credential-id",
                                     response =
                                         PasskeyAssertionAuthenticatorResponse(
-                                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
-                                            authenticatorData = "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
-                                            signature = "MEUCIQDexample",
+                                            clientDataJSON = "example-client-data",
+                                            authenticatorData = "example-authenticator-data",
+                                            signature = "example-signature",
                                             userHandle = "",
                                         ),
                                 ),
