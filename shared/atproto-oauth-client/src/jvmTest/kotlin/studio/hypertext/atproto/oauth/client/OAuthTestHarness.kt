@@ -7,7 +7,7 @@ internal class OAuthTestHarness(
     val atmosphere: MockAtmosphere = MockAtmosphere(),
     val keys: List<OAuthClientKey> = listOf(JvmOAuthCrypto.generateClientKey("client-key-1")),
 ) {
-    val stateStore = InMemoryOAuthStateStore()
+    val stateStore = InMemoryOAuthStateStore(atmosphere.clock)
     val sessionStore = InMemoryOAuthSessionStore()
 
     val config =
@@ -28,15 +28,21 @@ internal class OAuthTestHarness(
     }
 
     /** Another client instance sharing the same stores, as a second server process would. */
-    fun newClientInstance(configuration: OAuthClientConfig = config): AtprotoOAuthClient =
+    fun newClientInstance(
+        configuration: OAuthClientConfig = config,
+        strictDpopNonces: Boolean = false,
+        pendingStore: OAuthStateStore = stateStore,
+        sessions: OAuthSessionStore = sessionStore,
+    ): AtprotoOAuthClient =
         AtprotoOAuthClient(
             config = configuration,
             identityResolver = atmosphere.identityResolver,
             httpClient = atmosphere.httpClient,
             crypto = JvmOAuthCrypto,
-            stateStore = stateStore,
-            sessionStore = sessionStore,
+            stateStore = pendingStore,
+            sessionStore = sessions,
             clock = atmosphere.clock,
+            strictDpopNonces = strictDpopNonces,
         )
 
     suspend fun signIn(

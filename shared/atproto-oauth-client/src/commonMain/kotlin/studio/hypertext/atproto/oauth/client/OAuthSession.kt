@@ -8,9 +8,15 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.SerializationStrategy
 import studio.hypertext.atproto.identity.AtprotoDid
+import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.xrpc.KtorXrpcClient
 import studio.hypertext.atproto.xrpc.XrpcClient
+import studio.hypertext.atproto.xrpc.XrpcRequestBuilder
+import studio.hypertext.atproto.xrpc.XrpcTransportException
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -75,10 +81,10 @@ public class OAuthSession internal constructor(
      * plugins: a caller's logging or default-header plugins do not apply here, so they never see
      * the access token. Add request logging, if needed, outside this client.
      *
-     * Requests to any other origin fail with [IllegalStateException] so the access token is never
-     * sent elsewhere. Redirects are not followed, for the same reason; a 3xx response is returned
-     * as it is. Request bodies must be re-sendable (for example, text or bytes), because a request
-     * may be sent up to three times.
+     * Requests to any other origin fail with [OAuthForeignOriginException] so the access token is
+     * never sent elsewhere; the check runs again after a renewal. Redirects are not followed, for
+     * the same reason; a 3xx response is returned as it is. Request bodies must be re-sendable (for
+     * example, text or bytes), because a request may be sent up to three times.
      *
      * Closing this client does not close the shared engine.
      */
@@ -90,8 +96,55 @@ public class OAuthSession internal constructor(
 
     /**
      * Returns an [XrpcClient] for the account's data server that authenticates with this session.
+     *
+     * Each call renews the access token if it is about to expire, then sends the request to the
+     * account's current data server, so the client keeps working after the account moves to
+     * another one. Every failure, including a failed renewal and [OAuthSessionNotFoundException]
+     * once the session has been removed, arrives as the cause of an `XrpcTransportException`.
      */
-    public suspend fun xrpcClient(): XrpcClient = KtorXrpcClient(httpClient, manager.session(did, OAuthRefreshMode.NEVER).pdsUrl)
+    public fun xrpcClient(): XrpcClient = SessionXrpcClient()
+
+    private inner class SessionXrpcClient : XrpcClient {
+        private suspend fun current(): XrpcClient {
+            // Renewing first means the request is addressed to the data server the renewal found.
+            // Any renewal failure (an ended session, a token endpoint error, a network or resolution
+            // failure) is reported the way the XRPC client reports its own failures.
+            val pdsUrl =
+                try {
+                    manager.session(did, OAuthRefreshMode.AUTO).pdsUrl
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    throw XrpcTransportException("XRPC request failed", exception)
+                }
+            return KtorXrpcClient(httpClient, pdsUrl)
+        }
+
+        override suspend fun queryRaw(
+            nsid: Nsid,
+            block: XrpcRequestBuilder.() -> Unit,
+        ): String = current().queryRaw(nsid, block)
+
+        override suspend fun <Response> query(
+            nsid: Nsid,
+            deserializer: DeserializationStrategy<Response>,
+            block: XrpcRequestBuilder.() -> Unit,
+        ): Response = current().query(nsid, deserializer, block)
+
+        override suspend fun procedureRaw(
+            nsid: Nsid,
+            body: String?,
+            block: XrpcRequestBuilder.() -> Unit,
+        ): String = current().procedureRaw(nsid, body, block)
+
+        override suspend fun <Body, Response> procedure(
+            nsid: Nsid,
+            body: Body,
+            serializer: SerializationStrategy<Body>,
+            deserializer: DeserializationStrategy<Response>,
+            block: XrpcRequestBuilder.() -> Unit,
+        ): Response = current().procedure(nsid, body, serializer, deserializer, block)
+    }
 
     /**
      * Revokes the session at the authorization server and removes it from the session store.
@@ -107,17 +160,14 @@ public class OAuthSession internal constructor(
         createClientPlugin("AtprotoOAuthDpop") {
             on(Send) { request ->
                 var session = manager.session(did, OAuthRefreshMode.AUTO)
-                val targetOrigin = request.url.build().origin()
-                val pdsOrigin = Url(session.pdsUrl).origin()
-                check(targetOrigin == pdsOrigin) {
-                    "This session only authenticates requests to $pdsOrigin, not $targetOrigin"
-                }
+                requireDataServerOrigin(request, session)
 
                 suspend fun sendWithNonceRetry(): HttpResponse {
-                    authorize(request, session)
+                    val sentNonce = authorize(request, session, nonces.get(request.url.buildString()))
                     var response = proceed(request).response
-                    if (rememberNonce(request, response) && response.isDpopError("use_dpop_nonce")) {
-                        authorize(request, session)
+                    val freshNonce = rememberNonce(request, response)?.takeIf { it != sentNonce }
+                    if (freshNonce != null && response.isDpopError("use_dpop_nonce")) {
+                        authorize(request, session, freshNonce)
                         response = proceed(request).response
                         rememberNonce(request, response)
                     }
@@ -126,7 +176,9 @@ public class OAuthSession internal constructor(
 
                 var response = sendWithNonceRetry()
                 if (response.isDpopError("invalid_token")) {
-                    session = manager.session(did, OAuthRefreshMode.FORCE)
+                    session = manager.renewAfterRejection(session)
+                    // The renewal re-resolves the account, which may now live on another data server.
+                    requireDataServerOrigin(request, session)
                     response = sendWithNonceRetry()
                     if (response.isDpopError("invalid_token")) {
                         manager.end(did, OAuthSessionRevokedException(did, "the data server rejected a freshly renewed access token"))
@@ -136,36 +188,47 @@ public class OAuthSession internal constructor(
             }
         }
 
-    private suspend fun authorize(
+    private fun requireDataServerOrigin(
         request: HttpRequestBuilder,
         session: OAuthStoredSession,
     ) {
-        val url = request.url.buildString()
+        val targetOrigin = request.url.build().origin()
+        val pdsOrigin = Url(session.pdsUrl).origin()
+        if (targetOrigin != pdsOrigin) throw OAuthForeignOriginException(did, targetOrigin, pdsOrigin)
+    }
+
+    /**
+     * Adds the access token and a DPoP proof carrying [nonce], and returns [nonce].
+     */
+    private fun authorize(
+        request: HttpRequestBuilder,
+        session: OAuthStoredSession,
+        nonce: String?,
+    ): String? {
         val proof =
             crypto.createDpopProof(
                 dpopKey = session.dpopKey,
                 htm = request.method.value,
-                htu = dpopHtu(url),
-                nonce = nonces.get(url),
+                htu = dpopHtu(request.url.buildString()),
+                nonce = nonce,
                 accessToken = session.accessToken,
                 now = clock.now(),
             )
         request.headers[HttpHeaders.Authorization] = "DPoP ${session.accessToken}"
         request.headers[DPOP_HEADER] = proof
+        return nonce
     }
 
     /**
-     * Stores the response's DPoP nonce. Returns `true` if the nonce differs from the one sent.
+     * Stores and returns the response's DPoP nonce, if it has one.
      */
     private suspend fun rememberNonce(
         request: HttpRequestBuilder,
         response: HttpResponse,
-    ): Boolean {
-        val url = request.url.buildString()
-        val nonce = response.headers[DPOP_NONCE_HEADER] ?: return false
-        val previous = nonces.get(url)
-        nonces.put(url, nonce)
-        return nonce != previous
+    ): String? {
+        val nonce = response.headers[DPOP_NONCE_HEADER] ?: return null
+        nonces.put(request.url.buildString(), nonce)
+        return nonce
     }
 }
 

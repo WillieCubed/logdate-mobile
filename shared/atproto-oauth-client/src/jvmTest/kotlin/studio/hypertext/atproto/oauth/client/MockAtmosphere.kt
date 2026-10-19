@@ -81,6 +81,9 @@ internal class MockAtmosphere(
     val otherIssuer = "https://other-auth.example.net"
     val otherPdsUrl = "https://pds.example.net"
 
+    /** A second data server behind [issuer], for accounts that move between servers. */
+    val secondPdsUrl = "https://pds2.example.com"
+
     val alice = MockAccount(did = "did:plc:aliceaaaaaaaaaaaaaaaaaaa", handle = "alice.example.com", pdsUrl = pdsUrl)
     val bob = MockAccount(did = "did:plc:bobbbbbbbbbbbbbbbbbbbbbb", handle = "bob.example.com", pdsUrl = pdsUrl)
     val elsewhere = MockAccount(did = "did:plc:elsewhereeeeeeeeeeeeeeee", handle = "elsewhere.example.net", pdsUrl = otherPdsUrl)
@@ -91,7 +94,23 @@ internal class MockAtmosphere(
     var clientMetadataJson: String? = null
 
     var accessTokenLifetime: Duration = 5.minutes
+
+    /** When false, the servers neither require DPoP nonces nor send `DPoP-Nonce` headers. */
     var requireNonce: Boolean = true
+
+    var issueRefreshTokens: Boolean = true
+
+    /**
+     * When true, as on the reference server, presenting a spent refresh token ends the whole
+     * grant. When false, only that refresh request fails.
+     */
+    var detectRefreshTokenReuse: Boolean = true
+
+    /** When set, the pushed authorization request endpoint fails with this OAuth error. */
+    var parError: String? = null
+
+    /** Runs before each request is handled, for tests that interleave other work. */
+    var beforeRequest: (suspend (HttpRequestData) -> Unit)? = null
     var authorizationServerMetadataOverride: (JsonObject) -> JsonObject = { it }
     var tokenSubjectOverride: String? = null
     var grantedScopeOverride: String? = null
@@ -106,8 +125,10 @@ internal class MockAtmosphere(
     val requestLog = mutableListOf<String>()
     val revokedTokens = mutableListOf<String>()
 
-    private var nonce = "nonce-1"
+    /** Each server origin issues its own nonces, as RFC 9449 section 8 allows. */
+    private val nonces = mutableMapOf<String, String>()
     private var nonceCounter = 1
+    private var currentOrigin = ""
     private val seenDpopJtis = mutableSetOf<String>()
     private val seenAssertionJtis = mutableSetOf<String>()
     private val pendingRequests = mutableMapOf<String, PendingRequest>()
@@ -117,7 +138,13 @@ internal class MockAtmosphere(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    val httpClient: HttpClient = HttpClient(MockEngine { request -> handle(request) })
+    val httpClient: HttpClient =
+        HttpClient(
+            MockEngine { request ->
+                beforeRequest?.invoke(request)
+                handle(request)
+            },
+        )
 
     val identityResolver =
         DefaultIdentityResolver(
@@ -125,10 +152,27 @@ internal class MockAtmosphere(
             handleResolver = WellKnownHandleResolver(httpClient),
         )
 
+    /** Every server moves on to a new nonce. */
     fun rotateNonce() {
-        nonceCounter++
-        nonce = "nonce-$nonceCounter"
+        nonces.keys.toList().forEach { origin -> nonces[origin] = "nonce-${++nonceCounter}" }
     }
+
+    private fun nonceFor(origin: String): String = nonces.getOrPut(origin) { "nonce-${++nonceCounter}" }
+
+    private fun nonceHeaders(): Array<Pair<String, List<String>>> =
+        if (requireNonce) arrayOf(DPOP_NONCE_HEADER to listOf(nonceFor(currentOrigin))) else emptyArray()
+
+    /** Moves [account] to [pdsUrl], as when the person migrates to another data server. */
+    fun move(
+        account: MockAccount,
+        pdsUrl: String,
+    ) {
+        accounts[accounts.indexOfFirst { it.did == account.did }] = account.copy(pdsUrl = pdsUrl)
+    }
+
+    /** Whether [request] is a refresh token grant. */
+    fun isRefreshRequest(request: HttpRequestData): Boolean =
+        (request.body as? FormDataContent)?.formData?.get("grant_type") == "refresh_token"
 
     /** The authorization server ends every session for [did], as when the person revokes access. */
     fun revokeAllSessions(did: String) {
@@ -182,11 +226,12 @@ internal class MockAtmosphere(
     private fun MockRequestHandleScope.handle(request: HttpRequestData): HttpResponseData {
         val url = request.url
         val origin = "${url.protocol.name}://${url.host}"
+        currentOrigin = origin
         requestLog += "${request.method.value} $origin${url.encodedPath}"
         return when {
             origin == "https://plc.directory" -> didDocument(url.encodedPath.removePrefix("/"))
             url.encodedPath == "/.well-known/atproto-did" -> handleDid(url.host)
-            origin == pdsUrl || origin == otherPdsUrl -> dataServer(origin, request)
+            origin == pdsUrl || origin == otherPdsUrl || origin == secondPdsUrl -> dataServer(origin, request)
             origin == issuer || origin == otherIssuer -> authorizationServer(origin, request)
             else -> respondJson(HttpStatusCode.NotFound, buildJsonObject { put("error", "NotFound") })
         }
@@ -229,7 +274,7 @@ internal class MockAtmosphere(
         val path = request.url.encodedPath
         if (path == "/.well-known/oauth-protected-resource") {
             if (!publishProtectedResourceMetadata) return respondJson(HttpStatusCode.NotFound, buildJsonObject { })
-            val authorizationServer = if (origin == pdsUrl) issuer else otherIssuer
+            val authorizationServer = if (origin == otherPdsUrl) otherIssuer else issuer
             if (redirectProtectedResourceMetadata) return redirect("$authorizationServer/.well-known/oauth-protected-resource")
             return respondJson(
                 HttpStatusCode.OK,
@@ -274,7 +319,7 @@ internal class MockAtmosphere(
                 headersOf(
                     HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
                     HttpHeaders.WWWAuthenticate to listOf("DPoP algs=\"ES256\", error=\"$error\""),
-                    DPOP_NONCE_HEADER to listOf(nonce),
+                    *nonceHeaders(),
                 ),
         )
 
@@ -340,7 +385,7 @@ internal class MockAtmosphere(
             put("authorization_response_iss_parameter_supported", true)
             put("require_pushed_authorization_requests", true)
             put("client_id_metadata_document_supported", true)
-            put("protected_resources", strings(if (origin == issuer) pdsUrl else otherPdsUrl))
+            put("protected_resources", if (origin == issuer) strings(pdsUrl, secondPdsUrl) else strings(otherPdsUrl))
         }
 
     private fun MockRequestHandleScope.pushedAuthorizationRequest(
@@ -349,6 +394,7 @@ internal class MockAtmosphere(
         proof: DpopResult.Valid,
     ): HttpResponseData {
         val metadata = client.metadata
+        parError?.let { return oauthError(HttpStatusCode.BadRequest, it, "the request was refused") }
         if (parameters["response_type"] != "code") return oauthError(HttpStatusCode.BadRequest, "unsupported_response_type", "code only")
         if (parameters["code_challenge_method"] != "S256") return oauthError(HttpStatusCode.BadRequest, "invalid_request", "S256 required")
         val challenge =
@@ -456,7 +502,7 @@ internal class MockAtmosphere(
                 ?: return oauthError(HttpStatusCode.BadRequest, "invalid_grant", "Invalid refresh token")
         if (grant.revoked) return oauthError(HttpStatusCode.BadRequest, "invalid_grant", "Invalid refresh token")
         if (refreshToken in grant.usedRefreshTokens) {
-            grant.revoked = true
+            if (detectRefreshTokenReuse) grant.revoked = true
             return oauthError(HttpStatusCode.BadRequest, "invalid_grant", "Refresh token replayed")
         }
         if (grant.sessionExpired) return oauthError(HttpStatusCode.BadRequest, "invalid_grant", "Session expired")
@@ -480,7 +526,7 @@ internal class MockAtmosphere(
                 put("access_token", grant.accessToken)
                 put("token_type", "DPoP")
                 put("expires_in", accessTokenLifetime.inWholeSeconds)
-                put("refresh_token", grant.refreshToken)
+                if (issueRefreshTokens) put("refresh_token", grant.refreshToken)
                 put("scope", grantedScopeOverride ?: grant.scope)
                 put("sub", tokenSubjectOverride ?: grant.did)
             },
@@ -509,7 +555,7 @@ internal class MockAtmosphere(
             headers =
                 headersOf(
                     HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
-                    DPOP_NONCE_HEADER to listOf(nonce),
+                    *nonceHeaders(),
                 ),
         )
 
@@ -526,7 +572,7 @@ internal class MockAtmosphere(
             headers =
                 headersOf(
                     HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
-                    DPOP_NONCE_HEADER to listOf(nonce),
+                    *nonceHeaders(),
                 ),
         )
 
@@ -569,7 +615,7 @@ internal class MockAtmosphere(
         if (accessToken != null && ath != s256(accessToken)) return DpopResult.Invalid("ath mismatch")
         if (!seenDpopJtis.add(jti)) return DpopResult.Invalid("jti replayed")
         val proofNonce = claims.getStringClaim("nonce")
-        if (requireNonce && proofNonce != nonce) return DpopResult.UseNonce
+        if (requireNonce && proofNonce != nonceFor(currentOrigin)) return DpopResult.UseNonce
         return DpopResult.Valid(jwk.computeThumbprint().toString())
     }
 

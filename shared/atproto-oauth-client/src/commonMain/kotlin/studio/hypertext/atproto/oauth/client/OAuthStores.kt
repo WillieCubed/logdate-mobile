@@ -1,9 +1,12 @@
 package studio.hypertext.atproto.oauth.client
 
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import studio.hypertext.atproto.identity.AtprotoDid
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -74,12 +77,20 @@ public data class OAuthStoredSession(
  *
  * The callback may arrive at a different server instance than the one that started the sign-in,
  * so production implementations should use shared storage.
+ *
+ * Most sign-ins that start are never finished, so entries pile up unless the store drops them.
+ * Give each entry a time to live from `expiresAt` (for example a Redis `EXPIREAT` or a database
+ * column a cleanup job checks). The client refuses an expired entry either way.
  */
 public interface OAuthStateStore {
     /**
-     * Saves [value] under its `state`.
+     * Saves [value] under its `state`. The entry is useless after [expiresAt] and may be deleted
+     * then.
      */
-    public suspend fun save(value: OAuthAuthorizationState)
+    public suspend fun save(
+        value: OAuthAuthorizationState,
+        expiresAt: Instant,
+    )
 
     /**
      * Returns and removes the entry for [state] in one step, so each state can be used once.
@@ -113,11 +124,16 @@ public interface OAuthSessionStore {
 /**
  * Serializes token refreshes for one account.
  *
- * Refresh tokens are single-use: if two refreshes of the same session run at once, one fails and
- * the authorization server may end the session. The default [InProcessOAuthSessionLock] covers one
- * process. When several server instances share a session store, supply a lock that spans them,
- * such as a database advisory lock. Without one, the client still recovers by re-reading the
- * session store when a refresh is rejected, but a distributed lock avoids the race.
+ * Refresh tokens are single-use: if two refreshes of the same session run at once, the second one
+ * reuses a spent refresh token, and authorization servers that detect reuse (the reference one
+ * included) end the whole session. The person is signed out. The client reads sessions without the
+ * lock and takes it only to renew one, reading the session again inside it.
+ *
+ * The default [InProcessOAuthSessionLock] covers one process. **Server instances that share a
+ * session store must share a lock too**, such as a database advisory lock or a lease in Redis.
+ * When a refresh is rejected the client re-reads the store in case another instance just saved
+ * newer tokens, but that does not replace the lock: on a server with reuse detection, those newer
+ * tokens have already been revoked.
  */
 public interface OAuthSessionLock {
     /**
@@ -130,33 +146,82 @@ public interface OAuthSessionLock {
 }
 
 /**
- * An [OAuthSessionLock] that serializes refreshes within the current process.
+ * An [OAuthSessionLock] that serializes refreshes within the current process. A per-account lock
+ * exists only while someone holds or waits for it.
  */
 public class InProcessOAuthSessionLock : OAuthSessionLock {
+    private class Entry {
+        val mutex = Mutex()
+        var users = 0
+    }
+
     private val guard = Mutex()
-    private val locks = mutableMapOf<AtprotoDid, Mutex>()
+    private val locks = mutableMapOf<AtprotoDid, Entry>()
 
     override suspend fun <T> withLock(
         did: AtprotoDid,
         block: suspend () -> T,
     ): T {
-        val lock = guard.withLock { locks.getOrPut(did) { Mutex() } }
-        return lock.withLock { block() }
+        val entry = guard.withLock { locks.getOrPut(did) { Entry() }.also { it.users++ } }
+        try {
+            return entry.mutex.withLock { block() }
+        } finally {
+            withContext(NonCancellable) {
+                guard.withLock {
+                    entry.users--
+                    if (entry.users == 0) locks.remove(did)
+                }
+            }
+        }
     }
+
+    /**
+     * The number of accounts whose lock is held or awaited.
+     */
+    internal suspend fun activeLockCount(): Int = guard.withLock { locks.size }
 }
 
 /**
- * An in-memory [OAuthStateStore] for tests and single-process development servers.
+ * An in-memory [OAuthStateStore] for tests and single-process development servers. Expired
+ * entries are dropped whenever the store is used.
+ *
+ * @param clock Decides when entries expire.
  */
-public class InMemoryOAuthStateStore : OAuthStateStore {
+public class InMemoryOAuthStateStore(
+    private val clock: Clock = Clock.System,
+) : OAuthStateStore {
     private val mutex = Mutex()
-    private val entries = mutableMapOf<String, OAuthAuthorizationState>()
+    private val entries = mutableMapOf<String, Pair<OAuthAuthorizationState, Instant>>()
 
-    override suspend fun save(value: OAuthAuthorizationState) {
-        mutex.withLock { entries[value.state] = value }
+    override suspend fun save(
+        value: OAuthAuthorizationState,
+        expiresAt: Instant,
+    ) {
+        mutex.withLock {
+            dropExpired()
+            entries[value.state] = value to expiresAt
+        }
     }
 
-    override suspend fun take(state: String): OAuthAuthorizationState? = mutex.withLock { entries.remove(state) }
+    override suspend fun take(state: String): OAuthAuthorizationState? =
+        mutex.withLock {
+            dropExpired()
+            entries.remove(state)?.first
+        }
+
+    /**
+     * The number of entries that have not expired.
+     */
+    public suspend fun size(): Int =
+        mutex.withLock {
+            dropExpired()
+            entries.size
+        }
+
+    private fun dropExpired() {
+        val now = clock.now()
+        entries.values.removeAll { (_, expiresAt) -> expiresAt <= now }
+    }
 }
 
 /**

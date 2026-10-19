@@ -45,15 +45,30 @@ internal class OAuthServerAgent(
     private val crypto: OAuthCrypto,
     private val nonces: DpopNonceCache,
     private val clock: Clock,
+    private val strictDpopNonces: Boolean = false,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Pushes the authorization request and returns its `request_uri`.
+     *
+     * With [strictDpopNonces], a response without a `DPoP-Nonce` header is refused. Every sign-in
+     * starts here, so a server that does not use nonces is refused before it issues any tokens.
+     */
     suspend fun pushAuthorizationRequest(parameters: Map<String, String>): String {
         val endpoint =
             metadata.pushedAuthorizationRequestEndpoint
                 ?: throw OAuthServerMetadataException(metadata.issuer, "no pushed_authorization_request_endpoint")
-        val body = post("pushed_authorization_request", endpoint, parameters)
-        return body.string("request_uri")
+        val response = post("pushed_authorization_request", endpoint, parameters)
+        if (strictDpopNonces && response.nonce == null) {
+            throw OAuthServerResponseException(
+                "pushed_authorization_request",
+                response.status,
+                null,
+                "the response has no DPoP-Nonce header, which strict DPoP nonces require",
+            )
+        }
+        return response.body.string("request_uri")
             ?: throw OAuthServerResponseException(
                 "pushed_authorization_request",
                 HttpStatusCode.Created.value,
@@ -77,7 +92,7 @@ internal class OAuthServerAgent(
                     "code_verifier" to codeVerifier,
                     "redirect_uri" to redirectUri,
                 ),
-            ),
+            ).body,
         )
 
     suspend fun refresh(refreshToken: String): TokenResponse =
@@ -86,7 +101,7 @@ internal class OAuthServerAgent(
                 "token",
                 metadata.tokenEndpoint,
                 mapOf("grant_type" to "refresh_token", "refresh_token" to refreshToken),
-            ),
+            ).body,
         )
 
     /**
@@ -110,15 +125,15 @@ internal class OAuthServerAgent(
         endpointName: String,
         url: String,
         parameters: Map<String, String>,
-    ): JsonObject {
+    ): PostResult {
         var nonce = nonces.get(url)
         var nonceRetried = false
         while (true) {
             val response = send(endpointName, url, parameters, nonce)
             response.nonce?.let { nonces.put(url, it) }
             if (response.status in 200..299) {
-                if (response.body.isBlank()) return JsonObject(emptyMap())
-                return parseObject(endpointName, response.status, response.body)
+                val body = response.body.takeIf { it.isNotBlank() }?.let { parseObject(endpointName, response.status, it) }
+                return PostResult(response.status, response.nonce, body ?: JsonObject(emptyMap()))
             }
             val error = runCatching { json.parseToJsonElement(response.body).jsonObject }.getOrNull()
             val errorCode = error?.string("error")
@@ -136,6 +151,12 @@ internal class OAuthServerAgent(
             )
         }
     }
+
+    private class PostResult(
+        val status: Int,
+        val nonce: String?,
+        val body: JsonObject,
+    )
 
     private class ServerResponse(
         val status: Int,
