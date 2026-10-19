@@ -265,7 +265,7 @@ class OAuthPasskeySignInRoutesTest {
             )
         val token =
             client.post("/oauth/token") {
-                header("DPoP", createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = pushed.nonce))
+                header("DPoP", createDpopProof(pushed.dpopKey, "POST", "https://logdate.app/oauth/token", nonce = pushed.nonce))
                 setBody(
                     FormDataContent(
                         Parameters.build {
@@ -291,7 +291,7 @@ class OAuthPasskeySignInRoutesTest {
     private suspend fun ApplicationTestBuilder.assertRefreshRefused(grant: AppGrant) {
         val refresh =
             client.post("/oauth/token") {
-                header("DPoP", createDpopProof(grant.pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = grant.nonce))
+                header("DPoP", createDpopProof(grant.pushed.dpopKey, "POST", "https://logdate.app/oauth/token", nonce = grant.nonce))
                 setBody(
                     FormDataContent(
                         Parameters.build {
@@ -424,7 +424,7 @@ class OAuthPasskeySignInRoutesTest {
 
             val token =
                 client.post("/oauth/token") {
-                    header("DPoP", createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = pushed.nonce))
+                    header("DPoP", createDpopProof(pushed.dpopKey, "POST", "https://logdate.app/oauth/token", nonce = pushed.nonce))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -701,7 +701,7 @@ class OAuthPasskeySignInRoutesTest {
         val dpopKey = generateP256KeyPair()
         val response =
             client.post("/oauth/par") {
-                header("DPoP", createDpopProof(dpopKey, "POST", "http://localhost/oauth/par"))
+                header("DPoP", createDpopProof(dpopKey, "POST", "https://logdate.app/oauth/par"))
                 setBody(
                     FormDataContent(
                         Parameters.build {

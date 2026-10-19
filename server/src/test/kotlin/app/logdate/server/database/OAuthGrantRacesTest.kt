@@ -112,6 +112,35 @@ class OAuthGrantRacesTest {
         }
 
     @Test
+    fun `a code exchange racing a revocation on PostgreSQL never leaves a usable token`() =
+        withPostgres { repository ->
+            repeat(10) { round ->
+                val subject = subject()
+                val now = Clock.System.now()
+                repository.saveAuthorizationCode(code("$subject-code", subject, now, now))
+
+                val exchange =
+                    async(Dispatchers.IO) {
+                        val approved = repository.takeAuthorizationCode("$subject-code") ?: return@async false
+                        repository.saveGrantedRefreshToken(refreshToken("$subject-token", subject, approved.grantedAt, now))
+                    }
+                val revoke = async(Dispatchers.IO) { repository.revokeRefreshTokensForSubject(subject, Clock.System.now()) }
+                exchange.await()
+                revoke.await()
+
+                val later = Clock.System.now()
+                assertFalse(
+                    repository.rotateRefreshToken(
+                        "$subject-token",
+                        refreshToken("$subject-after", subject, later - 1.minutes, later),
+                        later,
+                    ),
+                    "round $round: the token from an exchange that raced the revocation is still usable",
+                )
+            }
+        }
+
+    @Test
     fun `parallel exchanges of one authorization code on PostgreSQL redeem it once`() =
         withPostgres { repository ->
             val now = Clock.System.now()

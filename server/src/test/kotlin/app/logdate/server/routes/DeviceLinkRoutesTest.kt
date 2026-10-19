@@ -2,6 +2,7 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.TokenScope
+import app.logdate.server.installForwardedClientAddress
 import app.logdate.server.routes.support.assertApiErrorCode
 import app.logdate.server.routes.support.configureDeviceLinkTestApp
 import app.logdate.server.routes.support.jsonBody
@@ -207,6 +208,25 @@ class DeviceLinkRoutesTest {
                 assertApiErrorCode(guess, HttpStatusCode.BadRequest, DeviceLinkErrorCodes.LINK_CODE_INVALID)
             }
             assertApiErrorCode(client.redeemLinkCode("not-a-real-code"), HttpStatusCode.TooManyRequests, "RATE_LIMIT_EXCEEDED")
+        }
+
+    @Test
+    fun `redeeming is limited per forwarded client address, not per proxy`() =
+        testApplication {
+            configureDeviceLinkTestApp(tokenService)
+            application { installForwardedClientAddress() }
+
+            suspend fun redeemFrom(vararg forwardedFor: String) =
+                client.post("/api/v1/auth/devices/link/redeem") {
+                    contentType(ContentType.Application.Json)
+                    forwardedFor.forEach { header(HttpHeaders.XForwardedFor, it) }
+                    setBody("""{"code":"not-a-real-code","deviceName":"Pixel Watch 3"}""")
+                }
+
+            repeat(10) { assertApiErrorCode(redeemFrom("203.0.113.5"), HttpStatusCode.BadRequest, DeviceLinkErrorCodes.LINK_CODE_INVALID) }
+
+            assertApiErrorCode(redeemFrom("198.51.100.77", "203.0.113.5"), HttpStatusCode.TooManyRequests, "RATE_LIMIT_EXCEEDED")
+            assertApiErrorCode(redeemFrom("203.0.113.6"), HttpStatusCode.BadRequest, DeviceLinkErrorCodes.LINK_CODE_INVALID)
         }
 
     @Test

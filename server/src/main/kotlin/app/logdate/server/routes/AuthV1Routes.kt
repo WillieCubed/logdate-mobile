@@ -23,6 +23,7 @@ import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TokenScope
 import app.logdate.server.auth.TokenService
 import app.logdate.server.auth.bearerToken
+import app.logdate.server.clientAddress
 import app.logdate.server.devices.DeviceLinkService
 import app.logdate.server.devices.DeviceSessionGuard
 import app.logdate.server.devices.DeviceSessionRefresh
@@ -74,7 +75,6 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.ContentTransformationException
-import io.ktor.server.plugins.origin
 import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -2065,7 +2065,7 @@ private suspend fun ApplicationCall.enforceRateLimit(
     policy: RateLimitPolicy,
     metrics: AuthMetricsRegistry?,
 ): Boolean {
-    val ipKey = hashRemoteIp() ?: request.origin.remoteHost.ifBlank { "unknown" }
+    val ipKey = hashRemoteIp() ?: clientAddress().ifBlank { "unknown" }
     val rateLimitKey = "$operation:$ipKey"
     if (rateLimiter.allow(rateLimitKey, policy)) {
         return true
@@ -2081,7 +2081,7 @@ private suspend fun ApplicationCall.enforceRateLimit(
 }
 
 private fun ApplicationCall.hashRemoteIp(): String? {
-    val value = request.origin.remoteHost.ifBlank { return null }
+    val value = clientAddress().ifBlank { return null }
     return value.sha256()
 }
 

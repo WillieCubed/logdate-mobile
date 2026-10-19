@@ -205,7 +205,7 @@ class OAuthRoutesTest {
 
             val par =
                 client.post("/oauth/par") {
-                    header("DPoP", createDpopProof(clientKeyPair, "POST", "http://localhost/oauth/par"))
+                    header("DPoP", createDpopProof(clientKeyPair, "POST", "https://logdate.app/oauth/par"))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -297,7 +297,7 @@ class OAuthRoutesTest {
 
             val token =
                 client.post("/oauth/token") {
-                    header("DPoP", createDpopProof(clientKeyPair, "POST", "http://localhost/oauth/token", nonce = nonce))
+                    header("DPoP", createDpopProof(clientKeyPair, "POST", "https://logdate.app/oauth/token", nonce = nonce))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -322,7 +322,7 @@ class OAuthRoutesTest {
 
             val refresh =
                 client.post("/oauth/token") {
-                    header("DPoP", createDpopProof(clientKeyPair, "POST", "http://localhost/oauth/token", nonce = refreshedNonce))
+                    header("DPoP", createDpopProof(clientKeyPair, "POST", "https://logdate.app/oauth/token", nonce = refreshedNonce))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -342,7 +342,7 @@ class OAuthRoutesTest {
                 client.post("/oauth/revoke") {
                     header(
                         "DPoP",
-                        createDpopProof(clientKeyPair, "POST", "http://localhost/oauth/revoke", nonce = refresh.headers["DPoP-Nonce"]),
+                        createDpopProof(clientKeyPair, "POST", "https://logdate.app/oauth/revoke", nonce = refresh.headers["DPoP-Nonce"]),
                     )
                     setBody(
                         FormDataContent(
@@ -411,7 +411,7 @@ class OAuthRoutesTest {
 
             val response =
                 client.post("/oauth/par") {
-                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "http://localhost/oauth/par"))
+                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "https://logdate.app/oauth/par"))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -431,7 +431,7 @@ class OAuthRoutesTest {
         }
 
     @Test
-    fun `oauth routes cover authorize auth failures and custom port htu`() =
+    fun `oauth routes cover authorize auth failures and take the htu from the configured issuer`() =
         testApplication {
             val accountRepository = InMemoryAccountRepository()
             val tokenService =
@@ -571,7 +571,8 @@ class OAuthRoutesTest {
             val customPortPar =
                 client.post("/oauth/par") {
                     header(HttpHeaders.Host, "localhost:444")
-                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "http://localhost:444/oauth/par"))
+                    header("X-Forwarded-Host", "evil.example.com")
+                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "https://logdate.app/oauth/par"))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -594,7 +595,7 @@ class OAuthRoutesTest {
             assertEquals(HttpStatusCode.BadRequest, postMissingRequestUri.status)
             assertEquals(HttpStatusCode.BadRequest, postInvalidRequestUri.status)
             assertEquals(HttpStatusCode.Created, customPortPar.status)
-            assertEquals("http://localhost:444/oauth/par", capturedHtu)
+            assertEquals("https://logdate.app/oauth/par", capturedHtu)
         }
 
     @Test
@@ -622,7 +623,7 @@ class OAuthRoutesTest {
 
             val parMissingClientId =
                 client.post("/oauth/par") {
-                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "http://localhost/oauth/par"))
+                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "https://logdate.app/oauth/par"))
                     setBody(FormDataContent(Parameters.build { append("redirect_uri", "https://viewer.example.com/callback") }))
                 }
             val parMissingDpop =
@@ -631,7 +632,7 @@ class OAuthRoutesTest {
                 }
             val parNonceRetry =
                 client.post("/oauth/par") {
-                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "http://localhost/oauth/par"))
+                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "https://logdate.app/oauth/par"))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -648,7 +649,7 @@ class OAuthRoutesTest {
             val authorizeWithoutAccountResolution = client.get("/oauth/authorize?request_uri=urn:test")
             val unsupportedGrant =
                 client.post("/oauth/token") {
-                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "http://localhost/oauth/token"))
+                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "https://logdate.app/oauth/token"))
                     setBody(
                         FormDataContent(
                             Parameters.build {
@@ -659,7 +660,7 @@ class OAuthRoutesTest {
                 }
             val revokeMissingToken =
                 client.post("/oauth/revoke") {
-                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "http://localhost/oauth/revoke"))
+                    header("DPoP", createDpopProof(generateP256KeyPair(), "POST", "https://logdate.app/oauth/revoke"))
                     setBody(FormDataContent(Parameters.build { append("client_id", "https://viewer.example.com/client.json") }))
                 }
             val revokeMissingDpop =

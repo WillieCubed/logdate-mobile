@@ -9,6 +9,7 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.datetime.CurrentTimestamp
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
@@ -93,7 +94,8 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[clientAuthKeyId] = code.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = code.clientAuthKeyThumbprint
                     it[expiresAt] = code.expiresAt
-                    it[grantedAt] = code.grantedAt
+                    // The database clock, so every instance stamps approvals on one timeline.
+                    it[grantedAt] = CurrentTimestamp
                 }
             } else {
                 OAuthAuthorizationCodesTable.update({ OAuthAuthorizationCodesTable.code eq code.code }) {
@@ -107,7 +109,8 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[clientAuthKeyId] = code.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = code.clientAuthKeyThumbprint
                     it[expiresAt] = code.expiresAt
-                    it[grantedAt] = code.grantedAt
+                    // The database clock, so every instance stamps approvals on one timeline.
+                    it[grantedAt] = CurrentTimestamp
                 }
             }
             code
@@ -234,22 +237,24 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     .forUpdate()
                     .singleOrNull()
                     ?.get(OAuthSubjectRevocationsTable.revokedAt)
+            // Revocation times come from the database clock, the same clock that stamps approvals, so
+            // clock differences between server instances cannot let a grant outlive its revocation.
             if (previous == null) {
                 OAuthSubjectRevocationsTable.insertIgnore {
                     it[OAuthSubjectRevocationsTable.subjectDid] = subjectDid
-                    it[OAuthSubjectRevocationsTable.revokedAt] = revokedAt
+                    it[OAuthSubjectRevocationsTable.revokedAt] = CurrentTimestamp
                 }
             }
             OAuthSubjectRevocationsTable.update({
-                (OAuthSubjectRevocationsTable.subjectDid eq subjectDid) and (OAuthSubjectRevocationsTable.revokedAt less revokedAt)
+                (OAuthSubjectRevocationsTable.subjectDid eq subjectDid) and (OAuthSubjectRevocationsTable.revokedAt less CurrentTimestamp)
             }) {
-                it[OAuthSubjectRevocationsTable.revokedAt] = revokedAt
+                it[OAuthSubjectRevocationsTable.revokedAt] = CurrentTimestamp
             }
             OAuthAuthorizationCodesTable.deleteWhere { OAuthAuthorizationCodesTable.subjectDid eq subjectDid }
             OAuthRefreshTokensTable.update({
                 (OAuthRefreshTokensTable.subjectDid eq subjectDid) and OAuthRefreshTokensTable.revokedAt.isNull()
             }) {
-                it[OAuthRefreshTokensTable.revokedAt] = revokedAt
+                it[OAuthRefreshTokensTable.revokedAt] = CurrentTimestamp
             }
         }
 

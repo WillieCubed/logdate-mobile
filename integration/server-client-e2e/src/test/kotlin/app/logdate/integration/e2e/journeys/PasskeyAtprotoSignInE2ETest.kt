@@ -220,7 +220,7 @@ class PasskeyAtprotoSignInE2ETest {
         ): HttpResponse =
             http.get(url) {
                 header(HttpHeaders.Authorization, "DPoP $accessToken")
-                header("DPoP", dpop.proof("GET", url.substringBefore('?'), nonce = nonce, accessToken = accessToken))
+                header("DPoP", dpop.proof("GET", publicUrl(url.substringBefore('?')), nonce = nonce, accessToken = accessToken))
             }
 
         suspend fun post(
@@ -231,7 +231,7 @@ class PasskeyAtprotoSignInE2ETest {
         ): HttpResponse =
             http.post(url) {
                 header(HttpHeaders.Authorization, "DPoP $accessToken")
-                header("DPoP", dpop.proof("POST", url, nonce = nonce, accessToken = accessToken))
+                header("DPoP", dpop.proof("POST", publicUrl(url), nonce = nonce, accessToken = accessToken))
                 contentType(type)
                 setBody(body)
             }
@@ -263,7 +263,7 @@ class PasskeyAtprotoSignInE2ETest {
                     append("state", "journal-viewer-state")
                     append("login_hint", handle)
                 },
-            ) { header("DPoP", dpop.proof("POST", "$logDate/oauth/par")) }
+            ) { header("DPoP", dpop.proof("POST", "$PUBLIC_ORIGIN/oauth/par")) }
         assertEquals(HttpStatusCode.Created, par.status, par.bodyAsText())
         val requestUri =
             par
@@ -335,7 +335,7 @@ class PasskeyAtprotoSignInE2ETest {
                     append("client_id", app.clientId)
                     append("code_verifier", verifier)
                 },
-            ) { header("DPoP", dpop.proof("POST", "$logDate/oauth/token", nonce = nonce)) }
+            ) { header("DPoP", dpop.proof("POST", "$PUBLIC_ORIGIN/oauth/token", nonce = nonce)) }
         assertEquals(HttpStatusCode.OK, token.status, token.bodyAsText())
         val tokens = token.json()
         assertEquals("DPoP", tokens["token_type"]?.jsonPrimitive?.content)
@@ -431,6 +431,9 @@ class PasskeyAtprotoSignInE2ETest {
         }
     }
 
+    /** A DPoP proof names the server's configured public address, whatever address the test reaches it at. */
+    private fun publicUrl(url: String): String = PUBLIC_ORIGIN + URI(url).rawPath
+
     private fun originOf(baseUrl: String): String {
         val uri = URI(baseUrl)
         return "${uri.scheme}://${uri.host}:${uri.port}"
@@ -440,6 +443,7 @@ class PasskeyAtprotoSignInE2ETest {
         Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also(SecureRandom()::nextBytes))
 
     private companion object {
+        const val PUBLIC_ORIGIN = "https://logdate.app"
         const val CONTENT = "studio.hypertext.logdate.content"
         const val DRAFT = "studio.hypertext.logdate.draft"
         const val ENTRY_ID = "journal-entry-1"

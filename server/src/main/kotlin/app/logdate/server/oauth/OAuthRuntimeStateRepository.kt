@@ -12,6 +12,9 @@ import kotlin.time.Instant
  * records the revocation time, and a grant approved at or before that time can never be used
  * again. That rule holds even for a refresh that was already in progress when the revocation
  * happened, because the check and the token change happen in one transaction.
+ *
+ * The PostgreSQL store takes both times from the database clock, ignoring the times passed in, so
+ * clock differences between server instances cannot let a grant outlive its revocation.
  */
 interface OAuthRuntimeStateRepository {
     suspend fun saveAuthorizationRequest(request: StoredAuthorizationRequest): StoredAuthorizationRequest

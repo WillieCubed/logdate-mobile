@@ -1,5 +1,6 @@
 package app.logdate.server.oauth
 
+import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -46,10 +47,7 @@ class OAuthClientMetadataResolver(
                 throw OAuthInvalidClientException("Client metadata document returned HTTP ${response.status.value}")
             }
 
-            val decoded =
-                json.decodeFromString<OAuthClientMetadata>(
-                    response.bodyAsText(),
-                )
+            val decoded = decodeClientDocument<OAuthClientMetadata>(response.bodyAsText(), "Client metadata document", normalizedClientId)
             val resolvedJwks =
                 when {
                     decoded.jwks != null -> decoded.jwks
@@ -110,8 +108,24 @@ class OAuthClientMetadataResolver(
         if (response.status != HttpStatusCode.OK) {
             throw OAuthInvalidClientException("Client JWKS document returned HTTP ${response.status.value}")
         }
-        return json.decodeFromString(response.bodyAsText())
+        return decodeClientDocument(response.bodyAsText(), "Client JWKS document", jwksUri)
     }
+
+    /**
+     * Decodes a document the client controls. A malformed one is the client's mistake: it is answered
+     * as `invalid_client` and logged as a warning, so a broken or hostile app cannot raise server errors.
+     */
+    private inline fun <reified T> decodeClientDocument(
+        text: String,
+        what: String,
+        source: String,
+    ): T =
+        try {
+            json.decodeFromString<T>(text)
+        } catch (error: IllegalArgumentException) {
+            Napier.w("$what from $source is malformed: ${error.message}")
+            throw OAuthInvalidClientException("$what is malformed")
+        }
 
     private fun normalizeClientId(clientId: String): String {
         val trimmed = clientId.trim()
@@ -151,8 +165,10 @@ class OAuthClientMetadataResolver(
         if (segments.size != JWT_SEGMENT_COUNT) {
             throw OAuthInvalidClientException("client_assertion must be a compact JWT")
         }
-        val header = json.decodeFromString<OAuthClientAssertionHeader>(decodeJsonSegment(segments[0]))
-        val claims = json.decodeFromString<OAuthClientAssertionClaims>(decodeJsonSegment(segments[1]))
+        val header =
+            decodeClientDocument<OAuthClientAssertionHeader>(segmentText(segments[0]), "Client assertion header", metadata.client_id)
+        val claims =
+            decodeClientDocument<OAuthClientAssertionClaims>(segmentText(segments[1]), "Client assertion claims", metadata.client_id)
         val assertionCurve =
             when (header.alg) {
                 EcCurve.P256.jwsAlgorithm -> EcCurve.P256
@@ -260,6 +276,13 @@ class OAuthClientMetadataResolver(
     }
 
     private fun decodeJsonSegment(segment: String): String = String(base64UrlDecode(segment), StandardCharsets.UTF_8)
+
+    private fun segmentText(segment: String): String =
+        runCatching {
+            decodeJsonSegment(
+                segment,
+            )
+        }.getOrElse { throw OAuthInvalidClientException("client_assertion is not valid base64url") }
 
     private fun base64UrlDecode(value: String): ByteArray {
         val padding = "=".repeat((4 - value.length % 4) % 4)

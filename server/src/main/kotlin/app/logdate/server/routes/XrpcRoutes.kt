@@ -77,6 +77,7 @@ fun Route.xrpcRoutes(
     oauthAccessTokenService: OAuthAccessTokenService? = null,
     oauthDpopVerifier: OAuthDpopVerifier? = null,
     oauthNonceService: OAuthNonceService? = null,
+    publicOrigin: String? = null,
     collectionsOpenToApps: Set<String> = OAuthScopes.collectionsOpenToApps,
 ) {
     val openCollections = OAuthScopes.requireOpenable(collectionsOpenToApps)
@@ -96,6 +97,7 @@ fun Route.xrpcRoutes(
                 oauthAccessTokenService = oauthAccessTokenService,
                 oauthDpopVerifier = oauthDpopVerifier,
                 oauthNonceService = oauthNonceService,
+                publicOrigin = publicOrigin,
             ) ?: return null
         if (ownsRepo(principal.account, repo)) return principal
         respondAsMissing()
@@ -498,6 +500,7 @@ fun Route.xrpcRoutes(
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
+                    publicOrigin = publicOrigin,
                 ) ?: return@post
             val wireRequest = call.receive<CreateRecordInput>()
             if (!call.allowOAuthWrite(principal, wireRequest.collection.toString(), openCollections)) return@post
@@ -547,6 +550,7 @@ fun Route.xrpcRoutes(
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
+                    publicOrigin = publicOrigin,
                 ) ?: return@post
             val wireRequest = call.receive<PutRecordInput>()
             if (!call.allowOAuthWrite(principal, wireRequest.collection.toString(), openCollections)) return@post
@@ -596,6 +600,7 @@ fun Route.xrpcRoutes(
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
+                    publicOrigin = publicOrigin,
                 ) ?: return@post
             val wireRequest = call.receive<DeleteRecordInput>()
             if (!call.allowOAuthWrite(principal, wireRequest.collection.toString(), openCollections)) return@post
@@ -642,6 +647,7 @@ fun Route.xrpcRoutes(
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
+                    publicOrigin = publicOrigin,
                 ) ?: return@post
             if (principal.oauth != null) return@post call.respondUploadsClosedToOAuthApps()
             val repoDid =
@@ -782,6 +788,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
     oauthAccessTokenService: OAuthAccessTokenService?,
     oauthDpopVerifier: OAuthDpopVerifier?,
     oauthNonceService: OAuthNonceService?,
+    publicOrigin: String?,
 ): XrpcPrincipal? {
     if (accountRepository == null) {
         respond(HttpStatusCode.NotImplemented, PdsErrorResponse("Unsupported", "Repo auth is not configured"))
@@ -797,7 +804,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
             }
             requireOAuthPrincipal(
                 accessToken = authHeader.removePrefix("DPoP ").trim(),
-                checks = OAuthChecks(oauthAccessTokenService, oauthDpopVerifier, oauthNonceService),
+                checks = OAuthChecks(oauthAccessTokenService, oauthDpopVerifier, oauthNonceService, publicOrigin),
                 identityService = identityService,
                 accountRepository = accountRepository,
             )
@@ -819,6 +826,8 @@ private class OAuthChecks(
     val accessTokens: OAuthAccessTokenService,
     val dpop: OAuthDpopVerifier,
     val nonces: OAuthNonceService,
+    /** The server's configured public origin; the DPoP `htu` is compared against it, never a client-sent host. */
+    val publicOrigin: String?,
 )
 
 /**
@@ -840,7 +849,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireOAuthPrinc
             checks.dpop.verify(
                 proof = proof,
                 method = request.httpMethod.value,
-                htu = absoluteRequestUrl(),
+                htu = checks.publicOrigin?.let { it.trimEnd('/') + request.path() } ?: absoluteRequestUrl(),
                 expectedNonce = checks.nonces.currentNonce(),
                 expectedAth = checks.dpop.accessTokenHash(accessToken),
             )
