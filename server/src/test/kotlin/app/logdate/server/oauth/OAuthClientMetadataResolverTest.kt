@@ -83,6 +83,32 @@ class OAuthClientMetadataResolverTest {
         }
 
     @Test
+    fun `resolver answers a malformed metadata document as invalid_client`() =
+        kotlinx.coroutines.test.runTest {
+            listOf("not json at all", """{"client_id":42}""", "[]", "").forEach { body ->
+                val resolver =
+                    OAuthClientMetadataResolver(
+                        httpClient =
+                            HttpClient(
+                                MockEngine {
+                                    respond(
+                                        content = body,
+                                        status = HttpStatusCode.OK,
+                                        headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+                                    )
+                                },
+                            ),
+                    )
+
+                val failure = resolver.resolve("https://viewer.example.com/client.json").exceptionOrNull()
+
+                assertIs<OAuthInvalidClientException>(failure, "body: $body")
+                assertEquals(HttpStatusCode.BadRequest, failure.status)
+                assertEquals("invalid_client", failure.error)
+            }
+        }
+
+    @Test
     fun `resolver rejects non success responses unsupported auth methods and missing dpop binding`() =
         kotlinx.coroutines.test.runTest {
             var requestIndex = 0

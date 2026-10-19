@@ -119,6 +119,7 @@ internal fun Application.atprotoRoutes() {
             oauthAccessTokenService = oauthAccessTokenService,
             oauthDpopVerifier = oauthDpopVerifier,
             oauthNonceService = oauthNonceService,
+            publicOrigin = oauthConfig.normalizedResource,
         )
     }
     personalSpaceRoutes()

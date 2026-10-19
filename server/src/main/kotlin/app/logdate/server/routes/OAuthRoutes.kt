@@ -3,6 +3,7 @@ package app.logdate.server.routes
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.TokenService
+import app.logdate.server.clientAddress
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthConfig
@@ -24,7 +25,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
-import io.ktor.server.plugins.origin
 import io.ktor.server.request.header
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
@@ -105,7 +105,7 @@ fun Route.oauthRoutes(
                         clientAssertionType = parameters["client_assertion_type"],
                         clientAssertion = parameters["client_assertion"],
                         dpopProof = dpopProof,
-                        htu = call.absoluteRequestUrl(),
+                        htu = call.endpointUrl(config),
                     ),
                 ).getOrThrow()
         }.onSuccess { response ->
@@ -267,7 +267,7 @@ fun Route.oauthRoutes(
                                 clientAssertionType = parameters["client_assertion_type"],
                                 clientAssertion = parameters["client_assertion"],
                                 dpopProof = dpopProof,
-                                htu = call.absoluteRequestUrl(),
+                                htu = call.endpointUrl(config),
                             ),
                         ).getOrThrow()
 
@@ -280,7 +280,7 @@ fun Route.oauthRoutes(
                                 clientAssertionType = parameters["client_assertion_type"],
                                 clientAssertion = parameters["client_assertion"],
                                 dpopProof = dpopProof,
-                                htu = call.absoluteRequestUrl(),
+                                htu = call.endpointUrl(config),
                             ),
                         ).getOrThrow()
 
@@ -318,7 +318,7 @@ fun Route.oauthRoutes(
                         clientAssertionType = parameters["client_assertion_type"],
                         clientAssertion = parameters["client_assertion"],
                         dpopProof = dpopProof,
-                        htu = call.absoluteRequestUrl(),
+                        htu = call.endpointUrl(config),
                     ),
                 ).getOrThrow()
         }.onSuccess {
@@ -457,7 +457,7 @@ private suspend fun ApplicationCall.allowPasskeyAttempt(
     limiter: SlidingWindowRateLimiter,
     operation: String,
 ): Boolean {
-    val key = "oauth.passkey.$operation:${request.origin.remoteHost.ifBlank { "unknown" }.sha256Hex()}"
+    val key = "oauth.passkey.$operation:${clientAddress().ifBlank { "unknown" }.sha256Hex()}"
     if (limiter.allow(key, SIGNIN_RATE_LIMIT)) return true
     response.header(HttpHeaders.RetryAfter, limiter.retryAfterSeconds(key, SIGNIN_RATE_LIMIT).toString())
     respond(
@@ -499,16 +499,11 @@ private fun io.ktor.http.Parameters.requireValue(name: String): String {
     return value
 }
 
-private fun ApplicationCall.absoluteRequestUrl(): String {
-    val origin = request.origin
-    val host =
-        if (origin.serverPort == DEFAULT_HTTPS_PORT || origin.serverPort == DEFAULT_HTTP_PORT) {
-            origin.serverHost
-        } else {
-            "${origin.serverHost}:${origin.serverPort}"
-        }
-    return "${origin.scheme}://$host${request.path()}"
-}
+/**
+ * The URL a client called, built from the configured issuer origin and the request path. A DPoP proof's
+ * `htu` is compared against it, so nothing a client sends, such as `X-Forwarded-Host`, can change it.
+ */
+private fun ApplicationCall.endpointUrl(config: OAuthConfig): String = config.issuerOrigin + request.path()
 
 @OptIn(ExperimentalUuidApi::class)
 private suspend fun resolveOAuthAccount(
@@ -547,5 +542,3 @@ private suspend fun resolveOAuthAccount(
 
 private const val DPOP_HEADER = "DPoP"
 private const val DPOP_NONCE_HEADER = "DPoP-Nonce"
-private const val DEFAULT_HTTPS_PORT = 443
-private const val DEFAULT_HTTP_PORT = 80
