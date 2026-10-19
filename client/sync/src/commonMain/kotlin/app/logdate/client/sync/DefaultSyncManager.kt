@@ -41,6 +41,8 @@ import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import app.logdate.client.sync.moments.createMomentDownloader
 import app.logdate.client.sync.moments.createMomentUploader
+import app.logdate.client.sync.space.SpaceSync
+import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.CloudQuotaManager
@@ -130,6 +132,8 @@ class DefaultSyncManager(
      * optional so tests that never read the account can omit it.
      */
     serverAccounts: ServerAccountStore? = null,
+    /** Syncs registered kinds through the account's personal space when its gate is open; null keeps every kind on its own endpoints. */
+    spaceSync: SpaceSyncDependencies? = null,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -474,6 +478,11 @@ class DefaultSyncManager(
             diagnostics = { event, source -> diagnostics?.record(event, source?.scope, source?.epoch) },
         )
 
+    internal val space =
+        spaceSync?.let {
+            SpaceSync(it, tokenRefresher, syncMetadataService, retryCoordinator, downloadInbox, statusPublisher::recordProgress)
+        }
+
     internal val downloader =
         SyncDownloader(
             journalRepository = journalRepository,
@@ -496,6 +505,7 @@ class DefaultSyncManager(
             downloadInbox = downloadInbox,
             downloadsMedia = profile.downloadsMedia,
             remoteApplyFilter = profile.remoteApplyFilter,
+            space = space,
         )
 
     internal val mergeUploader =
@@ -535,5 +545,6 @@ class DefaultSyncManager(
             profile = profile,
             createCollisionPolicy = createCollisionPolicy,
             transactionManager = transactionManager,
+            space = space,
         )
 }

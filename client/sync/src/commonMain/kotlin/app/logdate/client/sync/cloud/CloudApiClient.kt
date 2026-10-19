@@ -324,10 +324,14 @@ data class CheckUsernameAvailabilityResponse(
 
 /**
  * Exception thrown for API errors.
+ *
+ * @property retryAfterMillis How long the server asked for before the next attempt, when it said;
+ *   a retry is never scheduled sooner than this.
  */
 class CloudApiException(
     val errorCode: String,
     override val message: String,
     val statusCode: Int? = null,
     cause: Throwable? = null,
+    val retryAfterMillis: Long? = null,
 ) : Exception(message, cause)

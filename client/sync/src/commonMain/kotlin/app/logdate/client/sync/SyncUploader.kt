@@ -2,6 +2,7 @@ package app.logdate.client.sync
 
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
@@ -17,6 +18,8 @@ import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceSync
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
@@ -60,6 +63,7 @@ internal class SyncUploader(
     private val profile: SyncProfile = SyncProfile.Standard,
     createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
     private val transactionManager: SyncTransactionManager,
+    private val space: SpaceSync? = null,
 ) {
     private val associationUploader =
         AssociationUploader(
@@ -124,13 +128,34 @@ internal class SyncUploader(
             }
         }
 
-    suspend fun uploadJournals(accessToken: String): SyncResult = uploadPass("Upload journals") { journalUploader.uploadPending() }
+    suspend fun uploadJournals(accessToken: String): SyncResult =
+        uploadPass("Upload journals") {
+            val spaceKind = space?.activeKind(EntityType.JOURNAL)
+            if (spaceKind != null) space.uploadKind(spaceKind, profile.uploadsUpdates) else journalUploader.uploadPending()
+        }
+
+    /** Notes in the personal space: their media is uploaded first, as a space blob, exactly as [uploadContent] does. */
+    private suspend fun uploadNotesToSpace(
+        space: SpaceSync,
+        kind: SpaceKind<*>,
+    ): SyncResult {
+        @Suppress("UNCHECKED_CAST")
+        val notes = kind as SpaceKind<JournalNote>
+        return space.upload(
+            notes,
+            profile.uploadsUpdates,
+            begin = { pending, note, errors -> noteMediaUpload.prepare(pending, note, errors) },
+            afterDelete = { pending -> Uuid.parseOrNull(pending.entityId)?.let { mediaSyncRefStore.deleteScoped(it, pending.scope) } },
+        )
+    }
 
     suspend fun uploadContent(accessToken: String): SyncResult {
         return uploadPass("Upload content") {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
             setMediaDeferredForNetwork(false)
+            val spaceKind = space?.activeKind(EntityType.NOTE)
+            if (spaceKind != null) return uploadNotesToSpace(space, spaceKind)
 
             val pendingUploads = syncMetadataService.getPendingUploads(EntityType.NOTE).dueNow(EntityType.NOTE, retryCoordinator)
             if (pendingUploads.isEmpty()) {

@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingUpload
@@ -222,7 +223,7 @@ internal class SyncRetryCoordinator(
             return true
         }
 
-        val delayMs = computeBackoffMs(nextRetryCount)
+        val delayMs = maxOf(computeBackoffMs(nextRetryCount), (error as? CloudApiException)?.retryAfterMillis ?: 0L)
         retryScheduleStore.setNextAttemptAt(
             entityType,
             pending.retryKey(),

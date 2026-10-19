@@ -99,6 +99,7 @@ actual val syncModule: Module =
                 unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
                 locationHistorySyncEngine = get(),
                 createCollisionPolicy = getOrNull<CreateCollisionPolicy>() ?: CreateCollisionPolicy.None,
+                spaceSync = get(),
                 deviceEnrollment = {
                     check(get<DefaultDeviceManager>().registerWithCloud().getOrThrow()) {
                         "Device registration was not accepted"

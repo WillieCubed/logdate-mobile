@@ -59,6 +59,9 @@ kotlin {
             implementation(projects.client.media)
             implementation(projects.client.text)
             implementation(projects.client.util)
+            implementation(projects.shared.space)
+            implementation(projects.shared.atprotoRepo)
+            implementation(projects.shared.atprotoXrpc)
 
             // External dependencies
             implementation(libs.kotlinx.datetime)

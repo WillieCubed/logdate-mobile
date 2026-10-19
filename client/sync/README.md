@@ -17,6 +17,71 @@ Sync Module
 └── Platform Implementations
 ```
 
+## Personal space transport
+
+An account can keep its data in a sealed personal space instead of the per-kind sync endpoints
+(`/contents`, `/journals`, and so on). In a personal space every kind of data is an `app.logdate.*`
+record, encrypted on the device before it leaves, so the server stores only ciphertext. The code
+lives in `space/`, underneath the sync engine described below: the outbox, retries, dead letters,
+the download inbox, conflict resolvers and each kind's apply step all stay the same.
+
+### When a device uses it
+
+`SpaceTransportGate` opens only when all three agree:
+
+1. this build turns it on with the `PERSONAL_SPACE` feature flag (off by default);
+2. the connected server advertises the `personalSpaceV1` protocol feature;
+3. the server reports that the signed-in account is stored in a personal space.
+
+The third check reads `AccountStorageModeSource`, which reports no mode until the account endpoint
+returns one, so today every account keeps syncing through the per-kind endpoints.
+
+### How a kind of data plugs in
+
+Each kind needs two pieces, registered together as a `SpaceKind` in `SpaceRecordRegistry`:
+
+- a `SpaceRecordMapper`, which converts between the local item and its record. It is pure: no
+  storage, no network. Give it round-trip tests that prove every synced field survives.
+- a `SpaceLocalRecords`, which loads the item an outbox entry names, offers the kind's existing
+  conflict resolver, and records an upload the way the kind's existing upload path does.
+
+Contribute the `SpaceKind` to Koin and the registry picks it up. Journals and notes are wired
+through on both sides (`SyncUploader` and `SyncDownloader`). Another kind's downloader must read
+`SpaceStagedRecords` before its kind can be registered; the registry refuses it until then, so
+staged records never pile up with nothing to apply them.
+
+### Upload
+
+For each outbox entry, `SpaceUploader` builds the record, checks it against its schema, seals it and
+writes it with a swap condition: a create only if the record is absent, an update only if it still
+has the content identifier this device last saw. If another device changed it first, the uploader
+reads that version, runs the kind's resolver, and writes again. The last known version of each
+record is kept in the `sync_space_records` table (`SpaceSwapStore`).
+
+### Download
+
+`SpaceDownloader` pages the space's change feed from one cursor, the `SPACE` download checkpoint.
+Each change is opened, checked against its schema, and staged in the download inbox under its kind.
+A change this device can't open or check is staged under `SPACE_UNREADABLE` with the reason
+(a missing key, a corrupt record, or a record type from a newer version) and opened again on later
+downloads, so nothing is dropped. When the server says the cursor is older than deletions it has
+purged, the downloader lists the whole space again and stages a deletion for every record this
+device knows that the listing no longer has.
+
+### Media
+
+`SpaceMediaDataSource` encrypts media exactly as before (LDCE2, the account media key) and streams
+it to the space as a blob. The note then refers to it with a `SpaceMediaReference`, which carries
+the blob's content identifier; a download checks that the bytes match it before decrypting.
+Queuing a downloaded note's media for recovery still reads the per-kind record format, so the
+notes mapping also has to queue it from staged space records.
+
+### Errors
+
+`spaceCall` reports every failure in the sync engine's own terms: an expired token is the `401`
+that refreshes the session, rate limiting keeps the server's `Retry-After`, a full quota is
+`STORAGE_QUOTA_EXCEEDED`, and a failure before any response is a retried network error.
+
 ## Key Components
 
 ### Core Sync

@@ -91,6 +91,7 @@ actual val syncModule: Module =
                 identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),
                 unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
                 locationHistorySyncEngine = get(),
+                spaceSync = get(),
             )
         }
         single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get(), get()) }
