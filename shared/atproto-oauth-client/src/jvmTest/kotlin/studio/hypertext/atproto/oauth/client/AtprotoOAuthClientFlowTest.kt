@@ -13,6 +13,7 @@ import studio.hypertext.atproto.xrpc.XrpcTransportException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -207,6 +208,19 @@ class AtprotoOAuthClientFlowTest {
             harness.atmosphere.grantedScopeOverride = "transition:generic"
 
             assertFailsWith<OAuthInvalidTokenResponseException> { harness.signIn() }
+        }
+
+    @Test
+    fun keepsRawTokenEndpointBodiesOutOfErrors() =
+        runTest {
+            val harness = OAuthTestHarness()
+            harness.atmosphere.tokenEndpointFailureBody = "upstream proxy error; leaked access_token=secret-token-value"
+
+            val error = assertFailsWith<OAuthServerResponseException> { harness.signIn() }
+
+            assertEquals(502, error.statusCode)
+            assertFalse("secret-token-value" in error.message!!)
+            assertNull(error.cause)
         }
 
     @Test

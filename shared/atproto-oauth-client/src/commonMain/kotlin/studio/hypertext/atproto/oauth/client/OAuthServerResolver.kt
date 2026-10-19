@@ -1,11 +1,9 @@
 package studio.hypertext.atproto.oauth.client
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.client.statement.request
 import io.ktor.http.ContentType
 import io.ktor.http.DEFAULT_PORT
 import io.ktor.http.HttpHeaders
@@ -15,6 +13,7 @@ import io.ktor.http.Url
 import io.ktor.http.contentType
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.DidDocument
@@ -52,19 +51,26 @@ public data class OAuthResolvedServer(
  * Nothing is cached: sign-in flows are security-critical, and every token response is verified
  * against a fresh resolution.
  *
+ * @param httpClient Only its engine is used; see [AtprotoOAuthClient] for why and for the address
+ *   filtering the engine needs.
  * @param allowHttp Accept `http://` data servers and authorization servers. Only for local
  *   development.
  */
 public class OAuthServerResolver(
     private val identityResolver: IdentityResolver,
-    private val httpClient: HttpClient,
+    httpClient: HttpClient,
     private val allowHttp: Boolean = false,
 ) {
+    private val protocolClient = protocolHttpClient(httpClient)
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
      * Resolves [input] — a handle, a DID, or an `https://` data server or entryway URL — to its
      * authorization server.
+     *
+     * A handle or DID must lead to a data server that publishes protected resource metadata. A
+     * server URL is first tried as a data server; if that fails, it is treated as an authorization
+     * server itself (an entryway such as `https://bsky.social`).
      */
     public suspend fun resolve(input: String): OAuthResolvedServer {
         val trimmed = input.trim()
@@ -119,12 +125,12 @@ public class OAuthServerResolver(
     /**
      * Fetches the protected resource metadata of [pdsUrl] and the authorization server it names.
      *
-     * A data server that does not publish protected resource metadata (HTTP 404) is treated as its
-     * own authorization server.
+     * The data server must publish protected resource metadata. Only a sign-in that starts from a
+     * server URL falls back to treating that URL as an authorization server (see [resolve]).
      */
     public suspend fun authorizationServerForPds(pdsUrl: String): OAuthAuthorizationServerMetadata {
         val origin = webOrigin(pdsUrl, "data server URL")
-        val resourceMetadata = protectedResourceMetadata(origin) ?: return authorizationServerMetadata(origin)
+        val resourceMetadata = protectedResourceMetadata(origin)
         val issuer =
             resourceMetadata.authorizationServers.singleOrNull()
                 ?: throw OAuthServerMetadataException(
@@ -148,9 +154,7 @@ public class OAuthServerResolver(
             throw OAuthServerMetadataException(issuer, "an issuer must be a bare origin without a path or default port")
         }
         val url = "$origin/.well-known/oauth-authorization-server"
-        val metadata =
-            fetchJson(url, OAuthAuthorizationServerMetadata.serializer())
-                ?: throw OAuthServerMetadataException(url, "HTTP 404")
+        val metadata = fetchJson(url, OAuthAuthorizationServerMetadata.serializer())
         if (metadata.issuer != issuer) {
             throw OAuthServerMetadataException(url, "issuer is ${metadata.issuer}, expected $issuer")
         }
@@ -203,9 +207,9 @@ public class OAuthServerResolver(
         return service.serviceEndpoint
     }
 
-    private suspend fun protectedResourceMetadata(origin: String): OAuthProtectedResourceMetadata? {
+    private suspend fun protectedResourceMetadata(origin: String): OAuthProtectedResourceMetadata {
         val url = "$origin/.well-known/oauth-protected-resource"
-        val metadata = fetchJson(url, OAuthProtectedResourceMetadata.serializer()) ?: return null
+        val metadata = fetchJson(url, OAuthProtectedResourceMetadata.serializer())
         if (metadata.resource != origin) {
             throw OAuthServerMetadataException(url, "resource is ${metadata.resource}, expected $origin")
         }
@@ -213,36 +217,49 @@ public class OAuthServerResolver(
     }
 
     /**
-     * GETs [url] and decodes it, or returns `null` for HTTP 404. The response must be exactly
-     * HTTP 200 JSON from [url] itself; redirects are rejected.
+     * GETs [url] and decodes it. The response must be HTTP 200 JSON from [url] itself, no larger
+     * than [MAX_METADATA_BYTES]. Redirects are refused, not followed: a metadata document has to be
+     * served at its well-known location.
      */
     private suspend fun <T> fetchJson(
         url: String,
         deserializer: DeserializationStrategy<T>,
-    ): T? {
-        val response: HttpResponse =
+    ): T {
+        val body =
             try {
-                httpClient.get(url) { header(HttpHeaders.Accept, ContentType.Application.Json.toString()) }
+                protocolClient
+                    .prepareGet(url) { header(HttpHeaders.Accept, ContentType.Application.Json.toString()) }
+                    .execute { response -> metadataBody(url, response) }
             } catch (exception: CancellationException) {
                 throw exception
+            } catch (exception: OAuthClientException) {
+                throw exception
+            } catch (exception: ResponseTooLargeException) {
+                throw OAuthServerMetadataException(url, "the document is larger than ${exception.limit} bytes")
             } catch (exception: Exception) {
                 throw OAuthServerMetadataException(url, "request failed", exception)
             }
-        if (response.status == HttpStatusCode.NotFound) return null
-        if (response.status != HttpStatusCode.OK) throw OAuthServerMetadataException(url, "HTTP ${response.status.value}")
-        if (response.request.url.toString() != Url(url).toString()) {
-            throw OAuthServerMetadataException(url, "redirected to ${response.request.url}")
+        return try {
+            json.decodeFromString(deserializer, body)
+        } catch (exception: SerializationException) {
+            // The decoder's message quotes the response body, so it is not passed on.
+            throw OAuthServerMetadataException(url, "the document is not valid JSON metadata")
+        } catch (exception: IllegalArgumentException) {
+            throw OAuthServerMetadataException(url, "the document is not valid JSON metadata")
         }
+    }
+
+    private suspend fun metadataBody(
+        url: String,
+        response: HttpResponse,
+    ): String {
+        val status = response.status.value
+        if (status in 300..399) throw OAuthServerMetadataException(url, "HTTP $status redirect; metadata must be served directly")
+        if (response.status != HttpStatusCode.OK) throw OAuthServerMetadataException(url, "HTTP $status")
         if (response.contentType()?.withoutParameters() != ContentType.Application.Json) {
             throw OAuthServerMetadataException(url, "content type is ${response.contentType()}, expected application/json")
         }
-        return try {
-            json.decodeFromString(deserializer, response.bodyAsText())
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (exception: Exception) {
-            throw OAuthServerMetadataException(url, "invalid JSON document", exception)
-        }
+        return response.bodyAsTextCapped(MAX_METADATA_BYTES)
     }
 
     private fun webOrigin(

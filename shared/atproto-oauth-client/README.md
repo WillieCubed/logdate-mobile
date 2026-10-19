@@ -88,6 +88,10 @@ val config =
         clientUri = "https://logdate.example",
     )
 
+val httpClient = JvmOAuthHttp.publicInternetClient() // see "Network safety" below
+val identityResolver =
+    DefaultIdentityResolver(DidPlcResolver(httpClient), WellKnownHandleResolver(httpClient))
+
 val oauth =
     AtprotoOAuthClient(
         config = config,
@@ -134,7 +138,45 @@ val profile = xrpc.queryRaw(Nsid.require("com.atproto.server.getSession"))
 ```
 
 `session.httpClient` is a plain Ktor client for anything XRPC does not cover. It only sends
-requests to the account's own data server, so the token cannot leak to another host.
+requests to the account's own data server and does not follow redirects, so the token cannot leak
+to another host. It shares your client's engine but **not its plugins**: if you installed request
+logging or default headers on the client you passed in, they do not apply here. That is deliberate,
+so that a logging plugin never records an access token.
+
+## Network safety
+
+Signing someone in means fetching URLs that strangers control: their handle's well-known file,
+the data server in their DID document, and that server's metadata. Left unchecked, a handle or DID
+document could point your server at `localhost`, a cloud metadata service such as
+`169.254.169.254`, or another machine on your private network. This is called server-side request
+forgery (SSRF).
+
+**You must pass an `HttpClient` whose engine refuses private, loopback, and link-local addresses,
+and checks them after DNS resolution** (so a name that resolves to a public address once and a
+private one later, a trick called DNS rebinding, is still refused). Use the same client for the
+identity resolver.
+
+On the JVM, `JvmOAuthHttp.publicInternetClient()` is such a client. It is backed by OkHttp and
+checks the address of every connection at the moment the socket connects. It ignores proxy
+settings, because a proxy would resolve names where the check cannot see them. You can pass it
+extra configuration, such as timeouts; the proxy and socket settings are applied after yours, so
+nothing you pass can turn the check off. On other platforms, build the equivalent with your
+engine's connection hooks.
+
+The OAuth client also protects itself:
+
+- **Only the engine of your client is used.** Metadata, pushed authorization, token, refresh, and
+  revocation requests go through an internal client with no plugins, so tokens and client
+  assertions never pass through a logging plugin. Do not add logging interceptors to the engine
+  itself (for example an OkHttp `HttpLoggingInterceptor`), because those would see them.
+- **Redirects are refused, not followed.** A metadata document must be served at its well-known
+  URL, and token endpoints must answer directly.
+- **Responses are capped.** Metadata documents and authorization server responses larger than
+  64 KiB are refused.
+- **Requests time out.** Connections give up after 10 seconds, and authorization server requests
+  after 20.
+- **Error messages never quote a response body.** They carry the OAuth `error` and
+  `error_description` only, shortened and stripped of control characters.
 
 ## Sessions, storage, and multiple server instances
 

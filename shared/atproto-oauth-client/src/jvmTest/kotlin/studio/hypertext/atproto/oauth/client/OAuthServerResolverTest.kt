@@ -7,6 +7,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class OAuthServerResolverTest {
@@ -174,6 +175,49 @@ class OAuthServerResolverTest {
             val resolved = resolver.resolve(atmosphere.issuer)
 
             assertEquals(atmosphere.issuer, resolved.metadata.issuer)
+        }
+
+    @Test
+    fun refusesRedirectedResourceMetadataWithoutFollowingIt() =
+        runTest {
+            atmosphere.redirectProtectedResourceMetadata = true
+
+            val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+            assertTrue(error.message!!.contains("HTTP 302 redirect"), error.message)
+            assertFalse("GET ${atmosphere.issuer}/.well-known/oauth-protected-resource" in atmosphere.requestLog)
+        }
+
+    @Test
+    fun refusesRedirectedAuthorizationServerMetadataWithoutFollowingIt() =
+        runTest {
+            atmosphere.redirectAuthorizationServerMetadata = true
+
+            val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+            assertTrue(error.message!!.contains("HTTP 302 redirect"), error.message)
+            assertFalse("GET ${atmosphere.otherIssuer}/.well-known/oauth-authorization-server" in atmosphere.requestLog)
+        }
+
+    @Test
+    fun refusesOversizedMetadata() =
+        runTest {
+            atmosphere.authorizationServerMetadataOverride = { JsonObject(it + ("padding" to JsonPrimitive("x".repeat(70_000)))) }
+
+            val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+            assertTrue(error.message!!.contains("larger than"), error.message)
+        }
+
+    @Test
+    fun requiresResourceMetadataForAnAccountsDataServer() =
+        runTest {
+            atmosphere.publishProtectedResourceMetadata = false
+
+            val error = assertFailsWith<OAuthServerMetadataException> { resolver.resolve("alice.example.com") }
+
+            assertTrue(error.message!!.contains("oauth-protected-resource"), error.message)
+            assertFalse(atmosphere.requestLog.any { it.startsWith("GET ${atmosphere.pdsUrl}/.well-known/oauth-authorization-server") })
         }
 
     private fun strings(vararg values: String) = buildJsonArray { values.forEach { add(JsonPrimitive(it)) } }

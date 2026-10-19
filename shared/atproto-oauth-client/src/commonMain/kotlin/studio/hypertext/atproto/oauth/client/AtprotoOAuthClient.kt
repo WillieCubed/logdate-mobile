@@ -74,7 +74,12 @@ public data class OAuthCallbackResult(
  * @param config The client configuration and keys.
  * @param identityResolver Resolves handles and DIDs. It should support every handle resolution
  *   method (DNS TXT and HTTPS) and every DID method the AT Protocol allows.
- * @param httpClient The HTTP client for metadata, token, and data server requests.
+ * @param httpClient Supplies the engine for metadata, token, and data server requests. Only its
+ *   engine is used, never its plugins, so caller plugins such as request logging cannot see client
+ *   assertions or tokens; do not add logging interceptors to the engine itself either. The URLs
+ *   the client fetches come from handles, DID documents, and server metadata, which anyone can
+ *   control, so the engine must refuse private, loopback, and link-local addresses, checked after
+ *   DNS resolution. On the JVM, `JvmOAuthHttp.publicInternetClient()` does this.
  * @param crypto Platform cryptography; `JvmOAuthCrypto` on the JVM.
  * @param stateStore Storage for pending authorization requests.
  * @param sessionStore Storage for sessions. Share it between server instances.
@@ -105,7 +110,7 @@ public class AtprotoOAuthClient(
         OAuthSessionManager(
             config = config,
             resolver = resolver,
-            httpClient = httpClient,
+            httpClient = protocolHttpClient(httpClient),
             crypto = crypto,
             nonces = nonces,
             sessionStore = sessionStore,
