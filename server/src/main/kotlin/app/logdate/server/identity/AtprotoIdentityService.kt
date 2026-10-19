@@ -2,6 +2,8 @@ package app.logdate.server.identity
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
+import app.logdate.server.logging.IdentityNotices
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -41,51 +43,42 @@ class AtprotoIdentityService(
 
     /**
      * Returns [account] with a canonical handle, DID, and signing key, provisioning whatever is
-     * missing. Provisioning for one account is serialized within this process, so two concurrent
-     * calls never create two DIDs for the same account; the second call sees the first one's result.
+     * missing. Provisioning always starts from the stored account, read again under a per-account
+     * lock, so two concurrent calls in one process never create two DIDs. The result is written
+     * with [AccountRepository.updateIdentityIfUnchanged], so a deleted account is never written back
+     * and a DID another server instance assigned first is kept.
+     *
+     * @throws IdentityAccountMissingException when the account no longer exists.
      */
     suspend fun ensureIdentity(account: Account): Account {
         if (hasCanonicalIdentity(account)) return account
         return provisioningLockFor(account.id).withLock {
-            val current = accountRepository.findById(account.id)
-            if (current != null && hasCanonicalIdentity(current)) current else ensureIdentityLocked(account)
+            val current = accountRepository.findById(account.id) ?: throw IdentityAccountMissingException()
+            if (hasCanonicalIdentity(current)) current else ensureIdentityLocked(current)
         }
     }
 
-    private suspend fun ensureIdentityLocked(account: Account): Account {
-        val existingHandle = account.handle?.let(::canonicalizeHandle)
-        val existingDid = account.did?.let(::canonicalizeDid)
-        val existingRecoveryDidKey = account.plcRecoveryDidKey?.let(::canonicalizeDidKey)
-        if (existingHandle != null && existingDid != null && account.signingKeyPublic != null) {
-            if (
-                existingHandle == account.handle &&
-                existingDid == account.did &&
-                existingRecoveryDidKey == account.plcRecoveryDidKey
-            ) {
-                return account
-            }
-            return accountRepository.save(
-                account.copy(
-                    handle = existingHandle,
-                    did = existingDid,
-                    plcRecoveryDidKey = existingRecoveryDidKey,
-                ),
-            )
-        }
-
-        val normalizedAccount =
-            account.copy(
+    private suspend fun ensureIdentityLocked(stored: Account): Account {
+        val existingHandle = stored.handle?.let(::canonicalizeHandle)
+        val existingDid = stored.did?.let(::canonicalizeDid)
+        val existingRecoveryDidKey = stored.plcRecoveryDidKey?.let(::canonicalizeDidKey)
+        val normalized =
+            stored.copy(
                 handle = existingHandle,
                 did = existingDid,
                 plcRecoveryDidKey = existingRecoveryDidKey,
             )
-        val handle = provisionedHandleFor(normalizedAccount)
+        if (existingHandle != null && existingDid != null && stored.signingKeyPublic != null) {
+            return writeIdentity(stored, normalized)
+        }
+
+        val handle = provisionedHandleFor(normalized)
         val did =
             when (config.hostedAccountDidMethod) {
                 HostedAccountDidMethod.PLC -> {
                     val provisionedIdentity =
                         plcIdentityService.provisionHostedDid(
-                            accountId = account.id,
+                            accountId = stored.id,
                             handle = handle,
                             recoveryDidKey = existingRecoveryDidKey,
                         )
@@ -93,15 +86,23 @@ class AtprotoIdentityService(
                 }
                 HostedAccountDidMethod.WEB -> didForHandle(handle).toString()
             }
-        val signingKey = account.signingKeyPublic ?: signingKeyService.ensureActiveKey(account.id).publicKeyMultibase
+        val signingKey = stored.signingKeyPublic ?: signingKeyService.ensureActiveKey(stored.id).publicKeyMultibase
 
-        return accountRepository.save(
-            normalizedAccount.copy(
-                did = did,
-                handle = handle,
-                signingKeyPublic = signingKey,
-            ),
-        )
+        return writeIdentity(stored, normalized.copy(did = did, handle = handle, signingKeyPublic = signingKey))
+    }
+
+    /**
+     * Stores [updated]'s identity while the account still has [stored]'s. When another writer got
+     * there first, the account as it now stands is returned if it has a complete identity.
+     */
+    private suspend fun writeIdentity(
+        stored: Account,
+        updated: Account,
+    ): Account {
+        accountRepository.updateIdentityIfUnchanged(expected = stored, updated = updated)?.let { return it }
+        val current = accountRepository.findById(stored.id) ?: throw IdentityAccountMissingException()
+        if (hasCompleteIdentity(current)) return current
+        throw IdentityLifecycleConflictException("The account's identity changed while it was being provisioned")
     }
 
     private fun hasCanonicalIdentity(account: Account): Boolean {
@@ -117,10 +118,12 @@ class AtprotoIdentityService(
 
     /**
      * Provisions every active account that still lacks a handle, DID, or signing key, the same way
-     * sign-in does. Each account is attempted once; failures are counted and the run continues.
+     * sign-in does. Each account is attempted once. An account deleted after the listing is
+     * skipped; any other failure is logged and counted, and the run continues.
      */
     suspend fun backfillMissingIdentities(): IdentityBackfillResult {
         var provisioned = 0
+        var skipped = 0
         var failed = 0
         accountRepository.findAccountsMissingIdentity().forEach { account ->
             try {
@@ -128,11 +131,14 @@ class AtprotoIdentityService(
                 provisioned++
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
+            } catch (_: IdentityAccountMissingException) {
+                skipped++
+            } catch (error: Exception) {
+                Napier.e(IdentityNotices.BACKFILL_ACCOUNT_FAILED, error)
                 failed++
             }
         }
-        return IdentityBackfillResult(provisioned = provisioned, failed = failed)
+        return IdentityBackfillResult(provisioned = provisioned, skipped = skipped, failed = failed)
     }
 
     /** Active accounts that still lack a handle, DID, or signing key. Reads only. */
@@ -600,6 +606,7 @@ class AtprotoIdentityService(
 /** Outcome of [AtprotoIdentityService.backfillMissingIdentities]. */
 data class IdentityBackfillResult(
     val provisioned: Int,
+    val skipped: Int,
     val failed: Int,
 )
 

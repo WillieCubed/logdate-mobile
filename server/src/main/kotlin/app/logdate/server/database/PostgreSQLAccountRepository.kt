@@ -3,6 +3,8 @@ package app.logdate.server.database
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.entitlements.AccountEntitlementsTable
+import org.jetbrains.exposed.v1.core.Column
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -262,6 +264,38 @@ class PostgreSQLAccountRepository : AccountRepository {
             val deletedRows = AccountsTable.deleteWhere { AccountsTable.id eq id }
             deletedRows > 0
         }
+
+    override suspend fun updateIdentityIfUnchanged(
+        expected: Account,
+        updated: Account,
+    ): Account? =
+        transaction {
+            val id = expected.id.toJavaUUID()
+            val changed =
+                AccountsTable.update({
+                    (AccountsTable.id eq id) and
+                        AccountsTable.handle.matches(expected.handle) and
+                        AccountsTable.did.matches(expected.did) and
+                        AccountsTable.signingKeyPublic.matches(expected.signingKeyPublic) and
+                        AccountsTable.plcRecoveryDidKey.matches(expected.plcRecoveryDidKey)
+                }) {
+                    it[handle] = updated.handle
+                    it[did] = updated.did
+                    it[signingKeyPublic] = updated.signingKeyPublic
+                    it[plcRecoveryDidKey] = updated.plcRecoveryDidKey
+                }
+            if (changed == 0) {
+                null
+            } else {
+                AccountsTable
+                    .selectAll()
+                    .where { AccountsTable.id eq id }
+                    .single()
+                    .toAccount()
+            }
+        }
+
+    private fun Column<String?>.matches(value: String?): Op<Boolean> = if (value == null) isNull() else (this eq value)
 
     private fun ResultRow.toAccount(): Account =
         Account(

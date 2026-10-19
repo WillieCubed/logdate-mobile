@@ -52,7 +52,43 @@ interface AccountRepository {
     suspend fun getAccountsCreatedAfter(timestamp: Instant): List<Account>
 
     suspend fun deleteAccount(accountId: Uuid): Boolean
+
+    /**
+     * Writes [updated]'s AT Protocol identity (handle, DID, signing key and PLC recovery key) only
+     * while the stored account still has [expected]'s identity. Returns the stored account after the
+     * write, or null when the account no longer exists or another writer changed its identity
+     * first. It never inserts, so it cannot bring back a deleted account, and it leaves every other
+     * column alone.
+     *
+     * This default reads and then saves. The PostgreSQL repository overrides it with one
+     * conditional `UPDATE`, which is what keeps two server instances from both assigning a DID.
+     */
+    suspend fun updateIdentityIfUnchanged(
+        expected: Account,
+        updated: Account,
+    ): Account? {
+        val current = findById(expected.id) ?: return null
+        if (!current.hasSameIdentityAs(expected)) return null
+        return save(current.withIdentityOf(updated))
+    }
 }
+
+/** True when both accounts store the same handle, DID, signing key and PLC recovery key. */
+fun Account.hasSameIdentityAs(other: Account): Boolean =
+    handle == other.handle &&
+        did == other.did &&
+        signingKeyPublic == other.signingKeyPublic &&
+        plcRecoveryDidKey == other.plcRecoveryDidKey
+
+/** This account with [source]'s handle, DID, signing key and PLC recovery key. */
+@OptIn(ExperimentalUuidApi::class)
+fun Account.withIdentityOf(source: Account): Account =
+    copy(
+        handle = source.handle,
+        did = source.did,
+        signingKeyPublic = source.signingKeyPublic,
+        plcRecoveryDidKey = source.plcRecoveryDidKey,
+    )
 
 @OptIn(ExperimentalUuidApi::class)
 class InMemoryAccountRepository : AccountRepository {
