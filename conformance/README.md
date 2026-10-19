@@ -112,6 +112,10 @@ LogDate's own schemas don't yet use every constraint, so some kinds appear in no
 start appearing when a schema first uses the constraint, and `tools/lexicon-check/conformance.test.mjs`
 keeps the generator able to produce them.
 
+Space declarations (the `app.logdate.space.*` files that declare a kind of space) and permission
+sets (`app.logdate.authFull`, `app.logdate.authShare`) are not records, so they have no cases. They
+are still in `manifest.json`'s `inputs`, so a change to one needs `conformance:update` as well.
+
 Records always carry `$type`. The reference implementation refuses a record without it, so the
 suite has no case for one.
 
