@@ -271,13 +271,18 @@ class RepoCommitSpecTest {
                     },
                 )
             val nodeCid = Cid.sha256(DAG_CBOR_CODEC, nodeBytes)
-            val head = RepoHead(repo = repo, root = nodeCid, commitCid = nodeCid, revision = 1)
+            val commit = RepoCommit(repo = repo, root = nodeCid, revision = 1, createdAtEpochMillis = 0, recordCount = 2)
+            val signature = DigestRepoCommitSigner.sign(commit, encodeCommitPayload(commit))
+            val commitBytes = encodeSignedCommitPayload(commit, signature)
+            val commitCid = Cid.sha256(DAG_CBOR_CODEC, commitBytes)
+            val head = RepoHead(repo = repo, root = nodeCid, commitCid = commitCid, revision = 1)
             val export =
                 RepoExport(
                     repo = repo,
                     head = head,
-                    commits = emptyList(),
-                    blocks = listOf(RepoBlock(recordCid, recordBytes), RepoBlock(nodeCid, nodeBytes)),
+                    commits = listOf(SignedRepoCommit(cid = commitCid, commit = commit, signature = signature)),
+                    blocks =
+                        listOf(RepoBlock(recordCid, recordBytes), RepoBlock(nodeCid, nodeBytes), RepoBlock(commitCid, commitBytes)),
                 )
             val blockStore = InMemoryRepoBlockStore()
 

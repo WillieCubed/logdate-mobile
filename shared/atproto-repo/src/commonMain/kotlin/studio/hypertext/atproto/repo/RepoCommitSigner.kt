@@ -42,6 +42,11 @@ public interface RepoCommitSigner {
  * that never leaves this process, such as one in a test, but it is not a signature: relays and
  * other AT Protocol services reject these commits. A repository that other services will read
  * must use a signer backed by the account's signing key.
+ *
+ * The value is the unpadded base64url form of the SHA-256 digest of the unsigned commit, so the
+ * commit's `sig` field holds those 32 bytes. Versions before 2026-10 returned the digest as a CID
+ * string instead; commits written that way do not verify with this signer, and an import only
+ * checks the head commit, which every new write replaces.
  */
 public object DigestRepoCommitSigner : RepoCommitSigner {
     override suspend fun sign(
@@ -78,10 +83,12 @@ internal fun encodeSignedCommitPayload(
     signature: String,
 ): ByteArray =
     DagCborCodec.encode(
-        JsonObject(unsignedCommitObject(commit) + ("sig" to DagCborCodec.bytes(encodeCommitSignature(signature)))),
+        JsonObject(unsignedCommitObject(commit) + (COMMIT_SIGNATURE_FIELD to DagCborCodec.bytes(encodeCommitSignature(signature)))),
     )
 
 internal const val REPO_COMMIT_VERSION: Int = 3
+
+internal const val COMMIT_SIGNATURE_FIELD: String = "sig"
 
 /**
  * Decodes a signer's output into the raw signature bytes stored in the commit's `sig` field.

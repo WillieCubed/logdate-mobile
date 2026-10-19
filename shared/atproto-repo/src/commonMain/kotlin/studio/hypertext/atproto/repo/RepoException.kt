@@ -25,9 +25,13 @@ public class InvalidRepoCursorException(
 
 /**
  * Raised when commits for [repo] cannot be signed or checked because its account or signing key
- * cannot be found. The write that needed the commit fails instead of storing an unsigned commit.
+ * cannot be found, or the key does not match the one the account's DID document publishes. The
+ * write that needed the commit fails instead of storing a commit nobody can verify.
+ *
+ * This is a problem with the account's state, not with the request, so it is not a
+ * [RepoException] (which callers treat as a bad request).
  */
 public class RepoSigningKeyUnavailableException(
     public val repo: AtprotoDid,
     public val reason: String,
-) : RepoException("Cannot sign or verify commits for $repo: $reason")
+) : IllegalStateException("Cannot sign or verify commits for $repo: $reason")
