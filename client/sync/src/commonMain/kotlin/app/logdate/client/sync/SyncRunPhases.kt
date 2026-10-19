@@ -161,6 +161,7 @@ internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
         val historyResult = historyEngine?.download(accessToken) ?: SyncResult(success = true)
         val momentResult = momentDownloader?.download() ?: SyncResult(success = true)
         recoverMedia(accessToken, EntityType.NOTE)
+        recoverMedia(accessToken, EntityType.JOURNAL)
         val totalDownloaded =
             journalResult.downloadedItems +
                 contentResult.downloadedItems +

@@ -102,7 +102,7 @@ internal class SyncDownloader(
         val downloadScope = downloadInbox?.currentScope()
         val requestScope = tokenRefresher.currentRequestScope()
         val mergeScope = requestScope?.let { JournalMergeScope(it.ownerId, it.serverOrigin) }
-        val spaceRead = spaceRead<SpaceJournal>(EntityType.JOURNAL)?.let { JournalSpaceRead(it, mergeScope) }
+        val spaceRead = spaceRead<SpaceJournal>(EntityType.JOURNAL, ::enqueueSpaceCover)?.let { JournalSpaceRead(it, mergeScope) }
         val result =
             downloadEngine.download(
                 strategy =
@@ -174,6 +174,15 @@ internal class SyncDownloader(
         // The registry pairs each entity type with the kind of its own item type.
         @Suppress("UNCHECKED_CAST")
         return SpaceRead(sync, kind as SpaceKind<T>, afterStored)
+    }
+
+    /** Queues the personal-space file a journal applied from the space has as its cover, for media recovery. */
+    private suspend fun enqueueSpaceCover(id: Uuid) {
+        val inbox = downloadInbox ?: return
+        if (!downloadsMedia) return
+        val journal = journalRepository.getJournalById(id)?.takeIf { it.id == id } ?: return
+        if (journal.coverImageUri?.let { SpaceMediaReference.parse(it) } == null) return
+        inbox.enqueueSpaceJournalMedia(id.toString(), journal.syncVersion)
     }
 
     /** Queues the personal-space file a note applied from the space refers to, for media recovery. */
