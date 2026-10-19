@@ -140,7 +140,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertIn("native-transfer-api-36-1:", workflow)
         self.assertIn("platforms;android-36.1", workflow)
         self.assertIn(
-            "NativeBackgroundCredentialCallbackTest#modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable",
+            "NativeBackgroundCredentialCallbackTest",
             workflow,
         )
 
@@ -212,7 +212,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertIn("install_api36_apk app", callback)
         self.assertIn("install_api36_apk android-test", callback)
         self.assertIn("shell am instrument --user 0 -w -r", callback)
-        self.assertIn("NativeBackgroundCredentialCallbackTest#modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable", callback)
+        self.assertIn("NativeBackgroundCredentialCallbackTest", callback)
         self.assertIn("api36-1-*-install-attempt-*.log", workflow)
 
     def test_api_36_restore_probe_fails_if_full_restore_callback_is_missing(self):
@@ -833,6 +833,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             source="emulator-5576",
             destination="emulator-5584",
             exercise_missing_keys=False,
+            exercise_missing_privacy=False,
             exercise_credentials_only=False,
             exercise_archive_recovery=True,
             exercise_partial_media=False,

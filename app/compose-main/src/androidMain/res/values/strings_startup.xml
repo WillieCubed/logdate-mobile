@@ -8,4 +8,5 @@
     <string name="application_startup_retry">Try again</string>
     <string name="database_key_recovery_title">Finish restoring your journal</string>
     <string name="database_key_recovery_message">LogDate can’t read the encryption key needed to open your journal. Keep LogDate installed on both devices. On your original device, update LogDate and open your journal, then repeat the Android transfer or restore a complete device backup. After the transfer finishes, tap Try again.</string>
+    <string name="native_privacy_metadata_recovery_message">Your journal is here, but its privacy settings weren’t restored. LogDate has kept it protected. Update LogDate on your original device, then repeat the Android transfer or restore a complete device backup. When it finishes, tap Try again.</string>
 </resources>

@@ -10,6 +10,19 @@ import androidx.room.Query
 interface IntegrityDao {
     @Query(
         """
+        SELECT EXISTS(
+            SELECT 1 FROM journals
+            UNION ALL SELECT 1 FROM text_notes
+            UNION ALL SELECT 1 FROM image_notes
+            UNION ALL SELECT 1 FROM audio_notes
+            UNION ALL SELECT 1 FROM video_notes
+        )
+        """,
+    )
+    suspend fun hasRetainedJournalContent(): Boolean
+
+    @Query(
+        """
         SELECT COUNT(*)
         FROM journal_content_links AS links
         LEFT JOIN journals AS journals ON links.journal_id = journals.id

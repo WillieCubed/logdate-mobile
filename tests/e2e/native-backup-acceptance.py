@@ -118,7 +118,7 @@ def validate_preference_value(data):
     return number
 
 
-def canonical_preferences(data, allowed_names=None):
+def canonical_preferences(data, allowed_names=None, excluded_names=()):
     """Normalize DataStore preference ordering and omit its runtime search-index counter."""
     try:
         entries = {}
@@ -136,7 +136,7 @@ def canonical_preferences(data, allowed_names=None):
                 raise ValueError("invalid DataStore preferences: duplicate preference name")
             if name == "android_platform_search_index_generation" and value_type != 4:
                 raise ValueError("invalid DataStore preferences: runtime generation has invalid type")
-            if name not in RUNTIME_ONLY_PREFERENCES and (allowed_names is None or name in allowed_names):
+            if name not in RUNTIME_ONLY_PREFERENCES and name not in excluded_names and (allowed_names is None or name in allowed_names):
                 entries[name] = entry
         return b"".join(length_delimited_field(1, entry) for _, entry in sorted(entries.items()))
     except (IndexError, UnicodeDecodeError, ValueError) as error:
@@ -148,6 +148,23 @@ def canonical_preferences(data, allowed_names=None):
 def is_user_content_path(path):
     path = path.decode() if isinstance(path, bytes) else path
     return any(path == root or path.startswith(root) for root in USER_CONTENT_PATHS)
+
+
+def explicit_backup_privacy_defaults(data):
+    """Expected first-backup normalization; existing values and other preferences stay intact."""
+    normalized = canonical_preferences(data)
+    names = {
+        payload.decode()
+        for _, _, _, entry in protobuf_fields(normalized)
+        for number, wire, _, payload in protobuf_fields(entry)
+        if number == 1 and wire == 2
+    }
+    defaults = {"is_onboarded": b"\x08\x00", "security_level": length_delimited_field(5, b"NONE")}
+    for name, value in defaults.items():
+        if name not in names:
+            entry = length_delimited_field(1, name.encode()) + length_delimited_field(2, value)
+            normalized += length_delimited_field(1, entry)
+    return canonical_preferences(normalized)
 
 
 def contains_user_content(files):
@@ -288,6 +305,8 @@ def backup_source(serial, output, *, verify_after_backup=None):
             raise RuntimeError("The source app did not start before native backup")
         wait_for_timeline(serial, output.parent, timeout_seconds=120, prefix="source")
     before = package_file_snapshot(serial)
+    preference_path = "files/logdate.preferences_pb"
+    original_preferences = adb(serial, "exec-out", "run-as", PACKAGE, "cat", preference_path) if preference_path in before else b""
     if before.get("databases/logdate") is None:
         raise RuntimeError("The synthetic source has no database to back up")
     enable_backup(serial)
@@ -304,6 +323,11 @@ def backup_source(serial, output, *, verify_after_backup=None):
     after = package_file_snapshot(serial)
     private_file(output.with_name("source-files-before-native-backup.json"), json.dumps(before, indent=2).encode())
     private_file(output.with_name("source-files-after-native-backup.json"), json.dumps(after, indent=2).encode())
+    if before.get(preference_path) != after.get(preference_path):
+        prepared_preferences = adb(serial, "exec-out", "run-as", PACKAGE, "cat", preference_path)
+        if explicit_backup_privacy_defaults(original_preferences) != canonical_preferences(prepared_preferences):
+            raise RuntimeError("native backup changed preferences beyond explicit missing privacy defaults")
+        before = {**before, preference_path: after[preference_path]}
     if verify_after_backup is not None:
         adb(serial, "shell", "am", "force-stop", PACKAGE)
         verify_after_backup()
@@ -334,6 +358,25 @@ def without_portable_recovery_keys(payload):
 def credentials_only(payload):
     """Keep LogDate's portable recovery keys while removing journal and media data."""
     return rewrite_native_full_backup(payload, credentials_only_from_full_backup)
+
+
+def without_privacy_metadata(payload):
+    """Retain owner, drafts, keys, and content while omitting only the original privacy policy."""
+    preference_path = f"apps/{PACKAGE}/f/logdate.preferences_pb"
+
+    def remove_policy(full_backup):
+        with tarfile.open(fileobj=io.BytesIO(full_backup), mode="r:") as archive:
+            preferences = archive.extractfile(preference_path)
+            if preferences is None:
+                raise RuntimeError("native fixture is missing privacy metadata")
+            original = canonical_preferences(preferences.read())
+            filtered = canonical_preferences(original, excluded_names={"is_onboarded", "security_level"})
+            if filtered == original:
+                raise RuntimeError("native fixture never contained privacy metadata")
+            paths = {member.name for member in archive.getmembers()}
+        return rewrite_app_backup(full_backup, paths, {preference_path: filtered})
+
+    return rewrite_native_full_backup(payload, remove_policy)
 
 
 def without_one_native_media_file(payload):
@@ -736,6 +779,34 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
         raise RuntimeError(f"native {mode} probe failed; inspect {output}")
 
 
+def privacy_probe(serial, mode, output):
+    result = adb(serial, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+                 "app.logdate.client.e2e.NativeRestorePrivacyRuntimeTest",
+                 "-e", "restorePrivacyMode", mode, RUNNER)
+    private_file(output, result)
+    if b"OK (1 test)" not in result or b"Process crashed" in result or b"INSTRUMENTATION_STATUS_CODE: -3" in result:
+        raise RuntimeError(f"native privacy {mode} probe failed; inspect {output}")
+
+
+def verify_privacy_backup_refusal(result, diagnostics, started_at):
+    expected = f"Package {PACKAGE} with result: Transport rejected package because it wasn't able to process it at the time"
+    if expected not in result.decode().splitlines():
+        raise RuntimeError("Android did not report the expected package backup rejection")
+    agents = {}
+    for line in diagnostics.decode(errors="replace").splitlines():
+        match = re.match(r"\s*(\d+\.\d+)\s+(\d+)\s+\d+\s+[VDIWEF]\s+BackupServiceBinder\s*:\s*(.*)", line)
+        if match and float(match[1]) >= started_at:
+            agents.setdefault(match[2], []).append(match[3])
+    if not any(
+        "onFullBackup" in "\n".join(lines)
+        and "app.logdate.client.data.restore.NativeAccountBackupAgent" in "\n".join(lines)
+        and "NativeRestorePrivacyMetadataRequiredException" in "\n".join(lines)
+        and "NativeRestorePrivacyPolicy$prepareBackup" in "\n".join(lines)
+        for lines in agents.values()
+    ):
+        raise RuntimeError("The current backup did not reach the agent's missing-privacy refusal")
+
+
 def runtime_permission_grant(package_state, permission):
     requested = re.search(
         rf"^\s*{re.escape(permission)}\s*$",
@@ -861,7 +932,8 @@ def prepare_source(serial, app_apk, test_apk, output, identity, seed_source=True
 
 def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False,
              exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False,
-             exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False):
+             exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False,
+             exercise_missing_privacy=False):
     prepare_source(
         source,
         app_apk,
@@ -910,6 +982,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
             probe(source, "source-account-session-cleanup", output / "source-account-session-cleanup.log")
             adb(source, "shell", "am", "force-stop", PACKAGE)
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
+    original_payload = payload
     missing_media_path = None
     if exercise_missing_keys:
         payload = without_portable_recovery_keys(payload)
@@ -918,6 +991,8 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     elif exercise_partial_media:
         payload, missing_media_path = without_one_native_media_file(payload)
         private_file(output / "omitted-native-media-path.txt", missing_media_path.encode())
+    elif exercise_missing_privacy:
+        payload = without_privacy_metadata(payload)
     private_file(output / "native-transport.tar", payload)
     print("Restoring through Android's destination backup service", flush=True)
     adb(destination, "push", str(output / "native-transport.tar"), "/data/local/tmp/logdate-native-transport.tar")
@@ -950,6 +1025,30 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
     private_file(output / "destination-first-launch.log", launch)
     adb(destination, "install", "-t", str(test_apk))
+    if exercise_missing_privacy:
+        print("Verifying missing privacy metadata blocks every database consumer", flush=True)
+        privacy_probe(destination, "blocked", output / "destination-privacy-blocked.log")
+        started_at = float(adb(destination, "shell", "date", "+%s.%N").strip())
+        refused_backup = adb(destination, "shell", "bmgr", "backupnow", PACKAGE)
+        private_file(output / "destination-privacy-backup-refused.log", refused_backup)
+        diagnostics = adb(destination, "logcat", "-d", "-v", "epoch", "-s", "BackupServiceBinder:D")
+        verify_privacy_backup_refusal(refused_backup, diagnostics, started_at)
+        privacy_probe(destination, "blocked", output / "destination-privacy-after-backup.log")
+        # Deliver the original source policy through Android, without clearing destination data.
+        adb(destination, "shell", "am", "force-stop", PACKAGE)
+        private_file(output / "native-transport-complete.tar", original_payload)
+        adb(destination, "push", str(output / "native-transport-complete.tar"), "/data/local/tmp/logdate-native-transport.tar")
+        adb(destination, "shell", "tar", "-C", TRANSPORT_FILES, "-xf", "/data/local/tmp/logdate-native-transport.tar")
+        adb(destination, "shell", "chown", "-R", "system:system", TRANSPORT_FILES + "/1")
+        adb(destination, "shell", "restorecon", "-R", TRANSPORT_FILES + "/1")
+        repaired = adb(destination, "shell", "bmgr", "restore", "1", PACKAGE)
+        private_file(output / "native-restore-complete.log", repaired)
+        if b"restoreFinished: 0" not in repaired:
+            raise RuntimeError("Android did not finish delivering the original privacy policy")
+        verify_restored_snapshot(package_file_snapshot(destination), source_files, credentials_only=False)
+        privacy_probe(destination, "resolved", output / "destination-privacy-resolved.log")
+        print("Original native preferences restored journal access without replacing its key", flush=True)
+        return
     if exercise_missing_keys:
         print("Verifying a retained journal remains untouched when portable keys are missing", flush=True)
         probe(destination, "missing-keys", output / "destination-missing-keys.log")
@@ -1041,6 +1140,7 @@ def main():
     parser.add_argument("--exercise-quota", action="store_true", help="also verify native quota rejection on the synthetic source")
     parser.add_argument("--exercise-archive-recovery", action="store_true", help="transfer an edited partial archive and recover its originals on the destination")
     parser.add_argument("--exercise-missing-keys", action="store_true", help="omit portable key files from the native payload and verify safe recovery")
+    parser.add_argument("--exercise-missing-privacy", action="store_true", help="omit privacy metadata, verify protected recovery, then deliver original preferences")
     parser.add_argument("--exercise-credentials-only", action="store_true", help="restore portable recovery keys without journal or media data")
     parser.add_argument("--exercise-data-only", action="store_true", help="verify journal and media restore without an account session")
     parser.add_argument("--exercise-duplicate-restore", action="store_true", help="replay native restore before app launch and verify idempotent durable state")
@@ -1074,6 +1174,7 @@ def main():
         exercise_duplicate_restore=options.exercise_duplicate_restore,
         exercise_partial_media=options.exercise_partial_media,
         exercise_data_only=options.exercise_data_only,
+        exercise_missing_privacy=options.exercise_missing_privacy,
     )
     if options.exercise_quota:
         verify_quota(options.source, options.output.resolve())
@@ -1087,6 +1188,7 @@ def validate_options(options, parser):
         options.exercise_credentials_only,
         options.exercise_archive_recovery,
         options.exercise_partial_media,
+        options.exercise_missing_privacy,
     ]
     if sum(filtered_scenarios) > 1:
         parser.error("choose one restore recovery scenario per destination fixture")

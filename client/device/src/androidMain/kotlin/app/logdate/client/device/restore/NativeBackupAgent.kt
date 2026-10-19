@@ -9,19 +9,15 @@ import android.app.backup.FullRestoreDataInput
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import app.logdate.client.datastore.LegacyCloudCredentialMigration
+import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.crypto.AndroidCryptoManager
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.storage.AndroidSecureStorage
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -64,19 +60,11 @@ open class NativeBackupAgent : BackupAgent() {
             throw IOException("Native encryption recovery material could not be prepared", error)
         }
         // Backup may run before the first normal launch after an upgrade.
-        val job = SupervisorJob()
-        val scope = CoroutineScope(job + Dispatchers.IO)
-        try {
-            val preferences =
-                PreferenceDataStoreFactory.create(
-                    scope = scope,
-                    migrations = listOf(LegacyCloudCredentialMigration()),
-                    produceFile = { File(filesDir, "logdate.preferences_pb") },
-                )
-            runBlocking(Dispatchers.IO) { preferences.data.first() }
-        } finally {
-            scope.cancel()
-            runBlocking { job.join() }
+        if (PostRestoreDetector(this).hasMissingNativePrivacyPayload()) throw NativeRestorePrivacyMetadataRequiredException()
+        runBlocking(Dispatchers.IO) {
+            NativeRestorePrivacyPolicy.prepareBackup(createAndroidMainDataStore(this@NativeBackupAgent)) { snapshot ->
+                canEstablishNativePrivacyDefaults(this@NativeBackupAgent, snapshot)
+            }
         }
         super.onFullBackup(data)
     }
@@ -104,11 +92,8 @@ open class NativeBackupAgent : BackupAgent() {
             try {
                 PostRestoreDetector(this).recordRestoreCompletedUnderDeliveryLock()
                 synchronized(callbackLock) { restoreCompletionRecorded = true }
-                val preferencesFile = File(filesDir, "logdate.preferences_pb")
-                val job = SupervisorJob()
-                val scope = CoroutineScope(job + Dispatchers.IO)
                 try {
-                    val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferencesFile })
+                    val preferences = createAndroidMainDataStore(this)
                     runBlocking(Dispatchers.IO) {
                         withTimeoutOrNull(15_000) {
                             prepareRestoredInstallationState(preferences)
@@ -117,9 +102,6 @@ open class NativeBackupAgent : BackupAgent() {
                     }
                 } catch (_: Exception) {
                     Napier.w("Background native account recovery remains pending")
-                } finally {
-                    scope.cancel()
-                    runBlocking { job.join() }
                 }
             } finally {
                 AndroidNativeRestoreDeliveryGate.endRestore()
@@ -137,21 +119,23 @@ open class NativeBackupAgent : BackupAgent() {
         mode: Long,
         mtime: Long,
     ) {
-        restoreNativeFile(destination) {
-            super.onRestoreFile(data, size, destination, type, mode, mtime)
+        restoreNativeFile(destination, data, size) { descriptor, target ->
+            super.onRestoreFile(descriptor, size, target, type, mode, mtime)
         }
     }
 
     @TargetApi(Build.VERSION_CODES.BAKLAVA)
     override fun onRestoreFile(data: FullRestoreDataInput) {
-        restoreNativeFile(data.destination) {
-            super.onRestoreFile(data)
+        restoreNativeFile(data.destination, data.data, data.size) { descriptor, target ->
+            super.onRestoreFile(descriptor, data.size, target, data.type, data.mode, data.modificationTimeSeconds)
         }
     }
 
-    private inline fun restoreNativeFile(
+    private fun restoreNativeFile(
         destination: File,
-        restore: () -> Unit,
+        data: ParcelFileDescriptor,
+        size: Long,
+        restore: (ParcelFileDescriptor, File) -> Unit,
     ) {
         AndroidNativeRestoreDeliveryGate.beginRestoreCallback()
         try {
@@ -160,7 +144,12 @@ open class NativeBackupAgent : BackupAgent() {
                 installationStateReset = false
                 beginNativeRestoreSessionOnce()
             }
-            restore()
+            if (destination.canonicalFile == File(filesDir, "logdate.preferences_pb").canonicalFile) {
+                restoreMainPreferences(this, data, size) { descriptor -> restore(descriptor, destination) }
+                PostRestoreDetector(this).markNativePrivacyPayloadReceived()
+            } else {
+                restore(data, destination)
+            }
             val databaseDelivered =
                 runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
                     .getOrDefault(false)
@@ -179,11 +168,8 @@ open class NativeBackupAgent : BackupAgent() {
     private fun beginNativeRestoreSessionOnce() = nativeRestoreSession.beginIfNeeded()
 
     private fun retryAccountRecovery() {
-        val preferencesFile = File(filesDir, "logdate.preferences_pb")
-        val job = SupervisorJob()
-        val scope = CoroutineScope(job + Dispatchers.IO)
         try {
-            val preferences = PreferenceDataStoreFactory.create(scope = scope, produceFile = { preferencesFile })
+            val preferences = createAndroidMainDataStore(this)
             runBlocking(Dispatchers.IO) {
                 withTimeoutOrNull(15_000) {
                     prepareRestoredInstallationState(preferences)
@@ -192,9 +178,6 @@ open class NativeBackupAgent : BackupAgent() {
             }
         } catch (_: Exception) {
             Napier.w("Background native account recovery remains pending")
-        } finally {
-            scope.cancel()
-            runBlocking { job.join() }
         }
     }
 

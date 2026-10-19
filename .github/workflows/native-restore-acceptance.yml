@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/native-restore-acceptance.yml'
       - 'app/android-main/src/androidTest/**/NativeBackupTransferProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeRestorePrivacyRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeBackgroundCredentialCallbackTest.kt'
       - 'app/android-main/src/androidTest/**/NativeMissingMediaE2ETest.kt'
       - 'app/android-main/src/androidTest/**/ArchiveMediaRecoveryE2ETest.kt'
@@ -121,6 +122,10 @@ jobs:
             --device pixel_2 --force <<< 'no'
           avdmanager create avd \
             --name logdate-restore-work-restart \
+            --package 'system-images;android-34;google_apis;x86_64' \
+            --device pixel_2 --force <<< 'no'
+          avdmanager create avd \
+            --name logdate-restore-privacy \
             --package 'system-images;android-34;google_apis;x86_64' \
             --device pixel_2 --force <<< 'no'
           avdmanager create avd \
@@ -297,6 +302,7 @@ jobs:
           stop_emulator emulator-5556
           stop_emulator emulator-5558
           emulator -avd logdate-restore-work-restart -port 5556 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/work-restart-emulator.log" 2>&1 &
+          emulator -avd logdate-restore-privacy -port 5558 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/privacy-emulator.log" 2>&1 &
           adb -s emulator-5556 wait-for-device
           for _ in $(seq 1 120); do
             if [[ "$(adb -s emulator-5556 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
@@ -316,6 +322,27 @@ jobs:
             studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
             > "$RUNNER_TEMP/native-background-credential-callbacks.log"
           grep -Eq '^OK \([0-9]+ tests?\)$' "$RUNNER_TEMP/native-background-credential-callbacks.log"
+
+      - name: Verify missing privacy metadata and later complete native delivery
+        shell: bash
+        run: |
+          adb -s emulator-5558 wait-for-device
+          for _ in $(seq 1 120); do
+            if [[ "$(adb -s emulator-5558 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(adb -s emulator-5558 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          test "$(adb -s emulator-5558 shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          python3 tests/e2e/native-backup-acceptance.py \
+            --source emulator-5554 \
+            --destination emulator-5558 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-restore-privacy" \
+            --snapshot-existing-source \
+            --exercise-missing-privacy
 
       - name: Verify permission recovery on a clean emulator
         shell: bash
@@ -416,6 +443,9 @@ jobs:
             ${{ runner.temp }}/native-restore-credentials-only/*files*.json
             ${{ runner.temp }}/native-restore-work-restart/*.log
             ${{ runner.temp }}/native-background-credential-callbacks.log
+            ${{ runner.temp }}/native-restore-privacy/*.log
+            ${{ runner.temp }}/native-restore-privacy/*files*.json
+            ${{ runner.temp }}/privacy-emulator.log
             ${{ runner.temp }}/native-permission-recovery/**/*.log
             ${{ runner.temp }}/native-permission-recovery/**/environment-before.json
             ${{ runner.temp }}/native-permission-recovery/acceptance.json
@@ -580,10 +610,10 @@ jobs:
           install_api36_apk app app/android-main/build/outputs/apk/debug/android-main-debug.apk studio.hypertext.logdate.debug
           install_api36_apk android-test app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk studio.hypertext.logdate.debug.test
           adb -s emulator-5562 shell am instrument --user 0 -w -r \
-            -e class app.logdate.client.e2e.NativeBackgroundCredentialCallbackTest#modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable \
+            -e class app.logdate.client.e2e.NativeBackgroundCredentialCallbackTest \
             studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
             > "$RUNNER_TEMP/native-restore-api36-1-callback.log"
-          grep -Eq '^OK \(1 test\)$' "$RUNNER_TEMP/native-restore-api36-1-callback.log"
+          grep -Eq '^OK \(11 tests\)$' "$RUNNER_TEMP/native-restore-api36-1-callback.log"
 
       - name: Upload API 36.1 restore acceptance evidence
         if: always()

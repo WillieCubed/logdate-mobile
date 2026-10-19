@@ -124,6 +124,7 @@ class DatabaseRecoveryController(
 private fun classifyRecoveryReason(message: String): String {
     val normalized = message.lowercase()
     return when {
+        "journal privacy settings have not been restored" in normalized -> "Your journal’s privacy settings need to finish restoring."
         "native restore delivery is incomplete" in normalized -> "Android device transfer is still finishing."
         "file is not a database" in normalized -> "Encrypted database could not be decrypted with the current key."
         "hmac check failed" in normalized -> "Encrypted database integrity check failed for the active key."

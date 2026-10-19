@@ -21,6 +21,17 @@ D2D_SCRIPT = Path(__file__).with_name("native-d2d-acceptance.py")
 
 
 class RestoreSnapshotValidationTest(unittest.TestCase):
+    def test_first_backup_may_make_only_missing_privacy_defaults_explicit(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        original = harness.length_delimited_field(1, CredentialsOnlyBackupFilterTest.preference_entry("security_level", "BIOMETRIC"))
+        explicit = harness.explicit_backup_privacy_defaults(original)
+        self.assertIn(b"BIOMETRIC", explicit)
+        self.assertNotIn(b"NONE", explicit)
+        self.assertIn(b"is_onboarded", explicit)
+        self.assertEqual(explicit, harness.explicit_backup_privacy_defaults(explicit))
+        extra = harness.length_delimited_field(1, CredentialsOnlyBackupFilterTest.preference_entry("draft", "changed"))
+        self.assertNotEqual(explicit, harness.canonical_preferences(explicit + extra))
+
     def test_snapshot_ignores_firebase_backup_heartbeat_file(self):
         before = {
             "databases/logdate": {"bytes": 1, "sha256": "journal"},
@@ -424,6 +435,73 @@ class PartialNativeTransportTest(unittest.TestCase):
                 info.size = len(contents)
                 archive.addfile(info, io.BytesIO(contents))
         return output.getvalue()
+
+
+class MissingPrivacyBackupFilterTest(unittest.TestCase):
+    def test_requires_package_rejection_and_current_backup_agent_privacy_failure(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        result = f"Package {harness.PACKAGE} with result: Transport rejected package because it wasn't able to process it at the time\n".encode()
+        diagnostic = (
+            "100.100 42 43 D BackupServiceBinder: onFullBackup[M] (app.logdate.client.data.restore.NativeAccountBackupAgent) threw\n"
+            "100.101 42 43 D BackupServiceBinder: NativeRestorePrivacyMetadataRequiredException\n"
+            "100.102 42 43 D BackupServiceBinder: at NativeRestorePrivacyPolicy$prepareBackup$3.invokeSuspend\n"
+        ).encode()
+        harness.verify_privacy_backup_refusal(result, diagnostic, 100.0)
+        for unrelated in (b"Backup is not enabled", b"Backup finished with result: Success", b"Package missing with result: Success"):
+            with self.assertRaises(RuntimeError):
+                harness.verify_privacy_backup_refusal(unrelated, diagnostic, 100.0)
+        for unrelated in (b"", diagnostic.replace(b"prepareBackup", b"verifyBeforeContent")):
+            with self.assertRaises(RuntimeError):
+                harness.verify_privacy_backup_refusal(result, unrelated, 100.0)
+        with self.assertRaises(RuntimeError):
+            harness.verify_privacy_backup_refusal(result, diagnostic, 101.0)
+
+    def test_removes_only_privacy_metadata_and_preserves_nested_transport_content(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}"
+        preferences = b"".join(
+            harness.length_delimited_field(1, CredentialsOnlyBackupFilterTest.preference_entry(name, value))
+            for name, value in [
+                ("is_onboarded", "true"),
+                ("security_level", "BIOMETRIC"),
+                ("identity.canonical_owner_id", "native-test-owner"),
+                ("editor_drafts_anonymous", "unfinished"),
+            ]
+        )
+        entries = [
+            (prefix + "/_manifest", b"manifest"),
+            (prefix + "/f/logdate.preferences_pb", preferences),
+            (prefix + "/db/logdate", b"encrypted journal"),
+            (prefix + "/f/db_recovery/passphrase_backup", b"key"),
+            (prefix + "/f/media/photo.png", b"original"),
+        ]
+        full_backup = CredentialsOnlyBackupFilterTest.make_tar(entries)
+        transport_name = f"1/_full/{harness.PACKAGE}"
+        transport = CredentialsOnlyBackupFilterTest.make_tar([(transport_name, full_backup), ("1/@pm@", b"metadata")])
+
+        filtered = harness.without_privacy_metadata(transport)
+
+        with tarfile.open(fileobj=io.BytesIO(filtered), mode="r:") as outer:
+            self.assertEqual(b"metadata", outer.extractfile("1/@pm@").read())
+            with tarfile.open(fileobj=io.BytesIO(outer.extractfile(transport_name).read()), mode="r:") as inner:
+                for name, data in entries:
+                    actual = inner.extractfile(name).read()
+                    if name.endswith("logdate.preferences_pb"):
+                        self.assertNotIn(b"is_onboarded", actual)
+                        self.assertNotIn(b"security_level", actual)
+                        self.assertIn(b"native-test-owner", actual)
+                        self.assertIn(b"unfinished", actual)
+                    else:
+                        self.assertEqual(data, actual)
+
+    def test_rejects_fixture_that_never_had_privacy_metadata(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        full_backup = CredentialsOnlyBackupFilterTest.make_tar([
+            (f"apps/{harness.PACKAGE}/f/logdate.preferences_pb", b""),
+        ])
+        transport = CredentialsOnlyBackupFilterTest.make_tar([(f"1/_full/{harness.PACKAGE}", full_backup)])
+        with self.assertRaisesRegex(RuntimeError, "privacy metadata"):
+            harness.without_privacy_metadata(transport)
 
 
 class CredentialsOnlyBackupFilterTest(unittest.TestCase):

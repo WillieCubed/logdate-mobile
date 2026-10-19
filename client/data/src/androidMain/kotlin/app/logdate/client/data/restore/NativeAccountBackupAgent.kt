@@ -29,6 +29,8 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
     private val ownerKey = stringPreferencesKey("identity.canonical_owner_id")
     private val boundKey = stringPreferencesKey("identity.canonical_owner_bound")
 
+    private fun accountRecoveryDetector() = PostRestoreDetector(this).takeUnless { it.hasMissingNativePrivacyPayload() }
+
     private fun accountPolicy(snapshot: Preferences) =
         NativeRestoreAccountPolicy(
             snapshot[ownerKey],
@@ -38,7 +40,7 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
 
     override suspend fun restoreAccount(preferences: DataStore<Preferences>) =
         coroutineScope {
-            val detector = PostRestoreDetector(this@NativeAccountBackupAgent)
+            val detector = accountRecoveryDetector() ?: return@coroutineScope
             val delivery = detector.pendingAccountRecoveryId() ?: return@coroutineScope
             val snapshot = preferences.data.first()
             val config = nativeRestoreConfiguration(snapshot) ?: return@coroutineScope
