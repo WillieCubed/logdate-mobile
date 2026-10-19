@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Validates LogDate's lexicon files with the AT Protocol reference implementation.",
   "dependencies": {
-    "@atproto/lexicon": "0.7.14"
+    "@atproto/lexicon": "0.7.14",
+    "@atproto/syntax": "0.7.6"
   },
   "packageManager": "pnpm@12.11.2"
 }

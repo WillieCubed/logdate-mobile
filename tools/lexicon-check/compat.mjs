@@ -2,6 +2,11 @@
 // already use it, following "Changing a schema" in docs/reference/lexicon-style.md. Allowed
 // changes (new optional fields, new known values, new members of an open union, looser limits,
 // better descriptions) pass; everything that could reject or misread an existing record doesn't.
+//
+// Permission sets and space declarations are read again by authorization servers while apps'
+// sessions are live, so a change to one changes what apps that already asked for it can do. Adding
+// access is allowed; taking any away is breaking.
+import { values } from "./declarations.mjs";
 
 /**
  * Returns one message per breaking change from `before` to `after`, each prefixed with the
@@ -39,8 +44,13 @@ function compareDefinition(path, before, after, problems) {
         }
       }
       return;
-    case "token":
     case "permission-set":
+      comparePermissionSet(path, before, after, problems);
+      return;
+    case "space":
+      compareSpace(path, before, after, problems);
+      return;
+    case "token":
       return;
     default:
       compareField(path, before, after, problems);
@@ -159,4 +169,114 @@ function tightenedMinimum(limit, before, after, report) {
   if (after[limit] === undefined) return;
   if (before[limit] === undefined) report(`${limit} was added`);
   else if (after[limit] > before[limit]) report(`${limit} tightened from ${before[limit]} to ${after[limit]}`);
+}
+
+// A space declaration's collections are the default write access of every `space:` grant for
+// its type, and its key rule describes the keys existing spaces already have.
+function compareSpace(path, before, after, problems) {
+  if (before.key !== after.key) problems.push(`${path}: the space key changed from ${before.key} to ${after.key}`);
+  const kept = new Set(after.collections ?? []);
+  for (const collection of before.collections ?? []) {
+    if (!kept.has(collection)) problems.push(`${path}.collections: ${collection} was removed`);
+  }
+}
+
+// Every grant the old set made must still be made by some permission in the new one.
+function comparePermissionSet(path, before, after, problems) {
+  const newPermissions = after.permissions ?? [];
+  for (const permission of before.permissions ?? []) {
+    for (const grant of grants(permission)) {
+      if (!newPermissions.some((candidate) => covers(candidate, grant))) {
+        problems.push(`${path}.permissions: the set no longer grants ${grant.label}`);
+      }
+    }
+  }
+}
+
+const allRecordActions = ["create", "update", "delete"];
+const allSpaceActions = ["read", "create", "update", "delete"];
+const declaredCollections = "the space type's declared collections";
+
+// Splits a permission into the smallest grants it makes, so a narrowing anywhere shows up as a
+// missing grant.
+function grants(permission) {
+  switch (permission.resource) {
+    case "repo": {
+      const actions = permission.action === undefined ? allRecordActions : values(permission.action);
+      return values(permission.collection).flatMap((collection) =>
+        actions.map((action) => ({ resource: "repo", collection, action, label: `repo ${action} on ${collection}` })),
+      );
+    }
+    case "rpc": {
+      const audience = permission.inheritAud === true ? "the app's audience" : permission.aud;
+      return values(permission.lxm).map((lxm) => ({
+        resource: "rpc",
+        lxm,
+        inheritAud: permission.inheritAud === true,
+        aud: permission.aud,
+        label: `rpc ${lxm} for ${audience}`,
+      }));
+    }
+    case "space": {
+      const where = spaceSelector(permission);
+      const name = `${where.spaceType} spaces (authority ${where.authority}, skey ${where.skey})`;
+      const actions = permission.action === undefined ? allSpaceActions : values(permission.action);
+      const collections = permission.collection === undefined ? [declaredCollections] : values(permission.collection);
+      const records = actions.flatMap((action) =>
+        action === "read" || action === "read_self"
+          ? [{ ...where, kind: "action", action, label: `${action} in ${name}` }]
+          : collections.map((collection) => ({
+              ...where,
+              kind: "action",
+              action,
+              collection,
+              label: `${action} of ${collection} in ${name}`,
+            })),
+      );
+      const management = values(permission.manage).map((verb) => ({ ...where, kind: "manage", verb, label: `manage=${verb} of ${name}` }));
+      return [...records, ...management];
+    }
+    default:
+      return [{ resource: permission.resource, permission, label: `the ${permission.resource} permission ${JSON.stringify(permission)}` }];
+  }
+}
+
+function spaceSelector(permission) {
+  return {
+    resource: "space",
+    spaceType: permission.spaceType,
+    authority: permission.authority ?? "self",
+    skey: permission.skey ?? "*",
+  };
+}
+
+function covers(permission, grant) {
+  if (permission.resource !== grant.resource) return false;
+  switch (grant.resource) {
+    case "repo": {
+      const actions = permission.action === undefined ? allRecordActions : values(permission.action);
+      return values(permission.collection).includes(grant.collection) && actions.includes(grant.action);
+    }
+    case "rpc":
+      return (
+        values(permission.lxm).includes(grant.lxm) &&
+        (permission.inheritAud === true) === grant.inheritAud &&
+        (grant.inheritAud || permission.aud === grant.aud || permission.aud === "*")
+      );
+    case "space": {
+      const where = spaceSelector(permission);
+      if (where.spaceType !== grant.spaceType) return false;
+      if (where.authority !== "*" && where.authority !== grant.authority) return false;
+      if (where.skey !== "*" && where.skey !== grant.skey) return false;
+      if (grant.kind === "manage") return values(permission.manage).includes(grant.verb);
+      const actions = permission.action === undefined ? allSpaceActions : values(permission.action);
+      if (grant.action === "read_self") return actions.includes("read_self") || actions.includes("read");
+      if (!actions.includes(grant.action)) return false;
+      if (grant.collection === undefined) return true;
+      const collections = permission.collection === undefined ? [declaredCollections] : values(permission.collection);
+      return collections.includes("*") || collections.includes(grant.collection);
+    }
+    default:
+      return JSON.stringify(permission) === JSON.stringify(grant.permission);
+  }
 }
