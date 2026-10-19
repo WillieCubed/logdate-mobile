@@ -114,6 +114,7 @@ class AtprotoIdentityServiceTest {
                             handleDomain = "logdate.app",
                             pdsServiceEndpoint = "https://logdate.app",
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcIdentityService =
                         PlcIdentityService(
@@ -123,6 +124,7 @@ class AtprotoIdentityServiceTest {
                                     handleDomain = "logdate.app",
                                     pdsServiceEndpoint = "https://logdate.app",
                                     publishHostedPlcOperations = true,
+                                    recoveryKeysEnabled = true,
                                 ),
                             hostedPlcOperationRepository = InMemoryHostedPlcOperationRepository(),
                             plcDirectoryClient =
@@ -659,6 +661,7 @@ class AtprotoIdentityServiceTest {
                             pdsServiceEndpoint = "https://logdate.app",
                             hostedAccountDidMethod = HostedAccountDidMethod.PLC,
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcDirectoryClient =
                         object : PlcDirectoryClient {
@@ -701,6 +704,7 @@ class AtprotoIdentityServiceTest {
                             handleDomain = "logdate.app",
                             pdsServiceEndpoint = "https://logdate.app",
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcIdentityService = plcIdentityService,
                 )
@@ -816,6 +820,7 @@ class AtprotoIdentityServiceTest {
                             pdsServiceEndpoint = "https://logdate.app",
                             hostedAccountDidMethod = HostedAccountDidMethod.PLC,
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcDirectoryClient =
                         object : PlcDirectoryClient {
@@ -858,6 +863,7 @@ class AtprotoIdentityServiceTest {
                             handleDomain = "logdate.app",
                             pdsServiceEndpoint = "https://logdate.app",
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcIdentityService = plcIdentityService,
                 )

@@ -152,6 +152,20 @@ public object EcKeySupport {
         return signer.verifySignature(digest, r, s)
     }
 
+    /**
+     * Returns whether [signature], raw `r || s` for [curve], has an `s` no greater than half the
+     * curve order. AT Protocol accepts only these low-S signatures; [verifySha256] accepts both
+     * forms, so callers that must match the protocol check this as well.
+     */
+    public fun hasLowS(
+        signature: ByteArray,
+        curve: EcCurve,
+    ): Boolean {
+        require(signature.size == curve.coordinateBytes * 2) { "Unexpected ECDSA signature size" }
+        val s = BigInteger(1, signature.copyOfRange(curve.coordinateBytes, signature.size))
+        return s <= domainParameters(curve).n.shiftRight(1)
+    }
+
     private fun parameters(curve: EcCurve): ECParameterSpec =
         AlgorithmParameters
             .getInstance(KEY_ALGORITHM, BOUNCY_CASTLE_PROVIDER_NAME)

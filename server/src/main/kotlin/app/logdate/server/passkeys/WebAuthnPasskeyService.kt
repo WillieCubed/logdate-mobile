@@ -31,6 +31,9 @@ import kotlin.uuid.Uuid
 private const val AUTHENTICATION_TYPE = "authentication"
 private const val REGISTRATION_TYPE = "registration"
 
+/** Stored as its own challenge type; see the `challenge_type_valid` constraint. */
+private const val STEP_UP_PURPOSE = "step_up"
+
 /** Matches the `passkeys.nickname` column width. */
 private const val MAX_NICKNAME_LENGTH = 100
 
@@ -275,6 +278,32 @@ class WebAuthnPasskeyService(
         purpose: String,
         binding: Uuid,
     ): AuthenticationResult = verifyAuthentication(challenge, authenticationResponse, purpose, binding)
+
+    /**
+     * Issues a step-up challenge: a fresh passkey confirmation that only [userId]'s passkeys can
+     * answer, for an action that a signed-in session alone must not be able to take. It is bound to
+     * the account and its own purpose, so it cannot be spent as a sign-in challenge or the reverse.
+     */
+    fun generateStepUpOptions(userId: Uuid): PasskeyAuthenticationOptions =
+        generateBoundAuthenticationOptions(STEP_UP_PURPOSE, userId)
+            .copy(allowCredentials = getUserCredentials(userId))
+
+    /**
+     * Verifies a step-up from [generateStepUpOptions]: the challenge must have been issued to
+     * [userId], be unused and unexpired, and the assertion must come from one of [userId]'s passkeys.
+     * The challenge is spent whether or not the assertion verifies.
+     */
+    fun verifyStepUp(
+        userId: Uuid,
+        challenge: String,
+        authenticationResponse: PasskeyAuthenticationResponse,
+    ): AuthenticationResult {
+        val result = verifyBoundAuthentication(challenge, authenticationResponse, STEP_UP_PURPOSE, userId)
+        if (result.success && result.userId != userId) {
+            return AuthenticationResult(success = false, error = "The passkey belongs to a different account")
+        }
+        return result
+    }
 
     private fun verifyAuthentication(
         challenge: String,

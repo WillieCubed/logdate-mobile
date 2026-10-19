@@ -43,10 +43,10 @@ data class AtprotoIdentityConfig(
     /**
      * Whether people can register their own recovery key on a hosted `did:plc` identity and use it to
      * replace the server's key. It works from the server's own operation log, so it does not need
-     * PLC publishing; a server that publishes has always supported it.
+     * PLC publishing, and turning publishing on does not turn it on: it needs [recoveryKeysEnabled].
      */
     val supportsRecoveryKeys: Boolean =
-        hostedAccountDidMethod == HostedAccountDidMethod.PLC && (recoveryKeysEnabled || publishHostedPlcOperations)
+        hostedAccountDidMethod == HostedAccountDidMethod.PLC && recoveryKeysEnabled
 
     companion object {
         fun fromEnvironment(

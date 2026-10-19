@@ -41,6 +41,7 @@ import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.passkeys.WebAuthnPasskeyStepUp
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.routes.sync.locationHistoryRoutes
 import app.logdate.server.space.SpaceStore
@@ -166,7 +167,6 @@ internal fun Application.accountApiRoutes() {
     val entitlementService by inject<EntitlementService>()
     val planCatalogService by inject<PlanCatalogService>()
     val emailVerificationService by inject<EmailVerificationService>()
-    val signingKeyService by inject<SigningKeyService>()
     val deviceEnrollmentRepository by inject<DeviceEnrollmentRepository>()
     val accountDevices by inject<AccountDeviceRepository>()
     val accountKeyEnvelopes by inject<AccountKeyEnvelopeRepository>()
@@ -203,11 +203,27 @@ internal fun Application.accountApiRoutes() {
                 oauthGrantRevoker = oauthGrantRevoker,
                 newAccountStorageMode = descriptorConfig.newAccountStorageMode,
             )
+        }
+    }
+    identityApiRegistration()
+}
+
+/** `/api/v1` identity surface: handle, recovery key, and server signing key changes. */
+private fun Application.identityApiRegistration() {
+    val accountRepository by inject<AccountRepository>()
+    val tokenService by inject<TokenService>()
+    val atprotoIdentityService by inject<AtprotoIdentityService>()
+    val signingKeyService by inject<SigningKeyService>()
+    val webAuthnService by inject<WebAuthnPasskeyService>()
+
+    routing {
+        route("/api/v1") {
             identityApiRoutes(
                 accountRepository = accountRepository,
                 tokenService = tokenService,
                 atprotoIdentityService = atprotoIdentityService,
                 signingKeyService = signingKeyService,
+                passkeyStepUp = WebAuthnPasskeyStepUp(webAuthnService),
             )
         }
     }

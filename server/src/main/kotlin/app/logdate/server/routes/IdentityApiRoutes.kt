@@ -8,6 +8,7 @@ import app.logdate.server.identity.IdentityLifecycleConflictException
 import app.logdate.server.identity.IdentityLifecycleValidationException
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.identity.didKeyFor
+import app.logdate.server.passkeys.PasskeyStepUp
 import app.logdate.server.routes.docs.IdentityDocs
 import app.logdate.shared.model.ApiError
 import app.logdate.shared.model.ApiErrorResponse
@@ -115,47 +116,6 @@ data class CompleteRecoverySigningKeyImportRequest(
 )
 
 @Serializable
-data class RegisterPlcRecoveryKeyRequest(
-    val recoveryDidKey: String,
-)
-
-@Serializable
-data class RegisterPlcRecoveryKeyData(
-    val did: String,
-    val handle: String,
-    val recoveryDidKey: String,
-)
-
-@Serializable
-data class RegisterPlcRecoveryKeyResponse(
-    val success: Boolean,
-    val data: RegisterPlcRecoveryKeyData,
-)
-
-@Serializable
-data class PrepareIdentityRecoveryData(
-    val did: String,
-    val handle: String,
-    val recoveryDidKey: String,
-    val nextPublicKeyDidKey: String,
-    val unsignedOperationJson: String,
-    val signingPayloadBase64Url: String,
-    val preparedKey: String,
-)
-
-@Serializable
-data class PrepareIdentityRecoveryResponse(
-    val success: Boolean,
-    val data: PrepareIdentityRecoveryData,
-)
-
-@Serializable
-data class CompleteIdentityRecoveryRequest(
-    val preparedKey: String,
-    val signature: String,
-)
-
-@Serializable
 data class IdentityStatusData(
     val did: String,
     val handle: String,
@@ -193,6 +153,8 @@ fun Route.identityApiRoutes(
     tokenService: TokenService,
     atprotoIdentityService: AtprotoIdentityService,
     signingKeyService: SigningKeyService,
+    /** Confirms recovery-key changes with a fresh passkey; without it those changes are refused. */
+    passkeyStepUp: PasskeyStepUp? = null,
 ) {
     val plcJson =
         Json {
@@ -526,167 +488,12 @@ fun Route.identityApiRoutes(
             }
         }
 
-        post("/plc/recovery-key", IdentityDocs.registerPlcRecoveryKey) {
-            val account =
-                resolveIdentityApiAccount(
-                    call = call,
-                    accountRepository = accountRepository,
-                    tokenService = tokenService,
-                ) ?: return@post
-
-            try {
-                val request = call.receive<RegisterPlcRecoveryKeyRequest>()
-                if (request.recoveryDidKey.isBlank()) {
-                    call.respondIdentityApiError(
-                        HttpStatusCode.BadRequest,
-                        "RECOVERY_DID_KEY_REQUIRED",
-                        "Recovery did:key is required",
-                    )
-                    return@post
-                }
-
-                val registered =
-                    atprotoIdentityService.registerPlcRecoveryKey(
-                        account = account,
-                        recoveryDidKey = request.recoveryDidKey,
-                    )
-                val updatedAccount = registered.account
-
-                call.respond(
-                    HttpStatusCode.OK,
-                    RegisterPlcRecoveryKeyResponse(
-                        success = true,
-                        data =
-                            RegisterPlcRecoveryKeyData(
-                                did = requireNotNull(updatedAccount.did),
-                                handle = requireNotNull(updatedAccount.handle),
-                                recoveryDidKey = registered.recoveryDidKey,
-                            ),
-                    ),
-                )
-            } catch (error: IdentityLifecycleValidationException) {
-                call.respondIdentityApiError(
-                    HttpStatusCode.BadRequest,
-                    error.code ?: "PLC_RECOVERY_KEY_INVALID",
-                    error.message ?: "Invalid PLC recovery key",
-                )
-            } catch (error: IdentityLifecycleConflictException) {
-                call.respondIdentityApiError(
-                    HttpStatusCode.Conflict,
-                    error.code ?: "PLC_RECOVERY_KEY_CONFLICT",
-                    error.message ?: "PLC recovery key conflict",
-                )
-            } catch (error: Exception) {
-                Napier.e("Failed to register hosted PLC recovery key", error)
-                call.respondIdentityApiError(
-                    HttpStatusCode.InternalServerError,
-                    "PLC_RECOVERY_KEY_FAILED",
-                    "Failed to register PLC recovery key",
-                )
-            }
-        }
-
-        post("/recovery-key/recover/prepare", IdentityDocs.prepareIdentityRecovery) {
-            val account =
-                resolveIdentityApiAccount(
-                    call = call,
-                    accountRepository = accountRepository,
-                    tokenService = tokenService,
-                ) ?: return@post
-
-            try {
-                val prepared = atprotoIdentityService.prepareRecovery(account)
-                call.respond(
-                    HttpStatusCode.OK,
-                    PrepareIdentityRecoveryResponse(
-                        success = true,
-                        data =
-                            PrepareIdentityRecoveryData(
-                                did = prepared.did,
-                                handle = prepared.handle,
-                                recoveryDidKey = prepared.recoveryDidKey,
-                                nextPublicKeyDidKey = prepared.nextSigningKeyDidKey,
-                                unsignedOperationJson = plcJson.encodeToString(prepared.unsignedOperation),
-                                signingPayloadBase64Url = prepared.signingPayloadBase64Url,
-                                preparedKey = prepared.preparedKey,
-                            ),
-                    ),
-                )
-            } catch (error: IdentityLifecycleConflictException) {
-                call.respondIdentityApiError(
-                    HttpStatusCode.Conflict,
-                    error.code ?: "IDENTITY_RECOVERY_CONFLICT",
-                    error.message ?: "Identity recovery conflict",
-                )
-            } catch (error: Exception) {
-                Napier.e("Failed to prepare identity recovery", error)
-                call.respondIdentityApiError(
-                    HttpStatusCode.InternalServerError,
-                    "IDENTITY_RECOVERY_FAILED",
-                    "Failed to prepare identity recovery",
-                )
-            }
-        }
-
-        post("/recovery-key/recover/complete", IdentityDocs.completeIdentityRecovery) {
-            val account =
-                resolveIdentityApiAccount(
-                    call = call,
-                    accountRepository = accountRepository,
-                    tokenService = tokenService,
-                ) ?: return@post
-
-            try {
-                val request = call.receive<CompleteIdentityRecoveryRequest>()
-                if (request.preparedKey.isBlank()) {
-                    call.respondIdentityApiError(HttpStatusCode.BadRequest, "PREPARED_KEY_REQUIRED", "Prepared key is required")
-                    return@post
-                }
-                if (request.signature.isBlank()) {
-                    call.respondIdentityApiError(HttpStatusCode.BadRequest, "SIGNATURE_REQUIRED", "Recovery signature is required")
-                    return@post
-                }
-
-                val recovered =
-                    atprotoIdentityService.completeRecovery(
-                        account = account,
-                        preparedKey = request.preparedKey,
-                        signature = request.signature,
-                    )
-                val updatedAccount = recovered.account
-                call.respond(
-                    HttpStatusCode.OK,
-                    ImportSigningKeyResponse(
-                        success = true,
-                        data =
-                            ImportSigningKeyData(
-                                did = requireNotNull(updatedAccount.did),
-                                handle = requireNotNull(updatedAccount.handle),
-                                publicKeyDidKey = didKeyFor(recovered.activeKey.publicKeyMultibase),
-                            ),
-                    ),
-                )
-            } catch (error: IdentityLifecycleValidationException) {
-                call.respondIdentityApiError(
-                    HttpStatusCode.BadRequest,
-                    error.code ?: "IDENTITY_RECOVERY_INVALID",
-                    error.message ?: "Invalid identity recovery request",
-                )
-            } catch (error: IdentityLifecycleConflictException) {
-                call.respondIdentityApiError(
-                    HttpStatusCode.Conflict,
-                    error.code ?: "IDENTITY_RECOVERY_CONFLICT",
-                    error.message ?: "Identity recovery conflict",
-                )
-            } catch (error: Exception) {
-                Napier.e("Failed to complete identity recovery", error)
-                call.respondIdentityApiError(
-                    HttpStatusCode.InternalServerError,
-                    "IDENTITY_RECOVERY_FAILED",
-                    "Failed to complete identity recovery",
-                )
-            }
-        }
+        recoveryKeyRoutes(
+            accountRepository = accountRepository,
+            tokenService = tokenService,
+            atprotoIdentityService = atprotoIdentityService,
+            passkeyStepUp = passkeyStepUp,
+        )
 
         get("/plc/operations", IdentityDocs.listPlcOperations) {
             val account =
@@ -734,7 +541,7 @@ fun Route.identityApiRoutes(
 }
 
 @OptIn(ExperimentalUuidApi::class)
-private suspend fun resolveIdentityApiAccount(
+internal suspend fun resolveIdentityApiAccount(
     call: ApplicationCall,
     accountRepository: AccountRepository,
     tokenService: TokenService,
@@ -773,7 +580,7 @@ private suspend fun resolveIdentityApiAccount(
     return account
 }
 
-private suspend fun ApplicationCall.respondIdentityApiError(
+internal suspend fun ApplicationCall.respondIdentityApiError(
     status: HttpStatusCode,
     code: String,
     message: String,

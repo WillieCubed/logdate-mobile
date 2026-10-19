@@ -11,6 +11,13 @@ import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.PlcIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.identity.didKeyFor
+import app.logdate.server.passkeys.InMemoryPasskeyRepository
+import app.logdate.server.passkeys.PasskeyStepUpProof
+import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.passkeys.WebAuthnPasskeyStepUp
+import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
+import app.logdate.shared.model.PasskeyAssertionResponse
+import app.logdate.shared.model.PasskeyInfo
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -45,7 +52,9 @@ import kotlin.uuid.Uuid
 
 /**
  * The recovery-key endpoints over HTTP on a server that publishes nothing to the PLC directory:
- * register, prepare, sign on the "device", complete, and every refusal a client has to show.
+ * register, prepare, sign on the "device", complete, and every refusal a client has to show. Every
+ * change is confirmed with a passkey through the real step-up service, which runs its lightweight
+ * verification here, so challenge kinds and account binding are what is being checked.
  */
 @OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class RecoveryKeyRoutesTest {
@@ -136,7 +145,7 @@ class RecoveryKeyRoutesTest {
         testApplication {
             val server = installServer(recoveryKeysEnabled = false)
 
-            val register = client.register(server)
+            val register = client.register(server, stepUp = null)
             val prepare = client.prepare(server)
 
             assertEquals(HttpStatusCode.Conflict, register.status)
@@ -145,16 +154,158 @@ class RecoveryKeyRoutesTest {
             assertEquals("RECOVERY_KEYS_UNAVAILABLE", prepare.errorCode())
         }
 
+    @Test
+    fun `registering, replacing and completing each need a passkey confirmation`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true)
+
+            val unconfirmed = client.register(server, stepUp = null)
+            assertEquals(HttpStatusCode.Forbidden, unconfirmed.status)
+            assertEquals("STEP_UP_REQUIRED", unconfirmed.errorCode())
+
+            assertEquals(HttpStatusCode.OK, client.register(server).status)
+            val other = didKeyFor(server.signingKeys.generateKeyPair(EcCurve.P256).publicKeyMultibase)
+            val replace = client.replace(server, other, stepUp = null)
+            assertEquals(HttpStatusCode.Forbidden, replace.status)
+            assertEquals("STEP_UP_REQUIRED", replace.errorCode())
+
+            val prepared = json.decodeFromString<PrepareIdentityRecoveryResponse>(client.prepare(server).bodyAsText()).data
+            val complete = client.complete(server, prepared.preparedKey, server.sign(prepared.signingPayloadBase64Url), stepUp = null)
+            assertEquals(HttpStatusCode.Forbidden, complete.status)
+            assertEquals("STEP_UP_REQUIRED", complete.errorCode())
+        }
+
+    @Test
+    fun `a step up is single use and a sign in challenge or another account's passkey cannot stand in for one`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true)
+            val spent = client.stepUp(server)
+            client.register(server, stepUp = spent)
+            val signInChallenge = server.webAuthn.generateAuthenticationOptions(userId = server.accountId).challenge
+            server.addPasskey(Uuid.random(), "someone-elses-passkey")
+            val stranger = client.stepUp(server).copy(credential = server.assertion("someone-elses-passkey"))
+            val other = didKeyFor(server.signingKeys.generateKeyPair(EcCurve.P256).publicKeyMultibase)
+
+            val reused = client.replace(server, other, stepUp = spent)
+            val signIn = client.replace(server, other, stepUp = PasskeyStepUpProof(signInChallenge, server.assertion()))
+            val strangers = client.replace(server, other, stepUp = stranger)
+
+            listOf(reused, signIn, strangers).forEach { refused ->
+                assertEquals(HttpStatusCode.Forbidden, refused.status)
+                assertEquals("STEP_UP_FAILED", refused.errorCode())
+            }
+        }
+
+    @Test
+    fun `a lost recovery key can be replaced with a passkey confirmation`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true)
+            client.register(server)
+            val replacement = didKeyFor(server.signingKeys.generateKeyPair(EcCurve.P256).publicKeyMultibase)
+
+            val replaced = client.replace(server, replacement)
+
+            assertEquals(HttpStatusCode.OK, replaced.status)
+            assertEquals(replacement, json.decodeFromString<RegisterPlcRecoveryKeyResponse>(replaced.bodyAsText()).data.recoveryDidKey)
+            val history =
+                client.get("/api/v1/identity/plc/operations") { header(HttpHeaders.Authorization, "Bearer ${server.accessToken}") }
+            val operations = json.decodeFromString<HostedPlcOperationsResponse>(history.bodyAsText()).data
+            assertEquals(3, operations.size)
+            assertTrue(operations.last().operationJson.contains("\"rotationKeys\":[\"$replacement\","))
+            assertTrue(!operations.last().operationJson.contains(server.recoveryDidKey))
+        }
+
+    @Test
+    fun `replacing before registering answers recovery key not set`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true)
+
+            val refused = client.replace(server, server.recoveryDidKey)
+
+            assertEquals(HttpStatusCode.Conflict, refused.status)
+            assertEquals("RECOVERY_KEY_NOT_SET", refused.errorCode())
+        }
+
+    @Test
+    fun `an account without a passkey cannot begin a confirmation`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true, withPasskey = false)
+
+            val refused = client.stepUpResponse(server)
+
+            assertEquals(HttpStatusCode.Conflict, refused.status)
+            assertEquals("PASSKEY_REQUIRED", refused.errorCode())
+        }
+
+    @Test
+    fun `a server that cannot confirm with a passkey refuses every change`() =
+        testApplication {
+            val server = installServer(recoveryKeysEnabled = true, withStepUp = false)
+            val proof = PasskeyStepUpProof("unissued", server.assertion())
+
+            val begin = client.stepUpResponse(server)
+            val register = client.register(server, stepUp = proof)
+
+            assertEquals("STEP_UP_UNAVAILABLE", begin.errorCode())
+            assertEquals(HttpStatusCode.Conflict, register.status)
+            assertEquals("STEP_UP_UNAVAILABLE", register.errorCode())
+        }
+
     private class TestServer(
         val signingKeys: SigningKeyService,
         val accessToken: String,
         val recoveryDidKey: String,
         private val recoveryPrivateKey: ByteArray,
+        val webAuthn: WebAuthnPasskeyService,
+        val accountId: Uuid,
+        private val passkeys: InMemoryPasskeyRepository,
     ) {
         fun sign(payloadBase64Url: String): String = sign(recoveryPrivateKey, payloadBase64Url)
+
+        fun addPasskey(
+            owner: Uuid,
+            credentialId: String,
+        ) {
+            kotlinx.coroutines.runBlocking {
+                passkeys.storePasskey(
+                    userId = owner,
+                    credentialId = credentialId,
+                    publicKey = ByteArray(0),
+                    signCount = 0,
+                    info =
+                        PasskeyInfo(
+                            id = Uuid.random(),
+                            credentialId = credentialId,
+                            nickname = null,
+                            deviceType = "platform",
+                            createdAt = Clock.System.now(),
+                            lastUsedAt = null,
+                        ),
+                )
+            }
+        }
+
+        fun assertion(credentialId: String = PASSKEY_ID): PasskeyAssertionResponse =
+            PasskeyAssertionResponse(
+                id = credentialId,
+                rawId = credentialId,
+                response =
+                    PasskeyAssertionAuthenticatorResponse(
+                        clientDataJSON = "e30",
+                        authenticatorData = "AA",
+                        signature = "AA",
+                        userHandle = accountId.toString(),
+                    ),
+            )
     }
 
-    private fun ApplicationTestBuilder.installServer(recoveryKeysEnabled: Boolean): TestServer {
+    private fun ApplicationTestBuilder.installServer(
+        recoveryKeysEnabled: Boolean,
+        withPasskey: Boolean = true,
+        withStepUp: Boolean = true,
+    ): TestServer {
+        val passkeys = InMemoryPasskeyRepository()
+        val webAuthn = WebAuthnPasskeyService(passkeyRepository = passkeys, strictVerificationEnabled = false)
         val accounts = InMemoryAccountRepository()
         val tokenService = JwtTokenService("recovery-key-route-secret")
         val signingKeys = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
@@ -190,6 +341,7 @@ class RecoveryKeyRoutesTest {
                         tokenService = tokenService,
                         atprotoIdentityService = identity,
                         signingKeyService = signingKeys,
+                        passkeyStepUp = if (withStepUp) WebAuthnPasskeyStepUp(webAuthn) else null,
                     )
                 }
             }
@@ -200,17 +352,55 @@ class RecoveryKeyRoutesTest {
             accessToken = tokenService.generateAccessToken(account.id.toString()),
             recoveryDidKey = didKeyFor(recoveryKey.publicKeyMultibase),
             recoveryPrivateKey = recoveryKey.privateKeyPkcs8,
-        )
+            webAuthn = webAuthn,
+            accountId = account.id,
+            passkeys = passkeys,
+        ).also { if (withPasskey) it.addPasskey(account.id, PASSKEY_ID) }
     }
+
+    private suspend fun HttpClient.stepUpResponse(server: TestServer): HttpResponse =
+        post("/api/v1/identity/recovery-key/step-up") {
+            header(HttpHeaders.Authorization, "Bearer ${server.accessToken}")
+        }
+
+    /** Begins a step-up and answers it with the account's passkey, as the device would. */
+    private suspend fun HttpClient.stepUp(server: TestServer): PasskeyStepUpProof {
+        val response = stepUpResponse(server)
+        assertEquals(HttpStatusCode.OK, response.status)
+        val options = json.decodeFromString<RecoveryKeyStepUpResponse>(response.bodyAsText()).data
+        assertEquals(listOf(PASSKEY_ID), options.allowCredentials.map { it.id })
+        return PasskeyStepUpProof(challenge = options.challenge, credential = server.assertion())
+    }
+
+    /** [FRESH_STEP_UP] stands for "begin and answer a new step-up now". */
+    private suspend fun HttpClient.resolve(
+        server: TestServer,
+        stepUp: PasskeyStepUpProof?,
+    ): PasskeyStepUpProof? = if (stepUp === FRESH_STEP_UP) stepUp(server) else stepUp
+
+    private fun stepUpJson(stepUp: PasskeyStepUpProof?): String =
+        stepUp?.let { ",\"stepUp\":" + json.encodeToString(PasskeyStepUpProof.serializer(), it) }.orEmpty()
+
+    private suspend fun HttpClient.replace(
+        server: TestServer,
+        recoveryDidKey: String,
+        stepUp: PasskeyStepUpProof? = FRESH_STEP_UP,
+    ): HttpResponse =
+        post("/api/v1/identity/plc/recovery-key/replace") {
+            header(HttpHeaders.Authorization, "Bearer ${server.accessToken}")
+            contentType(ContentType.Application.Json)
+            setBody("""{"recoveryDidKey":"$recoveryDidKey"${stepUpJson(resolve(server, stepUp))}}""")
+        }
 
     private suspend fun HttpClient.register(
         server: TestServer,
         recoveryDidKey: String = server.recoveryDidKey,
+        stepUp: PasskeyStepUpProof? = FRESH_STEP_UP,
     ): HttpResponse =
         post("/api/v1/identity/plc/recovery-key") {
             header(HttpHeaders.Authorization, "Bearer ${server.accessToken}")
             contentType(ContentType.Application.Json)
-            setBody("""{"recoveryDidKey":"$recoveryDidKey"}""")
+            setBody("""{"recoveryDidKey":"$recoveryDidKey"${stepUpJson(resolve(server, stepUp))}}""")
         }
 
     private suspend fun HttpClient.prepare(server: TestServer): HttpResponse =
@@ -222,12 +412,16 @@ class RecoveryKeyRoutesTest {
         server: TestServer,
         preparedKey: String,
         signature: String,
+        stepUp: PasskeyStepUpProof? = FRESH_STEP_UP,
     ): HttpResponse =
         post("/api/v1/identity/recovery-key/recover/complete") {
             header(HttpHeaders.Authorization, "Bearer ${server.accessToken}")
             contentType(ContentType.Application.Json)
             setBody(
-                json.encodeToString(CompleteIdentityRecoveryRequest.serializer(), CompleteIdentityRecoveryRequest(preparedKey, signature)),
+                json.encodeToString(
+                    CompleteIdentityRecoveryRequest.serializer(),
+                    CompleteIdentityRecoveryRequest(preparedKey, signature, resolve(server, stepUp)),
+                ),
             )
         }
 
@@ -241,6 +435,14 @@ class RecoveryKeyRoutesTest {
             ?.content
 
     private companion object {
+        const val PASSKEY_ID = "alice-passkey"
+
+        val FRESH_STEP_UP =
+            PasskeyStepUpProof(
+                challenge = "fresh",
+                credential = PasskeyAssertionResponse("fresh", "fresh", PasskeyAssertionAuthenticatorResponse("", "", "", "")),
+            )
+
         fun sign(
             privateKeyPkcs8: ByteArray,
             payloadBase64Url: String,

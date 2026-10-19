@@ -8,7 +8,8 @@ class IdentityLifecycleConflictException(
     message: String,
     /** A specific error code for the response, or `null` to use the route's general conflict code. */
     val code: String? = null,
-) : IllegalStateException(message)
+    cause: Throwable? = null,
+) : IllegalStateException(message, cause)
 
 /**
  * Raised when an account was deleted before its identity could be provisioned. Nothing was written,

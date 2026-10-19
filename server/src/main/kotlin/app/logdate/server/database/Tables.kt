@@ -200,6 +200,7 @@ object HostedPlcOperationsTable : Table("hosted_plc_operations") {
     init {
         index("idx_hosted_plc_operations_account_created", false, accountId, createdAt)
         index("idx_hosted_plc_operations_did_created", false, did, createdAt)
+        uniqueIndex("uq_hosted_plc_operations_did_prev", did, prevCid)
     }
 }
 

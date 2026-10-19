@@ -17,20 +17,34 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class PostgreSQLSigningKeyRepository : SigningKeyRepository {
-    override suspend fun save(signingKey: StoredSigningKey): StoredSigningKey =
+    override suspend fun replaceActiveKey(signingKey: StoredSigningKey): StoredSigningKey =
         transaction {
-            SigningKeysTable.insert {
-                it[id] = signingKey.id.toJavaUUID()
-                it[accountId] = signingKey.accountId.toJavaUUID()
-                it[purpose] = signingKey.purpose
-                it[algorithm] = signingKey.algorithm
-                it[publicKeyMultibase] = signingKey.publicKeyMultibase
-                it[privateKeyEncrypted] = signingKey.privateKeyEncrypted
-                it[createdAt] = signingKey.createdAt
-                it[revokedAt] = signingKey.revokedAt
+            SigningKeysTable.update({
+                (SigningKeysTable.accountId eq signingKey.accountId.toJavaUUID()) and
+                    (SigningKeysTable.revokedAt eq null)
+            }) {
+                it[revokedAt] =
+                    kotlin.time.Clock.System
+                        .now()
             }
-            signingKey
+            insertKey(signingKey)
         }
+
+    override suspend fun save(signingKey: StoredSigningKey): StoredSigningKey = transaction { insertKey(signingKey) }
+
+    private fun insertKey(signingKey: StoredSigningKey): StoredSigningKey {
+        SigningKeysTable.insert {
+            it[id] = signingKey.id.toJavaUUID()
+            it[accountId] = signingKey.accountId.toJavaUUID()
+            it[purpose] = signingKey.purpose
+            it[algorithm] = signingKey.algorithm
+            it[publicKeyMultibase] = signingKey.publicKeyMultibase
+            it[privateKeyEncrypted] = signingKey.privateKeyEncrypted
+            it[createdAt] = signingKey.createdAt
+            it[revokedAt] = signingKey.revokedAt
+        }
+        return signingKey
+    }
 
     override suspend fun findActiveByAccountId(accountId: Uuid): StoredSigningKey? =
         transaction {

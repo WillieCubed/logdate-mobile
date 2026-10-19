@@ -24,6 +24,16 @@ interface SigningKeyRepository : EncryptedPrivateKeyStore {
     suspend fun findActiveByAccountId(accountId: Uuid): StoredSigningKey?
 
     suspend fun revokeActiveKeys(accountId: Uuid): Int
+
+    /**
+     * Revokes the account's active keys and stores [signingKey] as its only active key. The
+     * PostgreSQL repository does both in one transaction, so a failure never leaves the account
+     * without an active key.
+     */
+    suspend fun replaceActiveKey(signingKey: StoredSigningKey): StoredSigningKey {
+        revokeActiveKeys(signingKey.accountId)
+        return save(signingKey)
+    }
 }
 
 @OptIn(ExperimentalUuidApi::class)

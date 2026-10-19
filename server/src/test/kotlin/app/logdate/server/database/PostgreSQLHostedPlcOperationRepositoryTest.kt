@@ -1,11 +1,13 @@
 package app.logdate.server.database
 
 import app.logdate.server.database.support.withH2Database
+import app.logdate.server.identity.HostedPlcOperationConflictException
 import app.logdate.server.identity.StoredHostedPlcOperation
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -73,6 +75,45 @@ class PostgreSQLHostedPlcOperationRepositoryTest {
                     assertEquals(listOf(first, second).map(StoredHostedPlcOperation::id), byAccount.map(StoredHostedPlcOperation::id))
                     assertEquals(listOf("cid-1", "cid-2"), byDid.map(StoredHostedPlcOperation::cid))
                     assertEquals(listOf(null, "cid-1"), byDid.map(StoredHostedPlcOperation::prevCid))
+                }
+            }
+        }
+
+    @Test
+    fun `a second operation on the same head is refused as a conflict`() =
+        kotlinx.coroutines.test.runTest {
+            withH2Database(AccountsTable, HostedPlcOperationsTable) {
+                val repository = PostgreSQLHostedPlcOperationRepository()
+                val accountId = Uuid.random()
+                val did = "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
+                transaction {
+                    AccountsTable.insert {
+                        it[id] = accountId.toJavaUUID()
+                        it[username] = "plc-fork"
+                        it[displayName] = "PLC Fork"
+                        it[createdAt] = Clock.System.now()
+                        it[isActive] = true
+                        it[preferences] = "{}"
+                    }
+                }
+
+                fun update(cid: String) =
+                    StoredHostedPlcOperation(
+                        id = Uuid.random(),
+                        accountId = accountId,
+                        did = did,
+                        cid = cid,
+                        prevCid = "cid-genesis",
+                        operationType = "plc_operation",
+                        operationJson = """{"sig":"$cid"}""",
+                    )
+
+                kotlinx.coroutines.runBlocking {
+                    repository.save(update("cid-first"))
+                    val conflict = assertFailsWith<HostedPlcOperationConflictException> { repository.save(update("cid-second")) }
+
+                    assertEquals("cid-genesis", conflict.prevCid)
+                    assertEquals(listOf("cid-first"), repository.listByDid(did).map(StoredHostedPlcOperation::cid))
                 }
             }
         }
