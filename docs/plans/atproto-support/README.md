@@ -151,11 +151,14 @@ surfaces.
 - Roll out user-held recovery keys, described in
   [User-held recovery keys](../../superpowers/specs/2026-10-19-user-held-recovery-keys-design.md).
   The key is derived from the recovery phrase on Android, iOS and desktop, registered ahead of the
-  server's key, and can replace the server's key. It works from the server's hosted operation log
-  without PLC publishing. It is off until `ATPROTO_RECOVERY_KEYS_ENABLED` is set on the server and
-  the `IDENTITY_RECOVERY_KEY` client flag is turned on.
+  server's key, and can replace the server's key or be replaced when its phrase is lost. Every
+  change needs a fresh passkey confirmation, and the device checks every operation before signing
+  it. It works from the server's hosted operation log without PLC publishing. It is off until
+  `ATPROTO_RECOVERY_KEYS_ENABLED` is set on the server and the `IDENTITY_RECOVERY_KEY` client flag
+  is turned on.
 - Let people use their recovery key directly with the PLC directory once identities are published,
-  so recovery does not depend on the server cooperating.
+  so recovery, and undoing a change within its 72-hour window, does not depend on the server
+  cooperating.
 - Define and lock the final LogDate lexicon family. The 2026-10-09 design replaces this item: new
   lexicons use the `app.logdate.*` namespace, and the existing `studio.hypertext.logdate.*`
   lexicons move there as part of the sync migration. The current LogDate lexicons (`profile`,
