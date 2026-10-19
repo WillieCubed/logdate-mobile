@@ -1,28 +1,29 @@
 {
   "lexicon": 1,
   "id": "app.logdate.place.visit",
-  "description": "Time spent at one place.",
+  "description": "Time the person spent at a place, which they added to their location history themselves.",
   "defs": {
     "main": {
       "type": "record",
-      "description": "Time spent at one place.",
+      "description": "Time the person spent at a place, which they added to their location history themselves. Visits LogDate works out from location samples aren't stored as records; every device works them out again from app.logdate.place.sample records.",
       "key": "any",
       "record": {
         "type": "object",
         "required": [
-          "location",
+          "place",
           "startsAt",
-          "createdAt"
+          "endsAt"
         ],
         "properties": {
           "place": {
             "type": "ref",
             "ref": "app.logdate.defs#recordRef",
-            "description": "The saved place, when the visit matched one."
+            "description": "The place (app.logdate.place.place) the person was at."
           },
           "location": {
             "type": "ref",
-            "ref": "community.lexicon.location.geo"
+            "ref": "community.lexicon.location.geo",
+            "description": "Where exactly the person was, when it differs from the place's center."
           },
           "startsAt": {
             "type": "string",
@@ -30,26 +31,13 @@
           },
           "endsAt": {
             "type": "string",
-            "format": "datetime"
-          },
-          "source": {
-            "type": "string",
-            "knownValues": [
-              "inferred",
-              "manual"
-            ],
-            "description": "Whether LogDate worked out the visit from location history or the person added it."
-          },
-          "status": {
-            "type": "string",
-            "knownValues": [
-              "suggested",
-              "confirmed"
-            ]
+            "format": "datetime",
+            "description": "When the visit ended. Never before startsAt."
           },
           "createdAt": {
             "type": "string",
-            "format": "datetime"
+            "format": "datetime",
+            "description": "When the person added the visit, when known."
           }
         }
       }

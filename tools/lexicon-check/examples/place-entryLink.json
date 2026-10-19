@@ -1,0 +1,8 @@
+{
+  "collection": "app.logdate.place.entryLink",
+  "record": {
+    "$type": "app.logdate.place.entryLink",
+    "entry": { "collection": "app.logdate.journal.entry", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
+    "evidenceId": "a8c1f2e3-4d5b-4c6a-9e7f-8b9a0c1d2e3f"
+  }
+}

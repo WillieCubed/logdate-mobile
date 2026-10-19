@@ -1,0 +1,11 @@
+{
+  "collection": "app.logdate.place.correction",
+  "record": {
+    "$type": "app.logdate.place.correction",
+    "evidenceId": "place:0b8f3c1e-6a2d-4e9f-8c7b-1d2e3f4a5b6c",
+    "field": "label",
+    "label": "The good coffee place",
+    "supersedes": [{ "collection": "app.logdate.place.correction", "rkey": "1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f" }],
+    "createdAt": "2026-10-12T09:00:00.000Z"
+  }
+}

@@ -34,12 +34,12 @@
         "blob": {
           "type": "blob",
           "maxSize": 2000000000,
-          "description": "The stored file. In a personal, circle or group space this is ciphertext, encrypted with the same content key as the record that refers to it."
+          "description": "The stored file. In a personal, circle or group space this is ciphertext: the device encrypts the file in 64 KiB chunks with the account's media key (the LDCE2 format), not with the content key of the record that refers to it."
         },
         "mimeType": {
           "type": "string",
           "maxLength": 128,
-          "description": "The media type of the decrypted file, such as image/jpeg. The blob's own type describes the stored bytes, which may be ciphertext."
+          "description": "The media type of the decrypted file, such as image/jpeg. The app records it when the file is imported or uploaded. The blob's own type describes the stored bytes, which may be ciphertext."
         },
         "size": {
           "type": "integer",
@@ -78,29 +78,22 @@
     },
     "location": {
       "type": "object",
-      "description": "Where something happened. Coordinates use the community location schema.",
-      "required": [
-        "geo"
-      ],
+      "description": "Where something happened: the coordinates the device captured, a saved place, or both. At least one of geo and place is present.",
       "properties": {
         "geo": {
           "type": "ref",
-          "ref": "community.lexicon.location.geo"
+          "ref": "community.lexicon.location.geo",
+          "description": "The captured coordinates. Altitude, when known, is decimal meters above the WGS84 ellipsoid."
         },
-        "accuracyMeters": {
+        "accuracyCentimeters": {
           "type": "integer",
           "minimum": 0,
-          "description": "Horizontal accuracy of the coordinate, in meters."
+          "description": "Horizontal accuracy of the coordinates, in centimeters. Devices report accuracy in fractional meters, and centimeters keep those digits."
         },
         "place": {
           "type": "ref",
           "ref": "app.logdate.defs#recordRef",
-          "description": "The saved place this location belongs to, when there is one."
-        },
-        "timeZone": {
-          "type": "string",
-          "maxLength": 64,
-          "description": "IANA time zone where the moment happened, such as America/Chicago."
+          "description": "The saved place (app.logdate.place.place) this location belongs to, when there is one."
         }
       }
     }

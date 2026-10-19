@@ -30,7 +30,31 @@
           },
           "location": {
             "type": "ref",
-            "ref": "app.logdate.defs#location"
+            "ref": "app.logdate.defs#location",
+            "description": "Where the moment was captured."
+          },
+          "timeZone": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "IANA time zone the device was in when the moment was captured, such as America/Chicago. Present with or without a location, so the entry's local time can be shown as it was. Stored as written: a zone newer than the reader's time zone data is still kept."
+          },
+          "capturedOn": {
+            "type": "string",
+            "maxLength": 32,
+            "knownValues": [
+              "phone",
+              "watch"
+            ],
+            "description": "The kind of device the moment was captured on. Set once at capture and never edited. Absent when it wasn't recorded."
+          },
+          "capturedDuring": {
+            "type": "string",
+            "maxLength": 32,
+            "knownValues": [
+              "moving",
+              "inVehicle"
+            ],
+            "description": "What the person was doing when the moment was captured, while activity awareness was on. Set once at capture and never edited. Absent when nothing was under way or it wasn't recorded. Sleep is never recorded."
           },
           "createdAt": {
             "type": "string",
@@ -64,11 +88,12 @@
         },
         "format": {
           "type": "string",
+          "maxLength": 32,
           "knownValues": [
             "markdown",
             "plain"
           ],
-          "description": "How to interpret the text. Defaults to markdown."
+          "description": "How to interpret the text. Defaults to markdown, which is what LogDate's editor writes."
         }
       }
     },
@@ -92,15 +117,17 @@
         "caption": {
           "type": "string",
           "maxLength": 20000,
-          "maxGraphemes": 2000
+          "maxGraphemes": 2000,
+          "description": "What the person wrote about the photo, in markdown."
         },
         "presentation": {
           "type": "string",
+          "maxLength": 32,
           "knownValues": [
             "edgeToEdge",
             "framed"
           ],
-          "description": "How the photo is framed when the entry is shown."
+          "description": "How the photo is framed when the entry is shown. Defaults to edgeToEdge."
         }
       }
     },
@@ -124,7 +151,8 @@
         "caption": {
           "type": "string",
           "maxLength": 20000,
-          "maxGraphemes": 2000
+          "maxGraphemes": 2000,
+          "description": "What the person wrote about the video, in markdown."
         },
         "durationMs": {
           "type": "integer",
@@ -154,10 +182,16 @@
           "type": "integer",
           "minimum": 0
         },
+        "caption": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000,
+          "description": "What the person wrote about the recording, in markdown."
+        },
         "transcript": {
           "type": "ref",
           "ref": "app.logdate.defs#recordRef",
-          "description": "The transcript of this recording, when one exists."
+          "description": "The transcript of this recording (app.logdate.journal.transcript), when one exists."
         }
       }
     }

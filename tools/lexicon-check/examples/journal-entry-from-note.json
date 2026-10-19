@@ -1,0 +1,25 @@
+{
+  "collection": "app.logdate.journal.entry",
+  "record": {
+    "$type": "app.logdate.journal.entry",
+    "blocks": [
+      {
+        "$type": "app.logdate.journal.entry#audioBlock",
+        "id": "7d0c9e7a-2f4b-4b8e-9a51-3e6f1c2d4b90",
+        "media": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 65536 },
+          "mimeType": "audio/mp4",
+          "size": 61204
+        },
+        "durationMs": 8200,
+        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "7d0c9e7a-2f4b-4b8e-9a51-3e6f1c2d4b90" }
+      }
+    ],
+    "location": { "place": { "collection": "app.logdate.place.place", "rkey": "0b8f3c1e-6a2d-4e9f-8c7b-1d2e3f4a5b6c" } },
+    "timeZone": "Europe/Lisbon",
+    "capturedOn": "watch",
+    "capturedDuring": "inVehicle",
+    "createdAt": "2026-10-12T07:41:09.512Z",
+    "updatedAt": "2026-10-12T07:41:09.512Z"
+  }
+}

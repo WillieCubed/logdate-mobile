@@ -1,19 +1,17 @@
 {
   "lexicon": 1,
   "id": "app.logdate.place.place",
-  "description": "A place the person saved and named, such as Home or Grandma's house.",
+  "description": "A place in the person's life, such as Home or Grandma's house: one they saved and named, or one LogDate suggested from where they spend time.",
   "defs": {
     "main": {
       "type": "record",
-      "description": "A place the person saved and named, such as Home or Grandma's house.",
+      "description": "A place in the person's life, such as Home or Grandma's house: one they saved and named, or one LogDate suggested from where they spend time. A suggestion becomes the person's own once they confirm it. Renaming a place the person confirmed is recorded as an app.logdate.place.correction, so the name here stays the one first given.",
       "key": "any",
       "record": {
         "type": "object",
         "required": [
           "name",
-          "location",
-          "radiusMeters",
-          "createdAt"
+          "location"
         ],
         "properties": {
           "name": {
@@ -28,17 +26,34 @@
           },
           "location": {
             "type": "ref",
-            "ref": "community.lexicon.location.geo"
+            "ref": "community.lexicon.location.geo",
+            "description": "The center of the place."
           },
           "radiusMeters": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100000,
-            "description": "How far from the center still counts as being at the place."
+            "description": "How far from the center still counts as being at the place. When absent, apps use their usual distance for telling whether someone stayed somewhere."
+          },
+          "locality": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200,
+            "description": "A readable description of where the place is, such as its street address or neighborhood."
+          },
+          "externalId": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "The place's identifier in the map directory it was suggested from, used to recognize the same place when it's suggested again."
+          },
+          "userConfirmed": {
+            "type": "boolean",
+            "description": "True when the person saved or confirmed the place, false while it's only a suggestion. Defaults to false."
           },
           "createdAt": {
             "type": "string",
-            "format": "datetime"
+            "format": "datetime",
+            "description": "When the place was saved or first suggested, when known."
           },
           "updatedAt": {
             "type": "string",

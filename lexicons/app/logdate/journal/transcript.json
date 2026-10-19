@@ -1,11 +1,11 @@
 {
   "lexicon": 1,
   "id": "app.logdate.journal.transcript",
-  "description": "The transcript of an audio block, with timed segments and detected sounds.",
+  "description": "The transcript of an audio block: timed segments with word timings, the speakers, the engine that produced it, and detected sounds.",
   "defs": {
     "main": {
       "type": "record",
-      "description": "The transcript of an audio block, with timed segments and detected sounds.",
+      "description": "The transcript of an audio block: timed segments with word timings, the speakers, the engine that produced it, and detected sounds. The record key matches the key of the entry that holds the audio, so each recording has at most one transcript. The full text is the segments' text joined in time order.",
       "key": "any",
       "record": {
         "type": "object",
@@ -13,7 +13,7 @@
           "entry",
           "blockId",
           "status",
-          "createdAt"
+          "revision"
         ],
         "properties": {
           "entry": {
@@ -28,12 +28,8 @@
           },
           "language": {
             "type": "string",
-            "format": "language"
-          },
-          "text": {
-            "type": "string",
-            "maxLength": 1000000,
-            "description": "The full transcript text."
+            "format": "language",
+            "description": "BCP-47 language tag requested or detected for the transcript, such as en-US."
           },
           "segments": {
             "type": "array",
@@ -41,7 +37,21 @@
               "type": "ref",
               "ref": "#segment"
             },
-            "maxLength": 20000
+            "maxLength": 20000,
+            "description": "The transcript's segments, ordered by start time and then by id."
+          },
+          "speakers": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "#speaker"
+            },
+            "maxLength": 100,
+            "description": "The speakers that segments and words refer to."
+          },
+          "engine": {
+            "type": "ref",
+            "ref": "#engine"
           },
           "soundTags": {
             "type": "array",
@@ -51,40 +61,27 @@
             },
             "maxLength": 5000
           },
-          "source": {
-            "type": "string",
-            "knownValues": [
-              "onDevice",
-              "cloud"
-            ],
-            "description": "Where the transcript was produced."
-          },
-          "model": {
-            "type": "string",
-            "maxLength": 256,
-            "description": "The speech model that produced the transcript."
-          },
           "revision": {
             "type": "integer",
             "minimum": 0,
-            "description": "Increases each time the transcript is regenerated or corrected."
+            "description": "Increases every time the transcript changes. When two devices hold different versions, the higher revision is newer."
           },
           "status": {
             "type": "string",
+            "maxLength": 32,
             "knownValues": [
               "pending",
               "inProgress",
+              "refining",
               "complete",
               "failed"
-            ]
-          },
-          "speakerCount": {
-            "type": "integer",
-            "minimum": 0
+            ],
+            "description": "Where the transcript is in its life. pending: requested but not started. inProgress: the first recognition pass is still producing segments. refining: a more accurate second pass is improving a transcript that already exists. complete: every segment is stable. failed: recognition stopped with an error."
           },
           "createdAt": {
             "type": "string",
-            "format": "datetime"
+            "format": "datetime",
+            "description": "When the transcript was first produced, when known."
           },
           "updatedAt": {
             "type": "string",
@@ -97,11 +94,88 @@
       "type": "object",
       "description": "One timed stretch of speech.",
       "required": [
+        "id",
         "startMs",
         "endMs",
         "text"
       ],
       "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Identifier of the segment, unique within the transcript. A later, better recognition pass replaces the segment with the same id."
+        },
+        "startMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Start of the segment, in milliseconds from the beginning of the recording."
+        },
+        "endMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "End of the segment, in milliseconds from the beginning of the recording. Never before startMs."
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "words": {
+          "type": "array",
+          "items": {
+            "type": "ref",
+            "ref": "#word"
+          },
+          "maxLength": 5000,
+          "description": "Word-level timings, used to highlight search results and to jump to a word during playback."
+        },
+        "speaker": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "The id of the speaker in the transcript's speakers list."
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Recognition confidence, in thousandths."
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 32,
+          "knownValues": [
+            "imported",
+            "localLive",
+            "cloudLive",
+            "localRefinement",
+            "cloudRefinement"
+          ],
+          "description": "Which recognition pass produced the segment, from least to most authoritative: text imported from older storage, live recognition on the device, live recognition in LogDate Cloud, a second pass on the device, and a second pass in LogDate Cloud. A segment is only replaced by one from an equal or more authoritative pass."
+        },
+        "final": {
+          "type": "boolean",
+          "description": "True when the segment is stable and won't change again."
+        }
+      }
+    },
+    "word": {
+      "type": "object",
+      "description": "One recognized word and when it was spoken.",
+      "required": [
+        "text",
+        "startMs",
+        "endMs"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "The word as recognized."
+        },
+        "normalizedText": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "The word in the form search matches against, such as lowercase without punctuation."
+        },
         "startMs": {
           "type": "integer",
           "minimum": 0
@@ -110,22 +184,61 @@
           "type": "integer",
           "minimum": 0
         },
-        "text": {
-          "type": "string",
-          "maxLength": 100000
-        },
-        "speaker": {
-          "type": "string",
-          "maxLength": 64
-        },
         "confidence": {
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
           "description": "Recognition confidence, in thousandths."
         },
-        "final": {
-          "type": "boolean"
+        "speaker": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "The id of the speaker in the transcript's speakers list."
+        }
+      }
+    },
+    "speaker": {
+      "type": "object",
+      "description": "Someone who speaks in the recording.",
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier that segments and words use to refer to this speaker."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 640,
+          "maxGraphemes": 64,
+          "description": "The name shown for the speaker, such as Speaker 1."
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "description": "The speech recognizer that produced the transcript.",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "The recognizer's name."
+        },
+        "modelId": {
+          "type": "string",
+          "maxLength": 256,
+          "description": "The speech model the recognizer used."
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "The recognizer's version."
         }
       }
     },

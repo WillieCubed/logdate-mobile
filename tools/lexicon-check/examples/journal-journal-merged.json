@@ -1,0 +1,10 @@
+{
+  "collection": "app.logdate.journal.journal",
+  "record": {
+    "$type": "app.logdate.journal.journal",
+    "title": "Lake trips",
+    "mergedInto": { "collection": "app.logdate.journal.journal", "rkey": "5f2e8c1a-9b3d-4a7e-8f6c-2d1b0a9e8c7d" },
+    "createdAt": "2026-07-04T09:30:00.000Z",
+    "updatedAt": "2026-10-11T08:15:00.000Z"
+  }
+}

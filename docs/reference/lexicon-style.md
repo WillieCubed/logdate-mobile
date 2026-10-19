@@ -56,7 +56,7 @@ has `createdAt`, and records that can change have `updatedAt`. Name other times 
 `startsAt`, `endsAt`, `measuredAt`, `sharedAt`.
 
 **No floating-point numbers.** The AT Protocol data model has no floats. Use integers with the unit
-in the name (`accuracyMeters`, `durationMs`, `speedCentimetersPerSecond`), confidences in
+in the name (`accuracyCentimeters`, `durationMs`, `speedCentimetersPerSecond`), confidences in
 thousandths (`942` means 94.2%), and decimal strings for coordinates, which is what the community
 location schema does.
 
