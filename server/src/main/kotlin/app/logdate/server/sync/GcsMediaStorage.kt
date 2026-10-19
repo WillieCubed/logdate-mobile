@@ -221,6 +221,8 @@ class GcsMediaStorage(
             LogDateBlobNamespace.BACKUP -> "users/${request.ownerId}/backups/${request.blobId}.enc"
 
             LogDateBlobNamespace.ATPROTO -> "users/${request.ownerId}/atproto/blobs/${request.blobId}"
+
+            LogDateBlobNamespace.SPACE -> "users/${request.ownerId}/spaces/${request.blobId}"
         }
 
     companion object {
@@ -242,6 +244,7 @@ private fun LogDateBlobNamespace.errorLabel(): String =
         LogDateBlobNamespace.MEDIA -> "media"
         LogDateBlobNamespace.BACKUP -> "backup"
         LogDateBlobNamespace.ATPROTO -> "blob"
+        LogDateBlobNamespace.SPACE -> "space-blob"
     }
 
 /**

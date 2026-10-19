@@ -737,8 +737,13 @@ internal data class DeleteRecordInput(
     val swapCommit: String? = null,
 )
 
+/**
+ * The account a bearer or DPoP-bound access token belongs to, with its AT Protocol identity
+ * ensured, so its `did` is set. Answers the call itself (`401`, or `501` when auth isn't
+ * configured) and returns null when there's no such account.
+ */
 @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-private suspend fun io.ktor.server.application.ApplicationCall.requireAuthenticatedAccount(
+internal suspend fun io.ktor.server.application.ApplicationCall.requireAuthenticatedAccount(
     identityService: AtprotoIdentityService,
     accountRepository: AccountRepository?,
     tokenService: TokenService?,

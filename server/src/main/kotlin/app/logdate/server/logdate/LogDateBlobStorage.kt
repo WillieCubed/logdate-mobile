@@ -13,6 +13,9 @@ enum class LogDateBlobNamespace {
     MEDIA,
     BACKUP,
     ATPROTO,
+
+    /** Sealed blobs in a personal space; each upload gets its own object, even for repeated content. */
+    SPACE,
 }
 
 /**
