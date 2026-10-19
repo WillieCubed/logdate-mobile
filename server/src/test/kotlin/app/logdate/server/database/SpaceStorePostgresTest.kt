@@ -1,6 +1,8 @@
 package app.logdate.server.database
 
 import app.logdate.server.space.SpaceBlob
+import app.logdate.server.space.SpaceCursorTooOldException
+import app.logdate.server.space.SpacePurgeResult
 import app.logdate.server.space.SpaceRecordWrite
 import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.CoroutineScope
@@ -20,8 +22,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
@@ -155,6 +159,35 @@ class SpaceStorePostgresTest {
                         }
                     }
                 }
+            }
+        }
+
+    @Test
+    fun `purge remembers purged tombstones and keeps a blob whose object delete fails`() =
+        withFixture { fixture ->
+            with(fixture) {
+                store.put(write("a"))
+                store.put(write("b"))
+                val deleted = store.delete(owner, space, author, "a", swapCid = null)
+                val blobPath = "users/$owner/spaces/stubborn"
+                store.putBlob(owner, space, SpaceBlob("bafystubborn", "application/octet-stream", 1, blobPath))
+                val later = Clock.System.now() + 1.hours
+
+                val failing = store.purge(tombstonesBefore = later, unreferencedBlobsBefore = later) { error("The object store is down") }
+
+                assertEquals(SpacePurgeResult(blobsDeleted = 0, blobsFailed = 1), failing)
+                assertNotNull(store.getBlob(space, "bafystubborn"))
+                assertEquals(
+                    deleted.toInt(),
+                    count(source, "SELECT purged_through_seq FROM space_states WHERE space_uri = ? AND author_did = ?", space, author),
+                )
+                assertFailsWith<SpaceCursorTooOldException> { store.changes(space, author, 1, 10) }
+                assertEquals(listOf("b"), store.changes(space, author, 0, 10).changes.map { it.rkey })
+
+                val purged = ConcurrentLinkedQueue<String>()
+                assertEquals(SpacePurgeResult(blobsDeleted = 1, blobsFailed = 0), store.purge(later, later) { purged += it })
+                assertEquals(listOf(blobPath), purged.toList())
+                assertNull(store.getBlob(space, "bafystubborn"))
             }
         }
 
