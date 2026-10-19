@@ -17,7 +17,7 @@
     "deny": [
       "Bash(git add -A*)",
       "Bash(git add --all*)",
-      "Bash(git add .*)",
+      "Bash(git add .)",
       "Bash(git add \\*)",
       "Bash(git commit -a*)",
       "Bash(git commit --all*)",
