@@ -5,6 +5,7 @@ import java.math.BigInteger
 import java.security.interfaces.ECPublicKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -31,6 +32,26 @@ class EcKeySupportTest {
             assertEquals(multikey, EcKeySupport.encodePublicKeyMultibase(decoded.publicKey, curve))
             assertTrue(EcKeySupport.verifySha256(decoded.publicKey, curve, payload, signature))
             assertTrue(!EcKeySupport.verifySha256(decoded.publicKey, curve, "tampered".encodeToByteArray(), signature))
+        }
+    }
+
+    @Test
+    fun `high-S signatures are rejected unless the caller allows them`() {
+        val payload = "malleable".encodeToByteArray()
+
+        EcCurve.entries.forEach { curve ->
+            val keyPair = EcKeySupport.generateKeyPair(curve)
+            val signature = EcKeySupport.signSha256(keyPair.private, curve, payload)
+            // (r, n - s) is just as valid mathematically as (r, s). The AT Protocol accepts only the
+            // low-S form so each message has one signature; JOSE accepts both.
+            val order = CustomNamedCurves.getByName(curve.parameterSpecName).n
+            val width = curve.coordinateBytes
+            val s = BigInteger(1, signature.copyOfRange(width, signature.size))
+            val highS = signature.copyOfRange(0, width) + order.subtract(s).toFixedWidth(width)
+
+            assertTrue(EcKeySupport.verifySha256(keyPair.public, curve, payload, signature))
+            assertFalse(EcKeySupport.verifySha256(keyPair.public, curve, payload, highS))
+            assertTrue(EcKeySupport.verifySha256(keyPair.public, curve, payload, highS, allowHighS = true))
         }
     }
 

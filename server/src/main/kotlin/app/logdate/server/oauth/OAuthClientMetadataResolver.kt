@@ -208,6 +208,8 @@ class OAuthClientMetadataResolver(
                     curve = jwkCurve,
                     payload = "${segments[0]}.${segments[1]}".toByteArray(StandardCharsets.UTF_8),
                     signature = base64UrlDecode(segments[2]),
+                    // A client assertion is a JWS; JOSE does not require low-S signatures.
+                    allowHighS = true,
                 )
             }.getOrElse {
                 throw OAuthInvalidClientException("Client assertion signature verification failed")
