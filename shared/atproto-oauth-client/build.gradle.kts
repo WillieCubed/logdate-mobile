@@ -52,6 +52,7 @@ kotlin {
         jvmMain.dependencies {
             implementation(projects.shared.atprotoCrypto)
             implementation(libs.bouncycastle.bcprov)
+            api(libs.ktor.client.okhttp)
         }
 
         commonTest.dependencies {
@@ -63,7 +64,6 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.kotlin.test.junit)
             implementation(libs.nimbus.jose.jwt)
-            implementation(libs.ktor.client.okhttp)
         }
     }
 }

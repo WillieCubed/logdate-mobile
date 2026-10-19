@@ -96,6 +96,12 @@ internal class MockAtmosphere(
     var tokenSubjectOverride: String? = null
     var grantedScopeOverride: String? = null
     var revocationFails: Boolean = false
+    var publishProtectedResourceMetadata: Boolean = true
+    var redirectProtectedResourceMetadata: Boolean = false
+    var redirectAuthorizationServerMetadata: Boolean = false
+
+    /** When set, the token endpoint fails with this plain-text body instead of answering. */
+    var tokenEndpointFailureBody: String? = null
 
     val requestLog = mutableListOf<String>()
     val revokedTokens = mutableListOf<String>()
@@ -222,7 +228,9 @@ internal class MockAtmosphere(
     ): HttpResponseData {
         val path = request.url.encodedPath
         if (path == "/.well-known/oauth-protected-resource") {
+            if (!publishProtectedResourceMetadata) return respondJson(HttpStatusCode.NotFound, buildJsonObject { })
             val authorizationServer = if (origin == pdsUrl) issuer else otherIssuer
+            if (redirectProtectedResourceMetadata) return redirect("$authorizationServer/.well-known/oauth-protected-resource")
             return respondJson(
                 HttpStatusCode.OK,
                 buildJsonObject {
@@ -278,6 +286,9 @@ internal class MockAtmosphere(
     ): HttpResponseData {
         val path = request.url.encodedPath
         if (path == "/.well-known/oauth-authorization-server") {
+            if (redirectAuthorizationServerMetadata && origin == issuer) {
+                return redirect("$otherIssuer/.well-known/oauth-authorization-server")
+            }
             return respondJson(HttpStatusCode.OK, authorizationServerMetadataOverride(authorizationServerMetadata(origin)))
         }
         if (origin != issuer) return respondJson(HttpStatusCode.NotFound, buildJsonObject { })
@@ -371,6 +382,16 @@ internal class MockAtmosphere(
     }
 
     private fun MockRequestHandleScope.token(
+        parameters: Map<String, String>,
+        client: ClientAuthResult.Valid,
+        proof: DpopResult.Valid,
+    ): HttpResponseData =
+        when {
+            tokenEndpointFailureBody != null -> respond(tokenEndpointFailureBody!!, HttpStatusCode.BadGateway)
+            else -> grant(parameters, client, proof)
+        }
+
+    private fun MockRequestHandleScope.grant(
         parameters: Map<String, String>,
         client: ClientAuthResult.Valid,
         proof: DpopResult.Valid,
@@ -491,6 +512,9 @@ internal class MockAtmosphere(
                     DPOP_NONCE_HEADER to listOf(nonce),
                 ),
         )
+
+    private fun MockRequestHandleScope.redirect(location: String): HttpResponseData =
+        respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, location))
 
     private fun MockRequestHandleScope.respondJson(
         status: HttpStatusCode,

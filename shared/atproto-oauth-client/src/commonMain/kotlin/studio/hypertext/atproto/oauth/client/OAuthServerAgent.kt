@@ -1,10 +1,8 @@
 package studio.hypertext.atproto.oauth.client
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.forms.submitForm
+import io.ktor.client.request.forms.prepareForm
 import io.ktor.client.request.header
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.parameters
@@ -34,6 +32,9 @@ internal data class TokenResponse(
  *
  * Every request carries a fresh DPoP proof and a fresh `private_key_jwt` client assertion. When
  * the server answers `use_dpop_nonce`, the request is sent once more with the nonce it supplied.
+ *
+ * [httpClient] must be the plugin-free client from [protocolHttpClient], so no caller plugin sees
+ * the tokens or client assertions.
  */
 internal class OAuthServerAgent(
     val metadata: OAuthAuthorizationServerMetadata,
@@ -98,67 +99,90 @@ internal class OAuthServerAgent(
         post("revocation", endpoint, mapOf("token" to token))
     }
 
+    /**
+     * POSTs [parameters] to [url]. When the server answers `use_dpop_nonce` with a nonce other than
+     * the one the proof carried, the request is sent once more with the new nonce.
+     *
+     * Exception messages carry the OAuth `error` and `error_description` only, never the raw body,
+     * which may contain tokens.
+     */
     private suspend fun post(
         endpointName: String,
         url: String,
         parameters: Map<String, String>,
     ): JsonObject {
+        var nonce = nonces.get(url)
         var nonceRetried = false
         while (true) {
-            val response = send(endpointName, url, parameters)
-            val text = response.bodyAsText()
-            response.headers[DPOP_NONCE_HEADER]?.let { nonces.put(url, it) }
-            if (response.status.value in 200..299) {
-                if (text.isBlank()) return JsonObject(emptyMap())
-                return parseObject(endpointName, response.status.value, text)
+            val response = send(endpointName, url, parameters, nonce)
+            response.nonce?.let { nonces.put(url, it) }
+            if (response.status in 200..299) {
+                if (response.body.isBlank()) return JsonObject(emptyMap())
+                return parseObject(endpointName, response.status, response.body)
             }
-            val error = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
+            val error = runCatching { json.parseToJsonElement(response.body).jsonObject }.getOrNull()
             val errorCode = error?.string("error")
-            if (errorCode == "use_dpop_nonce" && response.headers[DPOP_NONCE_HEADER] != null && !nonceRetried) {
+            val freshNonce = response.nonce?.takeIf { it != nonce }
+            if (errorCode == "use_dpop_nonce" && freshNonce != null && !nonceRetried) {
                 nonceRetried = true
+                nonce = freshNonce
                 continue
             }
             throw OAuthServerResponseException(
                 endpoint = endpointName,
-                statusCode = response.status.value,
-                error = errorCode,
-                errorDescription = error?.string("error_description") ?: text.takeIf { error == null && it.isNotBlank() }?.take(200),
+                statusCode = response.status,
+                error = errorCode?.let(::printableServerText),
+                errorDescription = error?.string("error_description")?.let(::printableServerText),
             )
         }
     }
+
+    private class ServerResponse(
+        val status: Int,
+        val nonce: String?,
+        val body: String,
+    )
 
     private suspend fun send(
         endpointName: String,
         url: String,
         fields: Map<String, String>,
-    ): HttpResponse {
+        nonce: String?,
+    ): ServerResponse {
         val now = clock.now()
         val proof =
             crypto.createDpopProof(
                 dpopKey = dpopKey,
                 htm = "POST",
                 htu = dpopHtu(url),
-                nonce = nonces.get(url),
+                nonce = nonce,
                 accessToken = null,
                 now = now,
             )
         val assertion = crypto.createClientAssertion(clientKey, clientId, metadata.issuer, now)
-        return try {
-            httpClient.submitForm(
-                url = url,
-                formParameters =
-                    parameters {
-                        fields.forEach { (name, value) -> append(name, value) }
-                        append("client_id", clientId)
-                        append("client_assertion_type", CLIENT_ASSERTION_TYPE_JWT_BEARER)
-                        append("client_assertion", assertion)
-                    },
-            ) {
-                header(DPOP_HEADER, proof)
-                header(HttpHeaders.Accept, "application/json")
+        val form =
+            parameters {
+                fields.forEach { (name, value) -> append(name, value) }
+                append("client_id", clientId)
+                append("client_assertion_type", CLIENT_ASSERTION_TYPE_JWT_BEARER)
+                append("client_assertion", assertion)
             }
+        return try {
+            httpClient
+                .prepareForm(url = url, formParameters = form) {
+                    header(DPOP_HEADER, proof)
+                    header(HttpHeaders.Accept, "application/json")
+                }.execute { response ->
+                    ServerResponse(
+                        status = response.status.value,
+                        nonce = response.headers[DPOP_NONCE_HEADER],
+                        body = response.bodyAsTextCapped(MAX_AUTHORIZATION_SERVER_RESPONSE_BYTES),
+                    )
+                }
         } catch (exception: CancellationException) {
             throw exception
+        } catch (exception: ResponseTooLargeException) {
+            throw OAuthServerResponseException(endpointName, null, null, "the response is larger than ${exception.limit} bytes")
         } catch (exception: Exception) {
             throw OAuthServerResponseException(endpointName, null, null, "request failed", exception)
         }
@@ -170,7 +194,8 @@ internal class OAuthServerAgent(
         text: String,
     ): JsonObject =
         runCatching { json.parseToJsonElement(text).jsonObject }.getOrElse {
-            throw OAuthServerResponseException(endpointName, status, null, "response is not a JSON object", it)
+            // The parser's message quotes the body, which may hold tokens, so it is not kept as the cause.
+            throw OAuthServerResponseException(endpointName, status, null, "response is not a JSON object")
         }
 
     private fun tokenResponse(body: JsonObject): TokenResponse {
@@ -201,3 +226,14 @@ internal class OAuthServerAgent(
 }
 
 private fun JsonObject.string(name: String): String? = (this[name] as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
+
+/**
+ * Shortens server-supplied text for an exception message and drops control characters, so a
+ * hostile server cannot flood or forge log lines.
+ */
+private fun printableServerText(text: String): String =
+    text
+        .filter { !it.isISOControl() }
+        .let { if (it.length > MAX_SERVER_TEXT_LENGTH) it.take(MAX_SERVER_TEXT_LENGTH) + "…" else it }
+
+private const val MAX_SERVER_TEXT_LENGTH = 300

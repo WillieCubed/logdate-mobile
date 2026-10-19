@@ -1,7 +1,6 @@
 package studio.hypertext.atproto.oauth.client
 
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
 import kotlinx.coroutines.test.runTest
 import org.junit.Assume.assumeTrue
 import studio.hypertext.atproto.identity.DefaultIdentityResolver
@@ -34,7 +33,7 @@ class LiveBlueskyInteropTest {
     fun resolvesABlueskyAccountToBlueskysAuthorizationServer() =
         runTest(timeout = 60.seconds) {
             assumeTrue("Set ATPROTO_OAUTH_LIVE=1 to run checks against Bluesky", enabled)
-            val httpClient = HttpClient(OkHttp)
+            val httpClient = JvmOAuthHttp.publicInternetClient()
             val resolver = OAuthServerResolver(identityResolver(httpClient), httpClient)
 
             val resolved = resolver.resolve(BLUESKY_DID)
@@ -46,7 +45,7 @@ class LiveBlueskyInteropTest {
     fun blueskyAcceptsTheClientsDpopProofs() =
         runTest(timeout = 60.seconds) {
             assumeTrue("Set ATPROTO_OAUTH_LIVE=1 to run checks against Bluesky", enabled)
-            val httpClient = HttpClient(OkHttp)
+            val httpClient = JvmOAuthHttp.publicInternetClient()
             val client =
                 AtprotoOAuthClient(
                     config =

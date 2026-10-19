@@ -72,14 +72,18 @@ public class OAuthSession internal constructor(
      * An HTTP client that authenticates every request to the account's data server.
      *
      * It shares the engine of the client given to [AtprotoOAuthClient] but none of that client's
-     * plugins. Requests to any other origin fail with [IllegalStateException] so the access token
-     * is never sent elsewhere. Request bodies must be re-sendable (for example, text or bytes),
-     * because a request may be sent up to three times.
+     * plugins: a caller's logging or default-header plugins do not apply here, so they never see
+     * the access token. Add request logging, if needed, outside this client.
+     *
+     * Requests to any other origin fail with [IllegalStateException] so the access token is never
+     * sent elsewhere. Redirects are not followed, for the same reason; a 3xx response is returned
+     * as it is. Request bodies must be re-sendable (for example, text or bytes), because a request
+     * may be sent up to three times.
      *
      * Closing this client does not close the shared engine.
      */
     public val httpClient: HttpClient by lazy {
-        HttpClient(baseHttpClient.engine) {
+        dataServerHttpClient(baseHttpClient) {
             install(dpopAuthentication())
         }
     }
