@@ -146,7 +146,7 @@ class SpaceUploadTest {
     fun `a record its schema rejects is never sent and is set aside`() =
         runTest {
             val device = SpaceDevice(FakeDataHome())
-            device.create(Journal(title = "x".repeat(201), created = created, lastUpdated = created))
+            device.create(Journal(title = "x".repeat(100_001), created = created, lastUpdated = created))
 
             val result = device.manager.uploadPendingChanges()
 
