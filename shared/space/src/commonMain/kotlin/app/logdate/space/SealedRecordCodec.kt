@@ -56,6 +56,18 @@ public object SealedRecordCodec {
         space: SpaceRef,
         author: String,
         payload: SealedPayload,
+    ): SealedWrite = sealWithNonce(keys, space, author, payload, CryptographyRandom.nextBytes(NONCE))
+
+    /**
+     * Seals [payload] under the given [nonce]. Only known-answer tests choose the nonce: reusing one
+     * under the same key breaks AES-GCM, so [seal] always draws a fresh random one.
+     */
+    internal suspend fun sealWithNonce(
+        keys: SealingKeys,
+        space: SpaceRef,
+        author: String,
+        payload: SealedPayload,
+        nonce: ByteArray,
     ): SealedWrite {
         val rkey = sealedRkey(keys, payload.collection, payload.rkey)
         val encoded =
@@ -67,7 +79,7 @@ public object SealedRecordCodec {
                 // The cause would quote the offending value, so it isn't attached.
                 throw SealedRecordException("The record holds a value a sealed record can't encode (${e::class.simpleName})")
             }
-        return SealedWrite(rkey, encrypt(keys, space, author, rkey, SealedPadding.pad(encoded)))
+        return SealedWrite(rkey, encrypt(keys, space, author, rkey, SealedPadding.pad(encoded), nonce))
     }
 
     /**
@@ -123,8 +135,9 @@ public object SealedRecordCodec {
         author: String,
         sealedRkey: String,
         plaintext: ByteArray,
+        nonce: ByteArray = CryptographyRandom.nextBytes(NONCE),
     ): Sealed {
-        val nonce = CryptographyRandom.nextBytes(NONCE)
+        require(nonce.size == NONCE) { "The nonce must be $NONCE bytes" }
         val ciphertext = cipher(keys).encryptWithIv(nonce, plaintext, aad(space, author, sealedRkey))
         return Sealed(ciphertext = Bytes(ciphertext), keyId = keys.keyId, nonce = Bytes(nonce), version = VERSION)
     }
