@@ -10,6 +10,7 @@ import dev.whyoleg.cryptography.operations.IvAuthenticatedCipher
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import kotlinx.io.Buffer
 import kotlinx.io.RawSource
+import kotlinx.io.Sink
 import kotlinx.io.Source
 import kotlinx.io.buffered
 import kotlinx.io.readByteArray
@@ -132,6 +133,49 @@ internal fun decryptChunkedMedia(
         offset += length
     }
     return plaintext
+}
+
+/**
+ * Decrypts an LDCE2 payload read from [source] into [sink] one chunk at a time, so no more than one
+ * chunk is ever held, and returns the decrypted size. Throws when any chunk fails authentication or
+ * the layout is wrong; what was written before then must be discarded.
+ */
+internal fun decryptChunkedMediaStream(
+    mediaKey: ByteArray,
+    source: Source,
+    sink: Sink,
+): Long {
+    val header = Buffer()
+    while (header.size < HEADER_SIZE_BYTES) {
+        require(source.readAtMostTo(header, HEADER_SIZE_BYTES - header.size) != -1L) { "Encrypted media payload is too short." }
+    }
+    val headerBytes = header.readByteArray()
+    require(headerBytes.hasChunkedMediaPrefix()) { "Encrypted media payload isn't LDCE2." }
+    var offset = CHUNKED_MEDIA_PREFIX_BYTES.size
+    val chunkSize = headerBytes.readIntAt(offset)
+    require(chunkSize in 1..MAX_CHUNK_SIZE_BYTES) { "Encrypted media payload declares an invalid chunk size." }
+    offset += Int.SIZE_BYTES
+    val salt = headerBytes.copyOfRange(offset, offset + SALT_SIZE_BYTES)
+    offset += SALT_SIZE_BYTES
+    val noncePrefix = headerBytes.copyOfRange(offset, offset + NONCE_PREFIX_SIZE_BYTES)
+
+    val cipher = fileCipher(mediaKey, salt)
+    val sealedChunkSize = (chunkSize + TAG_SIZE_BYTES).toLong()
+    var index = 0
+    var written = 0L
+    while (true) {
+        val sealed = Buffer()
+        while (sealed.size < sealedChunkSize) {
+            if (source.readAtMostTo(sealed, sealedChunkSize - sealed.size) == -1L) break
+        }
+        require(sealed.size >= TAG_SIZE_BYTES) { "Encrypted media payload ends mid-chunk." }
+        val last = source.exhausted()
+        val chunk = cipher.decryptChunk(noncePrefix, index, last, sealed.readByteArray(), headerBytes)
+        sink.write(chunk)
+        written += chunk.size
+        if (last) return written
+        index++
+    }
 }
 
 private class ChunkEncryptingSource(

@@ -21,6 +21,7 @@ import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.space.SPACE_CHECKPOINT
 import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceMediaReference
 import app.logdate.client.sync.space.SpaceStagedRecords
 import app.logdate.client.sync.space.SpaceSync
 import app.logdate.shared.model.Journal
@@ -156,18 +157,31 @@ internal class SyncDownloader(
     }
 
     /** Reads [entityType]'s records from the personal space, when this device syncs that kind there now. */
-    private suspend fun <T : Any> spaceRead(entityType: EntityType): SpaceRead<T>? {
+    private suspend fun <T : Any> spaceRead(
+        entityType: EntityType,
+        afterStored: suspend (Uuid) -> Unit = {},
+    ): SpaceRead<T>? {
         val sync = space ?: return null
         val kind = sync.activeKind(entityType) ?: return null
-        // The registry pairs each entity type with the mapper of its own item type.
+        // The registry pairs each entity type with the kind of its own item type.
         @Suppress("UNCHECKED_CAST")
-        return SpaceRead(sync, kind as SpaceKind<T>)
+        return SpaceRead(sync, kind as SpaceKind<T>, afterStored)
+    }
+
+    /** Queues the personal-space file a note applied from the space refers to, for media recovery. */
+    private suspend fun enqueueSpaceMedia(id: Uuid) {
+        val inbox = downloadInbox ?: return
+        if (!downloadsMedia) return
+        val note = journalNotesRepository.getNoteById(id) ?: return
+        val reference = note.mediaRefOrNull()?.takeIf { SpaceMediaReference.parse(it) != null } ?: return
+        inbox.enqueueSpaceMedia(id.toString(), note.syncVersion, reference)
     }
 
     /** One download's read of a kind's staged personal-space records, settled as each item is applied. */
     private class SpaceRead<T : Any>(
         private val sync: SpaceSync,
         private val kind: SpaceKind<T>,
+        private val afterStored: suspend (Uuid) -> Unit,
     ) {
         private var staged: SpaceStagedRecords<T>? = null
 
@@ -182,6 +196,7 @@ internal class SyncDownloader(
             outcome: RemoteOutcome,
         ) {
             staged?.settle(id, outcome)
+            if (outcome == RemoteOutcome.STORED || outcome == RemoteOutcome.MERGED) afterStored(id)
         }
 
         suspend fun settleFailed(id: Uuid) {
@@ -228,7 +243,7 @@ internal class SyncDownloader(
         since: Instant,
     ): SyncResult {
         val syncableRepository = journalNotesRepository as? SyncableJournalNotesRepository
-        val spaceRead = spaceRead<JournalNote>(EntityType.NOTE)
+        val spaceRead = spaceRead<JournalNote>(EntityType.NOTE, ::enqueueSpaceMedia)
         return downloadEngine.download(
             strategy =
                 DownloadStrategy(

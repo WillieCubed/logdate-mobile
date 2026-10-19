@@ -23,6 +23,9 @@ data class DownloadScope(
     val origin: String,
 )
 
+/** Starts a media-recovery row for a note applied from the personal space; the file's reference follows. */
+internal const val SPACE_MEDIA_PREFIX = "SPACE1-MEDIA:"
+
 data class WireDownload(
     val id: String,
     val version: Long,
@@ -294,6 +297,24 @@ class DownloadInbox(
         id: String,
         selected: DownloadScope = scope(),
     ): DownloadInboxEntity? = dao.get(selected.owner, selected.origin, type, id)
+
+    /**
+     * Queues the file a note applied from the personal space refers to, as [reference], for media
+     * recovery. The note holds no inbox row of its own, so the row names the file itself.
+     */
+    internal suspend fun enqueueSpaceMedia(
+        id: String,
+        version: Long,
+        reference: String,
+        selected: DownloadScope = scope(),
+    ) {
+        transactions.withTransaction {
+            check(selected == scope()) { "Download scope changed" }
+            val prior = dao.get(selected.owner, selected.origin, "MEDIA_NOTE", id)
+            if (prior != null && prior.version >= version) return@withTransaction
+            dao.put(waitingRow(selected, "MEDIA_NOTE", WireDownload(id, version, false, SPACE_MEDIA_PREFIX + reference)))
+        }
+    }
 
     /** Replaces the payload of [id]'s row while it still holds [version] and isn't applied. */
     internal suspend fun replacePayload(

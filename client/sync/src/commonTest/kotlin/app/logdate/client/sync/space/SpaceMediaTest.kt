@@ -22,7 +22,7 @@ class SpaceMediaTest {
     private val location = SpaceLocation("https://cloud.test", TEST_SPACE)
 
     private fun space(home: FakeDataHome) =
-        SpaceMediaDataSource(SpaceDataHomes { _, token -> home.signedIn(token) }, AesGcmMediaPayloadCrypto(mediaKey)) { location }
+        SpaceMediaDataSource(SpaceDataHomes { _, token -> home.signedIn(token) }, AesGcmMediaPayloadCrypto(mediaKey), { location })
 
     @Test
     fun `media is chunk-encrypted and streamed to the space and named by its content identifier`() =

@@ -13,6 +13,8 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.DownloadedMediaFile
+import app.logdate.client.sync.cloud.FileMediaDataSource
 import app.logdate.client.sync.cloud.MediaReadException
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
@@ -23,6 +25,7 @@ import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.diagnostics.DiagnosticReason
 import kotlinx.coroutines.CancellationException
+import kotlinx.io.files.SystemFileSystem
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -285,9 +288,14 @@ internal class SyncMediaTransfer(
         return mapping?.let { note.withMediaRef(it.remoteUrl) }
     }
 
+    /**
+     * @param reusable whether an earlier upload, named by its remote reference, can stand in for
+     *   uploading again; one made to the per-kind endpoint can't for a note bound for the personal space.
+     */
     suspend fun uploadIfNeeded(
         accessToken: String,
         note: JournalNote,
+        reusable: (String) -> Boolean = { true },
     ): Result<JournalNote> {
         if (note.mediaRefOrNull()?.let(UnavailableMediaReferences::nativeSource) != null) {
             return resolveNativeNote(note)?.let { Result.success(it) }
@@ -298,7 +306,7 @@ internal class SyncMediaTransfer(
             return Result.success(note)
         }
         val cached = mediaSyncRefStore.get(note.uid)
-        if (cached != null && matchesLocalFile(cached, mediaRef) && cached.remoteUrl.isNotBlank()) {
+        if (cached != null && matchesLocalFile(cached, mediaRef) && cached.remoteUrl.isNotBlank() && reusable(cached.remoteUrl)) {
             return Result.success(note.withMediaRef(cached.remoteUrl))
         }
 
@@ -376,6 +384,9 @@ internal class SyncMediaTransfer(
         if (remote == null || !isRemoteRef(remote)) return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
         if (!mayDownload()) return MediaHydrationResult.Pending(DiagnosticReason.NETWORK_POLICY)
         val mediaId = extractMediaId(remote) ?: return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
+        (cloudMediaDataSource as? FileMediaDataSource)?.downloadMediaToFile(accessToken, remote, mediaId)?.let { file ->
+            return hydrateFromFile(note, remote, mediaId, cached, mediaRef, file, isStillCurrent)
+        }
         val downloaded =
             downloadMedia(accessToken, remote, mediaId).getOrElse { error ->
                 if (error is CancellationException) throw error
@@ -415,6 +426,57 @@ internal class SyncMediaTransfer(
             throw cancelled
         } catch (_: Exception) {
             MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
+        }
+    }
+
+    /**
+     * Moves a file downloaded straight to disk into the media store, so the file is never held whole
+     * in memory, and deletes the download either way.
+     */
+    private suspend fun hydrateFromFile(
+        note: JournalNote,
+        remote: String,
+        mediaId: String,
+        cached: MediaSyncRef?,
+        mediaRef: String,
+        download: Result<DownloadedMediaFile>,
+        isStillCurrent: (() -> Boolean)?,
+    ): MediaHydrationResult {
+        val file =
+            download.getOrElse { error ->
+                if (error is CancellationException) throw error
+                return MediaHydrationResult.Pending(mediaFailureReason(error))
+            }
+        try {
+            if (file.contentId != note.uid) return MediaHydrationResult.Pending(DiagnosticReason.CORRUPT_PAYLOAD)
+            if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
+            val localUri =
+                try {
+                    mediaManager.saveMediaFromFile(file.path.toString(), file.fileName, file.mimeType)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    return MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
+                }
+            if (isStillCurrent != null && !isStillCurrent()) {
+                // The store writes a uniquely named file, so one nothing refers to is removed here.
+                runCatching { mediaManager.deleteOwnedMedia(localUri) }
+                throw CancellationException("Media hydration scope changed")
+            }
+            if (!originalAvailable(localUri)) return MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
+            return MediaHydrationResult.Available(
+                note.withMediaRef(localUri),
+                MediaSyncRef(
+                    noteId = note.uid.toString(),
+                    localUri = localUri,
+                    remoteUrl = remote,
+                    mediaId = mediaId,
+                    updatedAt = Clock.System.now().toEpochMilliseconds(),
+                    localAliases = hydrationAliases(cached, remote, mediaRef),
+                ),
+            )
+        } finally {
+            SystemFileSystem.delete(file.path, mustExist = false)
         }
     }
 

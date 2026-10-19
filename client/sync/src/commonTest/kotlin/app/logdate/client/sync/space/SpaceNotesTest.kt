@@ -1,8 +1,10 @@
 package app.logdate.client.sync.space
 
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.repository.transcription.TranscriptDocumentStatus
+import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.PendingOperation
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
@@ -10,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -83,7 +86,7 @@ class SpaceNotesTest {
             assertEquals(note.mediaRef, applied.mediaRef)
             assertEquals(transcript(1), applied.transcript)
             assertEquals(2L, applied.syncVersion, "The newest record's position is the note's version")
-            assertEquals(0, tablet.inbox.count())
+            assertEquals(0, tablet.waitingRecords())
         }
 
     @Test
@@ -103,7 +106,7 @@ class SpaceNotesTest {
             tablet.manager.downloadRemoteChanges()
 
             assertEquals(transcript(2), (tablet.note(note.uid) as JournalNote.Audio).transcript)
-            assertEquals(0, tablet.inbox.count())
+            assertEquals(0, tablet.waitingRecords())
         }
 
     @Test
@@ -150,13 +153,13 @@ class SpaceNotesTest {
             tablet.manager.downloadRemoteChanges()
 
             assertNull(tablet.note(note.uid))
-            assertEquals(1, tablet.inbox.count(), "The transcript waits for its entry")
+            assertEquals(1, tablet.waitingRecords(), "The transcript waits for its entry")
 
             home.putFromAnotherDevice(ENTRY_COLLECTION, note.uid.toString(), TestEntryMapper.toRecord(note.copy(transcript = null)))
             tablet.manager.downloadRemoteChanges()
 
             assertEquals(transcript(3), (tablet.note(note.uid) as JournalNote.Audio).transcript)
-            assertEquals(0, tablet.inbox.count())
+            assertEquals(0, tablet.waitingRecords())
         }
 
     @Test
@@ -178,7 +181,49 @@ class SpaceNotesTest {
             assertTrue(home.liveRkeys().isEmpty())
             assertNull(tablet.note(note.uid))
             assertTrue(tablet.swapStore.states.isEmpty())
+            assertEquals(0, tablet.waitingRecords())
+        }
+
+    @Test
+    fun `a recording's file goes to the space encrypted and comes back to another device's media store`() =
+        runTest {
+            val home = FakeDataHome()
+            val phone = SpaceDevice(home)
+            val tablet = SpaceDevice(home)
+            val sound = ByteArray(300_000) { (it % 199).toByte() }
+            val local = phone.media.saveMedia(MediaPayload("memo.m4a", "audio/mp4", sound.size.toLong(), sound))
+            val note = recording().copy(mediaRef = local)
+            phone.saveNote(note)
+
+            val uploaded = phone.manager.uploadPendingChanges()
+            val downloaded = tablet.manager.downloadRemoteChanges()
+
+            assertTrue(uploaded.success, uploaded.errors.toString())
+            assertTrue(downloaded.success, downloaded.errors.toString())
+            val stored = home.blobs.values.single()
+            assertEquals("LDCE2", stored.copyOf(5).decodeToString())
+            val applied = assertIs<JournalNote.Audio>(tablet.note(note.uid))
+            assertFalse(applied.mediaRef.startsWith("https://"), "The file was recovered into the media store")
+            assertContentEquals(sound, tablet.media.readMedia(applied.mediaRef).data)
             assertEquals(0, tablet.inbox.count())
+        }
+
+    @Test
+    fun `a file uploaded to the old endpoint is uploaded again into the space`() =
+        runTest {
+            val home = FakeDataHome()
+            val phone = SpaceDevice(home)
+            val sound = ByteArray(1_000) { 4 }
+            val local = phone.media.saveMedia(MediaPayload("memo.m4a", "audio/mp4", sound.size.toLong(), sound))
+            val note = recording().copy(mediaRef = local)
+            phone.mediaRefs.upsert(MediaSyncRef(note.uid.toString(), local, "https://cloud.test/api/v1/media/m1", "m1", 0))
+            phone.saveNote(note)
+
+            val result = phone.manager.uploadPendingChanges()
+
+            assertTrue(result.success, result.errors.toString())
+            assertEquals(1, home.blobs.size)
+            assertNotNull(SpaceMediaReference.parse(phone.mediaRefs.get(note.uid)!!.remoteUrl))
         }
 
     @Test
