@@ -28,7 +28,65 @@ interface AccountIdentityRepository {
     suspend fun derivePlcRecoveryDidKey(recoveryPhrase: String): Result<AccountDerivedPlcRecoveryKey>
 
     suspend fun registerPlcRecoveryKey(recoveryDidKey: String): Result<AccountRegisteredPlcRecoveryKey>
+
+    /**
+     * Derives the recovery key from [recoveryPhrase] on this device and registers its public half on
+     * the identity, ahead of the server's key. Only the public half leaves the device.
+     *
+     * Fails with [IdentityRecoveryException] when the server refuses or cannot be reached.
+     */
+    suspend fun registerRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey>
+
+    /**
+     * Replaces the server's key for the identity with a new one, approved by the recovery key
+     * derived from [recoveryPhrase]. The phrase and the private key stay on this device; only the
+     * signature is sent.
+     *
+     * Fails with [IdentityRecoveryException], including [IdentityRecoveryFailure.PHRASE_MISMATCH]
+     * when the phrase does not produce the recovery key registered on the identity.
+     */
+    suspend fun recoverIdentity(recoveryPhrase: List<String>): Result<AccountImportedSigningKey>
 }
+
+/** Why a recovery-key request failed, in terms a person can act on. */
+enum class IdentityRecoveryFailure {
+    /** The server does not support recovery keys for this identity. */
+    NOT_AVAILABLE,
+
+    /** A different recovery key is already registered on the identity. */
+    ALREADY_SET,
+
+    /** No recovery key is registered on the identity. */
+    NOT_SET,
+
+    /** The identity's latest change no longer lists the registered recovery key. */
+    KEY_REMOVED,
+
+    /** The recovery phrase on this device does not produce the registered recovery key. */
+    PHRASE_MISMATCH,
+
+    /** The identity changed, or the request took too long, while the recovery was in progress. */
+    IDENTITY_CHANGED,
+
+    /** The session expired; the person has to sign in again. */
+    SIGNED_OUT,
+
+    /** The server could not be reached. */
+    UNREACHABLE,
+
+    /** This device could not derive or use the recovery key from its recovery phrase. */
+    DEVICE_ERROR,
+
+    /** The server refused the request for another reason. */
+    REFUSED,
+}
+
+/** A recovery-key request failed for [failure]; [message] carries the technical detail for logs. */
+class IdentityRecoveryException(
+    val failure: IdentityRecoveryFailure,
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
 
 @Serializable
 data class AccountIdentityStatus(

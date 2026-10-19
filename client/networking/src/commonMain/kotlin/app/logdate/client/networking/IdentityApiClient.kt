@@ -56,6 +56,16 @@ interface IdentityApiClientContract {
         accessToken: String,
         recoveryDidKey: String,
     ): Result<RegisterPlcRecoveryKeyDataDto>
+
+    /** Asks the server for the operation that replaces its key, for the recovery key to sign. */
+    suspend fun prepareIdentityRecovery(accessToken: String): Result<PrepareIdentityRecoveryDataDto>
+
+    /** Sends the recovery key's [signature] with the server's sealed [preparedKey] to finish a recovery. */
+    suspend fun completeIdentityRecovery(
+        accessToken: String,
+        preparedKey: String,
+        signature: String,
+    ): Result<ImportSigningKeyDataDto>
 }
 
 class IdentityApiClient(
@@ -215,6 +225,36 @@ class IdentityApiClient(
             accessToken = accessToken,
         )
 
+    override suspend fun prepareIdentityRecovery(accessToken: String): Result<PrepareIdentityRecoveryDataDto> =
+        request(
+            request = { token ->
+                post("${getBaseUrl()}/identity/recovery-key/recover/prepare") {
+                    header("Authorization", "Bearer $token")
+                }
+            },
+            success = { payload -> json.decodeFromString<PrepareIdentityRecoveryResponseDto>(payload).data },
+            failureMessage = "Failed to prepare identity recovery",
+            accessToken = accessToken,
+        )
+
+    override suspend fun completeIdentityRecovery(
+        accessToken: String,
+        preparedKey: String,
+        signature: String,
+    ): Result<ImportSigningKeyDataDto> =
+        request(
+            request = { token ->
+                post("${getBaseUrl()}/identity/recovery-key/recover/complete") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(CompleteIdentityRecoveryRequestDto(preparedKey = preparedKey, signature = signature))
+                }
+            },
+            success = { payload -> json.decodeFromString<ImportSigningKeyResponseDto>(payload).data },
+            failureMessage = "Failed to complete identity recovery",
+            accessToken = accessToken,
+        )
+
     private suspend fun <T> request(
         request: suspend HttpClient.(String) -> HttpResponse,
         success: (String) -> T,
@@ -362,6 +402,29 @@ data class PrepareRecoverySigningKeyImportDataDto(
     val nextPublicKeyDidKey: String,
     val unsignedOperationJson: String,
     val signingPayloadBase64Url: String,
+)
+
+@Serializable
+data class PrepareIdentityRecoveryResponseDto(
+    val success: Boolean,
+    val data: PrepareIdentityRecoveryDataDto,
+)
+
+@Serializable
+data class PrepareIdentityRecoveryDataDto(
+    val did: String,
+    val handle: String,
+    val recoveryDidKey: String,
+    val nextPublicKeyDidKey: String,
+    val unsignedOperationJson: String,
+    val signingPayloadBase64Url: String,
+    val preparedKey: String,
+)
+
+@Serializable
+data class CompleteIdentityRecoveryRequestDto(
+    val preparedKey: String,
+    val signature: String,
 )
 
 @Serializable

@@ -4,6 +4,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.crypto.PlcRecoveryKeyManager
 import app.logdate.client.networking.ExportedSigningKeyDto
 import app.logdate.client.networking.IdentityApiClientContract
+import app.logdate.client.networking.IdentityApiException
 import app.logdate.client.repository.account.AccountDerivedPlcRecoveryKey
 import app.logdate.client.repository.account.AccountExportedSigningKey
 import app.logdate.client.repository.account.AccountHostedPlcOperation
@@ -13,7 +14,10 @@ import app.logdate.client.repository.account.AccountImportedSigningKey
 import app.logdate.client.repository.account.AccountRegisteredPlcRecoveryKey
 import app.logdate.client.repository.account.AccountRotatedSigningKey
 import app.logdate.client.repository.account.ExportedIdentitySigningKeyPayload
+import app.logdate.client.repository.account.IdentityRecoveryException
+import app.logdate.client.repository.account.IdentityRecoveryFailure
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -172,6 +176,68 @@ class DefaultAccountIdentityRepository(
             }
         }
 
+    override suspend fun registerRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey> =
+        runRecoveryRequest("register the recovery key") { token ->
+            val recoveryDidKey = deriveOnDevice { plcRecoveryKeyManager.deriveDidKey(recoveryPhrase) }
+            val payload = apiClient.registerPlcRecoveryKey(token, recoveryDidKey).getOrThrow()
+            AccountRegisteredPlcRecoveryKey(did = payload.did, handle = payload.handle, recoveryDidKey = payload.recoveryDidKey)
+        }
+
+    override suspend fun recoverIdentity(recoveryPhrase: List<String>): Result<AccountImportedSigningKey> =
+        runRecoveryRequest("recover the identity") { token ->
+            val prepared = apiClient.prepareIdentityRecovery(token).getOrThrow()
+            val recoveryDidKey = deriveOnDevice { plcRecoveryKeyManager.deriveDidKey(recoveryPhrase) }
+            if (recoveryDidKey != prepared.recoveryDidKey) {
+                throw IdentityRecoveryException(
+                    IdentityRecoveryFailure.PHRASE_MISMATCH,
+                    "The recovery phrase on this device does not produce the registered recovery key",
+                )
+            }
+            val signature =
+                deriveOnDevice {
+                    plcRecoveryKeyManager.signPayload(recoveryPhrase, decodeBase64Url(prepared.signingPayloadBase64Url))
+                }
+            val payload = apiClient.completeIdentityRecovery(token, prepared.preparedKey, signature).getOrThrow()
+            AccountImportedSigningKey(did = payload.did, handle = payload.handle, publicKeyDidKey = payload.publicKeyDidKey)
+        }
+
+    /**
+     * Runs a recovery-key request and turns every failure into an [IdentityRecoveryException], so
+     * the screen can say what went wrong and what to do about it.
+     */
+    private suspend fun <T> runRecoveryRequest(
+        operationName: String,
+        block: suspend (String) -> T,
+    ): Result<T> {
+        val accessToken =
+            sessionStorage.getSession()?.accessToken
+                ?: return Result.failure(IdentityRecoveryException(IdentityRecoveryFailure.SIGNED_OUT, "No active session"))
+        return try {
+            Result.success(block(accessToken))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: IdentityRecoveryException) {
+            Napier.w("Could not $operationName: ${error.failure}", error)
+            Result.failure(error)
+        } catch (error: IdentityApiException) {
+            val failure = recoveryFailureFor(error.errorCode)
+            Napier.w("Could not $operationName: ${error.errorCode}", error)
+            Result.failure(IdentityRecoveryException(failure, error.message ?: "Could not $operationName", error))
+        } catch (error: Exception) {
+            Napier.e("Could not $operationName", error)
+            Result.failure(IdentityRecoveryException(IdentityRecoveryFailure.REFUSED, "Could not $operationName", error))
+        }
+    }
+
+    private suspend fun <T> deriveOnDevice(block: suspend () -> T): T =
+        try {
+            block()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            throw IdentityRecoveryException(IdentityRecoveryFailure.DEVICE_ERROR, "Could not use the recovery phrase on this device", error)
+        }
+
     private suspend fun <T> runWithAccessToken(
         operationName: String,
         block: suspend (String) -> Result<T>,
@@ -200,6 +266,20 @@ class DefaultAccountIdentityRepository(
 }
 
 private val WHITESPACE_REGEX = Regex("\\s+")
+
+/** The failure a person sees for a server error [code] from the recovery-key endpoints. */
+internal fun recoveryFailureFor(code: String): IdentityRecoveryFailure =
+    when (code) {
+        "RECOVERY_KEYS_UNAVAILABLE" -> IdentityRecoveryFailure.NOT_AVAILABLE
+        "RECOVERY_KEY_ALREADY_SET" -> IdentityRecoveryFailure.ALREADY_SET
+        "RECOVERY_KEY_NOT_SET" -> IdentityRecoveryFailure.NOT_SET
+        "RECOVERY_KEY_NOT_ON_IDENTITY" -> IdentityRecoveryFailure.KEY_REMOVED
+        "RECOVERY_SIGNATURE_INVALID" -> IdentityRecoveryFailure.PHRASE_MISMATCH
+        "IDENTITY_CHANGED", "PREPARED_KEY_EXPIRED" -> IdentityRecoveryFailure.IDENTITY_CHANGED
+        "INVALID_TOKEN" -> IdentityRecoveryFailure.SIGNED_OUT
+        "NETWORK_ERROR" -> IdentityRecoveryFailure.UNREACHABLE
+        else -> IdentityRecoveryFailure.REFUSED
+    }
 
 private fun app.logdate.client.networking.ExportedSigningKeyDto.toRepositoryModel(): ExportedIdentitySigningKeyPayload =
     ExportedIdentitySigningKeyPayload(

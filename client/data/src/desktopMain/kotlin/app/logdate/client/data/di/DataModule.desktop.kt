@@ -1,8 +1,8 @@
 package app.logdate.client.data.di
 
+import app.logdate.client.data.account.DefaultAccountIdentityRepository
 import app.logdate.client.data.account.ServerScopedAccount
 import app.logdate.client.data.account.ServerScopedAccounts
-import app.logdate.client.data.account.UnavailableAccountIdentityRepository
 import app.logdate.client.data.account.UnavailableAccountRepository
 import app.logdate.client.data.account.UnavailablePasskeyAccountRepository
 import app.logdate.client.data.account.historyOwnerAdoptionModule
@@ -329,7 +329,9 @@ actual val dataModule: Module =
 
         // Account
         single<AccountRepository> { UnavailableAccountRepository() }
-        single<AccountIdentityRepository> { UnavailableAccountIdentityRepository() }
+        single<AccountIdentityRepository> {
+            DefaultAccountIdentityRepository(apiClient = get(), sessionStorage = get(), plcRecoveryKeyManager = get())
+        }
         single<PasskeyAccountRepository> { UnavailablePasskeyAccountRepository() }
         single<ServerScopedAccounts> {
             ServerScopedAccounts { origin, _ ->
