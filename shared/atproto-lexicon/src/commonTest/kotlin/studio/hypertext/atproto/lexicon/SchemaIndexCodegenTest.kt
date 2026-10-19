@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  */
 class SchemaIndexCodegenTest {
     @Test
-    fun `the schema index holds every document as a Kotlin string, sorted by NSID`() {
+    fun `the schema index holds every document as a Kotlin string sorted by NSID`() {
         val index = LexiconCodegen.generateSchemaIndex(listOf(ENTRY, TRICKY), packageName = "com.example.models", objectName = "Schemas")
 
         assertTrue(index.contains("package com.example.models\n"))
