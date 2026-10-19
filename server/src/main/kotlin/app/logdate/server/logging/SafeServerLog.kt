@@ -59,6 +59,7 @@ private val approvedNotices =
         IdentityNotices.HANDLE_RESOLUTION_FAILED to "SERVER_HANDLE_RESOLUTION_FAILED",
         IdentityNotices.BACKFILL_REFUSED_PUBLISHING to "SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING",
         IdentityNotices.BACKFILL_FAILED to "SERVER_IDENTITY_BACKFILL_FAILED",
+        IdentityNotices.BACKFILL_ACCOUNT_FAILED to "SERVER_IDENTITY_BACKFILL_ACCOUNT_FAILED",
     )
 
 /**
@@ -68,7 +69,7 @@ private val approvedNotices =
 private val approvedCountMessages =
     listOf(
         Regex("^Identity backfill dry run: \\d+ accounts need an identity$"),
-        Regex("^Identity backfill complete: \\d+ provisioned, \\d+ failed$"),
+        Regex("^Identity backfill complete: \\d+ provisioned, \\d+ skipped, \\d+ failed$"),
     )
 
 private fun isApprovedCountMessage(message: String?): Boolean =
@@ -77,19 +78,23 @@ private fun isApprovedCountMessage(message: String?): Boolean =
 /**
  * Fixed log messages for AT Protocol identity. A failed handle lookup is an error because outside
  * apps then cannot verify LogDate handles; the backfill messages report the operator command.
+ * [BACKFILL_ACCOUNT_FAILED] names no account, because production logs carry nothing that identifies
+ * one; an account that failed still lacks an identity, so the next dry run counts it again.
  */
 internal object IdentityNotices {
     const val HANDLE_RESOLUTION_FAILED = "Resolving a handle failed"
     const val BACKFILL_REFUSED_PUBLISHING =
         "Identity backfill refused: PLC publishing is enabled and --allow-plc-publishing was not given"
     const val BACKFILL_FAILED = "Identity backfill failed"
+    const val BACKFILL_ACCOUNT_FAILED = "Identity backfill could not provision one account; the run continues"
 
     fun backfillDryRun(pending: Int): String = "Identity backfill dry run: $pending accounts need an identity"
 
     fun backfillComplete(
         provisioned: Int,
+        skipped: Int,
         failed: Int,
-    ): String = "Identity backfill complete: $provisioned provisioned, $failed failed"
+    ): String = "Identity backfill complete: $provisioned provisioned, $skipped skipped, $failed failed"
 }
 
 /**

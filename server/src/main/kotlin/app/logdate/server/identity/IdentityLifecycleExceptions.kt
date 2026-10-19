@@ -9,6 +9,12 @@ class IdentityLifecycleConflictException(
 ) : IllegalStateException(message)
 
 /**
+ * Raised when an account was deleted before its identity could be provisioned. Nothing was written,
+ * so the deleted account stays deleted.
+ */
+class IdentityAccountMissingException : IllegalStateException("The account no longer exists")
+
+/**
  * Raised when a user-supplied identity lifecycle payload is invalid.
  */
 class IdentityLifecycleValidationException(

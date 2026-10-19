@@ -85,7 +85,13 @@ fun handleIdentityBackfillCommand(args: Array<String>): Boolean {
             exitProcess(EXIT_REFUSED)
         }
         is IdentityBackfillOutcome.Completed -> {
-            Napier.i(IdentityNotices.backfillComplete(outcome.result.provisioned, outcome.result.failed))
+            Napier.i(
+                IdentityNotices.backfillComplete(
+                    provisioned = outcome.result.provisioned,
+                    skipped = outcome.result.skipped,
+                    failed = outcome.result.failed,
+                ),
+            )
             if (outcome.result.failed > 0) exitProcess(EXIT_FAILED)
         }
     }

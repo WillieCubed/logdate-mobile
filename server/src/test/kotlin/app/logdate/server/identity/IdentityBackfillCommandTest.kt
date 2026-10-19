@@ -55,7 +55,7 @@ class IdentityBackfillCommandTest {
 
             val outcome = runIdentityBackfill(service(accounts), IdentityBackfillOptions(dryRun = false, allowPlcPublishing = false))
 
-            assertEquals(IdentityBackfillOutcome.Completed(IdentityBackfillResult(provisioned = 1, failed = 0)), outcome)
+            assertEquals(IdentityBackfillOutcome.Completed(IdentityBackfillResult(provisioned = 1, skipped = 0, failed = 0)), outcome)
             assertEquals("legacy.logdate.app", accounts.findById(legacy.id)?.handle)
         }
 
@@ -97,8 +97,12 @@ class IdentityBackfillCommandTest {
             safeServerMessage(LogLevel.INFO, null, IdentityNotices.backfillDryRun(12)),
         )
         assertEquals(
-            "Identity backfill complete: 10 provisioned, 2 failed",
-            safeServerMessage(LogLevel.INFO, null, IdentityNotices.backfillComplete(10, 2)),
+            "Identity backfill complete: 10 provisioned, 1 skipped, 2 failed",
+            safeServerMessage(LogLevel.INFO, null, IdentityNotices.backfillComplete(provisioned = 10, skipped = 1, failed = 2)),
+        )
+        assertEquals(
+            "SERVER_IDENTITY_BACKFILL_ACCOUNT_FAILED",
+            safeServerMessage(LogLevel.ERROR, null, IdentityNotices.BACKFILL_ACCOUNT_FAILED),
         )
         assertEquals(
             "SERVER_HANDLE_RESOLUTION_FAILED",
