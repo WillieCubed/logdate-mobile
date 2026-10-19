@@ -23,7 +23,11 @@ class OAuthDpopVerifier(
     private val usedProofs: OAuthReplayStore = InMemoryOAuthReplayStore(clock),
 ) {
     /**
-     * Validates [proof] against the request described by [method] and [htu].
+     * Validates [proof] against the request described by [method] and [htu], and records it so it
+     * cannot be used again.
+     *
+     * A proof that fails a check is a failed [Result]. A failure to reach the replay store is not
+     * about the proof, so it is thrown for the caller to report as a server error.
      */
     fun verify(
         proof: String,
@@ -31,6 +35,21 @@ class OAuthDpopVerifier(
         htu: String,
         expectedNonce: String? = null,
         expectedAth: String? = null,
+    ): Result<VerifiedDpopProof> {
+        val checked = checkProof(proof, method, htu, expectedNonce, expectedAth).getOrElse { return Result.failure(it) }
+        // A proof stays acceptable for the clock-skew window on either side of its iat.
+        if (!usedProofs.firstUse("dpop:${checked.keyThumbprint}:${checked.jwtId}", acceptedClockSkew * 2)) {
+            return Result.failure(OAuthInvalidDpopProofException("DPoP proof has already been used"))
+        }
+        return Result.success(checked)
+    }
+
+    private fun checkProof(
+        proof: String,
+        method: String,
+        htu: String,
+        expectedNonce: String?,
+        expectedAth: String?,
     ): Result<VerifiedDpopProof> =
         runCatching {
             val segments = proof.split('.')
@@ -84,14 +103,8 @@ class OAuthDpopVerifier(
             if (!verified) {
                 throw OAuthInvalidDpopProofException("DPoP proof signature verification failed")
             }
-            val thumbprint = jwkThumbprint(header.jwk)
-            // A proof stays acceptable for the clock-skew window on either side of its iat.
-            if (!usedProofs.firstUse("dpop:$thumbprint:${claims.jti}", acceptedClockSkew * 2)) {
-                throw OAuthInvalidDpopProofException("DPoP proof has already been used")
-            }
-
             VerifiedDpopProof(
-                keyThumbprint = thumbprint,
+                keyThumbprint = jwkThumbprint(header.jwk),
                 jwtId = claims.jti,
                 nonce = claims.nonce,
             )

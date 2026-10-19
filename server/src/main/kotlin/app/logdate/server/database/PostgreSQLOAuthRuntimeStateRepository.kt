@@ -8,8 +8,10 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
+import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -91,6 +93,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[clientAuthKeyId] = code.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = code.clientAuthKeyThumbprint
                     it[expiresAt] = code.expiresAt
+                    it[grantedAt] = code.grantedAt
                 }
             } else {
                 OAuthAuthorizationCodesTable.update({ OAuthAuthorizationCodesTable.code eq code.code }) {
@@ -104,6 +107,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[clientAuthKeyId] = code.clientAuthKeyId
                     it[clientAuthKeyThumbprint] = code.clientAuthKeyThumbprint
                     it[expiresAt] = code.expiresAt
+                    it[grantedAt] = code.grantedAt
                 }
             }
             code
@@ -111,16 +115,17 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
 
     override suspend fun takeAuthorizationCode(code: String): StoredAuthorizationCode? =
         transaction {
+            // The row lock makes a concurrent exchange wait, then find the code gone.
             val existing =
                 OAuthAuthorizationCodesTable
                     .selectAll()
                     .where { OAuthAuthorizationCodesTable.code eq code }
+                    .forUpdate()
                     .singleOrNull()
                     ?.toAuthorizationCodeState()
-            if (existing != null) {
-                OAuthAuthorizationCodesTable.deleteWhere { OAuthAuthorizationCodesTable.code eq code }
-            }
-            existing
+                    ?: return@transaction null
+            val removed = OAuthAuthorizationCodesTable.deleteWhere { OAuthAuthorizationCodesTable.code eq code }
+            existing.takeIf { removed == 1 }
         }
 
     override suspend fun saveRefreshToken(token: StoredRefreshToken): StoredRefreshToken =
@@ -142,6 +147,7 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[clientAuthKeyThumbprint] = token.clientAuthKeyThumbprint
                     it[expiresAt] = token.expiresAt
                     it[revokedAt] = token.revokedAt
+                    it[grantedAt] = token.grantedAt
                 }
             } else {
                 OAuthRefreshTokensTable.update({ OAuthRefreshTokensTable.token eq token.token }) {
@@ -153,9 +159,43 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
                     it[clientAuthKeyThumbprint] = token.clientAuthKeyThumbprint
                     it[expiresAt] = token.expiresAt
                     it[revokedAt] = token.revokedAt
+                    it[grantedAt] = token.grantedAt
                 }
             }
             token
+        }
+
+    override suspend fun saveGrantedRefreshToken(token: StoredRefreshToken): Boolean =
+        transaction {
+            if (revokedSince(token.subjectDid, token.grantedAt)) return@transaction false
+            insertRefreshToken(token)
+            true
+        }
+
+    override suspend fun rotateRefreshToken(
+        oldToken: String,
+        replacement: StoredRefreshToken,
+        now: kotlin.time.Instant,
+    ): Boolean =
+        transaction {
+            // The row lock serializes refreshes of one token: the second waits, then finds it gone.
+            val old =
+                OAuthRefreshTokensTable
+                    .selectAll()
+                    .where { OAuthRefreshTokensTable.token eq oldToken }
+                    .forUpdate()
+                    .singleOrNull()
+                    ?.toRefreshTokenState()
+                    ?: return@transaction false
+            if (old.revokedAt != null || old.expiresAt <= now) return@transaction false
+            if (revokedSince(old.subjectDid, old.grantedAt)) return@transaction false
+            val removed =
+                OAuthRefreshTokensTable.deleteWhere {
+                    (OAuthRefreshTokensTable.token eq oldToken) and OAuthRefreshTokensTable.revokedAt.isNull()
+                }
+            if (removed != 1) return@transaction false
+            insertRefreshToken(replacement)
+            true
         }
 
     override suspend fun findRefreshToken(token: String): StoredRefreshToken? =
@@ -187,12 +227,60 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
         revokedAt: kotlin.time.Instant,
     ): Int =
         transaction {
+            val previous =
+                OAuthSubjectRevocationsTable
+                    .selectAll()
+                    .where { OAuthSubjectRevocationsTable.subjectDid eq subjectDid }
+                    .forUpdate()
+                    .singleOrNull()
+                    ?.get(OAuthSubjectRevocationsTable.revokedAt)
+            if (previous == null) {
+                OAuthSubjectRevocationsTable.insertIgnore {
+                    it[OAuthSubjectRevocationsTable.subjectDid] = subjectDid
+                    it[OAuthSubjectRevocationsTable.revokedAt] = revokedAt
+                }
+            }
+            OAuthSubjectRevocationsTable.update({
+                (OAuthSubjectRevocationsTable.subjectDid eq subjectDid) and (OAuthSubjectRevocationsTable.revokedAt less revokedAt)
+            }) {
+                it[OAuthSubjectRevocationsTable.revokedAt] = revokedAt
+            }
+            OAuthAuthorizationCodesTable.deleteWhere { OAuthAuthorizationCodesTable.subjectDid eq subjectDid }
             OAuthRefreshTokensTable.update({
                 (OAuthRefreshTokensTable.subjectDid eq subjectDid) and OAuthRefreshTokensTable.revokedAt.isNull()
             }) {
                 it[OAuthRefreshTokensTable.revokedAt] = revokedAt
             }
         }
+
+    private fun revokedSince(
+        subjectDid: String,
+        grantedAt: kotlin.time.Instant,
+    ): Boolean {
+        val revokedAt =
+            OAuthSubjectRevocationsTable
+                .selectAll()
+                .where { OAuthSubjectRevocationsTable.subjectDid eq subjectDid }
+                .singleOrNull()
+                ?.get(OAuthSubjectRevocationsTable.revokedAt)
+                ?: return false
+        return revokedAt >= grantedAt
+    }
+
+    private fun insertRefreshToken(token: StoredRefreshToken) {
+        OAuthRefreshTokensTable.insert {
+            it[OAuthRefreshTokensTable.token] = token.token
+            it[clientId] = token.clientId
+            it[subjectDid] = token.subjectDid
+            it[scope] = token.scope
+            it[dpopKeyThumbprint] = token.dpopKeyThumbprint
+            it[clientAuthKeyId] = token.clientAuthKeyId
+            it[clientAuthKeyThumbprint] = token.clientAuthKeyThumbprint
+            it[expiresAt] = token.expiresAt
+            it[revokedAt] = token.revokedAt
+            it[grantedAt] = token.grantedAt
+        }
+    }
 }
 
 private fun ResultRow.toAuthorizationRequestState(): StoredAuthorizationRequest =
@@ -224,6 +312,7 @@ private fun ResultRow.toAuthorizationCodeState(): StoredAuthorizationCode =
         clientAuthKeyId = this[OAuthAuthorizationCodesTable.clientAuthKeyId],
         clientAuthKeyThumbprint = this[OAuthAuthorizationCodesTable.clientAuthKeyThumbprint],
         expiresAt = this[OAuthAuthorizationCodesTable.expiresAt],
+        grantedAt = this[OAuthAuthorizationCodesTable.grantedAt],
     )
 
 private fun ResultRow.toRefreshTokenState(): StoredRefreshToken =
@@ -237,4 +326,5 @@ private fun ResultRow.toRefreshTokenState(): StoredRefreshToken =
         clientAuthKeyThumbprint = this[OAuthRefreshTokensTable.clientAuthKeyThumbprint],
         expiresAt = this[OAuthRefreshTokensTable.expiresAt],
         revokedAt = this[OAuthRefreshTokensTable.revokedAt],
+        grantedAt = this[OAuthRefreshTokensTable.grantedAt],
     )

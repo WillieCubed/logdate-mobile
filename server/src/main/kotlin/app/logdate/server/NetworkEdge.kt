@@ -18,7 +18,8 @@ import java.net.URI
  * Knobs:
  *  - `ALLOWED_ORIGINS` — comma-separated `scheme://host[:port]` entries trusted for CORS. Unset or
  *    blank disables the CORS plugin entirely (same-origin only). No default in any profile.
- *  - `TRUST_FORWARDED_HEADERS` — when `true`, installs [XForwardedHeaders] so the request's
+ *  - `TRUST_FORWARDED_HEADERS` — when `true`, installs [XForwardedHeaders] (see
+ *    [installForwardedClientAddress]) so the request's
  *    `scheme` / `remoteHost` reflect what the load balancer saw from the client rather than what
  *    the LB's backend socket looks like. **Defaults to `true` in production** (the typical deploy
  *    is behind Cloud Run / an ALB / GKE Ingress / Cloudflare, all of which forward plain HTTP to
@@ -34,6 +35,7 @@ internal fun Application.installNetworkEdge(
     allowedOrigins: String = System.getenv("ALLOWED_ORIGINS") ?: "",
     trustForwarded: Boolean = profileAwareBoolEnv("TRUST_FORWARDED_HEADERS", productionDefault = true, devDefault = true),
     requireHttps: Boolean = profileAwareBoolEnv("REQUIRE_HTTPS", productionDefault = true, devDefault = false),
+    trustedProxyHops: Int = System.getenv("TRUSTED_PROXY_HOPS")?.trim()?.toIntOrNull() ?: 0,
 ) {
     val parsedOrigins = parseAllowedOrigins(allowedOrigins)
     if (parsedOrigins.isNotEmpty()) {
@@ -57,11 +59,28 @@ internal fun Application.installNetworkEdge(
     }
 
     if (trustForwarded) {
-        install(XForwardedHeaders)
+        installForwardedClientAddress(trustedProxyHops)
     }
 
     if (requireHttps) {
         install(HttpsRedirect)
+    }
+}
+
+/**
+ * Reads the client's address from `X-Forwarded-For`, so rate limits and logs see the client rather
+ * than the proxy.
+ *
+ * Each proxy appends the address it received the request from, so only entries added by trusted
+ * proxies can be believed; anything before them came from the client and may be invented. Cloud Run's
+ * front end appends the real client address last, so by default the last entry is used.
+ * [trustedProxyHops] counts further trusted proxies that append after it, such as a load balancer
+ * placed in front of Cloud Run.
+ */
+internal fun Application.installForwardedClientAddress(trustedProxyHops: Int = 0) {
+    require(trustedProxyHops >= 0) { "TRUSTED_PROXY_HOPS must not be negative" }
+    install(XForwardedHeaders) {
+        if (trustedProxyHops == 0) useLastProxy() else skipLastProxies(trustedProxyHops)
     }
 }
 

@@ -85,6 +85,7 @@ import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -222,6 +223,105 @@ class XrpcRouteCoverageTest {
                     ?.content,
             )
         }
+
+    @Test
+    fun `journal lexicons stay closed to OAuth tokens even when the repository accepts them`() =
+        testApplication {
+            val store = StubRepoRecordStore()
+            val journalRecord =
+                RepoRecord(
+                    uri = AtUri.require("at://did:web:closed-user.logdate.app/app.logdate.journal.entry/entry-1"),
+                    cid = "bafy-record",
+                    value = buildJsonObject { put("text", "a private entry") },
+                )
+            store.getRecordResult = Result.success(journalRecord)
+            store.listRecordsResult = Result.success(RepoListPage(records = listOf(journalRecord)))
+            val env = configureXrpcApp(repoRecordStore = store)
+            val account =
+                runBlocking {
+                    env.identityService.ensureIdentity(
+                        env.accountRepository.save(
+                            Account(id = Uuid.random(), username = "closed-user", displayName = "Closed", createdAt = Clock.System.now()),
+                        ),
+                    )
+                }
+            val did = requireNotNull(account.did)
+            val clientKey = generateP256KeyPair()
+            val token = { scope: String ->
+                env.oauthAccessTokenService
+                    .issueAccessToken(
+                        did,
+                        "https://viewer.example.com/client.json",
+                        scope,
+                        env.oauthDpopVerifier.jwkThumbprint(publicJwk(clientKey)),
+                    ).token
+            }
+            val generic = token("atproto transition:generic")
+            val proof = { method: String, path: String, accessToken: String ->
+                createDpopProof(
+                    keyPair = clientKey,
+                    method = method,
+                    htu = "http://localhost$path",
+                    nonce = env.oauthNonceService.currentNonce(),
+                    ath = env.oauthDpopVerifier.accessTokenHash(accessToken),
+                )
+            }
+
+            listOf(
+                "app.logdate.journal.entry",
+                "App.LogDate.journal.entry",
+                "studio.hypertext.logdate.content",
+                "Studio.Hypertext.Logdate.content",
+            ).forEach { collection ->
+                val create =
+                    client.post("/xrpc/com.atproto.repo.createRecord") {
+                        contentType(ContentType.Application.Json)
+                        header(HttpHeaders.Authorization, "DPoP $generic")
+                        header("DPoP", proof("POST", "/xrpc/com.atproto.repo.createRecord", generic))
+                        setBody("""{"repo":"$did","collection":"$collection","record":{"text":"hi"}}""")
+                    }
+                assertEquals(HttpStatusCode.Forbidden, create.status, "$collection write: ${create.bodyAsText()}")
+
+                val read =
+                    client.get("/xrpc/com.atproto.repo.getRecord?repo=$did&collection=$collection&rkey=entry-1") {
+                        header(HttpHeaders.Authorization, "DPoP $generic")
+                        header("DPoP", proof("GET", "/xrpc/com.atproto.repo.getRecord", generic))
+                    }
+                assertTrue("RecordNotFound" in read.bodyAsText(), "$collection read: ${read.bodyAsText()}")
+
+                val list =
+                    client.get("/xrpc/com.atproto.repo.listRecords?repo=$did&collection=$collection") {
+                        header(HttpHeaders.Authorization, "DPoP $generic")
+                        header("DPoP", proof("GET", "/xrpc/com.atproto.repo.listRecords", generic))
+                    }
+                assertEquals(HttpStatusCode.OK, list.status, "$collection list: ${list.bodyAsText()}")
+                assertFalse("entry-1" in list.bodyAsText(), "$collection list: ${list.bodyAsText()}")
+            }
+
+            val identityOnly = token("atproto")
+            val identityRead =
+                client.get("/xrpc/com.atproto.repo.listRecords?repo=$did&collection=com.example.note") {
+                    header(HttpHeaders.Authorization, "DPoP $identityOnly")
+                    header("DPoP", proof("GET", "/xrpc/com.atproto.repo.listRecords", identityOnly))
+                }
+            assertEquals(HttpStatusCode.Forbidden, identityRead.status, "atproto alone does not include the repository")
+            assertTrue("InsufficientScope" in identityRead.bodyAsText())
+        }
+
+    @Test
+    fun `journal collections cannot be opened to apps`() {
+        listOf("app.logdate.journal.entry", "Studio.Hypertext.Logdate.content").forEach { collection ->
+            assertFailsWith<IllegalArgumentException>(collection) {
+                app.logdate.server.oauth.OAuthScopes
+                    .requireOpenable(setOf(collection))
+            }
+        }
+        assertEquals(
+            setOf("com.example.note"),
+            app.logdate.server.oauth.OAuthScopes
+                .requireOpenable(setOf("Com.Example.note")),
+        )
+    }
 
     @Test
     fun `xrpc routes support dpop oauth auth and reject invalid proofs`() =
@@ -1208,6 +1308,7 @@ class XrpcRouteCoverageTest {
         sessionService: PdsSessionService? = null,
         syncService: PdsSyncService? = null,
         atprotoSessionTokenService: AtprotoSessionTokenService? = null,
+        collectionsOpenToApps: Set<String> = setOf("com.example.note"),
     ): XrpcCoverageEnvironment {
         val concreteAccountRepository = accountRepository ?: InMemoryAccountRepository()
         val identityService = identityService(concreteAccountRepository)
@@ -1232,6 +1333,7 @@ class XrpcRouteCoverageTest {
                     oauthAccessTokenService = oauthAccessTokenService,
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
+                    collectionsOpenToApps = collectionsOpenToApps,
                 )
             }
         }

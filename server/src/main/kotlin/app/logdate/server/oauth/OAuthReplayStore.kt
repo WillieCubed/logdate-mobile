@@ -32,13 +32,13 @@ internal fun replayKeyHash(key: String): String =
 
 /**
  * A replay store for one process, used when the server runs without a database. It holds at most
- * [maxEntries] values and forgets the oldest first when full.
+ * [maxEntries] values and, when full, forgets the one that expires soonest.
  */
 class InMemoryOAuthReplayStore(
     private val clock: Clock = Clock.System,
     private val maxEntries: Int = DEFAULT_MAX_ENTRIES,
 ) : OAuthReplayStore {
-    private val seen = LinkedHashMap<String, Instant>()
+    private val seen = HashMap<String, Instant>()
 
     @Synchronized
     override fun firstUse(
@@ -46,14 +46,12 @@ class InMemoryOAuthReplayStore(
         ttl: Duration,
     ): Boolean {
         val now = clock.now()
-        // Each caller records one kind of value with one lifetime, so insertion order is close to expiry order.
-        val iterator = seen.entries.iterator()
-        while (iterator.hasNext() && iterator.next().value <= now) iterator.remove()
+        // Values of different kinds have different lifetimes, so expiry is checked per entry.
+        seen.values.removeIf { expiresAt -> expiresAt <= now }
         val hash = replayKeyHash(key)
-        seen[hash]?.let { expiresAt -> if (expiresAt > now) return false }
-        seen.remove(hash)
+        if (seen.containsKey(hash)) return false
         if (seen.size >= maxEntries) {
-            seen.remove(seen.keys.first())
+            seen.minByOrNull { it.value }?.let { soonest -> seen.remove(soonest.key) }
         }
         seen[hash] = now + ttl
         return true

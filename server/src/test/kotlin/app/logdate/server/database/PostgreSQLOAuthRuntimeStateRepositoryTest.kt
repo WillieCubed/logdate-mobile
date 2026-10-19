@@ -63,6 +63,7 @@ class PostgreSQLOAuthRuntimeStateRepositoryTest {
                         clientAuthKeyId = request.clientAuthKeyId,
                         clientAuthKeyThumbprint = request.clientAuthKeyThumbprint,
                         expiresAt = now + 1.minutes,
+                        grantedAt = now,
                     )
                 val refresh =
                     StoredRefreshToken(
@@ -74,6 +75,7 @@ class PostgreSQLOAuthRuntimeStateRepositoryTest {
                         clientAuthKeyId = request.clientAuthKeyId,
                         clientAuthKeyThumbprint = request.clientAuthKeyThumbprint,
                         expiresAt = now + 5.minutes,
+                        grantedAt = now,
                     )
 
                 kotlinx.coroutines.runBlocking {

@@ -158,6 +158,7 @@ class OAuthAuthorizationService(
                 clientAuthKeyId = stored.clientAuthKeyId,
                 clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
                 expiresAt = clock.now() + AUTHORIZATION_CODE_TTL,
+                grantedAt = clock.now(),
             ),
         )
         return appendQuery(
@@ -251,18 +252,21 @@ class OAuthAuthorizationService(
                 keyThumbprint = proof.keyThumbprint,
             )
         val refreshToken = randomToken()
-        runtimeStateRepository.saveRefreshToken(
-            StoredRefreshToken(
-                token = refreshToken,
-                clientId = stored.clientId,
-                subjectDid = stored.subjectDid,
-                scope = stored.scope,
-                dpopKeyThumbprint = proof.keyThumbprint,
-                clientAuthKeyId = stored.clientAuthKeyId,
-                clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
-                expiresAt = clock.now() + refreshTokenLifetime(stored.clientId),
-            ),
-        )
+        val saved =
+            runtimeStateRepository.saveGrantedRefreshToken(
+                StoredRefreshToken(
+                    token = refreshToken,
+                    clientId = stored.clientId,
+                    subjectDid = stored.subjectDid,
+                    scope = stored.scope,
+                    dpopKeyThumbprint = proof.keyThumbprint,
+                    clientAuthKeyId = stored.clientAuthKeyId,
+                    clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
+                    expiresAt = clock.now() + refreshTokenLifetime(stored.clientId),
+                    grantedAt = stored.grantedAt,
+                ),
+            )
+        if (!saved) throw OAuthInvalidGrantException("The account revoked this grant")
         return OAuthTokenResponse(
             access_token = issued.token,
             token_type = "DPoP",
@@ -325,14 +329,7 @@ class OAuthAuthorizationService(
                 scope = stored.scope,
                 keyThumbprint = stored.dpopKeyThumbprint,
             )
-        val rotatedRefreshToken = randomToken()
-        runtimeStateRepository.deleteRefreshToken(refreshToken)
-        runtimeStateRepository.saveRefreshToken(
-            stored.copy(
-                token = rotatedRefreshToken,
-                expiresAt = clock.now() + refreshTokenLifetime(stored.clientId),
-            ),
-        )
+        val rotatedRefreshToken = rotate(refreshToken, stored)
         return OAuthTokenResponse(
             access_token = issued.token,
             token_type = "DPoP",
@@ -481,6 +478,31 @@ class OAuthAuthorizationService(
         return revoked
     }
 
+    /**
+     * Replaces [refreshToken] with a new one and returns it. The read of [stored] may be stale: another
+     * refresh or a revocation can land after it, so the rotation re-checks everything and replaces the
+     * token in one transaction. The caller only returns tokens when this succeeds.
+     */
+    private suspend fun rotate(
+        refreshToken: String,
+        stored: StoredRefreshToken,
+    ): String {
+        val rotatedRefreshToken = randomToken()
+        val rotated =
+            runtimeStateRepository.rotateRefreshToken(
+                oldToken = refreshToken,
+                replacement =
+                    stored.copy(
+                        token = rotatedRefreshToken,
+                        expiresAt = clock.now() + refreshTokenLifetime(stored.clientId),
+                        revokedAt = null,
+                    ),
+                now = clock.now(),
+            )
+        if (!rotated) throw OAuthInvalidGrantException("Refresh token is invalid or expired")
+        return rotatedRefreshToken
+    }
+
     private fun refreshTokenLifetime(clientId: String) =
         if (clientId in trustedClientIds) TRUSTED_REFRESH_TOKEN_TTL else UNTRUSTED_REFRESH_TOKEN_TTL
 
@@ -533,8 +555,8 @@ private suspend fun OAuthRuntimeStateRepository.claimAuthorizationRequest(reques
 }
 
 /**
- * Revokes the OAuth grants an account has given to apps. Signing out everywhere and removing a
- * passkey call it so apps lose access along with the account's own devices.
+ * Revokes the OAuth grants an account has given to apps. Removing a passkey and deleting the
+ * account call it, so apps lose access when the account's own sign-in changes.
  */
 fun interface OAuthGrantRevoker {
     suspend fun revokeAllForSubject(subjectDid: String): Int

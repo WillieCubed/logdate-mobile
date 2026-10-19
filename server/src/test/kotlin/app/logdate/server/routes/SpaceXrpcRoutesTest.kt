@@ -529,7 +529,7 @@ class SpaceXrpcRoutesTest {
                     .issueAccessToken(
                         subjectDid = did,
                         clientId = "https://viewer.example.com/client.json",
-                        scope = "atproto",
+                        scope = "atproto transition:generic",
                         keyThumbprint = env.oauthDpopVerifier.jwkThumbprint(publicJwk(clientKey)),
                     ).token
             var proofs = 0

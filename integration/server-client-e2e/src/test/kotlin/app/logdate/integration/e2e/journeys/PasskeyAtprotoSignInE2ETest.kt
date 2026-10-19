@@ -86,13 +86,11 @@ class PasskeyAtprotoSignInE2ETest {
                         assertEquals(did, session.subject)
                         assertEquals("atproto transition:generic", session.scope)
 
-                        // The app now acts as the account: it uploads a file into the account's repository.
-                        val anonymousUpload =
-                            http.post("$logDate/xrpc/com.atproto.repo.uploadBlob") {
-                                contentType(ContentType.Text.Plain)
-                                setBody("Posted by Journal Viewer")
-                            }
-                        assertEquals(HttpStatusCode.Unauthorized, anonymousUpload.status)
+                        // The app uses the identity: the token's subject resolves to the account's public handle.
+                        val description = http.get("$logDate/xrpc/com.atproto.repo.describeRepo?repo=${session.subject}").json()
+                        assertEquals(handle, description["handle"]?.jsonPrimitive?.content)
+
+                        // Uploads stay closed to apps until a collection open to apps refers to files.
                         val upload =
                             session.post(
                                 http,
@@ -100,8 +98,7 @@ class PasskeyAtprotoSignInE2ETest {
                                 "Posted by Journal Viewer",
                                 ContentType.Text.Plain,
                             )
-                        assertEquals(HttpStatusCode.OK, upload.status, upload.bodyAsText())
-                        assertNotNull(upload.json()["blob"], upload.bodyAsText())
+                        assertEquals(HttpStatusCode.Forbidden, upload.status, upload.bodyAsText())
                     }
                 }
             }
@@ -154,6 +151,13 @@ class PasskeyAtprotoSignInE2ETest {
                                 """{"repo":"$did","collection":"$CONTENT","rkey":"$ENTRY_ID"}""",
                             )
                         assertEquals(HttpStatusCode.Forbidden, appDelete.status, appDelete.bodyAsText())
+                        val journalLexicon =
+                            session.post(
+                                http,
+                                "$logDate/xrpc/com.atproto.repo.createRecord",
+                                """{"repo":"$did","collection":"app.logdate.journal.entry","record":{"text":"written by an app"}}""",
+                            )
+                        assertEquals(HttpStatusCode.Forbidden, journalLexicon.status, journalLexicon.bodyAsText())
                         val entries = apiClient.getContentChanges(token, 0).getOrThrow().changes
                         assertTrue(entries.any { it.id == ENTRY_ID && !it.isDeleted }, "the entry is still in the journal")
 
@@ -173,7 +177,7 @@ class PasskeyAtprotoSignInE2ETest {
         }
 
     @Test
-    fun `an app granted only the atproto scope cannot write`() =
+    fun `an app granted only the atproto scope cannot use the repository`() =
         kotlinx.coroutines.test.runTest {
             withServerClientHarness {
                 withThirdPartyApp { app ->
@@ -193,6 +197,10 @@ class PasskeyAtprotoSignInE2ETest {
                             )
 
                         assertEquals(HttpStatusCode.Forbidden, upload.status, upload.bodyAsText())
+                        val did = assertNotNull(account.response.data.account.did)
+                        val read = session.get(http, "$logDate/xrpc/com.atproto.repo.listRecords?repo=$did&collection=$CONTENT")
+                        assertEquals(HttpStatusCode.Forbidden, read.status, read.bodyAsText())
+                        assertTrue("InsufficientScope" in read.bodyAsText(), read.bodyAsText())
                     }
                 }
             }
@@ -280,10 +288,8 @@ class PasskeyAtprotoSignInE2ETest {
             postJson("$logDate/oauth/authorize/passkey/options", buildJsonObject { put("request_uri", requestUri) })
                 .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                 .json()
-        assertEquals(
-            listOf(account.authenticator.credentialIdB64),
-            options.getValue("allow_credentials").jsonArray.map { it.jsonPrimitive.content },
-        )
+        // The options never name credentials; the browser offers the person's discoverable passkeys.
+        assertEquals(emptyList(), options.getValue("allow_credentials").jsonArray.map { it.jsonPrimitive.content })
         val challenge = options.getValue("challenge").jsonPrimitive.content
         val (clientDataJson, authenticatorData, signature) = account.authenticator.assert(challenge)
         val approval =

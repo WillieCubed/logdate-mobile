@@ -12,9 +12,11 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Resolves and validates OAuth client metadata documents from `client_id` URLs.
@@ -24,9 +26,9 @@ class OAuthClientMetadataResolver(
     private val json: Json = Json { ignoreUnknownKeys = true },
     private val clock: Clock = Clock.System,
     private val cacheTtl: Duration = 10.minutes,
+    private val usedClientAssertions: OAuthReplayStore = InMemoryOAuthReplayStore(clock),
 ) {
-    private val cache = mutableMapOf<String, CachedClientMetadata>()
-    private val usedClientAssertions = mutableMapOf<String, CachedClientAssertion>()
+    private val cache = ConcurrentHashMap<String, CachedClientMetadata>()
 
     /**
      * Resolves and validates the metadata document at [clientId].
@@ -208,19 +210,16 @@ class OAuthClientMetadataResolver(
         )
     }
 
+    /** Records the assertion's `jti` until the assertion expires, in the store every server instance shares. */
     private fun markClientAssertionUsed(
         clientId: String,
         jti: String,
         expiresAtEpochSeconds: Long,
     ) {
-        val now = clock.now().epochSeconds
-        usedClientAssertions.entries.removeIf { (_, assertion) -> assertion.expiresAtEpochSeconds <= now }
-        val cacheKey = "$clientId:$jti"
-        val existing = usedClientAssertions[cacheKey]
-        if (existing != null && existing.expiresAtEpochSeconds > now) {
+        val remaining = (expiresAtEpochSeconds - clock.now().epochSeconds).coerceAtLeast(1).seconds
+        if (!usedClientAssertions.firstUse("client-assertion:$clientId:$jti", remaining)) {
             throw OAuthInvalidClientException("Client assertion jti has already been used")
         }
-        usedClientAssertions[cacheKey] = CachedClientAssertion(expiresAtEpochSeconds = expiresAtEpochSeconds)
     }
 
     private fun OAuthClientMetadata.resolveAssertionKey(kid: String?): OAuthClientJwk {
@@ -272,10 +271,6 @@ class OAuthClientMetadataResolver(
     private data class CachedClientMetadata(
         val metadata: OAuthClientMetadata,
         val expiresAt: kotlin.time.Instant,
-    )
-
-    private data class CachedClientAssertion(
-        val expiresAtEpochSeconds: Long,
     )
 
     private data class VerifiedClientAssertion(

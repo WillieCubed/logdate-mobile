@@ -77,7 +77,10 @@ fun Route.xrpcRoutes(
     oauthAccessTokenService: OAuthAccessTokenService? = null,
     oauthDpopVerifier: OAuthDpopVerifier? = null,
     oauthNonceService: OAuthNonceService? = null,
+    collectionsOpenToApps: Set<String> = OAuthScopes.collectionsOpenToApps,
 ) {
+    val openCollections = OAuthScopes.requireOpenable(collectionsOpenToApps)
+
     // Every repo holds its owner's private journal, so reads are owner-only. Anyone else gets
     // `respondAsMissing`, the answer for a repo that does not exist, before anything is looked up.
     suspend fun ApplicationCall.requireRepoOwner(
@@ -253,7 +256,7 @@ fun Route.xrpcRoutes(
             call.respond(
                 HttpStatusCode.OK,
                 repoDescription.copy(
-                    collections = repoDescription.collections.filterNot { OAuthScopes.isPrivateCollection(it.toString()) },
+                    collections = repoDescription.collections.filter { OAuthScopes.isOpenToApps(it.toString(), openCollections) },
                 ),
             )
         }
@@ -386,8 +389,9 @@ fun Route.xrpcRoutes(
             val recordId =
                 parseRecordId(identityService, repoValue, collectionValue, recordKeyValue)
                     ?: return@get call.respondInvalidRecordId()
-            if (principal.oauth != null && OAuthScopes.isPrivateCollection(recordId.collection.toString())) {
-                return@get call.respondRecordNotFound()
+            principal.oauth?.let { grant ->
+                if (!call.allowOAuthRepositoryUse(grant)) return@get
+                if (!OAuthScopes.isOpenToApps(recordId.collection.toString(), openCollections)) return@get call.respondRecordNotFound()
             }
 
             val recordResult =
@@ -446,8 +450,11 @@ fun Route.xrpcRoutes(
                 call.respondInvalidRepoOrCollection()
                 return@get
             }
-            if (principal.oauth != null && OAuthScopes.isPrivateCollection(collection.toString())) {
-                return@get call.respond(HttpStatusCode.OK, ListRecordsResponse(records = emptyList()))
+            principal.oauth?.let { grant ->
+                if (!call.allowOAuthRepositoryUse(grant)) return@get
+                if (!OAuthScopes.isOpenToApps(collection.toString(), openCollections)) {
+                    return@get call.respond(HttpStatusCode.OK, ListRecordsResponse(records = emptyList()))
+                }
             }
 
             val result =
@@ -493,7 +500,7 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val wireRequest = call.receive<CreateRecordInput>()
-            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString())) return@post
+            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString(), openCollections)) return@post
             val repo =
                 resolveRepoDid(identityService, wireRequest.repo)
                     ?: return@post call.respond(
@@ -542,7 +549,7 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val wireRequest = call.receive<PutRecordInput>()
-            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString())) return@post
+            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString(), openCollections)) return@post
             val repo =
                 resolveRepoDid(identityService, wireRequest.repo)
                     ?: return@post call.respond(
@@ -591,7 +598,7 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val wireRequest = call.receive<DeleteRecordInput>()
-            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString())) return@post
+            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString(), openCollections)) return@post
             val repo =
                 resolveRepoDid(identityService, wireRequest.repo)
                     ?: return@post call.respond(
@@ -636,7 +643,7 @@ fun Route.xrpcRoutes(
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
-            if (!call.allowOAuthWrite(principal, collection = null)) return@post
+            if (principal.oauth != null) return@post call.respondUploadsClosedToOAuthApps()
             val repoDid =
                 principal.account.did
                     ?.let(AtprotoDid::parse)
@@ -766,7 +773,7 @@ internal data class DeleteRecordInput(
     val swapCommit: String? = null,
 )
 
-@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+/** Picks the token kind from the `Authorization` header and checks it with the matching steps. */
 private suspend fun io.ktor.server.application.ApplicationCall.requireAuthenticatedAccount(
     identityService: AtprotoIdentityService,
     accountRepository: AccountRepository?,
@@ -777,107 +784,122 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
     oauthNonceService: OAuthNonceService?,
 ): XrpcPrincipal? {
     if (accountRepository == null) {
-        respond(
-            HttpStatusCode.NotImplemented,
-            PdsErrorResponse("Unsupported", "Repo auth is not configured"),
-        )
+        respond(HttpStatusCode.NotImplemented, PdsErrorResponse("Unsupported", "Repo auth is not configured"))
         return null
     }
-
     val authHeader = request.header(HttpHeaders.Authorization)
-    if (authHeader == null) {
-        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing bearer token"))
-        return null
+    return when {
+        authHeader == null -> respondAuthRequired("Missing bearer token")
+        authHeader.startsWith("DPoP ") -> {
+            if (oauthAccessTokenService == null || oauthDpopVerifier == null || oauthNonceService == null) {
+                respond(HttpStatusCode.NotImplemented, PdsErrorResponse("Unsupported", "OAuth DPoP auth is not configured"))
+                return null
+            }
+            requireOAuthPrincipal(
+                accessToken = authHeader.removePrefix("DPoP ").trim(),
+                checks = OAuthChecks(oauthAccessTokenService, oauthDpopVerifier, oauthNonceService),
+                identityService = identityService,
+                accountRepository = accountRepository,
+            )
+        }
+        authHeader.startsWith("Bearer ") ->
+            requireLogDatePrincipal(
+                bearerToken = authHeader.removePrefix("Bearer ").trim(),
+                identityService = identityService,
+                accountRepository = accountRepository,
+                tokenService = tokenService,
+                atprotoSessionTokenService = atprotoSessionTokenService,
+            )
+        else -> respondAuthRequired("Missing bearer token")
     }
+}
 
-    if (authHeader.startsWith("DPoP ")) {
-        if (oauthAccessTokenService == null || oauthDpopVerifier == null || oauthNonceService == null) {
-            respond(HttpStatusCode.NotImplemented, PdsErrorResponse("Unsupported", "OAuth DPoP auth is not configured"))
-            return null
-        }
-        val accessToken = authHeader.removePrefix("DPoP ").trim()
-        val accessClaims = oauthAccessTokenService.validateAccessToken(accessToken)
-        if (accessClaims == null) {
-            respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Invalid DPoP access token"))
-            return null
-        }
-        val proof =
-            request
-                .header(DPOP_HEADER)
-                ?.trim()
-                ?.takeIf(String::isNotEmpty)
-                ?: run {
-                    respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing DPoP proof"))
-                    return null
-                }
-        val verification =
-            oauthDpopVerifier.verify(
+/** The services that check an OAuth access token and its DPoP proof. */
+private class OAuthChecks(
+    val accessTokens: OAuthAccessTokenService,
+    val dpop: OAuthDpopVerifier,
+    val nonces: OAuthNonceService,
+)
+
+/**
+ * Checks an OAuth access token, its DPoP proof and the account it acts for. A failure to reach
+ * the replay store is a server problem, so it is logged and answered as one, not as a bad proof.
+ */
+private suspend fun io.ktor.server.application.ApplicationCall.requireOAuthPrincipal(
+    accessToken: String,
+    checks: OAuthChecks,
+    identityService: AtprotoIdentityService,
+    accountRepository: AccountRepository,
+): XrpcPrincipal? {
+    val accessClaims = checks.accessTokens.validateAccessToken(accessToken) ?: return respondAuthRequired("Invalid DPoP access token")
+    val proof =
+        request.header(DPOP_HEADER)?.trim()?.takeIf(String::isNotEmpty)
+            ?: return respondAuthRequired("Missing DPoP proof")
+    val verification =
+        try {
+            checks.dpop.verify(
                 proof = proof,
                 method = request.httpMethod.value,
                 htu = absoluteRequestUrl(),
-                expectedNonce = oauthNonceService.currentNonce(),
-                expectedAth = oauthDpopVerifier.accessTokenHash(accessToken),
+                expectedNonce = checks.nonces.currentNonce(),
+                expectedAth = checks.dpop.accessTokenHash(accessToken),
             )
-        val verified =
-            verification.getOrElse { error ->
-                if (error is OAuthUseDpopNonceException) {
-                    response.headers.append(DPOP_NONCE_HEADER, error.nonce)
-                }
-                respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", error.message ?: "Invalid DPoP proof"))
-                return null
-            }
-        if (verified.keyThumbprint != accessClaims.keyThumbprint) {
-            respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "DPoP proof does not match the access token"))
+        } catch (error: Exception) {
+            Napier.e("Could not check a DPoP proof", error)
+            respond(
+                HttpStatusCode.ServiceUnavailable,
+                PdsErrorResponse("TemporarilyUnavailable", "The server could not check this request. Try again shortly."),
+            )
             return null
         }
-        val account =
-            accountRepository
-                .findByDid(accessClaims.subjectDid)
-                ?.takeIf(Account::isActive)
-                ?.let { identityService.ensureIdentity(it) }
-        if (account == null) {
-            respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Account not found for DPoP access token"))
-            return null
+    val verified =
+        verification.getOrElse { error ->
+            if (error is OAuthUseDpopNonceException) response.headers.append(DPOP_NONCE_HEADER, error.nonce)
+            return respondAuthRequired(error.message ?: "Invalid DPoP proof")
         }
-        return XrpcPrincipal(account, OAuthGrant(clientId = accessClaims.clientId, scopes = OAuthScopes.parse(accessClaims.scope)))
-    }
+    if (verified.keyThumbprint != accessClaims.keyThumbprint) return respondAuthRequired("DPoP proof does not match the access token")
+    val account =
+        accountRepository
+            .findByDid(accessClaims.subjectDid)
+            ?.takeIf(Account::isActive)
+            ?.let { identityService.ensureIdentity(it) }
+            ?: return respondAuthRequired("Account not found for DPoP access token")
+    return XrpcPrincipal(account, OAuthGrant(clientId = accessClaims.clientId, scopes = OAuthScopes.parse(accessClaims.scope)))
+}
 
-    if (!authHeader.startsWith("Bearer ")) {
-        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Missing bearer token"))
-        return null
-    }
+/** Checks a LogDate app token or an AT Protocol session token; neither carries an OAuth grant. */
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+private suspend fun io.ktor.server.application.ApplicationCall.requireLogDatePrincipal(
+    bearerToken: String,
+    identityService: AtprotoIdentityService,
+    accountRepository: AccountRepository,
+    tokenService: TokenService?,
+    atprotoSessionTokenService: AtprotoSessionTokenService?,
+): XrpcPrincipal? {
     if (atprotoSessionTokenService == null && tokenService == null) {
-        respond(
-            HttpStatusCode.NotImplemented,
-            PdsErrorResponse("Unsupported", "Repo auth is not configured"),
-        )
+        respond(HttpStatusCode.NotImplemented, PdsErrorResponse("Unsupported", "Repo auth is not configured"))
         return null
     }
+    atprotoSessionTokenService
+        ?.getAccessAccount(bearerToken, accountRepository, identityService)
+        ?.let { return XrpcPrincipal(it, oauth = null) }
 
-    val bearerToken = authHeader.removePrefix("Bearer ").trim()
-    val atprotoAccount =
-        atprotoSessionTokenService
-            ?.getAccessAccount(bearerToken, accountRepository, identityService)
-    if (atprotoAccount != null) {
-        return XrpcPrincipal(atprotoAccount, oauth = null)
-    }
-
-    val subject = tokenService?.validateAccessToken(bearerToken)
-    val accountId = subject?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-    if (accountId == null) {
-        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Invalid bearer token"))
-        return null
-    }
+    val accountId =
+        tokenService
+            ?.validateAccessToken(bearerToken)
+            ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            ?: return respondAuthRequired("Invalid bearer token")
     val account =
         accountRepository
             .findById(kotlin.uuid.Uuid.parse(accountId.toString()))
             ?.let { identityService.ensureIdentity(it) }
-    if (account == null) {
-        respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Account not found for bearer token"))
-        return null
-    }
-
+            ?: return respondAuthRequired("Account not found for bearer token")
     return XrpcPrincipal(account, oauth = null)
+}
+
+private suspend fun io.ktor.server.application.ApplicationCall.respondAuthRequired(message: String): XrpcPrincipal? {
+    respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", message))
+    return null
 }
 
 /**
@@ -894,34 +916,44 @@ internal data class OAuthGrant(
     val clientId: String,
     val scopes: Set<String>,
 ) {
-    /** `atproto` alone only confirms the identity; writing needs `transition:generic`. */
-    val canWrite: Boolean get() = OAuthScopes.TRANSITION_GENERIC in scopes
+    /** `atproto` alone only confirms the identity; any repository read or write needs `transition:generic`. */
+    val canUseRepository: Boolean get() = OAuthScopes.TRANSITION_GENERIC in scopes
+}
+
+/** Answers `403 InsufficientScope` and returns `false` when [grant] only confirms the identity. */
+private suspend fun ApplicationCall.allowOAuthRepositoryUse(grant: OAuthGrant): Boolean {
+    if (grant.canUseRepository) return true
+    respond(
+        HttpStatusCode.Forbidden,
+        PdsErrorResponse("InsufficientScope", "This app was only granted the atproto scope, which does not include the repository"),
+    )
+    return false
 }
 
 /**
  * Lets LogDate sessions write anything they own. An OAuth app needs `transition:generic` and may
- * never touch a journal [collection]; a `null` collection is a file upload.
+ * only write a collection that is open to apps.
  */
 private suspend fun ApplicationCall.allowOAuthWrite(
     principal: XrpcPrincipal,
-    collection: String?,
+    collection: String,
+    openCollections: Set<String>,
 ): Boolean {
     val grant = principal.oauth ?: return true
-    if (!grant.canWrite) {
-        respond(
-            HttpStatusCode.Forbidden,
-            PdsErrorResponse("InsufficientScope", "This app was only granted the atproto scope, which does not allow writes"),
-        )
-        return false
-    }
-    if (collection != null && OAuthScopes.isPrivateCollection(collection)) {
-        respond(
-            HttpStatusCode.Forbidden,
-            PdsErrorResponse("Forbidden", "Apps signed in through OAuth cannot change LogDate journal records"),
-        )
-        return false
-    }
-    return true
+    if (!allowOAuthRepositoryUse(grant)) return false
+    if (OAuthScopes.isOpenToApps(collection, openCollections)) return true
+    respond(HttpStatusCode.Forbidden, PdsErrorResponse("Forbidden", "Apps signed in through OAuth cannot write to this collection"))
+    return false
+}
+
+private suspend fun ApplicationCall.respondUploadsClosedToOAuthApps() {
+    respond(
+        HttpStatusCode.Forbidden,
+        PdsErrorResponse(
+            "Forbidden",
+            "Apps signed in through OAuth cannot upload files yet, because no collection open to apps refers to files",
+        ),
+    )
 }
 
 private suspend fun ApplicationCall.respondClosedToOAuthApps() {

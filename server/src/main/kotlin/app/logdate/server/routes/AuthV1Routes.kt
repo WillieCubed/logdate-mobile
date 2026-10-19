@@ -74,6 +74,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.ContentTransformationException
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -1371,7 +1372,6 @@ fun Route.authV1Routes(
                         metrics,
                     )
 
-                account.did?.let { did -> oauthGrantRevoker?.revokeAllForSubject(did) }
                 val summary = deletionService.deleteAccount(account.id)
                 if (!summary.accountRowDeleted) {
                     return@delete call.respondApiError(
@@ -2065,7 +2065,7 @@ private suspend fun ApplicationCall.enforceRateLimit(
     policy: RateLimitPolicy,
     metrics: AuthMetricsRegistry?,
 ): Boolean {
-    val ipKey = hashRemoteIp() ?: request.local.remoteHost.ifBlank { "unknown" }
+    val ipKey = hashRemoteIp() ?: request.origin.remoteHost.ifBlank { "unknown" }
     val rateLimitKey = "$operation:$ipKey"
     if (rateLimiter.allow(rateLimitKey, policy)) {
         return true
@@ -2081,7 +2081,7 @@ private suspend fun ApplicationCall.enforceRateLimit(
 }
 
 private fun ApplicationCall.hashRemoteIp(): String? {
-    val value = request.local.remoteHost.ifBlank { return null }
+    val value = request.origin.remoteHost.ifBlank { return null }
     return value.sha256()
 }
 

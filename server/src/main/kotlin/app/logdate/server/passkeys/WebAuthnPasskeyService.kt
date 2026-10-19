@@ -252,19 +252,18 @@ class WebAuthnPasskeyService(
 
     /**
      * Issues a challenge that only [verifyBoundAuthentication] with the same [purpose] and
-     * [binding] accepts, so it cannot be spent on any other sign-in. [credentialOwner] limits the
-     * allowed credentials to that account's passkeys; `null` allows any discoverable passkey.
+     * [binding] accepts, so it cannot be spent on any other sign-in. It lists no credentials, so
+     * the browser offers any discoverable passkey and nothing about an account is revealed.
      */
     fun generateBoundAuthenticationOptions(
         purpose: String,
         binding: Uuid,
-        credentialOwner: Uuid?,
     ): PasskeyAuthenticationOptions {
         require(purpose != AUTHENTICATION_TYPE && purpose != REGISTRATION_TYPE) { "A bound challenge needs its own purpose" }
         return PasskeyAuthenticationOptions(
             challenge = challengeStore.issue(binding, purpose),
             rpId = relyingPartyId,
-            allowCredentials = credentialOwner?.let(::getUserCredentials).orEmpty(),
+            allowCredentials = emptyList(),
             timeout = 300_000L,
         )
     }

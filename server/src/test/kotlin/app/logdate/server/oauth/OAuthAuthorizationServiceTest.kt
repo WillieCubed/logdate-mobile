@@ -963,6 +963,7 @@ class OAuthAuthorizationServiceTest {
                 null,
                 null,
                 Instant.parse("2026-03-08T00:00:00Z"),
+                Instant.parse("2026-03-07T23:59:00Z"),
             )
         val refreshToken =
             instantiatePrivate(
@@ -975,6 +976,7 @@ class OAuthAuthorizationServiceTest {
                 null,
                 null,
                 Instant.parse("2026-03-08T00:00:00Z"),
+                Instant.parse("2026-03-07T23:59:00Z"),
                 null,
             )
 

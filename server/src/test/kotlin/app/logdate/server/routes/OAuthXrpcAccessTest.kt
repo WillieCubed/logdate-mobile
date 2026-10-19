@@ -103,13 +103,26 @@ class OAuthXrpcAccessTest {
         }
 
     @Test
-    fun `transition generic allows uploads`() =
+    fun `uploads stay closed to OAuth apps until a collection open to apps refers to files`() =
         testApplication {
             val fixture = setUp()
 
             val upload = fixture.oauthPost("/xrpc/com.atproto.repo.uploadBlob", GENERIC, "hello", ContentType.Text.Plain)
+            val ownerUpload = fixture.bearerPost("/xrpc/com.atproto.repo.uploadBlob", "hello", ContentType.Text.Plain)
 
-            assertEquals(HttpStatusCode.OK, upload.status, upload.bodyAsText())
+            assertEquals(HttpStatusCode.Forbidden, upload.status, upload.bodyAsText())
+            assertEquals(HttpStatusCode.OK, ownerUpload.status, ownerUpload.bodyAsText())
+        }
+
+    @Test
+    fun `the atproto scope alone cannot read the repository`() =
+        testApplication {
+            val fixture = setUp()
+
+            val read = fixture.oauthGet("/xrpc/com.atproto.repo.listRecords?repo=$HANDLE&collection=com.example.note", ATPROTO)
+
+            assertEquals(HttpStatusCode.Forbidden, read.status)
+            assertTrue("InsufficientScope" in read.bodyAsText(), read.bodyAsText())
         }
 
     @Test
@@ -170,6 +183,17 @@ class OAuthXrpcAccessTest {
         private val dpopKey = generateP256KeyPair()
 
         suspend fun bearerGet(path: String): HttpResponse = test.client.get(path) { header(HttpHeaders.Authorization, "Bearer $bearer") }
+
+        suspend fun bearerPost(
+            path: String,
+            body: String,
+            type: ContentType,
+        ): HttpResponse =
+            test.client.post(path) {
+                header(HttpHeaders.Authorization, "Bearer $bearer")
+                contentType(type)
+                setBody(body)
+            }
 
         suspend fun oauthGet(
             path: String,

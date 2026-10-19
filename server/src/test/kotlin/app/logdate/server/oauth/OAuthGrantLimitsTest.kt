@@ -13,7 +13,11 @@ import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
@@ -112,6 +116,76 @@ class OAuthGrantLimitsTest {
 
         assertEquals("DPoP proof has already been used", replay?.message)
     }
+
+    @Test
+    fun `the in-memory replay store expires each value on its own lifetime`() {
+        val clock = MutableClock(Instant.parse("2026-10-19T00:00:00Z"))
+        val store = InMemoryOAuthReplayStore(clock)
+        assertTrue(store.firstUse("pkce:long", 60.minutes))
+        assertTrue(store.firstUse("dpop:short", 1.minutes))
+
+        clock.nowValue = clock.nowValue + 2.minutes
+
+        assertTrue(store.firstUse("dpop:short", 1.minutes), "the short-lived value expired")
+        assertFalse(store.firstUse("pkce:long", 60.minutes), "the long-lived value is still remembered")
+    }
+
+    @Test
+    fun `a full in-memory replay store forgets the value that expires soonest`() {
+        val clock = MutableClock(Instant.parse("2026-10-19T00:00:00Z"))
+        val store = InMemoryOAuthReplayStore(clock, maxEntries = 2)
+        store.firstUse("pkce:long", 60.minutes)
+        store.firstUse("dpop:short", 1.minutes)
+
+        store.firstUse("dpop:another", 1.minutes)
+
+        assertFalse(store.firstUse("pkce:long", 60.minutes))
+    }
+
+    @Test
+    fun `a client assertion used through one server instance is refused by another`() =
+        runTest {
+            val clock = MutableClock(Instant.parse("2026-10-19T00:00:00Z"))
+            val sharedStore = InMemoryOAuthReplayStore(clock)
+            val clientKey = generateP256KeyPair()
+            val resolver = {
+                OAuthClientMetadataResolver(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content =
+                                        clientMetadataJson(
+                                            clientId = CLIENT_ID,
+                                            redirectUri = REDIRECT_URI,
+                                            tokenEndpointAuthMethod = "private_key_jwt",
+                                            tokenEndpointAuthSigningAlg = "ES256",
+                                            jwksJson = clientJwksJson(clientKey),
+                                        ),
+                                    status = HttpStatusCode.OK,
+                                    headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+                                )
+                            },
+                        ),
+                    clock = clock,
+                    usedClientAssertions = sharedStore,
+                )
+            }
+            val assertion = createClientAssertion(clientKey, CLIENT_ID, ISSUER, iat = clock.now().epochSeconds, jti = "shared-jti")
+            val authenticate = { instance: OAuthClientMetadataResolver ->
+                kotlinx.coroutines.runBlocking {
+                    instance.authenticateClient(
+                        clientId = CLIENT_ID,
+                        clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        clientAssertion = assertion,
+                        authorizationServerIssuer = ISSUER,
+                    )
+                }
+            }
+
+            assertTrue(authenticate(resolver()).isSuccess)
+            assertIs<OAuthInvalidClientException>(authenticate(resolver()).exceptionOrNull())
+        }
 
     private class Harness(
         metadataScope: String = "atproto transition:generic",

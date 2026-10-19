@@ -8,6 +8,7 @@ import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -31,6 +32,7 @@ import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
+import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
@@ -280,6 +282,14 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     deviceLinkService = deviceLinkService,
                     accessTokenVerifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
                     oauthGrantRevoker = oauthAuthorizationService,
+                    accountDeletionService =
+                        AccountDeletionService(
+                            accountRepository = accountRepository,
+                            mediaBlobRepository = mediaBlobRepository,
+                            backupRepository = InMemoryLogDateBackupRepository(),
+                            blobStorage = blobStorage,
+                            oauthGrantRevoker = oauthAuthorizationService,
+                        ),
                 )
                 identityApiRoutes(
                     accountRepository = accountRepository,

@@ -93,7 +93,7 @@ internal object OAuthDocs {
             reads it first to learn the endpoint URLs and what the server supports: only the `code` response
             type with PKCE (`S256`), pushed authorization requests are required, DPoP proofs must be signed with
             `ES256` or `ES256K`. The scopes are `atproto`, which only confirms which account signed in, and
-            `transition:generic`, which also allows writing records and uploading files. Access tokens last 15
+            `transition:generic`, which also allows reading and writing collections open to apps (none yet). Access tokens last 15
             minutes.
             """,
         )
@@ -335,10 +335,17 @@ internal object OAuthDocs {
                 "only the LogDate apps can approve requests here.",
             "Passkey sign-in on the authorization page is not enabled on this server",
         )
+    private val databaseUnavailable =
+        ErrorCase(
+            "temporarily_unavailable",
+            "The server could not reach its database. Nothing about the request was wrong; retry shortly. Internal details " +
+                "are logged on the server, never returned.",
+            "The server could not reach its database. Try again shortly.",
+        )
     private val tooManyPasskeyAttempts =
         ErrorCase(
             "temporarily_unavailable",
-            "Too many passkey attempts came from this network in the last minute. Wait for `Retry-After` seconds.",
+            "Too many passkey attempts came from this client address in the last minute. Wait for `Retry-After` seconds.",
             "Too many sign-in attempts from this network. Wait a minute and try again.",
         )
     private val retryAfter: io.github.smiley4.ktoropenapi.config.ResponseConfig.() -> Unit = {
@@ -360,8 +367,10 @@ internal object OAuthDocs {
             Called by the browser authorization page, not by third-party clients. It starts a passkey sign-in
             for the pushed request named by `request_uri` and returns the options the page passes to
             `navigator.credentials.get`. When the client's `login_hint` names an account on this server,
-            `allow_credentials` lists that account's passkeys; otherwise it is empty and the browser offers any
-            passkey for this relying party. User verification is always required. The challenge only approves
+            the page names that account, but `allow_credentials` is always empty, so the options reveal nothing about
+            which passkeys an account has. The browser offers the person's discoverable passkeys, and **Approve a request
+            by signing in with a passkey** refuses one that belongs to another account. User verification is always
+            required. The challenge only approves
             this `request_uri`; it cannot be used for an app sign-in or for another request.
             """,
         )
@@ -385,6 +394,7 @@ internal object OAuthDocs {
             oauthError(HttpStatusCode.BadRequest, expiredRequest)
             oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.TooManyRequests, tooManyPasskeyAttempts, headers = retryAfter)
+            oauthError(HttpStatusCode.ServiceUnavailable, databaseUnavailable)
             oauthError(HttpStatusCode.NotImplemented, passkeySignInDisabled)
         }
     }
@@ -457,6 +467,7 @@ internal object OAuthDocs {
             )
             oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.TooManyRequests, tooManyPasskeyAttempts, headers = retryAfter)
+            oauthError(HttpStatusCode.ServiceUnavailable, databaseUnavailable)
             oauthError(HttpStatusCode.NotImplemented, passkeySignInDisabled)
         }
     }
