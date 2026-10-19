@@ -43,6 +43,12 @@ interface AccountRepository {
 
     suspend fun getAllAccounts(): List<Account>
 
+    /**
+     * Active accounts that have not been assigned an AT Protocol handle yet. Handle resolution
+     * provisions these on demand, so the lookup must stay small as the account table grows.
+     */
+    suspend fun findAccountsWithoutHandle(): List<Account> = getAllAccounts().filter { it.handle == null }
+
     suspend fun getAccountsCreatedAfter(timestamp: Instant): List<Account>
 
     suspend fun deleteAccount(accountId: Uuid): Boolean

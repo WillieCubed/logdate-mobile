@@ -963,6 +963,33 @@ class AtprotoIdentityServiceTest {
         assertNull(handleFromDid.invoke(service, "did:plc:alice123"))
     }
 
+    @Test
+    fun `resolving an unknown handle never loads every account`() =
+        kotlinx.coroutines.test.runTest {
+            val delegate = InMemoryAccountRepository()
+            val accountRepository = FullScanForbiddenAccountRepository(delegate)
+            val service =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
+                )
+            service.ensureIdentity(
+                delegate.save(Account(id = Uuid.random(), username = "provisioned", displayName = "P", createdAt = Clock.System.now())),
+            )
+            delegate.save(Account(id = Uuid.random(), username = "legacy", displayName = "L", createdAt = Clock.System.now()))
+
+            assertNull(service.findByHandle("unknown.logdate.app"))
+            assertTrue(service.findByHandle("provisioned.logdate.app")?.did?.startsWith("did:plc:") == true)
+            assertTrue(service.findByHandle("legacy.logdate.app")?.did?.startsWith("did:plc:") == true)
+        }
+
+    private class FullScanForbiddenAccountRepository(
+        private val delegate: InMemoryAccountRepository,
+    ) : app.logdate.server.auth.AccountRepository by delegate {
+        override suspend fun getAllAccounts(): List<Account> = error("Handle resolution must not load every account")
+    }
+
     private fun decodeBase64Url(value: String): ByteArray {
         val normalized =
             when (value.length % 4) {

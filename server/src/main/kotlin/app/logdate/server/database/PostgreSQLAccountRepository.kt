@@ -8,6 +8,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
@@ -212,6 +213,15 @@ class PostgreSQLAccountRepository : AccountRepository {
             AccountsTable
                 .selectAll()
                 .where { AccountsTable.isActive eq true }
+                .orderBy(AccountsTable.createdAt, SortOrder.DESC)
+                .map { it.toAccount() }
+        }
+
+    override suspend fun findAccountsWithoutHandle(): List<Account> =
+        transaction {
+            AccountsTable
+                .selectAll()
+                .where { AccountsTable.handle.isNull() and (AccountsTable.isActive eq true) }
                 .orderBy(AccountsTable.createdAt, SortOrder.DESC)
                 .map { it.toAccount() }
         }

@@ -116,6 +116,22 @@ class PostgreSqlRepositoriesTest {
     }
 
     @Test
+    fun `account repository lists only active accounts that have no handle`() {
+        withAccountTables {
+            val repository = PostgreSQLAccountRepository()
+            val now = Clock.System.now()
+            val withHandle =
+                Account(id = Uuid.random(), username = "named", displayName = "N", handle = "named.logdate.app", createdAt = now)
+            val withoutHandle = Account(id = Uuid.random(), username = "legacy", displayName = "L", createdAt = now)
+            val inactiveWithoutHandle = Account(id = Uuid.random(), username = "gone", displayName = "G", createdAt = now)
+            listOf(withHandle, withoutHandle, inactiveWithoutHandle).forEach { repository.save(it) }
+            repository.deactivateAccount(inactiveWithoutHandle.id)
+
+            assertEquals(listOf(withoutHandle.id), repository.findAccountsWithoutHandle().map { it.id })
+        }
+    }
+
+    @Test
     fun `deleting an account removes its journal repository and sync index`() {
         withAccountTables {
             val repository = PostgreSQLAccountRepository()

@@ -99,19 +99,11 @@ class AtprotoIdentityService(
         }
 
         return accountRepository
-            .getAllAccounts()
+            .findAccountsWithoutHandle()
             .firstNotNullOfOrNull { account ->
-                val resolvedHandle =
-                    if (account.handle != null || account.did != null || account.signingKeyPublic != null) {
-                        account.handle?.let(::canonicalizeHandle)
-                    } else {
-                        provisionedHandleFor(account)
-                    }
-                if (resolvedHandle == normalizedHandle) {
-                    ensureIdentity(account)
-                } else {
-                    null
-                }
+                if (account.did != null || account.signingKeyPublic != null) return@firstNotNullOfOrNull null
+                if (provisionedHandleFor(account) != normalizedHandle) return@firstNotNullOfOrNull null
+                ensureIdentity(account)
             }
     }
 
