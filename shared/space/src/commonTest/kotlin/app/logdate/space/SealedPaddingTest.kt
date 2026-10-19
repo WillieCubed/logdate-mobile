@@ -18,6 +18,26 @@ class SealedPaddingTest {
     }
 
     @Test
+    fun `padding matches the shared conformance sizes`() {
+        val padding = ConformanceFixtures.padding
+        padding.list("sizes").forEach { entry ->
+            val length = entry.int("payloadLength")
+            val padded = SealedPadding.pad(ByteArray(length) { 1 })
+            assertEquals(entry.int("paddedLength"), SealedPadding.paddedSize(length), "payload of $length bytes")
+            assertEquals(entry.int("paddedLength"), padded.size, "padded payload of $length bytes")
+            assertEquals(
+                length,
+                (0 until 4).fold(0) { sum, index -> (sum shl 8) or (padded[index].toInt() and 0xff) },
+                "length header of $length bytes",
+            )
+            assertContentEquals(ByteArray(length) { 1 }, SealedPadding.unpad(padded))
+        }
+        assertEquals(padding.int("largestSealablePayload"), padding.list("sizes").maxOf { it.int("payloadLength") })
+        assertEquals(padding.int("largestSealablePayload") + 1, padding.int("smallestRefusedPayload"))
+        assertFailsWith<SealedRecordException> { SealedPadding.pad(ByteArray(padding.int("smallestRefusedPayload"))) }
+    }
+
+    @Test
     fun `padding round-trips and hides the length`() {
         val short = SealedPadding.pad(ByteArray(10) { 1 })
         val longer = SealedPadding.pad(ByteArray(400) { 2 })
