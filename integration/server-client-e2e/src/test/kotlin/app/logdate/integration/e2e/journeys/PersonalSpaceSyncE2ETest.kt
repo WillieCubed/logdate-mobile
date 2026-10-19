@@ -32,8 +32,8 @@ import kotlin.time.Instant
 
 /**
  * Devices of one account sync through its sealed personal space on a real server, with real Room
- * databases and the real sync engine. The journal and note mappings are minimal ones written for
- * these tests; the real per-kind mappings are their own work.
+ * databases and the real sync engine. Journals use the real mapping; the note mappings are minimal ones
+ * written for these tests.
  */
 class PersonalSpaceSyncE2ETest {
     @Test
@@ -86,6 +86,37 @@ class PersonalSpaceSyncE2ETest {
             assertNull(tablet.journals.getJournalById(journal.id))
             assertEquals(0, tablet.inbox.count())
             assertTrue(phone.metadata.getPendingUploads(EntityType.JOURNAL).isEmpty())
+        }
+
+    @Test
+    fun `a journal with a description and a unicode title reaches another device and its edits come back`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val journal =
+                Journal(
+                    title = "Lac d'Annecy 🏊 日本語",
+                    description = "Every swim\nthis summer",
+                    created = later(0),
+                    lastUpdated = later(0),
+                )
+            phone.journals.create(journal)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertFalse("Annecy" in rawChanges(account), "The server received the journal's title")
+
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            val arrived = assertNotNull(tablet.journals.getJournalById(journal.id))
+            assertEquals(journal.title, arrived.title)
+            assertEquals(journal.description, arrived.description)
+            assertEquals(journal.created.toEpochMilliseconds(), arrived.created.toEpochMilliseconds())
+
+            tablet.journals.update(arrived.copy(title = "Lac d'Annecy et Léman", description = "", lastUpdated = later(1)))
+            assertSynced(tablet.manager.uploadPendingChanges())
+            assertSynced(phone.manager.downloadRemoteChanges())
+            val edited = assertNotNull(phone.journals.getJournalById(journal.id))
+            assertEquals("Lac d'Annecy et Léman", edited.title)
+            assertEquals("", edited.description)
+            assertEquals(0, phone.inbox.count())
         }
 
     @Test

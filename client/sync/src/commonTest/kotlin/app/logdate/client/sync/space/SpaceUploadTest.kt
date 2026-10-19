@@ -3,6 +3,7 @@ package app.logdate.client.sync.space
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.space.mappers.SpaceJournal
 import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.test.runTest
@@ -36,7 +37,7 @@ class SpaceUploadTest {
             assertEquals(1, result.uploadedItems)
             val opened = device.home.openJournal(journal.id.toString())
             assertEquals(JOURNAL_COLLECTION, opened.collection)
-            assertEquals(TestJournalMapper.toRecord(journal), opened.record.jsonObject)
+            assertEquals(TestJournalMapper.toRecord(SpaceJournal(journal)), opened.record.jsonObject)
             val state = assertNotNull(device.swapStore.get(device.scope, JOURNAL_COLLECTION, journal.id.toString()))
             assertEquals(state.seq, device.journal(journal.id)?.syncVersion)
             assertTrue(device.pendingJournals().isEmpty())

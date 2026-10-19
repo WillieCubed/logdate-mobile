@@ -27,34 +27,27 @@ import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudRequestLocation
 import app.logdate.client.sync.cloud.CloudRequestLocationProvider
 import app.logdate.client.sync.cloud.JournalContentAssociation
-import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.JournalConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
-import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.space.RoomSpaceSwapStore
-import app.logdate.client.sync.space.SpaceKind
-import app.logdate.client.sync.space.SpaceLocalRecords
 import app.logdate.client.sync.space.SpaceLocation
 import app.logdate.client.sync.space.SpaceMediaDataSource
-import app.logdate.client.sync.space.SpaceRecordMapper
 import app.logdate.client.sync.space.SpaceRecordRegistry
 import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.mappers.journalSpaceKind
 import app.logdate.client.sync.space.mappers.noteSpaceKind
-import app.logdate.client.sync.space.parseDatetime
-import app.logdate.client.sync.space.parseUuidKey
-import app.logdate.client.sync.space.toDatetime
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
 import app.logdate.shared.config.DefaultLogDateConfigRepository
@@ -74,10 +67,6 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readByteArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import okhttp3.Interceptor
 import okhttp3.Protocol
 import okhttp3.Response
@@ -264,7 +253,7 @@ internal class SpaceDevice(
             syncScope = scope,
             spaceSync =
                 SpaceSyncDependencies(
-                    registry = SpaceRecordRegistry(listOf(journalKind(journals, journalResolver), noteSpaceKind(notes, noteResolver))),
+                    registry = SpaceRecordRegistry(listOf(journalSpaceKind(journals, journalResolver), noteSpaceKind(notes, noteResolver))),
                     gate = SpaceTransportGate({ true }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
                     homes = homes,
                     swapStore = RoomSpaceSwapStore(database.spaceRecordStateDao()),
@@ -369,55 +358,3 @@ internal class FileReadingMediaManager : InMemoryMediaManager() {
         return saveMedia(MediaPayload(fileName, mimeType, data.size.toLong(), data))
     }
 }
-
-/** A minimal journal mapping, written for these tests: title, description and timestamps. */
-private object TestJournalMapper : SpaceRecordMapper<Journal> {
-    override val collection = JOURNAL
-
-    override fun rkeyOf(value: Journal) = value.id.toString()
-
-    override fun toRecord(value: Journal): JsonObject =
-        buildJsonObject {
-            put("\$type", JOURNAL)
-            put("title", value.title)
-            if (value.description.isNotEmpty()) put("description", value.description)
-            put("createdAt", value.created.toDatetime("$JOURNAL createdAt"))
-            put("updatedAt", value.lastUpdated.toDatetime("$JOURNAL updatedAt"))
-        }
-
-    override fun fromRecord(
-        rkey: String,
-        record: JsonObject,
-    ) = Journal(
-        id = parseUuidKey(JOURNAL, rkey),
-        title = record.getValue("title").jsonPrimitive.content,
-        description = record["description"]?.jsonPrimitive?.content.orEmpty(),
-        created = parseDatetime("$JOURNAL createdAt", record.getValue("createdAt").jsonPrimitive.content),
-        lastUpdated = parseDatetime("$JOURNAL updatedAt", record.getValue("updatedAt").jsonPrimitive.content),
-    )
-}
-
-private fun journalKind(
-    journals: FailingJournals,
-    resolver: ConflictResolver<Journal>,
-) = SpaceKind.single(
-    EntityType.JOURNAL,
-    TestJournalMapper,
-    object : SpaceLocalRecords<Journal> {
-        override suspend fun load(entityId: String) = journals.getJournalById(Uuid.parse(entityId))
-
-        override val conflictResolver = resolver
-
-        override fun lastUpdatedOf(item: Journal) = item.lastUpdated
-
-        override suspend fun acknowledgeUpload(
-            item: Journal,
-            seq: Long,
-            syncedAt: Instant,
-        ) = journals.updateSyncMetadata(item.id, seq, syncedAt)
-
-        override suspend fun replaceLocal(item: Journal) {
-            if (journals.getJournalById(item.id) == null) journals.createFromSync(item) else journals.updateFromSync(item)
-        }
-    },
-) { journal, version -> journal.copy(syncVersion = version) }

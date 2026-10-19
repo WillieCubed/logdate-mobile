@@ -1,0 +1,98 @@
+package app.logdate.client.sync.space.mappers
+
+import app.logdate.client.repository.journals.SyncableJournalRepository
+import app.logdate.client.sync.conflict.ConflictResolution
+import app.logdate.client.sync.conflict.ConflictResolver
+import app.logdate.client.sync.conflict.DeletionResolution
+import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceLocalRecords
+import app.logdate.client.sync.space.SpaceMediaResolver
+import app.logdate.shared.model.Journal
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
+
+/**
+ * Journals as a kind of the personal space: one `app.logdate.journal.journal` record each.
+ *
+ * A record that says its journal was merged into another one is applied as a merge on this device
+ * (see [SpaceJournal]); it never becomes a journal the person can see.
+ *
+ * @param journals the stored journals, written without queueing another upload.
+ * @param resolver decides between this device's journal and another device's when both changed.
+ * @param media connects each journal's cover with the blob in the personal space.
+ */
+fun journalSpaceKind(
+    journals: SyncableJournalRepository,
+    resolver: ConflictResolver<Journal>,
+    media: SpaceMediaResolver = SpaceMediaResolver.Default,
+): SpaceKind<SpaceJournal> =
+    SpaceKind.single(
+        entityType = EntityType.JOURNAL,
+        mapper = JournalRecordMapper(media),
+        local = StoredJournals(journals, JournalOrMerge(resolver)),
+        withSyncVersion = { item, version -> item.copy(journal = item.journal.copy(syncVersion = version)) },
+    )
+
+/** Settles two journals with the journal resolver, and prefers a merge made elsewhere to an edit made here. */
+private class JournalOrMerge(
+    private val journals: ConflictResolver<Journal>,
+) : ConflictResolver<SpaceJournal> {
+    override fun resolve(
+        local: SpaceJournal,
+        remote: SpaceJournal,
+        localTimestamp: Instant,
+        remoteTimestamp: Instant,
+    ): ConflictResolution<SpaceJournal> {
+        if (remote.mergedInto != null) return ConflictResolution.KeepRemote(remote)
+        if (local.mergedInto != null) return ConflictResolution.KeepLocal(local)
+        return when (val resolution = journals.resolve(local.journal, remote.journal, localTimestamp, remoteTimestamp)) {
+            is ConflictResolution.KeepLocal -> ConflictResolution.KeepLocal(SpaceJournal(resolution.value))
+            is ConflictResolution.KeepRemote -> ConflictResolution.KeepRemote(SpaceJournal(resolution.value))
+            is ConflictResolution.Merge -> ConflictResolution.Merge(SpaceJournal(resolution.merged))
+            is ConflictResolution.RequiresManualResolution ->
+                ConflictResolution.RequiresManualResolution(
+                    SpaceJournal(resolution.local),
+                    SpaceJournal(resolution.remote),
+                    resolution.reason,
+                )
+        }
+    }
+
+    override fun resolveDeletion(
+        remote: SpaceJournal,
+        remoteTimestamp: Instant,
+    ): DeletionResolution =
+        if (remote.mergedInto != null) DeletionResolution.DELETE else journals.resolveDeletion(remote.journal, remoteTimestamp)
+}
+
+private class StoredJournals(
+    private val journals: SyncableJournalRepository,
+    override val conflictResolver: ConflictResolver<SpaceJournal>,
+) : SpaceLocalRecords<SpaceJournal> {
+    override suspend fun load(entityId: String): SpaceJournal? =
+        Uuid.parseOrNull(entityId)?.let { journals.getJournalById(it) }?.let { SpaceJournal(it) }
+
+    override fun lastUpdatedOf(item: SpaceJournal): Instant = item.journal.lastUpdated
+
+    override suspend fun acknowledgeUpload(
+        item: SpaceJournal,
+        seq: Long,
+        syncedAt: Instant,
+    ) {
+        if (item.mergedInto != null) return
+        journals.updateSyncMetadata(item.journal.id, seq, syncedAt)
+    }
+
+    override suspend fun replaceLocal(item: SpaceJournal) {
+        val journal = item.journal
+        val survivor = item.mergedInto
+        if (survivor != null) {
+            journals.applyJournalRedirect(journal.id, survivor)
+        } else if (journals.getJournalById(journal.id) == null) {
+            journals.createFromSync(journal)
+        } else {
+            journals.updateFromSync(journal)
+        }
+    }
+}

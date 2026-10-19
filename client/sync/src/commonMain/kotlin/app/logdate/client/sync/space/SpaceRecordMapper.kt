@@ -4,6 +4,7 @@ import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.metadata.EntityType
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Converts one record type, such as `app.logdate.journal.entry`, to and from the value LogDate
@@ -134,6 +135,8 @@ interface SpaceLocalRecords<T : Any> {
  *
  * @param main the record that is the item itself: deleting it deletes the item.
  * @param others any further record types the kind owns.
+ * @param isItemId whether a string is an id this kind's items can have, so a record whose key names
+ *   anything else is kept as unreadable. LogDate ids by default.
  * @param withSyncVersion the item with [Long] as its sync version, the newest change-log position of
  *   its records, so a newer write always compares as newer.
  * @param assemble builds the item from its changed records on top of the local copy, for records
@@ -146,6 +149,7 @@ class SpaceKind<T : Any>(
     val local: SpaceLocalRecords<T>,
     val withSyncVersion: (T, Long) -> T,
     val others: List<SpacePart<T, *>> = emptyList(),
+    val isItemId: (String) -> Boolean = { Uuid.parseOrNull(it) != null },
     private val assemble: (changes: SpaceItemChanges<T>, local: T?) -> T?,
 ) {
     /** Every record type the kind owns, its main record first. */

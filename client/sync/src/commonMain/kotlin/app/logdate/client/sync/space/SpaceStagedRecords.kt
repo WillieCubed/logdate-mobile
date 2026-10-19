@@ -11,7 +11,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /**
  * One kind's personal-space records staged in the download inbox, joined into that kind's own items
@@ -32,14 +31,14 @@ class SpaceStagedRecords<T : Any> internal constructor(
     private val selected: DownloadScope,
 ) {
     private val type = spacePartsType(kind.entityType)
-    private val offered = mutableMapOf<Uuid, List<Staged>>()
+    private val offered = mutableMapOf<String, List<Staged>>()
     private val seen = mutableSetOf<String>()
     private var lastReadAt: Instant? = null
 
     /** The items to apply, the items deleted, when they were read, and whether more rows are due. */
     class Page<T>(
         val changes: List<T>,
-        val deletions: List<Uuid>,
+        val deletions: List<String>,
         val readAt: Instant,
         val hasMore: Boolean,
     )
@@ -51,22 +50,21 @@ class SpaceStagedRecords<T : Any> internal constructor(
         val due = inbox.pending(type, selected)
         val rows = due.filter { seen.add(it.entityId) }
         val changes = mutableListOf<T>()
-        val deletions = mutableListOf<Uuid>()
+        val deletions = mutableListOf<String>()
         for ((owner, staged) in group(rows)) {
-            val id = Uuid.parseOrNull(owner)
-            if (id == null) {
+            if (!kind.isItemId(owner)) {
                 staged.forEach { fail(it.row, DiagnosticReason.CORRUPT_PAYLOAD) }
                 continue
             }
             val mainChange = staged.lastOrNull { it.part === kind.main }
             if (mainChange?.row?.deleted == true) {
-                deletions += id
-                offered[id] = staged
+                deletions += owner
+                offered[owner] = staged
                 continue
             }
             val item = assemble(owner, staged) ?: continue
             changes += item.first
-            offered[id] = item.second
+            offered[owner] = item.second
         }
         val now = Clock.System.now()
         val readAt = lastReadAt?.let { maxOf(now, it + 1.milliseconds) } ?: now
@@ -79,20 +77,20 @@ class SpaceStagedRecords<T : Any> internal constructor(
      * the versions recorded for its records are stored together or not at all.
      */
     internal suspend fun settle(
-        id: Uuid,
+        id: String,
         outcome: RemoteOutcome,
     ) {
         val staged = offered.remove(id) ?: return
         when (outcome) {
             RemoteOutcome.STORED, RemoteOutcome.MERGED, RemoteOutcome.KEPT_LOCAL -> staged.forEach { record(it) }
-            RemoteOutcome.DELETED -> forgetItem(id.toString())
+            RemoteOutcome.DELETED -> forgetItem(id)
             RemoteOutcome.DECLINED -> Unit
         }
         staged.forEach { inbox.applied(type, it.row.entityId, it.row.version, selected, enqueueMedia = false) }
     }
 
     /** Leaves item [id]'s rows to be offered again after the inbox's backoff. */
-    internal suspend fun settleFailed(id: Uuid) {
+    internal suspend fun settleFailed(id: String) {
         offered.remove(id)?.forEach { fail(it.row, DiagnosticReason.LOCAL_STORAGE) }
     }
 
@@ -105,7 +103,13 @@ class SpaceStagedRecords<T : Any> internal constructor(
                 fail(row, DiagnosticReason.CORRUPT_PAYLOAD)
                 continue
             }
-            val owner = canonicalRecordKey(part.ownerOf(payload.rkey))
+            val owner =
+                try {
+                    canonicalRecordKey(part.ownerOf(payload.rkey))
+                } catch (_: IllegalArgumentException) {
+                    fail(row, DiagnosticReason.CORRUPT_PAYLOAD)
+                    continue
+                }
             byOwner.getOrPut(owner) { mutableListOf() } += Staged(row, payload, part)
         }
         return byOwner
@@ -168,7 +172,8 @@ class SpaceStagedRecords<T : Any> internal constructor(
     }
 
     private suspend fun mainDeleted(owner: String): Boolean {
-        val sealed = SealedRecordCodec.sealedRkey(access.keys, kind.main.collection, owner)
+        val mainKey = canonicalRecordKey(kind.main.rkeysOf(owner).first())
+        val sealed = SealedRecordCodec.sealedRkey(access.keys, kind.main.collection, mainKey)
         val row = inbox.row(type, sealed, selected) ?: return false
         return row.deleted && row.state == "APPLIED"
     }
