@@ -35,6 +35,20 @@ class PlcEncodingTest {
     }
 
     @Test
+    fun `operation cid matches the cid the directory assigned to the real audit sample`() {
+        val cid = PlcEncoding.operationCid(sampleGenesisOperation())
+
+        assertEquals("bafyreibfvkh3n6odvdpwj54j4xxdsgnn4zo5utbyf7z7nfbyikhtygzjcq", cid)
+    }
+
+    @Test
+    fun `operation cid rejects unsigned operations`() {
+        assertFailsWith<IllegalArgumentException> {
+            PlcEncoding.operationCid(sampleGenesisOperation().copy(sig = null))
+        }
+    }
+
+    @Test
     fun `signed operation encoding is deterministic`() {
         val operation = sampleGenesisOperation()
 
