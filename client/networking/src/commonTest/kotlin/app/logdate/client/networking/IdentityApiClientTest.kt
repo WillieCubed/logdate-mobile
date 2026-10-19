@@ -241,4 +241,85 @@ class IdentityApiClientTest {
             assertTrue(result.isSuccess)
             assertEquals("did:key:zImported", result.getOrThrow().publicKeyDidKey)
         }
+
+    @Test
+    fun `prepareIdentityRecovery posts to the recover prepare path`() =
+        runTest {
+            val client =
+                createClient(
+                    MockEngine { request ->
+                        assertEquals("/api/v1/identity/recovery-key/recover/prepare", request.url.encodedPath)
+                        assertEquals("Bearer token-123", request.headers[HttpHeaders.Authorization])
+                        respond(
+                            content =
+                                """
+                                {
+                                  "success": true,
+                                  "data": {
+                                    "did": "did:plc:alice123",
+                                    "handle": "alice.logdate.app",
+                                    "recoveryDidKey": "did:key:zRecovery",
+                                    "nextPublicKeyDidKey": "did:key:zNext",
+                                    "unsignedOperationJson": "{}",
+                                    "signingPayloadBase64Url": "cGF5bG9hZA",
+                                    "preparedKey": "sealed"
+                                  }
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val prepared = client.prepareIdentityRecovery("token-123").getOrThrow()
+
+            assertEquals("sealed", prepared.preparedKey)
+            assertEquals("did:key:zRecovery", prepared.recoveryDidKey)
+        }
+
+    @Test
+    fun `completeIdentityRecovery sends the sealed key and signature`() =
+        runTest {
+            val client =
+                createClient(
+                    MockEngine { request ->
+                        assertEquals("/api/v1/identity/recovery-key/recover/complete", request.url.encodedPath)
+                        val body = (request.body as io.ktor.http.content.TextContent).text
+                        assertTrue(body.contains("\"preparedKey\":\"sealed\""))
+                        assertTrue(body.contains("\"signature\":\"sig\""))
+                        respond(
+                            content =
+                                """
+                                {"success":true,"data":{"did":"did:plc:alice123","handle":"alice.logdate.app","publicKeyDidKey":"did:key:zNext"}}
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val completed = client.completeIdentityRecovery("token-123", preparedKey = "sealed", signature = "sig").getOrThrow()
+
+            assertEquals("did:key:zNext", completed.publicKeyDidKey)
+        }
+
+    @Test
+    fun `identity errors keep the server's code`() =
+        runTest {
+            val client =
+                createClient(
+                    MockEngine {
+                        respond(
+                            content = """{"success":false,"error":{"code":"IDENTITY_CHANGED","message":"changed"}}""",
+                            status = HttpStatusCode.Conflict,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val error = client.completeIdentityRecovery("token-123", preparedKey = "sealed", signature = "sig").exceptionOrNull()
+
+            assertEquals("IDENTITY_CHANGED", (error as IdentityApiException).errorCode)
+        }
 }

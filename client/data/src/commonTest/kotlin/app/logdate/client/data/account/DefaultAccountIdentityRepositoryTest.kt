@@ -7,12 +7,16 @@ import app.logdate.client.networking.ExportSigningKeyDataDto
 import app.logdate.client.networking.ExportedSigningKeyDto
 import app.logdate.client.networking.HostedPlcOperationDataDto
 import app.logdate.client.networking.IdentityApiClientContract
+import app.logdate.client.networking.IdentityApiException
 import app.logdate.client.networking.IdentityStatusDataDto
 import app.logdate.client.networking.ImportSigningKeyDataDto
+import app.logdate.client.networking.PrepareIdentityRecoveryDataDto
 import app.logdate.client.networking.PrepareRecoverySigningKeyImportDataDto
 import app.logdate.client.networking.RegisterPlcRecoveryKeyDataDto
 import app.logdate.client.networking.RotateSigningKeyDataDto
 import app.logdate.client.repository.account.ExportedIdentitySigningKeyPayload
+import app.logdate.client.repository.account.IdentityRecoveryException
+import app.logdate.client.repository.account.IdentityRecoveryFailure
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -159,7 +163,93 @@ class DefaultAccountIdentityRepositoryTest {
             assertTrue(result.isSuccess)
             assertEquals("did:key:zRecovery", result.getOrThrow().recoveryDidKey)
         }
+
+    @Test
+    fun `registerRecoveryKey sends only the derived public key`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient()
+            val repository = recoveryRepository(apiClient)
+
+            val result = repository.registerRecoveryKey(PHRASE)
+
+            assertEquals("did:key:zRecovery", apiClient.lastRegisteredRecoveryDidKey)
+            assertEquals("did:key:zRecovery", result.getOrThrow().recoveryDidKey)
+        }
+
+    @Test
+    fun `recoverIdentity signs the prepared payload and returns the sealed key`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient()
+            val repository = recoveryRepository(apiClient)
+
+            val result = repository.recoverIdentity(PHRASE)
+
+            assertEquals("sealed-key", apiClient.lastPreparedKey)
+            assertEquals("signed:payload", apiClient.lastRecoverySignature)
+            assertEquals("did:key:zFresh", result.getOrThrow().publicKeyDidKey)
+        }
+
+    @Test
+    fun `recoverIdentity stops before signing when the phrase does not match the registered key`() =
+        runTest {
+            val apiClient = FakeIdentityApiClient(preparedRecoveryDidKey = "did:key:zSomeoneElse")
+            val repository = recoveryRepository(apiClient)
+
+            val failure = repository.recoverIdentity(PHRASE).exceptionOrNull()
+
+            assertEquals(IdentityRecoveryFailure.PHRASE_MISMATCH, (failure as IdentityRecoveryException).failure)
+            assertEquals(null, apiClient.lastPreparedKey)
+        }
+
+    @Test
+    fun `recovery failures carry what the person can act on`() =
+        runTest {
+            val changed = FakeIdentityApiClient(completeError = IdentityApiException("IDENTITY_CHANGED", "changed"))
+            val offline = FakeIdentityApiClient(completeError = IdentityApiException("NETWORK_ERROR", "offline"))
+            val alreadySet = FakeIdentityApiClient(registerError = IdentityApiException("RECOVERY_KEY_ALREADY_SET", "set"))
+
+            assertEquals(IdentityRecoveryFailure.IDENTITY_CHANGED, recoveryRepository(changed).recoverIdentity(PHRASE).failure())
+            assertEquals(IdentityRecoveryFailure.UNREACHABLE, recoveryRepository(offline).recoverIdentity(PHRASE).failure())
+            assertEquals(IdentityRecoveryFailure.ALREADY_SET, recoveryRepository(alreadySet).registerRecoveryKey(PHRASE).failure())
+            assertEquals(IdentityRecoveryFailure.KEY_REMOVED, recoveryFailureFor("RECOVERY_KEY_NOT_ON_IDENTITY"))
+            assertEquals(IdentityRecoveryFailure.NOT_AVAILABLE, recoveryFailureFor("RECOVERY_KEYS_UNAVAILABLE"))
+            assertEquals(IdentityRecoveryFailure.REFUSED, recoveryFailureFor("SOMETHING_NEW"))
+        }
+
+    @Test
+    fun `recovery without a session or with an unusable phrase says so`() =
+        runTest {
+            val signedOut =
+                DefaultAccountIdentityRepository(
+                    apiClient = FakeIdentityApiClient(),
+                    sessionStorage = FakeSessionStorage(),
+                    plcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
+                    json = json,
+                )
+            val broken =
+                DefaultAccountIdentityRepository(
+                    apiClient = FakeIdentityApiClient(),
+                    sessionStorage = FakeSessionStorage(session = TEST_SESSION),
+                    plcRecoveryKeyManager = FakePlcRecoveryKeyManager(failure = IllegalArgumentException("Invalid recovery phrase")),
+                    json = json,
+                )
+
+            assertEquals(IdentityRecoveryFailure.SIGNED_OUT, signedOut.registerRecoveryKey(PHRASE).failure())
+            assertEquals(IdentityRecoveryFailure.DEVICE_ERROR, broken.registerRecoveryKey(PHRASE).failure())
+        }
+
+    private fun recoveryRepository(apiClient: FakeIdentityApiClient) =
+        DefaultAccountIdentityRepository(
+            apiClient = apiClient,
+            sessionStorage = FakeSessionStorage(session = TEST_SESSION),
+            plcRecoveryKeyManager = FakePlcRecoveryKeyManager(),
+            json = json,
+        )
+
+    private fun Result<*>.failure(): IdentityRecoveryFailure? = (exceptionOrNull() as? IdentityRecoveryException)?.failure
 }
+
+private val PHRASE = List(12) { "word${it + 1}" }
 
 private val TEST_SESSION =
     UserSession(
@@ -188,7 +278,13 @@ private class FakeSessionStorage(
     }
 }
 
-private class FakeIdentityApiClient : IdentityApiClientContract {
+private class FakeIdentityApiClient(
+    private val preparedRecoveryDidKey: String = "did:key:zRecovery",
+    private val completeError: IdentityApiException? = null,
+    private val registerError: IdentityApiException? = null,
+) : IdentityApiClientContract {
+    var lastRegisteredRecoveryDidKey: String? = null
+    var lastPreparedKey: String? = null
     var lastAccessToken: String? = null
     var lastPassphrase: String? = null
     var lastImportedExportedKey: ExportedSigningKeyDto? = null
@@ -332,6 +428,8 @@ private class FakeIdentityApiClient : IdentityApiClientContract {
         recoveryDidKey: String,
     ): Result<RegisterPlcRecoveryKeyDataDto> {
         lastAccessToken = accessToken
+        lastRegisteredRecoveryDidKey = recoveryDidKey
+        registerError?.let { return Result.failure(it) }
         return Result.success(
             RegisterPlcRecoveryKeyDataDto(
                 did = "did:plc:alice123",
@@ -340,10 +438,48 @@ private class FakeIdentityApiClient : IdentityApiClientContract {
             ),
         )
     }
+
+    override suspend fun prepareIdentityRecovery(accessToken: String): Result<PrepareIdentityRecoveryDataDto> {
+        lastAccessToken = accessToken
+        return Result.success(
+            PrepareIdentityRecoveryDataDto(
+                did = "did:plc:alice123",
+                handle = "alice.logdate.app",
+                recoveryDidKey = preparedRecoveryDidKey,
+                nextPublicKeyDidKey = "did:key:zFresh",
+                unsignedOperationJson = """{"type":"plc_operation"}""",
+                signingPayloadBase64Url = "cGF5bG9hZA",
+                preparedKey = "sealed-key",
+            ),
+        )
+    }
+
+    override suspend fun completeIdentityRecovery(
+        accessToken: String,
+        preparedKey: String,
+        signature: String,
+    ): Result<ImportSigningKeyDataDto> {
+        lastAccessToken = accessToken
+        lastPreparedKey = preparedKey
+        lastRecoverySignature = signature
+        completeError?.let { return Result.failure(it) }
+        return Result.success(
+            ImportSigningKeyDataDto(
+                did = "did:plc:alice123",
+                handle = "alice.logdate.app",
+                publicKeyDidKey = "did:key:zFresh",
+            ),
+        )
+    }
 }
 
-private class FakePlcRecoveryKeyManager : PlcRecoveryKeyManager {
-    override suspend fun deriveDidKey(recoveryPhrase: List<String>): String = "did:key:zRecovery"
+private class FakePlcRecoveryKeyManager(
+    private val failure: Exception? = null,
+) : PlcRecoveryKeyManager {
+    override suspend fun deriveDidKey(recoveryPhrase: List<String>): String {
+        failure?.let { throw it }
+        return "did:key:zRecovery"
+    }
 
     override suspend fun signPayload(
         recoveryPhrase: List<String>,
