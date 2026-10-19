@@ -2,6 +2,7 @@
 
 package app.logdate.server.database
 
+import app.logdate.server.passkeys.OAUTH_AUTHORIZATION_CHALLENGE_TYPE
 import app.logdate.server.passkeys.PasskeyChallengeRepository
 import app.logdate.shared.model.PasskeyChallenge
 import org.jetbrains.exposed.v1.core.and
@@ -70,6 +71,7 @@ class PostgreSQLPasskeyChallengeRepository : PasskeyChallengeRepository {
         scope: String,
         type: String,
     ): String? {
+        if (scope == "passkey" && type == OAUTH_AUTHORIZATION_CHALLENGE_TYPE) return type
         val ceremony = if (scope == "restore") type.removePrefix("restore-") else type
         return ceremony.takeIf {
             scope in setOf("passkey", "restore") &&

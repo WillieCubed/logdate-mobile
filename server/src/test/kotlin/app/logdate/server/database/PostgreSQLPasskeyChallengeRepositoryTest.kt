@@ -35,6 +35,22 @@ class PostgreSQLPasskeyChallengeRepositoryTest {
         }
 
     @Test
+    fun `an authorization page challenge is stored apart from app sign-in challenges`() =
+        withH2Database(WebAuthnChallengesTable) {
+            runBlocking {
+                val repository = PostgreSQLPasskeyChallengeRepository()
+                val now = Clock.System.now()
+                val bound = challenge().copy(type = "oauth_authorize")
+                repository.save("passkey", bound)
+
+                assertNull(repository.consume("passkey", bound.challenge, "authentication", null, now))
+                assertNull(repository.consume("passkey", bound.challenge, "oauth_authorize", Uuid.random(), now))
+                assertNull(repository.consume("restore", bound.challenge, "oauth_authorize", bound.userId, now))
+                assertNotNull(repository.consume("passkey", bound.challenge, "oauth_authorize", bound.userId, now))
+            }
+        }
+
+    @Test
     fun `expired challenges cannot be consumed including at the expiry boundary`() =
         withH2Database(WebAuthnChallengesTable) {
             runBlocking {
