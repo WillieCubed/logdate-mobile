@@ -27,6 +27,11 @@ import app.logdate.feature.core.settings.account.hosting.HostingContent
 import app.logdate.feature.core.settings.account.hosting.HostingUiState
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseContent
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseUiState
+import app.logdate.feature.core.settings.account.recoverykey.KeyStatus
+import app.logdate.feature.core.settings.account.recoverykey.PhraseStatus
+import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyContent
+import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyDestinations
+import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyUiState
 import app.logdate.feature.core.settings.account.signin.LinkedProviderRow
 import app.logdate.feature.core.settings.account.signin.PasskeyRow
 import app.logdate.feature.core.settings.account.signin.SignInMethodsContent
@@ -128,6 +133,46 @@ internal val personalSettingsScenes: List<SharedScreenshotSceneSpec> =
                 onReveal = {},
                 onHide = {},
                 onEnterPhrase = {},
+            )
+        },
+        sharedScene(
+            SharedScreenshotSceneId.RecoveryKeySetup,
+            ScreenshotSceneGroup.SETTINGS,
+            standardMatrixVariants +
+                listOf(
+                    ScreenshotSceneVariant(ScreenshotViewportId.PHONE_RTL),
+                    ScreenshotSceneVariant(ScreenshotViewportId.PHONE_LARGE_TEXT),
+                ),
+        ) {
+            RecoveryKeyContent(
+                state =
+                    RecoveryKeyUiState.Ready(
+                        handle = "alex.logdate.app",
+                        serverName = "LogDate Cloud",
+                        phrase = PhraseStatus.CONFIRMED,
+                        key = KeyStatus.OFF,
+                    ),
+                destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}, onEnterPhrase = {}),
+                onTurnOn = {},
+                onReplaceServerKey = {},
+                onRetry = {},
+                onDismissError = {},
+            )
+        },
+        sharedScene(SharedScreenshotSceneId.RecoveryKeyOn, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+            RecoveryKeyContent(
+                state =
+                    RecoveryKeyUiState.Ready(
+                        handle = "alex.logdate.app",
+                        serverName = "LogDate Cloud",
+                        phrase = PhraseStatus.CONFIRMED,
+                        key = KeyStatus.ON,
+                    ),
+                destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}, onEnterPhrase = {}),
+                onTurnOn = {},
+                onReplaceServerKey = {},
+                onRetry = {},
+                onDismissError = {},
             )
         },
         sharedScene(SharedScreenshotSceneId.Hosting, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

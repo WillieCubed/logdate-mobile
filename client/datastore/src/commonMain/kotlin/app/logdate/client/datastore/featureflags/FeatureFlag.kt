@@ -117,6 +117,14 @@ enum class FeatureFlag(
      * uses the personal space when the server offers it and the account is stored there.
      */
     PERSONAL_SPACE(key = "personal_space_enabled", defaultEnabled = false),
+
+    /**
+     * A recovery key the person holds for their identity, derived from their recovery phrase and
+     * ranked above the server's key. Account shows it only when the connected server supports it.
+     *
+     * Off by default until it has been tried against a server with recovery keys turned on.
+     */
+    IDENTITY_RECOVERY_KEY(key = "identity_recovery_key_enabled", defaultEnabled = false),
     ;
 
     companion object {

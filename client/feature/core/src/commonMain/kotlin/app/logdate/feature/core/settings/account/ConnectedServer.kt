@@ -17,12 +17,15 @@ import kotlinx.coroutines.launch
  * @property displayName the name the server gives itself, or `null` before it has been asked
  * @property publishesIdentityChanges whether AT Protocol identity changes made here reach the PLC
  *   directory, so identity tools that depend on that can be offered
+ * @property supportsRecoveryKeys whether people can register their own recovery key on their
+ *   identity here and use it to replace the server's key
  */
 data class ConnectedServerInfo(
     val origin: String,
     val displayName: String?,
     val isLogDateCloud: Boolean,
     val publishesIdentityChanges: Boolean,
+    val supportsRecoveryKeys: Boolean = false,
 ) {
     /** The origin without its scheme, as a person would type it. */
     val host: String get() = origin.substringAfter("://").trimEnd('/')
@@ -63,6 +66,8 @@ class DefaultConnectedServer(
                 isLogDateCloud = backendUrl == DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL,
                 publishesIdentityChanges =
                     currentDescriptor?.hasProtocolFeature(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1) == true,
+                supportsRecoveryKeys =
+                    currentDescriptor?.hasProtocolFeature(ServerProtocolFeature.ATPROTO_RECOVERY_KEYS_V1) == true,
             )
         }
 

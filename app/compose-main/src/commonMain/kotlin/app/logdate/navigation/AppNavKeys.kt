@@ -38,6 +38,7 @@ import app.logdate.feature.core.settings.navigation.PeopleSettingsRoute
 import app.logdate.feature.core.settings.navigation.PersonDetailRoute
 import app.logdate.feature.core.settings.navigation.PrivacySettingsRoute
 import app.logdate.feature.core.settings.navigation.RecommendationSettingsRoute
+import app.logdate.feature.core.settings.navigation.RecoveryKeyRoute
 import app.logdate.feature.core.settings.navigation.RecoveryPhraseEntrySettingsRoute
 import app.logdate.feature.core.settings.navigation.RecoveryPhraseRoute
 import app.logdate.feature.core.settings.navigation.ResetAppSettingsRoute
@@ -144,6 +145,7 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(AccountSettingsRoute::class, AccountSettingsRoute.serializer())
                     subclass(SignInMethodsRoute::class, SignInMethodsRoute.serializer())
                     subclass(RecoveryPhraseRoute::class, RecoveryPhraseRoute.serializer())
+                    subclass(RecoveryKeyRoute::class, RecoveryKeyRoute.serializer())
                     subclass(RecoveryPhraseEntrySettingsRoute::class, RecoveryPhraseEntrySettingsRoute.serializer())
                     subclass(HostingRoute::class, HostingRoute.serializer())
                     subclass(MoveServerRoute::class, MoveServerRoute.serializer())

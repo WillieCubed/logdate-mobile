@@ -26,7 +26,7 @@ class SettingsActivityRegistrationTest {
                 )
             }
         assertEquals(ActivityPresentation.SettingsRoot, entries(SettingsRoute()).activityPresentation())
-        for (route in listOf(AccountSettingsRoute, HostingRoute, MoveServerRoute, RecoveryPhraseRoute)) {
+        for (route in listOf(AccountSettingsRoute, HostingRoute, MoveServerRoute, RecoveryPhraseRoute, RecoveryKeyRoute)) {
             val entry = entries(route)
             assertEquals(ActivityPresentation.SettingsDetail("account"), entry.activityPresentation())
             assertTrue(entry.hasViewModelsPerVisit())

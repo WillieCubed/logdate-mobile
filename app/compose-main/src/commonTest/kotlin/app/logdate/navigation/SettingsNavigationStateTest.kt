@@ -11,6 +11,7 @@ import app.logdate.feature.core.settings.navigation.DeveloperToolsRoute
 import app.logdate.feature.core.settings.navigation.HostingRoute
 import app.logdate.feature.core.settings.navigation.LabsSettingsRoute
 import app.logdate.feature.core.settings.navigation.MoveServerRoute
+import app.logdate.feature.core.settings.navigation.RecoveryKeyRoute
 import app.logdate.feature.core.settings.navigation.RecoveryPhraseEntrySettingsRoute
 import app.logdate.feature.core.settings.navigation.RecoveryPhraseRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
@@ -27,6 +28,7 @@ abstract class SettingsNavigationStateTest {
             listOf(
                 SignInMethodsRoute,
                 RecoveryPhraseRoute,
+                RecoveryKeyRoute,
                 HostingRoute,
                 MoveServerRoute,
                 DeleteAccountRoute,
