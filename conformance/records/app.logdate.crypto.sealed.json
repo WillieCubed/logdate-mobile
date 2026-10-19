@@ -1,15 +1,26 @@
 {
   "collection": "app.logdate.crypto.sealed",
   "recordKey": "any",
+  "recordKeys": {
+    "valid": [
+      "3jzfcijpj2z2a",
+      "self",
+      "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80",
+      "lake-house",
+      "a.b-c_d:e~f"
+    ],
+    "invalid": [
+      "",
+      ".",
+      "..",
+      "a/b",
+      "has space",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ]
+  },
   "valid": [
     {
       "name": "minimal",
-      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
-      "dagCbor": "a565247479706578196170702e6c6f67646174652e63727970746f2e7365616c6564656b657949647450616e63616b657320617420746865206c616b65656e6f6e6365460102030405066776657273696f6e076a6369706865727465787446010203040506",
-      "cid": "bafyreihjjdbpjyhddtnqo7sksey5rhntl5gdlgdobnleklrrr6zjj6mucq"
-    },
-    {
-      "name": "every-field",
       "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
       "dagCbor": "a565247479706578196170702e6c6f67646174652e63727970746f2e7365616c6564656b657949647450616e63616b657320617420746865206c616b65656e6f6e6365460102030405066776657273696f6e076a6369706865727465787446010203040506",
       "cid": "bafyreihjjdbpjyhddtnqo7sksey5rhntl5gdlgdobnleklrrr6zjj6mucq"

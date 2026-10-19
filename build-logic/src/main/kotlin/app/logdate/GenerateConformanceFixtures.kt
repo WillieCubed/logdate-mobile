@@ -1,25 +1,31 @@
 package app.logdate
 
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 
 /**
- * Embeds the JSON files of a client conformance fixture folder in a Kotlin object, so tests in
- * `commonTest` can read them on every target, iOS included, without a file system. The fixtures
- * stay the single source of truth: this copies them at build time and nothing generated is
- * checked in.
+ * Embeds JSON fixture files in a Kotlin object, so tests in `commonTest` can read them on every
+ * target, iOS included, without a file system. The fixtures stay the single source of truth: this
+ * copies them at build time and nothing generated is checked in.
+ *
+ * The inputs are exactly the files in [fixtures], so only the JSON files you select can change
+ * the task's result: select them with a file tree rooted at [root] and `include` patterns.
  *
  * ```kotlin
+ * val conformance = rootProject.layout.projectDirectory.dir("conformance")
  * val fixtures = tasks.register<GenerateConformanceFixtures>("generateSealedConformanceFixtures") {
- *     fixtures.set(rootProject.layout.projectDirectory.dir("conformance/sealed"))
+ *     root.set(conformance)
+ *     fixtures.from(rootProject.fileTree(conformance) { include("manifest.json", "sealed/padding.json") })
  *     packageName.set("app.logdate.space")
  *     objectName.set("SealedConformanceFixtures")
  *     outputDirectory.set(layout.buildDirectory.dir("generated/conformance/kotlin"))
@@ -29,10 +35,14 @@ import org.gradle.api.tasks.TaskAction
  */
 @CacheableTask
 abstract class GenerateConformanceFixtures : DefaultTask() {
-    /** The folder whose top-level `.json` files are embedded. Subfolders are ignored. */
-    @get:InputDirectory
+    /** The JSON files to embed. */
+    @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
-    abstract val fixtures: DirectoryProperty
+    abstract val fixtures: ConfigurableFileCollection
+
+    /** The folder the embedded names are relative to, such as `sealed/padding.json`. */
+    @get:Internal
+    abstract val root: DirectoryProperty
 
     @get:Input
     abstract val packageName: Property<String>
@@ -45,16 +55,13 @@ abstract class GenerateConformanceFixtures : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val files =
-            fixtures
-                .get()
-                .asFile
-                .listFiles { file -> file.isFile && file.extension == "json" }
-                .orEmpty()
-                .sortedBy { it.name }
-                .associate { it.name to it.readText() }
-        check(files.isNotEmpty()) { "No .json fixtures in ${fixtures.get().asFile}" }
+        val base = root.get().asFile
+        val selected = fixtures.files.filter { it.isFile }
+        check(selected.isNotEmpty()) { "No fixture files selected under $base" }
+        val notJson = selected.filter { it.extension != "json" }
+        check(notJson.isEmpty()) { "Only .json fixtures can be embedded, not ${notJson.map { it.name }}" }
 
+        val files = selected.sortedBy { it.relativeTo(base).invariantSeparatorsPath }.associate { it.relativeTo(base).invariantSeparatorsPath to it.readText() }
         val output = outputDirectory.get().asFile.resolve(packageName.get().replace('.', '/'))
         output.deleteRecursively()
         output.mkdirs()
@@ -78,7 +85,10 @@ fun conformanceFixtureSource(
         files.forEach { (name, text) -> appendLine("            ${kotlinString(name)} to ${kotlinString(text)},") }
         appendLine("        )")
         appendLine()
-        appendLine("    /** The text of the fixture file called [name], such as `padding.json`. */")
+        appendLine("    /** The names of the embedded files, such as `sealed/padding.json`. */")
+        appendLine("    val names: List<String> get() = files.keys.toList()")
+        appendLine()
+        appendLine("    /** The text of the fixture file called [name], such as `sealed/padding.json`. */")
         appendLine("    fun text(name: String): String = files[name] ?: error(\"No conformance fixture called \$name\")")
         appendLine("}")
     }

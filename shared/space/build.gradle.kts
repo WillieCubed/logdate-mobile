@@ -15,10 +15,12 @@ description = "LogDate's private and shared spaces: sealed records, and the data
 // The sealed-record tests read the shared client conformance fixtures, so this module, the Mac app
 // and the Linux app are held to the same known answers. They're embedded at build time because
 // common tests run on iOS too, where there's no repository to read files from.
+val conformanceDirectory = rootProject.layout.projectDirectory.dir("conformance")
 val generateSealedConformanceFixtures =
     tasks.register<GenerateConformanceFixtures>("generateSealedConformanceFixtures") {
-        description = "Embed conformance/sealed in the test sources."
-        fixtures.set(rootProject.layout.projectDirectory.dir("conformance/sealed"))
+        description = "Embed the conformance manifest and sealed fixtures in the test sources."
+        root.set(conformanceDirectory)
+        fixtures.from(rootProject.fileTree(conformanceDirectory) { include("manifest.json", "sealed/*.json") })
         packageName.set("app.logdate.space")
         objectName.set("SealedConformanceFixtures")
         outputDirectory.set(layout.buildDirectory.dir("generated/conformance/kotlin"))

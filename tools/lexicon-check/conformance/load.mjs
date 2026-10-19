@@ -9,6 +9,9 @@ export const root = resolve(here, "../../..");
 export const conformanceRoot = join(root, "conformance");
 export const examplesDir = join(root, "tools/lexicon-check/examples");
 const lexiconRoot = join(root, "lexicons");
+
+/** The folders the record fixtures are generated from. */
+export const schemaInputDirs = [join(lexiconRoot, "app/logdate"), join(lexiconRoot, "community"), examplesDir];
 const notSchemas = new Set([join(lexiconRoot, "activity-streams.json"), join(lexiconRoot, "published.json")]);
 
 export async function jsonFiles(dir) {

@@ -16,12 +16,45 @@ another.
 | `sealed/key-schedule.json` | How the personal space's content key, index key, key ID and opaque record keys derive from an identity key. |
 | `sealed/padding.json` | How a payload is padded to its size bucket before encryption. |
 | `sealed/envelopes.json` | Whole `app.logdate.crypto.sealed` envelopes: the plaintext payload, the nonce, the DAG-CBOR bytes, the ciphertext, and changes that must make an envelope fail to open. |
-| `sealed/reference/verify.py` | A second implementation of sealing in Python, which reproduces every sealed fixture from scratch. |
-| `manifest.json` | The suite's version, the failure kinds, the record types and every fixture file. Use it to notice when a file is added. |
+| `sealed/reference/verify.py` | A second implementation in Python. It reproduces every sealed fixture, opens every envelope and refuses every listed change, and recomputes the DAG-CBOR bytes and CID of every valid record. |
+| `manifest.json` | The suite's version, the failure kinds, the record types, every fixture file, and `inputs`: the digest of the lexicon files the record fixtures were generated from. |
 
 Don't edit the `.json` files by hand. They are generated from the lexicons in `lexicons/` and from
 the sealed-record format, by `tools/lexicon-check/conformance.mjs` (see [Changing the
 suite](#changing-the-suite)).
+
+## Who produces and checks the fixtures
+
+Nobody has to trust a single implementation:
+
+| Fixtures | Produced by | Checked by |
+|---|---|---|
+| `records/` DAG-CBOR bytes and CIDs | `@atproto/lex-cbor`, the AT Protocol reference implementation (Node) | `sealed/reference/verify.py`, with its own encoder (Python), and the Kotlin codec in `RecordConformanceTest` |
+| `records/` valid and invalid labels | `@atproto/lexicon`, the reference validator, which must agree with every label when the fixtures are generated | `RecordConformanceTest`, with the Kotlin validator |
+| `sealed/` | `tools/lexicon-check/conformance/sealed.mjs`, with Node's crypto | `sealed/reference/verify.py` (Python's `cryptography` package) and `SealedEnvelopeConformanceTest` (Kotlin, on JVM, Android and iOS) |
+
+The values in the records are synthetic: they follow the schemas and mean nothing. A record whose
+fields are all required has no `every-field` case, because it would repeat `minimal`.
+
+## Matching the lexicons
+
+The record cases were generated from particular lexicon files, and a client's validator and models
+come from its own copy of them. Copy `lexicons/` into the client at the same revision as this
+folder, then check each file against `manifest.json`:
+
+```json
+"inputs": {
+  "digest": "517f…",
+  "files": { "lexicons/app/logdate/journal/entry.json": "9c1d…", "tools/lexicon-check/examples/journal-entry.json": "…" }
+}
+```
+
+Each value in `files` is the SHA-256 of that file's bytes. A client with the lexicons checks the
+`lexicons/` entries and fails with the file's name when one differs, which means its copy and the
+fixtures are from different revisions. `digest` covers every entry, the example files included: it
+is the SHA-256 of the lines `<sha256>  <path>` (two spaces, then the path from the repository
+root, newline after each), sorted by path. `./run lint:conformance` recomputes it, so a lexicon
+change can't reach `main` without regenerated fixtures.
 
 ## Running the record cases
 
@@ -31,6 +64,7 @@ Every `records/<nsid>.json` file looks like this:
 {
   "collection": "app.logdate.journal.entry",
   "recordKey": "any",
+  "recordKeys": { "valid": ["3jzfcijpj2z2a", "self"], "invalid": ["", "a/b"] },
   "valid":   [{ "name": "minimal", "record": { }, "dagCbor": "a365…", "cid": "bafyrei…" }],
   "invalid": [{ "name": "missing-createdAt", "record": { }, "failure": { "kind": "missing-required", "path": "/createdAt" } }]
 }
@@ -50,6 +84,11 @@ For each **valid** case, a client must:
    `record` into the model for `collection`, encode it again, and get the same JSON and the same
    bytes. A case with `"modelRoundTrip": false` holds a field from a newer version of the schema. It
    must still validate, but a model that doesn't know the field is allowed to drop it.
+
+Some of the checks above are about the record, not the encoding. A record's key is checked
+separately: `recordKey` is the key rule from the lexicon (`any`, `tid` or `literal:self`), and
+every key in `recordKeys.valid` must be accepted under that rule while every key in
+`recordKeys.invalid` must be refused.
 
 For each **invalid** case, a client's validator must refuse `record` and report `failure.kind` at
 `failure.path`. The path is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into the
@@ -105,8 +144,14 @@ more can't be sealed.
    associated data. The result, tag included, must match `ciphertext`.
 6. If `envelope` is present, it is the stored record. Open it with the same keys and the same
    `space`, `author` and `sealedRkey`, and get the payload back.
-7. For each entry of `refusedEnvelopes`, replace the inputs it names (`author`, `space`,
-   `sealedRkey`, or fields of `envelope`) and try to open the envelope. Opening must fail.
+7. For each entry of `refusedEnvelopes`, replace the inputs it names (`identityKey`, `author`,
+   `space`, `sealedRkey`, or fields of `envelope`) and try to open the envelope. Opening must
+   fail. `opened with another identity key` keeps the envelope's own `keyId`, so a client that
+   skips the key ID check still has to fail on authentication.
+
+The records inside the sealed payloads exist to exercise the encoding. They are not valid journal
+entries (the ones in `envelopes.json` have no `blocks`), so don't validate a payload's `record`
+against its collection's lexicon.
 
 Never reuse a nonce with the same key outside a test. The fixed nonces are there only so the
 output is repeatable.
@@ -121,19 +166,25 @@ shape of a file changes, so a client can refuse a copy it doesn't understand.
 A client needs, at the least:
 
 - a loader for `manifest.json` that fails when `version` isn't one it understands;
+- a check of its copy of `lexicons/` against `manifest.json`'s `inputs` (see [Matching the
+  lexicons](#matching-the-lexicons));
 - a record test per `records/*.json` file, written as the steps above;
 - a sealed test per file in `sealed/`;
 - a check that every file named in the manifest is read, so a file added later isn't skipped.
 
 ## Where this repository runs them
 
-- `shared/lexicon/src/jvmTest/.../RecordConformanceJvmTest.kt` runs the record cases against the
-  Kotlin validator, DAG-CBOR codec and generated models.
+- `shared/lexicon/src/commonTest/.../RecordConformanceTest.kt` runs the record cases against the
+  Kotlin validator, DAG-CBOR codec and generated models on every target, iOS included. It reads
+  the manifest, refuses a `version` it doesn't know, and runs every record file the manifest lists.
 - `shared/space/src/commonTest/.../SealingKeysTest.kt`, `SealedPaddingTest.kt` and
-  `SealedEnvelopeConformanceTest.kt` run the sealed cases on every target, iOS included. The build
-  embeds `sealed/*.json` into the test sources, so there is one copy of the fixtures.
+  `SealedEnvelopeConformanceTest.kt` run the sealed cases on every target, and
+  `ConformanceManifestTest.kt` checks the version and that the manifest lists no sealed file these
+  tests skip. The build embeds the fixtures into the test sources (`GenerateConformanceFixtures`),
+  so there is one copy of them.
 - `scripts/tests/lexicons/test-conformance-fixtures.sh` runs in CI. It checks that the committed
-  fixtures match the generator, runs the generator's tests, and runs `sealed/reference/verify.py`.
+  fixtures and the lexicon digest match the generator, runs the generator's tests, and runs
+  `sealed/reference/verify.py`.
 
 To run the Python reference on its own:
 
@@ -150,6 +201,9 @@ Change a lexicon, then regenerate and review the diff:
 ./run conformance:update   # rewrite the fixtures from the lexicons
 ./run lint:conformance     # check they are up to date (CI runs this)
 ```
+
+Any edit to a lexicon file, even to a description, changes the digest in `manifest.json`, so it
+needs `conformance:update` too. The diff then shows exactly which fixtures the edit changed.
 
 `lint:conformance` fails when a fixture differs from what the generator produces, when the
 reference implementation disagrees with a fixture's label (a record meant to be valid is rejected,

@@ -17,9 +17,16 @@ import kotlinx.serialization.json.jsonPrimitive
  * in [SealedConformanceFixtures].
  */
 internal object ConformanceFixtures {
-    val keySchedule: JsonObject = parse("key-schedule.json")
-    val padding: JsonObject = parse("padding.json")
-    val envelopes: List<JsonObject> = parse("envelopes.json").list("envelopes")
+    /** The version of the suite's file shapes this module understands. */
+    const val SUPPORTED_VERSION = 1
+
+    /** The sealed fixture files this module reads, which must be all the manifest lists under `sealed/`. */
+    val sealedFiles: List<String> = listOf("sealed/envelopes.json", "sealed/key-schedule.json", "sealed/padding.json")
+
+    val manifest: JsonObject = parse("manifest.json")
+    val keySchedule: JsonObject = parse("sealed/key-schedule.json")
+    val padding: JsonObject = parse("sealed/padding.json")
+    val envelopes: List<JsonObject> = parse("sealed/envelopes.json").list("envelopes")
 
     private fun parse(name: String): JsonObject = Json.parseToJsonElement(SealedConformanceFixtures.text(name)).jsonObject
 }

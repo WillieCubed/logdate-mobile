@@ -1,6 +1,18 @@
 {
   "collection": "app.logdate.crypto.keyDeclaration",
   "recordKey": "tid",
+  "recordKeys": {
+    "valid": [
+      "3jzfcijpj2z2a",
+      "2222222222222"
+    ],
+    "invalid": [
+      "self",
+      "3jzfcijpj2z2",
+      "3JZFCIJPJ2Z2A",
+      "zzzzzzzzzzzzz"
+    ]
+  },
   "valid": [
     {
       "name": "minimal",

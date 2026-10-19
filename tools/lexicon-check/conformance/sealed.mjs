@@ -185,7 +185,7 @@ function flipped(bytes, index) {
 export function envelopes() {
   return {
     description:
-      "Whole sealed envelopes. Sealing the payload with the given nonce must produce exactly this envelope, and opening the envelope must produce exactly this payload. A payload with an `expand` entry is written compactly: replace the string at `path` with `repeat` written `times` times before encoding.",
+      "Whole sealed envelopes. Sealing the payload with the given nonce must produce exactly this envelope, and opening the envelope must produce exactly this payload. A payload with an `expand` entry is written compactly: replace the string at `path` with `repeat` written `times` times before encoding. The records inside these payloads exist to exercise the encoding: they are not valid journal entries and must not be validated as entries.",
     algorithm: {
       payload: "DAG-CBOR of { collection, rkey, record }",
       padding: "see padding.json",
@@ -236,6 +236,7 @@ function refusals(entry, keys, rkey, ciphertext) {
   const b64 = (bytes) => ({ $bytes: Buffer.from(bytes).toString("base64") });
   return [
     { name: "opened for another author", author: "did:plc:else" },
+    { name: "opened with another identity key", identityKey: hex(sequence(0x40, 32)) },
     { name: "opened in another space", space: `at://${author}/space/${SALT}/other` },
     { name: "stored under another sealed key", sealedRkey: `${rkey.slice(0, -1)}${rkey.endsWith("a") ? "b" : "a"}` },
     { name: "envelope version 2", envelope: { version: 2 } },

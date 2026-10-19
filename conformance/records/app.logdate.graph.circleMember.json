@@ -1,15 +1,26 @@
 {
   "collection": "app.logdate.graph.circleMember",
   "recordKey": "any",
+  "recordKeys": {
+    "valid": [
+      "3jzfcijpj2z2a",
+      "self",
+      "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80",
+      "lake-house",
+      "a.b-c_d:e~f"
+    ],
+    "invalid": [
+      "",
+      ".",
+      "..",
+      "a/b",
+      "has space",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ]
+  },
   "valid": [
     {
       "name": "minimal",
-      "record": {"$type":"app.logdate.graph.circleMember","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a4652474797065781e6170702e6c6f67646174652e67726170682e636972636c654d656d62657266636972636c65a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279677375626a65637478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
-      "cid": "bafyreih3yrztgc2cyatsdqk5poqb5lg2tp3pjm7vcw4rnaepl7xybvjc6e"
-    },
-    {
-      "name": "every-field",
       "record": {"$type":"app.logdate.graph.circleMember","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z"},
       "dagCbor": "a4652474797065781e6170702e6c6f67646174652e67726170682e636972636c654d656d62657266636972636c65a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279677375626a65637478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
       "cid": "bafyreih3yrztgc2cyatsdqk5poqb5lg2tp3pjm7vcw4rnaepl7xybvjc6e"

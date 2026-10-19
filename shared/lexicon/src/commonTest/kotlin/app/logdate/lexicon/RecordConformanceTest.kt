@@ -4,6 +4,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -15,14 +16,11 @@ import studio.hypertext.atproto.lexicon.data.LexiconData
 import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.DagCborCodec
 import studio.hypertext.atproto.syntax.Nsid
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.extension
-import kotlin.io.path.name
-import kotlin.io.path.readText
-import kotlin.streams.asSequence
+import studio.hypertext.atproto.syntax.RecordKey
+import studio.hypertext.atproto.syntax.Tid
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -30,32 +28,35 @@ import kotlin.test.assertTrue
  * for every `app.logdate.*` record type, generated from the lexicons by
  * `tools/lexicon-check/conformance.mjs`. The Mac and Linux apps run the same files, so what passes
  * here is what every LogDate client must accept and refuse.
+ *
+ * The fixtures and the schemas are embedded in the test sources at build time, so these tests run
+ * on every target. The values in the records are synthetic: they follow the schemas and mean
+ * nothing.
  */
-class RecordConformanceJvmTest {
+class RecordConformanceTest {
     private val validator =
-        LexiconRecordValidator(
-            LexiconRegistry(
-                listOf("lexicons/app/logdate", "lexicons/community")
-                    .flatMap { jsonFiles(repositoryRoot().resolve(it)) }
-                    .map { LexiconParser.parse(it.readText()) },
-            ),
-        )
+        LexiconRecordValidator(LexiconRegistry(LexiconSchemaFixtures.names.map { LexiconParser.parse(LexiconSchemaFixtures.text(it)) }))
+    private val manifest = readJson("manifest.json")
+    private val recordFiles =
+        manifest
+            .getValue("files")
+            .jsonArray
+            .map { it.jsonPrimitive.content }
+            .filter { it.startsWith("records/") }
 
     @Test
-    fun `the suite covers every LogDate record type`() {
-        val manifest = readJson(conformanceRoot().resolve("manifest.json"))
+    fun `the suite is a version these tests understand`() {
+        assertEquals(SUPPORTED_VERSION, manifest.getValue("version").jsonPrimitive.int)
+    }
+
+    @Test
+    fun `the suite covers every LogDate record type and every file is read`() {
         val listed = manifest.getValue("recordTypes").jsonArray.map { it.jsonPrimitive.content }
         val generated = LogDateRecords.records.keys.filter { it.startsWith("app.logdate.") }
 
         assertEquals(generated.sorted(), listed.sorted())
-        assertEquals(
-            listed.map { "records/$it.json" }.sorted(),
-            manifest
-                .getValue("files")
-                .jsonArray
-                .map { it.jsonPrimitive.content }
-                .filter { it.startsWith("records/") },
-        )
+        assertEquals(listed.map { "records/$it.json" }.sorted(), recordFiles.sorted())
+        assertEquals(recordFiles.sorted(), RecordConformanceFixtures.names.filter { it.startsWith("records/") }.sorted())
     }
 
     @Test
@@ -69,7 +70,7 @@ class RecordConformanceJvmTest {
                 val bytes = DagCborCodec.encode(record)
                 assertEquals(case.string("dagCbor"), bytes.toHex(), "$label: DAG-CBOR")
                 assertEquals(case.string("cid"), Cid.sha256(DAG_CBOR_CODEC, bytes).value, "$label: CID")
-                assertEquals(record, DagCborCodec.decode(Hex.decode(case.string("dagCbor"))), "$label: decoding the DAG-CBOR")
+                assertEquals(record, DagCborCodec.decode(case.string("dagCbor").hexToBytes()), "$label: decoding the DAG-CBOR")
             }
         }
     }
@@ -102,16 +103,46 @@ class RecordConformanceJvmTest {
         }
     }
 
-    private fun forEachSuite(check: (Nsid, Suite) -> Unit) {
-        val files = jsonFiles(conformanceRoot().resolve("records"))
-        assertTrue(files.size > 30, "Expected a suite per record type, found ${files.size}")
-        files.forEach { path ->
-            val suite = Suite(readJson(path))
-            val collection =
+    @Test
+    fun `record keys follow the record type's key rule`() {
+        forEachSuite { collection, suite ->
+            val rule =
                 suite.value
-                    .getValue("collection")
+                    .getValue("recordKey")
                     .jsonPrimitive.content
-            check(Nsid.require(collection), suite)
+            val keys = suite.value.getValue("recordKeys").jsonObject
+            keys.getValue("valid").jsonArray.map { it.jsonPrimitive.content }.forEach { key ->
+                assertTrue(isValidKey(rule, key), "$collection: \"$key\" should be a valid $rule key")
+            }
+            keys.getValue("invalid").jsonArray.map { it.jsonPrimitive.content }.forEach { key ->
+                assertFalse(isValidKey(rule, key), "$collection: \"$key\" should be an invalid $rule key")
+            }
+        }
+    }
+
+    private fun isValidKey(
+        rule: String,
+        key: String,
+    ): Boolean =
+        when (rule) {
+            "any" -> RecordKey.isValid(key)
+            "tid" -> Tid.isValid(key)
+            "literal:self" -> key == "self"
+            else -> error("Unknown record key rule $rule")
+        }
+
+    private fun forEachSuite(check: (Nsid, Suite) -> Unit) {
+        assertTrue(recordFiles.size > 30, "Expected a suite per record type, found ${recordFiles.size}")
+        recordFiles.forEach { name ->
+            val suite = Suite(readJson(name))
+            check(
+                Nsid.require(
+                    suite.value
+                        .getValue("collection")
+                        .jsonPrimitive.content,
+                ),
+                suite,
+            )
         }
     }
 
@@ -143,6 +174,7 @@ class RecordConformanceJvmTest {
     )
 
     private companion object {
+        const val SUPPORTED_VERSION = 1
         const val DAG_CBOR_CODEC = 0x71
 
         fun classify(issue: LexiconValidationIssue): Failure = Failure(kindOf(issue), pointer(issue.path))
@@ -174,26 +206,10 @@ class RecordConformanceJvmTest {
             }
         }
 
-        fun readJson(path: Path): JsonObject = Json.parseToJsonElement(path.readText()).jsonObject
+        fun readJson(name: String): JsonObject = Json.parseToJsonElement(RecordConformanceFixtures.text(name)).jsonObject
 
-        fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
+        fun ByteArray.toHex(): String = joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
 
-        fun jsonFiles(directory: Path): List<Path> =
-            Files.walk(directory).use { paths ->
-                paths
-                    .asSequence()
-                    .filter { it.extension == "json" }
-                    .sortedBy { it.name }
-                    .toList()
-            }
-
-        fun repositoryRoot(): Path =
-            generateSequence(Path.of("").toAbsolutePath()) { it.parent }.first { Files.isDirectory(it.resolve("conformance/records")) }
-
-        fun conformanceRoot(): Path = repositoryRoot().resolve("conformance")
-    }
-
-    private object Hex {
-        fun decode(text: String): ByteArray = ByteArray(text.length / 2) { text.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+        fun String.hexToBytes(): ByteArray = ByteArray(length / 2) { substring(it * 2, it * 2 + 2).toInt(16).toByte() }
     }
 }

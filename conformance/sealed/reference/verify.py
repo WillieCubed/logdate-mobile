@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""Recomputes every sealed-record fixture from scratch and compares it with the fixture files.
+"""Recomputes the conformance fixtures from scratch and compares them with the fixture files.
 
-This is a second, independent implementation of the personal space's sealing: it builds the key
-schedule, the opaque record keys, the padding, the DAG-CBOR payload and the AES-GCM envelope
-itself, with only the `cryptography` package (`pip install cryptography`). If it prints
-"Sealed fixtures verified" the fixtures describe what the format really is, whichever client's
-code produced them first.
+This is a second, independent implementation, in Python, of two things the Node generator and the
+Kotlin tests also do:
+
+- Sealing: the key schedule, the opaque record keys, the padding, the DAG-CBOR payload and the
+  AES-GCM envelope, and opening an envelope, including refusing every change the fixtures list.
+- Record encoding: the DAG-CBOR bytes and the CID of every valid record in conformance/records/,
+  and the digest of the lexicon files the fixtures were generated from.
+
+It needs only the `cryptography` package (`pip install cryptography`). If it prints "Conformance
+fixtures verified" the fixtures describe what the formats really are, whichever client's code
+produced them first.
 
     python3 conformance/sealed/reference/verify.py
 """
@@ -16,11 +22,15 @@ import json
 import sys
 from pathlib import Path
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 SEALED = Path(__file__).resolve().parent.parent
+CONFORMANCE = SEALED.parent
+REPOSITORY = CONFORMANCE.parent
+SUPPORTED_VERSION = 1
 SALT = b"app.logdate.space.personal"
 problems = []
 
@@ -108,6 +118,40 @@ def from_json(value):
     return value
 
 
+def cid_of(encoded):
+    """CIDv1, dag-cbor (0x71), SHA-256, written in lowercase base32 with the 'b' prefix."""
+    return "b" + b32(bytes([0x01, 0x71, 0x12, 0x20]) + hashlib.sha256(encoded).digest())
+
+
+def is_padded_size(size):
+    if not 512 <= size <= 4_000_000 - 16:
+        return False
+    return size & (size - 1) == 0 if size <= 65536 else size % 65536 == 0
+
+
+def open_envelope(identity, space, author, rkey, envelope):
+    """Opens a stored envelope and returns its DAG-CBOR payload. Raises when it must be refused."""
+    content, _, key_id = keys_for(identity)
+    if envelope["version"] != 1:
+        raise ValueError("unsupported envelope version")
+    if envelope["keyId"] != key_id:
+        raise ValueError("sealed with another key")
+    nonce = base64.b64decode(envelope["nonce"]["$bytes"])
+    ciphertext = base64.b64decode(envelope["ciphertext"]["$bytes"])
+    if len(nonce) != 12:
+        raise ValueError("nonce is not 12 bytes")
+    if not is_padded_size(len(ciphertext) - 16):
+        raise ValueError("ciphertext is not a sealed size")
+    aad = f"app.logdate.crypto.sealed|1|{space}|{author}|{rkey}".encode()
+    plaintext = AESGCM(content).decrypt(nonce, ciphertext, aad)  # raises InvalidTag when anything differs
+    length = int.from_bytes(plaintext[:4], "big")
+    if length > len(plaintext) - 4 or padded_size(length) != len(plaintext):
+        raise ValueError("padding length is invalid")
+    if any(plaintext[4 + length :]):
+        raise ValueError("padding is not zeros")
+    return plaintext[4 : 4 + length]
+
+
 def check_bytes(label, entry, data):
     check(f"{label} length", len(data), entry["length"])
     check(f"{label} sha256", hashlib.sha256(data).hexdigest(), entry["sha256"])
@@ -175,15 +219,72 @@ def verify_envelopes():
             check(f"{label} envelope ciphertext", base64.b64decode(envelope["ciphertext"]["$bytes"]), ciphertext)
             check(f"{label} envelope nonce", base64.b64decode(envelope["nonce"]["$bytes"]), bytes.fromhex(entry["nonce"]))
             check(f"{label} envelope key id", envelope["keyId"], key_id)
+            identity = bytes.fromhex(entry["identityKey"])
+            opened = open_envelope(identity, entry["space"], entry["author"], rkey, envelope)
+            check(f"{label} opened payload", opened, encoded)
+            verify_refusals(label, entry, identity, rkey)
 
 
+def verify_refusals(label, entry, identity, rkey):
+    """Every listed change must make the envelope fail to open."""
+    refusals = entry["refusedEnvelopes"]
+    if not refusals:
+        problems.append(f"{label}: has an envelope but no refusals")
+    for refusal in refusals:
+        try:
+            open_envelope(
+                bytes.fromhex(refusal.get("identityKey", entry["identityKey"])),
+                refusal.get("space", entry["space"]),
+                refusal.get("author", entry["author"]),
+                refusal.get("sealedRkey", rkey),
+                {**entry["envelope"], **refusal.get("envelope", {})},
+            )
+        except (ValueError, InvalidTag):
+            continue
+        problems.append(f"{label}: the envelope opened although {refusal['name']}")
+
+
+def verify_records(manifest):
+    """Encodes every valid record to DAG-CBOR and a CID with this script's own encoder."""
+    record_files = [name for name in manifest["files"] if name.startswith("records/")]
+    check("record files in the manifest", sorted(record_files), sorted(f"records/{t}.json" for t in manifest["recordTypes"]))
+    cases = 0
+    for name in record_files:
+        suite = json.loads((CONFORMANCE / name).read_text())
+        for case in suite["valid"]:
+            encoded = dag_cbor(from_json(case["record"]))
+            check(f"{name} {case['name']} DAG-CBOR", encoded.hex(), case["dagCbor"])
+            check(f"{name} {case['name']} CID", cid_of(encoded), case["cid"])
+            cases += 1
+    return cases
+
+
+def verify_inputs(manifest):
+    """Recomputes the digest of the lexicon and example files, when they are next to the fixtures."""
+    lexicons = REPOSITORY / "lexicons"
+    if not lexicons.is_dir():
+        return
+    entries = sorted(
+        (path.relative_to(REPOSITORY).as_posix(), hashlib.sha256(path.read_bytes()).hexdigest())
+        for folder in ("lexicons/app/logdate", "lexicons/community", "tools/lexicon-check/examples")
+        for path in (REPOSITORY / folder).rglob("*.json")
+    )
+    check("input files", dict(entries), manifest["inputs"]["files"])
+    listing = "".join(f"{sha}  {name}\n" for name, sha in entries)
+    check("input digest", hashlib.sha256(listing.encode()).hexdigest(), manifest["inputs"]["digest"])
+
+
+manifest = json.loads((CONFORMANCE / "manifest.json").read_text())
+check("suite version", manifest["version"], SUPPORTED_VERSION)
 verify_key_schedule()
 verify_padding()
 verify_envelopes()
+record_cases = verify_records(manifest)
+verify_inputs(manifest)
 
 if problems:
     print(f"{len(problems)} fixture value(s) differ:", file=sys.stderr)
     for problem in problems:
         print(f"  - {problem}", file=sys.stderr)
     sys.exit(1)
-print("Sealed fixtures verified.")
+print(f"Conformance fixtures verified: sealed envelopes and {record_cases} valid records.")
