@@ -66,6 +66,10 @@ revision consume the rendered Neon contract.
   `https://app.staging.logdate.app`, so staging passkeys use a distinct relying
   party. Never authorize the production frontend origin `https://app.logdate.app`
   or the production backend origin `https://cloud.logdate.app` in staging.
+- Do not set `ATPROTO_PLC_PUBLISH_ENABLED=true` in staging. Staging accounts are test accounts,
+  and anything published to the public PLC directory stays there; the contract renderer refuses it.
+  Production turns it on only by following
+  [identity publishing runbook](identity-publishing.md).
 - Do not add non-Cloud-Run domains to Terraform `domains`. Marketing redirects
   and unrelated DNS live outside this Cloud Run service.
 - Do not mount optional Cloud Run secrets until the Secret Manager container
