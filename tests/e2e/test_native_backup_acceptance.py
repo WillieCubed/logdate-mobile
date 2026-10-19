@@ -105,7 +105,7 @@ class NativeD2DRestoreEvidenceTest(unittest.TestCase):
 
         self.assertLess(backup_call, mutation_probe)
         self.assertLess(mutation_probe, restore_call)
-        verification = harness.index('HARNESS.probe(serial, "verify"')
+        verification = harness.index('HARNESS.probe(serial, "verify-in-place"')
         self.assertLess(restore_call, verification)
         self.assertIn('"post-backup-mutation"', probe)
         self.assertIn("Mutated after native D2D backup", probe)

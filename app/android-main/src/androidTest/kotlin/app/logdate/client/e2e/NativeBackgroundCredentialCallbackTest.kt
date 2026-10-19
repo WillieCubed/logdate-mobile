@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.Process
+import android.os.UserManager
+import android.system.Os
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
@@ -38,22 +41,22 @@ import kotlin.uuid.Uuid
 @RunWith(AndroidJUnit4::class)
 class NativeBackgroundCredentialCallbackTest {
     private val application = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
-    private val noBackupRoot =
-        application.noBackupFilesDir.apply {
-            check(mkdirs() || isDirectory) {
-                "Could not create the app's no-backup directory " +
-                    "(path=$absolutePath, parentExists=${parentFile?.isDirectory}, parentWritable=${parentFile?.canWrite()})"
-            }
-        }
+    private val testFilesRoot =
+        application.createDeviceProtectedStorageContext().getDir("native-restore-probe", Context.MODE_PRIVATE)
     private val folder =
-        File(noBackupRoot, "background-restore-probe-${Uuid.random()}").apply {
+        File(testFilesRoot, "background-restore-probe-${Uuid.random()}").apply {
             check(mkdirs() || isDirectory) {
-                "Could not create isolated restore probe directory " +
-                    "(parent=${parentFile?.absolutePath}, parentExists=${parentFile?.isDirectory}, parentWritable=${parentFile?.canWrite()})"
+                val failure = runCatching { Os.mkdir(absolutePath, 0x1C0) }.exceptionOrNull()
+                "Could not create isolated restore probe directory in app-private test storage " +
+                    "(uid=${Process.myUid()}, appUid=${application.applicationInfo.uid}, " +
+                    "unlocked=${application.getSystemService(UserManager::class.java).isUserUnlocked}, " +
+                    "parent=${parentFile?.absolutePath}, parentExists=${parentFile?.isDirectory}, " +
+                    "appRootExists=${testFilesRoot.parentFile?.isDirectory}, cause=${failure?.message})"
             }
         }
     private val context =
-        object : ContextWrapper(application) {
+        // The test APK has no backup include list restricting this isolated fixture to the real database path.
+        object : ContextWrapper(InstrumentationRegistry.getInstrumentation().context) {
             override fun getCacheDir(): File = File(folder, "cache").apply { mkdirs() }
 
             override fun getFilesDir(): File = File(folder, "files").apply { mkdirs() }

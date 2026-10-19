@@ -34,8 +34,53 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 adb.assert_not_called()
 
     def test_d2d_restore_set_parser_accepts_decimal_and_hex_tokens(self):
-        self.assertEqual("1", D2D.restore_set_token("Available restore sets:\n  1 : device"))
-        self.assertEqual("0x29f", D2D.restore_set_token("Available restore sets:\n  0x29f : device"))
+        for token in ("1", "0x29f", "3e0c27e54db33477"):
+            with self.subTest(token=token):
+                self.assertEqual(token, D2D.restore_set_token(f"Available restore sets:\n  {token} : D2D Restore Set"))
+
+    def test_d2d_restore_set_parser_skips_unrelated_cloud_snapshots(self):
+        self.assertEqual("abc", D2D.restore_set_token("  123 : Other phone\n  abc : D2D\n"))
+        with self.assertRaisesRegex(RuntimeError, "D2D restore set"):
+            D2D.restore_set_token("  123 : Other phone\n")
+
+    def test_d2d_restore_switches_to_gms_as_required_by_the_android_guide(self):
+        with patch.object(D2D.HARNESS, "adb", side_effect=[b"selected", b"  * " + D2D.GMS_BACKUP_TRANSPORT.encode()]) as adb:
+            D2D.select_d2d_restore_transport("emulator-5582")
+        self.assertEqual(("shell", "bmgr", "transport", D2D.GMS_BACKUP_TRANSPORT), adb.call_args_list[0].args[1:])
+
+    def test_d2d_selected_transport_accepts_androids_indented_marker(self):
+        for indent in ("", "  ", "\t"):
+            with self.subTest(indent=indent), patch.object(
+                D2D.HARNESS, "adb", return_value=f"    other\n{indent}* {D2D.D2D_TRANSPORT}\n".encode()
+            ):
+                self.assertEqual(D2D.D2D_TRANSPORT, D2D.selected_transport("emulator-5582"))
+
+    def test_d2d_fixture_is_read_with_the_debug_app_identity(self):
+        with patch.object(D2D.HARNESS, "adb", return_value=b"{}") as adb:
+            self.assertEqual(b"{}", D2D.source_fixture("emulator-5582"))
+        adb.assert_called_once_with(
+            "emulator-5582", "exec-out", "run-as", D2D.HARNESS.PACKAGE, "cat", "no_backup/native-backup-fixture.json"
+        )
+
+    def test_d2d_refuses_retained_data_before_seeding(self):
+        with patch.object(D2D.HARNESS, "adb", return_value=f"package:{D2D.HARNESS.PACKAGE}\n".encode()), patch.object(
+            D2D.HARNESS, "package_user_files", return_value=[b"./databases/logdate"]
+        ):
+            with self.assertRaisesRegex(RuntimeError, "retained user data"):
+                D2D.require_empty_source("emulator-5582")
+
+    def test_d2d_allows_an_absent_package_without_reading_private_storage(self):
+        with patch.object(D2D.HARNESS, "adb", return_value=f"package:{D2D.HARNESS.PACKAGE}.test\n".encode()), patch.object(
+            D2D.HARNESS, "package_user_files"
+        ) as files:
+            D2D.require_empty_source("emulator-5582")
+            files.assert_not_called()
+
+    def test_d2d_allows_a_preinstalled_empty_app(self):
+        with patch.object(D2D.HARNESS, "adb", return_value=f"package:{D2D.HARNESS.PACKAGE}\n".encode()), patch.object(
+            D2D.HARNESS, "package_user_files", return_value=[b"./cache/test"]
+        ):
+            D2D.require_empty_source("emulator-5582")
 
     def test_d2d_transport_requires_registration_selection_and_initialization(self):
         transport = D2D.D2D_TRANSPORT.encode()
@@ -89,6 +134,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertIn("backup_enable_d2d_test_mode", d2d_harness)
         self.assertIn(D2D.D2D_TRANSPORT, d2d_harness)
         self.assertIn('"native-restore-status"', d2d_harness)
+        self.assertIn('"verify-in-place"', d2d_harness)
         probe = (ROOT / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackupTransferProbeTest.kt").read_text()
         self.assertIn("PostRestoreType.CONTENT_RESTORED", probe)
         self.assertIn("native-transfer-api-36-1:", workflow)
@@ -188,7 +234,11 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             ROOT
             / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundCredentialCallbackTest.kt"
         ).read_text()
-        self.assertIn("application.noBackupFilesDir", callback_test)
+        self.assertIn(
+            'application.createDeviceProtectedStorageContext().getDir("native-restore-probe", Context.MODE_PRIVATE)',
+            callback_test,
+        )
+        self.assertNotIn("application.noBackupFilesDir", callback_test)
 
     def test_native_restore_ci_exercises_the_real_cloud_quota_rejection_callback(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
