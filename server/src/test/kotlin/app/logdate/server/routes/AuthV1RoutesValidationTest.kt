@@ -353,6 +353,16 @@ class AuthV1RoutesValidationTest {
                 }
             assertEquals(HttpStatusCode.Conflict, usernameTaken.status)
 
+            for (reservedUsername in listOf("about", "delete_account", "xn__lookalike", "terms_")) {
+                val reservedChange =
+                    client.put("/api/v1/auth/me") {
+                        header(HttpHeaders.Authorization, "Bearer $access")
+                        contentType(ContentType.Application.Json)
+                        setBody("{\"username\":\"$reservedUsername\"}")
+                    }
+                assertEquals(HttpStatusCode.BadRequest, reservedChange.status, reservedUsername)
+            }
+
             val blankDisplay =
                 client.put("/api/v1/auth/me") {
                     header(HttpHeaders.Authorization, "Bearer $access")

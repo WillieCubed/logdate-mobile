@@ -116,18 +116,36 @@ class PostgreSqlRepositoriesTest {
     }
 
     @Test
-    fun `account repository lists only active accounts that have no handle`() {
+    fun `account repository lists active accounts missing any part of their identity`() {
         withAccountTables {
             val repository = PostgreSQLAccountRepository()
             val now = Clock.System.now()
-            val withHandle =
-                Account(id = Uuid.random(), username = "named", displayName = "N", handle = "named.logdate.app", createdAt = now)
-            val withoutHandle = Account(id = Uuid.random(), username = "legacy", displayName = "L", createdAt = now)
-            val inactiveWithoutHandle = Account(id = Uuid.random(), username = "gone", displayName = "G", createdAt = now)
-            listOf(withHandle, withoutHandle, inactiveWithoutHandle).forEach { repository.save(it) }
-            repository.deactivateAccount(inactiveWithoutHandle.id)
 
-            assertEquals(listOf(withoutHandle.id), repository.findAccountsWithoutHandle().map { it.id })
+            fun account(
+                username: String,
+                handle: String? = null,
+                did: String? = null,
+                key: String? = null,
+            ) = Account(
+                id = Uuid.random(),
+                username = username,
+                displayName = username,
+                handle = handle,
+                did = did,
+                signingKeyPublic = key,
+                createdAt = now,
+            )
+            val complete = account("done", "done.logdate.app", "did:plc:doneaaaaaaaaaaaaaaaaaaaa", "zKey")
+            val legacy = account("legacy")
+            val handleOnly = account("partial", handle = "partial.logdate.app")
+            val inactiveLegacy = account("gone")
+            listOf(complete, legacy, handleOnly, inactiveLegacy).forEach { repository.save(it) }
+            repository.deactivateAccount(inactiveLegacy.id)
+
+            assertEquals(
+                setOf(legacy.id, handleOnly.id),
+                repository.findAccountsMissingIdentity().map { it.id }.toSet(),
+            )
         }
     }
 

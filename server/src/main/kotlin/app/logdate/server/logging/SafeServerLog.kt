@@ -56,7 +56,41 @@ private val approvedNotices =
         SpacePurgeNotices.BLOBS_PURGED to "SERVER_SPACE_BLOBS_PURGED",
         SpacePurgeNotices.BLOB_DELETE_FAILED to "SERVER_SPACE_BLOB_DELETE_FAILED",
         SpacePurgeNotices.PURGE_FAILED to "SERVER_SPACE_PURGE_FAILED",
+        IdentityNotices.HANDLE_RESOLUTION_FAILED to "SERVER_HANDLE_RESOLUTION_FAILED",
+        IdentityNotices.BACKFILL_REFUSED_PUBLISHING to "SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING",
+        IdentityNotices.BACKFILL_FAILED to "SERVER_IDENTITY_BACKFILL_FAILED",
     )
+
+/**
+ * Messages that carry only counts. They pass through unchanged because a number of accounts says
+ * nothing about any one account.
+ */
+private val approvedCountMessages =
+    listOf(
+        Regex("^Identity backfill dry run: \\d+ accounts need an identity$"),
+        Regex("^Identity backfill complete: \\d+ provisioned, \\d+ failed$"),
+    )
+
+private fun isApprovedCountMessage(message: String?): Boolean =
+    message != null && message.length <= 120 && approvedCountMessages.any { it.matches(message) }
+
+/**
+ * Fixed log messages for AT Protocol identity. A failed handle lookup is an error because outside
+ * apps then cannot verify LogDate handles; the backfill messages report the operator command.
+ */
+internal object IdentityNotices {
+    const val HANDLE_RESOLUTION_FAILED = "Resolving a handle failed"
+    const val BACKFILL_REFUSED_PUBLISHING =
+        "Identity backfill refused: PLC publishing is enabled and --allow-plc-publishing was not given"
+    const val BACKFILL_FAILED = "Identity backfill failed"
+
+    fun backfillDryRun(pending: Int): String = "Identity backfill dry run: $pending accounts need an identity"
+
+    fun backfillComplete(
+        provisioned: Int,
+        failed: Int,
+    ): String = "Identity backfill complete: $provisioned provisioned, $failed failed"
+}
 
 /**
  * Fixed log messages for signing-key custody. Production logs keep only approved messages, so these
@@ -103,6 +137,7 @@ internal fun safeServerMessage(
 ): String {
     if (tag == SAFE_SERVER_EVENT_TAG) validatedEvent(message)?.let { return it }
     approvedNotices[message]?.let { return it }
+    if (isApprovedCountMessage(message)) return requireNotNull(message)
     return when (priority) {
         LogLevel.ERROR, LogLevel.ASSERT -> "SERVER_ERROR"
         LogLevel.WARNING -> "SERVER_WARNING"
@@ -125,6 +160,7 @@ class SafeServerMessageConverter : ClassicConverter() {
         if (event.loggerName == SERVER_LOG_NAME) {
             val text = event.formattedMessage
             if (text in approvedNotices.values || text in setOf("SERVER_ERROR", "SERVER_WARNING", "SERVER_NOTICE")) return text
+            if (isApprovedCountMessage(text)) return text
             validatedEvent(text)?.let { return it }
         }
         return "SERVER_LIBRARY_EVENT"

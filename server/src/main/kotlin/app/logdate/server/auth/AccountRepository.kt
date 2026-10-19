@@ -44,10 +44,10 @@ interface AccountRepository {
     suspend fun getAllAccounts(): List<Account>
 
     /**
-     * Active accounts that have not been assigned an AT Protocol handle yet. Handle resolution
-     * provisions these on demand, so the lookup must stay small as the account table grows.
+     * Active accounts that still lack an AT Protocol handle, DID, or signing key. Only the operator
+     * identity backfill reads this; request handling never scans accounts.
      */
-    suspend fun findAccountsWithoutHandle(): List<Account> = getAllAccounts().filter { it.handle == null }
+    suspend fun findAccountsMissingIdentity(): List<Account>
 
     suspend fun getAccountsCreatedAfter(timestamp: Instant): List<Account>
 
@@ -158,6 +158,9 @@ class InMemoryAccountRepository : AccountRepository {
     }
 
     override suspend fun getAllAccounts(): List<Account> = accounts.values.filter { it.isActive }
+
+    override suspend fun findAccountsMissingIdentity(): List<Account> =
+        accounts.values.filter { it.isActive && (it.handle == null || it.did == null || it.signingKeyPublic == null) }
 
     override suspend fun getAccountsCreatedAfter(timestamp: Instant): List<Account> =
         accounts.values.filter {

@@ -9,6 +9,7 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.isNull
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
@@ -217,12 +218,14 @@ class PostgreSQLAccountRepository : AccountRepository {
                 .map { it.toAccount() }
         }
 
-    override suspend fun findAccountsWithoutHandle(): List<Account> =
+    override suspend fun findAccountsMissingIdentity(): List<Account> =
         transaction {
             AccountsTable
                 .selectAll()
-                .where { AccountsTable.handle.isNull() and (AccountsTable.isActive eq true) }
-                .orderBy(AccountsTable.createdAt, SortOrder.DESC)
+                .where {
+                    (AccountsTable.isActive eq true) and
+                        (AccountsTable.handle.isNull() or AccountsTable.did.isNull() or AccountsTable.signingKeyPublic.isNull())
+                }.orderBy(AccountsTable.createdAt, SortOrder.DESC)
                 .map { it.toAccount() }
         }
 

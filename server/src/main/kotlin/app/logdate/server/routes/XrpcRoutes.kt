@@ -6,12 +6,14 @@ import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.TokenService
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.logging.IdentityNotices
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
 import app.logdate.server.routes.docs.XrpcDocs
 import app.logdate.server.routes.docs.XrpcRepoDocs
+import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.ContentType
@@ -110,6 +112,16 @@ fun Route.xrpcRoutes(
             }
 
             val result = identityService.resolveHandle(handleValue)
+            // A failed lookup is an outage, not a missing handle: answering HandleNotFound would let
+            // other apps treat a real account as nonexistent.
+            result.exceptionOrNull()?.let { error ->
+                Napier.e(IdentityNotices.HANDLE_RESOLUTION_FAILED, error)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    PdsErrorResponse("InternalServerError", "Handle resolution failed"),
+                )
+                return@get
+            }
             val resolved = result.getOrNull()
             if (resolved == null) {
                 call.respond(
@@ -956,6 +968,9 @@ private suspend fun io.ktor.server.application.ApplicationCall.respondForSession
     when {
         message == "UnsupportedDomain" ->
             respond(HttpStatusCode.BadRequest, PdsErrorResponse("UnsupportedDomain", "Handle domain is not supported"))
+
+        message == "InvalidHandle" ->
+            respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidHandle", "Handle is reserved or not a single valid name"))
 
         message == "InvalidPassword" || message.contains("Password must", ignoreCase = true) ->
             respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidPassword", "Password does not satisfy server requirements"))

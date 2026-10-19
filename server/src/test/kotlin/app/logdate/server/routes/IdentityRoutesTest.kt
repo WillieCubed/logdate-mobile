@@ -1,6 +1,8 @@
 package app.logdate.server.routes
 
+import app.logdate.server.AuthV1TestEnvironment
 import app.logdate.server.auth.Account
+import app.logdate.server.auth.AccountRepository
 import app.logdate.server.configureAuthV1TestApp
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -8,6 +10,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.testApplication
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -36,16 +40,8 @@ class IdentityRoutesTest {
     fun `well known identity routes resolve host mapped account`() =
         testApplication {
             val env = configureAuthV1TestApp()
-            runBlocking {
-                env.accountRepository.save(
-                    Account(
-                        id = Uuid.random(),
-                        username = "alice",
-                        displayName = "Alice",
-                        createdAt = Clock.System.now(),
-                    ),
-                )
-            }
+            // Signing in assigns an identity; resolving a handle never does.
+            runBlocking { env.provisionedAccount("alice") }
 
             val didResponse =
                 client.get("/.well-known/atproto-did") {
@@ -137,16 +133,8 @@ class IdentityRoutesTest {
     fun `xrpc resolveHandle returns expected success and errors`() =
         testApplication {
             val env = configureAuthV1TestApp()
-            runBlocking {
-                env.accountRepository.save(
-                    Account(
-                        id = Uuid.random(),
-                        username = "brie",
-                        displayName = "Brie",
-                        createdAt = Clock.System.now(),
-                    ),
-                )
-            }
+            // Signing in assigns an identity; resolving a handle never does.
+            runBlocking { env.provisionedAccount("brie") }
 
             val success = client.get("/xrpc/com.atproto.identity.resolveHandle?handle=brie.logdate.app")
             assertEquals(HttpStatusCode.OK, success.status)
@@ -166,16 +154,8 @@ class IdentityRoutesTest {
     fun `xrpc describeServer and describeRepo expose identity metadata`() =
         testApplication {
             val env = configureAuthV1TestApp()
-            runBlocking {
-                env.accountRepository.save(
-                    Account(
-                        id = Uuid.random(),
-                        username = "cora",
-                        displayName = "Cora",
-                        createdAt = Clock.System.now(),
-                    ),
-                )
-            }
+            // Signing in assigns an identity; resolving a handle never does.
+            runBlocking { env.provisionedAccount("cora") }
 
             val describeServer = client.get("/xrpc/com.atproto.server.describeServer")
             assertEquals(HttpStatusCode.OK, describeServer.status)
@@ -196,4 +176,53 @@ class IdentityRoutesTest {
             assertEquals("cora.logdate.app", repoPayload["handle"]?.jsonPrimitive?.content)
             assertTrue(repoPayload["did"]?.jsonPrimitive?.content?.startsWith("did:plc:") == true)
         }
+
+    @Test
+    fun `anonymous lookups never create an identity for an account without one`() =
+        testApplication {
+            val env = configureAuthV1TestApp()
+            val legacy =
+                runBlocking {
+                    env.accountRepository.save(
+                        Account(id = Uuid.random(), username = "legacy", displayName = "Legacy", createdAt = Clock.System.now()),
+                    )
+                }
+
+            val wellKnown =
+                client.get("/.well-known/atproto-did") {
+                    header(HttpHeaders.Host, "legacy.logdate.app")
+                }
+            val xrpc = client.get("/xrpc/com.atproto.identity.resolveHandle?handle=legacy.logdate.app")
+            val describeRepo = client.get("/xrpc/com.atproto.repo.describeRepo?repo=legacy.logdate.app")
+
+            assertEquals(HttpStatusCode.NotFound, wellKnown.status)
+            assertTrue(xrpc.bodyAsText().contains("HandleNotFound"))
+            assertTrue(describeRepo.status != HttpStatusCode.OK)
+            assertEquals(legacy, runBlocking { env.accountRepository.findById(legacy.id) })
+        }
+
+    @Test
+    fun `a failing account lookup is an outage and never a missing handle`() =
+        testApplication {
+            val accountRepository = mockk<AccountRepository>(relaxed = true)
+            coEvery { accountRepository.findByHandle(any()) } throws IllegalStateException("database unavailable")
+            configureAuthV1TestApp(accountRepository = accountRepository)
+
+            val xrpc = client.get("/xrpc/com.atproto.identity.resolveHandle?handle=alice.logdate.app")
+            val wellKnown =
+                client.get("/.well-known/atproto-did") {
+                    header(HttpHeaders.Host, "alice.logdate.app")
+                }
+
+            assertEquals(HttpStatusCode.InternalServerError, xrpc.status)
+            assertTrue(xrpc.bodyAsText().contains("InternalServerError"))
+            assertEquals(HttpStatusCode.InternalServerError, wellKnown.status)
+        }
+
+    private suspend fun AuthV1TestEnvironment.provisionedAccount(username: String): Account =
+        atprotoIdentityService.ensureIdentity(
+            accountRepository.save(
+                Account(id = Uuid.random(), username = username, displayName = username, createdAt = Clock.System.now()),
+            ),
+        )
 }
