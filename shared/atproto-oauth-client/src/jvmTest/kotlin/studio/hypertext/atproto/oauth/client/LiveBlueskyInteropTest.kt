@@ -75,8 +75,8 @@ class LiveBlueskyInteropTest {
         DefaultIdentityResolver(DidPlcResolver(httpClient), WellKnownHandleResolver(httpClient))
 
     private companion object {
-        /** The DID of the bsky.app account. */
-        const val BLUESKY_DID = "did:plc:z72i7hdynmk6r22z27h6tvur"
+        /** The public DID of the bsky.app account, published in the PLC directory; not a secret. */
+        const val BLUESKY_DID = "did:plc:z72i7hdynmk6r22z27h6tvur" // ggignore
         const val BLUESKY_ISSUER = "https://bsky.social"
     }
 }

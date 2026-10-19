@@ -46,9 +46,7 @@ class OAuthServerResolverTest {
         runTest {
             assertFailsWith<OAuthIdentityResolutionException> { resolver.resolve("not a handle") }
             assertFailsWith<OAuthIdentityResolutionException> {
-                resolver.resolve(
-                    "did:key:zQ3shunBKsXixLxKtC5qeSG9E4J5RkGN57im31pcTzbNQnm5w",
-                )
+                resolver.resolve("did:key:zexample")
             }
         }
 
