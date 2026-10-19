@@ -1,9 +1,11 @@
 package app.logdate.client.database
 
 import android.content.Context
+import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,14 +49,26 @@ internal fun <T> openDatabaseWithPassphraseCandidates(
 ): OpenedDatabase<T> {
     require(candidates.isNotEmpty()) { "No database passphrase candidates are available" }
     var lastError: Exception? = null
+    var nonKeyError: Exception? = null
     candidates.forEach { candidate ->
         try {
             return OpenedDatabase(openDatabase(candidate), candidate)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             lastError = error
+            val message =
+                error
+                    .rootCause()
+                    .message
+                    .orEmpty()
+                    .lowercase()
+            if (listOf("file is not a database", "hmac check failed", "decrypting page").none { it in message }) {
+                nonKeyError = error
+            }
         }
     }
-    throw requireNotNull(lastError)
+    throw nonKeyError ?: DatabaseKeyRecoveryRequiredException(lastError)
 }
 
 class DatabaseStartupMonitor {

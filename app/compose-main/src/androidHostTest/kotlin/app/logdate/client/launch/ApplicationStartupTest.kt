@@ -1,5 +1,6 @@
 package app.logdate.client.launch
 
+import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -11,11 +12,26 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ApplicationStartupTest {
+    @Test
+    fun `database storage exhaustion gives a repair action before journal initialization`() {
+        val failure = IllegalStateException("Database initialization failed", IllegalStateException("no space left on device"))
+
+        assertEquals(ApplicationStartupFailureMessage.STORAGE_FULL, applicationStartupFailureMessage(failure))
+    }
+
+    @Test
+    fun `missing database key reaches recovery guidance through dependency wrappers`() {
+        val failure = IllegalStateException("Storage dependency failed", DatabaseKeyRecoveryRequiredException())
+
+        assertNotEquals(ApplicationStartupFailureMessage.GENERIC, applicationStartupFailureMessage(failure))
+    }
+
     @Test
     fun `native media recovery offers a storage-specific retry when the database is full`() {
         val failure = NativeMediaQuarantinePendingException(IllegalStateException("database or disk is full"))

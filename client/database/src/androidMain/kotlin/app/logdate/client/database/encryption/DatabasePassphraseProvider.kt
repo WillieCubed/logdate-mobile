@@ -6,6 +6,10 @@ import kotlinx.coroutines.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
+class DatabaseKeyRecoveryRequiredException(
+    cause: Throwable? = null,
+) : IllegalStateException("The retained journal database needs its original encryption key", cause)
+
 /**
  * Loads or generates the database encryption passphrase.
  *
@@ -39,13 +43,13 @@ class DatabasePassphraseProvider(
             primary?.let { encoded ->
                 runCatching { Base64.decode(encoded) }.getOrNull()?.takeIf { it.size == KEY_LENGTH_BYTES }
             }
-        val backup = backupStore.read()?.takeIf { it.size == KEY_LENGTH_BYTES }
-        val candidates = listOfNotNull(primaryKey, backup?.takeUnless { primaryKey?.contentEquals(it) == true })
+        val candidates =
+            (listOfNotNull(primaryKey) + backupStore.readCandidates())
+                .filter { it.size == KEY_LENGTH_BYTES }
+                .distinctBy { it.toList() }
         if (candidates.isNotEmpty()) return candidates
 
-        check(!backupStore.hasBackup() && !hasExistingDatabase()) {
-            "The retained journal database needs its original encryption key"
-        }
+        if (backupStore.hasBackup() || hasExistingDatabase()) throw DatabaseKeyRecoveryRequiredException()
 
         // A replacement key is only meaningful when there is no retained database.
         Napier.i("Generating new database passphrase (no existing key found)")

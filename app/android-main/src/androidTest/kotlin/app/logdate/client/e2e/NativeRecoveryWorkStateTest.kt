@@ -2,6 +2,7 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.ApplicationInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Data
@@ -36,6 +37,13 @@ class NativeRecoveryWorkStateTest {
     private val folder = File(application.cacheDir, "native-reconciliation-${Uuid.random()}").apply { mkdirs() }
     private val context =
         object : ContextWrapper(application) {
+            override fun getApplicationContext(): Context = this
+
+            override fun getApplicationInfo(): ApplicationInfo =
+                ApplicationInfo(application.applicationInfo).apply { dataDir = folder.absolutePath }
+
+            override fun getFilesDir(): File = File(folder, "files").apply { mkdirs() }
+
             override fun getNoBackupFilesDir(): File = folder
 
             override fun getDatabasePath(name: String): File = File(folder, name)
