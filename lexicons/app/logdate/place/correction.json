@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "One change the person made to their location history, such as renaming a place, moving a visit to another place or deleting a journey. Corrections are stored separately from the samples, so working the history out again never loses them. A correction is never edited: a later one replaces it by listing it in supersedes, and two corrections to the same field that don't supersede each other are shown to the person as a conflict to settle.",
+      "description": "One change the person made to their location history, such as renaming a place, moving a visit to another place or deleting a journey. Corrections are stored separately from the samples, so working the history out again never loses them. A correction is never edited: a later one replaces it by listing it in supersedes. The current corrections to a field of one thing are the ones no other correction lists in supersedes. If they all give the same value, that value applies. If they disagree, none of them applies, the thing keeps its own value, and the person is offered the disagreeing corrections as a conflict to settle. A delete correction applies as soon as one exists. Corrections are never ordered by time, because many have no createdAt.",
       "key": "any",
       "record": {
         "type": "object",
@@ -30,7 +30,7 @@
               "end",
               "delete"
             ],
-            "description": "What the correction changes. label: the name shown (set label). place: which place a visit, or a place merged into another, belongs to (set place). activity: how the person traveled (set activity). start and end: when it began or ended (set startsAt or endsAt). delete: removes it from the history, and needs no value."
+            "description": "What the correction changes. label: the name shown (set label); for a place, an agreed label also marks the place as confirmed. place: which place a visit, or a place merged into another, belongs to (set place). activity: how the person traveled (set activity). start and end: when it began or ended (set startsAt or endsAt). delete: removes it from the history, and needs no value."
           },
           "label": {
             "type": "string",
