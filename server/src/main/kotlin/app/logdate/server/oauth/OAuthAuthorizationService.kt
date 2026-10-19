@@ -1,5 +1,6 @@
 package app.logdate.server.oauth
 
+import io.github.aakira.napier.Napier
 import studio.hypertext.atproto.pds.AuthorizationCodeTokenRequest
 import studio.hypertext.atproto.pds.AuthorizationDecisionRequest
 import studio.hypertext.atproto.pds.AuthorizationPrompt
@@ -15,6 +16,7 @@ import java.security.SecureRandom
 import java.util.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -29,7 +31,10 @@ class OAuthAuthorizationService(
     private val runtimeStateRepository: OAuthRuntimeStateRepository = InMemoryOAuthRuntimeStateRepository(),
     private val clock: Clock = Clock.System,
     private val secureRandom: SecureRandom = SecureRandom(),
-) : PdsOAuthService {
+    private val trustedClientIds: Set<String> = emptySet(),
+    private val usedCodeChallenges: OAuthReplayCache = OAuthReplayCache(clock),
+) : PdsOAuthService,
+    OAuthGrantRevoker {
     /**
      * Validates and stores a pushed authorization request.
      */
@@ -56,14 +61,8 @@ class OAuthAuthorizationService(
         if (codeChallengeMethod != "S256") {
             throw OAuthInvalidRequestException("code_challenge_method must be S256")
         }
-        val requestedScopes =
-            scope
-                .trim()
-                .split(' ')
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-                .toSet()
-        if ("atproto" !in requestedScopes) {
+        val requestedScopes = OAuthScopes.parse(scope)
+        if (OAuthScopes.ATPROTO !in requestedScopes) {
             throw OAuthInvalidRequestException("scope must include atproto")
         }
 
@@ -85,6 +84,9 @@ class OAuthAuthorizationService(
         }
 
         val proof = dpopVerifier.verify(dpopProof, method = "POST", htu = htu).getOrElse { throw it }
+        if (!usedCodeChallenges.firstUse(codeChallenge.trim(), CODE_CHALLENGE_MEMORY)) {
+            throw OAuthInvalidRequestException("code_challenge has already been used; generate a new PKCE verifier")
+        }
         val requestUri = "urn:ietf:params:oauth:request_uri:${randomToken()}"
         runtimeStateRepository.saveAuthorizationRequest(
             StoredAuthorizationRequest(
@@ -92,7 +94,7 @@ class OAuthAuthorizationService(
                 clientId = clientId,
                 clientName = clientMetadata.client_name ?: clientId,
                 redirectUri = redirectUri,
-                scope = requestedScopes.joinToString(" "),
+                scope = OAuthScopes.granted(requestedScopes).joinToString(" "),
                 state = state?.trim()?.takeIf(String::isNotEmpty),
                 loginHint = loginHint?.trim()?.takeIf(String::isNotEmpty),
                 codeChallenge = codeChallenge.trim(),
@@ -135,7 +137,7 @@ class OAuthAuthorizationService(
         approved: Boolean,
     ): String {
         val stored = runtimeStateRepository.requireValidRequest(requestUri, clock)
-        runtimeStateRepository.deleteAuthorizationRequest(requestUri)
+        runtimeStateRepository.claimAuthorizationRequest(requestUri)
 
         if (!loginHintMatches(stored.loginHint, subjectDid = subjectDid, subjectHandle = subjectHandle)) {
             throw OAuthInvalidRequestException("login_hint does not match the authenticated account")
@@ -177,7 +179,7 @@ class OAuthAuthorizationService(
      */
     suspend fun denyAuthorization(requestUri: String): String {
         val stored = runtimeStateRepository.requireValidRequest(requestUri, clock)
-        runtimeStateRepository.deleteAuthorizationRequest(requestUri)
+        runtimeStateRepository.claimAuthorizationRequest(requestUri)
         return deniedRedirect(stored)
     }
 
@@ -258,7 +260,7 @@ class OAuthAuthorizationService(
                 dpopKeyThumbprint = proof.keyThumbprint,
                 clientAuthKeyId = stored.clientAuthKeyId,
                 clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
-                expiresAt = clock.now() + REFRESH_TOKEN_TTL,
+                expiresAt = clock.now() + refreshTokenLifetime(stored.clientId),
             ),
         )
         return OAuthTokenResponse(
@@ -328,7 +330,7 @@ class OAuthAuthorizationService(
         runtimeStateRepository.saveRefreshToken(
             stored.copy(
                 token = rotatedRefreshToken,
-                expiresAt = clock.now() + REFRESH_TOKEN_TTL,
+                expiresAt = clock.now() + refreshTokenLifetime(stored.clientId),
             ),
         )
         return OAuthTokenResponse(
@@ -469,6 +471,19 @@ class OAuthAuthorizationService(
         return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
     }
 
+    /**
+     * Revokes every refresh token issued for [subjectDid], so no app can keep acting for the
+     * account once its access tokens expire. Returns how many were revoked.
+     */
+    override suspend fun revokeAllForSubject(subjectDid: String): Int {
+        val revoked = runtimeStateRepository.revokeRefreshTokensForSubject(subjectDid, clock.now())
+        Napier.i("Revoked $revoked OAuth refresh tokens for an account")
+        return revoked
+    }
+
+    private fun refreshTokenLifetime(clientId: String) =
+        if (clientId in trustedClientIds) TRUSTED_REFRESH_TOKEN_TTL else UNTRUSTED_REFRESH_TOKEN_TTL
+
     private fun randomToken(): String {
         val bytes = ByteArray(TOKEN_BYTES)
         secureRandom.nextBytes(bytes)
@@ -478,7 +493,9 @@ class OAuthAuthorizationService(
     private companion object {
         private val REQUEST_URI_TTL = 5.minutes
         private val AUTHORIZATION_CODE_TTL = 1.minutes
-        private val REFRESH_TOKEN_TTL = 30.days
+        private val TRUSTED_REFRESH_TOKEN_TTL = 30.days
+        private val UNTRUSTED_REFRESH_TOKEN_TTL = 14.days
+        private val CODE_CHALLENGE_MEMORY = 1.hours
         private const val TOKEN_BYTES = 32
         private const val SHA_256_ALGORITHM = "SHA-256"
     }
@@ -503,6 +520,24 @@ private suspend fun OAuthRuntimeStateRepository.requireValidRequest(
         throw OAuthInvalidRequestException("request_uri is invalid or expired")
     }
     return stored
+}
+
+/**
+ * Removes [requestUri] so it can be decided once. Two decisions racing for the same request
+ * cannot both succeed: only the one that actually removed it continues.
+ */
+private suspend fun OAuthRuntimeStateRepository.claimAuthorizationRequest(requestUri: String) {
+    if (!deleteAuthorizationRequest(requestUri)) {
+        throw OAuthInvalidRequestException("request_uri is invalid or expired")
+    }
+}
+
+/**
+ * Revokes the OAuth grants an account has given to apps. Signing out everywhere and removing a
+ * passkey call it so apps lose access along with the account's own devices.
+ */
+fun interface OAuthGrantRevoker {
+    suspend fun revokeAllForSubject(subjectDid: String): Int
 }
 
 /**

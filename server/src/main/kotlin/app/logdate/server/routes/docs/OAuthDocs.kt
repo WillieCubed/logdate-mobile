@@ -92,7 +92,9 @@ internal object OAuthDocs {
             The RFC 8414 discovery document for this server's OAuth authorization server. An AT Protocol client
             reads it first to learn the endpoint URLs and what the server supports: only the `code` response
             type with PKCE (`S256`), pushed authorization requests are required, DPoP proofs must be signed with
-            `ES256` or `ES256K`, and the only scope is `atproto`.
+            `ES256` or `ES256K`. The scopes are `atproto`, which only confirms which account signed in, and
+            `transition:generic`, which also allows writing records and uploading files. Access tokens last 15
+            minutes.
             """,
         )
         response {
@@ -111,7 +113,7 @@ internal object OAuthDocs {
                     token_endpoint_auth_methods_supported = listOf("none", "private_key_jwt"),
                     token_endpoint_auth_signing_alg_values_supported = listOf("ES256", "ES256K"),
                     dpop_signing_alg_values_supported = listOf("ES256", "ES256K"),
-                    scopes_supported = listOf("atproto"),
+                    scopes_supported = listOf("atproto", "transition:generic"),
                     authorization_response_iss_parameter_supported = true,
                     require_pushed_authorization_requests = true,
                     client_id_metadata_document_supported = true,
@@ -179,10 +181,13 @@ internal object OAuthDocs {
             Then send the person to `/oauth/authorize?request_uri=<it>`.
 
             The form fields are `client_id` (the URL of your client metadata document), `redirect_uri`,
-            `scope` (`atproto`), `response_type` (`code`), `code_challenge` and `code_challenge_method`
-            (`S256`), plus optional `state`, `login_hint`, and `client_assertion_type` /
-            `client_assertion` for confidential clients. The request must carry a `DPoP` proof; the response's
-            `DPoP-Nonce` header is the nonce to use on your next proof.
+            `scope` (`atproto`, optionally with `transition:generic`), `response_type` (`code`), `code_challenge`
+            and `code_challenge_method` (`S256`), plus optional `state`, `login_hint`, and
+            `client_assertion_type` / `client_assertion` for confidential clients. The request must carry a
+            `DPoP` proof; the response's `DPoP-Nonce` header is the nonce to use on your next proof.
+
+            Scopes this server does not enforce are dropped, so the token's `scope` lists exactly what it allows.
+            Each request needs a fresh PKCE verifier: a `code_challenge` that was already used is refused.
             """,
         )
         request {
@@ -330,6 +335,15 @@ internal object OAuthDocs {
                 "only the LogDate apps can approve requests here.",
             "Passkey sign-in on the authorization page is not enabled on this server",
         )
+    private val tooManyPasskeyAttempts =
+        ErrorCase(
+            "temporarily_unavailable",
+            "Too many passkey attempts came from this network in the last minute. Wait for `Retry-After` seconds.",
+            "Too many sign-in attempts from this network. Wait a minute and try again.",
+        )
+    private val retryAfter: io.github.smiley4.ktoropenapi.config.ResponseConfig.() -> Unit = {
+        header<String>("Retry-After") { description = "Seconds to wait before the next attempt." }
+    }
     private val expiredRequest =
         ErrorCase(
             "invalid_request",
@@ -347,7 +361,8 @@ internal object OAuthDocs {
             for the pushed request named by `request_uri` and returns the options the page passes to
             `navigator.credentials.get`. When the client's `login_hint` names an account on this server,
             `allow_credentials` lists that account's passkeys; otherwise it is empty and the browser offers any
-            passkey for this relying party. User verification is always required.
+            passkey for this relying party. User verification is always required. The challenge only approves
+            this `request_uri`; it cannot be used for an app sign-in or for another request.
             """,
         )
         request {
@@ -369,6 +384,7 @@ internal object OAuthDocs {
             )
             oauthError(HttpStatusCode.BadRequest, expiredRequest)
             oauthError(HttpStatusCode.InternalServerError, serverError)
+            oauthError(HttpStatusCode.TooManyRequests, tooManyPasskeyAttempts, headers = retryAfter)
             oauthError(HttpStatusCode.NotImplemented, passkeySignInDisabled)
         }
     }
@@ -440,6 +456,7 @@ internal object OAuthDocs {
                 ),
             )
             oauthError(HttpStatusCode.InternalServerError, serverError)
+            oauthError(HttpStatusCode.TooManyRequests, tooManyPasskeyAttempts, headers = retryAfter)
             oauthError(HttpStatusCode.NotImplemented, passkeySignInDisabled)
         }
     }
@@ -491,7 +508,7 @@ internal object OAuthDocs {
                             OAuthTokenResponse(
                                 access_token = "at-eyJhbGciOiJFUzI1NiJ9.access-example",
                                 token_type = "DPoP",
-                                expires_in = 3600,
+                                expires_in = 900,
                                 refresh_token = "rt-9a8b7c6d5e4f",
                                 sub = DocExamples.DID,
                                 scope = "atproto",

@@ -31,6 +31,7 @@ import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.HandleLabels
+import app.logdate.server.oauth.OAuthGrantRevoker
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.ratelimit.RateLimitPolicy
@@ -316,6 +317,7 @@ fun Route.authV1Routes(
     emailVerificationService: EmailVerificationService? = null,
     deviceLinkService: DeviceLinkService? = null,
     accessTokenVerifier: AccessTokenVerifier = AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
+    oauthGrantRevoker: OAuthGrantRevoker? = null,
 ) {
     val rateLimiter = InMemoryAuthRateLimiter()
 
@@ -1347,6 +1349,8 @@ fun Route.authV1Routes(
                     )
                 }
                 webAuthnService.deletePasskey(credentialId, account.id)
+                // A removed passkey may be the one that approved an app, so every app loses access.
+                account.did?.let { did -> oauthGrantRevoker?.revokeAllForSubject(did) }
                 call.respond(HttpStatusCode.NoContent)
             } catch (e: Exception) {
                 Napier.e("Failed to delete passkey", e)
@@ -1367,6 +1371,7 @@ fun Route.authV1Routes(
                         metrics,
                     )
 
+                account.did?.let { did -> oauthGrantRevoker?.revokeAllForSubject(did) }
                 val summary = deletionService.deleteAccount(account.id)
                 if (!summary.accountRowDeleted) {
                     return@delete call.respondApiError(

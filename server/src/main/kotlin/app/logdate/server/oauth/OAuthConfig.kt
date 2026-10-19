@@ -15,6 +15,11 @@ data class OAuthConfig(
     val issuer: String,
     val resource: String = issuer,
     val passkeySignInEnabled: Boolean = false,
+    /**
+     * Client IDs whose self-reported names the authorization page may show and whose refresh
+     * tokens last longer. Every other app is named by its client ID URL.
+     */
+    val trustedClientIds: Set<String> = emptySet(),
 ) {
     init {
         require(issuer.startsWith("https://")) { "issuer must use https" }
@@ -67,7 +72,7 @@ data class OAuthConfig(
             token_endpoint_auth_methods_supported = listOf("none", "private_key_jwt"),
             token_endpoint_auth_signing_alg_values_supported = listOf("ES256", "ES256K"),
             dpop_signing_alg_values_supported = listOf("ES256", "ES256K"),
-            scopes_supported = listOf("atproto"),
+            scopes_supported = OAuthScopes.supported,
             authorization_response_iss_parameter_supported = true,
             require_pushed_authorization_requests = true,
             client_id_metadata_document_supported = true,
@@ -84,11 +89,21 @@ data class OAuthConfig(
 
     companion object {
         private const val PASSKEY_SIGN_IN_FLAG = "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED"
+        private const val TRUSTED_CLIENT_IDS = "LOGDATE_OAUTH_TRUSTED_CLIENT_IDS"
         private const val DEFAULT_HTTPS_PORT = 443
 
         /** Reads `LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED`; only the exact value `true` turns it on. */
         fun passkeySignInEnabledFromEnvironment(readEnv: (String) -> String? = System::getenv): Boolean =
             readEnv(PASSKEY_SIGN_IN_FLAG)?.trim() == "true"
+
+        /** Reads the comma-separated `LOGDATE_OAUTH_TRUSTED_CLIENT_IDS`. */
+        fun trustedClientIdsFromEnvironment(readEnv: (String) -> String? = System::getenv): Set<String> =
+            readEnv(TRUSTED_CLIENT_IDS)
+                ?.split(',')
+                ?.map(String::trim)
+                ?.filter(String::isNotEmpty)
+                ?.toSet()
+                .orEmpty()
 
         /**
          * Reads OAuth discovery configuration from environment variables.

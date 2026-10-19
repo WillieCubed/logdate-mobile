@@ -51,7 +51,7 @@ class OAuthConfigTest {
         assertEquals(listOf("none", "private_key_jwt"), metadata.token_endpoint_auth_methods_supported)
         assertEquals(listOf("ES256", "ES256K"), metadata.token_endpoint_auth_signing_alg_values_supported)
         assertEquals(listOf("ES256", "ES256K"), metadata.dpop_signing_alg_values_supported)
-        assertEquals(listOf("atproto"), metadata.scopes_supported)
+        assertEquals(listOf("atproto", "transition:generic"), metadata.scopes_supported)
         assertTrue(metadata.authorization_response_iss_parameter_supported)
         assertTrue(metadata.require_pushed_authorization_requests)
         assertTrue(metadata.client_id_metadata_document_supported)

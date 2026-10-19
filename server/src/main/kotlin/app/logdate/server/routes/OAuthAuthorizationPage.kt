@@ -65,8 +65,8 @@ internal fun renderAuthorizationPage(
                 nonce = nonce,
                 title = "No LogDate account for ${page.requestedAccount}",
                 body =
-                    "${page.clientName} asked to sign in as ${page.requestedAccount}, which isn't a LogDate account. Go back " +
-                        "to ${page.clientName} and sign in with your LogDate handle.",
+                    "${page.clientLabel} asked to sign in as ${page.requestedAccount}, which isn't a LogDate account. Go back " +
+                        "to the app and sign in with your LogDate handle.",
             )
     }
 
@@ -74,31 +74,42 @@ private fun signInPage(
     page: OAuthPasskeyPage.SignIn,
     nonce: String,
 ): String {
-    val client = page.clientName.escapeHtml()
+    val client = page.clientLabel.escapeHtml()
     val account = page.accountHandle?.let { "@$it".escapeHtml() }
+    val accountPhrase = account?.let { ", <strong>$it</strong>" }.orEmpty()
+    // An untrusted app is already named by its client ID URL, so its address would only repeat it.
+    val address =
+        page.clientAddress
+            .takeUnless { page.clientLabel.contains(it) }
+            ?.let { " <span class=\"address\">${it.escapeHtml()}</span>" }
+            .orEmpty()
+    val access =
+        if (page.canWrite) {
+            "If you continue, this app can upload files to your account. It can't see or change your journal."
+        } else {
+            "If you continue, this app learns which LogDate account you are. It can't see or change anything in your account."
+        }
     val pageData =
         buildJsonObject {
             put("request_uri", page.requestUri)
-            put("client_name", page.clientName)
+            put("client_label", page.clientLabel)
         }.toString().escapeForScript()
     val content =
-        """
-        <h1>Sign in to $client</h1>
-        <p class="lead"><strong>$client</strong> <span class="address">${page.clientAddress.escapeHtml()}</span> wants to use your LogDate identity${account?.let {
-            ", <strong>$it</strong>"
-        }.orEmpty()}.</p>
-        <p>If you continue, $client can read and change the journal data stored in your LogDate account.</p>
-        <div class="actions">
-          <button type="button" id="continue" class="primary">Continue with passkey</button>
-          <form method="post" action="/oauth/authorize">
-            <input type="hidden" name="request_uri" value="${page.requestUri.escapeHtml()}">
-            <input type="hidden" name="decision" value="deny">
-            <button type="submit" class="text">Cancel</button>
-          </form>
-        </div>
-        <p id="status" class="status" role="status" aria-live="polite"></p>
-        <noscript><p class="status" data-kind="error">Turn on JavaScript in this browser to sign in with a passkey.</p></noscript>
-        """.trimIndent()
+        listOf(
+            "<h1>Sign in to $client</h1>",
+            "<p class=\"lead\"><strong>$client</strong>$address wants to confirm your LogDate identity$accountPhrase.</p>",
+            "<p>$access</p>",
+            "<div class=\"actions\">",
+            "<button type=\"button\" id=\"continue\" class=\"primary\">Continue with passkey</button>",
+            "<form method=\"post\" action=\"/oauth/authorize\">",
+            "<input type=\"hidden\" name=\"request_uri\" value=\"${page.requestUri.escapeHtml()}\">",
+            "<input type=\"hidden\" name=\"decision\" value=\"deny\">",
+            "<button type=\"submit\" class=\"text\">Cancel</button>",
+            "</form>",
+            "</div>",
+            "<p id=\"status\" class=\"status\" role=\"status\" aria-live=\"polite\"></p>",
+            "<noscript><p class=\"status\" data-kind=\"error\">Turn on JavaScript in this browser to sign in with a passkey.</p></noscript>",
+        ).joinToString("\n")
     val footer = "<p class=\"footnote\">Only continue if you started signing in to $client yourself.</p>"
     val scripts =
         "<script type=\"application/json\" id=\"authorization-request\">$pageData</script>\n" +

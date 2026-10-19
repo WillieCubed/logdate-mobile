@@ -14,6 +14,7 @@ import app.logdate.shared.model.PasskeyAssertionResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.delete
 import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -85,9 +86,11 @@ class OAuthPasskeySignInRoutesTest {
             assertEquals(HttpStatusCode.OK, page.status)
             assertEquals(ContentType.Text.Html, page.contentType()?.withoutParameters())
             val body = page.bodyAsText()
-            assertTrue("Journal Viewer" in body, body)
-            assertTrue("viewer.example.com" in body, body)
+            assertTrue("<h1>Sign in to $CLIENT_ID</h1>" in body, body)
+            assertFalse("Journal Viewer" in body, "an untrusted app's self-reported name is never shown")
             assertTrue("@alice.logdate.app" in body, body)
+            assertTrue("learns which LogDate account you are" in body, body)
+            assertFalse("journal data" in body, body)
             assertTrue("Continue with passkey" in body, body)
             val csp = assertNotNull(page.headers["Content-Security-Policy"])
             assertTrue("frame-ancestors 'none'" in csp, csp)
@@ -101,13 +104,181 @@ class OAuthPasskeySignInRoutesTest {
     @Test
     fun `the page escapes a client name it does not control`() =
         testApplication {
-            configureApp(clientName = "<script>alert(1)</script>")
+            configureApp(clientName = "<script>alert(1)</script>", trusted = true)
             val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
 
             val body = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }.bodyAsText()
 
             assertFalse("<script>alert(1)</script>" in body, body)
             assertTrue("&lt;script&gt;alert(1)&lt;/script&gt;" in body, body)
+        }
+
+    @Test
+    fun `a trusted app is named by its own name and address`() =
+        testApplication {
+            configureApp(trusted = true)
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val body = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }.bodyAsText()
+
+            assertTrue("<h1>Sign in to Journal Viewer</h1>" in body, body)
+            assertTrue("viewer.example.com" in body, body)
+        }
+
+    @Test
+    fun `the page describes write access only when the app asked for it`() =
+        testApplication {
+            configureApp()
+            val requestUri = pushAuthorizationRequest(loginHint = null, scope = "atproto transition:generic").requestUri
+
+            val body = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }.bodyAsText()
+
+            assertTrue("can upload files to your account" in body, body)
+            assertTrue("can't see or change your journal" in body, body)
+        }
+
+    @Test
+    fun `a challenge for one request cannot approve another`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val passkey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val first = pushAuthorizationRequest(loginHint = null).requestUri
+            val second = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val challenge = passkeyOptions(first).getValue("challenge").jsonPrimitive.content
+            val crossed = approveWithPasskey(second, challenge, passkey.assert(challenge))
+
+            assertEquals(HttpStatusCode.Unauthorized, crossed.status)
+            val ownChallenge = passkeyOptions(second).getValue("challenge").jsonPrimitive.content
+            assertEquals(HttpStatusCode.OK, approveWithPasskey(second, ownChallenge, passkey.assert(ownChallenge)).status)
+        }
+
+    @Test
+    fun `an app sign-in challenge cannot approve an authorization request`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val passkey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val appChallenge = env.webAuthn.generateAuthenticationOptions(userId = alice.id).challenge
+            val rejected = approveWithPasskey(requestUri, appChallenge, passkey.assert(appChallenge))
+
+            assertEquals(HttpStatusCode.Unauthorized, rejected.status)
+        }
+
+    @Test
+    fun `an approved request cannot be approved again`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val passkey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+            val first = passkeyOptions(requestUri).getValue("challenge").jsonPrimitive.content
+            val second = passkeyOptions(requestUri).getValue("challenge").jsonPrimitive.content
+
+            assertEquals(HttpStatusCode.OK, approveWithPasskey(requestUri, first, passkey.assert(first)).status)
+            val again = approveWithPasskey(requestUri, second, passkey.assert(second))
+
+            assertEquals(HttpStatusCode.BadRequest, again.status)
+            assertEquals(
+                "invalid_request",
+                json
+                    .parseToJsonElement(again.bodyAsText())
+                    .jsonObject["error"]
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+        }
+
+    @Test
+    fun `passkey attempts are rate limited per network`() =
+        testApplication {
+            configureApp()
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val statuses =
+                (1..11).map {
+                    postJson("/oauth/authorize/passkey/options", buildJsonObject { put("request_uri", requestUri) })
+                }
+
+            assertTrue(statuses.take(10).all { it.status == HttpStatusCode.OK })
+            val limited = statuses.last()
+            assertEquals(HttpStatusCode.TooManyRequests, limited.status)
+            assertNotNull(limited.headers[HttpHeaders.RetryAfter])
+        }
+
+    @Test
+    fun `deleting a passkey revokes every app the account approved`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val passkey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val spare = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val pushed = pushAuthorizationRequest(loginHint = null)
+            val challenge = passkeyOptions(pushed.requestUri).getValue("challenge").jsonPrimitive.content
+            val redirect =
+                Url(
+                    json
+                        .parseToJsonElement(approveWithPasskey(pushed.requestUri, challenge, passkey.assert(challenge)).bodyAsText())
+                        .jsonObject
+                        .getValue("redirect_uri")
+                        .jsonPrimitive.content,
+                )
+            val token =
+                client.post("/oauth/token") {
+                    header("DPoP", createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = pushed.nonce))
+                    setBody(
+                        FormDataContent(
+                            Parameters.build {
+                                append("grant_type", "authorization_code")
+                                append("code", assertNotNull(redirect.parameters["code"]))
+                                append("redirect_uri", REDIRECT_URI)
+                                append("client_id", CLIENT_ID)
+                                append("code_verifier", pushed.verifier)
+                            },
+                        ),
+                    )
+                }
+            val refreshToken =
+                json
+                    .parseToJsonElement(token.bodyAsText())
+                    .jsonObject
+                    .getValue("refresh_token")
+                    .jsonPrimitive.content
+
+            val delete =
+                client.delete("/api/v1/auth/me/passkeys/${spare.credentialIdB64}") {
+                    header(HttpHeaders.Authorization, "Bearer ${env.base.tokenService.generateAccessToken(alice.id.toString())}")
+                }
+            assertEquals(HttpStatusCode.NoContent, delete.status, delete.bodyAsText())
+
+            val refresh =
+                client.post("/oauth/token") {
+                    header(
+                        "DPoP",
+                        createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = token.headers["DPoP-Nonce"]),
+                    )
+                    setBody(
+                        FormDataContent(
+                            Parameters.build {
+                                append("grant_type", "refresh_token")
+                                append("refresh_token", refreshToken)
+                                append("client_id", CLIENT_ID)
+                            },
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.BadRequest, refresh.status)
+            assertEquals(
+                "invalid_grant",
+                json
+                    .parseToJsonElement(refresh.bodyAsText())
+                    .jsonObject["error"]
+                    ?.jsonPrimitive
+                    ?.content,
+            )
         }
 
     @Test
@@ -191,7 +362,7 @@ class OAuthPasskeySignInRoutesTest {
                                 append("code", code)
                                 append("redirect_uri", REDIRECT_URI)
                                 append("client_id", CLIENT_ID)
-                                append("code_verifier", CODE_VERIFIER)
+                                append("code_verifier", pushed.verifier)
                             },
                         ),
                     )
@@ -320,6 +491,16 @@ class OAuthPasskeySignInRoutesTest {
         }
 
     @Test
+    fun `turning the page on without strict passkey verification fails at startup`() {
+        val failure =
+            assertFailsWith<IllegalStateException> {
+                createPasskeySignInService(issuer = "https://logdate.app", relyingPartyId = "logdate.app", strict = false)
+            }
+
+        assertTrue("WEBAUTHN_STRICT_VERIFICATION" in assertNotNull(failure.message), failure.message)
+    }
+
+    @Test
     fun `turning the page on for an issuer outside the relying party fails at startup`() {
         val failure =
             assertFailsWith<IllegalStateException> {
@@ -333,6 +514,7 @@ class OAuthPasskeySignInRoutesTest {
     private fun createPasskeySignInService(
         issuer: String,
         relyingPartyId: String,
+        strict: Boolean = true,
     ) {
         val accounts =
             app.logdate.server.auth
@@ -343,7 +525,12 @@ class OAuthPasskeySignInRoutesTest {
         app.logdate.server.oauth.OAuthPasskeySignInService(
             config = config,
             authorizationService = io.mockk.mockk(),
-            webAuthnService = WebAuthnPasskeyService(relyingPartyId = relyingPartyId, origins = setOf("https://app.$relyingPartyId")),
+            webAuthnService =
+                WebAuthnPasskeyService(
+                    relyingPartyId = relyingPartyId,
+                    origins = setOf("https://app.$relyingPartyId", "https://$relyingPartyId"),
+                    strictVerificationEnabled = strict,
+                ),
             accountRepository = accounts,
             identityService = io.mockk.mockk(),
         )
@@ -353,6 +540,7 @@ class OAuthPasskeySignInRoutesTest {
         val requestUri: String,
         val nonce: String,
         val dpopKey: java.security.KeyPair,
+        val verifier: String,
     )
 
     private class PasskeyEnv(
@@ -364,6 +552,7 @@ class OAuthPasskeySignInRoutesTest {
     private fun TestApplicationBuilder.configureApp(
         passkeySignInEnabled: Boolean = true,
         clientName: String = "Journal Viewer",
+        trusted: Boolean = false,
     ): PasskeyEnv {
         val passkeys = InMemoryPasskeyRepository()
         val webAuthn =
@@ -380,8 +569,11 @@ class OAuthPasskeySignInRoutesTest {
                         MockEngine { request ->
                             respond(
                                 content =
-                                    clientMetadataJson(clientId = request.url.toString(), redirectUri = REDIRECT_URI)
-                                        .replace("\"Journal Viewer\"", Json.encodeToJsonElement(clientName).toString()),
+                                    clientMetadataJson(
+                                        clientId = request.url.toString(),
+                                        redirectUri = REDIRECT_URI,
+                                        scope = "atproto transition:generic",
+                                    ).replace("\"Journal Viewer\"", Json.encodeToJsonElement(clientName).toString()),
                                 status = HttpStatusCode.OK,
                                 headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
                             )
@@ -393,6 +585,11 @@ class OAuthPasskeySignInRoutesTest {
                 webAuthnPasskeyService = webAuthn,
                 oauthClientMetadataResolver = metadataResolver,
                 oauthPasskeySignInEnabled = passkeySignInEnabled,
+                oauthConfig =
+                    app.logdate.server.oauth.OAuthConfig(
+                        issuer = "https://logdate.app",
+                        trustedClientIds = if (trusted) setOf(CLIENT_ID) else emptySet(),
+                    ),
             )
         return PasskeyEnv(base, webAuthn, passkeys)
     }
@@ -425,7 +622,12 @@ class OAuthPasskeySignInRoutesTest {
         registerWith(lenient, account.id, account.username)
     }
 
-    private suspend fun ApplicationTestBuilder.pushAuthorizationRequest(loginHint: String?): PushedRequest {
+    private suspend fun ApplicationTestBuilder.pushAuthorizationRequest(
+        loginHint: String?,
+        scope: String = "atproto",
+    ): PushedRequest {
+        // Each pushed request needs its own PKCE verifier; the server refuses a reused challenge.
+        val verifier = "example-code-verifier-${Uuid.random()}"
         val dpopKey = generateP256KeyPair()
         val response =
             client.post("/oauth/par") {
@@ -435,9 +637,9 @@ class OAuthPasskeySignInRoutesTest {
                         Parameters.build {
                             append("client_id", CLIENT_ID)
                             append("response_type", "code")
-                            append("scope", "atproto")
+                            append("scope", scope)
                             append("redirect_uri", REDIRECT_URI)
-                            append("code_challenge", CODE_CHALLENGE)
+                            append("code_challenge", pkceChallenge(verifier))
                             append("code_challenge_method", "S256")
                             append("state", "state-123")
                             loginHint?.let { append("login_hint", it) }
@@ -455,6 +657,7 @@ class OAuthPasskeySignInRoutesTest {
                     .jsonPrimitive.content,
             nonce = assertNotNull(response.headers["DPoP-Nonce"]),
             dpopKey = dpopKey,
+            verifier = verifier,
         )
     }
 
@@ -494,15 +697,15 @@ class OAuthPasskeySignInRoutesTest {
     private companion object {
         const val CLIENT_ID = "https://viewer.example.com/client.json"
         const val REDIRECT_URI = "https://viewer.example.com/callback"
-        const val CODE_VERIFIER = "example-code-verifier-for-journal-viewer-tests"
-        val CODE_CHALLENGE: String =
-            java.util.Base64
-                .getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(
-                    java.security.MessageDigest
-                        .getInstance("SHA-256")
-                        .digest(CODE_VERIFIER.toByteArray()),
-                )
     }
 }
+
+private fun pkceChallenge(verifier: String): String =
+    java.util.Base64
+        .getUrlEncoder()
+        .withoutPadding()
+        .encodeToString(
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(verifier.toByteArray()),
+        )

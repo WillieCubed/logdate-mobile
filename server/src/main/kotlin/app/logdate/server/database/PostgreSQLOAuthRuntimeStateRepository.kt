@@ -5,7 +5,9 @@ import app.logdate.server.oauth.StoredAuthorizationCode
 import app.logdate.server.oauth.StoredAuthorizationRequest
 import app.logdate.server.oauth.StoredRefreshToken
 import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -178,6 +180,18 @@ internal class PostgreSQLOAuthRuntimeStateRepository : OAuthRuntimeStateReposito
     override suspend fun deleteRefreshToken(token: String): Boolean =
         transaction {
             OAuthRefreshTokensTable.deleteWhere { OAuthRefreshTokensTable.token eq token } > 0
+        }
+
+    override suspend fun revokeRefreshTokensForSubject(
+        subjectDid: String,
+        revokedAt: kotlin.time.Instant,
+    ): Int =
+        transaction {
+            OAuthRefreshTokensTable.update({
+                (OAuthRefreshTokensTable.subjectDid eq subjectDid) and OAuthRefreshTokensTable.revokedAt.isNull()
+            }) {
+                it[OAuthRefreshTokensTable.revokedAt] = revokedAt
+            }
         }
 }
 

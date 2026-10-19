@@ -166,6 +166,7 @@ internal fun Application.accountApiRoutes() {
     val passkeys by inject<PasskeyRepository>()
     val descriptorConfig by inject<ServerDescriptorConfig>()
     val deviceLinkService by inject<DeviceLinkService>()
+    val oauthGrantRevoker by inject<OAuthAuthorizationService>()
     val accessTokenVerifier by inject<AccessTokenVerifier>()
 
     routing {
@@ -192,6 +193,7 @@ internal fun Application.accountApiRoutes() {
                 emailVerificationService = emailVerificationService,
                 deviceLinkService = deviceLinkService,
                 accessTokenVerifier = accessTokenVerifier,
+                oauthGrantRevoker = oauthGrantRevoker,
             )
             identityApiRoutes(
                 accountRepository = accountRepository,

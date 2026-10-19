@@ -372,7 +372,14 @@ class OpenApiContractTest {
                 "createDeviceLink",
                 "redeemDeviceLink",
             )
-        private val RATE_LIMITED_WITH_RETRY_AFTER = setOf("uploadMedia", "uploadBackup", "createTranscriptionSession")
+        private val RATE_LIMITED_WITH_RETRY_AFTER =
+            setOf(
+                "uploadMedia",
+                "uploadBackup",
+                "createTranscriptionSession",
+                "getAuthorizationPasskeyOptions",
+                "approveAuthorizationWithPasskey",
+            )
         private val QUOTA_ENFORCED = setOf("uploadMedia", "uploadBackup", "createTranscriptionSession")
     }
 }

@@ -29,7 +29,7 @@ internal fun createDpopProof(
     nonce: String? = null,
     ath: String? = null,
     iat: Long = Clock.System.now().epochSeconds,
-    jti: String = "proof-$iat",
+    jti: String = "proof-${java.util.UUID.randomUUID()}",
     typ: String = "dpop+jwt",
     alg: String = jwkAlgorithm(EcCurve.P256),
     jwk: DpopPublicJwk = publicJwk(keyPair),

@@ -248,7 +248,7 @@ class XrpcRouteCoverageTest {
                     .issueAccessToken(
                         subjectDid = repoDid,
                         clientId = "https://viewer.example.com/client.json",
-                        scope = "atproto",
+                        scope = "atproto transition:generic",
                         keyThumbprint = thumbprint,
                     ).token
 
@@ -270,7 +270,7 @@ class XrpcRouteCoverageTest {
                         """
                         {
                           "repo": "$repoDid",
-                          "collection": "studio.hypertext.logdate.content",
+                          "collection": "com.example.note",
                           "rkey": "entry-1",
                           "record": { "type": "TEXT" }
                         }
@@ -280,7 +280,7 @@ class XrpcRouteCoverageTest {
             assertEquals(HttpStatusCode.OK, created.status)
 
             val listed =
-                client.get("/xrpc/com.atproto.repo.listRecords?repo=$repoDid&collection=studio.hypertext.logdate.content") {
+                client.get("/xrpc/com.atproto.repo.listRecords?repo=$repoDid&collection=com.example.note") {
                     header(HttpHeaders.Authorization, "DPoP $accessToken")
                     header(
                         "DPoP",
@@ -299,7 +299,7 @@ class XrpcRouteCoverageTest {
                 client.post("/xrpc/com.atproto.repo.createRecord") {
                     contentType(ContentType.Application.Json)
                     header(HttpHeaders.Authorization, "DPoP $accessToken")
-                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"com.example.note","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, missingProof.status)
 
@@ -317,7 +317,7 @@ class XrpcRouteCoverageTest {
                             ath = env.oauthDpopVerifier.accessTokenHash(accessToken),
                         ),
                     )
-                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"com.example.note","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, wrongKey.status)
 
@@ -335,7 +335,7 @@ class XrpcRouteCoverageTest {
                             ath = env.oauthDpopVerifier.accessTokenHash(accessToken),
                         ),
                     )
-                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"com.example.note","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, wrongNonce.status)
             assertEquals(env.oauthNonceService.currentNonce(), wrongNonce.headers["DPoP-Nonce"])
@@ -345,7 +345,7 @@ class XrpcRouteCoverageTest {
                     .issueAccessToken(
                         subjectDid = "did:plc:missing-user",
                         clientId = "https://viewer.example.com/client.json",
-                        scope = "atproto",
+                        scope = "atproto transition:generic",
                         keyThumbprint = thumbprint,
                     ).token
             val missingAccount =
@@ -362,7 +362,7 @@ class XrpcRouteCoverageTest {
                             ath = env.oauthDpopVerifier.accessTokenHash(missingAccountToken),
                         ),
                     )
-                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"com.example.note","record":{"type":"TEXT"}}""")
                 }
             assertEquals(HttpStatusCode.Unauthorized, missingAccount.status)
         }
@@ -392,7 +392,7 @@ class XrpcRouteCoverageTest {
                     .issueAccessToken(
                         subjectDid = repoDid,
                         clientId = "https://viewer.example.com/client.json",
-                        scope = "atproto",
+                        scope = "atproto transition:generic",
                         keyThumbprint = thumbprint,
                     ).token
 
@@ -400,13 +400,13 @@ class XrpcRouteCoverageTest {
                 client.post("/xrpc/com.atproto.repo.createRecord") {
                     contentType(ContentType.Application.Json)
                     header(HttpHeaders.Authorization, "DPoP bad-token")
-                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"com.example.note","record":{"type":"TEXT"}}""")
                 }
             val unsupportedScheme =
                 client.post("/xrpc/com.atproto.repo.createRecord") {
                     contentType(ContentType.Application.Json)
                     header(HttpHeaders.Authorization, "Basic abc")
-                    setBody("""{"repo":"$repoDid","collection":"studio.hypertext.logdate.content","record":{"type":"TEXT"}}""")
+                    setBody("""{"repo":"$repoDid","collection":"com.example.note","record":{"type":"TEXT"}}""")
                 }
             val customPort =
                 client.post("/xrpc/com.atproto.repo.createRecord") {
@@ -427,7 +427,7 @@ class XrpcRouteCoverageTest {
                         """
                         {
                           "repo": "$repoDid",
-                          "collection": "studio.hypertext.logdate.content",
+                          "collection": "com.example.note",
                           "rkey": "entry-custom-port",
                           "record": { "type": "TEXT" }
                         }

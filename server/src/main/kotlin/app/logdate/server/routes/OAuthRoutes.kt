@@ -15,6 +15,7 @@ import app.logdate.server.oauth.OAuthPasskeyOptionsRequest
 import app.logdate.server.oauth.OAuthPasskeyPage
 import app.logdate.server.oauth.OAuthPasskeySignInService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
+import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.routes.docs.OAuthDocs
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -60,6 +61,7 @@ fun Route.oauthRoutes(
     tokenService: TokenService? = null,
     identityService: AtprotoIdentityService? = null,
     passkeySignIn: OAuthPasskeySignInService? = null,
+    passkeyRateLimiter: SlidingWindowRateLimiter = SlidingWindowRateLimiter(),
 ) {
     get("/.well-known/oauth-authorization-server", OAuthDocs.getAuthorizationServerMetadata) {
         call.respond(HttpStatusCode.OK, discoveryService?.authorizationServerMetadata() ?: config.authorizationServerMetadata())
@@ -206,6 +208,7 @@ fun Route.oauthRoutes(
 
     post("/oauth/authorize/passkey/options", OAuthDocs.getPasskeyOptions) {
         val signIn = passkeySignIn ?: return@post call.respondPasskeySignInDisabled()
+        if (!call.allowPasskeyAttempt(passkeyRateLimiter, "options")) return@post
         val request =
             runCatching { call.receive<OAuthPasskeyOptionsRequest>() }
                 .getOrElse { return@post call.respondOAuthError(OAuthInvalidRequestException("request_uri is required")) }
@@ -218,6 +221,7 @@ fun Route.oauthRoutes(
 
     post("/oauth/authorize/passkey", OAuthDocs.approveWithPasskey) {
         val signIn = passkeySignIn ?: return@post call.respondPasskeySignInDisabled()
+        if (!call.allowPasskeyAttempt(passkeyRateLimiter, "approve")) return@post
         val request =
             runCatching { call.receive<OAuthPasskeyApprovalRequest>() }
                 .getOrElse {
@@ -421,6 +425,30 @@ private suspend fun ApplicationCall.respondBrowserDecision(
             }
         }
 }
+
+/**
+ * Applies the passkey sign-in limit per client address, like the app sign-in endpoints, and
+ * answers `429` with `Retry-After` once it is spent.
+ */
+private suspend fun ApplicationCall.allowPasskeyAttempt(
+    limiter: SlidingWindowRateLimiter,
+    operation: String,
+): Boolean {
+    val key = "oauth.passkey.$operation:${request.local.remoteHost.ifBlank { "unknown" }.sha256Hex()}"
+    if (limiter.allow(key, SIGNIN_RATE_LIMIT)) return true
+    response.header(HttpHeaders.RetryAfter, limiter.retryAfterSeconds(key, SIGNIN_RATE_LIMIT).toString())
+    respond(
+        HttpStatusCode.TooManyRequests,
+        OAuthErrorResponse("temporarily_unavailable", "Too many sign-in attempts from this network. Wait a minute and try again."),
+    )
+    return false
+}
+
+private fun String.sha256Hex(): String =
+    java.security.MessageDigest
+        .getInstance("SHA-256")
+        .digest(toByteArray())
+        .joinToString("") { "%02x".format(it) }
 
 private suspend fun ApplicationCall.respondPasskeySignInDisabled() =
     respond(

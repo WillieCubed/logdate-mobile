@@ -29,6 +29,12 @@ interface OAuthRuntimeStateRepository {
     ): Boolean
 
     suspend fun deleteRefreshToken(token: String): Boolean
+
+    /** Revokes every unrevoked refresh token issued for [subjectDid] and returns how many there were. */
+    suspend fun revokeRefreshTokensForSubject(
+        subjectDid: String,
+        revokedAt: Instant,
+    ): Int
 }
 
 data class StoredAuthorizationRequest(
@@ -110,4 +116,13 @@ class InMemoryOAuthRuntimeStateRepository : OAuthRuntimeStateRepository {
     }
 
     override suspend fun deleteRefreshToken(token: String): Boolean = refreshTokens.remove(token) != null
+
+    override suspend fun revokeRefreshTokensForSubject(
+        subjectDid: String,
+        revokedAt: Instant,
+    ): Int {
+        val active = refreshTokens.values.filter { it.subjectDid == subjectDid && it.revokedAt == null }
+        active.forEach { refreshTokens[it.token] = it.copy(revokedAt = revokedAt) }
+        return active.size
+    }
 }
