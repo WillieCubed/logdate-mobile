@@ -30,9 +30,13 @@ import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.xrpc.BearerToken
 import studio.hypertext.atproto.xrpc.XrpcAuth
 import studio.hypertext.atproto.xrpc.XrpcClient
+import studio.hypertext.atproto.xrpc.XrpcException
 import studio.hypertext.atproto.xrpc.XrpcProtocolException
+import studio.hypertext.atproto.xrpc.XrpcSerializationException
+import studio.hypertext.atproto.xrpc.XrpcTransportException
 import studio.hypertext.atproto.xrpc.procedure
 import studio.hypertext.atproto.xrpc.query
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * LogDate Cloud, or a self-hosted LogDate server, as a [DataHome].
@@ -79,6 +83,7 @@ public class XrpcDataHome(
         rkey: String,
         swap: RecordSwap,
     ): Long {
+        require(swap != RecordSwap.Absent) { "A delete can't require the record to be absent" }
         val input = DeleteRecordInput(space = space.uri, rkey = rkey, swapCid = (swap as? RecordSwap.Matching)?.cid)
         val credentials = auth()
         return conflicts {
@@ -127,44 +132,83 @@ public class XrpcDataHome(
         return ChangePage(changes, output.cursor, output.hasMore)
     }
 
+    /**
+     * @throws XrpcTransportException if the request fails before a response arrives.
+     * @throws XrpcSerializationException if the response isn't a blob reference.
+     * @throws IllegalStateException if [auth] supplies no bearer token.
+     */
     override suspend fun uploadBlob(
         space: SpaceRef,
         bytes: ByteArray,
     ): String {
-        val response =
-            httpClient.post(url(UPLOAD_BLOB)) {
-                parameter("space", space.uri)
-                bearer(auth())
-                contentType(ContentType.Application.OctetStream)
-                setBody(bytes)
+        val token = bearerToken(auth())
+        val body =
+            transport {
+                val response =
+                    httpClient.post(url(UPLOAD_BLOB)) {
+                        parameter("space", space.uri)
+                        bearer(token)
+                        contentType(ContentType.Application.OctetStream)
+                        setBody(bytes)
+                    }
+                if (!response.status.isSuccess()) throw response.failure()
+                response.bodyAsText()
             }
-        if (!response.status.isSuccess()) throw response.failure()
-        return json
-            .decodeFromString<UploadBlobOutput>(response.bodyAsText())
-            .blob.ref.cid.value
+        return try {
+            json
+                .decodeFromString<UploadBlobOutput>(body)
+                .blob.ref.cid.value
+        } catch (e: IllegalArgumentException) {
+            throw XrpcSerializationException("Failed to decode the uploadBlob response", e)
+        }
     }
 
+    /**
+     * @throws XrpcTransportException if the request fails before a response arrives.
+     * @throws IllegalStateException if [auth] supplies no bearer token.
+     */
     override suspend fun getBlob(
         space: SpaceRef,
         cid: String,
     ): ByteArray? {
-        val response =
-            httpClient.get(url(GET_BLOB)) {
-                parameter("space", space.uri)
-                parameter("cid", cid)
-                bearer(auth())
-            }
-        if (response.status.isSuccess()) return response.readRawBytes()
-        val failure = response.failure()
-        if (failure.error == BLOB_NOT_FOUND) return null
-        throw failure
+        val token = bearerToken(auth())
+        return transport {
+            val response =
+                httpClient.get(url(GET_BLOB)) {
+                    parameter("space", space.uri)
+                    parameter("cid", cid)
+                    bearer(token)
+                }
+            if (response.status.isSuccess()) return@transport response.readRawBytes()
+            val failure = response.failure()
+            if (failure.error == BLOB_NOT_FOUND) return@transport null
+            throw failure
+        }
     }
 
     private fun url(nsid: Nsid): String = "${baseUrl.trimEnd('/')}/xrpc/${nsid.value}"
 
-    private fun HttpRequestBuilder.bearer(credentials: XrpcAuth) {
-        if (credentials is BearerToken) header(HttpHeaders.Authorization, "Bearer ${credentials.token}")
+    /** The blob methods bypass [client] and sign their own requests, so they refuse to go out unsigned. */
+    private fun bearerToken(credentials: XrpcAuth): String {
+        check(credentials is BearerToken) { "The space blob methods need a bearer token" }
+        return credentials.token
     }
+
+    private fun HttpRequestBuilder.bearer(token: String) {
+        header(HttpHeaders.Authorization, "Bearer $token")
+    }
+
+    /** Runs a blob request, reporting a failure before any response as [XrpcTransportException], as [client] does. */
+    private inline fun <T> transport(block: () -> T): T =
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: XrpcException) {
+            throw e
+        } catch (e: Exception) {
+            throw XrpcTransportException("XRPC request failed", e)
+        }
 
     private suspend fun HttpResponse.failure(): XrpcProtocolException {
         val payload = runCatching { json.parseToJsonElement(bodyAsText()).jsonObject }.getOrNull()
