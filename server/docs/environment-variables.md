@@ -75,6 +75,15 @@
 - **Notes**:
   - Set to `false` when the server is directly internet-facing (no LB/reverse proxy). Trusting forwarded headers without a trusted proxy in front lets any client spoof their scheme and IP.
   - Needed in production so `REQUIRE_HTTPS` doesn't redirect-loop requests the LB already accepted over HTTPS but forwards internally as HTTP.
+  - The client address is read from the **last** `X-Forwarded-For` entry, the one Cloud Run's front end appends. Earlier entries come from the client and can be invented, so they are ignored. Rate limits on sign-in, the OAuth authorization page and device linking are keyed on this address.
+
+### `TRUSTED_PROXY_HOPS`
+- **Description**: How many trusted proxies append to `X-Forwarded-For` after the one that saw the client. With Cloud Run alone this is `0`, and the last entry is the client. If a load balancer you control sits in front of Cloud Run and appends its own entry, set it to `1`.
+- **Type**: Integer, `0` or more
+- **Default**: `0`
+- **Example**: `TRUSTED_PROXY_HOPS=1`
+- **Required**: No.
+- **Notes**: Only used when `TRUST_FORWARDED_HEADERS` is on. Setting it too high lets a client choose its own address; setting it too low makes every visitor share one rate limit.
 
 ---
 
@@ -505,7 +514,7 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Browsers only offer a passkey on a page whose host is the relying-party ID or a subdomain of it. The page is served from the OAuth issuer (`ATPROTO_OAUTH_ISSUER`), so the issuer's host must sit inside `WEBAUTHN_RP_ID`. For example, `https://cloud.logdate.app` works with `WEBAUTHN_RP_ID=logdate.app`. If it doesn't, the server refuses to start and names both values.
   - The issuer's origin is added to the origins passkey verification accepts automatically; it does not need to be listed in `WEBAUTHN_ALLOWED_ORIGINS`.
   - The server also refuses to start when passkey verification is not strict, because the page would then accept an assertion without checking it. Set `WEBAUTHN_STRICT_VERIFICATION=true` (the production default).
-  - An approved app never sees or changes the LogDate journal. With the `atproto` scope alone it only learns which account signed in; with `transition:generic` it can also upload files. This holds whether or not the flag is on.
+  - An approved app never sees or changes the LogDate journal. With either scope it only learns which account signed in today: `transition:generic` reaches only collections open to apps, and none is open yet. Uploads are refused too. This holds whether or not the flag is on.
   - Design: `docs/superpowers/specs/2026-10-19-passkey-atproto-sign-in-design.md`.
 
 ### `LOGDATE_OAUTH_TRUSTED_CLIENT_IDS`
