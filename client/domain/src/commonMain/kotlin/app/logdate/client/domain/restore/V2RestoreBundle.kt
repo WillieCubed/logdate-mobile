@@ -140,6 +140,7 @@ private fun V2RestoreBundle.decodeAndMapJournals(): List<Journal> =
                 description = it.description,
                 created = it.createdAt,
                 lastUpdated = it.updatedAt,
+                isFavorited = it.favorite,
             )
         }
 

@@ -130,6 +130,7 @@ object ArchiveSchemas {
                                 "description" to string(),
                                 "createdAt" to ref("instant"),
                                 "updatedAt" to ref("instant"),
+                                "favorite" to bool(),
                             ),
                         ),
                 ),

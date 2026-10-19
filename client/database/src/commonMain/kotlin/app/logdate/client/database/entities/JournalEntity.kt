@@ -1,5 +1,6 @@
 package app.logdate.client.database.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlin.time.Instant
@@ -19,4 +20,6 @@ data class JournalEntity(
     val lastSynced: Instant? = null,
     val deletedAt: Instant? = null,
     val coverImageUri: String? = null,
+    @ColumnInfo(defaultValue = "0")
+    val isFavorited: Boolean = false,
 )
