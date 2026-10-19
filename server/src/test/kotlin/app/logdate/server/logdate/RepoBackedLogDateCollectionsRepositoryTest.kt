@@ -35,6 +35,10 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class RepoBackedLogDateCollectionsRepositoryTest {
+    // One key store per test, shared by the identity service and the repo signer the way the
+    // server shares it: commits must be signed with the key the account's DID document lists.
+    private val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+
     @Test
     fun `a retry after a failed index write creates the entry once`() =
         runTest {
@@ -72,7 +76,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 RepoBackedLogDateCollectionsRepository(
                     accounts,
                     identity,
-                    SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    signingKeyService,
                     InMemoryRepoBlockStore(),
                     metadata,
                 )
@@ -90,7 +94,6 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     fun `entries become canonical repo records while preserving sync change feeds`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
-            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -181,7 +184,6 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     fun `journals and associations share the same canonical repo did and status counts`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
-            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -261,7 +263,6 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     fun `missing accounts fall back to a stable synthetic repo did`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
-            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val repository =
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
@@ -302,7 +303,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
                     identityService = identityService(accountRepository),
-                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    signingKeyService = signingKeyService,
                     blockStore = InMemoryRepoBlockStore(),
                     metadataStore = InMemoryLogDateCollectionsMetadataStore(),
                 )
@@ -332,7 +333,6 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     fun `a metadata failure partway through a batch leaves no phantom repo records`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
-            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -413,7 +413,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accountRepository,
                     identityService = identityService,
-                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    signingKeyService = signingKeyService,
                     blockStore = blockStore,
                     metadataStore = FailingBatchMetadataStore(InMemoryLogDateCollectionsMetadataStore(), failingKey),
                 )
@@ -469,7 +469,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 RepoBackedLogDateCollectionsRepository(
                     accountRepository = accounts,
                     identityService = identity,
-                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    signingKeyService = signingKeyService,
                     blockStore = InMemoryRepoBlockStore(),
                     metadataStore = InMemoryLogDateCollectionsMetadataStore(),
                 )
@@ -498,7 +498,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
     private fun identityService(accountRepository: InMemoryAccountRepository): AtprotoIdentityService =
         AtprotoIdentityService(
             accountRepository = accountRepository,
-            signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+            signingKeyService = signingKeyService,
             config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
         )
 

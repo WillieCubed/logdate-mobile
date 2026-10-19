@@ -105,7 +105,10 @@ class SigningKeyService(
         )
     }
 
-    suspend fun ensureActiveKey(accountId: Uuid): StoredSigningKey = repository.findActiveByAccountId(accountId) ?: createKey(accountId)
+    suspend fun ensureActiveKey(accountId: Uuid): StoredSigningKey = findActiveKey(accountId) ?: createKey(accountId)
+
+    /** Returns the account's active key, or null when it has none; unlike [ensureActiveKey] it never creates one. */
+    suspend fun findActiveKey(accountId: Uuid): StoredSigningKey? = repository.findActiveByAccountId(accountId)
 
     suspend fun rotateKey(accountId: Uuid): StoredSigningKey = activatePreparedKey(accountId, prepareKey(accountId))
 

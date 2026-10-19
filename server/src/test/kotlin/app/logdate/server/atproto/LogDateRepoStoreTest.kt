@@ -38,11 +38,14 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class LogDateRepoStoreTest {
+    // One key store per test, shared by the identity service and the repo signer the way the
+    // server shares it: commits must be signed with the key the account's DID document lists.
+    private val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+
     @Test
     fun `repo store stays stable across instances and clears when records are deleted`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
-            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -137,7 +140,6 @@ class LogDateRepoStoreTest {
     fun `repo reads reflect writes performed through the canonical collections repository`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
-            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
             val identityService = identityService(accountRepository)
             val account =
                 identityService.ensureIdentity(
@@ -208,7 +210,7 @@ class LogDateRepoStoreTest {
     private fun identityService(accountRepository: AccountRepository): AtprotoIdentityService =
         AtprotoIdentityService(
             accountRepository = accountRepository,
-            signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+            signingKeyService = signingKeyService,
             config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
         )
 }

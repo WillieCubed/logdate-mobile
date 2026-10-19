@@ -42,6 +42,10 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class AtprotoContentRecordStoreTest {
+    // One key store per test, shared by the identity service and the repo signer the way the
+    // server shares it: commits must be signed with the key the account's DID document lists.
+    private val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+
     @Test
     fun `collectionsForDid reflects whether content exists`() =
         kotlinx.coroutines.test.runTest {
@@ -617,7 +621,7 @@ class AtprotoContentRecordStoreTest {
     private fun identityService(accountRepository: AccountRepository): AtprotoIdentityService =
         AtprotoIdentityService(
             accountRepository = accountRepository,
-            signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+            signingKeyService = signingKeyService,
             config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
         )
 
@@ -626,7 +630,6 @@ class AtprotoContentRecordStoreTest {
         identityService: AtprotoIdentityService,
     ): CanonicalStoreContext {
         val blockStore = InMemoryRepoBlockStore()
-        val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
         val collectionsRepository =
             RepoBackedLogDateCollectionsRepository(
                 accountRepository = accountRepository,
