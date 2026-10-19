@@ -14,6 +14,8 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.DidDocument
 
@@ -163,7 +165,7 @@ public class KtorPlcDirectoryClient(
                 }
             val body = response.bodyAsText()
             if (response.status != HttpStatusCode.OK) {
-                throw PlcDirectoryException("PLC export failed with ${response.status.value}")
+                throw failure("PLC export", response.status.value, body)
             }
             body
                 .lineSequence()
@@ -190,7 +192,7 @@ public class KtorPlcDirectoryClient(
                     setBody(rawEntry)
                 }
             if (response.status.value !in 200..299) {
-                throw PlcDirectoryException("PLC operation submission failed with ${response.status.value}")
+                throw failure("PLC operation submission", response.status.value, response.bodyAsText())
             }
         }
 
@@ -202,10 +204,31 @@ public class KtorPlcDirectoryClient(
         val response = httpClient.get(url)
         val body = response.bodyAsText()
         if (response.status != HttpStatusCode.OK) {
-            throw PlcDirectoryException("$failureLabel failed with ${response.status.value}")
+            throw failure(failureLabel, response.status.value, body)
         }
         return decode(body, serializer)
     }
+
+    private fun failure(
+        label: String,
+        statusCode: Int,
+        body: String,
+    ): PlcDirectoryException =
+        PlcDirectoryException(
+            message = "$label failed with $statusCode",
+            statusCode = statusCode,
+            directoryMessage = directoryMessageIn(body),
+        )
+
+    private fun directoryMessageIn(body: String): String? =
+        runCatching { json.parseToJsonElement(body) }
+            .getOrNull()
+            ?.let { it as? JsonObject }
+            ?.get("message")
+            ?.let { it as? JsonPrimitive }
+            ?.takeIf(JsonPrimitive::isString)
+            ?.content
+            ?.take(MAX_DIRECTORY_MESSAGE_LENGTH)
 
     private fun <T> decode(
         body: String,
@@ -233,10 +256,22 @@ public class KtorPlcDirectoryClient(
 
 /**
  * PLC directory transport or decoding failure.
+ *
+ * @property statusCode HTTP status the directory answered with, or `null` when the failure happened
+ * before or after the exchange, such as an undecodable response.
+ * @property directoryMessage the directory's own explanation from the `message` field of its error
+ * body, when it sent one. The reference directory uses it to say why it rejected an operation.
  */
 public class PlcDirectoryException(
     message: String,
     cause: Throwable? = null,
-) : IllegalStateException(message, cause)
+    public val statusCode: Int? = null,
+    public val directoryMessage: String? = null,
+) : IllegalStateException(message, cause) {
+    /** Whether the directory answered that it has no entry for the requested DID. */
+    public val isNotFound: Boolean
+        get() = statusCode == HttpStatusCode.NotFound.value
+}
 
 private const val PLC_METHOD: String = "plc"
+private const val MAX_DIRECTORY_MESSAGE_LENGTH: Int = 300

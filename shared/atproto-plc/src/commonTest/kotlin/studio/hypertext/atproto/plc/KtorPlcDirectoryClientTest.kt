@@ -245,6 +245,42 @@ class KtorPlcDirectoryClientTest {
             }
         }
 
+    @Test
+    fun `directory failures carry the status code and the directory's own message`() =
+        kotlinx.coroutines.test.runTest {
+            val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+            val operation =
+                PlcOperation(
+                    sig = "sig-value",
+                    services = mapOf("atproto_pds" to PlcService("AtprotoPersonalDataServer", "https://logdate.app")),
+                    alsoKnownAs = listOf("at://alice.logdate.app"),
+                    rotationKeys = listOf("did:key:zQ3shhCGUqDKjStzuDxPkTxN6ujddP4RkEKJJouJGRRkaLGbg"),
+                    verificationMethods = mapOf("atproto" to "did:key:zQ3shXjHeiBuRCKmM36cuYnm7YEMzhGnCmCyW92sRJ9pribSF"),
+                )
+            val missing =
+                KtorPlcDirectoryClient(
+                    httpClient = mockClient { respond("""{"message":"DID not registered"}""", HttpStatusCode.NotFound, jsonHeaders()) },
+                )
+            val rejecting =
+                KtorPlcDirectoryClient(
+                    httpClient = mockClient { respond("""{"message":"Invalid signature"}""", HttpStatusCode.BadRequest, jsonHeaders()) },
+                )
+            val unreadable =
+                KtorPlcDirectoryClient(
+                    httpClient = mockClient { respond("<html>bad gateway</html>", HttpStatusCode.BadGateway, jsonHeaders()) },
+                )
+
+            val notFound = assertIs<PlcDirectoryException>(missing.getAuditLog(did).exceptionOrNull())
+            assertEquals(404, notFound.statusCode)
+            assertEquals("DID not registered", notFound.directoryMessage)
+            val rejected = assertIs<PlcDirectoryException>(rejecting.submit(did, operation).exceptionOrNull())
+            assertEquals(400, rejected.statusCode)
+            assertEquals("Invalid signature", rejected.directoryMessage)
+            val gateway = assertIs<PlcDirectoryException>(unreadable.getDocument(did).exceptionOrNull())
+            assertEquals(502, gateway.statusCode)
+            assertEquals(null, gateway.directoryMessage)
+        }
+
     private fun mockClient(handler: MockRequestHandler): HttpClient =
         HttpClient(MockEngine) {
             engine {
