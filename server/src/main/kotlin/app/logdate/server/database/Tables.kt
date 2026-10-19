@@ -126,6 +126,18 @@ object OAuthSigningKeysTable : Table("oauth_signing_keys") {
     override val primaryKey = PrimaryKey(slot)
 }
 
+/** Single-use OAuth values (DPoP proof IDs, PKCE challenges), by SHA-256, until they could no longer be accepted. */
+object OAuthUsedValuesTable : Table("oauth_used_values") {
+    val valueHash = varchar("value_hash", 64)
+    val expiresAt = timestamp("expires_at")
+
+    override val primaryKey = PrimaryKey(valueHash)
+
+    init {
+        index("idx_oauth_used_values_expires_at", false, expiresAt)
+    }
+}
+
 object OAuthRefreshTokensTable : Table("oauth_refresh_tokens") {
     val token = varchar("token", 255)
     val clientId = text("client_id")

@@ -32,7 +32,7 @@ class OAuthAuthorizationService(
     private val clock: Clock = Clock.System,
     private val secureRandom: SecureRandom = SecureRandom(),
     private val trustedClientIds: Set<String> = emptySet(),
-    private val usedCodeChallenges: OAuthReplayCache = OAuthReplayCache(clock),
+    private val usedCodeChallenges: OAuthReplayStore = InMemoryOAuthReplayStore(clock),
 ) : PdsOAuthService,
     OAuthGrantRevoker {
     /**
@@ -84,7 +84,7 @@ class OAuthAuthorizationService(
         }
 
         val proof = dpopVerifier.verify(dpopProof, method = "POST", htu = htu).getOrElse { throw it }
-        if (!usedCodeChallenges.firstUse(codeChallenge.trim(), CODE_CHALLENGE_MEMORY)) {
+        if (!usedCodeChallenges.firstUse("pkce:${codeChallenge.trim()}", CODE_CHALLENGE_MEMORY)) {
             throw OAuthInvalidRequestException("code_challenge has already been used; generate a new PKCE verifier")
         }
         val requestUri = "urn:ietf:params:oauth:request_uri:${randomToken()}"
