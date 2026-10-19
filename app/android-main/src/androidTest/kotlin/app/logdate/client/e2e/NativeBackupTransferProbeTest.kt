@@ -91,6 +91,7 @@ class NativeBackupTransferProbeTest {
                     setOf(
                         "seed",
                         "verify",
+                        "verify-in-place",
                         "quota",
                         "quota-cleanup",
                         "missing-keys",
@@ -252,6 +253,11 @@ class NativeBackupTransferProbeTest {
                 assertEquals("Native transfer journal", journal.title, "Only the expected synthetic journal may be mutated")
                 journals.update(journal.copy(title = "Mutated after native D2D backup"))
                 assertEquals("Mutated after native D2D backup", journals.getJournalById(journalId)?.title)
+                val recording = File(context.filesDir, "audio_notes/transfer-recording.m4a")
+                assertContentEquals("committed recording".encodeToByteArray(), recording.readBytes())
+                val replacement = "Changed after native D2D backup".encodeToByteArray()
+                recording.writeBytes(replacement)
+                assertContentEquals(replacement, recording.readBytes())
                 return@runBlocking
             }
             if (mode == "data-only") {
@@ -334,14 +340,21 @@ class NativeBackupTransferProbeTest {
                 identity.restoreFromBackupIfAvailable()
                 if (accountIdentity) assertNull(identity.getStoredRecoveryPhrase())
                 assertEquals(arguments.getString("sourceOwner"), koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId())
-                assertNotEquals(
-                    arguments.getString("sourceDevice"),
+                val restoredDevice =
                     koin
                         .get<DeviceIdProvider>()
                         .getDeviceId()
                         .value
-                        .toString(),
-                )
+                        .toString()
+                if (mode == "verify-in-place") {
+                    assertEquals(arguments.getString("sourceDevice"), restoredDevice, "In-place restore must retain the installation ID")
+                } else {
+                    assertNotEquals(
+                        arguments.getString("sourceDevice"),
+                        restoredDevice,
+                        "A fresh target must have a distinct installation ID",
+                    )
+                }
                 assertEquals(
                     arguments.getString("sourceFingerprint"),
                     IdentityKeyFingerprint.of(identity.getIdentityKey(), koin.get<CryptoManager>()),
@@ -357,9 +370,9 @@ class NativeBackupTransferProbeTest {
                     "Transferred encryption keys cannot decrypt the original Cloud media payload",
                 )
                 if (arguments.getString("sourceRecordingTransferFixture") == "true") {
-                    verifyRecordingTransferFixture(context)
+                    verifyRecordingTransferFixture(context, inPlace = mode == "verify-in-place")
                 }
-                fixture.assertNoUnfinishedCameraCaptureTransferred(context)
+                fixture.verifyUnfinishedCameraCapture(context, inPlace = mode == "verify-in-place")
                 if (mode == "partial-media") {
                     fixture.verifyPartialTransfer(requireNotNull(arguments.getString("expectedMissingMediaPath")))
                     return@runBlocking
@@ -445,13 +458,24 @@ private suspend fun verifyMissingRecoveryKeys(
     )
 }
 
-private fun verifyRecordingTransferFixture(context: android.content.Context) {
+private fun verifyRecordingTransferFixture(
+    context: android.content.Context,
+    inPlace: Boolean,
+) {
     val final = File(context.filesDir, "audio_notes/transfer-recording.m4a")
     val inFlight = CrashSafeRecording.inFlightFile(final, isolateForBackup = true)
     val remux = CrashSafeRecording.remuxStagingFile(inFlight, final)
     assertTrue(final.isFile && final.readBytes().contentEquals("committed recording".encodeToByteArray()))
-    assertFalse(inFlight.exists(), "An interrupted raw recording must not transfer as committed audio")
-    assertFalse(remux.exists(), "An unfinished remux temporary must not transfer")
+    if (inPlace) {
+        assertContentEquals(
+            "unfinished raw recording".encodeToByteArray(),
+            inFlight.readBytes(),
+            "In-place restore must retain excluded source data",
+        )
+    } else {
+        assertFalse(inFlight.exists(), "An interrupted raw recording must not transfer as committed audio")
+        assertFalse(remux.exists(), "An unfinished remux temporary must not transfer")
+    }
 }
 
 private class NativeJournalFixture(
@@ -598,11 +622,20 @@ private class NativeJournalFixture(
         verifyMedia(assertNotNull((draft.blocks[3] as? SerializableVideoBlock)?.uri), "proof.mp4")
     }
 
-    fun assertNoUnfinishedCameraCaptureTransferred(context: android.content.Context) {
-        assertFalse(
-            File(context.filesDir, "camera-captures/logdate-camera-unfinished.mp4").exists(),
-            "unfinished CameraX output was transferred",
-        )
+    fun verifyUnfinishedCameraCapture(
+        context: android.content.Context,
+        inPlace: Boolean,
+    ) {
+        val capture = File(context.filesDir, "camera-captures/logdate-camera-unfinished.mp4")
+        if (inPlace) {
+            assertContentEquals(
+                "unfinished camera output".encodeToByteArray(),
+                capture.readBytes(),
+                "In-place restore must retain excluded source data",
+            )
+        } else {
+            assertFalse(capture.exists(), "unfinished CameraX output was transferred")
+        }
     }
 
     suspend fun verifyPartialTransfer(expectedMissingMediaPath: String) {

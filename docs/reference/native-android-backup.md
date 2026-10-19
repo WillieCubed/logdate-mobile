@@ -344,12 +344,15 @@ files, and destination recovery across two app installations. That transport run
 Google's D2D transport or the setup wizard.
 
 `native-d2d-acceptance.py` follows the guide's repeatable single-device GMS `D2dTransport` test-mode
-flow on an API 31+ Google Play emulator. It backs up a synthetic journal, changes that journal after
-the backup, then runs `bmgr restore` and verifies that the saved journal returns. The repository
+flow on an API 31+ Google Play emulator. It backs up a synthetic journal, changes its title and a
+committed recording after backup, then runs `bmgr restore` and verifies that both saved versions
+return. The repository
 forbids uninstalling or clearing LogDate app data, so the harness restores explicitly instead of
 using the guide's uninstall/reinstall step. Passing it proves the GMS test transport, callbacks, and
 restored content; it does not prove source-to-fresh-target setup-wizard transfer. That broader
 acceptance remains a separate device-transfer test and must use a new target.
+The in-place simulation retains the installation ID stored outside backup. The two-emulator
+scenario requires a distinct ID on the fresh destination and verifies recovery into a new Keystore.
 
 The local transport exercises file selection, native callbacks, and application recovery using
 test encryption and direct-transfer flags. Google credential delivery and setup transfer require

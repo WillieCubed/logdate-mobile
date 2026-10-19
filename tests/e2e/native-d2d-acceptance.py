@@ -40,15 +40,31 @@ def verify_emulator(serial):
 def restore_set_token(output):
     text = output.decode(errors="replace") if isinstance(output, bytes) else output
     for line in text.splitlines():
-        match = re.match(r"\s*(0x[0-9a-fA-F]+|[0-9]+)\s*:", line)
-        if match:
+        match = re.match(r"\s*((?:0x)?[0-9a-fA-F]+)\s*:\s*(.+)", line)
+        if match and re.match(r"D2D\b", match.group(2), re.IGNORECASE):
             return match.group(1)
-    raise RuntimeError("Google D2D test transport did not expose a restore set")
+    raise RuntimeError("Google D2D test transport did not expose a D2D restore set")
 
 
 def selected_transport(serial):
     transports = HARNESS.adb(serial, "shell", "bmgr", "list", "transports").decode().splitlines()
-    return next((line[2:].strip() for line in transports if line.startswith("* ")), None)
+    return next((line.lstrip()[2:].strip() for line in transports if line.lstrip().startswith("* ")), None)
+
+
+def source_fixture(serial):
+    return HARNESS.adb(serial, "exec-out", "run-as", HARNESS.PACKAGE, "cat", "no_backup/native-backup-fixture.json")
+
+
+def require_empty_source(serial):
+    packages = HARNESS.adb(serial, "shell", "pm", "list", "packages", HARNESS.PACKAGE).decode().splitlines()
+    if "package:" + HARNESS.PACKAGE in packages and HARNESS.contains_user_content(HARNESS.package_user_files(serial)):
+        raise RuntimeError("Use a fresh emulator for D2D acceptance; the installed app contains retained user data")
+
+
+def select_d2d_restore_transport(serial):
+    HARNESS.adb(serial, "shell", "bmgr", "transport", GMS_BACKUP_TRANSPORT, timeout=60)
+    if selected_transport(serial) != GMS_BACKUP_TRANSPORT:
+        raise RuntimeError("Google backup transport was not selected for D2D test-mode restore")
 
 
 def select_d2d_transport(serial, attempts=30):
@@ -106,6 +122,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
     verify_emulator(serial)
     if not app_apk.is_file() or not test_apk.is_file():
         raise RuntimeError("Both debug and instrumentation APKs must exist")
+    require_empty_source(serial)
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     HARNESS.ensure_emulator_setup_complete(serial)
     previous_transport = selected_transport(serial)
@@ -119,8 +136,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
         HARNESS.adb(serial, "install", "-r", "-t", str(app_apk.resolve()))
         HARNESS.adb(serial, "install", "-r", "-t", str(test_apk.resolve()))
         HARNESS.probe(serial, "seed", output / "source-seed.log")
-        fixture_path = f"/data/user/0/{HARNESS.PACKAGE}/no_backup/native-backup-fixture.json"
-        raw_fixture = HARNESS.adb(serial, "exec-out", "cat", fixture_path)
+        raw_fixture = source_fixture(serial)
         metadata = json.loads(raw_fixture)
         HARNESS.private_file(output / "source-fixture.json", raw_fixture)
 
@@ -130,6 +146,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
             raise RuntimeError("Google D2D test transport did not complete the native backup")
 
         HARNESS.probe(serial, "post-backup-mutation", output / "post-backup-mutation.log")
+        select_d2d_restore_transport(serial)
         sets = HARNESS.adb(serial, "shell", "bmgr", "list", "sets", timeout=60)
         HARNESS.private_file(output / "d2d-restore-sets.log", sets)
         token = restore_set_token(sets)
@@ -141,7 +158,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
 
         HARNESS.adb(serial, "install", "-r", "-t", str(test_apk.resolve()))
         HARNESS.probe(serial, "native-restore-status", output / "d2d-callback-status.log")
-        HARNESS.probe(serial, "verify", output / "d2d-restored-content.log", metadata)
+        HARNESS.probe(serial, "verify-in-place", output / "d2d-restored-content.log", metadata)
         print("Google D2D test-mode backup, restore callback, and restored content passed", flush=True)
     finally:
         restore_device_settings(serial, previous_transport, previous_mode, backup_was_enabled)

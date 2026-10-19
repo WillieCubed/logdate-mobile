@@ -2,6 +2,9 @@ package app.logdate.client.database.encryption
 
 import android.content.Context
 import app.logdate.client.device.storage.SecureStorage
+import io.github.aakira.napier.Antilog
+import io.github.aakira.napier.LogLevel
+import io.github.aakira.napier.Napier
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -17,6 +20,8 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class DatabasePassphraseRecoveryTest {
     private val directory = createTempDirectory("database-key-recovery").toFile()
@@ -182,5 +187,90 @@ class DatabasePassphraseRecoveryTest {
 
             assertContentEquals(backup, store.read())
             coVerify { secureStorage.putString("db_encryption_key", Base64.encode(backup)) }
+        }
+
+    @Test
+    fun `unreadable primary recovers portable material without logging the storage exception`() =
+        runTest {
+            val expected = ByteArray(32) { 9 }
+            val privateDetail = "private-recovery-material-${Base64.encode(expected)}"
+            store.write(expected)
+            coEvery { secureStorage.getString("db_encryption_key") } throws IOException(privateDetail)
+            val captured = mutableListOf<String>()
+            val sink =
+                object : Antilog() {
+                    override fun performLog(
+                        priority: LogLevel,
+                        tag: String?,
+                        throwable: Throwable?,
+                        message: String?,
+                    ) {
+                        captured += message.orEmpty() + throwable?.stackTraceToString().orEmpty()
+                    }
+                }
+            Napier.base(sink)
+            try {
+                val candidates = DatabasePassphraseProvider(secureStorage, store) { true }.getPassphraseCandidates()
+
+                assertContentEquals(expected, candidates.single())
+                assertTrue(captured.isNotEmpty(), "The diagnostic path must actually run")
+                assertFalse(captured.joinToString().contains(privateDetail))
+                assertFalse(captured.joinToString().contains(Base64.encode(expected)))
+                coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
+            } finally {
+                Napier.takeLogarithm(sink)
+            }
+        }
+
+    @Test
+    fun `unreadable portable material cannot mint over the retained database`() =
+        runTest {
+            val recovery = File(directory, "db_recovery/passphrase_backup").apply { mkdirs() }
+            val retained = File(recovery, "retained-key-bytes").apply { writeText("retained") }
+            val database = File(directory, "retained-database").apply { writeBytes(byteArrayOf(8, 9, 10)) }
+            coEvery { secureStorage.getString("db_encryption_key") } returns null
+
+            assertFailsWith<IllegalStateException> {
+                DatabasePassphraseProvider(secureStorage, store) { database.exists() }.getPassphraseCandidates()
+            }
+
+            assertEquals("retained", retained.readText())
+            assertContentEquals(byteArrayOf(8, 9, 10), database.readBytes())
+            coVerify(exactly = 0) { secureStorage.putString(any(), any()) }
+        }
+
+    @Test
+    fun `interrupted initial persistence reuses its portable key on restart`() =
+        runTest {
+            coEvery { secureStorage.getString("db_encryption_key") } returns null
+            coEvery { secureStorage.putString(any(), any()) } throws IOException("Synthetic primary write interruption")
+
+            assertFailsWith<IOException> { DatabasePassphraseProvider(secureStorage, store).getPassphraseCandidates() }
+            val retained = assertNotNull(store.read())
+            val reopened = DatabasePassphraseProvider(secureStorage, PassphraseBackupStore(context))
+
+            assertContentEquals(retained, reopened.getPassphraseCandidates().single())
+            coVerify(exactly = 1) { secureStorage.putString(any(), any()) }
+        }
+
+    @Test
+    fun `interrupted confirmation retains the opened key for the next startup`() =
+        runTest {
+            val oldPrimary = ByteArray(32) { 7 }
+            val openedKey = ByteArray(32) { 8 }
+            store.write(oldPrimary)
+            coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(oldPrimary)
+            coEvery { secureStorage.putString(any(), any()) } throws IOException("Synthetic primary write interruption")
+
+            assertFailsWith<IOException> {
+                DatabasePassphraseProvider(secureStorage, store) { true }.confirmOpenedDatabasePassphrase(openedKey)
+            }
+            val candidates = DatabasePassphraseProvider(secureStorage, PassphraseBackupStore(context)) { true }.getPassphraseCandidates()
+
+            assertEquals(2, candidates.size)
+            assertContentEquals(oldPrimary, candidates.first())
+            assertContentEquals(openedKey, candidates.last())
+            assertContentEquals(openedKey, store.read())
+            coVerify(exactly = 1) { secureStorage.putString(any(), any()) }
         }
 }
