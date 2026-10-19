@@ -641,7 +641,18 @@ resource "google_monitoring_alert_policy" "handle_resolution_failing" {
     }
   }
   documentation {
-    content   = "P1: other AT Protocol apps cannot verify logdate.app handles while this fires. Run `./scripts/check-handle-resolution.sh --handle ${var.handle_resolution_monitor.handle} --service-url https://cloud.logdate.app` to see which step fails. See docs/reference/handle-resolution.md."
+    content   = "P1: other AT Protocol apps cannot verify logdate.app handles while this fires. Run `./scripts/check-handle-resolution.sh --handle ${var.handle_resolution_monitor.handle} --service-url ${lookup(var.cloud_run_env, "LOGDATE_PUBLIC_ORIGIN", "")}` to see which step fails. See docs/reference/handle-resolution.md."
     mime_type = "text/markdown"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = length(var.handle_resolution_notification_channels) > 0 || (var.enable_cloud_run_service && var.cleanup_operator_email != "")
+      error_message = "The handle resolution alert needs somewhere to send it: set handle_resolution_notification_channels or cleanup_operator_email."
+    }
+    precondition {
+      condition     = startswith(lookup(var.cloud_run_env, "LOGDATE_PUBLIC_ORIGIN", ""), "https://")
+      error_message = "The handle resolution alert's runbook needs the server origin: set LOGDATE_PUBLIC_ORIGIN in cloud_run_env."
+    }
   }
 }

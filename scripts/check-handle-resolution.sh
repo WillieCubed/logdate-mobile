@@ -83,7 +83,9 @@ failure() {
     FAILURES=$((FAILURES + 1))
 }
 
-# Fetches a URL without following redirects; AT Protocol resolvers treat a redirect as a failure.
+# Fetches a URL without following redirects. The AT Protocol lets a handle host redirect, but
+# LogDate's hosts answer directly, so a redirect here means a misrouted request (for example a
+# sign-in wall) and this stricter check reports it.
 # Sets HTTP_STATUS ("000" when no response arrived) and leaves the body in $BODY_FILE.
 http_get() {
     local url="$1" host_header="${2:-}"
@@ -133,7 +135,9 @@ fi
 WELL_KNOWN_URL="https://$HANDLE/.well-known/atproto-did"
 fetch_well_known "$HANDLE"
 WELL_KNOWN_DID="$(tr -d '[:space:]' <"$BODY_FILE")"
-if [[ "$HTTP_STATUS" != "200" ]]; then
+if [[ "$HTTP_STATUS" == 3?? ]]; then
+    failure "$WELL_KNOWN_URL redirected (HTTP $HTTP_STATUS); LogDate handle hosts answer directly, so this usually means a sign-in wall or a misrouted host"
+elif [[ "$HTTP_STATUS" != "200" ]]; then
     failure "$WELL_KNOWN_URL returned $(response_problem)"
 elif [[ ! "$WELL_KNOWN_DID" =~ $DID_PATTERN ]]; then
     failure "$WELL_KNOWN_URL returned a body that is not a DID"
