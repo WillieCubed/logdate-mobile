@@ -9,9 +9,9 @@ publish flows without guessing.
 
 The publishing convention is implemented in
 [`AtprotoPublishedModulePlugin.kt`](../../build-logic/src/main/kotlin/app/logdate/AtprotoPublishedModulePlugin.kt)
-and applied by the nine Kotlin Multiplatform modules: `atproto-crypto`, `atproto-syntax`,
+and applied by the ten Kotlin Multiplatform modules: `atproto-crypto`, `atproto-syntax`,
 `atproto-identity`, `atproto-xrpc`, `atproto-repo`, `atproto-plc`, `atproto-lexicon`,
-`atproto-pds`, and `atproto-pds-runtime`.
+`atproto-pds`, `atproto-pds-runtime`, and `atproto-oauth-client`.
 
 Two other `shared/atproto-*` directories do not apply it:
 
@@ -182,7 +182,7 @@ Publish the current ATProto module set to Maven Local:
 ./gradlew publishAtprotoToMavenLocal :shared:atproto-bom:publishToMavenLocal
 ```
 
-`publishAtprotoToMavenLocal` covers the nine Kotlin Multiplatform modules only. The BOM needs its
+`publishAtprotoToMavenLocal` covers the ten Kotlin Multiplatform modules only. The BOM needs its
 own `:shared:atproto-bom:publishToMavenLocal`, and the standalone sample imports the BOM, so it
 needs both.
 

@@ -68,6 +68,7 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 | `shared/atproto-identity/` | `atproto` |
 | `shared/atproto-lexicon/` | `atproto` |
 | `shared/atproto-licensing/` | `atproto` |
+| `shared/atproto-oauth-client/` | `atproto` |
 | `shared/atproto-pds/` | `atproto` |
 | `shared/atproto-pds-runtime/` | `atproto` |
 | `shared/atproto-plc/` | `atproto` |

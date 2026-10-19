@@ -23,6 +23,11 @@
   - shared request/response models and service contracts for discovery, identity, OAuth, session, repo, blob, and sync surfaces
 - `shared/atproto-pds-runtime`
   - reusable runtime implementations for discovery, repo, blob, and sync services backed by the shared PDS contracts
+- `shared/atproto-oauth-client`
+  - a confidential OAuth client for signing in with accounts on other AT Protocol servers: identity
+    and authorization server discovery, PAR, PKCE, DPoP with server nonces, `private_key_jwt` client
+    authentication, token refresh and revocation, and DPoP-authenticated XRPC calls. See its
+    [README](../../shared/atproto-oauth-client/README.md)
 - `shared/atproto-bom`
   - a Gradle `java-platform` bill of materials that pins every module above to one version
 - `shared/atproto-licensing`
@@ -108,6 +113,7 @@ The full module set:
 - `studio.hypertext.atproto:atproto-lexicon:$version`
 - `studio.hypertext.atproto:atproto-pds:$version`
 - `studio.hypertext.atproto:atproto-pds-runtime:$version`
+- `studio.hypertext.atproto:atproto-oauth-client:$version`
 
 The repo-wide default version lives in [`gradle.properties`](../../gradle.properties) as
 `atproto.version`.
@@ -155,7 +161,7 @@ Publish locally:
 ./gradlew publishAtprotoToMavenLocal :shared:atproto-bom:publishToMavenLocal
 ```
 
-`publishAtprotoToMavenLocal` publishes the nine Kotlin Multiplatform modules but not the BOM, so
+`publishAtprotoToMavenLocal` publishes the ten Kotlin Multiplatform modules but not the BOM, so
 add `:shared:atproto-bom:publishToMavenLocal` whenever a consumer, such as the standalone sample,
 imports the BOM.
 
@@ -208,6 +214,7 @@ The sample imports `atproto-bom`, so publish the BOM along with the modules firs
 
 - Standalone Kotlin/KMP modules with explicit public APIs and typed value objects
 - ATProto identity resolution, OAuth/PDS wire models, reusable PDS runtime services, repo CRUD plus commit/export primitives, and low-level XRPC client support
+- A confidential OAuth client (with DPoP) for signing in with accounts hosted on other AT Protocol servers
 - Server integration in this repo now consumes shared PDS and repo contracts instead of defining duplicate route DTOs
 - Checked-in LogDate lexicon JSON documents plus deterministic generated Kotlin models
 - Checked-in official `com.atproto.*` lexicon JSON documents plus deterministic generated Kotlin models for the current server/repo/identity surface
