@@ -1,6 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountStorageModes
 import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.devices.DeviceSessionGuard
@@ -60,13 +61,15 @@ fun Route.syncRoutes(
     diagnosticReportService: DiagnosticReportService? = null,
     accessTokenVerifier: AccessTokenVerifier? = tokenService?.let { AccessTokenVerifier(it, DeviceSessionGuard.Disabled) },
     momentsRepository: LogDateMomentsRepository? = null,
+    storageModes: AccountStorageModes? = null,
 ) {
     val config = SyncRouteConfig(mediaAccessPolicy = mediaAccessPolicy)
     syncStatusRoutes(tokenService, accessTokenVerifier, metrics, collectionsRepository)
-    syncCollectionRoutes(accessTokenVerifier, metrics, collectionsRepository)
-    if (momentsRepository != null) syncMomentRoutes(accessTokenVerifier, metrics, momentsRepository)
+    syncCollectionRoutes(accessTokenVerifier, storageModes, metrics, collectionsRepository)
+    if (momentsRepository != null) syncMomentRoutes(accessTokenVerifier, storageModes, metrics, momentsRepository)
     syncMediaRoutes(
         accessTokenVerifier = accessTokenVerifier,
+        storageModes = storageModes,
         mediaStorage = mediaStorage,
         metrics = metrics,
         encryptionService = encryptionService,

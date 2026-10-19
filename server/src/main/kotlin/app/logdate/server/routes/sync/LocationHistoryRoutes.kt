@@ -1,5 +1,6 @@
 package app.logdate.server.routes.sync
 
+import app.logdate.server.auth.AccountStorageModes
 import app.logdate.server.auth.TokenService
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.LocationHistoryDocs
@@ -26,10 +27,11 @@ private val locationHistoryJson = Json { ignoreUnknownKeys = true }
 internal fun Route.locationHistoryRoutes(
     tokenService: TokenService?,
     repository: LocationHistoryRepository,
+    storageModes: AccountStorageModes? = null,
 ) {
     route("/location-history") {
         put(LocationHistoryDocs.upload) {
-            val userId = extractUserId(call, tokenService) ?: return@put
+            val userId = extractUserId(call, tokenService)?.let { call.requireLegacyStorage(it, storageModes) } ?: return@put
             try {
                 val body = call.receiveChannel().readRemaining(MAX_LOCATION_BATCH_BYTES + 1).readByteArray()
                 if (body.size > MAX_LOCATION_BATCH_BYTES) {
@@ -46,7 +48,7 @@ internal fun Route.locationHistoryRoutes(
             }
         }
         get(LocationHistoryDocs.changes) {
-            val userId = extractUserId(call, tokenService) ?: return@get
+            val userId = extractUserId(call, tokenService)?.let { call.requireLegacyStorage(it, storageModes) } ?: return@get
             val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
             if (since < 0 ||

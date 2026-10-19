@@ -1,6 +1,7 @@
 package app.logdate.server.routes.docs
 
 import app.logdate.server.routes.ErrorCase
+import app.logdate.shared.model.StorageModeErrorCodes
 import app.logdate.shared.model.sync.DeviceId
 
 /** Shared identifiers and values for the sync examples, consistent with the overview's walkthrough. */
@@ -20,6 +21,15 @@ internal object SyncExamples {
     val deviceId = DeviceId(DocExamples.DEVICE_ID)
 
     const val NOTE_TEXT = "Walked to the lake before work. Fog on the water."
+
+    val storageModeMismatch =
+        ErrorCase(
+            StorageModeErrorCodes.SYNC_STORAGE_MODE_MISMATCH,
+            "The account's data isn't kept in legacy sync storage: its `storageMode` is `personalSpaceV1`, or one this " +
+                "server doesn't recognize. Nothing was read or written. Read the account again from `/auth/me` and sync " +
+                "the way its `storageMode` says.",
+            "This account's data isn't kept in legacy sync storage; read the account again",
+        )
 
     val serverMisconfigured =
         ErrorCase(

@@ -13,6 +13,7 @@ import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
+import app.logdate.server.auth.storageModes
 import app.logdate.server.devices.AccountDeviceRepository
 import app.logdate.server.devices.DeviceLinkService
 import app.logdate.server.enrollment.DeviceEnrollmentRepository
@@ -230,7 +231,7 @@ internal fun Application.contentApiRoutes() {
 
     routing {
         route("/api/v1") {
-            locationHistoryRoutes(tokenService, locationHistoryRepository)
+            locationHistoryRoutes(tokenService, locationHistoryRepository, accountRepository.storageModes())
             syncRoutes(
                 tokenService = tokenService,
                 mediaStorage = blobStorage,
@@ -249,6 +250,7 @@ internal fun Application.contentApiRoutes() {
                         },
                 accessTokenVerifier = accessTokenVerifier,
                 momentsRepository = momentsRepository,
+                storageModes = accountRepository.storageModes(),
             )
             quotaRoutes(
                 tokenService = tokenService,

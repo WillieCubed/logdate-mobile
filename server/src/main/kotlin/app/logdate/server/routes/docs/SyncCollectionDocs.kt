@@ -120,6 +120,7 @@ internal object SyncCollectionDocs {
                 details = deletedDetails,
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -153,6 +154,7 @@ internal object SyncCollectionDocs {
             )
             syncError(HttpStatusCode.BadRequest, SyncExamples.invalidSince)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -171,6 +173,7 @@ internal object SyncCollectionDocs {
         response {
             ok("The entry as the server holds it.", contentChange)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(
                 HttpStatusCode.NotFound,
                 ErrorCase("NOT_FOUND", "No entry with that ID belongs to this account, or it was deleted.", "Content not found"),
@@ -210,6 +213,7 @@ internal object SyncCollectionDocs {
             )
             recordState(HttpStatusCode.NotFound, "The server has no record of this ID.")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -248,6 +252,7 @@ internal object SyncCollectionDocs {
                 ),
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(HttpStatusCode.Conflict, SyncExamples.conflict)
             syncServerError()
         }
@@ -270,6 +275,7 @@ internal object SyncCollectionDocs {
         response {
             noContent("The entry is deleted (or already was).")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -363,6 +369,7 @@ internal object SyncCollectionDocs {
                 ),
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -392,6 +399,7 @@ internal object SyncCollectionDocs {
             )
             syncError(HttpStatusCode.BadRequest, SyncExamples.invalidSince)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -407,6 +415,7 @@ internal object SyncCollectionDocs {
         response {
             ok("The journal as the server holds it.", journalChange)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(
                 HttpStatusCode.NotFound,
                 ErrorCase("NOT_FOUND", "No journal with that ID belongs to this account, or it was deleted.", "Journal not found"),
@@ -449,6 +458,7 @@ internal object SyncCollectionDocs {
                 ),
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(
                 HttpStatusCode.Conflict,
                 SyncExamples.conflict,
@@ -477,6 +487,7 @@ internal object SyncCollectionDocs {
         response {
             noContent("The journal is deleted (or already was).")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }

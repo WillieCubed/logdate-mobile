@@ -150,6 +150,7 @@ internal object SyncStorageDocs {
                 ),
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             quotaExceeded()
             rateLimited(MEDIA_UPLOAD_RATE_LIMIT, ErrorEnvelope.SYNC)
             syncError(
@@ -184,6 +185,7 @@ internal object SyncStorageDocs {
         response {
             ok("The file's details.", mediaMetadata)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(HttpStatusCode.NotFound, ErrorCase("NOT_FOUND", "No media with that ID belongs to this account.", "Media not found"))
             syncServerError()
         }
@@ -207,6 +209,7 @@ internal object SyncStorageDocs {
                 body(binarySchema()) { mediaTypes(ContentType.Application.OctetStream) }
             }
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(
                 HttpStatusCode.NotFound,
                 ErrorCase(
@@ -243,6 +246,7 @@ internal object SyncStorageDocs {
         response {
             noContent("The file is gone (or already was).")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(
                 HttpStatusCode.InternalServerError,
                 ErrorCase(

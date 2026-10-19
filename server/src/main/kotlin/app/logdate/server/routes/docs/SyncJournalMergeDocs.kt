@@ -6,12 +6,20 @@ import app.logdate.server.routes.bearerOperation
 import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.syncError
+import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import app.logdate.shared.model.sync.JournalMergeRequest
 import app.logdate.shared.model.sync.JournalMergeResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
 
 internal object SyncJournalMergeDocs {
+    private val mergeScopeDenied =
+        ErrorCase(
+            DeviceLinkErrorCodes.DEVICE_SCOPE_DENIED,
+            "A linked device sent this request. Only a signed-in phone or computer can merge journals.",
+            "A linked device cannot do this",
+        )
+
     val merge: RouteConfig.() -> Unit = {
         bearerOperation(
             "mergeJournals",
@@ -59,6 +67,7 @@ internal object SyncJournalMergeDocs {
                 ),
             )
             syncUnauthorized()
+            syncError(HttpStatusCode.Forbidden, mergeScopeDenied, SyncExamples.storageModeMismatch)
             syncServerError()
         }
     }

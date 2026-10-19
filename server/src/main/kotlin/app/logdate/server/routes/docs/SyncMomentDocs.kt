@@ -121,6 +121,7 @@ internal object SyncMomentDocs {
                 details = deletedDetails,
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -154,6 +155,7 @@ internal object SyncMomentDocs {
             )
             syncError(HttpStatusCode.BadRequest, SyncExamples.invalidSince)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -170,6 +172,7 @@ internal object SyncMomentDocs {
             ok("The moment.", momentChange)
             syncError(HttpStatusCode.NotFound, momentNotFound)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -204,6 +207,7 @@ internal object SyncMomentDocs {
             syncError(HttpStatusCode.NotFound, momentNotFound)
             syncError(HttpStatusCode.Conflict, SyncExamples.conflict)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -222,6 +226,7 @@ internal object SyncMomentDocs {
         response {
             noContent("The moment is deleted.")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
