@@ -321,6 +321,7 @@ internal class SpaceDevice(
     resolver: ConflictResolver<Journal> = LastWriteWinsResolver(),
     did: String? = TEST_DID,
     val journals: JournalRepository = FakeJournalRepository(),
+    noteKindOf: (FakeJournalNotesRepository) -> SpaceKind<JournalNote> = { noteKind(it) },
 ) {
     val notes = FakeJournalNotesRepository()
 
@@ -373,7 +374,7 @@ internal class SpaceDevice(
                 ),
             spaceSync =
                 SpaceSyncDependencies(
-                    registry = SpaceRecordRegistry(listOf(journalKind(journals, resolver), noteKind(notes))),
+                    registry = SpaceRecordRegistry(listOf(journalKind(journals, resolver), noteKindOf(notes))),
                     gate = SpaceTransportGate({ spaceEnabled }, { serverOffersSpaces }, { mode }),
                     homes = homes,
                     swapStore = swapStore,
