@@ -125,15 +125,10 @@ These need a Gradle Managed Device. `connectedDebugAndroidTest` is forbidden in 
 ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest -Plogdate.androidTestClass=app.logdate.client.DeepLinkResolverTest
 ```
 
-The managed devices are defined in the root `build.gradle.kts`:
-
-| Device | Model | API level |
-| --- | --- | --- |
-| `oldestSupportedPhoneApi30` | Pixel 2 | 30 |
-| `flagshipPhoneApi36` | Pixel 9 Pro | 36 |
-| `largeScreenTabletApi35` | Pixel Tablet | 35 |
-
-They are grouped as `smokeDevices`, `phoneDevices`, `tabletDevices`, and `deviceMatrix`.
+The managed devices are defined in the root `build.gradle.kts`. The
+[Devices](../../docs/DEVELOPMENT.md#devices) section of the development guide lists every device,
+its role in the Studio device testing standard, and the groups (`smokeDevices`, `deviceMatrix`,
+`apiMatrix`, `phoneDevices`, and `tabletDevices`).
 
 Tests that capture images (for example `WidgetSetupScreenshotsTest`) write to
 `build/outputs/managed_device_android_test_additional_output/`.

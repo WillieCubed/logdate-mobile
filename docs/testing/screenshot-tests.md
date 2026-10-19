@@ -173,8 +173,8 @@ see them, so `OsSurfaceScreenshotsTest` captures them on Gradle Managed Devices:
 # Every capture, on the Android 17 phone and tablet
 ./run screenshots:os
 
-# One capture on the Android 16 phone
-OS_SURFACE_TEST=launcherShortcuts ./run screenshots:os flagshipPhoneApi36
+# One capture on the Android 17 phone
+OS_SURFACE_TEST=launcherShortcuts ./run screenshots:os flagshipPhoneApi37
 ```
 
 The test drives Android with UI Automator, and pins the status bar with SystemUI demo mode. The clock

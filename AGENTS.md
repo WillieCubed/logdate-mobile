@@ -157,14 +157,15 @@ repository.
   installed with real data (for example `adb uninstall`, `adb shell pm uninstall`,
   `adb shell pm clear`, `adb shell cmd package uninstall`,
   `adb shell rm -rf /data/data/studio.hypertext.logdate`, or Gradle `uninstall*` tasks).
-- Only use Android emulators or Gradle Managed Devices for Android app installs, instrumentation
-  tests, UI tests, screenshots, benchmarks, and manual validation.
+- Use Gradle Managed Devices for every Android device run: instrumentation tests, UI tests,
+  screenshots, benchmarks, and manual validation, as the Studio device testing standard requires.
+  The devices and groups are listed in [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md#devices).
+  Never create a hand-made emulator.
 - If Android instrumentation coverage is needed, use an emulator-only or Gradle Managed Device task
   such as `:app:android-main:smokeDevicesGroupDebugAndroidTest` instead of
   `:app:android-main:connectedDebugAndroidTest`.
 - Before any Android command that could talk to a device, verify the target is safe. A safe target
   is:
-    - an emulator with an `adb` serial that starts with `emulator-`, or
     - a Gradle Managed Device started by Gradle for the current task.
 - If any connected target is a physical device, do not use it. Stop immediately and either:
     - run the task on an emulator,
