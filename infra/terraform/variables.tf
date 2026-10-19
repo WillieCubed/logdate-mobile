@@ -313,3 +313,26 @@ variable "cleanup_operator_email" {
   type        = string
   default     = ""
 }
+
+variable "handle_resolution_monitor" {
+  description = "Account whose handle Cloud Monitoring resolves every five minutes through `https://<handle>/.well-known/atproto-did`, and the DID that response must contain. Leave null to create no monitor. See docs/reference/handle-resolution.md."
+  type = object({
+    handle = string
+    did    = string
+  })
+  default = null
+
+  validation {
+    condition = var.handle_resolution_monitor == null || (
+      can(regex("^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$", var.handle_resolution_monitor.handle)) &&
+      can(regex("^did:(plc:[a-z2-7]{24}|web:[a-z0-9.%-]+)$", var.handle_resolution_monitor.did))
+    )
+    error_message = "handle_resolution_monitor needs a lowercase handle such as name.logdate.app and its did:plc or did:web identifier."
+  }
+}
+
+variable "handle_resolution_notification_channels" {
+  description = "Cloud Monitoring channel resource names alerted when the handle resolution monitor fails. The operator email channel from `cleanup_operator_email` is always added."
+  type        = list(string)
+  default     = []
+}

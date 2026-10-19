@@ -1,0 +1,50 @@
+name: Check Handle Resolution
+run-name: Check staging handle resolution
+
+# Other AT Protocol apps find a LogDate account by fetching https://<handle>/.well-known/atproto-did.
+# This workflow resolves a staging canary account that way after every staging deploy and once a
+# day, so a broken route (DNS, the website Worker, or the server lookup) shows up before production.
+# Production has its own Cloud Monitoring check; see docs/reference/handle-resolution.md.
+
+on:
+  workflow_run:
+    workflows: ["Deploy Server Staging"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "23 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging:
+    name: Resolve the staging canary handle
+    # The job is skipped, not failed, until the repository variable names a staging canary account.
+    if: >-
+      ${{
+        vars.LOGDATE_STAGING_RESOLUTION_HANDLE != '' &&
+        (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+      - name: Resolve the canary handle the way other apps do
+        shell: bash
+        env:
+          LOGDATE_RESOLUTION_HANDLE: ${{ vars.LOGDATE_STAGING_RESOLUTION_HANDLE }}
+          EXPECTED_DID: ${{ vars.LOGDATE_STAGING_RESOLUTION_DID }}
+        run: |
+          set -euo pipefail
+          LOGDATE_RESOLUTION_SERVICE_URL="$(awk -F'"' '/^[[:space:]]*LOGDATE_PUBLIC_ORIGIN[[:space:]]*=/ { print $2 }' infra/terraform/staging.tfvars)"
+          [[ "$LOGDATE_RESOLUTION_SERVICE_URL" == https://* ]] || {
+            echo "::error::infra/terraform/staging.tfvars does not declare an https LOGDATE_PUBLIC_ORIGIN"
+            exit 1
+          }
+          export LOGDATE_RESOLUTION_SERVICE_URL
+          args=()
+          [[ -z "$EXPECTED_DID" ]] || args+=(--expect-did "$EXPECTED_DID")
+          ./scripts/check-handle-resolution.sh "${args[@]}"

@@ -275,6 +275,14 @@ variable "cleanup_notification_channels" {
   type = list(string)
   default = []
 }
+variable "handle_resolution_monitor" {
+  type = any
+  default = null
+}
+variable "handle_resolution_notification_channels" {
+  type = list(string)
+  default = []
+}
 variable "webauthn_origin" {
   type = string
   default = ""

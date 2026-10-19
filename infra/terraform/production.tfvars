@@ -64,6 +64,11 @@ startup_cpu_boost   = true
 
 cleanup_operator_email = "willie@hypertext.studio"
 
+# Cloud Monitoring resolves this canary account's handle the way other AT Protocol apps do and alerts
+# when it stops returning the account's DID. Set it once a dedicated canary account exists; see
+# docs/reference/handle-resolution.md.
+# handle_resolution_monitor = { handle = "<canary>.logdate.app", did = "did:plc:<canary DID>" }
+
 # Must match scripts/render-cloud-run-contract.sh exactly: the renderer requires every key
 # below and rejects any it does not know, so an extra entry fails the deploy just as a missing
 # one does. HOST, GCS_*, and WEBAUTHN_* are derived by the renderer from the fields above.
