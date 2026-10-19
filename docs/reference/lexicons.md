@@ -93,6 +93,7 @@ Some data lives outside Room and also becomes records:
 | Birthday | `app.logdate.actor.settings`, not the profile | Private only | Authored | Personal space |
 | Editor drafts | `app.logdate.journal.draft` | Private only | Authored, unfinished | Personal space |
 | Journal favorites | The `favorite` field of `app.logdate.journal.journal`, left out of shared copies | Private only | Authored | Personal space |
+| Places named in entries | `location.place` and `location.placeDetails` of an entry, left out of shared copies unless the person chooses to share the place | Private only, like the place itself | Authored | Personal space |
 
 ## How today's synced data becomes records
 
@@ -117,7 +118,7 @@ entry would mix those up. Entries with several blocks stay possible for later.
 | Audio `durationMs` | `audioBlock.durationMs` |
 | Audio `transcript` | An `app.logdate.journal.transcript` keyed `<entry>:<block>`, referred to from `audioBlock.transcript` |
 | Location coordinates and accuracy | `location.geo` (latitude, longitude, altitude) and `location.accuracyCentimeters` |
-| Location place | `location.place`, plus `location.placeDetails` with the place's name and center, so the location still reads correctly where the place record is missing. A location can have a place without coordinates |
+| Location place | `location.place`, plus `location.placeDetails` with the place's name and center, so the location still reads correctly where the place record is missing. When the place record is available, its name (after label corrections) and center are shown instead of the copy. A location can have a place without coordinates. Places are private only, so a shared copy of the entry leaves both fields out unless the person chooses to share the place |
 | `timeZoneId` | `timeZone`. Today's sync leaves it out; the entry carries it |
 | `capturedOn` (`phone`, `watch`) | `capturedOn`, with the same values |
 | `capturedDuring` (`moving`, `in_vehicle`) | `capturedDuring` (`moving`, `inVehicle`) |
@@ -304,7 +305,7 @@ These don't exist yet. They come from the [social model](../feature-design/socia
 | Circles and their members | `app.logdate.graph.circle`, `app.logdate.graph.circleMember` | Only the owner | Personal space |
 | Groups | `app.logdate.space.groupProfile`, with an `app.logdate.space.member` record per member | The group's members | Group space |
 | A shared item | `app.logdate.share.share`, the author's record of what they shared and with whom | Only the author | Personal space |
-| What recipients receive | `app.logdate.share.item`, plus copies of the shared records under their usual types | The people it was shared with | Circle or group space |
+| What recipients receive | `app.logdate.share.item`, plus copies of the shared records under their usual types. A copy leaves out private-only parts: a journal's `favorite`, and an entry's `location.place` and `location.placeDetails` unless the person chooses to share the place | The people it was shared with | Circle or group space |
 | Reactions and replies | `app.logdate.share.reaction`, `app.logdate.share.reply` | The author and the person responding | Circle or group space |
 | Content keys for recipients | `app.logdate.crypto.wrappedKey` | The recipient | Circle or group space |
 | Sharing keys | `app.logdate.crypto.keyDeclaration` | Public, so others can encrypt to you | Public repository |
@@ -557,6 +558,7 @@ Streams form.
 | 2026-10-18 | **The schemas carry everything LogDate syncs today.** Every field of today's synced notes, transcripts, journals, journal links, drafts, marked moments and location history has a place in an `app.logdate.*` record, so switching sync over loses nothing. The field-by-field map is in [How today's synced data becomes records](#how-todays-synced-data-becomes-records). |
 | 2026-10-18 | **One note becomes one single-block entry.** The entry's record key and its block's id are the note's id. Each note has its own time, location and capture details today, so merging notes into one entry would mix them up. Multi-block entries stay supported. |
 | 2026-10-18 | **Capture details belong to the entry.** `timeZone`, `capturedOn` and `capturedDuring` are entry fields, so the local time is known even without a location. `app.logdate.defs#location` holds only where: coordinates, a place, or both. |
+| 2026-10-18 | **A place stays private in shared entries by default.** An entry's location can name a saved place and copy its name and center (`placeDetails`), so the location reads correctly without the place record. Places are private only, so a shared copy of an entry leaves out `place` and `placeDetails` unless the person chooses to share the place. Where the place record is available, its current name and center are shown rather than the copy. |
 | 2026-10-18 | **Media is encrypted with the account's media key.** Blobs are encrypted on the device in 64 KiB chunks with the account-wide media key (`LDCE2`), not with the content key of the record that refers to them. `mimeType` comes from the file when it's uploaded. |
 | 2026-10-18 | **A missing file doesn't lose the block.** `media` is optional on an entry's photo, video and audio blocks. Its absence means no device has the file, such as a note restored from an archive without its media, and the block keeps its caption, length and transcript. |
 | 2026-10-18 | **Text fields are at least as long as the app allows.** The app doesn't limit captions, journal titles and descriptions, place names and descriptions, or correction labels, so they share the limits of an entry's text (1,000,000 bytes, 100,000 characters). |
