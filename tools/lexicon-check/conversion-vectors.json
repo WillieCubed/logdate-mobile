@@ -1,0 +1,43 @@
+{
+  "description": "Known answers for converting a device's fractional measurement to a LogDate integer field (docs/reference/lexicon-style.md, \"No floating-point numbers\"). input is a 64-bit double; \"NaN\", \"Infinity\" and \"-Infinity\" stand for those values. expected is the integer to write, or null when the field is left out. A 32-bit Float input is widened to a double first: the float32 cases give the exact double value of the float.",
+  "roundHalfAwayFromZero": [
+    { "input": 2.5, "expected": 3 },
+    { "input": -2.5, "expected": -3 },
+    { "input": 0.5, "expected": 1 },
+    { "input": -0.5, "expected": -1 },
+    { "input": 1.4999999999999998, "expected": 1 },
+    { "input": 0.49999999999999994, "expected": 0, "note": "floor(x + 0.5) gets this wrong: x + 0.5 rounds to 1.0" },
+    { "input": 4503599627370495.5, "expected": 4503599627370496 },
+    { "input": -4503599627370495.5, "expected": -4503599627370496 }
+  ],
+  "fields": [
+    { "kind": "centimeters", "input": 12.5, "expected": 1250 },
+    { "kind": "centimeters", "input": 0.005, "expected": 1, "note": "0.005 * 100 is 0.5 in double arithmetic, a half, so it rounds away from zero" },
+    { "kind": "centimeters", "input": 3.7899999618530273, "expected": 379, "note": "3.79f widened to a double" },
+    { "kind": "centimeters", "input": 4.105000019073486, "expected": 411, "note": "4.105f widened to a double is just above the half" },
+    { "kind": "centimeters", "input": -3.2, "expected": 0, "note": "negative accuracy, speed or radius becomes 0" },
+    { "kind": "centimeters", "input": 90071992547409.9, "expected": 9007199254740991, "note": "scales to exactly 2^53 - 1, the largest value kept" },
+    { "kind": "centimeters", "input": 90071992547410, "expected": null, "note": "scaled past 2^53 - 1: refused, not saturated" },
+    { "kind": "centimeters", "input": 1e300, "expected": null },
+    { "kind": "centimeters", "input": "NaN", "expected": null },
+    { "kind": "centimeters", "input": "Infinity", "expected": null },
+    { "kind": "centimeters", "input": "-Infinity", "expected": null },
+    { "kind": "bearing", "input": 72.5, "expected": 7250 },
+    { "kind": "bearing", "input": 359.996, "expected": 0, "note": "rounds to 36000, which is 0" },
+    { "kind": "bearing", "input": 360, "expected": 0 },
+    { "kind": "bearing", "input": -0.01, "expected": 35999 },
+    { "kind": "bearing", "input": -360.5, "expected": 35950, "note": "below -360: fmod first, then add 360" },
+    { "kind": "bearing", "input": 720.25, "expected": 25 },
+    { "kind": "bearing", "input": -1e-20, "expected": 0, "note": "fmod gives -1e-20, adding 360 gives 360.0, which rounds to 36000, so 0" },
+    { "kind": "bearing", "input": 1e300, "expected": 0, "note": "fmod of a huge finite double is exact (here 0), so the bearing is kept, not refused" },
+    { "kind": "bearing", "input": "NaN", "expected": null },
+    { "kind": "bearing", "input": "-Infinity", "expected": null },
+    { "kind": "thousandths", "input": 0.942, "expected": 942 },
+    { "kind": "thousandths", "input": 0.9425, "expected": 943 },
+    { "kind": "thousandths", "input": 0.9409999847412109, "expected": 941, "note": "0.941f widened to a double" },
+    { "kind": "thousandths", "input": 1.2, "expected": 1000, "note": "kept between 0 and 1000" },
+    { "kind": "thousandths", "input": -0.3, "expected": 0 },
+    { "kind": "thousandths", "input": 1e300, "expected": null, "note": "too large once scaled: refused, not clamped" },
+    { "kind": "thousandths", "input": "NaN", "expected": null }
+  ]
+}
