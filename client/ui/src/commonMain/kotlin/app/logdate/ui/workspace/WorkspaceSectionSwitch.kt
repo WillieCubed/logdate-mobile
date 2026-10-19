@@ -3,7 +3,6 @@
 package app.logdate.ui.workspace
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -18,6 +17,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import app.logdate.ui.common.DropdownMenu
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.workspace_section_switch_label

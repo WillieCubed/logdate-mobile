@@ -230,6 +230,7 @@ fun LogDateNavDisplay(
             ) {
                 LockableContent(
                     isLocked = appUiState.requiresUnlock,
+                    authState = appUiState.authState,
                     displayName = appUiState.displayName,
                     onUsePasscode = onShowUnlockPrompt,
                 ) {

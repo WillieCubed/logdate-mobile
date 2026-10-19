@@ -18,7 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import app.logdate.ui.common.Dialog
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.grant_permission
 import logdate.client.feature.editor.generated.resources.open_app_settings

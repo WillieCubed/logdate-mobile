@@ -5,7 +5,6 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.client.sync.diagnostics.DiagnosticConsent
 import app.logdate.client.sync.diagnostics.DiagnosticReportingController
+import app.logdate.ui.common.AlertDialog
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import kotlinx.coroutines.launch

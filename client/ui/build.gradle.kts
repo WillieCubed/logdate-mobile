@@ -13,6 +13,49 @@ plugins {
     alias(libs.plugins.dokka)
 }
 
+val checkPrivateModalContract by tasks.registering {
+    group = "verification"
+    description = "Checks that private app windows respect the app lock."
+    val sources =
+        listOf("client", "app/compose-main").map { directory ->
+            rootProject.fileTree(directory) {
+                include("**/src/*Main/**/*.kt")
+                exclude("**/build/**")
+            }
+        }
+    inputs.files(sources)
+    val sourceRoot = rootProject.projectDir
+    doLast {
+        val directModal =
+            Regex(
+                "androidx\\.compose\\.(?:material3\\.(?:AlertDialog|DatePickerDialog|DropdownMenu|ModalBottomSheet|BasicAlertDialog|TooltipBox)|ui\\.window\\.(?:Dialog|Popup))\\b",
+            )
+        val allowed =
+            setOf(
+                "client/ui/src/commonMain/kotlin/app/logdate/ui/common/PrivateModals.kt",
+                "client/ui/src/commonMain/kotlin/app/logdate/ui/common/PrivateTooltip.kt",
+                "app/compose-main/src/androidMain/kotlin/app/logdate/client/launch/ApplicationStartupGate.kt",
+            )
+        val failures =
+            sources.flatMap { it.files }.filter { it.relativeTo(sourceRoot).invariantSeparatorsPath !in allowed }.flatMap { file ->
+                file.readLines().mapIndexedNotNull { index, line ->
+                    if (directModal.containsMatchIn(line)) {
+                        "${file.relativeTo(
+                            sourceRoot,
+                        )}:${index + 1}: Use app.logdate.ui.common modal components so app lock hides private windows."
+                    } else {
+                        null
+                    }
+                }
+            }
+        check(failures.isEmpty()) { failures.joinToString("\n") }
+    }
+}
+
+tasks.matching { it.name == "check" || it.name == "ktlintCheck" }.configureEach {
+    dependsOn(checkPrivateModalContract)
+}
+
 kotlin {
     android {
         namespace = "app.logdate.client.ui"

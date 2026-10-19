@@ -1,11 +1,11 @@
 package app.logdate.feature.editor.ui.dialog.alert
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import app.logdate.ui.common.AlertDialog
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.editor_action_discard
 import logdate.client.feature.editor.generated.resources.editor_delete_block_dialog_description

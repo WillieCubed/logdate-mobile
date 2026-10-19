@@ -2,7 +2,6 @@
 
 package app.logdate.feature.timeline.ui.marks
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -18,6 +17,7 @@ import app.logdate.client.domain.moments.ObserveMarkPhotoSuggestionsUseCase
 import app.logdate.client.permissions.rememberMediaLibraryPermissionState
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.client.repository.moments.MarkedMomentRepository
+import app.logdate.ui.common.AlertDialog
 import kotlinx.coroutines.CancellationException
 import logdate.client.feature.timeline.generated.resources.Res
 import logdate.client.feature.timeline.generated.resources.mark_cancel

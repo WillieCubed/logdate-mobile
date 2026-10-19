@@ -37,7 +37,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -79,6 +78,7 @@ import app.logdate.feature.location.timeline.ui.model.LocationTimelineUiState
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.adaptive.AdaptivePaneLayout
+import app.logdate.ui.common.AlertDialog
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.platform.PlatformSheet
 import logdate.client.feature.location.timeline.generated.resources.Res
@@ -734,7 +734,7 @@ private fun StopCard(
                         Icon(Icons.Default.MoreVert, contentDescription = null)
                     }
 
-                    androidx.compose.material3.DropdownMenu(
+                    app.logdate.ui.common.DropdownMenu(
                         expanded = showActions,
                         onDismissRequest = { showActions = false },
                     ) {

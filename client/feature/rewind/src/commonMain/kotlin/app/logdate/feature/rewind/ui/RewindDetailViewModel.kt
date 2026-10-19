@@ -185,7 +185,7 @@ class RewindDetailViewModel(
      * Whether the "delete this rewind?" confirmation dialog is currently visible.
      *
      * The story view reads this so auto-advance pauses while the user is making the call,
-     * and the screen renders an [androidx.compose.material3.AlertDialog] when it's true.
+     * and the screen renders an [app.logdate.ui.common.AlertDialog] when it's true.
      */
     val deletePromptVisible: StateFlow<Boolean> = deletePromptVisibleFlow.asStateFlow()
 

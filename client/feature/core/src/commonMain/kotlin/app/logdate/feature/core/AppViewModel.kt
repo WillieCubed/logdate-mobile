@@ -36,7 +36,10 @@ class AppViewModel(
     private val onCloudRestoreSignIn: () -> Unit = {},
 ) : ViewModel() {
     private val biometricState = biometricGatekeeper.authState
-    private val appLockState = MutableStateFlow(AppLockState.Unlocked)
+    private val appLockState = MutableStateFlow(AppLockState.Locked)
+    private var appIsForegrounded = true
+    private var foregroundGeneration = 0L
+    private var unlockRequest = 0L
     private val securityLevelState = MutableStateFlow(AppSecurityLevel.NONE)
     private var hasAttemptedCloudRestoreSignIn = false
     private var pendingNativeRecovery: NativeAccountRecoveryRequest? = null
@@ -92,14 +95,6 @@ class AppViewModel(
                     // re-assert on next backgrounding or cold start.
                 }
                 isInitialEmission = false
-            }
-        }
-
-        viewModelScope.launch {
-            biometricGatekeeper.authState.collect { authState ->
-                if (authState == AppAuthState.AUTHENTICATED) {
-                    appLockState.value = AppLockState.Unlocked
-                }
             }
         }
     }
@@ -183,16 +178,41 @@ class AppViewModel(
      *
      * This relies on native OS biometric unlock mechanisms.
      */
-    fun showNativeUnlockPrompt() {
-        biometricGatekeeper.authenticate()
+    fun showNativeUnlockPrompt() = authenticateNativeUnlock(requestEnrollmentIfNecessary = true)
+
+    private fun authenticateNativeUnlock(requestEnrollmentIfNecessary: Boolean) {
+        val request = ++unlockRequest
+        biometricGatekeeper.authenticate(requestEnrollmentIfNecessary = requestEnrollmentIfNecessary) { result ->
+            val deliveredInForeground = appIsForegrounded
+            val generation = foregroundGeneration
+            viewModelScope.launch {
+                if (result == AppAuthState.AUTHENTICATED &&
+                    deliveredInForeground &&
+                    appIsForegrounded &&
+                    generation == foregroundGeneration &&
+                    request == unlockRequest
+                ) {
+                    appLockState.value = AppLockState.Unlocked
+                }
+            }
+        }
     }
 
-    /**
-     * Marks the app as locked when it moves to the background.
-     */
-    fun onAppForegrounded() = retryPendingNativeRecovery()
+    /** Rechecks security after returning from destination-device enrollment. */
+    fun onAppForegrounded() {
+        appIsForegrounded = true
+        retryPendingNativeRecovery()
+        if (securityLevelState.value == AppSecurityLevel.BIOMETRIC &&
+            biometricState.value == AppAuthState.REQUEST_ENROLLMENT
+        ) {
+            authenticateNativeUnlock(requestEnrollmentIfNecessary = false)
+        }
+    }
 
+    /** Requires a new challenge when the app returns from the background. */
     fun onAppBackgrounded() {
+        appIsForegrounded = false
+        foregroundGeneration += 1
         if (securityLevelState.value == AppSecurityLevel.BIOMETRIC) {
             appLockState.value = AppLockState.Locked
         }
@@ -224,7 +244,8 @@ private fun resolveAuthState(
         AppAuthState.UPDATE_REQUIRED,
         AppAuthState.UNKNOWN,
         -> biometricState
-        AppAuthState.AUTHENTICATED -> AppAuthState.AUTHENTICATED
+        AppAuthState.AUTHENTICATED ->
+            if (appLockState == AppLockState.Unlocked) AppAuthState.AUTHENTICATED else AppAuthState.REQUIRE_PROMPT
         AppAuthState.NO_PROMPT_NEEDED,
         AppAuthState.REQUIRE_PROMPT,
         ->

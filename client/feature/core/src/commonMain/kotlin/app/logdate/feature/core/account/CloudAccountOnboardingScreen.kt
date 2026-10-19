@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +29,7 @@ import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.feature.core.sync.SyncProgressIndicator
 import app.logdate.shared.model.ServerDescriptor
+import app.logdate.ui.common.AlertDialog
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_body
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_confirm

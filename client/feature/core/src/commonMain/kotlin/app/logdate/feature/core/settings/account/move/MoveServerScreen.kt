@@ -15,7 +15,6 @@ import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.core.settings.ui.CheckedServer
 import app.logdate.feature.core.settings.ui.ServerProblem
 import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.ui.common.AlertDialog
 import app.logdate.ui.common.SettingsRow
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.step.StepBusyButton
