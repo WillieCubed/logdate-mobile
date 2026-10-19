@@ -112,11 +112,16 @@ public class XrpcDataHome(
     ): ChangePage {
         val credentials = auth()
         val output =
-            client.query<ListRepoOpsOutput>(LIST) {
-                auth = credentials
-                queryParameter("space", space.uri)
-                queryParameter("since", since.toString())
-                queryParameter("limit", limit.toString())
+            try {
+                client.query<ListRepoOpsOutput>(LIST) {
+                    auth = credentials
+                    queryParameter("space", space.uri)
+                    queryParameter("since", since.toString())
+                    queryParameter("limit", limit.toString())
+                }
+            } catch (e: XrpcProtocolException) {
+                if (e.error == CURSOR_TOO_OLD) throw DataHomeCursorTooOldException(e.errorMessage ?: "List again from 0")
+                throw e
             }
         val changes = output.ops.map { RecordChange(it.rkey, it.seq, it.deleted, it.cid, it.value) }
         return ChangePage(changes, output.cursor, output.hasMore)
@@ -182,6 +187,7 @@ public class XrpcDataHome(
         const val INVALID_SWAP = "InvalidSwap"
         const val RECORD_NOT_FOUND = "RecordNotFound"
         const val BLOB_NOT_FOUND = "BlobNotFound"
+        const val CURSOR_TOO_OLD = "CursorTooOld"
         val PUT = Nsid.require("app.logdate.space.putRecord")
         val DELETE = Nsid.require("app.logdate.space.deleteRecord")
         val GET = Nsid.require("app.logdate.space.getRecord")

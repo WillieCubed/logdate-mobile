@@ -1,10 +1,13 @@
 -- Sealed records in spaces (personal now; circle and group spaces later). The server sees only
 -- each record's space, author repository, opaque key, sequence number and padded bytes.
+-- purged_through_seq is the highest sequence number of a tombstone purging has deleted, so a client
+-- whose cursor is older learns it missed deletions.
 CREATE TABLE space_states (
     space_uri TEXT NOT NULL,
     author_did TEXT NOT NULL,
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     last_seq BIGINT NOT NULL DEFAULT 0,
+    purged_through_seq BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (space_uri, author_did)
 );
 CREATE INDEX idx_space_states_account ON space_states(account_id);

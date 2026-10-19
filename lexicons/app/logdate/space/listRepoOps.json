@@ -26,7 +26,10 @@
             "hasMore": { "type": "boolean" }
           }
         }
-      }
+      },
+      "errors": [
+        { "name": "CursorTooOld", "description": "Deletions after since were purged, so paging on from it would miss them. List again from since=0." }
+      ]
     },
     "change": {
       "type": "object",

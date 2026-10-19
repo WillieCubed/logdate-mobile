@@ -17,6 +17,7 @@ import app.logdate.server.space.deleteObjectOrThrow
 import app.logdate.server.space.logObjectDeleteFailure
 import app.logdate.server.space.recordCid
 import app.logdate.server.space.requireChangesLimit
+import app.logdate.server.space.requireFreshCursor
 import app.logdate.server.space.requireSealedRecord
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,6 +30,7 @@ import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.lessEq
+import org.jetbrains.exposed.v1.core.max
 import org.jetbrains.exposed.v1.core.notExists
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.batchInsert
@@ -155,6 +157,13 @@ class PostgreSQLSpaceStore(
             // Sizes first, so only the records that fit the byte budget are loaded. Repeatable read
             // makes the second query see exactly the rows the first one measured.
             transaction(transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ) {
+                val purgedThrough =
+                    SpaceStatesTable
+                        .select(SpaceStatesTable.purgedThroughSeq)
+                        .where { stateKey(space, author) }
+                        .singleOrNull()
+                        ?.get(SpaceStatesTable.purgedThroughSeq) ?: 0L
+                requireFreshCursor(since, purgedThrough)
                 val after =
                     (SpaceRecordsTable.spaceUri eq space) and (SpaceRecordsTable.authorDid eq author) and
                         (SpaceRecordsTable.seq greater since)
@@ -257,9 +266,7 @@ class PostgreSQLSpaceStore(
         deleteObject: (storagePath: String) -> Unit,
     ): SpacePurgeResult =
         withContext(Dispatchers.IO) {
-            transaction {
-                SpaceRecordsTable.deleteWhere { (deleted eq true) and (deletedAt less tombstonesBefore) }
-            }
+            purgeTombstones(tombstonesBefore)
             var deleted = 0
             var failed = 0
             var after: Pair<String, String>? = null
@@ -276,6 +283,45 @@ class PostgreSQLSpaceStore(
             } while (batch.size == PURGE_BATCH_SIZE)
             SpacePurgeResult(deleted, failed)
         }
+
+    /**
+     * Deletes tombstones made before [before], one repository at a time. Each repository's state row is
+     * locked first, as every write locks it, and its purged-through sequence number is raised to the
+     * highest tombstone deleted, in the same transaction.
+     */
+    private fun purgeTombstones(before: Instant) {
+        val old = (SpaceRecordsTable.deleted eq true) and (SpaceRecordsTable.deletedAt less before)
+        val repositories =
+            transaction {
+                SpaceRecordsTable
+                    .select(SpaceRecordsTable.spaceUri, SpaceRecordsTable.authorDid)
+                    .where { old }
+                    .withDistinct()
+                    .map { it[SpaceRecordsTable.spaceUri] to it[SpaceRecordsTable.authorDid] }
+            }
+        repositories.forEach { (space, author) ->
+            transaction {
+                val purgedThrough =
+                    SpaceStatesTable
+                        .select(SpaceStatesTable.purgedThroughSeq)
+                        .where { stateKey(space, author) }
+                        .forUpdate()
+                        .singleOrNull()
+                        ?.get(SpaceStatesTable.purgedThroughSeq) ?: return@transaction
+                val tombstones = old and (SpaceRecordsTable.spaceUri eq space) and (SpaceRecordsTable.authorDid eq author)
+                val highest = SpaceRecordsTable.seq.max()
+                val highestSeq =
+                    SpaceRecordsTable
+                        .select(highest)
+                        .where { tombstones }
+                        .single()[highest] ?: return@transaction
+                SpaceRecordsTable.deleteWhere { tombstones }
+                if (highestSeq > purgedThrough) {
+                    SpaceStatesTable.update({ stateKey(space, author) }) { it[SpaceStatesTable.purgedThroughSeq] = highestSeq }
+                }
+            }
+        }
+    }
 
     /**
      * The next [PURGE_BATCH_SIZE] blobs, in key order after [after], that were created before

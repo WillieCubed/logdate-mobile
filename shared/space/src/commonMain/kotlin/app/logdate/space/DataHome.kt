@@ -67,6 +67,14 @@ public class DataHomeConflictException(
 ) : Exception(message)
 
 /**
+ * Thrown by [DataHome.listChanges] when deletions after its `since` cursor have been purged, so paging
+ * on would miss them. List again from zero and replace what the device holds with the result.
+ */
+public class DataHomeCursorTooOldException(
+    message: String,
+) : Exception(message)
+
+/**
  * Where a space's sealed records live: LogDate Cloud, or a self-hosted LogDate server. Every app
  * reaches a data home through this interface, and a data home only ever sees sealed envelopes and
  * encrypted blobs.
@@ -107,7 +115,11 @@ public interface DataHome {
         rkey: String,
     ): StoredRecord?
 
-    /** Reads up to [limit] changes made after sequence number [since], oldest first. */
+    /**
+     * Reads up to [limit] changes made after sequence number [since], oldest first.
+     *
+     * @throws DataHomeCursorTooOldException if deletions after [since] were purged; list again from zero.
+     */
     public suspend fun listChanges(
         space: SpaceRef,
         since: Long,

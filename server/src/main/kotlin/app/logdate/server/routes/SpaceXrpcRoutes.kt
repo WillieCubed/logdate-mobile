@@ -15,6 +15,7 @@ import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.routes.docs.XrpcSpaceDocs
 import app.logdate.server.space.MAX_SPACE_CHANGES_LIMIT
 import app.logdate.server.space.SpaceBlob
+import app.logdate.server.space.SpaceCursorTooOldException
 import app.logdate.server.space.SpaceInvalidRecordException
 import app.logdate.server.space.SpaceMissingBlobException
 import app.logdate.server.space.SpaceRecordWrite
@@ -65,6 +66,7 @@ private const val MAX_RECORD_BLOBS = 64
 private const val MAX_CID_LENGTH = 255
 private const val RECORD_NOT_FOUND = "RecordNotFound"
 private const val BLOB_NOT_FOUND = "BlobNotFound"
+private const val CURSOR_TOO_OLD = "CursorTooOld"
 private const val SPACE_BLOB_MIME_TYPE = "application/octet-stream"
 
 private val spaceJson = Json { ignoreUnknownKeys = true }
@@ -223,7 +225,15 @@ private fun Route.listRepoOps(
             call.request.queryParameters["limit"]?.let { param ->
                 param.toIntOrNull()?.coerceIn(1, MAX_SPACE_CHANGES_LIMIT) ?: return@get call.respondInvalid("limit must be a whole number")
             } ?: DEFAULT_CHANGES_LIMIT
-        val page = store.changes(space.uri, space.authority, since, limit)
+        val page =
+            try {
+                store.changes(space.uri, space.authority, since, limit)
+            } catch (_: SpaceCursorTooOldException) {
+                return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    PdsErrorResponse(CURSOR_TOO_OLD, "Deletions after this cursor were purged; list again from 0"),
+                )
+            }
         val ops =
             page.changes.map {
                 ListRepoOpsChange(cid = it.cid, deleted = it.deleted, rkey = it.rkey, seq = it.seq, value = it.record?.toSealed())
