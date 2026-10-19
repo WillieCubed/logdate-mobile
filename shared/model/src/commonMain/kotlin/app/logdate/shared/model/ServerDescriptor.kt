@@ -64,6 +64,13 @@ object ServerProtocolFeature {
      * was shared with. Without it a journal link reaches no one, and clients must not offer one.
      */
     const val JOURNAL_SHARE_LINKS_V1 = "journalShareLinksV1"
+
+    /**
+     * The server stores each account's personal space through the owner-only `app.logdate.space.*`
+     * XRPC methods. Every record in it is sealed, so the server holds only ciphertext. Without it
+     * those methods answer `501 MethodNotImplemented`, and clients must not keep a space here.
+     */
+    const val PERSONAL_SPACE_V1 = "personalSpaceV1"
 }
 
 @Serializable

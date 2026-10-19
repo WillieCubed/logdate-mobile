@@ -6,6 +6,7 @@ import app.logdate.server.openapi.schemadocs.CloudSchemaDocs
 import app.logdate.server.openapi.schemadocs.DeviceSchemaDocs
 import app.logdate.server.openapi.schemadocs.DiagnosticSchemaDocs
 import app.logdate.server.openapi.schemadocs.LocationHistorySchemaDocs
+import app.logdate.server.openapi.schemadocs.SpaceSchemaDocs
 import app.logdate.server.openapi.schemadocs.SyncSchemaDocs
 import io.swagger.v3.oas.models.OpenAPI
 
@@ -32,7 +33,8 @@ internal object SchemaDocumentation {
             LocationHistorySchemaDocs.docs +
             SyncSchemaDocs.docs +
             CloudSchemaDocs.docs +
-            AtProtoSchemaDocs.docs
+            AtProtoSchemaDocs.docs +
+            SpaceSchemaDocs.docs
 }
 
 /**

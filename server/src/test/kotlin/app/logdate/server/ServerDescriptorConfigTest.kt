@@ -52,6 +52,17 @@ class ServerDescriptorConfigTest {
     }
 
     @Test
+    fun `personal spaces are advertised only when the flag is on`() {
+        val identity = AtprotoIdentityConfig()
+        val baseline = ServerDescriptorConfig.fromEnvironment(personalSpaceEnabled = false).toDescriptor(identity, "logdate.app", "LogDate")
+        val enabled = ServerDescriptorConfig.fromEnvironment(personalSpaceEnabled = true).toDescriptor(identity, "logdate.app", "LogDate")
+        assertFalse(ServerDescriptorConfig().personalSpaceEnabled)
+        assertFalse(baseline.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_V1))
+        assertTrue(enabled.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_V1))
+        assertEquals(baseline.capabilities, enabled.capabilities)
+    }
+
+    @Test
     fun `first-party environment advertises LogDate Cloud defaults`() {
         val config = ServerDescriptorConfig.fromEnvironment(deploymentKind = "first_party")
 

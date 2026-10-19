@@ -10,6 +10,7 @@ import app.logdate.shared.model.ServerProtocolFeature
 data class ServerDescriptorConfig(
     val deploymentKind: DeploymentKind = DeploymentKind.SELF_HOSTED,
     val encryptedAccountKeysEnabled: Boolean = false,
+    val personalSpaceEnabled: Boolean = false,
     val displayName: String = defaultDisplayName(DeploymentKind.SELF_HOSTED),
     val privacyPolicyUrl: String? = null,
     val termsOfServiceUrl: String? = null,
@@ -58,6 +59,9 @@ data class ServerDescriptorConfig(
                     if (encryptedAccountKeysEnabled) {
                         add(ServerProtocolFeature.ENCRYPTED_ACCOUNT_KEYS_V1)
                     }
+                    if (personalSpaceEnabled) {
+                        add(ServerProtocolFeature.PERSONAL_SPACE_V1)
+                    }
                     if (identityConfig.publishesPlcOperations) {
                         add(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1)
                     }
@@ -74,6 +78,7 @@ data class ServerDescriptorConfig(
             privacyPolicyUrl: String? = System.getenv("LOGDATE_PRIVACY_POLICY_URL"),
             termsOfServiceUrl: String? = System.getenv("LOGDATE_TERMS_OF_SERVICE_URL"),
             encryptedAccountKeysEnabled: Boolean = System.getenv("LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED") == "true",
+            personalSpaceEnabled: Boolean = System.getenv("LOGDATE_PERSONAL_SPACE_ENABLED") == "true",
         ): ServerDescriptorConfig {
             val resolvedDeploymentKind =
                 when (deploymentKind?.trim()?.lowercase()) {
@@ -84,6 +89,7 @@ data class ServerDescriptorConfig(
             return ServerDescriptorConfig(
                 deploymentKind = resolvedDeploymentKind,
                 encryptedAccountKeysEnabled = encryptedAccountKeysEnabled,
+                personalSpaceEnabled = personalSpaceEnabled,
                 displayName =
                     displayName
                         ?.trim()

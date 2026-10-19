@@ -34,6 +34,7 @@ import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
+import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -49,7 +50,11 @@ import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
+import app.logdate.server.routes.requireAuthenticatedAccount
+import app.logdate.server.routes.spaceXrpcRoutes
 import app.logdate.server.routes.xrpcRoutes
+import app.logdate.server.space.InMemorySpaceStore
+import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncRepository
 import app.logdate.util.UuidSerializer
@@ -86,6 +91,8 @@ data class AuthV1TestEnvironment(
     val oauthDpopVerifier: OAuthDpopVerifier,
     val oauthAccessTokenService: OAuthAccessTokenService,
     val oauthAuthorizationService: OAuthAuthorizationService,
+    val blobStorage: LogDateBlobStorage,
+    val spaceStore: SpaceStore,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -108,6 +115,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     entitlementService: EntitlementService? = null,
     deviceLinkService: DeviceLinkService? = null,
     accessTokenVerifier: AccessTokenVerifier? = null,
+    personalSpaceEnabled: Boolean = false,
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
@@ -121,6 +129,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
         )
     val repoBlockStore = InMemoryRepoBlockStore()
     val blobStorage = InMemoryLogDateBlobStorage()
+    val spaceStore = InMemorySpaceStore()
     val atprotoBlobRepository = InMemoryLogDateAtprotoBlobRepository()
     val mediaRepository = InMemoryLogDateMediaRepository()
     val mediaBlobRepository =
@@ -228,6 +237,22 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 oauthDpopVerifier = oauthDpopVerifier,
                 oauthNonceService = oauthNonceService,
             )
+            spaceXrpcRoutes(
+                enabled = personalSpaceEnabled,
+                store = spaceStore,
+                blobStorage = blobStorage,
+                auth = {
+                    requireAuthenticatedAccount(
+                        identityService = atprotoIdentityService,
+                        accountRepository = accountRepository,
+                        tokenService = tokenService,
+                        atprotoSessionTokenService = atprotoSessionTokenService,
+                        oauthAccessTokenService = oauthAccessTokenService,
+                        oauthDpopVerifier = oauthDpopVerifier,
+                        oauthNonceService = oauthNonceService,
+                    )
+                },
+            )
             route("/api/v1") {
                 authV1Routes(
                     accountRepository = accountRepository,
@@ -269,5 +294,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
         oauthDpopVerifier = oauthDpopVerifier,
         oauthAccessTokenService = oauthAccessTokenService,
         oauthAuthorizationService = oauthAuthorizationService,
+        blobStorage = blobStorage,
+        spaceStore = spaceStore,
     )
 }
