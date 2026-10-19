@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Exercise restored tracking grants and widget choices on synthetic Android emulators."""
+"""Exercise restored tracking, notification delivery, recording salvage, and widget choices on synthetic Android emulators."""
 import argparse
 import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import time
+import uuid
 
 spec = importlib.util.spec_from_file_location("media_acceptance", Path(__file__).with_name("native-missing-media-acceptance.py"))
 h = importlib.util.module_from_spec(spec)
@@ -64,6 +66,32 @@ def run(args, serial):
         probe("locationResumesAfterExternalGrants", "location-grant-recovery.log",
               status_actions={b"RESTORE_LOCATION_GRANT_REQUIRED": grant_location,
                               b"RESTORE_MOTION_GRANT_REQUIRED": grant_motion})
+        notification_test = "app.logdate.client.e2e.RestoredNotificationDeliveryTest#"
+        h.instrument(serial, notification_test + "denied_permission_preserves_reminder_history", directory / "notifications-denied.log", extras=EXTRAS)
+        h.adb(serial, "shell", "pm", "grant", h.PACKAGE, "android.permission.POST_NOTIFICATIONS")
+        h.instrument(serial, notification_test + "granted_permission_records_delivery_once", directory / "notifications-granted.log", extras=EXTRAS)
+        h.instrument(serial, notification_test + "blocked_channel_preserves_reminder_history", directory / "notifications-blocked-channel.log", extras=EXTRAS)
+        recording_test = "app.logdate.client.e2e.CompletedRecordingRestartTest"
+        fixture = str(uuid.uuid4())
+        h.instrument(serial, recording_test, directory / "recording-before-restart.log",
+                     extras=["-e", "recordingRecoveryMode", "seed", "-e", "recordingRecoveryFixture", fixture])
+        h.safe_target(serial)
+        h.adb(serial, "shell", "am", "force-stop", h.PACKAGE)
+        h.adb(serial, "shell", "am", "start", "-W", "-n", h.PACKAGE + "/app.logdate.client.MainActivity")
+        for _ in range(120):
+            published = h.adb(serial, "shell", "run-as", h.PACKAGE, "test", "-f",
+                              "files/audio_notes/restore-salvage-" + fixture + ".m4a", check=False)
+            if published.returncode == 0:
+                break
+            time.sleep(0.25)
+        else:
+            raise RuntimeError("Foreground startup did not publish the completed recording")
+        services = h.adb(serial, "shell", "dumpsys", "activity", "services", h.PACKAGE).stdout.decode()
+        (directory / "recording-services-after-launch.log").write_text(services)
+        if "AudioRecordingService" in services:
+            raise RuntimeError("Foreground salvage restarted the recording service")
+        h.instrument(serial, recording_test, directory / "recording-after-restart.log",
+                     extras=["-e", "recordingRecoveryMode", "verify", "-e", "recordingRecoveryFixture", fixture])
         for method, name in [("widget settings survive launcher ID remapping", "widget-remap.log"),
                              ("overlapping restored IDs preserve both widget choices", "widget-overlapping-remap.log")]:
             h.instrument(serial, "app.logdate.client.e2e.WidgetInstanceSettingsTest#" + method, directory / name)
@@ -81,7 +109,8 @@ def run(args, serial):
                     restored_asleep = "mWakefulness=Asleep" in restored_power or "mWakefulness=Dozing" in restored_power
                     if not restored_asleep:
                         raise RuntimeError("The emulator's original wakefulness was not restored")
-    return {"serial": serial, "locationAndMotionGrantRecovery": True, "widgetRemapping": True, "environmentRestored": True}
+    return {"serial": serial, "locationAndMotionGrantRecovery": True, "widgetRemapping": True, "notificationDestinationChecks": True,
+            "completedRecordingRestart": True, "environmentRestored": True}
 
 
 def main():

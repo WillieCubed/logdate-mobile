@@ -1,12 +1,16 @@
 package app.logdate.client.notifications
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationChannelGroup
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 
 data class AndroidLogDateNotificationGroupSpec(
     val key: LogDateNotificationGroupKey,
@@ -201,6 +205,30 @@ class LogDateNotificationRegistrar(
 ) {
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    /** Destination permission and channel choices govern delivery, independently of restored settings. */
+    fun canPost(key: LogDateNotificationChannelKey): Boolean {
+        registerChannel(key)
+        return canPostToChannel(key.id)
+    }
+
+    /** Checks an existing channel without changing its importance or group. */
+    fun canPostToChannel(channelId: String): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return false
+        }
+        if (!notificationManager.areNotificationsEnabled()) return false
+        val channel = notificationManager.getNotificationChannel(channelId) ?: return false
+        if (channel.importance == NotificationManager.IMPORTANCE_NONE) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            channel.group?.let { notificationManager.getNotificationChannelGroup(it)?.isBlocked } == true
+        ) {
+            return false
+        }
+        return true
+    }
 
     fun registerAllPhoneChannels() {
         notificationManager.createNotificationChannelGroups(

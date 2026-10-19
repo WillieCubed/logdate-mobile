@@ -275,7 +275,9 @@ periodic work. Foreground capture can retry a launch denied before the activity 
 
 A later motion-permission grant must register activity transitions in an already running capture
 service. Keep an existing location subscription rather than starting a second one. Media-library
-and notification grants are separate from access to private recovered originals.
+and notification grants are separate from access to private recovered originals. Both reminder paths
+check destination notification permission, the app-wide switch, and channel/group blocking before
+recording a reminder as shown. A blocked reminder remains eligible for a later evaluation.
 
 Placed-widget choices live in `shared_prefs/logdate_widget_instances.xml`. Native cloud and device
 transfer include that specific file; launcher restoration remaps old widget IDs to replacement IDs.
@@ -311,7 +313,18 @@ and each original permission state. It never clears or uninstalls the app.
 
 `tests/e2e/native-permission-acceptance.py` uses the same explicit emulator and synthetic-data
 arguments. It exercises externally granted location and motion permission through the resumed
-activity, plus widget ID remapping. The test waits for SDK acceptance using a temporary in-memory
+activity, notification delivery and widget ID remapping. Notification cases require the host
+sequence opt-in and test denied/granted permission through the real coordinator. The blocked-channel
+case uses a disposable channel to check the OS gate, then checks the worker retains reminder history
+when that gate refuses delivery. It never mutes a production channel.
+
+The recording fixture stages a completed AAC file, stops the app process, and launches the real
+activity. The host observes publication and checks that no recording service is running before
+starting verification instrumentation. Verification checks exact bytes and offline playback, then
+removes only its uniquely named recording. Normal startup and the foreground fallback for a
+restore-retained Application run the same salvage step before database access.
+
+The location test waits for SDK acceptance using a temporary in-memory
 Napier sink; a non-null pending request is insufficient, and production log redaction stays intact.
 A private checkpoint retains the original tracking preferences
 until cleanup succeeds. Cleanup restores permissions and radio settings and reads them back.

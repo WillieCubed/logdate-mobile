@@ -25,8 +25,8 @@ import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.feature.widgets.publishWidgetPreviews
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.launch.ApplicationStartup
+import app.logdate.client.launch.recoverCompletedRecordingFiles
 import app.logdate.client.location.tracking.LocationTrackingManager
-import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.notifications.LogDateNotificationRegistrar
@@ -79,10 +79,7 @@ class LogdateApplication :
     internal val startup =
         ApplicationStartup(startupScope) {
             try {
-                runCatching {
-                    val recovered = CrashSafeRecording.recoverCompletedRecordings(filesDir.resolve("audio_notes"))
-                    if (recovered > 0) Napier.i("Recovered $recovered completed audio recording(s)", tag = APP_STARTUP_TAG)
-                }.onFailure { Napier.w("Completed audio recordings remain queued for recovery", it, tag = APP_STARTUP_TAG) }
+                recoverCompletedRecordingFiles(filesDir)
                 get<LogDateDatabase>()
                 val detector = PostRestoreDetector(this@LogdateApplication)
                 awaitNativeMediaQuarantine(
@@ -339,6 +336,7 @@ internal object ApplicationStartupCoordinator {
                     val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
                     ApplicationStartup(startupScope) {
                         try {
+                            recoverCompletedRecordingFiles(application.filesDir)
                             val koin = GlobalContext.get()
                             koin.get<LogDateDatabase>()
                             val detector = PostRestoreDetector(application)
