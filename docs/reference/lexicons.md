@@ -179,8 +179,9 @@ others at it.
 
 A membership's record key is `<journal>:<entry>`, the same pair today's journal links are keyed by.
 Its `createdAt` is optional. Two devices that add the same entry to the same journal write the same
-key, so a device that finds the membership already there keeps the earlier `createdAt` rather than
-writing its own.
+key, so each writes it create-only (`createOnly`) and leaves a membership that's already there as
+it is. The first `createdAt` written is then the one every device sees. Entry links are written the
+same way.
 
 ### Drafts
 
@@ -211,14 +212,16 @@ record type:
 | `memory-link` | `app.logdate.place.entryLink` | `<entry>:<SHA-256 of the evidence id, in lowercase hexadecimal>` |
 | `manual` (a visit the person added) | `app.logdate.place.visit` | The visit's id |
 
-Deleting a sample or an activity change is no longer a deleted record of its own: the device
-rewrites the hour without it and lists its id in `deletedSampleIds` or `deletedTransitionIds`, so
-the device that recorded it never adds it back.
+Deleting a sample or an activity change is no longer a deleted record of its own. The device
+removes it from the part of the hour that holds it and lists its id in that same part's
+`deletedSampleIds` or `deletedTransitionIds`, never in another part. The deleted location is then
+gone from the stored record, and the device that recorded it never adds it back.
 
 That means a device can rewrite an hour another device recorded: deleting a visit deletes its
-samples, whichever device took them. Every write to an hour's record is conditional on the version
-the device last read (`swapCid`). When the write is refused because the record changed, the device
-reads it again, merges, and retries. Merging two versions is always the same:
+samples, whichever device took them. The first write of an hour, or of a new part, is create-only
+(`createOnly`), because there's no version to compare with yet. Every later write is conditional on
+the version the device last read (`swapCid`). When a write is refused because the record exists or
+changed, the device reads it again, merges, and retries. Merging two versions is always the same:
 
 - `samples` is every sample in either version, minus every id in either version's
   `deletedSampleIds`.
@@ -226,13 +229,16 @@ reads it again, merges, and retries. Merging two versions is always the same:
   `deletedTransitionIds`.
 - Each deletion list is everything in either version. Deletion lists only grow.
 
-The parts of one hour are merged together the same way.
-
 An hour's record holds at most 5,000 samples, 500 activity changes and as many deleted ids. With
 every field at its longest, that's about 3.6 MB, which fits in one sealed record (about 3.99 MB of
 payload). The foreground stream, the busiest source, takes about one sample a second, or 3,600 an
-hour. When a list in the hour's last part is full, the device starts the next part (`part` 2, keyed
-`:2`, and so on) and adds to that.
+hour.
+
+New samples and activity changes always go into the hour's last part. The device starts the next
+part (`part` 2, keyed `:2`, and so on) as soon as the last part's samples plus `deletedSampleIds`
+reach 5,000, or its transitions plus `deletedTransitionIds` reach 500. A sample can only move from
+its part's `samples` to the same part's deletion list, so the two together never grow past 5,000
+and a deletion always fits.
 
 Visits and journeys that LogDate works out from samples aren't records. Every device works them
 out again. `app.logdate.place.visit` holds only visits the person added, and
@@ -552,9 +558,9 @@ Streams form.
 | 2026-10-18 | **Text fields are at least as long as the app allows.** The app doesn't limit captions, journal titles and descriptions, place names and descriptions, or correction labels, so they share the limits of an entry's text (1,000,000 bytes, 100,000 characters). |
 | 2026-10-18 | **Transcripts keep full detail.** Segment ids, words, speakers, the recognition pass of each segment and the engine are all stored, because a transcript is costly to produce again. Speaker colors aren't: they're a display choice nothing sets. The first recognition pass maps to `inProgress` and the second to `refining`. A transcript is keyed `<entry>:<block>`, so an entry can hold a transcript for each recording. |
 | 2026-10-18 | **Merged journals leave a redirect.** The merged-away journal stays as a record with `mergedInto`, so every device can move what it still has in that journal, however long it was offline. It's deleted with the surviving journal, and points at the newest survivor when merges chain. In a circle of merges, the journal with the smallest record key survives. |
-| 2026-10-18 | **Records that two devices may both create have keys built from what they connect.** Memberships are keyed `<journal>:<entry>`, entry links `<entry>:<SHA-256 of the evidence id>` and transcripts `<entry>:<block>`, so the same fact is always one record. A membership's optional `createdAt` keeps its earliest value, so both devices settle on the same bytes. |
+| 2026-10-18 | **Records that two devices may both create have keys built from what they connect.** Memberships are keyed `<journal>:<entry>`, entry links `<entry>:<SHA-256 of the evidence id>` and transcripts `<entry>:<block>`, so the same fact is always one record. They are written create-only (`createOnly`), and an existing record is left as it is, so a membership's optional `createdAt` is the first one written and both devices settle on the same bytes. |
 | 2026-10-18 | **One record per place.** A saved place and the location-history place with the same id become one `place.place` with every field from both. The saved place's name, coordinates and radius win, because it changes in place when the person edits it. |
 | 2026-10-18 | **Marked moments are their own record.** `app.logdate.journal.markedMoment` is private only. A mark isn't an entry: it's left out of Rewinds and the library, and it can hold a heart rate. |
 | 2026-10-18 | **Stored location history is samples plus what the person did.** Samples and activity changes, places, corrections, entry links and visits the person added are records. Visits and journeys LogDate works out are recomputed on every device, so `app.logdate.place.journey` is reserved and nothing writes it yet. Corrections and entry links name their target with today's evidence ids, and each correction stores its new value in a field of the right type. |
-| 2026-10-18 | **Hourly location records, one per device.** Raw location samples and activity changes are batched into one `place.sample` record per device per UTC hour, keyed `<UTC hour>:<device>`, instead of one record per day. A sealed record is replaced whole on every change, and a device uploads new samples every few minutes. A day can hold tens of thousands of samples (the foreground stream takes about one a second), so a daily record would be encrypted and uploaded again at several megabytes, many times a day, and could outgrow a sealed record. An hourly record stays small, and an hour that has ended only changes again when the person deletes something. Only the recording device adds samples, so devices don't conflict over new ones. Another device may delete samples, so every write uses `swapCid` and a refused write is merged and retried: samples from either version minus deleted ids from either, with deletion lists that only grow. An hour's lists are capped so a record fits in a sealed record with every field at its longest; a fuller hour continues in parts keyed `:2`, `:3`. Keying by UTC hour means a time zone change or a daylight saving change never puts two hours under one key. |
+| 2026-10-18 | **Hourly location records, one per device.** Raw location samples and activity changes are batched into one `place.sample` record per device per UTC hour, keyed `<UTC hour>:<device>`, instead of one record per day. A sealed record is replaced whole on every change, and a device uploads new samples every few minutes. A day can hold tens of thousands of samples (the foreground stream takes about one a second), so a daily record would be encrypted and uploaded again at several megabytes, many times a day, and could outgrow a sealed record. An hourly record stays small, and an hour that has ended only changes again when the person deletes something. Only the recording device adds samples, so devices don't conflict over new ones. Another device may delete samples, so the first write of a record is create-only (`createOnly`), every later write uses `swapCid`, and a refused write is merged and retried: samples from either version minus deleted ids from either, with deletion lists that only grow. A deletion is listed in the part that held the sample. An hour's lists are capped so a record fits in a sealed record with every field at its longest; a new part, keyed `:2`, `:3`, starts once a part's samples plus deleted ids reach 5,000 (or its transitions plus deleted ids reach 500), so a deletion always fits. Keying by UTC hour means a time zone change or a daylight saving change never puts two hours under one key. |
 | 2026-10-18 | **Fractional measurements use smaller units.** Accuracy and radius are in centimeters, speed in centimeters per second and bearing in hundredths of a degree. Each is the device's value times 100, rounded to the nearest whole number; negative accuracy, speed and radius become 0, and bearing is reduced modulo 36,000. Confidences are rounded to the nearest thousandth and kept between 0 and 1000. Sub-centimeter digits are dropped, since they're finer than any location sensor measures. |
