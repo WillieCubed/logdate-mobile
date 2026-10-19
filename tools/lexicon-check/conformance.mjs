@@ -1,0 +1,155 @@
+#!/usr/bin/env node
+
+// Generates the client conformance suite in conformance/ from the lexicons, and checks that what
+// is committed still matches. Every client (this repository's Kotlin code, the Mac app, the Linux
+// app) reads the same fixtures, so a schema or protocol change shows up here first.
+//
+//   node tools/lexicon-check/conformance.mjs           checks the committed fixtures
+//   node tools/lexicon-check/conformance.mjs --write   regenerates them
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
+import { jsonToLex } from "@atproto/lexicon";
+import { dagCbor, hex, recordCid } from "./conformance/encoding.mjs";
+import { classify, failureKinds } from "./conformance/failures.mjs";
+import { conformanceRoot, examplesDir, jsonFiles, loadLexicons, logdateRecordTypes, readJson } from "./conformance/load.mjs";
+import { envelopes, keySchedule, padding } from "./conformance/sealed.mjs";
+import { Synthesizer } from "./conformance/synthesize.mjs";
+
+const SUITE_VERSION = 1;
+const compactKeys = new Set(["record", "failure", "payload", "envelope", "expand"]);
+
+/** Pretty JSON, except that the keys in compactKeys keep their value on one line. */
+function format(value, key = "", indent = "") {
+  const compact = compactKeys.has(key) || value === null || typeof value !== "object";
+  if (compact) return JSON.stringify(value);
+  const inner = `${indent}  `;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    return `[\n${value.map((item) => `${inner}${format(item, "", inner)}`).join(",\n")}\n${indent}]`;
+  }
+  const entries = Object.entries(value).map(([name, item]) => `${inner}${JSON.stringify(name)}: ${format(item, name, inner)}`);
+  return entries.length === 0 ? "{}" : `{\n${entries.join(",\n")}\n${indent}}`;
+}
+
+const { docs, lexicons } = await loadLexicons();
+const synthesizer = new Synthesizer(docs);
+const files = new Map();
+const problems = [];
+
+const validate = (collection, record) => {
+  try {
+    lexicons.assertValidRecord(collection, jsonToLex(record));
+    return null;
+  } catch (error) {
+    return error.message;
+  }
+};
+
+async function validCase(collection, name, record, extra = {}) {
+  const rejection = validate(collection, record);
+  if (rejection) {
+    problems.push(`${collection} ${name}: the reference implementation rejects a record that should be valid (${rejection})`);
+    return null;
+  }
+  return { name, record, dagCbor: hex(dagCbor(record)), cid: await recordCid(record), ...extra };
+}
+
+function invalidCase(collection, { name, record, expected }) {
+  const message = validate(collection, record);
+  if (!message) {
+    problems.push(`${collection} ${name}: the reference implementation accepts a record that should be invalid`);
+    return null;
+  }
+  const actual = classify(message);
+  if (actual.kind !== expected.kind || actual.path !== expected.path) {
+    problems.push(`${collection} ${name}: expected ${expected.kind} at ${expected.path}, the reference implementation reports ${actual.kind} at ${actual.path} (${message})`);
+    return null;
+  }
+  return { name, record, failure: expected };
+}
+
+const examples = new Map();
+for (const path of await jsonFiles(examplesDir)) {
+  const { collection, record } = await readJson(path);
+  const name = `example-${relative(examplesDir, path).replace(/\.json$/, "")}`;
+  examples.set(collection, [...(examples.get(collection) ?? []), { name, record }]);
+}
+
+const recordTypes = logdateRecordTypes(docs);
+for (const collection of recordTypes) {
+  const minimal = synthesizer.minimal(collection);
+  const valid = [
+    await validCase(collection, "minimal", minimal),
+    await validCase(collection, "every-field", synthesizer.full(collection)),
+    await validCase(collection, "unknown-field-from-a-newer-version", { ...minimal, unknownFutureField: "ignored" }, { modelRoundTrip: false }),
+    ...(await Promise.all((examples.get(collection) ?? []).map(({ name, record }) => validCase(collection, name, record)))),
+  ].filter(Boolean);
+  const invalid = synthesizer
+    .invalidCases(collection)
+    .map((entry) => invalidCase(collection, entry))
+    .filter(Boolean);
+  files.set(`records/${collection}.json`, {
+    collection,
+    recordKey: docs.get(collection).defs.main.key,
+    valid,
+    invalid,
+  });
+}
+
+files.set("sealed/key-schedule.json", keySchedule());
+files.set("sealed/padding.json", padding());
+const sealed = envelopes();
+files.set("sealed/envelopes.json", sealed);
+for (const { name, envelope } of sealed.envelopes) {
+  const rejection = envelope && validate("app.logdate.crypto.sealed", envelope);
+  if (rejection) problems.push(`sealed envelope ${name}: the reference implementation rejects the envelope (${rejection})`);
+}
+
+files.set("manifest.json", {
+  suite: "logdate-client-conformance",
+  version: SUITE_VERSION,
+  description:
+    "Fixtures every LogDate client must pass. See README.md in this folder. Generated by tools/lexicon-check/conformance.mjs; don't edit by hand.",
+  failureKinds,
+  recordTypes,
+  files: [...files.keys()].filter((name) => name !== "manifest.json").sort(),
+});
+
+const rendered = new Map([...files].map(([name, content]) => [name, `${format(content)}\n`]));
+
+async function committed(dir) {
+  const entries = await readdir(join(conformanceRoot, dir), { withFileTypes: true }).catch(() => []);
+  return entries.filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => `${dir}/${entry.name}`);
+}
+
+const stale = [...(await committed("records")), ...(await committed("sealed"))].filter((name) => !rendered.has(name));
+
+if (process.argv.includes("--write")) {
+  if (problems.length > 0) fail(problems);
+  for (const [name, content] of rendered) {
+    await mkdir(dirname(join(conformanceRoot, name)), { recursive: true });
+    await writeFile(join(conformanceRoot, name), content);
+  }
+  for (const name of stale) console.warn(`Stale fixture, delete it: conformance/${name}`);
+  console.log(`Wrote ${rendered.size} conformance fixtures.`);
+  process.exit(stale.length > 0 ? 1 : 0);
+}
+
+for (const [name, content] of rendered) {
+  const current = await readFile(join(conformanceRoot, name), "utf8").catch(() => null);
+  if (current === null) problems.push(`conformance/${name} is missing`);
+  else if (current !== content) problems.push(`conformance/${name} doesn't match what the lexicons and generator produce`);
+}
+for (const name of stale) problems.push(`conformance/${name} no longer has a source; delete it`);
+if (problems.length > 0) {
+  problems.push("Regenerate with ./run conformance:update, review the diff, and commit it.");
+  fail(problems);
+}
+const caseCount = [...files.values()].reduce((sum, file) => sum + (file.valid?.length ?? 0) + (file.invalid?.length ?? 0), 0);
+console.log(`Conformance check passed: ${recordTypes.length} record types, ${caseCount} record cases, ${sealed.envelopes.length} sealed envelopes.`);
+
+function fail(messages) {
+  console.error(`Conformance check failed with ${messages.length} problem(s):`);
+  for (const message of messages) console.error(`  - ${message}`);
+  process.exit(1);
+}

@@ -1,0 +1,57 @@
+{
+  "collection": "app.logdate.graph.circle",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.graph.circle","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a3646e616d656a4c616b6520686f75736565247479706578186170702e6c6f67646174652e67726170682e636972636c65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreif6ogorioljgpi3h6vxmuvdkotpw6r2gjz5g2mskubbhnf7ihcsuq"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.graph.circle","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4646e616d656a4c616b6520686f75736565247479706578186170702e6c6f67646174652e67726170682e636972636c65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreigq2enllrpl5vsozrmykjj3hgri5eaumrq7fdh4lfbi7oljrmghka"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.graph.circle","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a4646e616d656a4c616b6520686f75736565247479706578186170702e6c6f67646174652e67726170682e636972636c65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreib5jmgtuq743nqwqyozozibwdwaypebswcuudmqzuspsc5krjzx7i",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-name",
+      "record": {"$type":"app.logdate.graph.circle","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/name"}
+    },
+    {
+      "name": "wrong-type-name",
+      "record": {"$type":"app.logdate.graph.circle","name":42,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/name"}
+    },
+    {
+      "name": "too-long-name",
+      "record": {"$type":"app.logdate.graph.circle","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/name"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.graph.circle","name":"Lake house"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.graph.circle","name":"Lake house","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

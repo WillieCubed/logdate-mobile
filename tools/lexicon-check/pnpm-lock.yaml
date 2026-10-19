@@ -166,6 +166,12 @@ importers:
 
   .:
     dependencies:
+      '@atproto/lex-cbor':
+        specifier: 0.1.7
+        version: 0.1.7
+      '@atproto/lex-json':
+        specifier: 0.1.7
+        version: 0.1.7
       '@atproto/lexicon':
         specifier: 0.7.14
         version: 0.7.14
@@ -177,6 +183,10 @@ packages:
 
   '@atproto/common-web@0.5.14':
     resolution: {integrity: sha512-eJEgJVI61n5t/ieluVOxaEl16hWKipvy60SWOLcISanOywvEW5MkOeeg4PVeYqntBvYn1ldZiNHDrFsEyt6+Jg==}
+    engines: {node: '>=22'}
+
+  '@atproto/lex-cbor@0.1.7':
+    resolution: {integrity: sha512-3v68HO94wbE/2ZNejTSseb4ZkpjayxU4SmGy/s5zfpG8q1mNCvKcu9B1043yO+RCrE5BsOBiaRMituifbPiy3Q==}
     engines: {node: '>=22'}
 
   '@atproto/lex-data@0.1.8':
@@ -194,6 +204,10 @@ packages:
   '@atproto/syntax@0.7.6':
     resolution: {integrity: sha512-luKQTcWw1H1jLmYvX34ldBqNjz2orF082njmcF9fxbWTqVhsO+TpY0FHRKVPoV7dwL0Y3L16DNz1ma0LFGH25g==}
     engines: {node: '>=22'}
+
+  cborg@4.5.8:
+    resolution: {integrity: sha512-6/viltD51JklRhq4L7jC3zgy6gryuG5xfZ3kzpE+PravtyeQLeQmCYLREhQH7pWENg5pY4Yu/XCd6a7dKScVlw==}
+    hasBin: true
 
   iso-datestring-validator@2.2.2:
     resolution: {integrity: sha512-yLEMkBbLZTlVQqOnQ4FiMujR6T4DEcCb1xizmvXS+OxuhwcbtynoosRzdMA69zZCShCNAbi+gJ71FxZBBXx1SA==}
@@ -219,6 +233,12 @@ snapshots:
       '@atproto/syntax': 0.7.6
       zod: 3.25.76
 
+  '@atproto/lex-cbor@0.1.7':
+    dependencies:
+      '@atproto/lex-data': 0.1.8
+      cborg: 4.5.8
+      tslib: 2.8.1
+
   '@atproto/lex-data@0.1.8':
     dependencies:
       multiformats: 13.4.2
@@ -241,6 +261,8 @@ snapshots:
     dependencies:
       iso-datestring-validator: 2.2.2
       tslib: 2.8.1
+
+  cborg@4.5.8: {}
 
   iso-datestring-validator@2.2.2: {}
 

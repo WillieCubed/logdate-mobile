@@ -2,8 +2,10 @@
   "name": "logdate-lexicon-check",
   "private": true,
   "type": "module",
-  "description": "Validates LogDate's lexicon files with the AT Protocol reference implementation.",
+  "description": "Validates LogDate's lexicon files with the AT Protocol reference implementation, and generates the client conformance fixtures from them.",
   "dependencies": {
+    "@atproto/lex-cbor": "0.1.7",
+    "@atproto/lex-json": "0.1.7",
     "@atproto/lexicon": "0.7.14",
     "@atproto/syntax": "0.7.6"
   },

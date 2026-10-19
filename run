@@ -63,6 +63,8 @@ quality|lint:format|Auto-format Kotlin code|./gradlew ktlintFormat
 quality|lint:modules|Verify ktlint task coverage for all modules|./scripts/verify-ktlint-task-coverage.sh
 quality|lint:complexity|Check function and class size limits|./gradlew detekt
 quality|lint:lexicons|Validate the LogDate lexicon schemas and their example records|pnpm --dir tools/lexicon-check install --frozen-lockfile --silent && node tools/lexicon-check/check.mjs
+quality|lint:conformance|Check the shared client conformance fixtures against the lexicons|pnpm --dir tools/lexicon-check install --frozen-lockfile --silent && node tools/lexicon-check/conformance.mjs
+quality|conformance:update|Regenerate the shared client conformance fixtures from the lexicons|pnpm --dir tools/lexicon-check install --frozen-lockfile --silent && node tools/lexicon-check/conformance.mjs --write
 quality|check|Run all checks (tests + lint)|./gradlew check
 quality|perf:baseline:phone|Generate phone baseline profile|./gradlew generatePhoneBaselineProfile
 quality|perf:baseline:wear|Generate Wear baseline profile|./gradlew generateWearBaselineProfile

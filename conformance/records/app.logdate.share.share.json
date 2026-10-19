@@ -1,0 +1,98 @@
+{
+  "collection": "app.logdate.share.share",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4646974656da264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279652474797065776170702e6c6f67646174652e73686172652e73686172656861756469656e636581a265247479706578266170702e6c6f67646174652e73686172652e736861726523636972636c6541756469656e636566636972636c65a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreibvoiydjnsqg3sbhqssnzh7wcailjwwlm6vn54ylcbmedfvp2hbaa"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},{"$type":"app.logdate.share.share#personAudience","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz"},{"$type":"app.logdate.share.share#groupAudience","space":"Pancakes at the lake"}],"includeLocation":true,"createdAt":"2026-10-16T18:30:00.000Z","revokedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a6646974656da264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279652474797065776170702e6c6f67646174652e73686172652e73686172656861756469656e636583a265247479706578266170702e6c6f67646174652e73686172652e736861726523636972636c6541756469656e636566636972636c65a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279a265247479706578266170702e6c6f67646174652e73686172652e736861726523706572736f6e41756469656e6365677375626a65637478206469643a706c633a65777669376e787a796f756e367a687872687336346f697aa265247479706578256170702e6c6f67646174652e73686172652e73686172652367726f757041756469656e63656573706163657450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697265766f6b656441747818323032362d31302d31365431383a33303a30302e3030305a6f696e636c7564654c6f636174696f6ef5",
+      "cid": "bafyreid3oadfgyoeqywfibxfdo7oabmlrh5kyklsolrpbqzucaasp6cuga"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a5646974656da264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279652474797065776170702e6c6f67646174652e73686172652e73686172656861756469656e636581a265247479706578266170702e6c6f67646174652e73686172652e736861726523636972636c6541756469656e636566636972636c65a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreibeb5u7wrlf2b57drl2t4l2yu6ssclcxm4ms3okxm7ixaqrcbgiga",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-share-share",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.graph.circle","rkey":"family"}},{"$type":"app.logdate.share.share#personAudience","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz"}],"includeLocation":false,"createdAt":"2026-10-10T20:15:00.000Z"},
+      "dagCbor": "a5646974656da264726b6579782433613163326234642d356536662d346137622d386339642d3065316632613362346335646a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279652474797065776170702e6c6f67646174652e73686172652e73686172656861756469656e636582a265247479706578266170702e6c6f67646174652e73686172652e736861726523636972636c6541756469656e636566636972636c65a264726b65796666616d696c796a636f6c6c656374696f6e78186170702e6c6f67646174652e67726170682e636972636c65a265247479706578266170702e6c6f67646174652e73686172652e736861726523706572736f6e41756469656e6365677375626a65637478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a696372656174656441747818323032362d31302d31305432303a31353a30302e3030305a6f696e636c7564654c6f636174696f6ef4",
+      "cid": "bafyreib67crjdxfeh5cq3w7gnrxf2ktzzyl4tw7nmcdn7t7hxfwupnps7y"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-item",
+      "record": {"$type":"app.logdate.share.share","audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/item"}
+    },
+    {
+      "name": "wrong-type-item",
+      "record": {"$type":"app.logdate.share.share","item":"not the right type","audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/item"}
+    },
+    {
+      "name": "missing-item-collection",
+      "record": {"$type":"app.logdate.share.share","item":{"rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/item/collection"}
+    },
+    {
+      "name": "wrong-type-item-collection",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":42,"rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/item/collection"}
+    },
+    {
+      "name": "invalid-format-item-collection",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/item/collection"}
+    },
+    {
+      "name": "invalid-format-item-rkey",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/item/rkey"}
+    },
+    {
+      "name": "missing-audience",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/audience"}
+    },
+    {
+      "name": "wrong-type-audience",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":"not the right type","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/audience"}
+    },
+    {
+      "name": "union-member-missing-type-audience-0",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"union-member-missing-type","path":"/audience/0"}
+    },
+    {
+      "name": "wrong-type-includeLocation",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"2026-10-16T18:30:00.000Z","includeLocation":"yes"},
+      "failure": {"kind":"wrong-type","path":"/includeLocation"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}]},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.share.share","item":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"audience":[{"$type":"app.logdate.share.share#circleAudience","circle":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

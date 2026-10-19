@@ -16,7 +16,8 @@ LogDate is a Kotlin Multiplatform project built with Gradle. Install these befor
   On macOS, `brew install --cask android-platform-tools` installs `adb` on its own.
 - **Docker and Docker Compose** for the local PostgreSQL and Redis the server uses.
 - **Xcode**, only for iOS work.
-- **Node.js and pnpm**, only for `./run lint:lexicons`.
+- **Node.js and pnpm**, only for `./run lint:lexicons`, `./run lint:conformance` and
+  `./run conformance:update`.
 
 ## Set up
 

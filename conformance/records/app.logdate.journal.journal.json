@@ -1,0 +1,82 @@
+{
+  "collection": "app.logdate.journal.journal",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a3652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c657469746c6571412064617920617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreiduq3njw2b33ejs7p6bjyzp3kvtjarcyeuylhuhbu25q2dy5efmwa"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","description":"Pancakes at the lake","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a6652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c65636f766572a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468076668656967687407657469746c6571412064617920617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6b6465736372697074696f6e7450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreiegoqt7ro7npu7vr7rrzrhtgauz73lu2dwwpfv67elz3iw4ntohgu"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a4652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c657469746c6571412064617920617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreifv25rmbksyd37kptpktjlynwqfqbc5if34x2c67dh5wcrx65zk5y",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-title",
+      "record": {"$type":"app.logdate.journal.journal","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/title"}
+    },
+    {
+      "name": "wrong-type-title",
+      "record": {"$type":"app.logdate.journal.journal","title":42,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/title"}
+    },
+    {
+      "name": "too-long-title",
+      "record": {"$type":"app.logdate.journal.journal","title":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/title"}
+    },
+    {
+      "name": "wrong-type-cover",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/cover"}
+    },
+    {
+      "name": "missing-cover-blob",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":{"mimeType":"image/jpeg"}},
+      "failure": {"kind":"missing-required","path":"/cover/blob"}
+    },
+    {
+      "name": "wrong-type-cover-blob",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":{"blob":"not the right type","mimeType":"image/jpeg"}},
+      "failure": {"kind":"wrong-type","path":"/cover/blob"}
+    },
+    {
+      "name": "wrong-type-cover-size",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":"seven"}},
+      "failure": {"kind":"wrong-type","path":"/cover/size"}
+    },
+    {
+      "name": "below-minimum-cover-size",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":-1}},
+      "failure": {"kind":"out-of-range","path":"/cover/size"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

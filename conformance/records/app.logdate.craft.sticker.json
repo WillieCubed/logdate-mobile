@@ -1,0 +1,92 @@
+{
+  "collection": "app.logdate.craft.sticker",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a365247479706578196170702e6c6f67646174652e63726166742e737469636b657265696d616765a264626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d686d696d65547970656a696d6167652f6a706567696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreig4iuepfqil72ep4xdhfysslpu3h6uoqqwspd73lzzs7rlqbq5dfi"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"source":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"sourceMoment":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"label":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a665247479706578196170702e6c6f67646174652e63726166742e737469636b657265696d616765a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468076668656967687407656c6162656c7450616e63616b657320617420746865206c616b6566736f75726365a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468076668656967687407696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6c736f757263654d6f6d656e74a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279",
+      "cid": "bafyreifuzqer2k3iwhffgauaux7xrb7untlxgko3v37oddndujx7xtpyp4"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg"},"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a465247479706578196170702e6c6f67646174652e63726166742e737469636b657265696d616765a264626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d686d696d65547970656a696d6167652f6a706567696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreif263bnvv3ynjwjmhxeb6podbspzsqeivxmskoi7gz5fimgeuotje",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-image",
+      "record": {"$type":"app.logdate.craft.sticker","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/image"}
+    },
+    {
+      "name": "wrong-type-image",
+      "record": {"$type":"app.logdate.craft.sticker","image":"not the right type","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/image"}
+    },
+    {
+      "name": "missing-image-blob",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"mimeType":"image/jpeg"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/image/blob"}
+    },
+    {
+      "name": "wrong-type-image-blob",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":"not the right type","mimeType":"image/jpeg"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/image/blob"}
+    },
+    {
+      "name": "wrong-type-image-mimeType",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":42},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/image/mimeType"}
+    },
+    {
+      "name": "too-long-image-mimeType",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/image/mimeType"}
+    },
+    {
+      "name": "wrong-type-image-size",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":"seven"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/image/size"}
+    },
+    {
+      "name": "below-minimum-image-size",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":-1},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"out-of-range","path":"/image/size"}
+    },
+    {
+      "name": "invalid-format-sourceMoment-collection",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg"},"createdAt":"2026-10-16T18:30:00.000Z","sourceMoment":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/sourceMoment/collection"}
+    },
+    {
+      "name": "invalid-format-sourceMoment-rkey",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg"},"createdAt":"2026-10-16T18:30:00.000Z","sourceMoment":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/sourceMoment/rkey"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg"}},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.craft.sticker","image":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg"},"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

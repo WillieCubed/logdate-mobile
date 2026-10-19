@@ -1,0 +1,62 @@
+{
+  "collection": "app.logdate.share.reaction",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.share.reaction","item":"Pancakes at the lake","reaction":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4646974656d7450616e63616b657320617420746865206c616b65652474797065781a6170702e6c6f67646174652e73686172652e7265616374696f6e687265616374696f6e7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreihidkwoq3phrmuexd4lzrwsgbfnyxxzllunpilzlywkpcb4twuhcm"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.share.reaction","item":"Pancakes at the lake","reaction":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4646974656d7450616e63616b657320617420746865206c616b65652474797065781a6170702e6c6f67646174652e73686172652e7265616374696f6e687265616374696f6e7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreihidkwoq3phrmuexd4lzrwsgbfnyxxzllunpilzlywkpcb4twuhcm"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.share.reaction","item":"Pancakes at the lake","reaction":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a5646974656d7450616e63616b657320617420746865206c616b65652474797065781a6170702e6c6f67646174652e73686172652e7265616374696f6e687265616374696f6e7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreifqxyjqxd4nqisvzauviopudato7wdj2h7tdup6udv6c3q4h32bt4",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","item":"Pancakes at the lake","reaction":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-item",
+      "record": {"$type":"app.logdate.share.reaction","reaction":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/item"}
+    },
+    {
+      "name": "wrong-type-item",
+      "record": {"$type":"app.logdate.share.reaction","item":42,"reaction":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/item"}
+    },
+    {
+      "name": "too-long-item",
+      "record": {"$type":"app.logdate.share.reaction","item":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","reaction":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/item"}
+    },
+    {
+      "name": "missing-reaction",
+      "record": {"$type":"app.logdate.share.reaction","item":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/reaction"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.share.reaction","item":"Pancakes at the lake","reaction":"Pancakes at the lake"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.share.reaction","item":"Pancakes at the lake","reaction":"Pancakes at the lake","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "collection": "app.logdate.actor.settings",
+  "recordKey": "literal:self",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.actor.settings"},
+      "dagCbor": "a1652474797065781a6170702e6c6f67646174652e6163746f722e73657474696e6773",
+      "cid": "bafyreihkwks3xcevza2posobkx4q5s34uohwwbgkdcipoe5lqjsmzfk7xi"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.actor.settings","birthday":"Pancakes a","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a3652474797065781a6170702e6c6f67646174652e6163746f722e73657474696e67736862697274686461796a50616e63616b65732061697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreidu4nftp7eeip44hdkyswjkybtmbubqkguayzuk7ijspr76jysfge"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.actor.settings","unknownFutureField":"ignored"},
+      "dagCbor": "a2652474797065781a6170702e6c6f67646174652e6163746f722e73657474696e677372756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreiay53l6e77n2nulxrwp3tdia4u63fq7raxvpfsmfbjczox7grvdfi",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "wrong-type-birthday",
+      "record": {"$type":"app.logdate.actor.settings","birthday":42},
+      "failure": {"kind":"wrong-type","path":"/birthday"}
+    },
+    {
+      "name": "too-long-birthday",
+      "record": {"$type":"app.logdate.actor.settings","birthday":"aaaaaaaaaaa"},
+      "failure": {"kind":"too-long","path":"/birthday"}
+    },
+    {
+      "name": "invalid-format-updatedAt",
+      "record": {"$type":"app.logdate.actor.settings","updatedAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/updatedAt"}
+    }
+  ]
+}

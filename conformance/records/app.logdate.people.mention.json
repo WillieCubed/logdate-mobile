@@ -1,0 +1,97 @@
+{
+  "collection": "app.logdate.people.mention",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a5652474797065781a6170702e6c6f67646174652e70656f706c652e6d656e74696f6e66706572736f6ea264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796673746174757369737567676573746564677375626a656374a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreie6427ir6ou5jde6yzgirsoouaqjpskyfv4te355pegsfsvhdjk64"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"provenance":"manual","confidence":7,"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a8652474797065781a6170702e6c6f67646174652e70656f706c652e6d656e74696f6e66706572736f6ea264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796673746174757369737567676573746564677375626a656374a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6a636f6e666964656e6365076a70726f76656e616e6365666d616e75616c",
+      "cid": "bafyreigalexvldqndf5y37k6agsnvw76bba2fleypmnpsgpilbutwitgky"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a6652474797065781a6170702e6c6f67646174652e70656f706c652e6d656e74696f6e66706572736f6ea264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796673746174757369737567676573746564677375626a656374a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreih5ntuxs3oi726j3da2tksar3uk4wpoljhy2hjzug24vmk4j34vdy",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-person",
+      "record": {"$type":"app.logdate.people.mention","subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/person"}
+    },
+    {
+      "name": "wrong-type-person",
+      "record": {"$type":"app.logdate.people.mention","person":"not the right type","subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/person"}
+    },
+    {
+      "name": "missing-person-collection",
+      "record": {"$type":"app.logdate.people.mention","person":{"rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/person/collection"}
+    },
+    {
+      "name": "wrong-type-person-collection",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":42,"rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/person/collection"}
+    },
+    {
+      "name": "invalid-format-person-collection",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/person/collection"}
+    },
+    {
+      "name": "invalid-format-person-rkey",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/person/rkey"}
+    },
+    {
+      "name": "missing-subject",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/subject"}
+    },
+    {
+      "name": "wrong-type-confidence",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z","confidence":"seven"},
+      "failure": {"kind":"wrong-type","path":"/confidence"}
+    },
+    {
+      "name": "below-minimum-confidence",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z","confidence":-1},
+      "failure": {"kind":"out-of-range","path":"/confidence"}
+    },
+    {
+      "name": "above-maximum-confidence",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"2026-10-16T18:30:00.000Z","confidence":1001},
+      "failure": {"kind":"out-of-range","path":"/confidence"}
+    },
+    {
+      "name": "missing-status",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/status"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.people.mention","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"subject":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"suggested","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

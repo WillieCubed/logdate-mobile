@@ -25,6 +25,11 @@ reference resolves and every record type has an Activity Streams mapping, checks
 declarations and permission sets, and validates the example records in
 `tools/lexicon-check/examples/` against their schemas.
 
+Every record type also has test cases that the Mac and Linux apps run too, in
+[`conformance/`](../conformance). They are generated from these schemas. After changing a schema,
+run `./run conformance:update`, review the diff and commit it; `./run lint:conformance` fails until
+you do.
+
 What each record is for, and where it's allowed to live, is in
 [docs/reference/lexicons.md](../docs/reference/lexicons.md). How to write and change a schema is in
 [docs/reference/lexicon-style.md](../docs/reference/lexicon-style.md).

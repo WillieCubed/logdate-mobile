@@ -1,0 +1,100 @@
+{
+  "description": "Whole sealed envelopes. Sealing the payload with the given nonce must produce exactly this envelope, and opening the envelope must produce exactly this payload. A payload with an `expand` entry is written compactly: replace the string at `path` with `repeat` written `times` times before encoding.",
+  "algorithm": {
+    "payload": "DAG-CBOR of { collection, rkey, record }",
+    "padding": "see padding.json",
+    "cipher": "AES-256-GCM under the content key and the nonce; the 16-byte tag is appended to the ciphertext",
+    "additionalData": "\"app.logdate.crypto.sealed|1|{space}|{author}|{sealedRkey}\""
+  },
+  "envelopes": [
+    {
+      "name": "small-record",
+      "description": "A small record in the smallest bucket.",
+      "identityKey": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "author": "did:plc:owner",
+      "space": "at://did:plc:owner/space/app.logdate.space.personal/self",
+      "nonce": "a0a1a2a3a4a5a6a7a8a9aaab",
+      "payload": {"collection":"app.logdate.journal.entry","rkey":"3k2a","record":{"$type":"app.logdate.journal.entry","text":"Pancakes at the lake"}},
+      "expand": [],
+      "keyId": "rjbotc7k4vxiy",
+      "sealedRkey": "n4mi5n4etheqzgucpsng6icwjf",
+      "dagCbor": {
+        "length": 116,
+        "sha256": "cdf715e7b4ca1da237f95a97f44428783d4868aa8e48856c5ea9e8fe51bb7d5f",
+        "hex": "a364726b657964336b3261667265636f7264a264746578747450616e63616b657320617420746865206c616b6565247479706578196170702e6c6f67646174652e6a6f75726e616c2e656e7472796a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279"
+      },
+      "paddedLength": 512,
+      "additionalData": "app.logdate.crypto.sealed|1|at://did:plc:owner/space/app.logdate.space.personal/self|did:plc:owner|n4mi5n4etheqzgucpsng6icwjf",
+      "ciphertext": {
+        "length": 528,
+        "sha256": "6a390ec01e9acdfa27db62edf59482cda87c7f99c0b53b723a96fc485694449c",
+        "hex": "326d4bab3add6f215ef65fbe2baf3f308793f90c9ddf58019c8e06fe6f02a2a58947e4113204f03115195ee06e08698981e0c793a693b536b94c6af9ff4749c882b1d7ed6fd5d0bb82013dbb2f145f0dfac73e6cad91df24decb46dd8fdf228e05b17a05ecd5eeef2ed1fd7c9f477d812f09d12bdc5b08347812054b0c50ba382fd2c929e29baeff877d32504356e7fb5c6cb28a5f24ba931cfe1eb65d5ed9970d0e6e4e79fc75ab7c1c5f06bb944363f57e78ad379337957cfbb96b840d94d48fb84aab6ec24029659db2d57de8c1f3b8d8d011b6b64a25094af063f7e075624e3aced79843a349c4542164b65cb0839fa4cfd6cd6e98897ec4d40ce858b877e66f4e00ac041995bb929edc5a7cf411342e43b8d96bc9044544ee5706c7913bbec51625924c83e5236e0c7b3ca367f68194a90a8804846d806bf514d0bb80cb540b3681e1e76da4ce9b5fba4cd891970fc08e62e0ff4743463fda3f66054fc95067fa0a48619fc1113177a450e01774714131b6577156be26080caf484a21af69bb216f68ad553a0b59f488681b0977649b03cdf133f94efea7052ec1d7fe87248b373ba1b7eb8c46d982391859647652ccd0c1591ac781dec13c645e4278697184296e0916541dac798771a9e0ed54fd2956b4247cf6fe893f479c25c1313ccc761ec041a23a99f3a3f6878a54162dab582b6c8b2e7f73f29731deaa713ca0233223fe97b733505affd21af3f0e130"
+      },
+      "envelope": {"$type":"app.logdate.crypto.sealed","version":1,"keyId":"rjbotc7k4vxiy","nonce":{"$bytes":"oKGio6Slpqeoqaqr"},"ciphertext":{"$bytes":"Mm1LqzrdbyFe9l++K68/MIeT+Qyd31gBnI4G/m8CoqWJR+QRMgTwMRUZXuBuCGmJgeDHk6aTtTa5TGr5/0dJyIKx1+1v1dC7ggE9uy8UXw36xz5srZHfJN7LRt2P3yKOBbF6BezV7u8u0f18n0d9gS8J0SvcWwg0eBIFSwxQujgv0skp4puu/4d9MlBDVuf7XGyyil8kupMc/h62XV7Zlw0Obk55/HWrfBxfBruUQ2P1fnitN5M3lXz7uWuEDZTUj7hKq27CQCllnbLVfejB87jY0BG2tkolCUrwY/fgdWJOOs7XmEOjScRUIWS2XLCDn6TP1s1umIl+xNQM6Fi4d+ZvTgCsBBmVu5Ke3Fp89BE0LkO42WvJBEVE7lcGx5E7vsUWJZJMg+Ujbgx7PKNn9oGUqQqIBIRtgGv1FNC7gMtUCzaB4edtpM6bX7pM2JGXD8COYuD/R0NGP9o/ZgVPyVBn+gpIYZ/BETF3pFDgF3RxQTG2V3FWviYIDK9ISiGvabshb2itVToLWfSIaBsJd2SbA83xM/lO/qcFLsHX/ockizc7obfrjEbZgjkYWWR2UszQwVkax4HewTxkXkJ4aXGEKW4JFlQdrHmHcang7VT9KVa0JHz2/ok/R5wlwTE8zHYewEGiOpnzo/aHilQWLatYK2yLLn9z8pcx3qpxPKAjMiP+l7czUFr/0hrz8OEw"}},
+      "refusedEnvelopes": [
+        {
+          "name": "opened for another author",
+          "author": "did:plc:else"
+        },
+        {
+          "name": "opened in another space",
+          "space": "at://did:plc:owner/space/app.logdate.space.personal/other"
+        },
+        {
+          "name": "stored under another sealed key",
+          "sealedRkey": "n4mi5n4etheqzgucpsng6icwja"
+        },
+        {
+          "name": "envelope version 2",
+          "envelope": {"version":2}
+        },
+        {
+          "name": "sealed with another key",
+          "envelope": {"keyId":"aaaaaaaaaaaaa"}
+        },
+        {
+          "name": "nonce of 11 bytes",
+          "envelope": {"nonce":{"$bytes":"oKGio6Slpqeoqao="}}
+        },
+        {
+          "name": "flipped nonce bit",
+          "envelope": {"nonce":{"$bytes":"oaGio6Slpqeoqaqr"}}
+        },
+        {
+          "name": "flipped ciphertext bit",
+          "envelope": {"ciphertext":{"$bytes":"Mm1LqzrdbyFe9l++K68/MIeT+Qyd31gBnI4G/m8CoqWJR+QRMgTwMRUZXuBuCGmJgeDHk6aTtTa5TGr5/0dJyIKx1+1v1dC7ggE9uy8UXw36xz5srZHfJN7LRt2P3yKOBbF6Be3V7u8u0f18n0d9gS8J0SvcWwg0eBIFSwxQujgv0skp4puu/4d9MlBDVuf7XGyyil8kupMc/h62XV7Zlw0Obk55/HWrfBxfBruUQ2P1fnitN5M3lXz7uWuEDZTUj7hKq27CQCllnbLVfejB87jY0BG2tkolCUrwY/fgdWJOOs7XmEOjScRUIWS2XLCDn6TP1s1umIl+xNQM6Fi4d+ZvTgCsBBmVu5Ke3Fp89BE0LkO42WvJBEVE7lcGx5E7vsUWJZJMg+Ujbgx7PKNn9oGUqQqIBIRtgGv1FNC7gMtUCzaB4edtpM6bX7pM2JGXD8COYuD/R0NGP9o/ZgVPyVBn+gpIYZ/BETF3pFDgF3RxQTG2V3FWviYIDK9ISiGvabshb2itVToLWfSIaBsJd2SbA83xM/lO/qcFLsHX/ockizc7obfrjEbZgjkYWWR2UszQwVkax4HewTxkXkJ4aXGEKW4JFlQdrHmHcang7VT9KVa0JHz2/ok/R5wlwTE8zHYewEGiOpnzo/aHilQWLatYK2yLLn9z8pcx3qpxPKAjMiP+l7czUFr/0hrz8OEw"}}
+        },
+        {
+          "name": "flipped authentication tag bit",
+          "envelope": {"ciphertext":{"$bytes":"Mm1LqzrdbyFe9l++K68/MIeT+Qyd31gBnI4G/m8CoqWJR+QRMgTwMRUZXuBuCGmJgeDHk6aTtTa5TGr5/0dJyIKx1+1v1dC7ggE9uy8UXw36xz5srZHfJN7LRt2P3yKOBbF6BezV7u8u0f18n0d9gS8J0SvcWwg0eBIFSwxQujgv0skp4puu/4d9MlBDVuf7XGyyil8kupMc/h62XV7Zlw0Obk55/HWrfBxfBruUQ2P1fnitN5M3lXz7uWuEDZTUj7hKq27CQCllnbLVfejB87jY0BG2tkolCUrwY/fgdWJOOs7XmEOjScRUIWS2XLCDn6TP1s1umIl+xNQM6Fi4d+ZvTgCsBBmVu5Ke3Fp89BE0LkO42WvJBEVE7lcGx5E7vsUWJZJMg+Ujbgx7PKNn9oGUqQqIBIRtgGv1FNC7gMtUCzaB4edtpM6bX7pM2JGXD8COYuD/R0NGP9o/ZgVPyVBn+gpIYZ/BETF3pFDgF3RxQTG2V3FWviYIDK9ISiGvabshb2itVToLWfSIaBsJd2SbA83xM/lO/qcFLsHX/ockizc7obfrjEbZgjkYWWR2UszQwVkax4HewTxkXkJ4aXGEKW4JFlQdrHmHcang7VT9KVa0JHz2/ok/R5wlwTE8zHYewEGiOpnzo/aHilQWLatYK2yLLn9z8pcx3qpxPKAjMiP+l7czUFr/0hrz8OEx"}}
+        },
+        {
+          "name": "ciphertext that is not a sealed size",
+          "envelope": {"ciphertext":{"$bytes":"Mm1LqzrdbyFe9l++K68/MIeT+Qyd31gBnI4G/m8CoqWJR+QRMgTwMRUZXuBuCGmJgeDHk6aTtTa5TGr5/0dJyIKx1+1v1dC7ggE9uy8UXw36xz5srZHfJN7LRt2P3yKOBbF6BezV7u8u0f18n0d9gS8J0SvcWwg0eBIFSwxQujgv0skp4puu/4d9MlBDVuf7XGyyil8kupMc/h62XV7Zlw0Obk55/HWrfBxfBruUQ2P1fnitN5M3lXz7uWuEDZTUj7hKq27CQCllnbLVfejB87jY0BG2tkolCUrwY/fgdWJOOs7XmEOjScRUIWS2XLCDn6TP1s1umIl+xNQM6Fi4d+ZvTgCsBBmVu5Ke3Fp89BE0LkO42WvJBEVE7lcGx5E7vsUWJZJMg+Ujbgx7PKNn9oGUqQqIBIRtgGv1FNC7gMtUCzaB4edtpM6bX7pM2JGXD8COYuD/R0NGP9o/ZgVPyVBn+gpIYZ/BETF3pFDgF3RxQTG2V3FWviYIDK9ISiGvabshb2itVToLWfSIaBsJd2SbA83xM/lO/qcFLsHX/ockizc7obfrjEbZgjkYWWR2UszQwVkax4HewTxkXkJ4aXGEKW4JFlQdrHmHcang7VT9KVa0JHz2/ok/R5wlwTE8zHYewEGiOpnzo/aHilQWLatYK2yLLn9z8pcx3qpxPKAjMiP+l7czUFr/0hrz8OE="}}
+        }
+      ]
+    },
+    {
+      "name": "every-kind-of-value",
+      "description": "A record with positive, negative and 64-bit integers, an array, nested objects, bytes and a CID link, whose text is long enough that the payload passes 64 KiB and pads to a multiple of 64 KiB.",
+      "identityKey": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "author": "did:plc:owner",
+      "space": "at://did:plc:owner/space/app.logdate.space.personal/self",
+      "nonce": "b0b1b2b3b4b5b6b7b8b9babb",
+      "payload": {"collection":"app.logdate.journal.entry","rkey":"3k2b","record":{"$type":"app.logdate.journal.entry","mood":-3,"steps":12345,"createdMs":5000000000123,"tags":["lake","breakfast",7],"place":{"name":"The lake","visits":{"count":2,"lastYear":2025}},"thumbnail":{"$bytes":"AQIDBAUGBwgJ"},"photo":{"$link":"bafyreidpai6xycffexlsyxnuh653jnsg4ewa2czatzn6wos7nioh6zd2nm"},"text":""}},
+      "expand": [{"path":"/record/text","repeat":"Pancakes at the lake. ","times":3200}],
+      "keyId": "rjbotc7k4vxiy",
+      "sealedRkey": "ap6hv32266rmajaeifsuukhv5t",
+      "dagCbor": {
+        "length": 70671,
+        "sha256": "404f99ab07ccd006d347edf955d8e71001d8648ca15cd3cf16ee3f6c157a459a"
+      },
+      "paddedLength": 131072,
+      "additionalData": "app.logdate.crypto.sealed|1|at://did:plc:owner/space/app.logdate.space.personal/self|did:plc:owner|ap6hv32266rmajaeifsuukhv5t",
+      "ciphertext": {
+        "length": 131088,
+        "sha256": "257bd4540cf442f6c74c758748bc259c4700828bed95f37c93631c8c5e416354"
+      }
+    }
+  ]
+}

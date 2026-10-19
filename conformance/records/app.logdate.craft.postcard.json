@@ -1,0 +1,97 @@
+{
+  "collection": "app.logdate.craft.postcard",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4652474797065781a6170702e6c6f67646174652e63726166742e706f73746361726468646f63756d656e747450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6f646f63756d656e7456657273696f6e07",
+      "cid": "bafyreicytcqillnrkfu7qrjoooyqmvmawc6ewqhxjirsabo3niybjbgele"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.craft.postcard","title":"A day at the lake","document":"Pancakes at the lake","documentVersion":7,"rendered":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"sourceMoment":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a8652474797065781a6170702e6c6f67646174652e63726166742e706f737463617264657469746c6571412064617920617420746865206c616b6568646f63756d656e747450616e63616b657320617420746865206c616b656872656e6465726564a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468076668656967687407696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6c736f757263654d6f6d656e74a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796f646f63756d656e7456657273696f6e07",
+      "cid": "bafyreidkzqrs7bpgksphupwjss4hedga3tznnxawnfguzy6pzxsylungf4"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a5652474797065781a6170702e6c6f67646174652e63726166742e706f73746361726468646f63756d656e747450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6f646f63756d656e7456657273696f6e0772756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreib4uzr5cc5kf3lg6tnqsmdbjvan43mui6ft2eh66jeqxgyvpihwvq",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "wrong-type-title",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","title":42},
+      "failure": {"kind":"wrong-type","path":"/title"}
+    },
+    {
+      "name": "too-long-title",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","title":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "failure": {"kind":"too-long","path":"/title"}
+    },
+    {
+      "name": "missing-document",
+      "record": {"$type":"app.logdate.craft.postcard","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/document"}
+    },
+    {
+      "name": "missing-documentVersion",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/documentVersion"}
+    },
+    {
+      "name": "wrong-type-documentVersion",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":"seven","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/documentVersion"}
+    },
+    {
+      "name": "below-minimum-documentVersion",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":0,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"out-of-range","path":"/documentVersion"}
+    },
+    {
+      "name": "wrong-type-rendered",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","rendered":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/rendered"}
+    },
+    {
+      "name": "missing-rendered-blob",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","rendered":{"mimeType":"image/jpeg"}},
+      "failure": {"kind":"missing-required","path":"/rendered/blob"}
+    },
+    {
+      "name": "wrong-type-rendered-blob",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","rendered":{"blob":"not the right type","mimeType":"image/jpeg"}},
+      "failure": {"kind":"wrong-type","path":"/rendered/blob"}
+    },
+    {
+      "name": "invalid-format-sourceMoment-collection",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","sourceMoment":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/sourceMoment/collection"}
+    },
+    {
+      "name": "invalid-format-sourceMoment-rkey",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"2026-10-16T18:30:00.000Z","sourceMoment":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/sourceMoment/rkey"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.craft.postcard","document":"Pancakes at the lake","documentVersion":7,"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

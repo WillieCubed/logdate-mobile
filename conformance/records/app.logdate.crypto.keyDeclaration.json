@@ -1,0 +1,72 @@
+{
+  "collection": "app.logdate.crypto.keyDeclaration",
+  "recordKey": "tid",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a565247479706578216170702e6c6f67646174652e63727970746f2e6b65794465636c61726174696f6e69616c676f726974686d66783235353139696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697075626c69634b657946010203040506697369676e617475726546010203040506",
+      "cid": "bafyreicil4bwjja2imm2idtoo4oh5wkrwfjq2fjogccslqkyoy73ba4wre"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z","expiresAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a665247479706578216170702e6c6f67646174652e63727970746f2e6b65794465636c61726174696f6e69616c676f726974686d66783235353139696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a696578706972657341747818323032362d31302d31365431383a33303a30302e3030305a697075626c69634b657946010203040506697369676e617475726546010203040506",
+      "cid": "bafyreidzyf2qwy6ev4urfzpouekvqubk5eby2fwd74uvfebaghcb32lboi"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a665247479706578216170702e6c6f67646174652e63727970746f2e6b65794465636c61726174696f6e69616c676f726974686d66783235353139696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697075626c69634b657946010203040506697369676e61747572654601020304050672756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreihkeec5twrebadbtljkmadczxljtow32asuc6ofbcu3i2ly5xlrge",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-publicKey",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/publicKey"}
+    },
+    {
+      "name": "wrong-type-publicKey",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":"not the right type","algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/publicKey"}
+    },
+    {
+      "name": "missing-algorithm",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/algorithm"}
+    },
+    {
+      "name": "wrong-type-algorithm",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":42,"signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/algorithm"}
+    },
+    {
+      "name": "too-long-algorithm",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","signature":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/algorithm"}
+    },
+    {
+      "name": "missing-signature",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"x25519","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/signature"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.crypto.keyDeclaration","publicKey":{"$bytes":"AQIDBAUG"},"algorithm":"x25519","signature":{"$bytes":"AQIDBAUG"},"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

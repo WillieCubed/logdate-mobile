@@ -1,0 +1,77 @@
+{
+  "collection": "app.logdate.place.correction",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e66616374696f6e67636f6e6669726d66746172676574a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreifannllc56vcvscljbn3djomevsqv4mjvf7vbuc7pyehwritpw3bm"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","place":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a7652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e65706c616365a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727966616374696f6e67636f6e6669726d66656e647341747818323032362d31302d31365431383a33303a30302e3030305a66746172676574a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreibc2hfp3ihf6timz6p2e7zqmunz2xbcb3dzmy4gbrsdxyhmi4l7ry"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a5652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e66616374696f6e67636f6e6669726d66746172676574a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreihidnsvyg3kldosqtbwmtefj6phavg3wya3q6lz2k2zxogcth4w4i",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-target",
+      "record": {"$type":"app.logdate.place.correction","action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/target"}
+    },
+    {
+      "name": "wrong-type-target",
+      "record": {"$type":"app.logdate.place.correction","target":"not the right type","action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/target"}
+    },
+    {
+      "name": "missing-target-collection",
+      "record": {"$type":"app.logdate.place.correction","target":{"rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/target/collection"}
+    },
+    {
+      "name": "wrong-type-target-collection",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":42,"rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/target/collection"}
+    },
+    {
+      "name": "invalid-format-target-collection",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/target/collection"}
+    },
+    {
+      "name": "invalid-format-target-rkey",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/target/rkey"}
+    },
+    {
+      "name": "missing-action",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/action"}
+    },
+    {
+      "name": "invalid-format-startsAt",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z","startsAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/startsAt"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    }
+  ]
+}

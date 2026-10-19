@@ -1,0 +1,72 @@
+{
+  "collection": "app.logdate.space.group",
+  "recordKey": "literal:self",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a5646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e73706163652e67726f7570656f776e657278206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6773686172696e676865766572796f6e65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreidz7xnl2iqxqv744pq6oqpvgmrspxi36lejkjoyhwtb7qfhjiec7m"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","description":"Pancakes at the lake","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","endsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a7646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e73706163652e67726f7570656f776e657278206469643a706c633a65777669376e787a796f756e367a687872687336346f697a66656e647341747818323032362d31302d31365431383a33303a30302e3030305a6773686172696e676865766572796f6e65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6b6465736372697074696f6e7450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreiavkuulj5jbnfznqnmwjvaxyigqujumntes2bminlsryn2gr7rdte"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a6646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e73706163652e67726f7570656f776e657278206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6773686172696e676865766572796f6e65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreifshmrium5njrbjqrjsnc525dssvrfxvsofunzyyok7slhkwmetxu",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","name":"Lake house","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-name",
+      "record": {"$type":"app.logdate.space.group","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/name"}
+    },
+    {
+      "name": "wrong-type-name",
+      "record": {"$type":"app.logdate.space.group","name":42,"owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/name"}
+    },
+    {
+      "name": "too-long-name",
+      "record": {"$type":"app.logdate.space.group","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/name"}
+    },
+    {
+      "name": "missing-owner",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/owner"}
+    },
+    {
+      "name": "invalid-format-owner",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","owner":"not-a-did","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/owner"}
+    },
+    {
+      "name": "missing-sharing",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/sharing"}
+    },
+    {
+      "name": "invalid-format-endsAt",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone","createdAt":"2026-10-16T18:30:00.000Z","endsAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/endsAt"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.space.group","name":"Lake house","owner":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","sharing":"everyone"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    }
+  ]
+}

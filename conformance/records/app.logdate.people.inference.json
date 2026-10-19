@@ -1,0 +1,107 @@
+{
+  "collection": "app.logdate.people.inference",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a5652474797065781c6170702e6c6f67646174652e70656f706c652e696e666572656e6365667374617475736770656e64696e67696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6b646973706c61794e616d6565416c6963656e6e6f726d616c697a65644e616d657450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreig2m4tgloos3ke62kcjtx73tfu3hudna6nqtihquj6xef76nutefy"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"evidence":[{"source":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"label":"Pancakes at the lake","confidence":7}],"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a8652474797065781c6170702e6c6f67646174652e70656f706c652e696e666572656e636566706572736f6ea264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279667374617475736770656e64696e676865766964656e636581a3656c6162656c7450616e63616b657320617420746865206c616b6566736f75726365a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796a636f6e666964656e636507696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6b646973706c61794e616d6565416c6963656e6e6f726d616c697a65644e616d657450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreiesffnzfxdcwod7nbjrtfa5fxvopxwwybtf6gc7pfb25luvofz3ce"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a6652474797065781c6170702e6c6f67646174652e70656f706c652e696e666572656e6365667374617475736770656e64696e67696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6b646973706c61794e616d6565416c6963656e6e6f726d616c697a65644e616d657450616e63616b657320617420746865206c616b6572756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreidjp2iff24vedjtgweuxagc5r6sqsgtif5causnn4eqz3jtwt3kqm",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-displayName",
+      "record": {"$type":"app.logdate.people.inference","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/displayName"}
+    },
+    {
+      "name": "wrong-type-displayName",
+      "record": {"$type":"app.logdate.people.inference","displayName":42,"normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/displayName"}
+    },
+    {
+      "name": "too-long-displayName",
+      "record": {"$type":"app.logdate.people.inference","displayName":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/displayName"}
+    },
+    {
+      "name": "missing-normalizedName",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/normalizedName"}
+    },
+    {
+      "name": "missing-status",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/status"}
+    },
+    {
+      "name": "wrong-type-person",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","person":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/person"}
+    },
+    {
+      "name": "missing-person-collection",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","person":{"rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"missing-required","path":"/person/collection"}
+    },
+    {
+      "name": "invalid-format-person-collection",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","person":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/person/collection"}
+    },
+    {
+      "name": "invalid-format-person-rkey",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","person":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/person/rkey"}
+    },
+    {
+      "name": "wrong-type-evidence",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","evidence":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/evidence"}
+    },
+    {
+      "name": "wrong-type-evidence-0-confidence",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","evidence":[{"source":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"confidence":"seven"}]},
+      "failure": {"kind":"wrong-type","path":"/evidence/0/confidence"}
+    },
+    {
+      "name": "below-minimum-evidence-0-confidence",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","evidence":[{"source":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"confidence":-1}]},
+      "failure": {"kind":"out-of-range","path":"/evidence/0/confidence"}
+    },
+    {
+      "name": "above-maximum-evidence-0-confidence",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","evidence":[{"source":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"confidence":1001}]},
+      "failure": {"kind":"out-of-range","path":"/evidence/0/confidence"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.people.inference","displayName":"Alice","normalizedName":"Pancakes at the lake","status":"pending","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

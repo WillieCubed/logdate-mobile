@@ -1,0 +1,83 @@
+{
+  "collection": "app.logdate.crypto.sealed",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "dagCbor": "a565247479706578196170702e6c6f67646174652e63727970746f2e7365616c6564656b657949647450616e63616b657320617420746865206c616b65656e6f6e6365460102030405066776657273696f6e076a6369706865727465787446010203040506",
+      "cid": "bafyreihjjdbpjyhddtnqo7sksey5rhntl5gdlgdobnleklrrr6zjj6mucq"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "dagCbor": "a565247479706578196170702e6c6f67646174652e63727970746f2e7365616c6564656b657949647450616e63616b657320617420746865206c616b65656e6f6e6365460102030405066776657273696f6e076a6369706865727465787446010203040506",
+      "cid": "bafyreihjjdbpjyhddtnqo7sksey5rhntl5gdlgdobnleklrrr6zjj6mucq"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"},"unknownFutureField":"ignored"},
+      "dagCbor": "a665247479706578196170702e6c6f67646174652e63727970746f2e7365616c6564656b657949647450616e63616b657320617420746865206c616b65656e6f6e6365460102030405066776657273696f6e076a636970686572746578744601020304050672756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreia5zxq3vii2e3qmq3we6e2wsxlse6p5hcdfzgbgnmv63xruaywlee",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-crypto-sealed",
+      "record": {"$type":"app.logdate.crypto.sealed","version":1,"keyId":"content-1","nonce":{"$bytes":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYX"},"ciphertext":{"$bytes":"c2VhbGVkIHBheWxvYWQgZ29lcyBoZXJl"}},
+      "dagCbor": "a565247479706578196170702e6c6f67646174652e63727970746f2e7365616c6564656b6579496469636f6e74656e742d31656e6f6e63655818000102030405060708090a0b0c0d0e0f10111213141516176776657273696f6e016a6369706865727465787458187365616c6564207061796c6f616420676f65732068657265",
+      "cid": "bafyreidbsib74hu5qrpzcd5wqdyvqyf7mw5vhfgldwex7uffeiof5qpwyi"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","version":7,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-version",
+      "record": {"$type":"app.logdate.crypto.sealed","keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"missing-required","path":"/version"}
+    },
+    {
+      "name": "wrong-type-version",
+      "record": {"$type":"app.logdate.crypto.sealed","version":"seven","keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"wrong-type","path":"/version"}
+    },
+    {
+      "name": "below-minimum-version",
+      "record": {"$type":"app.logdate.crypto.sealed","version":0,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"out-of-range","path":"/version"}
+    },
+    {
+      "name": "missing-keyId",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"missing-required","path":"/keyId"}
+    },
+    {
+      "name": "wrong-type-keyId",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":42,"nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"wrong-type","path":"/keyId"}
+    },
+    {
+      "name": "too-long-keyId",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","nonce":{"$bytes":"AQIDBAUG"},"ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"too-long","path":"/keyId"}
+    },
+    {
+      "name": "missing-nonce",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"missing-required","path":"/nonce"}
+    },
+    {
+      "name": "wrong-type-nonce",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","nonce":"not the right type","ciphertext":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"wrong-type","path":"/nonce"}
+    },
+    {
+      "name": "missing-ciphertext",
+      "record": {"$type":"app.logdate.crypto.sealed","version":7,"keyId":"Pancakes at the lake","nonce":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"missing-required","path":"/ciphertext"}
+    }
+  ]
+}

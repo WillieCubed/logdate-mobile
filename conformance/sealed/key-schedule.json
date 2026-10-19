@@ -1,0 +1,87 @@
+{
+  "description": "How the personal space's keys derive from the account's 32-byte identity key. Every client must reproduce these values exactly.",
+  "algorithm": {
+    "contentKey": "HKDF-SHA256(ikm = identity key, salt = \"app.logdate.space.personal\", info = \"sealed-record v1\"), 32 bytes",
+    "indexKey": "HKDF-SHA256(ikm = identity key, salt = \"app.logdate.space.personal\", info = \"sealed-rkey v1\"), 32 bytes",
+    "keyId": "base32(HMAC-SHA256(content key, \"keyId\")[0 until 8])",
+    "sealedRkey": "base32(HMAC-SHA256(index key, \"{collection}/{rkey}\")).take(26)",
+    "base32": "RFC 4648, lowercase, without padding"
+  },
+  "vectors": [
+    {
+      "name": "sequential-identity-key",
+      "identityKey": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "contentKey": "a468cefb3a8ef131555d994017ef9cb4c62a87db9bf1303cc16e62be0db765d5",
+      "indexKey": "4de7829b169a2f838d86425e7190546702c1629b3384d2978ebaa3dda082ec38",
+      "keyId": "rjbotc7k4vxiy",
+      "sealedRkeys": [
+        {
+          "collection": "app.logdate.journal.entry",
+          "rkey": "3k2a",
+          "sealedRkey": "n4mi5n4etheqzgucpsng6icwjf"
+        },
+        {
+          "collection": "app.logdate.journal.entry",
+          "rkey": "3k2b",
+          "sealedRkey": "ap6hv32266rmajaeifsuukhv5t"
+        },
+        {
+          "collection": "app.logdate.journal.journal",
+          "rkey": "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80",
+          "sealedRkey": "pqfky3ps2euhelmhomlo5c3t3m"
+        },
+        {
+          "collection": "app.logdate.place.place",
+          "rkey": "lake-house",
+          "sealedRkey": "yw4o3ibw4x6bpnq34kjyqev27u"
+        },
+        {
+          "collection": "app.logdate.actor.settings",
+          "rkey": "self",
+          "sealedRkey": "y6o4okam7m67yodogw4d4sujkb"
+        }
+      ]
+    },
+    {
+      "name": "second-identity-key",
+      "identityKey": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+      "contentKey": "f8f6a620f7ec510db8e41aa37c23ddbc23b5fc453b9c2bee7e64394ea35afaf5",
+      "indexKey": "cda84499c0a83549c5264d26d65973a9895a2c6be997807f570da9012fb54174",
+      "keyId": "4pengya5zr2hi",
+      "sealedRkeys": [
+        {
+          "collection": "app.logdate.journal.entry",
+          "rkey": "3k2a",
+          "sealedRkey": "4sunvo6mzikmg7yoxgumrhctvy"
+        },
+        {
+          "collection": "app.logdate.journal.entry",
+          "rkey": "3k2b",
+          "sealedRkey": "wtv7v7ztd4etdrnobk4qae7ubd"
+        },
+        {
+          "collection": "app.logdate.journal.journal",
+          "rkey": "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80",
+          "sealedRkey": "nfk6q3lipmc45bvyfffgjtdu5n"
+        },
+        {
+          "collection": "app.logdate.place.place",
+          "rkey": "lake-house",
+          "sealedRkey": "uai6ogbedbuxo6panhjeufx64b"
+        },
+        {
+          "collection": "app.logdate.actor.settings",
+          "rkey": "self",
+          "sealedRkey": "eguzaq5blhs3v2og6wpth5kjhx"
+        }
+      ]
+    }
+  ],
+  "refusedIdentityKeyLengths": [
+    0,
+    16,
+    31,
+    33,
+    64
+  ]
+}

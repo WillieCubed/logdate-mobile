@@ -1,0 +1,103 @@
+{
+  "collection": "app.logdate.people.person",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a3646e616d656a4c616b6520686f75736565247479706578196170702e6c6f67646174652e70656f706c652e706572736f6e696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreibjolgnpwuheduscpo5k6l622xpl7elo5uqtoto4lkooytrfvsgre"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","aliases":["Pancakes at the lake"],"relationship":"Pancakes at the lake","notes":"Pancakes at the lake","photo":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"origin":"manual","connection":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "aa646e616d656a4c616b6520686f75736565247479706578196170702e6c6f67646174652e70656f706c652e706572736f6e656e6f7465737450616e63616b657320617420746865206c616b656570686f746fa563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468076668656967687407666f726967696e666d616e75616c67616c6961736573817450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6a636f6e6e656374696f6e78206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6c72656c6174696f6e736869707450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreidv7u5l3vsto354iypquetn33fipcg3bglkf2tyjtu5en7g7chkge"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a4646e616d656a4c616b6520686f75736565247479706578196170702e6c6f67646174652e70656f706c652e706572736f6e696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreidkkeytz5dbri3bv6v5btdqk3w6ktanga5nplvoh3do4ohfwpn6dm",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-people-person",
+      "record": {"$type":"app.logdate.people.person","name":"Sam Rivera","aliases":["Sammy"],"relationship":"College roommate","origin":"inference","connection":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-09-02T18:00:00.000Z"},
+      "dagCbor": "a7646e616d656a53616d2052697665726165247479706578196170702e6c6f67646174652e70656f706c652e706572736f6e666f726967696e69696e666572656e636567616c6961736573816553616d6d79696372656174656441747818323032362d30392d30325431383a30303a30302e3030305a6a636f6e6e656374696f6e78206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6c72656c6174696f6e7368697070436f6c6c65676520726f6f6d6d617465",
+      "cid": "bafyreibfzf3nrlkprwfveskchsh3yuqsslzqertgylp722tk6iy2cvkgha"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-name",
+      "record": {"$type":"app.logdate.people.person","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/name"}
+    },
+    {
+      "name": "wrong-type-name",
+      "record": {"$type":"app.logdate.people.person","name":42,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/name"}
+    },
+    {
+      "name": "too-long-name",
+      "record": {"$type":"app.logdate.people.person","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/name"}
+    },
+    {
+      "name": "wrong-type-aliases",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","aliases":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/aliases"}
+    },
+    {
+      "name": "too-long-aliases",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","aliases":["Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake","Pancakes at the lake"]},
+      "failure": {"kind":"too-long","path":"/aliases"}
+    },
+    {
+      "name": "wrong-type-photo",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","photo":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/photo"}
+    },
+    {
+      "name": "missing-photo-blob",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","photo":{"mimeType":"image/jpeg"}},
+      "failure": {"kind":"missing-required","path":"/photo/blob"}
+    },
+    {
+      "name": "wrong-type-photo-blob",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","photo":{"blob":"not the right type","mimeType":"image/jpeg"}},
+      "failure": {"kind":"wrong-type","path":"/photo/blob"}
+    },
+    {
+      "name": "wrong-type-photo-size",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","photo":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":"seven"}},
+      "failure": {"kind":"wrong-type","path":"/photo/size"}
+    },
+    {
+      "name": "below-minimum-photo-size",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","photo":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":-1}},
+      "failure": {"kind":"out-of-range","path":"/photo/size"}
+    },
+    {
+      "name": "invalid-format-connection",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"2026-10-16T18:30:00.000Z","connection":"not-a-did"},
+      "failure": {"kind":"invalid-format","path":"/connection"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.people.person","name":"Lake house","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "collection": "app.logdate.journal.draft",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a365247479706578196170702e6c6f67646174652e6a6f75726e616c2e647261667466626c6f636b7381a362696462623164746578747450616e63616b657320617420746865206c616b6565247479706578236170702e6c6f67646174652e6a6f75726e616c2e656e7472792374657874426c6f636b696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreidjb2osyus6rp3kirlbra7xmv7r64ptgz2s5qt4kbj7palq7oycim"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake","format":"markdown"},{"$type":"app.logdate.journal.entry#imageBlock","id":"b1","media":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"caption":"Pancakes at the lake","presentation":"edgeToEdge"},{"$type":"app.logdate.journal.entry#videoBlock","id":"b1","media":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"caption":"Pancakes at the lake","durationMs":7},{"$type":"app.logdate.journal.entry#audioBlock","id":"b1","media":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"durationMs":7,"transcript":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}}],"journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"location":{"geo":{"latitude":"44.9778","longitude":"-93.2650","altitude":"Pancakes at the lake","name":"Lake house"},"accuracyMeters":7,"place":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"timeZone":"America/Chicago"},"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a665247479706578196170702e6c6f67646174652e6a6f75726e616c2e647261667466626c6f636b7384a462696462623164746578747450616e63616b657320617420746865206c616b6565247479706578236170702e6c6f67646174652e6a6f75726e616c2e656e7472792374657874426c6f636b66666f726d6174686d61726b646f776ea562696462623165247479706578246170702e6c6f67646174652e6a6f75726e616c2e656e74727923696d616765426c6f636b656d65646961a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa26577696474680766686569676874076763617074696f6e7450616e63616b657320617420746865206c616b656c70726573656e746174696f6e6a65646765546f45646765a562696462623165247479706578246170702e6c6f67646174652e6a6f75726e616c2e656e74727923766964656f426c6f636b656d65646961a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa26577696474680766686569676874076763617074696f6e7450616e63616b657320617420746865206c616b656a6475726174696f6e4d7307a562696462623165247479706578246170702e6c6f67646174652e6a6f75726e616c2e656e74727923617564696f426c6f636b656d65646961a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa26577696474680766686569676874076a6475726174696f6e4d73076a7472616e736372697074a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279686c6f636174696f6ea46367656fa4646e616d656a4c616b6520686f75736568616c7469747564657450616e63616b657320617420746865206c616b65686c617469747564656734342e39373738696c6f6e676974756465682d39332e3236353065706c616365a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796874696d655a6f6e656f416d65726963612f4368696361676f6e61636375726163794d657465727307696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreibyc5ytzpvx3crrcmoxvfejfj5tam2erravxuynjlultfs7nv4nm4"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a465247479706578196170702e6c6f67646174652e6a6f75726e616c2e647261667466626c6f636b7381a362696462623164746578747450616e63616b657320617420746865206c616b6565247479706578236170702e6c6f67646174652e6a6f75726e616c2e656e7472792374657874426c6f636b696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreidn32rbd2xtcdlckw3yava7ng5t43oldng5pq2q2lb7mgs3tz2qx4",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-blocks",
+      "record": {"$type":"app.logdate.journal.draft","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/blocks"}
+    },
+    {
+      "name": "wrong-type-blocks",
+      "record": {"$type":"app.logdate.journal.draft","blocks":"not the right type","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/blocks"}
+    },
+    {
+      "name": "union-member-missing-type-blocks-0",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"union-member-missing-type","path":"/blocks/0"}
+    },
+    {
+      "name": "missing-blocks-0-id",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/blocks/0/id"}
+    },
+    {
+      "name": "wrong-type-blocks-0-id",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":42,"text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/blocks/0/id"}
+    },
+    {
+      "name": "too-long-blocks-0-id",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/blocks/0/id"}
+    },
+    {
+      "name": "wrong-type-journal",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z","journal":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/journal"}
+    },
+    {
+      "name": "invalid-format-journal-collection",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z","journal":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/journal/collection"}
+    },
+    {
+      "name": "invalid-format-journal-rkey",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z","journal":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/journal/rkey"}
+    },
+    {
+      "name": "wrong-type-location-accuracyMeters",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z","location":{"geo":{"latitude":"44.9778","longitude":"-93.2650"},"accuracyMeters":"seven"}},
+      "failure": {"kind":"wrong-type","path":"/location/accuracyMeters"}
+    },
+    {
+      "name": "below-minimum-location-accuracyMeters",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"2026-10-16T18:30:00.000Z","location":{"geo":{"latitude":"44.9778","longitude":"-93.2650"},"accuracyMeters":-1}},
+      "failure": {"kind":"out-of-range","path":"/location/accuracyMeters"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.journal.draft","blocks":[{"$type":"app.logdate.journal.entry#textBlock","id":"b1","text":"Pancakes at the lake"}],"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

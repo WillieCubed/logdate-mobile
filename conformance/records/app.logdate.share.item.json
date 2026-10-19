@@ -1,0 +1,103 @@
+{
+  "collection": "app.logdate.share.item",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a5646b696e6465656e747279652474797065766170702e6c6f67646174652e73686172652e6974656d66617574686f7278206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6873686172656441747818323032362d31302d31365431383a33303a30302e3030305a687375626a6563747381a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279",
+      "cid": "bafyreihx3r4tw6cdkzfxw47zdgulzmm7zpikjv6xvb64y4eyw6h2j5bo5i"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"date":"Pancakes a","partOf":"Pancakes at the lake","includeLocation":true,"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a864646174656a50616e63616b65732061646b696e6465656e747279652474797065766170702e6c6f67646174652e73686172652e6974656d66617574686f7278206469643a706c633a65777669376e787a796f756e367a687872687336346f697a66706172744f667450616e63616b657320617420746865206c616b656873686172656441747818323032362d31302d31365431383a33303a30302e3030305a687375626a6563747381a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796f696e636c7564654c6f636174696f6ef5",
+      "cid": "bafyreigor7iqydomh263h73sota2iot7ydmwtzqxktzebjd5eapz6edpqy"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a6646b696e6465656e747279652474797065766170702e6c6f67646174652e73686172652e6974656d66617574686f7278206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6873686172656441747818323032362d31302d31365431383a33303a30302e3030305a687375626a6563747381a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727972756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreibxm3jri243cwmkr2nemxd67yhptedsz4ry43ffernzctzwy6rnxm",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-share-item-day",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"day","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"},{"collection":"app.logdate.journal.entry","rkey":"5b2d3c4e-6f70-4b8c-9dae-1f203a4b5c6d"}],"date":"2026-10-10","includeLocation":false,"sharedAt":"2026-10-10T20:15:00.000Z"},
+      "dagCbor": "a764646174656a323032362d31302d3130646b696e6463646179652474797065766170702e6c6f67646174652e73686172652e6974656d66617574686f7278206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6873686172656441747818323032362d31302d31305432303a31353a30302e3030305a687375626a6563747382a264726b6579782433613163326234642d356536662d346137622d386339642d3065316632613362346335646a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279a264726b6579782435623264336334652d366637302d346238632d396461652d3166323033613462356336646a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796f696e636c7564654c6f636174696f6ef4",
+      "cid": "bafyreiaipdvsslu6r46bmo6blpd2ut4u7x3cnzggaglvaibo7wj3lpk2bm"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-author",
+      "record": {"$type":"app.logdate.share.item","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/author"}
+    },
+    {
+      "name": "wrong-type-author",
+      "record": {"$type":"app.logdate.share.item","author":42,"kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/author"}
+    },
+    {
+      "name": "invalid-format-author",
+      "record": {"$type":"app.logdate.share.item","author":"not-a-did","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/author"}
+    },
+    {
+      "name": "missing-kind",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/kind"}
+    },
+    {
+      "name": "missing-subjects",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/subjects"}
+    },
+    {
+      "name": "wrong-type-subjects",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":"not the right type","sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/subjects"}
+    },
+    {
+      "name": "missing-subjects-0-collection",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/subjects/0/collection"}
+    },
+    {
+      "name": "invalid-format-subjects-0-collection",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/subjects/0/collection"}
+    },
+    {
+      "name": "invalid-format-subjects-0-rkey",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"a/b"}],"sharedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/subjects/0/rkey"}
+    },
+    {
+      "name": "too-long-date",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z","date":"aaaaaaaaaaa"},
+      "failure": {"kind":"too-long","path":"/date"}
+    },
+    {
+      "name": "wrong-type-includeLocation",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"2026-10-16T18:30:00.000Z","includeLocation":"yes"},
+      "failure": {"kind":"wrong-type","path":"/includeLocation"}
+    },
+    {
+      "name": "missing-sharedAt",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}]},
+      "failure": {"kind":"missing-required","path":"/sharedAt"}
+    },
+    {
+      "name": "invalid-format-sharedAt",
+      "record": {"$type":"app.logdate.share.item","author":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","kind":"entry","subjects":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"sharedAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/sharedAt"}
+    }
+  ]
+}
