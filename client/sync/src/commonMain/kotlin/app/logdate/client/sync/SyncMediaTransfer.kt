@@ -224,7 +224,7 @@ internal class SyncMediaTransfer(
         if (!mayDownload()) throw DraftMediaFailure(DiagnosticReason.NETWORK_POLICY)
         val mediaId = extractMediaId(remote) ?: throw DraftMediaFailure(DiagnosticReason.MISSING_MEDIA)
         val downloaded =
-            downloadMedia(accessToken, mediaId).getOrElse { error ->
+            downloadMedia(accessToken, remote, mediaId).getOrElse { error ->
                 if (error is CancellationException) throw error
                 throw DraftMediaFailure(mediaFailureReason(error))
             }
@@ -377,7 +377,7 @@ internal class SyncMediaTransfer(
         if (!mayDownload()) return MediaHydrationResult.Pending(DiagnosticReason.NETWORK_POLICY)
         val mediaId = extractMediaId(remote) ?: return MediaHydrationResult.Pending(DiagnosticReason.MISSING_MEDIA)
         val downloaded =
-            downloadMedia(accessToken, mediaId).getOrElse { error ->
+            downloadMedia(accessToken, remote, mediaId).getOrElse { error ->
                 if (error is CancellationException) throw error
                 return MediaHydrationResult.Pending(mediaFailureReason(error))
             }
@@ -429,8 +429,11 @@ internal class SyncMediaTransfer(
 
     private suspend fun downloadMedia(
         accessToken: String,
+        reference: String,
         mediaId: String,
-    ) = cloudMediaDataSource.downloadMedia(accessToken, mediaId)
+    ) = (cloudMediaDataSource as? app.logdate.client.sync.cloud.ReferencedMediaDataSource)
+        ?.downloadReferencedMedia(accessToken, reference, mediaId)
+        ?: cloudMediaDataSource.downloadMedia(accessToken, mediaId)
 
     private fun mediaFailureReason(error: Throwable): DiagnosticReason =
         when {
@@ -438,6 +441,7 @@ internal class SyncMediaTransfer(
             error is CloudApiException && error.statusCode == 404 -> DiagnosticReason.MISSING_MEDIA
             error is CloudApiException && error.statusCode == 401 -> DiagnosticReason.SIGN_IN_REQUIRED
             error is app.logdate.client.sync.cloud.MediaDecryptionException -> DiagnosticReason.CORRUPT_PAYLOAD
+            error is app.logdate.client.sync.cloud.MediaIntegrityException -> DiagnosticReason.CORRUPT_PAYLOAD
             else -> DiagnosticReason.UNKNOWN
         }
 

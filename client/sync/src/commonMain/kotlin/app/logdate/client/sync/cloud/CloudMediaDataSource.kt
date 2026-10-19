@@ -37,6 +37,20 @@ interface CloudMediaDataSource {
 }
 
 /**
+ * A media source that finds a file by its whole reference, not only the identifier the sync engine
+ * reads from it. A separate interface rather than a default method, so a source that wraps another
+ * by delegation keeps its own [CloudMediaDataSource.downloadMedia].
+ */
+interface ReferencedMediaDataSource {
+    /** Downloads the media [reference] names; [mediaId] is the identifier read from it. */
+    suspend fun downloadReferencedMedia(
+        accessToken: String,
+        reference: String,
+        mediaId: String,
+    ): Result<MediaFile>
+}
+
+/**
  * Represents a media file for sync operations.
  */
 data class MediaFile(
@@ -211,7 +225,7 @@ private const val MAX_MEDIA_UPLOAD_BYTES = 31 * 1024 * 1024
  * from [MediaFileSource.sizeBytes], which the upload declared before reading a byte. A file that
  * changed or vanished since then must not be sent as a truncated or oversized body.
  */
-private class SizeCheckedSource(
+internal class SizeCheckedSource(
     private val media: MediaFileSource,
 ) : RawSource {
     private val source = readingMedia { media.open() }
@@ -249,3 +263,8 @@ private class SizeCheckedSource(
 }
 
 class MediaDecryptionException : Exception("MEDIA_DECRYPTION_FAILED")
+
+/** Downloaded media isn't the file its reference names: its content identifier doesn't match. */
+class MediaIntegrityException(
+    message: String,
+) : Exception(message)

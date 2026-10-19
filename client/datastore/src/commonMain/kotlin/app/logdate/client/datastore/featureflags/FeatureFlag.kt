@@ -108,6 +108,15 @@ enum class FeatureFlag(
      * Off by default while it is built. The phone mirrors it to the watch.
      */
     ACTIVITY_AWARENESS(key = "activity_awareness_enabled", defaultEnabled = false),
+
+    /**
+     * Sync through the account's sealed personal space, as LogDate schema records, instead of the
+     * per-kind sync endpoints.
+     *
+     * Off by default while each kind of data gains its record mapping. Even when on, a device only
+     * uses the personal space when the server offers it and the account is stored there.
+     */
+    PERSONAL_SPACE(key = "personal_space_enabled", defaultEnabled = false),
     ;
 
     companion object {

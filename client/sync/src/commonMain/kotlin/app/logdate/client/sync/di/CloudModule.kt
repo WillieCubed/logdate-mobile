@@ -4,6 +4,7 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.LocationHistoryApiClient
@@ -36,14 +37,65 @@ import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.location.LocationHistoryStager
 import app.logdate.client.sync.location.LocationHistorySyncEngine
+import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
+import app.logdate.client.sync.space.AccountStorageModeSource
+import app.logdate.client.sync.space.RoomSpaceSwapStore
+import app.logdate.client.sync.space.SpaceDataHomes
+import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceMediaDataSource
+import app.logdate.client.sync.space.SpaceRecordRegistry
+import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
+import app.logdate.client.sync.space.SpaceSwapStore
+import app.logdate.client.sync.space.SpaceSyncDependencies
+import app.logdate.client.sync.space.SpaceTransportGate
+import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.spaceLocation
 import app.logdate.shared.config.LogDateConfigRepository
+import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.ServerProtocolFeature
 import org.koin.dsl.module
 import kotlin.time.Clock
+
+/**
+ * The personal-space transport: which kinds use it, whether it is open, and how to reach the space.
+ * Each kind's [SpaceKind] is contributed by the module that owns its mapper; with none registered,
+ * every kind keeps syncing through its own endpoints.
+ */
+val spaceSyncModule =
+    module {
+        single { SpaceRecordRegistry(getAll<SpaceKind<*>>()) }
+        single<SpaceDataHomes> { XrpcSpaceDataHomes(get<io.ktor.client.HttpClient>()) }
+        single<SpaceSwapStore> { RoomSpaceSwapStore(get<LogDateDatabase>().spaceRecordStateDao()) }
+        // Replaced by the account's reported storage mode once the account endpoint returns it.
+        single<AccountStorageModeSource> { AccountStorageModeSource.NotReported }
+        single {
+            val flags = get<FeatureFlagStore>()
+            val config = get<LogDateConfigRepository>()
+            SpaceTransportGate(
+                enabledInThisBuild = { flags.isEnabled(FeatureFlag.PERSONAL_SPACE) },
+                serverOffersPersonalSpace = {
+                    config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_V1) == true
+                },
+                storageMode = get(),
+            )
+        }
+        single {
+            val accounts = get<CloudAccountRepository>()
+            val identity = get<IdentityKeyManager>()
+            SpaceSyncDependencies(
+                registry = get(),
+                gate = get(),
+                homes = get(),
+                swapStore = get(),
+                accountDid = { accounts.getCurrentAccount()?.did },
+                identityKey = { identity.getIdentityKey() },
+            )
+        }
+    }
 
 /**
  * Koin module for Cloud API client dependencies.
@@ -141,7 +193,16 @@ val cloudModule =
         }
         single { MediaPayloadKeyProvider(get(), get(), get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
-        single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get(), get()) }
+        includes(spaceSyncModule)
+        single<CloudMediaDataSource> {
+            val registry = get<SpaceRecordRegistry>()
+            val gate = get<SpaceTransportGate>()
+            SpaceRoutingMediaDataSource(
+                legacy = DefaultCloudMediaDataSource(get(), get()),
+                space = SpaceMediaDataSource(get(), get(), spaceLocation(get(), get<SpaceSyncDependencies>().accountDid)),
+                uploadsToSpace = { registry.forEntityType(EntityType.NOTE) != null && gate.isOpen() },
+            )
+        }
         single {
             AutomaticMediaRecovery(
                 get(),

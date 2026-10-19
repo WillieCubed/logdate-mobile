@@ -132,6 +132,18 @@ class DownloadInbox(
         cursor: Long,
         records: List<WireDownload>,
         selected: DownloadScope = scope(),
+    ) = stageAll(type, cursor, mapOf(type to records), selected)
+
+    /**
+     * Stages records of several kinds, keyed by entity type, and advances one [checkpoint] to
+     * [cursor], all in one transaction. The personal space's change feed carries every kind of data
+     * under one cursor, so a page is staged whole or not at all.
+     */
+    suspend fun stageAll(
+        checkpoint: String,
+        cursor: Long,
+        records: Map<String, List<WireDownload>>,
+        selected: DownloadScope = scope(),
     ) {
         check(selected == scope()) { "Download scope changed" }
         require(selected.owner.isNotBlank() && selected.origin.isNotBlank())
@@ -140,23 +152,25 @@ class DownloadInbox(
         var cursorAdvanced = false
         try {
             transactions.withTransaction {
-                for (record in records) {
-                    val existing = dao.get(selected.owner, selected.origin, type, record.id)
-                    val reconsiderLegacy =
-                        existing?.state == "APPLIED" &&
-                            existing.version == record.version &&
-                            !record.deleted &&
-                            (existing.payload.isEmpty() || existing.payload == record.payload) &&
-                            (type == "NOTE" || type == "JOURNAL") &&
-                            record.payload.contains("LDSE1:")
-                    if (existing != null && existing.version >= record.version && !reconsiderLegacy) continue
-                    val row = waitingRow(selected, type, record)
-                    dao.put(row)
-                    staged += row
+                for ((type, rows) in records) {
+                    for (record in rows) {
+                        val existing = dao.get(selected.owner, selected.origin, type, record.id)
+                        val reconsiderLegacy =
+                            existing?.state == "APPLIED" &&
+                                existing.version == record.version &&
+                                !record.deleted &&
+                                (existing.payload.isEmpty() || existing.payload == record.payload) &&
+                                (type == "NOTE" || type == "JOURNAL") &&
+                                record.payload.contains("LDSE1:")
+                        if (existing != null && existing.version >= record.version && !reconsiderLegacy) continue
+                        val row = waitingRow(selected, type, record)
+                        dao.put(row)
+                        staged += row
+                    }
                 }
-                val previous = dao.checkpoint(selected.owner, selected.origin, type)?.cursor ?: 0
+                val previous = dao.checkpoint(selected.owner, selected.origin, checkpoint)?.cursor ?: 0
                 cursorAdvanced = cursor > previous
-                dao.checkpoint(DownloadCheckpointEntity(selected.owner, selected.origin, type, maxOf(cursor, previous)))
+                dao.checkpoint(DownloadCheckpointEntity(selected.owner, selected.origin, checkpoint, maxOf(cursor, previous)))
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             recordDiagnostic(SyncDiagnosticEvent(DiagnosticPhase.PERSIST, DiagnosticOutcome.INTERRUPTED), source)
@@ -236,6 +250,18 @@ class DownloadInbox(
                     ?: DownloadCheckpointEntity(selected.owner, selected.origin, type, 0)
             dao.checkpoint(previous.copy(fetchFailure = reason.name))
         }
+    }
+
+    /**
+     * Moves [checkpoint] back to zero, so the next download lists everything again. Staged rows and
+     * their applied versions stay, so records already applied aren't applied twice.
+     */
+    suspend fun resetCheckpoint(
+        checkpoint: String,
+        selected: DownloadScope = scope(),
+    ) {
+        check(selected == scope()) { "Download scope changed" }
+        dao.checkpoint(DownloadCheckpointEntity(selected.owner, selected.origin, checkpoint, 0))
     }
 
     suspend fun cursor(

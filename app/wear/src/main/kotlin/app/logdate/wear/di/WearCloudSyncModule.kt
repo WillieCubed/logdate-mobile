@@ -9,6 +9,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.ContentEncryptionService
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.media.AndroidMediaManager
 import app.logdate.client.media.MediaManager
 import app.logdate.client.networking.DataUsagePolicy
@@ -42,6 +43,7 @@ import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.di.SyncQualifiers
 import app.logdate.client.sync.metadata.CloudEligibility
+import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.KeyValueFirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.KeyValueIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.KeyValueLastSyncErrorStore
@@ -54,6 +56,16 @@ import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
+import app.logdate.client.sync.space.AccountStorageModeSource
+import app.logdate.client.sync.space.RoomSpaceSwapStore
+import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceMediaDataSource
+import app.logdate.client.sync.space.SpaceRecordRegistry
+import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
+import app.logdate.client.sync.space.SpaceSyncDependencies
+import app.logdate.client.sync.space.SpaceTransportGate
+import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.spaceLocation
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.ServerProtocolFeature
@@ -123,6 +135,28 @@ val wearCloudSyncModule =
         single<JournalContentRepository>(WatchCloud) {
             OfflineFirstJournalContentRepository(get(), get(), get(), syncMetadataService = get())
         }
+        single(WatchCloud) {
+            val flags = get<FeatureFlagStore>()
+            val config = get<LogDateConfigRepository>()
+            val accounts = get<CloudAccountRepository>(WatchCloud)
+            val identity = get<IdentityKeyManager>()
+            SpaceSyncDependencies(
+                registry = SpaceRecordRegistry(getAll<SpaceKind<*>>()),
+                gate =
+                    SpaceTransportGate(
+                        enabledInThisBuild = { flags.isEnabled(FeatureFlag.PERSONAL_SPACE) },
+                        serverOffersPersonalSpace = {
+                            config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_V1) == true
+                        },
+                        // Replaced by the account's reported storage mode once the account endpoint returns it.
+                        storageMode = AccountStorageModeSource.NotReported,
+                    ),
+                homes = XrpcSpaceDataHomes(httpClient),
+                swapStore = RoomSpaceSwapStore(get<LogDateDatabase>().spaceRecordStateDao()),
+                accountDid = { accounts.getCurrentAccount()?.did },
+                identityKey = { identity.getIdentityKey() },
+            )
+        }
         single(WatchCloud) { watchCloudEngine() }
     }
 
@@ -132,11 +166,17 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
     val cipher = get<SyncPayloadCipher>(WatchCloud)
     val config = get<LogDateConfigRepository>()
     val sessions = get<SessionStorage>()
+    val space = get<SpaceSyncDependencies>(WatchCloud)
     return DefaultSyncManager(
         cloudContentDataSource = DefaultCloudContentDataSource(durable, cipher),
         cloudJournalDataSource = DefaultCloudJournalDataSource(durable, cipher),
         cloudAssociationDataSource = DefaultCloudAssociationDataSource(durable),
-        cloudMediaDataSource = DefaultCloudMediaDataSource(get(WatchCloud), get()),
+        cloudMediaDataSource =
+            SpaceRoutingMediaDataSource(
+                legacy = DefaultCloudMediaDataSource(get(WatchCloud), get()),
+                space = SpaceMediaDataSource(space.homes, get(), spaceLocation(sessions, space.accountDid)),
+                uploadsToSpace = { space.registry.forEntityType(EntityType.NOTE) != null && space.gate.isOpen() },
+            ),
         cloudDraftDataSource = DefaultCloudDraftDataSource(durable, cipher),
         cloudAccountRepository = get(WatchCloud),
         sessionStorage = sessions,
@@ -171,5 +211,6 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
         momentSyncConfig = get(WatchCloud),
         deviceSessionRevocationListener = DeviceSessionRevocationListener { get<app.logdate.wear.sync.v2.removal.WatchDataWiper>().wipe() },
         profile = SyncProfile.LinkedWatch(RecentCaptureFilter(RECENT_CAPTURES)),
+        spaceSync = space,
     )
 }
