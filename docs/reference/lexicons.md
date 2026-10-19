@@ -234,9 +234,10 @@ changed, the device reads it again, merges, and retries. Merging two versions is
   `deletedTransitionIds`.
 - Each deletion list is everything in either version. Deletion lists only grow.
 
-An hour's record holds at most 5,000 samples, 500 activity changes and as many deleted ids. With
-every field at its longest, that's about 3.6 MB, which fits in one sealed record (about 3.99 MB of
-payload). The foreground stream, the busiest source, takes about one sample a second, or 3,600 an
+A part of an hour holds at most 5,000 samples and deleted sample ids together, and at most 500
+activity changes and deleted activity ids together. The schema's separate list limits allow up to
+twice that, and even then, with every field at its longest, a record is about 3.6 MB, which fits in
+one sealed record (about 3.99 MB of payload). The foreground stream, the busiest source, takes about one sample a second, or 3,600 an
 hour.
 
 New samples and activity changes always go into the hour's last part. The device starts the next
