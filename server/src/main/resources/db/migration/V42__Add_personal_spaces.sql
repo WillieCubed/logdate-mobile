@@ -24,6 +24,8 @@ CREATE TABLE space_records (
 );
 CREATE INDEX idx_space_records_seq ON space_records(space_uri, author_did, seq);
 CREATE INDEX idx_space_records_account ON space_records(account_id);
+-- Purging tombstones looks them up by age.
+CREATE INDEX idx_space_records_tombstones ON space_records(deleted_at) WHERE deleted;
 
 CREATE TABLE space_record_blobs (
     space_uri TEXT NOT NULL,

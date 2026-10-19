@@ -1,6 +1,9 @@
 package app.logdate.server
 
+import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
+import app.logdate.server.logging.SpaceBlobNotices
+import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
@@ -16,6 +19,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
 import java.time.Duration
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 /**
  * Starts the tombstone retention sweep against the Koin-provided repository and cancels it when
@@ -25,6 +31,8 @@ import java.time.Duration
 internal fun Application.installSyncMaintenance(isDatabaseAvailable: Boolean) {
     val collectionsRepository by inject<LogDateCollectionsRepository>()
     val syncMetrics by inject<SyncMetricsRegistry>()
+    val spaceStore by inject<SpaceStore>()
+    val blobStorage by inject<LogDateBlobStorage>()
 
     val maintenanceReadEnv: (String) -> String? =
         if (isDatabaseAvailable) {
@@ -32,7 +40,14 @@ internal fun Application.installSyncMaintenance(isDatabaseAvailable: Boolean) {
         } else {
             { name -> if (name == "SYNC_TOMBSTONE_PURGE_ENABLED") "false" else null }
         }
-    val maintenanceJob: Job? = startSyncMaintenance(collectionsRepository, syncMetrics, maintenanceReadEnv)
+    val maintenanceJob: Job? =
+        startSyncMaintenance(
+            collectionsRepository = collectionsRepository,
+            metrics = syncMetrics,
+            readEnv = maintenanceReadEnv,
+            spaceStore = spaceStore,
+            blobStorage = blobStorage,
+        )
     monitor.subscribe(ApplicationStopped) {
         maintenanceJob?.cancel()
     }
@@ -49,6 +64,8 @@ internal fun startSyncMaintenance(
     collectionsRepository: LogDateCollectionsRepository,
     metrics: SyncMetricsRegistry,
     readEnv: (String) -> String?,
+    spaceStore: SpaceStore? = null,
+    blobStorage: LogDateBlobStorage? = null,
 ): Job? {
     val enabled = readEnv("SYNC_TOMBSTONE_PURGE_ENABLED")?.toBooleanStrictOrNull() ?: true
     if (!enabled) return null
@@ -85,7 +102,43 @@ internal fun startSyncMaintenance(
                     success,
                 )
             }
+            if (spaceStore != null) purgeSpacesRecorded(spaceStore, blobStorage, metrics)
             delay(Duration.ofMinutes(intervalMinutes).toMillis())
         }
     }
+}
+
+private suspend fun purgeSpacesRecorded(
+    store: SpaceStore,
+    blobs: LogDateBlobStorage?,
+    metrics: SyncMetricsRegistry,
+) {
+    val start = System.currentTimeMillis()
+    var success = false
+    try {
+        purgeSpaces(store, blobs, Clock.System.now())
+        success = true
+    } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        Napier.e(SpaceBlobNotices.BLOB_PURGE_FAILED, e)
+    } finally {
+        metrics.recordOperation("maintenance.space_purge", System.currentTimeMillis() - start, success)
+    }
+}
+
+/** Tombstones older than the sync tombstone window go, and so do blobs no record has referred to for a day. */
+internal suspend fun purgeSpaces(
+    store: SpaceStore,
+    blobs: LogDateBlobStorage?,
+    now: Instant,
+) {
+    val paths = store.purge(tombstonesBefore = now - 30.days, unreferencedBlobsBefore = now - 1.days)
+    paths.forEach { path ->
+        try {
+            blobs?.deleteBlobIfExists(path)
+        } catch (e: Exception) {
+            Napier.e(SpaceBlobNotices.BLOB_PURGE_FAILED, e)
+        }
+    }
+    if (paths.isNotEmpty()) Napier.i(SpaceBlobNotices.BLOBS_PURGED)
 }

@@ -53,6 +53,8 @@ private val approvedNotices =
         KeyCustodyNotices.OAUTH_KEY_ROTATION_FAILED to "SERVER_OAUTH_KEY_ROTATION_FAILED",
         DownloadUrlSigningNotices.MEDIA_SIGNING_FAILED to "SERVER_MEDIA_URL_SIGNING_FAILED",
         DownloadUrlSigningNotices.BACKUP_SIGNING_FAILED to "SERVER_BACKUP_URL_SIGNING_FAILED",
+        SpaceBlobNotices.BLOBS_PURGED to "SERVER_SPACE_BLOBS_PURGED",
+        SpaceBlobNotices.BLOB_PURGE_FAILED to "SERVER_SPACE_BLOB_PURGE_FAILED",
     )
 
 /**
@@ -79,6 +81,15 @@ internal object KeyCustodyNotices {
 internal object DownloadUrlSigningNotices {
     const val MEDIA_SIGNING_FAILED = "Signing a media download URL failed; serving it through the server instead"
     const val BACKUP_SIGNING_FAILED = "Signing a backup download URL failed; serving it through the server instead"
+}
+
+/**
+ * Fixed log messages for the space maintenance sweep. A failed purge leaves orphaned objects in
+ * storage until a later sweep removes them, so it is logged as an error rather than dropped.
+ */
+internal object SpaceBlobNotices {
+    const val BLOBS_PURGED = "Purged space blobs that nothing refers to"
+    const val BLOB_PURGE_FAILED = "Purging space blobs failed"
 }
 
 internal fun safeServerMessage(
