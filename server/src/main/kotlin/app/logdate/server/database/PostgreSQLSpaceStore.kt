@@ -36,6 +36,8 @@ import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+private const val PUT_BLOB_ATTEMPTS = 3
+
 /**
  * Stores sealed space records in PostgreSQL. Every write locks its (space, author) state row before
  * taking the next sequence number, so concurrent writes never share one.
@@ -156,30 +158,51 @@ class PostgreSQLSpaceStore : SpaceStore {
         accountId: UUID,
         space: String,
         blob: SpaceBlob,
-    ) {
+    ): SpaceBlob =
         withContext(Dispatchers.IO) {
-            transaction {
-                val now = Clock.System.now()
-                val inserted =
-                    SpaceBlobsTable
-                        .insertIgnore {
-                            it[spaceUri] = space
-                            it[cid] = blob.cid
-                            it[SpaceBlobsTable.accountId] = accountId
-                            it[mimeType] = blob.mimeType
-                            it[sizeBytes] = blob.size
-                            it[storagePath] = blob.storagePath
-                            it[createdAt] = now
-                        }.insertedCount
-                if (inserted == 0) {
-                    SpaceBlobsTable.update({ (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq blob.cid) }) {
-                        it[mimeType] = blob.mimeType
-                        it[sizeBytes] = blob.size
-                        it[createdAt] = now
-                    }
-                }
+            repeat(PUT_BLOB_ATTEMPTS) {
+                transaction { tryPutBlob(accountId, space, blob) }?.let { return@withContext it }
             }
+            error("Blob ${blob.cid} was purged during every attempt to store it")
         }
+
+    /**
+     * Inserts the blob row, or locks and refreshes the existing one and returns it with its original
+     * storage path. Returns null when the existing row was purged between the two statements, so the
+     * caller tries again rather than answering success without a row.
+     */
+    private fun tryPutBlob(
+        accountId: UUID,
+        space: String,
+        blob: SpaceBlob,
+    ): SpaceBlob? {
+        val now = Clock.System.now()
+        val inserted =
+            SpaceBlobsTable
+                .insertIgnore {
+                    it[spaceUri] = space
+                    it[cid] = blob.cid
+                    it[SpaceBlobsTable.accountId] = accountId
+                    it[mimeType] = blob.mimeType
+                    it[sizeBytes] = blob.size
+                    it[storagePath] = blob.storagePath
+                    it[createdAt] = now
+                }.insertedCount
+        if (inserted > 0) return blob
+        val key = (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq blob.cid)
+        val existingPath =
+            SpaceBlobsTable
+                .select(SpaceBlobsTable.storagePath)
+                .where { key }
+                .forUpdate()
+                .singleOrNull()
+                ?.get(SpaceBlobsTable.storagePath) ?: return null
+        SpaceBlobsTable.update({ key }) {
+            it[mimeType] = blob.mimeType
+            it[sizeBytes] = blob.size
+            it[createdAt] = now
+        }
+        return blob.copy(storagePath = existingPath)
     }
 
     override suspend fun getBlob(
