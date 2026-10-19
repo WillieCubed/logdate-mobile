@@ -95,7 +95,7 @@ class ServerDescriptorConfigTest {
     }
 
     @Test
-    fun `recovery keys are advertised when enabled or publishing and only for did plc accounts`() {
+    fun `recovery keys are advertised only when enabled and only for did plc accounts`() {
         val enabled = descriptorFor(AtprotoIdentityConfig(recoveryKeysEnabled = true))
         val publishing = descriptorFor(AtprotoIdentityConfig(publishHostedPlcOperations = true))
         val neither = descriptorFor(AtprotoIdentityConfig())
@@ -103,7 +103,7 @@ class ServerDescriptorConfigTest {
 
         assertTrue(enabled.hasProtocolFeature(ServerProtocolFeature.ATPROTO_RECOVERY_KEYS_V1))
         assertFalse(enabled.hasProtocolFeature(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1))
-        assertTrue(publishing.hasProtocolFeature(ServerProtocolFeature.ATPROTO_RECOVERY_KEYS_V1))
+        assertFalse(publishing.hasProtocolFeature(ServerProtocolFeature.ATPROTO_RECOVERY_KEYS_V1))
         assertFalse(neither.hasProtocolFeature(ServerProtocolFeature.ATPROTO_RECOVERY_KEYS_V1))
         assertFalse(web.hasProtocolFeature(ServerProtocolFeature.ATPROTO_RECOVERY_KEYS_V1))
     }

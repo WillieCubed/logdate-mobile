@@ -1,10 +1,12 @@
 package app.logdate.server.database
 
+import app.logdate.server.identity.HostedPlcOperationConflictException
 import app.logdate.server.identity.HostedPlcOperationRepository
 import app.logdate.server.identity.StoredHostedPlcOperation
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.exceptions.ExposedSQLException
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -14,6 +16,14 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 class PostgreSQLHostedPlcOperationRepository : HostedPlcOperationRepository {
     override suspend fun save(operation: StoredHostedPlcOperation): StoredHostedPlcOperation =
+        try {
+            insert(operation)
+        } catch (error: ExposedSQLException) {
+            if (error.sqlState != UNIQUE_VIOLATION) throw error
+            throw HostedPlcOperationConflictException(operation.did, operation.prevCid, error)
+        }
+
+    private fun insert(operation: StoredHostedPlcOperation): StoredHostedPlcOperation =
         transaction {
             HostedPlcOperationsTable.insert {
                 it[id] = operation.id.toJavaUUID()
@@ -57,4 +67,9 @@ class PostgreSQLHostedPlcOperationRepository : HostedPlcOperationRepository {
             operationJson = this[HostedPlcOperationsTable.operationJson],
             createdAt = this[HostedPlcOperationsTable.createdAt],
         )
+
+    private companion object {
+        /** PostgreSQL's SQLSTATE for a unique index violation; H2 reports the same code. */
+        private const val UNIQUE_VIOLATION = "23505"
+    }
 }

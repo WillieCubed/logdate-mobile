@@ -82,6 +82,14 @@ class AtprotoIdentityConfigTest {
     }
 
     @Test
+    fun `publishing alone does not turn on recovery keys`() {
+        val publishing = AtprotoIdentityConfig.fromEnvironment(publishHostedPlcOperations = "true", recoveryKeysEnabled = null)
+
+        assertTrue(publishing.publishesPlcOperations)
+        assertEquals(false, publishing.supportsRecoveryKeys)
+    }
+
+    @Test
     fun `environment factory rejects unsupported hosted did methods`() {
         assertFailsWith<IllegalArgumentException> {
             AtprotoIdentityConfig.fromEnvironment(hostedAccountDidMethod = "unsupported")

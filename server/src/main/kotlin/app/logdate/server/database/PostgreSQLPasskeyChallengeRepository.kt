@@ -73,6 +73,7 @@ class PostgreSQLPasskeyChallengeRepository : PasskeyChallengeRepository {
     ): String? {
         if (scope == "passkey" && type == OAUTH_AUTHORIZATION_CHALLENGE_TYPE) return type
         val ceremony = if (scope == "restore") type.removePrefix("restore-") else type
+        if (scope == "passkey" && type == "step_up") return type
         return ceremony.takeIf {
             scope in setOf("passkey", "restore") &&
                 (scope != "restore" || type.startsWith("restore-")) &&

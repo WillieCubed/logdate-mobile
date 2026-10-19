@@ -203,11 +203,19 @@ class PlcIdentityService(
         requireRecoveryKeys(did)
 
         val activeKey = signingKeyService.ensureActiveKey(accountId)
+        val activeDidKey = didKeyFor(activeKey.publicKeyMultibase)
+        val head = head(did)
+        if (activeDidKey !in head.operation.rotationKeys) {
+            throw IdentityLifecycleConflictException(
+                "The identity's latest operation does not list the server's current key, so it cannot sign the next one",
+                code = SERVER_KEY_NOT_ON_IDENTITY,
+            )
+        }
         val unsignedOperation =
             buildHostedAtprotoUpdate(
-                prevCid = latestOperation(did).cid,
+                prevCid = head.cid,
                 handle = handle,
-                signingKeyDidKey = didKeyFor(activeKey.publicKeyMultibase),
+                signingKeyDidKey = activeDidKey,
                 recoveryDidKey = recoveryDidKey,
             )
         val signedOperation =
@@ -244,7 +252,7 @@ class PlcIdentityService(
     ): PreparedPlcRecoveryOperation {
         requireRecoveryKeys(did)
 
-        val latest = latestOperation(did)
+        val latest = head(did)
         if (recoveryDidKey !in latest.operation.rotationKeys) {
             throw IdentityLifecycleConflictException(
                 "The identity's latest operation does not list the registered recovery key",
@@ -283,8 +291,15 @@ class PlcIdentityService(
         requireRecoveryKeys(did)
         require(preparedOperation.did == did.toString()) { "Prepared PLC recovery import belongs to a different DID" }
         require(preparedOperation.recoveryDidKey == recoveryDidKey) { "Prepared PLC recovery import belongs to a different recovery key" }
-        if (preparedOperation.unsignedOperation.prev != latestOperation(did).cid) {
+        val head = head(did)
+        if (preparedOperation.unsignedOperation.prev != head.cid) {
             throw IdentityLifecycleConflictException("The identity changed after this recovery was prepared", code = IDENTITY_CHANGED)
+        }
+        if (recoveryDidKey !in head.operation.rotationKeys) {
+            throw IdentityLifecycleConflictException(
+                "The identity's latest operation does not list the registered recovery key",
+                code = RECOVERY_KEY_NOT_ON_IDENTITY,
+            )
         }
         verifyRecoverySignature(
             recoveryDidKey = recoveryDidKey,
@@ -309,8 +324,10 @@ class PlcIdentityService(
     /**
      * The identity's newest operation and its CID: from the PLC directory's audit log when this server
      * publishes, otherwise from the hosted operation log, which is then the identity's only history.
+     * The hosted log is followed from its genesis operation through each `prev`, not read in the
+     * order rows were written, so the head is the end of the one chain.
      */
-    private suspend fun latestOperation(did: AtprotoDid): LatestPlcOperation {
+    suspend fun head(did: AtprotoDid): PlcOperationHead {
         val plcClient = plcDirectoryClient
         if (config.publishHostedPlcOperations && plcClient != null) {
             val indexed =
@@ -322,13 +339,28 @@ class PlcIdentityService(
             val operation =
                 indexed.operation as? PlcOperation
                     ?: throw IdentityLifecycleConflictException("The identity $did has been deactivated")
-            return LatestPlcOperation(cid = indexed.cid, operation = operation)
+            return PlcOperationHead(cid = indexed.cid, operation = operation)
         }
-        val stored =
-            listStoredOperations(did).lastOrNull()
-                ?: throw IdentityLifecycleConflictException("No hosted PLC operation exists for $did")
-        val operation = json.decodeFromString(PlcOperation.serializer(), stored.operationJson)
-        return LatestPlcOperation(cid = stored.cid ?: PlcEncoding.operationCid(operation), operation = operation)
+        return hostedChainHead(did)
+    }
+
+    private suspend fun hostedChainHead(did: AtprotoDid): PlcOperationHead {
+        val links =
+            listStoredOperations(did).map { stored ->
+                val operation = json.decodeFromString(PlcOperation.serializer(), stored.operationJson)
+                PlcOperationHead(cid = stored.cid ?: PlcEncoding.operationCid(operation), operation = operation)
+            }
+        if (links.isEmpty()) throw IdentityLifecycleConflictException("No hosted PLC operation exists for $did")
+        val followers = links.groupBy { it.operation.prev }
+        var current =
+            followers[null]?.singleOrNull()
+                ?: throw IdentityLifecycleConflictException("The hosted operation log for $did does not start with one genesis operation")
+        repeat(links.size) {
+            val next = followers[current.cid] ?: return current
+            current = next.singleOrNull()
+                ?: throw IdentityLifecycleConflictException("The hosted operation log for $did forks after ${current.cid}")
+        }
+        throw IdentityLifecycleConflictException("The hosted operation log for $did loops")
     }
 
     /** Submits [operation] to the PLC directory when this server publishes, then records it in the hosted log. */
@@ -341,12 +373,20 @@ class PlcIdentityService(
         if (config.publishHostedPlcOperations && plcClient != null) {
             plcClient.submit(did, operation).getOrThrow()
         }
-        persistHostedOperation(
-            accountId = accountId,
-            did = did,
-            operation = operation,
-            resolvedCid = resolvePublishedCid(did, operation),
-        )
+        try {
+            persistHostedOperation(
+                accountId = accountId,
+                did = did,
+                operation = operation,
+                resolvedCid = resolvePublishedCid(did, operation),
+            )
+        } catch (conflict: HostedPlcOperationConflictException) {
+            throw IdentityLifecycleConflictException(
+                "Another change to the identity was made at the same time; nothing was changed",
+                code = IDENTITY_CHANGED,
+                cause = conflict,
+            )
+        }
     }
 
     /** The CID the directory reports for [operation] when this server publishes, otherwise the one computed locally. */
@@ -417,12 +457,15 @@ class PlcIdentityService(
         val decoded = EcKeySupport.decodePublicKey(multikey)
         val verified =
             runCatching {
-                EcKeySupport.verifySha256(
-                    publicKey = decoded.publicKey,
-                    curve = decoded.curve,
-                    payload = payload,
-                    signature = decodeBase64Url(signature),
-                )
+                val signatureBytes = decodeBase64Url(signature)
+                // The directory accepts only low-S signatures, so the hosted log must not hold any other kind.
+                EcKeySupport.hasLowS(signatureBytes, decoded.curve) &&
+                    EcKeySupport.verifySha256(
+                        publicKey = decoded.publicKey,
+                        curve = decoded.curve,
+                        payload = payload,
+                        signature = signatureBytes,
+                    )
             }.getOrDefault(false)
         if (!verified) {
             throw IdentityLifecycleValidationException("Client PLC recovery signature is invalid", code = RECOVERY_SIGNATURE_INVALID)
@@ -452,13 +495,16 @@ class PlcIdentityService(
         /** Another operation was appended between preparing and completing a recovery. */
         const val IDENTITY_CHANGED: String = "IDENTITY_CHANGED"
 
-        /** The recovery signature is not the registered recovery key's signature over the operation. */
+        /** The recovery signature is not the registered recovery key's low-S signature over the operation. */
         const val RECOVERY_SIGNATURE_INVALID: String = "RECOVERY_SIGNATURE_INVALID"
+
+        /** The identity's latest operation does not list the server's current key, so the server cannot sign. */
+        const val SERVER_KEY_NOT_ON_IDENTITY: String = "SERVER_KEY_NOT_ON_IDENTITY"
     }
 }
 
 /** The newest operation in an identity's history and the CID the next operation names as `prev`. */
-private data class LatestPlcOperation(
+data class PlcOperationHead(
     val cid: String,
     val operation: PlcOperation,
 )

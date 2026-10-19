@@ -50,6 +50,7 @@ import app.logdate.server.oauth.OAuthPasskeySignInService
 import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.passkeys.WebAuthnPasskeyStepUp
 import app.logdate.server.routes.LogDateAccountAuth
 import app.logdate.server.routes.MAX_SPACE_BLOB_BYTES
 import app.logdate.server.routes.SpaceRateLimits
@@ -310,6 +311,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     tokenService = tokenService,
                     atprotoIdentityService = atprotoIdentityService,
                     signingKeyService = signingKeyService,
+                    passkeyStepUp = WebAuthnPasskeyStepUp(webAuthnPasskeyService),
                 )
             }
         }

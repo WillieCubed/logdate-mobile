@@ -100,6 +100,7 @@ class PlcIdentityServiceTest {
                             pdsServiceEndpoint = "https://logdate.app",
                             hostedAccountDidMethod = HostedAccountDidMethod.PLC,
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcDirectoryClient =
                         object : PlcDirectoryClient {
@@ -198,6 +199,7 @@ class PlcIdentityServiceTest {
                             pdsServiceEndpoint = "https://logdate.app",
                             hostedAccountDidMethod = HostedAccountDidMethod.PLC,
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     hostedPlcOperationRepository = operationRepository,
                     plcDirectoryClient =
@@ -272,6 +274,7 @@ class PlcIdentityServiceTest {
                             pdsServiceEndpoint = "https://logdate.app",
                             hostedAccountDidMethod = HostedAccountDidMethod.PLC,
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     hostedPlcOperationRepository = operationRepository,
                     plcDirectoryClient =
@@ -345,6 +348,7 @@ class PlcIdentityServiceTest {
                             pdsServiceEndpoint = "https://logdate.app",
                             hostedAccountDidMethod = HostedAccountDidMethod.PLC,
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     hostedPlcOperationRepository = operationRepository,
                     plcDirectoryClient =

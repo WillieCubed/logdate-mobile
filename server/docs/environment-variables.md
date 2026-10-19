@@ -615,9 +615,10 @@ with the change that makes them required.
 - **Required**: No
 - **Notes**: Only applies when `ATPROTO_HOSTED_DID_METHOD` is `plc`. It works without
   `ATPROTO_PLC_PUBLISH_ENABLED`: the server's hosted operation log is then the identity's history,
-  and nothing is sent to the PLC directory. When enabled, or when publishing is on, the server
-  advertises the `atprotoRecoveryKeysV1` protocol feature. When neither is set, the recovery-key
-  endpoints answer `409 RECOVERY_KEYS_UNAVAILABLE`.
+  and nothing is sent to the PLC directory. Turning publishing on does not turn recovery keys on.
+  When enabled, the server advertises the `atprotoRecoveryKeysV1` protocol feature. When it is not
+  set, the recovery-key endpoints answer `409 RECOVERY_KEYS_UNAVAILABLE`. Registering a key,
+  replacing it and replacing the server's key each also need a fresh passkey confirmation.
 
 ### `ATPROTO_PLC_DIRECTORY_URL`
 - **Description**: The PLC directory to publish to and resolve `did:plc` identities from.

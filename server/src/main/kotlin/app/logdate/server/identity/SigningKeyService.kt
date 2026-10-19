@@ -36,12 +36,13 @@ class SigningKeyService(
     /**
      * Seals a key from [prepareKey] into an opaque token the client returns to finish a two-step
      * change, so the server stores nothing in between. The token is encrypted with the key-encryption
-     * key, names its account and the operation it was prepared on, and expires after
-     * [PREPARED_KEY_LIFETIME].
+     * key, names its account, the operation it was prepared on and a digest of the operation it
+     * prepared, and expires after [PREPARED_KEY_LIFETIME].
      */
     fun sealPreparedKey(
         key: StoredSigningKey,
         prevCid: String,
+        operationDigest: String,
     ): String =
         atRestCipher.encrypt(
             sealJson
@@ -53,6 +54,7 @@ class SigningKeyService(
                         publicKeyMultibase = key.publicKeyMultibase,
                         privateKeyEncrypted = key.privateKeyEncrypted,
                         prevCid = prevCid,
+                        operationDigest = operationDigest,
                         sealedAtEpochSeconds = clock.now().epochSeconds,
                     ),
                 ).encodeToByteArray(),
@@ -90,6 +92,7 @@ class SigningKeyService(
                     createdAt = clock.now(),
                 ),
             prevCid = sealed.prevCid,
+            operationDigest = sealed.operationDigest,
         )
     }
 
@@ -121,8 +124,7 @@ class SigningKeyService(
         preparedKey: StoredSigningKey,
     ): StoredSigningKey {
         require(preparedKey.accountId == accountId) { "Prepared signing key belongs to a different account" }
-        repository.revokeActiveKeys(accountId)
-        return repository.save(preparedKey)
+        return repository.replaceActiveKey(preparedKey)
     }
 
     suspend fun exportActiveKey(
@@ -263,10 +265,11 @@ class SigningKeyService(
         val iterations: Int = EXPORT_KDF_ITERATIONS,
     )
 
-    /** A key from [sealPreparedKey], ready to activate, and the operation it was prepared on. */
+    /** A key from [sealPreparedKey], ready to activate, the operation it was prepared on and the digest of the one it prepared. */
     data class OpenedPreparedKey(
         val key: StoredSigningKey,
         val prevCid: String,
+        val operationDigest: String,
     )
 
     @Serializable
@@ -276,6 +279,7 @@ class SigningKeyService(
         val publicKeyMultibase: String,
         val privateKeyEncrypted: String,
         val prevCid: String,
+        val operationDigest: String,
         val sealedAtEpochSeconds: Long,
     )
 

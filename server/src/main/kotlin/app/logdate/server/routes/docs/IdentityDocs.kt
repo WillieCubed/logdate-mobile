@@ -2,7 +2,6 @@ package app.logdate.server.routes.docs
 
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.openapi.ApiTags
-import app.logdate.server.routes.CompleteIdentityRecoveryRequest
 import app.logdate.server.routes.CompleteRecoverySigningKeyImportRequest
 import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.ErrorEnvelope
@@ -16,14 +15,9 @@ import app.logdate.server.routes.IdentityStatusResponse
 import app.logdate.server.routes.ImportSigningKeyData
 import app.logdate.server.routes.ImportSigningKeyRequest
 import app.logdate.server.routes.ImportSigningKeyResponse
-import app.logdate.server.routes.PrepareIdentityRecoveryData
-import app.logdate.server.routes.PrepareIdentityRecoveryResponse
 import app.logdate.server.routes.PrepareRecoverySigningKeyImportData
 import app.logdate.server.routes.PrepareRecoverySigningKeyImportRequest
 import app.logdate.server.routes.PrepareRecoverySigningKeyImportResponse
-import app.logdate.server.routes.RegisterPlcRecoveryKeyData
-import app.logdate.server.routes.RegisterPlcRecoveryKeyRequest
-import app.logdate.server.routes.RegisterPlcRecoveryKeyResponse
 import app.logdate.server.routes.RotateSigningKeyData
 import app.logdate.server.routes.RotateSigningKeyRequest
 import app.logdate.server.routes.RotateSigningKeyResponse
@@ -380,201 +374,6 @@ internal object IdentityDocs {
                 "Failed to complete signing key recovery import",
                 passphraseRequired,
                 ErrorCase("SIGNATURE_REQUIRED", "`signature` is blank.", "Recovery signature is required"),
-            )
-        }
-    }
-
-    val registerPlcRecoveryKey: RouteConfig.() -> Unit = {
-        bearerOperation(
-            "registerPlcRecoveryKey",
-            ApiTags.IDENTITY,
-            "Register a recovery key",
-            """
-            Records a `did:key` the person controls as the identity's PLC recovery key. The server appends an
-            operation that lists it first in `rotationKeys`, ahead of the server's own key, so it can overrule
-            the server. The operation is published to the PLC directory only when this server publishes;
-            otherwise the server's operation log is the identity's history. Derive or generate the key on the
-            device and keep the private half there.
-
-            Registering the same key again changes nothing. A different key is refused while one is set, so a
-            session alone cannot replace the person's key. Requires the `atprotoRecoveryKeysV1` protocol
-            feature.
-            """,
-        )
-        request { jsonBody(RegisterPlcRecoveryKeyRequest(recoveryDidKey = RECOVERY_DID_KEY), "The public recovery key as a `did:key`.") }
-        response {
-            ok(
-                "The recovery key is registered and published.",
-                RegisterPlcRecoveryKeyResponse(
-                    success = true,
-                    data =
-                        RegisterPlcRecoveryKeyData(
-                            did = DocExamples.DID,
-                            handle = DocExamples.HANDLE,
-                            recoveryDidKey = RECOVERY_DID_KEY,
-                        ),
-                ),
-            )
-            identityFailures(
-                "PLC_RECOVERY_KEY_INVALID",
-                "`recoveryDidKey` is not a valid `did:key` for a supported curve.",
-                "PLC_RECOVERY_KEY_CONFLICT",
-                "The identity's history could not be read. Nothing was changed.",
-                "PLC_RECOVERY_KEY_FAILED",
-                "Failed to register PLC recovery key",
-                ErrorCase("RECOVERY_DID_KEY_REQUIRED", "`recoveryDidKey` is blank.", "Recovery DID key is required"),
-                extraConflicts =
-                    listOf(
-                        recoveryKeysUnavailable,
-                        ErrorCase(
-                            "RECOVERY_KEY_ALREADY_SET",
-                            "A different recovery key is already registered. Nothing was changed.",
-                            "A different recovery key is already registered for this identity",
-                        ),
-                    ),
-            )
-        }
-    }
-
-    private val recoveryKeysUnavailable =
-        ErrorCase(
-            "RECOVERY_KEYS_UNAVAILABLE",
-            "This server does not support recovery keys (it does not advertise `atprotoRecoveryKeysV1`), or the " +
-                "identity is not a `did:plc`. Nothing was changed.",
-            "Recovery keys are not enabled on this server",
-        )
-
-    private val recoveryKeyNotSet =
-        ErrorCase(
-            "RECOVERY_KEY_NOT_SET",
-            "No recovery key is registered for this identity. Register one with **Register a recovery key** first.",
-            "No recovery key is registered for this identity",
-        )
-
-    private val recoveryKeyNotOnIdentity =
-        ErrorCase(
-            "RECOVERY_KEY_NOT_ON_IDENTITY",
-            "The identity's latest operation does not list the registered recovery key, so it cannot sign the next one.",
-            "The identity's latest operation does not list the registered recovery key",
-        )
-
-    val prepareIdentityRecovery: RouteConfig.() -> Unit = {
-        bearerOperation(
-            "prepareIdentityRecovery",
-            ApiTags.IDENTITY,
-            "Prepare a recovery",
-            """
-            Step one of replacing the server's key with the person's recovery key. The server creates a fresh
-            signing key and builds the PLC operation that installs it, keeping the recovery key first in
-            `rotationKeys`. It returns the operation, the exact bytes the recovery key must sign, and
-            `preparedKey`: the fresh key sealed with the server's key-encryption key. The server stores
-            nothing until step two.
-
-            Sign `signingPayloadBase64Url` with the recovery key on the device and send the signature with
-            `preparedKey` to **Complete a recovery** within 30 minutes. The recovery key never reaches the
-            server. Requires the `atprotoRecoveryKeysV1` protocol feature; PLC publishing is not needed.
-            """,
-        )
-        response {
-            ok(
-                "The operation to sign and the sealed key that completing it installs.",
-                PrepareIdentityRecoveryResponse(
-                    success = true,
-                    data =
-                        PrepareIdentityRecoveryData(
-                            did = DocExamples.DID,
-                            handle = DocExamples.HANDLE,
-                            recoveryDidKey = RECOVERY_DID_KEY,
-                            nextPublicKeyDidKey = NEXT_DID_KEY,
-                            unsignedOperationJson =
-                                """{"type":"plc_operation","rotationKeys":["$RECOVERY_DID_KEY","$NEXT_DID_KEY"],""" +
-                                    """"prev":"bafyreih…"}""",
-                            signingPayloadBase64Url = "omR0eXBlbXBsY19vcGVyYXRpb25scm90YXRpb25LZXlz…",
-                            preparedKey = "q1W3…sealed-key…",
-                        ),
-                ),
-            )
-            bearerUnauthorized(ErrorEnvelope.API)
-            apiError(HttpStatusCode.NotFound, DocExamples.apiAccountNotFound)
-            apiError(HttpStatusCode.Conflict, recoveryKeysUnavailable, recoveryKeyNotSet, recoveryKeyNotOnIdentity)
-            apiError(
-                HttpStatusCode.InternalServerError,
-                ErrorCase(
-                    "IDENTITY_RECOVERY_FAILED",
-                    "Something failed on the server. Retry with backoff.",
-                    "Failed to prepare identity recovery",
-                ),
-            )
-        }
-    }
-
-    val completeIdentityRecovery: RouteConfig.() -> Unit = {
-        bearerOperation(
-            "completeIdentityRecovery",
-            ApiTags.IDENTITY,
-            "Complete a recovery",
-            """
-            Step two: send `preparedKey` from **Prepare a recovery** and the recovery key's signature over
-            `signingPayloadBase64Url`. The server checks that the identity has not changed since step one and
-            that the signature is the registered recovery key's, then appends the operation and makes the
-            prepared key the server's key. The previous key loses all authority over the identity.
-            """,
-        )
-        request {
-            jsonBody(
-                CompleteIdentityRecoveryRequest(preparedKey = "q1W3…sealed-key…", signature = "u7Xq…recovery-key-signature…"),
-                "The sealed key from step one and the recovery key's signature (raw r||s, base64url).",
-            )
-        }
-        response {
-            ok(
-                "The operation was appended and the new key is the server's key.",
-                ImportSigningKeyResponse(
-                    success = true,
-                    data = ImportSigningKeyData(did = DocExamples.DID, handle = DocExamples.HANDLE, publicKeyDidKey = NEXT_DID_KEY),
-                ),
-            )
-            apiError(
-                HttpStatusCode.BadRequest,
-                ErrorCase("PREPARED_KEY_REQUIRED", "`preparedKey` is blank.", "Prepared key is required"),
-                ErrorCase("SIGNATURE_REQUIRED", "`signature` is blank.", "Recovery signature is required"),
-                ErrorCase(
-                    "PREPARED_KEY_INVALID",
-                    "`preparedKey` was altered, sealed by another server, or belongs to another account.",
-                    "The prepared key is not valid",
-                ),
-                ErrorCase(
-                    "RECOVERY_SIGNATURE_INVALID",
-                    "The signature is not the registered recovery key's signature over `signingPayloadBase64Url`.",
-                    "Client PLC recovery signature is invalid",
-                ),
-            )
-            bearerUnauthorized(ErrorEnvelope.API)
-            apiError(HttpStatusCode.NotFound, DocExamples.apiAccountNotFound)
-            apiError(
-                HttpStatusCode.Conflict,
-                ErrorCase(
-                    "IDENTITY_CHANGED",
-                    "Another change was made to the identity after step one. Start again from **Prepare a recovery**.",
-                    "The identity changed after this recovery was prepared",
-                ),
-                ErrorCase(
-                    "PREPARED_KEY_EXPIRED",
-                    "Step one was more than 30 minutes ago. Start again.",
-                    "The prepared key has expired; start again",
-                ),
-                recoveryKeysUnavailable,
-                recoveryKeyNotSet,
-                recoveryKeyNotOnIdentity,
-            )
-            apiError(
-                HttpStatusCode.InternalServerError,
-                ErrorCase(
-                    "IDENTITY_RECOVERY_FAILED",
-                    "Something failed on the server, or the body was not valid JSON for this request (that case answers `500` here, " +
-                        "not `400`). Check the body first; retry with backoff only if it is well-formed.",
-                    "Failed to complete identity recovery",
-                ),
             )
         }
     }

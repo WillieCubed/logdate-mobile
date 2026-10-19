@@ -1,5 +1,7 @@
 package studio.hypertext.atproto.crypto
 
+import org.bouncycastle.crypto.ec.CustomNamedCurves
+import java.math.BigInteger
 import java.security.interfaces.ECPublicKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,9 +50,26 @@ class EcKeySupportTest {
 
         assertTrue(EcKeySupport.verifySha256(decoded, curve, payload, signature))
     }
+
+    @Test
+    fun `signatures are low S and their high S twins verify but are not low S`() {
+        EcCurve.entries.forEach { curve ->
+            val keyPair = EcKeySupport.generateKeyPair(curve)
+            val payload = "low-s".encodeToByteArray()
+            val signature = EcKeySupport.signSha256(keyPair.private, curve, payload)
+            val width = curve.coordinateBytes
+            val order = CustomNamedCurves.getByName(curve.parameterSpecName).n
+            val s = BigInteger(1, signature.copyOfRange(width, signature.size))
+            val highS = signature.copyOfRange(0, width) + order.subtract(s).toFixedWidth(width)
+
+            assertTrue(EcKeySupport.hasLowS(signature, curve))
+            assertTrue(EcKeySupport.verifySha256(keyPair.public, curve, payload, highS))
+            assertTrue(!EcKeySupport.hasLowS(highS, curve))
+        }
+    }
 }
 
-private fun java.math.BigInteger.toFixedWidth(width: Int): ByteArray {
+private fun BigInteger.toFixedWidth(width: Int): ByteArray {
     val encoded = toByteArray()
     return when {
         encoded.size == width -> encoded

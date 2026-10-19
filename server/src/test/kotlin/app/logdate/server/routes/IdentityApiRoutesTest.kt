@@ -12,6 +12,7 @@ import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.PlcIdentityService
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.identity.didKeyFor
+import app.logdate.server.passkeys.TestPasskeyStepUp
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -437,6 +438,7 @@ class IdentityApiRoutesTest {
                             handleDomain = "logdate.app",
                             pdsServiceEndpoint = "https://logdate.app",
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcIdentityService =
                         PlcIdentityService(
@@ -446,6 +448,7 @@ class IdentityApiRoutesTest {
                                     handleDomain = "logdate.app",
                                     pdsServiceEndpoint = "https://logdate.app",
                                     publishHostedPlcOperations = true,
+                                    recoveryKeysEnabled = true,
                                 ),
                             hostedPlcOperationRepository = hostedPlcOperationRepository,
                             plcDirectoryClient =
@@ -559,6 +562,7 @@ class IdentityApiRoutesTest {
                             handleDomain = "logdate.app",
                             pdsServiceEndpoint = "https://logdate.app",
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcIdentityService =
                         PlcIdentityService(
@@ -568,6 +572,7 @@ class IdentityApiRoutesTest {
                                     handleDomain = "logdate.app",
                                     pdsServiceEndpoint = "https://logdate.app",
                                     publishHostedPlcOperations = true,
+                                    recoveryKeysEnabled = true,
                                 ),
                             hostedPlcOperationRepository = hostedPlcOperationRepository,
                             plcDirectoryClient =
@@ -711,6 +716,7 @@ class IdentityApiRoutesTest {
                             handleDomain = "logdate.app",
                             pdsServiceEndpoint = "https://logdate.app",
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcIdentityService =
                         PlcIdentityService(
@@ -720,6 +726,7 @@ class IdentityApiRoutesTest {
                                     handleDomain = "logdate.app",
                                     pdsServiceEndpoint = "https://logdate.app",
                                     publishHostedPlcOperations = true,
+                                    recoveryKeysEnabled = true,
                                 ),
                             hostedPlcOperationRepository = hostedPlcOperationRepository,
                             plcDirectoryClient =
@@ -863,6 +870,7 @@ class IdentityApiRoutesTest {
                             handleDomain = "logdate.app",
                             pdsServiceEndpoint = "https://logdate.app",
                             publishHostedPlcOperations = true,
+                            recoveryKeysEnabled = true,
                         ),
                     plcIdentityService =
                         PlcIdentityService(
@@ -872,6 +880,7 @@ class IdentityApiRoutesTest {
                                     handleDomain = "logdate.app",
                                     pdsServiceEndpoint = "https://logdate.app",
                                     publishHostedPlcOperations = true,
+                                    recoveryKeysEnabled = true,
                                 ),
                             hostedPlcOperationRepository = InMemoryHostedPlcOperationRepository(),
                             plcDirectoryClient =
@@ -926,6 +935,7 @@ class IdentityApiRoutesTest {
                 )
             val accessToken = tokenService.generateAccessToken(account.id.toString())
             val recoveryDidKey = didKeyFor(signingKeyService.ensureActiveKey(Uuid.random()).publicKeyMultibase)
+            val stepUp = TestPasskeyStepUp()
 
             application {
                 install(ContentNegotiation) {
@@ -938,6 +948,7 @@ class IdentityApiRoutesTest {
                             tokenService = tokenService,
                             atprotoIdentityService = identityService,
                             signingKeyService = signingKeyService,
+                            passkeyStepUp = stepUp,
                         )
                     }
                 }
@@ -947,7 +958,15 @@ class IdentityApiRoutesTest {
                 client.post("/api/v1/identity/plc/recovery-key") {
                     header(HttpHeaders.Authorization, "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
-                    setBody("""{"recoveryDidKey":"  DID:KEY:${recoveryDidKey.removePrefix("did:key:")}  "}""")
+                    setBody(
+                        json.encodeToString(
+                            RegisterPlcRecoveryKeyRequest.serializer(),
+                            RegisterPlcRecoveryKeyRequest(
+                                recoveryDidKey = "  DID:KEY:${recoveryDidKey.removePrefix("did:key:")}  ",
+                                stepUp = stepUp.proofFor(account.id),
+                            ),
+                        ),
+                    )
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
