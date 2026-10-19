@@ -1,6 +1,7 @@
 package app.logdate.server.routes.sync
 
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountStorageModes
 import app.logdate.server.logdate.DraftFormatUpgradeRequiredException
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateDraft
@@ -45,17 +46,19 @@ import kotlinx.serialization.Serializable
  */
 internal fun Route.syncCollectionRoutes(
     accessTokenVerifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
-    contentRoutes(accessTokenVerifier, metrics, collectionsRepository)
-    journalRoutes(accessTokenVerifier, metrics, collectionsRepository)
-    associationRoutes(accessTokenVerifier, metrics, collectionsRepository)
-    draftRoutes(accessTokenVerifier, collectionsRepository)
+    contentRoutes(accessTokenVerifier, storageModes, metrics, collectionsRepository)
+    journalRoutes(accessTokenVerifier, storageModes, metrics, collectionsRepository)
+    associationRoutes(accessTokenVerifier, storageModes, metrics, collectionsRepository)
+    draftRoutes(accessTokenVerifier, storageModes, collectionsRepository)
 }
 
 private fun Route.contentRoutes(
     accessTokenVerifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
@@ -64,7 +67,7 @@ private fun Route.contentRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@put
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@put
                 val contentId = call.requiredPathParam("contentId")
                 val req = call.receive<ContentUploadRequest>()
                 if (req.id != contentId) {
@@ -126,7 +129,7 @@ private fun Route.contentRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@get
                 val since = parseSinceParameter(call) ?: return@get
                 val pageSize = call.resolvePageSize()
                 val changeSet = collectionsRepository.entryChanges(userId, since, pageSize)
@@ -150,7 +153,7 @@ private fun Route.contentRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@get
                 val contentId = call.requiredPathParam("contentId")
                 val record =
                     collectionsRepository.getEntry(userId, contentId)
@@ -163,7 +166,7 @@ private fun Route.contentRoutes(
         }
 
         head("/{contentId}", SyncCollectionDocs.headContent) {
-            val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@head
+            val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@head
             call.respondRecordState(collectionsRepository.entryState(userId, call.requiredPathParam("contentId")))
         }
 
@@ -171,7 +174,7 @@ private fun Route.contentRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@patch
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@patch
                 val contentId = call.requiredPathParam("contentId")
                 val req = call.receive<ContentUpdateRequest>()
                 val existing = collectionsRepository.getEntry(userId, contentId)
@@ -215,7 +218,7 @@ private fun Route.contentRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@delete
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@delete
                 val contentId = call.requiredPathParam("contentId")
                 collectionsRepository.deleteEntry(userId, contentId, System.currentTimeMillis())
                 call.respond(HttpStatusCode.NoContent)
@@ -229,11 +232,12 @@ private fun Route.contentRoutes(
 
 private fun Route.draftRoutes(
     accessTokenVerifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/drafts") {
         put("/{draftId}", SyncDraftDocs.upsertDraft) {
-            val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@put
+            val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@put
             val draftId = call.requiredPathParam("draftId")
             val req = call.receive<DraftUploadRequest>()
             val encryptedBlocks = req.encryptedBlocks
@@ -280,7 +284,7 @@ private fun Route.draftRoutes(
         }
 
         get("/changes", SyncDraftDocs.listDraftChanges) {
-            val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
+            val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@get
             val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DRAFT_SYNC_PAGE_SIZE
             val changeSet = collectionsRepository.draftChanges(userId, since, limit)
@@ -312,7 +316,7 @@ private fun Route.draftRoutes(
         }
 
         delete("/{draftId}", SyncDraftDocs.deleteDraft) {
-            val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@delete
+            val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@delete
             val draftId = call.requiredPathParam("draftId")
             collectionsRepository.deleteDraft(userId, draftId, System.currentTimeMillis())
             call.respond(HttpStatusCode.NoContent)

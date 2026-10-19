@@ -1,6 +1,7 @@
 package app.logdate.server.routes.sync
 
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountStorageModes
 import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.QuotaCheck
@@ -44,6 +45,7 @@ import kotlin.uuid.Uuid
  */
 internal fun Route.syncMediaRoutes(
     accessTokenVerifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     mediaStorage: LogDateBlobStorage?,
     metrics: SyncMetricsRegistry,
     encryptionService: EncryptionService,
@@ -59,7 +61,7 @@ internal fun Route.syncMediaRoutes(
             var success = false
             var bytes = 0L
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@post
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@post
 
                 if (rateLimiter != null && !rateLimiter.allow("media-upload:$userId", MEDIA_UPLOAD_RATE_LIMIT)) {
                     return@post respondRateLimited(call, rateLimiter, "media-upload:$userId", MEDIA_UPLOAD_RATE_LIMIT)
@@ -204,7 +206,7 @@ internal fun Route.syncMediaRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@get
                 val mediaId = call.requiredPathParam("mediaId")
                 val record =
                     mediaBlobRepository.getMedia(userId, mediaId)
@@ -232,7 +234,7 @@ internal fun Route.syncMediaRoutes(
             var success = false
             var bytes = 0L
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@get
                 val mediaId = call.requiredPathParam("mediaId")
                 val record =
                     mediaBlobRepository.getMedia(userId, mediaId)
@@ -279,7 +281,7 @@ internal fun Route.syncMediaRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@delete
+                val userId = extractSyncUserId(call, accessTokenVerifier, storageModes) ?: return@delete
                 val mediaId = call.requiredPathParam("mediaId")
                 val record = mediaBlobRepository.getMedia(userId, mediaId)
                 if (record != null) {

@@ -13,6 +13,9 @@ import io.ktor.http.HttpStatusCode
 /** Response helpers and examples shared by the sync documentation objects. */
 internal fun ResponsesConfig.syncUnauthorized() = bearerUnauthorized(ErrorEnvelope.SYNC)
 
+/** The per-kind sync routes serve only accounts in legacy storage. */
+internal fun ResponsesConfig.syncStorageModeMismatch() = syncError(HttpStatusCode.Forbidden, SyncExamples.storageModeMismatch)
+
 internal fun ResponsesConfig.syncServerError() = syncError(HttpStatusCode.InternalServerError, SyncExamples.serverMisconfigured)
 
 // Indented to match the descriptions it is spliced into, so `trimIndent()` strips evenly.

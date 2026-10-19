@@ -4,6 +4,7 @@ import app.logdate.server.audit.AuditCategory
 import app.logdate.server.audit.AuditLogger
 import app.logdate.server.auth.AccessCheck
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountStorageModes
 import app.logdate.server.auth.TokenScope
 import app.logdate.server.auth.TokenService
 import app.logdate.server.auth.bearerToken
@@ -23,6 +24,8 @@ import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.SyncMetricsSnapshot
+import app.logdate.shared.model.AccountStorageMode
+import app.logdate.shared.model.StorageModeErrorCodes
 import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.ContentChange
@@ -259,6 +262,7 @@ internal suspend fun extractUserId(
 internal suspend fun extractSyncUserId(
     call: ApplicationCall,
     verifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes? = null,
 ): UUID? {
     if (verifier == null) {
         call.respond(
@@ -284,7 +288,7 @@ internal suspend fun extractSyncUserId(
             AccessCheck.ScopeDenied ->
                 return call.rejectAccess(HttpStatusCode.Forbidden, DeviceLinkErrorCodes.DEVICE_SCOPE_DENIED, DEVICE_SCOPE_DENIED_MESSAGE)
         }
-    return call.parseAccountId(claims.accountId)
+    return call.parseAccountId(claims.accountId)?.let { call.requireLegacyStorage(it, storageModes) }
 }
 
 /**
@@ -294,6 +298,7 @@ internal suspend fun extractSyncUserId(
 internal suspend fun extractFullAccessUserId(
     call: ApplicationCall,
     verifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes? = null,
 ): UUID? {
     if (verifier == null) {
         call.respond(
@@ -313,8 +318,25 @@ internal suspend fun extractFullAccessUserId(
             AccessCheck.ScopeDenied ->
                 return call.rejectAccess(HttpStatusCode.Forbidden, DeviceLinkErrorCodes.DEVICE_SCOPE_DENIED, DEVICE_SCOPE_DENIED_MESSAGE)
         }
-    return call.parseAccountId(claims.accountId)
+    return call.parseAccountId(claims.accountId)?.let { call.requireLegacyStorage(it, storageModes) }
 }
+
+/**
+ * [accountId] when its data is kept in legacy storage, which the per-kind sync routes serve. Any other
+ * storage mode, including one this server doesn't recognize, answers `403 SYNC_STORAGE_MODE_MISMATCH`,
+ * so a device with a stale or wrong idea of the account's mode can't split its data between two
+ * stores; it reads `/auth/me` again instead. Without [storageModes] every account passes.
+ */
+internal suspend fun ApplicationCall.requireLegacyStorage(
+    accountId: UUID,
+    storageModes: AccountStorageModes?,
+): UUID? {
+    val mode = storageModes?.of(accountId) ?: return accountId
+    if (mode == AccountStorageMode.LEGACY) return accountId
+    return rejectAccess(HttpStatusCode.Forbidden, StorageModeErrorCodes.SYNC_STORAGE_MODE_MISMATCH, STORAGE_MODE_MISMATCH_MESSAGE)
+}
+
+private const val STORAGE_MODE_MISMATCH_MESSAGE = "This account's data isn't kept in legacy sync storage; read the account again"
 
 private suspend fun ApplicationCall.rejectAccess(
     status: HttpStatusCode,

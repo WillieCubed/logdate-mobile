@@ -1,6 +1,7 @@
 package app.logdate.server.routes.sync
 
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountStorageModes
 import app.logdate.server.logdate.LogDateMoment
 import app.logdate.server.logdate.LogDateMomentsRepository
 import app.logdate.server.logdate.LogDateRecordState
@@ -41,20 +42,22 @@ internal const val MAX_MOMENT_PAYLOAD_LENGTH = 64 * 1024
  */
 internal fun Route.syncMomentRoutes(
     accessTokenVerifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     momentsRepository: LogDateMomentsRepository,
 ) {
     route("/moments") {
-        upsertMomentRoute(accessTokenVerifier, metrics, momentsRepository)
-        listMomentChangesRoute(accessTokenVerifier, metrics, momentsRepository)
-        getMomentRoute(accessTokenVerifier, metrics, momentsRepository)
-        patchMomentRoute(accessTokenVerifier, metrics, momentsRepository)
-        deleteMomentRoute(accessTokenVerifier, metrics, momentsRepository)
+        upsertMomentRoute(accessTokenVerifier, storageModes, metrics, momentsRepository)
+        listMomentChangesRoute(accessTokenVerifier, storageModes, metrics, momentsRepository)
+        getMomentRoute(accessTokenVerifier, storageModes, metrics, momentsRepository)
+        patchMomentRoute(accessTokenVerifier, storageModes, metrics, momentsRepository)
+        deleteMomentRoute(accessTokenVerifier, storageModes, metrics, momentsRepository)
     }
 }
 
 private fun Route.upsertMomentRoute(
     verifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     repository: LogDateMomentsRepository,
 ) {
@@ -62,7 +65,7 @@ private fun Route.upsertMomentRoute(
         val start = System.currentTimeMillis()
         var success = false
         try {
-            val userId = extractSyncUserId(call, verifier) ?: return@put
+            val userId = extractSyncUserId(call, verifier, storageModes) ?: return@put
             val momentId = call.requiredPathParam("momentId")
             val req = call.receive<MomentUploadRequest>()
             if (req.id != momentId) {
@@ -98,6 +101,7 @@ private fun Route.upsertMomentRoute(
 
 private fun Route.listMomentChangesRoute(
     verifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     repository: LogDateMomentsRepository,
 ) {
@@ -105,7 +109,7 @@ private fun Route.listMomentChangesRoute(
         val start = System.currentTimeMillis()
         var success = false
         try {
-            val userId = extractSyncUserId(call, verifier) ?: return@get
+            val userId = extractSyncUserId(call, verifier, storageModes) ?: return@get
             val since = parseSinceParameter(call) ?: return@get
             val changeSet = repository.momentChanges(userId, since, call.resolvePageSize())
             call.respond(
@@ -125,6 +129,7 @@ private fun Route.listMomentChangesRoute(
 
 private fun Route.getMomentRoute(
     verifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     repository: LogDateMomentsRepository,
 ) {
@@ -132,7 +137,7 @@ private fun Route.getMomentRoute(
         val start = System.currentTimeMillis()
         var success = false
         try {
-            val userId = extractSyncUserId(call, verifier) ?: return@get
+            val userId = extractSyncUserId(call, verifier, storageModes) ?: return@get
             val moment =
                 repository.getMoment(userId, call.requiredPathParam("momentId"))
                     ?: return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Moment not found"))
@@ -146,6 +151,7 @@ private fun Route.getMomentRoute(
 
 private fun Route.patchMomentRoute(
     verifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     repository: LogDateMomentsRepository,
 ) {
@@ -153,7 +159,7 @@ private fun Route.patchMomentRoute(
         val start = System.currentTimeMillis()
         var success = false
         try {
-            val userId = extractSyncUserId(call, verifier) ?: return@patch
+            val userId = extractSyncUserId(call, verifier, storageModes) ?: return@patch
             val momentId = call.requiredPathParam("momentId")
             val req = call.receive<MomentUpdateRequest>()
             if (call.rejectInvalidMoment(momentId, req.payload, req.schema)) return@patch
@@ -187,6 +193,7 @@ private fun Route.patchMomentRoute(
 
 private fun Route.deleteMomentRoute(
     verifier: AccessTokenVerifier?,
+    storageModes: AccountStorageModes?,
     metrics: SyncMetricsRegistry,
     repository: LogDateMomentsRepository,
 ) {
@@ -194,7 +201,7 @@ private fun Route.deleteMomentRoute(
         val start = System.currentTimeMillis()
         var success = false
         try {
-            val userId = extractSyncUserId(call, verifier) ?: return@delete
+            val userId = extractSyncUserId(call, verifier, storageModes) ?: return@delete
             repository.deleteMoment(userId, call.requiredPathParam("momentId"), System.currentTimeMillis())
             call.respond(HttpStatusCode.NoContent)
             success = true

@@ -55,6 +55,7 @@ internal object LocationHistoryDocs {
         response {
             ok("The accepted records with their account-scoped server versions.", LocationHistoryBatchResponse(listOf(deletedRecord)))
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(
                 HttpStatusCode.BadRequest,
                 ErrorCase("VALIDATION_ERROR", "The JSON or record fields are invalid.", "Invalid location history batch"),
@@ -106,6 +107,7 @@ internal object LocationHistoryDocs {
         response {
             ok("One page of ciphertext and tombstones.", LocationHistoryChangesResponse(listOf(deletedRecord), 8, false))
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncError(
                 HttpStatusCode.BadRequest,
                 ErrorCase("VALIDATION_ERROR", "Correct the since or limit query parameter.", "Invalid page parameters"),

@@ -65,6 +65,7 @@ internal object SyncAssociationDocs {
                 AssociationUploadResponse(uploadedCount = 1, uploadedAt = SyncExamples.SERVER_VERSION),
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -108,6 +109,7 @@ internal object SyncAssociationDocs {
             )
             syncError(HttpStatusCode.BadRequest, SyncExamples.invalidSince)
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -133,6 +135,7 @@ internal object SyncAssociationDocs {
         response {
             noContent("The link exists.")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -155,6 +158,7 @@ internal object SyncAssociationDocs {
         response {
             noContent("The link is gone (or already was).")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -180,6 +184,7 @@ internal object SyncAssociationDocs {
         response {
             noContent("The links are gone.")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }

@@ -56,6 +56,7 @@ internal object SyncDraftDocs {
                 ),
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -97,6 +98,7 @@ internal object SyncDraftDocs {
                 ),
             )
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
@@ -121,6 +123,7 @@ internal object SyncDraftDocs {
         response {
             noContent("The draft is deleted (or already was).")
             syncUnauthorized()
+            syncStorageModeMismatch()
             syncServerError()
         }
     }
