@@ -71,7 +71,7 @@ class XrpcDataHomeTest {
     private fun HttpRequestData.bodyBytes(): ByteArray = (body as OutgoingContent.ByteArrayContent).bytes()
 
     @Test
-    fun `putRecord sends the space, key, envelope and swap, signed in`() =
+    fun `putRecord sends the space and key and envelope and swap signed in`() =
         runTest {
             val stored =
                 home(HttpStatusCode.OK, """{"cid":"bafyrecord","seq":7}""")
