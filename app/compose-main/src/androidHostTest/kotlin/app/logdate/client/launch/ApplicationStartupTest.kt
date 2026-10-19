@@ -1,6 +1,7 @@
 package app.logdate.client.launch
 
 import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
+import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -18,6 +19,12 @@ import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ApplicationStartupTest {
+    @Test
+    fun `missing restored privacy metadata reaches its recovery guidance through dependency wrappers`() {
+        val failure = IllegalStateException("Startup dependency failed", NativeRestorePrivacyMetadataRequiredException())
+        assertEquals(ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY, applicationStartupFailureMessage(failure))
+    }
+
     @Test
     fun `database storage exhaustion gives a repair action before journal initialization`() {
         val failure = IllegalStateException("Database initialization failed", IllegalStateException("no space left on device"))

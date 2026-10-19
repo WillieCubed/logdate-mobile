@@ -83,6 +83,8 @@ private class FakeIntegrityDao(
     var reassignedOwnerId: String? = null
     var reassignedDeviceId: String? = null
 
+    override suspend fun hasRetainedJournalContent(): Boolean = false
+
     override suspend fun countPlaceholderOwnedLocations(): Int = placeholderOwned
 
     override suspend fun reassignPlaceholderOwnedLocations(

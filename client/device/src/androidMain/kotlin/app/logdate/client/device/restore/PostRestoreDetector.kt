@@ -77,6 +77,7 @@ class PostRestoreDetector(
         synchronized(lock) {
             NativeInstallationResetMarker(context.noBackupFilesDir).clear()
             val sessionId = Uuid.random().toString()
+            writeAtomically(restorePrivacyFile(), "pending:$sessionId")
             // Publish the new generation first. If deletion is interrupted, prior receipts still
             // carry the old generation and cannot establish that this delivery contained a file.
             writeAtomically(pendingRestoreFile(), "$RESTORE_IN_PROGRESS:$sessionId")
@@ -89,6 +90,25 @@ class PostRestoreDetector(
         synchronized(lock) {
             val fingerprint = restoreFingerprint() ?: return@synchronized
             writeRestoreFingerprints((readRestoreFingerprints() + fingerprint).distinct().takeLast(MAX_RESTORE_FINGERPRINTS))
+        }
+
+    fun hasMissingNativePrivacyPayload(): Boolean =
+        synchronized(lock) {
+            val file = restorePrivacyFile()
+            if (!file.exists()) return@synchronized false
+            val receipt = readSmallFile(file) ?: return@synchronized true
+            !receipt.startsWith("received:") || runCatching { Uuid.parse(receipt.removePrefix("received:")) }.isFailure
+        }
+
+    fun markNativePrivacyPayloadReceived() =
+        synchronized(lock) {
+            val session = readDelivery()?.takeIf { it.first == RESTORE_IN_PROGRESS }?.second ?: return@synchronized
+            writeAtomically(restorePrivacyFile(), "received:$session")
+        }
+
+    internal fun acknowledgeEmptyNativePrivacyPayload() =
+        synchronized(lock) {
+            if (hasMissingNativePrivacyPayload()) writeAtomically(restorePrivacyFile(), "received:${Uuid.random()}")
         }
 
     fun pendingMediaQuarantineId(): String? =
@@ -187,6 +207,12 @@ class PostRestoreDetector(
                         else -> PostRestoreType.CONTENT_MISSING
                     }
             }
+        }
+
+    /** A fresh or restored installation cannot infer a lost privacy policy from readable content. */
+    fun shouldValidatePrivacyMetadata(): Boolean =
+        synchronized(lock) {
+            !initializedFile().exists() || pendingRestoreFile().exists() || hasCompletedNativeRestoreDelivery()
         }
 
     fun markDeviceInitialized() =
@@ -335,6 +361,8 @@ class PostRestoreDetector(
     private fun restorePayloadReceivedFile() = File(context.noBackupFilesDir, ".logdate_native_restore_payload_received")
 
     private fun restoreDatabaseReceivedFile() = File(context.noBackupFilesDir, ".logdate_native_restore_database_received")
+
+    private fun restorePrivacyFile() = File(context.noBackupFilesDir, ".logdate_native_restore_privacy_received")
 
     private companion object {
         val lock = Any()

@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.client.database.NativeRestoreInProgressException
 import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
+import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.theme.LogDateTheme
@@ -42,8 +43,11 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
                         title = {
                             Text(
                                 stringResource(
-                                    if (applicationStartupFailureMessage(failure.cause) ==
-                                        ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY
+                                    if (applicationStartupFailureMessage(failure.cause) in
+                                        setOf(
+                                            ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY,
+                                            ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY,
+                                        )
                                     ) {
                                         R.string.database_key_recovery_title
                                     } else {
@@ -80,6 +84,7 @@ internal enum class ApplicationStartupFailureMessage {
     NATIVE_MEDIA_PENDING,
     STORAGE_FULL,
     DATABASE_KEY_RECOVERY,
+    PRIVACY_METADATA_RECOVERY,
 }
 
 internal fun applicationStartupFailureMessage(cause: Throwable): ApplicationStartupFailureMessage =
@@ -87,6 +92,8 @@ internal fun applicationStartupFailureMessage(cause: Throwable): ApplicationStar
         cause.hasStorageFullCause() -> ApplicationStartupFailureMessage.STORAGE_FULL
         cause.hasNativeMediaQuarantinePending() -> ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING
         cause.hasNativeRestoreInProgress() -> ApplicationStartupFailureMessage.NATIVE_RESTORE_PENDING
+        cause.causesAndSuppressed().any { it is NativeRestorePrivacyMetadataRequiredException } ->
+            ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY
         cause.causesAndSuppressed().any {
             it is DatabaseKeyRecoveryRequiredException
         } -> ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY
@@ -100,6 +107,7 @@ private fun ApplicationStartupFailureMessage.stringResource(): Int =
         ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING -> R.string.native_media_quarantine_pending_message
         ApplicationStartupFailureMessage.STORAGE_FULL -> R.string.native_media_quarantine_storage_message
         ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY -> R.string.database_key_recovery_message
+        ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY -> R.string.native_privacy_metadata_recovery_message
     }
 
 private fun Throwable.hasNativeRestoreInProgress(): Boolean = causesAndSuppressed().any { it is NativeRestoreInProgressException }

@@ -3,6 +3,7 @@ package app.logdate.client.database
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
+import app.logdate.client.device.restore.NativeRestorePrivacyGuard
 import app.logdate.client.device.restore.PostRestoreDetector
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -60,6 +61,16 @@ actual val databaseModule: Module =
                             // An accepted key remains in at least one source. Startup can still open
                             // the journal and retry portable-key synchronization on its next launch.
                             Napier.w("Portable database recovery material could not be refreshed; will retry on next launch")
+                        }
+                        try {
+                            runBlocking {
+                                get<NativeRestorePrivacyGuard>().verifyBeforeContent {
+                                    opened.database.integrityDao().hasRetainedJournalContent()
+                                }
+                            }
+                        } catch (error: Exception) {
+                            opened.database.close()
+                            throw error
                         }
                         startupMonitor.markReady()
                         Napier.i("Startup: encrypted database opened and protections applied")

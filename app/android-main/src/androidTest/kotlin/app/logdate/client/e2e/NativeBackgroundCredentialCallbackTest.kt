@@ -18,7 +18,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.data.restore.NativeAccountBackupAgent
 import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.NativeRestorePolicy
+import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.restore.NativeBackupAgent
+import app.logdate.client.device.restore.NativeRestorePrivacyGuard
+import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
 import io.mockk.every
@@ -34,6 +37,7 @@ import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -142,7 +146,7 @@ class NativeBackgroundCredentialCallbackTest {
         assertTrue(called)
         assertEquals(PostRestoreType.CONTENT_MISSING, PostRestoreDetector(context).detect(true))
         assertTrue(PostRestoreDetector(context).isAccountRecoveryPending())
-        // A second store after callback return proves its DataStore scope was closed.
+        // Normal application consumers observe the callback's committed reset.
         withPreferences { assertEquals(null, it.data.first()[stringPreferencesKey("device.id")]) }
     }
 
@@ -217,7 +221,7 @@ class NativeBackgroundCredentialCallbackTest {
     @Test
     fun `duplicate completion retries an interrupted installation identity reset`() {
         val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
-        withPreferences { preferences ->
+        withUncachedPreferences { preferences ->
             preferences.edit { values -> values[stringPreferencesKey("device.id")] = "source-device" }
         }
         preferencesFile.writeBytes(byteArrayOf(0xFF.toByte()))
@@ -304,7 +308,88 @@ class NativeBackgroundCredentialCallbackTest {
             }.invoke(this, context)
     }
 
+    @Test
+    fun cachedUnlockedPolicyIsReplacedByTransferredBiometricPolicyInSameProcess() =
+        runBlocking {
+            val live =
+                app.logdate.client.datastore
+                    .createAndroidMainDataStore(context)
+            live.edit { it[stringPreferencesKey("security_level")] = "NONE" }
+            val agent = object : NativeBackupAgent() {}.also { it.initialize(context) }
+            deliverPreferences(agent, incomingPreferences("BIOMETRIC"))
+            agent.onRestoreFinished()
+            assertEquals("BIOMETRIC", live.data.first()[stringPreferencesKey("security_level")])
+            assertTrue(!PostRestoreDetector(context).hasMissingNativePrivacyPayload())
+        }
+
+    @Test
+    fun incompletePolicyCanBeRepairedWithoutReplacingLivePreferencesReaders() =
+        runBlocking {
+            val live =
+                app.logdate.client.datastore
+                    .createAndroidMainDataStore(context)
+            val agent = object : NativeBackupAgent() {}.also { it.initialize(context) }
+            deliverPreferences(agent, incomingPreferences(null))
+            agent.onRestoreFinished()
+            val guard =
+                app.logdate.client.device.restore
+                    .NativeRestorePrivacyGuard(context, live)
+            assertFailsWith<NativeRestorePrivacyMetadataRequiredException> {
+                guard.verifyBeforeContent { true }
+            }
+            deliverPreferences(agent, incomingPreferences("BIOMETRIC"))
+            agent.onRestoreFinished()
+            guard.verifyBeforeContent { true }
+            assertEquals("BIOMETRIC", live.data.first()[stringPreferencesKey("security_level")])
+        }
+
+    private fun deliverPreferences(
+        agent: NativeBackupAgent,
+        source: File,
+    ) {
+        ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+            if (Build.VERSION.SDK_INT >= 36) {
+                val inputType = Class.forName("android.app.backup.FullRestoreDataInput")
+                val input = mockkClass(inputType.kotlin, relaxed = true)
+                every { inputType.getMethod("getData").invoke(input) } returns descriptor
+                every { inputType.getMethod("getDestination").invoke(input) } returns File(context.filesDir, "logdate.preferences_pb")
+                every { inputType.getMethod("getSize").invoke(input) } returns source.length()
+                every { inputType.getMethod("getType").invoke(input) } returns BackupAgent.TYPE_FILE
+                every { inputType.getMethod("getMode").invoke(input) } returns 0x180L
+                every { inputType.getMethod("getModificationTimeSeconds").invoke(input) } returns 1L
+                NativeBackupAgent::class.java.getDeclaredMethod("onRestoreFile", inputType).invoke(agent, input)
+                return
+            }
+            agent.onRestoreFile(
+                descriptor,
+                source.length(),
+                File(context.filesDir, "logdate.preferences_pb"),
+                BackupAgent.TYPE_FILE,
+                0x180L,
+                1L,
+            )
+        }
+    }
+
+    private suspend fun incomingPreferences(policy: String?): File {
+        val file = File(folder, "incoming-${Uuid.random()}.preferences_pb")
+        val job = SupervisorJob()
+        try {
+            val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(job + Dispatchers.IO)) { file }
+            store.edit {
+                it[stringPreferencesKey("identity.canonical_owner_id")] = "native-test-owner"
+                if (policy != null) it[stringPreferencesKey("security_level")] = policy
+            }
+        } finally {
+            job.cancelAndJoin()
+        }
+        return file
+    }
+
     private fun withPreferences(block: suspend (DataStore<Preferences>) -> Unit) =
+        runBlocking { block(createAndroidMainDataStore(context)) }
+
+    private fun withUncachedPreferences(block: suspend (DataStore<Preferences>) -> Unit) =
         runBlocking {
             val job = SupervisorJob()
             try {

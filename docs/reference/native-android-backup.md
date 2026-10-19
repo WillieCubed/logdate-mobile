@@ -402,10 +402,34 @@ to prove portable recovery
 keys arrive without journal or media data, `--exercise-missing-keys` to retain encrypted journal
 data without replacing unreadable keys, `--exercise-partial-media` to omit one original while
 checking the remaining media and recoverable source reference, and `--exercise-duplicate-restore`
-to replay Android restore before app launch and compare durable state. Run filtered payload scenarios
+to replay Android restore before app launch and compare durable state. `--exercise-missing-privacy`
+retains the journal, keys, canonical owner, and drafts while removing onboarding and security
+metadata. It verifies protected startup, retry, Activity recreation, and refusal to back up an
+unknown policy, then delivers the complete source backup through Android and checks journal access.
+Run filtered payload scenarios
 on a fresh destination because they intentionally alter the transported fixture. These modes use
 synthetic app data and do not establish Google Restore Credentials or setup-transfer provider
 acceptance.
+
+### Privacy metadata during partial delivery
+
+A restored encryption key proves that LogDate can read the journal; it does not establish the
+original app-lock policy. The shared database factory validates restored privacy metadata before
+returning a database to any consumer, including widgets and background work. Retained journal or
+draft content without that metadata enters the protected restore screen. Retry and process restart
+retain the original database and key. A later complete delivery supplies the missing policy and
+allows normal startup. An empty installation or credentials-only delivery can still onboard.
+
+Backup preparation writes explicit onboarding and security defaults for an established source or a
+proven empty installation. It refuses to manufacture defaults for an unverified restored journal.
+Existing explicit policies remain unchanged, including biometric protection and unfinished
+onboarding. Legacy onboarding metadata without a security field retains its established default.
+Native preferences are staged privately, parsed, and committed through the same canonical DataStore
+used by application consumers. A live reader therefore observes a transferred biometric policy
+instead of a cached unlocked policy. A delivery receipt also prevents old destination preferences
+from authorizing transferred content when the source preferences never arrive.
+Completed native-delivery fingerprints keep validation active after restore work is acknowledged,
+so a second launch cannot bypass the check.
 
 `RestoreCredentialCleanupRuntimeTest` checks encrypted-storage recreation, worker retry, and
 production dependency injection and scheduling. Its `cleanupSurvivesAppProcessRestart` test accepts
