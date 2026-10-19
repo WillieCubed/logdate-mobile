@@ -1,16 +1,11 @@
 package app.logdate.client.reminders
 
-import android.Manifest
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import app.logdate.client.MainActivity
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_DRAFT
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
@@ -46,15 +41,8 @@ class PhoneMomentReminderNotifier(
         } else if (supplemental != null) {
             return false
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return false
-        }
+        if (!LogDateNotificationRegistrar(context).canPost(CHANNEL)) return false
         val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return false
-        LogDateNotificationRegistrar(context).registerChannel(CHANNEL)
-        if (manager.getNotificationChannel(CHANNEL.id)?.importance == NotificationManager.IMPORTANCE_NONE) return false
         val (title, message) = content(trigger)
         val body =
             buildString {

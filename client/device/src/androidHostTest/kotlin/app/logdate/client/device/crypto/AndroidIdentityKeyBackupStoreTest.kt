@@ -217,6 +217,37 @@ class AndroidIdentityKeyBackupStoreTest {
             assertTrue(store.hasBackup())
         }
 
+    @Test
+    fun `malformed account recovery material cannot escape in exception diagnostics`() =
+        runTest {
+            val secret = Base64.encode(ByteArray(32) { 71 })
+            val file =
+                File(tempDir, "identity_recovery/account_key_backup").apply {
+                    parentFile?.mkdirs()
+                    writeText("""{"version":2,"accountId":"synthetic","key":"$secret","checksum":"""")
+                }
+            val original = file.readBytes()
+            val failure = assertFailsWith<IllegalStateException> { store.readAccountIdentity() }
+            assertTrue(secret !in failure.stackTraceToString())
+            assertContentEquals(original, file.readBytes())
+        }
+
+    @Test
+    fun `malformed media recovery material cannot escape in exception diagnostics`() =
+        runTest {
+            val secret = Base64.encode(ByteArray(32) { 72 })
+            val binding = Base64.encode(ByteArray(32) { 73 })
+            val file =
+                File(tempDir, "identity_recovery/media_key_backup").apply {
+                    parentFile?.mkdirs()
+                    writeText("""{"version":1,"identities":[{"identityBinding":"$binding","key":"$secret","checksum":"""")
+                }
+            val original = file.readBytes()
+            val failure = assertFailsWith<IllegalStateException> { store.readMediaIdentity(binding) }
+            assertTrue(secret !in failure.stackTraceToString())
+            assertContentEquals(original, file.readBytes())
+        }
+
     @AfterTest
     fun cleanup() {
         tempDir.deleteRecursively()

@@ -71,8 +71,8 @@ class AndroidIdentityKeyBackupStore(
                 }
             }
             stored.identities
-        } catch (error: Exception) {
-            throw IllegalStateException("The retained media recovery backup could not be read", error)
+        } catch (_: Exception) {
+            throw IllegalStateException("The retained media recovery backup could not be read")
         }
     }
 
@@ -117,9 +117,9 @@ class AndroidIdentityKeyBackupStore(
                     "Account identity backup integrity check failed"
                 }
                 AccountIdentityBackup(stored.accountId, key, media)
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 Napier.w("Native account identity backup needs recovery")
-                throw IllegalStateException("The retained account identity backup could not be read", error)
+                throw IllegalStateException("The retained account identity backup could not be read")
             }
         }
 
@@ -150,8 +150,8 @@ class AndroidIdentityKeyBackupStore(
             runCatching {
                 val phrase = file.readText().trim()
                 phrase.ifEmpty { null }
-            }.getOrElse { error ->
-                Napier.w("Failed to read identity recovery phrase backup", error)
+            }.getOrElse {
+                Napier.w("Failed to read identity recovery phrase backup")
                 null
             }
         }

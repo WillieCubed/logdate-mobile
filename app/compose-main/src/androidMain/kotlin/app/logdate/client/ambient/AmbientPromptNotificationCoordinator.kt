@@ -15,6 +15,7 @@ import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
 import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.util.toReadableDateAllDay
 import app.logdate.util.toReadableDateTimeShort
 import io.github.aakira.napier.Napier
@@ -32,6 +33,7 @@ class AmbientPromptNotificationCoordinator(
         if (candidate.family == AmbientPromptFamily.EVENT_NUDGE && !FeatureFlag.EVENTS.availableForLaunch) return false
         return runCatching {
             val channelKey = candidate.channelKey()
+            if (!LogDateNotificationRegistrar(context).canPost(channelKey)) return false
             val notificationId = channelKey.notificationId ?: candidate.dedupeKey.hashCode()
             val content = notificationContent(candidate)
             val builder =
