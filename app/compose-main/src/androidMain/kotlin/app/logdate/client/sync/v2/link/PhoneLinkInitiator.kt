@@ -26,7 +26,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -83,25 +85,52 @@ class PhoneLinkInitiator(
     private suspend fun reconcileWhileActive() =
         coroutineScope {
             val retries = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+            var storageRetry: Job? = null
+            var storageFailures = 0
             launch {
-                store.observe().collectLatest { records ->
-                    val dueTimes =
-                        records.values
-                            .filter { it.failure != null }
-                            .map { it.nextAttemptAt }
-                            .distinct()
-                            .sorted()
-                    dueTimes.forEach { due ->
-                        delay((due - clock.now().toEpochMilliseconds()).coerceAtLeast(0L))
-                        retries.emit(Unit)
+                store
+                    .observe()
+                    .onCompletion { cause ->
+                        if (cause == null) error("Watch-link observation ended before linking stopped")
+                    }.retryWhen { cause, attempt ->
+                        if (cause is CancellationException) throw cause
+                        Napier.w("Watch-link retry scheduling will reconnect to storage", cause)
+                        delay(minOf(60_000L shl attempt.coerceAtMost(9).toInt(), 6L * 60 * 60 * 1000))
+                        true
+                    }.collectLatest { records ->
+                        val dueTimes =
+                            records.values
+                                .filter { it.failure != null }
+                                .map { it.nextAttemptAt }
+                                .distinct()
+                                .sorted()
+                        dueTimes.forEach { due ->
+                            delay((due - clock.now().toEpochMilliseconds()).coerceAtLeast(0L))
+                            retries.emit(Unit)
+                        }
                     }
-                }
             }
             combine(watchDocuments, retries.onStart { emit(Unit) }) { documents, _ -> documents }
                 .conflate()
                 .collect { documents ->
                     latest.value = Trigger(active = true, documents = documents)
-                    reconcile(documents)
+                    try {
+                        reconcile(documents)
+                        storageFailures = 0
+                        storageRetry?.cancel()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Napier.w("Watch linking could not persist its state; it will retry automatically", e)
+                        val retryDelay = minOf(60_000L shl storageFailures.coerceAtMost(9), 6L * 60 * 60 * 1000)
+                        storageFailures++
+                        storageRetry?.cancel()
+                        storageRetry =
+                            launch {
+                                delay(retryDelay)
+                                retries.emit(Unit)
+                            }
+                    }
                 }
         }
 
@@ -138,9 +167,10 @@ class PhoneLinkInitiator(
         target: LinkTarget,
         document: StateDocument?,
     ) {
+        val generation = store.generation(target.nodeId)
         if (store.removalSuppressed(target.nodeId)) return
         val now = clock.now().toEpochMilliseconds()
-        val record = store.get(target.nodeId)
+        val record = store.getForReconciliation(target.nodeId)
         val watch = document?.watch
         if (record?.linkId != null && watch?.linkId == record.linkId) {
             watch.sessionId?.let { store.recordSession(target.nodeId, record.linkId, it) }
@@ -148,9 +178,9 @@ class PhoneLinkInitiator(
         val plan = bundles.plan(document?.watch?.features.orEmpty())
         when (val decision = PhoneLinkDecision.decide(record, plan, document, now)) {
             PhoneLinkDecision.Wait -> Unit
-            PhoneLinkDecision.Exchange -> runExchange(target, plan, document, now)
-            PhoneLinkDecision.Confirm -> confirm(target, checkNotNull(record).mode, checkNotNull(document), now)
-            is PhoneLinkDecision.WatchProblem -> recordWatchProblem(target, plan, decision.failure, checkNotNull(document), now)
+            PhoneLinkDecision.Exchange -> runExchange(target, plan, document, now, generation)
+            PhoneLinkDecision.Confirm -> confirm(target, checkNotNull(record), checkNotNull(document), now)
+            is PhoneLinkDecision.WatchProblem -> recordWatchProblem(target, plan, decision.failure, checkNotNull(document), now, generation)
         }
     }
 
@@ -160,8 +190,10 @@ class PhoneLinkInitiator(
         failure: PhoneLinkFailure,
         document: StateDocument,
         now: Long,
+        generation: Long,
     ) {
-        val record = store.recordFailure(target, plan, failure, at = now, seenWatchDocAt = document.writtenAt)
+        val record =
+            store.recordFailure(target, plan, failure, at = now, seenWatchDocAt = document.writtenAt, generation = generation) ?: return
         Napier.w("${target.displayName} could not install the account link: $failure; it is tried again after ${record.nextAttemptAt}")
         if (failure.needsAttention && store.claimAttention(target.nodeId, failure)) notifier.needsAttention(target, failure)
     }
@@ -171,18 +203,31 @@ class PhoneLinkInitiator(
         plan: LinkPlan,
         document: StateDocument?,
         now: Long,
+        generation: Long,
     ) {
+        if (!store.isAttemptCurrent(target.nodeId, generation)) return
         val seen = document?.writtenAt ?: 0L
-        val outcome = exchangeWith(target, plan)
+        val outcome = exchangeWith(target, plan, generation)
         if (!isActive()) return
         when (outcome) {
             is ExchangeOutcome.Linked -> {
-                store.recordSuccess(target, plan, outcome.pairKey, at = now, seenWatchDocAt = seen, linkId = outcome.linkId)
+                val record =
+                    store.recordSuccess(
+                        target,
+                        plan,
+                        outcome.pairKey,
+                        at = now,
+                        seenWatchDocAt = seen,
+                        linkId = outcome.linkId,
+                        generation = generation,
+                    )
+                        ?: return
                 Napier.i("Linked ${target.displayName} in ${plan.mode} mode")
-                if (plan.mode == LinkMode.PAIR) confirm(target, plan.mode, document, now)
+                if (plan.mode == LinkMode.PAIR) confirm(target, record, document, now)
             }
             is ExchangeOutcome.Failed -> {
-                val record = store.recordFailure(target, plan, outcome.failure, at = now, seenWatchDocAt = seen)
+                val record =
+                    store.recordFailure(target, plan, outcome.failure, at = now, seenWatchDocAt = seen, generation = generation) ?: return
                 Napier.w("Linking ${target.displayName} failed with ${outcome.failure}; it is tried again after ${record.nextAttemptAt}")
                 if (outcome.failure.needsAttention &&
                     store.claimAttention(target.nodeId, outcome.failure)
@@ -195,17 +240,25 @@ class PhoneLinkInitiator(
 
     private suspend fun confirm(
         target: LinkTarget,
-        mode: LinkMode,
+        record: PhoneWatchLink,
         document: StateDocument?,
         now: Long,
     ) {
-        if (store.get(target.nodeId)?.confirmedAt == null) notifier.linked(target, mode)
-        store.markConfirmed(target.nodeId, at = now, seenWatchDocAt = document?.writtenAt ?: 0L, sessionId = document?.watch?.sessionId)
+        val newlyConfirmed =
+            store.markConfirmed(
+                target.nodeId,
+                at = now,
+                seenWatchDocAt = document?.writtenAt ?: 0L,
+                expectedLinkId = record.linkId,
+                sessionId = document?.watch?.sessionId,
+            )
+        if (newlyConfirmed) notifier.linked(target, record.mode)
     }
 
     private suspend fun exchangeWith(
         target: LinkTarget,
         plan: LinkPlan,
+        generation: Long,
     ): ExchangeOutcome {
         val phoneNode = localNodeId() ?: return ExchangeOutcome.Failed(PhoneLinkFailure.PHONE_NODE_UNKNOWN)
         val started = exchange.start(plan.mode, phoneNode)
@@ -219,7 +272,11 @@ class PhoneLinkInitiator(
                 is LinkAnswer.Refused -> return ExchangeOutcome.Failed(answer.reason.toFailure())
                 is LinkAnswer.Unreadable -> return ExchangeOutcome.Failed(PhoneLinkFailure.ANSWER_UNREADABLE)
             }
-        if (!isActive()) return ExchangeOutcome.Failed(PhoneLinkFailure.WATCH_CANNOT_LINK)
+        if (!isActive() ||
+            !store.isAttemptCurrent(target.nodeId, generation)
+        ) {
+            return ExchangeOutcome.Failed(PhoneLinkFailure.WATCH_CANNOT_LINK)
+        }
         val bundle =
             when (val result = bundles.bundle(plan)) {
                 is LinkBundleResult.Ready -> result.bundle
@@ -230,14 +287,20 @@ class PhoneLinkInitiator(
                 is LinkStep.Ok -> step.value
                 is LinkStep.Failed -> return ExchangeOutcome.Failed(step.failure.toFailure())
             }
-        return finish(target, sealed)
+        if (!store.isAttemptCurrent(target.nodeId, generation)) return ExchangeOutcome.Failed(PhoneLinkFailure.WATCH_CANNOT_LINK)
+        return finish(target, sealed, generation)
     }
 
     private suspend fun finish(
         target: LinkTarget,
         sealed: PhoneLinkExchange.Sealed,
+        generation: Long,
     ): ExchangeOutcome {
-        if (!isActive()) return ExchangeOutcome.Failed(PhoneLinkFailure.WATCH_CANNOT_LINK)
+        if (!isActive() ||
+            !store.isAttemptCurrent(target.nodeId, generation)
+        ) {
+            return ExchangeOutcome.Failed(PhoneLinkFailure.WATCH_CANNOT_LINK)
+        }
         val bundleAnswer =
             requester
                 .request(target.nodeId, WearPaths.LINK_BUNDLE, LinkWire.write(SealedLinkBundle.serializer(), sealed.bundle))

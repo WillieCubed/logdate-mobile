@@ -10,6 +10,7 @@ import okio.Path.Companion.toPath
  */
 internal fun createDataStore(producePath: () -> String): DataStore<Preferences> =
     PreferenceDataStoreFactory.createWithPath(
+        migrations = listOf(LegacyCloudCredentialMigration()),
         produceFile = { producePath().toPath() },
     )
 

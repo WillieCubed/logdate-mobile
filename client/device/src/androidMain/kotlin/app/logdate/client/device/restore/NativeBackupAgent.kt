@@ -12,6 +12,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import app.logdate.client.datastore.LegacyCloudCredentialMigration
 import app.logdate.client.device.crypto.AndroidCryptoManager
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -61,6 +62,21 @@ open class NativeBackupAgent : BackupAgent() {
             }
         } catch (error: Exception) {
             throw IOException("Native encryption recovery material could not be prepared", error)
+        }
+        // Backup may run before the first normal launch after an upgrade.
+        val job = SupervisorJob()
+        val scope = CoroutineScope(job + Dispatchers.IO)
+        try {
+            val preferences =
+                PreferenceDataStoreFactory.create(
+                    scope = scope,
+                    migrations = listOf(LegacyCloudCredentialMigration()),
+                    produceFile = { File(filesDir, "logdate.preferences_pb") },
+                )
+            runBlocking(Dispatchers.IO) { preferences.data.first() }
+        } finally {
+            scope.cancel()
+            runBlocking { job.join() }
         }
         super.onFullBackup(data)
     }

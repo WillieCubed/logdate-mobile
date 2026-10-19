@@ -25,6 +25,11 @@ class DataStoreKeyValueStorage(
 ) : KeyValueStorage {
     override suspend fun getStringOrThrow(key: String): String? = dataStore.data.first()[stringPreferencesKey(key)]
 
+    override suspend fun getBooleanOrThrow(
+        key: String,
+        defaultValue: Boolean,
+    ): Boolean = dataStore.data.first()[booleanPreferencesKey(key)] ?: defaultValue
+
     override suspend fun putStringOrThrow(
         key: String,
         value: String,

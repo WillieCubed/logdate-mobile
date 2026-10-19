@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
-/** Strings in memory, observable, for the phone's version 2 tests; other value types read back their defaults. */
+/** Strings and booleans in memory, observable, for the phone's version 2 tests. */
 class MemoryKeyValueStorage : KeyValueStorage {
     private val strings = MutableStateFlow<Map<String, String>>(emptyMap())
 
@@ -29,12 +29,14 @@ class MemoryKeyValueStorage : KeyValueStorage {
     override suspend fun getBoolean(
         key: String,
         defaultValue: Boolean,
-    ): Boolean = defaultValue
+    ): Boolean = strings.value[key]?.toBooleanStrictOrNull() ?: defaultValue
 
     override suspend fun putBoolean(
         key: String,
         value: Boolean,
-    ) = Unit
+    ) {
+        putString(key, value.toString())
+    }
 
     override suspend fun getInt(
         key: String,
@@ -81,7 +83,7 @@ class MemoryKeyValueStorage : KeyValueStorage {
     override fun observeBoolean(
         key: String,
         defaultValue: Boolean,
-    ): Flow<Boolean> = flowOf(defaultValue)
+    ): Flow<Boolean> = strings.map { it[key]?.toBooleanStrictOrNull() ?: defaultValue }.distinctUntilChanged()
 
     override fun observeInt(
         key: String,

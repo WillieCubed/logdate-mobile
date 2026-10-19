@@ -69,10 +69,31 @@ class PhoneWatchLinkStore(
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = MapSerializer(String.serializer(), PhoneWatchLink.serializer())
     private val mutex = Mutex()
+    private val generations = mutableMapOf<String, Long>()
+
+    suspend fun generation(nodeId: String): Long = mutex.withLock { generations[nodeId] ?: 0L }
+
+    suspend fun isAttemptCurrent(
+        nodeId: String,
+        generation: Long,
+    ): Boolean = mutex.withLock { (generations[nodeId] ?: 0L) == generation && !removalSuppressed(nodeId) }
 
     fun observe(): Flow<Map<String, PhoneWatchLink>> = storage.observeString(KEY).map(::decode).distinctUntilChanged()
 
     suspend fun get(nodeId: String): PhoneWatchLink? = decode(storage.getString(KEY))[nodeId]
+
+    /** A copied success record cannot stand in for the installation's excluded pair key. */
+    suspend fun getForReconciliation(nodeId: String): PhoneWatchLink? =
+        mutex.withLock {
+            val records = decode(storage.getStringOrThrow(KEY))
+            val record = records[nodeId] ?: return@withLock null
+            if (record.failure == null && record.linkedAt != null && pairKeys.get(nodeId)?.size != 32) {
+                storage.putStringOrThrow(KEY, json.encodeToString(serializer, records - nodeId))
+                null
+            } else {
+                record
+            }
+        }
 
     suspend fun recordSuccess(
         target: LinkTarget,
@@ -81,33 +102,52 @@ class PhoneWatchLinkStore(
         at: Long,
         seenWatchDocAt: Long,
         linkId: String? = null,
-    ): PhoneWatchLink {
-        pairKeys.put(target.nodeId, pairKey)
-        return update(target.nodeId) { previous ->
+        generation: Long? = null,
+    ): PhoneWatchLink? =
+        mutex.withLock {
+            if (removalSuppressed(target.nodeId) ||
+                (generation != null && (generations[target.nodeId] ?: 0L) != generation)
+            ) {
+                return@withLock null
+            }
+            val previous = decode(storage.getStringOrThrow(KEY))[target.nodeId]
             val samePlan = previous.matches(plan)
-            PhoneWatchLink(
-                nodeId = target.nodeId,
-                displayName = target.displayName,
-                mode = plan.mode,
-                accountId = plan.accountId,
-                serverOrigin = plan.serverOrigin,
-                linkedAt = at,
-                confirmedAt =
-                    previous?.confirmedAt?.takeIf {
-                        previous.mode == plan.mode &&
-                            previous.accountId == plan.accountId &&
-                            previous.serverOrigin == plan.serverOrigin &&
-                            previous.linkId == linkId
-                    },
-                attempts = if (samePlan) previous?.attempts ?: 0 else 0,
-                lastFailure = previous?.lastFailure?.takeIf { samePlan },
-                attentionShown = if (samePlan) previous?.attentionShown.orEmpty() else emptySet(),
-                lastAttemptAt = at,
-                seenWatchDocAt = seenWatchDocAt,
-                linkId = linkId,
-            )
+            val success =
+                PhoneWatchLink(
+                    nodeId = target.nodeId,
+                    displayName = target.displayName,
+                    mode = plan.mode,
+                    accountId = plan.accountId,
+                    serverOrigin = plan.serverOrigin,
+                    linkedAt = at,
+                    confirmedAt =
+                        previous?.confirmedAt?.takeIf {
+                            previous.mode == plan.mode &&
+                                previous.accountId == plan.accountId &&
+                                previous.serverOrigin == plan.serverOrigin &&
+                                previous.linkId == linkId
+                        },
+                    attempts = if (samePlan) previous?.attempts ?: 0 else 0,
+                    lastFailure = previous?.lastFailure?.takeIf { samePlan },
+                    attentionShown = if (samePlan) previous?.attentionShown.orEmpty() else emptySet(),
+                    lastAttemptAt = at,
+                    seenWatchDocAt = seenWatchDocAt,
+                    linkId = linkId,
+                )
+            updateUnderLock(target.nodeId) {
+                success.copy(
+                    linkedAt = null,
+                    confirmedAt = null,
+                    failure = PhoneLinkFailure.KEYS_UNAVAILABLE,
+                    attempts = maxOf(success.attempts, 1),
+                    nextAttemptAt = at + FIRST_WAIT_MS,
+                    linkId = null,
+                    sessionId = null,
+                )
+            }
+            pairKeys.put(target.nodeId, pairKey)
+            updateUnderLock(target.nodeId) { success }
         }
-    }
 
     suspend fun recordFailure(
         target: LinkTarget,
@@ -115,74 +155,95 @@ class PhoneWatchLinkStore(
         failure: PhoneLinkFailure,
         at: Long,
         seenWatchDocAt: Long,
-    ): PhoneWatchLink =
-        update(target.nodeId) { previous ->
-            val samePlan = previous.matches(plan)
-            val attempts =
-                if (samePlan &&
-                    (previous?.failure ?: previous?.lastFailure) == failure
-                ) {
-                    checkNotNull(previous).attempts + 1
-                } else {
-                    1
-                }
-            PhoneWatchLink(
-                nodeId = target.nodeId,
-                displayName = target.displayName,
-                mode = plan.mode,
-                accountId = plan.accountId,
-                serverOrigin = plan.serverOrigin,
-                linkedAt = previous?.linkedAt?.takeIf { samePlan },
-                confirmedAt = previous?.confirmedAt?.takeIf { samePlan },
-                failure = failure,
-                lastFailure = failure,
-                attentionShown = if (samePlan) previous?.attentionShown.orEmpty() else emptySet(),
-                attempts = attempts,
-                lastAttemptAt = at,
-                nextAttemptAt = at + backoffMs(attempts),
-                seenWatchDocAt = maxOf(seenWatchDocAt, previous?.seenWatchDocAt ?: 0),
-                linkId = previous?.linkId?.takeIf { samePlan },
-            )
+        generation: Long? = null,
+    ): PhoneWatchLink? =
+        mutex.withLock {
+            if (removalSuppressed(target.nodeId) ||
+                (generation != null && (generations[target.nodeId] ?: 0L) != generation)
+            ) {
+                return@withLock null
+            }
+            updateUnderLock(target.nodeId) { previous ->
+                val samePlan = previous.matches(plan)
+                val attempts =
+                    if (samePlan &&
+                        (previous?.failure ?: previous?.lastFailure) == failure
+                    ) {
+                        checkNotNull(previous).attempts + 1
+                    } else {
+                        1
+                    }
+                PhoneWatchLink(
+                    nodeId = target.nodeId,
+                    displayName = target.displayName,
+                    mode = plan.mode,
+                    accountId = plan.accountId,
+                    serverOrigin = plan.serverOrigin,
+                    linkedAt = previous?.linkedAt?.takeIf { samePlan },
+                    confirmedAt = previous?.confirmedAt?.takeIf { samePlan },
+                    failure = failure,
+                    lastFailure = failure,
+                    attentionShown = if (samePlan) previous?.attentionShown.orEmpty() else emptySet(),
+                    attempts = attempts,
+                    lastAttemptAt = at,
+                    nextAttemptAt = at + backoffMs(attempts),
+                    seenWatchDocAt = maxOf(seenWatchDocAt, previous?.seenWatchDocAt ?: 0),
+                    linkId = previous?.linkId?.takeIf { samePlan },
+                )
+            }
         }
 
     suspend fun markConfirmed(
         nodeId: String,
         at: Long,
         seenWatchDocAt: Long,
+        expectedLinkId: String?,
         sessionId: String? = null,
-    ) {
-        update(nodeId) { previous ->
-            checkNotNull(previous) { "Only a recorded link can be confirmed" }.copy(
-                confirmedAt = at,
-                sessionId = sessionId ?: previous.sessionId,
-                seenWatchDocAt = seenWatchDocAt,
-                attempts = 0,
-                lastFailure = null,
-                attentionShown = emptySet(),
-            )
+    ): Boolean =
+        mutex.withLock {
+            val previous = decode(storage.getStringOrThrow(KEY))[nodeId] ?: return@withLock false
+            if (removalSuppressed(nodeId) || previous.linkId != expectedLinkId || pairKeys.get(nodeId)?.size != 32) return@withLock false
+            updateUnderLock(nodeId) {
+                previous.copy(
+                    confirmedAt = at,
+                    sessionId = sessionId ?: previous.sessionId,
+                    seenWatchDocAt = seenWatchDocAt,
+                    attempts = 0,
+                    lastFailure = null,
+                    attentionShown = emptySet(),
+                )
+            }
+            previous.confirmedAt == null
         }
-    }
 
     suspend fun recordSession(
         nodeId: String,
         linkId: String,
         sessionId: String,
     ) {
-        update(nodeId) { previous ->
-            checkNotNull(previous).let { if (it.linkId == linkId) it.copy(sessionId = sessionId) else it }
+        mutex.withLock {
+            val previous = decode(storage.getStringOrThrow(KEY))[nodeId] ?: return@withLock
+            if (!removalSuppressed(nodeId) && previous.linkId == linkId) {
+                updateUnderLock(nodeId) { previous.copy(sessionId = sessionId) }
+            }
         }
     }
 
-    suspend fun removalSuppressed(nodeId: String): Boolean = storage.getBoolean("watch.removed.$nodeId")
+    suspend fun removalSuppressed(nodeId: String): Boolean = storage.getBooleanOrThrow("watch.removed.$nodeId")
 
-    suspend fun allowRelink(nodeId: String) = storage.remove("watch.removed.$nodeId")
+    suspend fun allowRelink(nodeId: String) =
+        mutex.withLock {
+            generations[nodeId] = (generations[nodeId] ?: 0L) + 1
+            storage.remove("watch.removed.$nodeId")
+        }
 
     suspend fun forget(nodeId: String) =
         mutex.withLock {
+            generations[nodeId] = (generations[nodeId] ?: 0L) + 1
             storage.putBoolean("watch.removed.$nodeId", true)
-            check(storage.getBoolean("watch.removed.$nodeId"))
-            val records = decode(storage.getString(KEY)) - nodeId
-            storage.putString(KEY, json.encodeToString(serializer, records))
+            check(storage.getBooleanOrThrow("watch.removed.$nodeId"))
+            val records = decode(storage.getStringOrThrow(KEY)) - nodeId
+            storage.putStringOrThrow(KEY, json.encodeToString(serializer, records))
             check(decode(storage.getString(KEY))[nodeId] == null)
             pairKeys.remove(nodeId)
         }
@@ -192,10 +253,11 @@ class PhoneWatchLinkStore(
         failure: PhoneLinkFailure,
     ): Boolean {
         var claimed = false
-        update(nodeId) { previous ->
-            val record = checkNotNull(previous)
+        mutex.withLock {
+            val record = decode(storage.getStringOrThrow(KEY))[nodeId] ?: return@withLock
+            if (removalSuppressed(nodeId) || record.failure != failure) return@withLock
             claimed = failure !in record.attentionShown
-            record.copy(attentionShown = record.attentionShown + failure)
+            updateUnderLock(nodeId) { record.copy(attentionShown = record.attentionShown + failure) }
         }
         return claimed
     }
@@ -203,16 +265,15 @@ class PhoneWatchLinkStore(
     private fun PhoneWatchLink?.matches(plan: LinkPlan): Boolean =
         this != null && mode == plan.mode && accountId == plan.accountId && serverOrigin == plan.serverOrigin
 
-    private suspend fun update(
+    private suspend fun updateUnderLock(
         nodeId: String,
         change: (PhoneWatchLink?) -> PhoneWatchLink,
-    ): PhoneWatchLink =
-        mutex.withLock {
-            val all = decode(storage.getString(KEY))
-            val changed = change(all[nodeId])
-            storage.putString(KEY, json.encodeToString(serializer, all + (nodeId to changed)))
-            changed
-        }
+    ): PhoneWatchLink {
+        val all = decode(storage.getStringOrThrow(KEY))
+        val changed = change(all[nodeId])
+        storage.putStringOrThrow(KEY, json.encodeToString(serializer, all + (nodeId to changed)))
+        return changed
+    }
 
     private fun decode(text: String?): Map<String, PhoneWatchLink> {
         if (text == null) return emptyMap()

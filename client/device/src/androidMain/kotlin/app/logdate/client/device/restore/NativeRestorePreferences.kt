@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import app.logdate.client.datastore.LegacyCloudCredentialMigration
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -13,10 +14,15 @@ internal suspend fun resetRestoredInstallationState(
     preferences: DataStore<Preferences>,
     sourceDeviceId: String?,
 ) {
-    if (sourceDeviceId == null) return
     val deviceIdKey = stringPreferencesKey("device.id")
     preferences.edit { restored ->
-        if (restored[deviceIdKey] == sourceDeviceId) restored.remove(deviceIdKey)
+        val clean = LegacyCloudCredentialMigration.withoutCredentials(restored)
+        restored
+            .asMap()
+            .keys
+            .filter { it !in clean.asMap() }
+            .forEach { restored.remove(it) }
+        if (sourceDeviceId != null && restored[deviceIdKey] == sourceDeviceId) restored.remove(deviceIdKey)
     }
 }
 
