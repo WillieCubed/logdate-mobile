@@ -6,7 +6,7 @@
 // Permission sets and space declarations are read again by authorization servers while apps'
 // sessions are live, so a change to one changes what apps that already asked for it can do. Adding
 // access is allowed; taking any away is breaking.
-import { values } from "./declarations.mjs";
+import { namespaceGroup, permissionProblems, values } from "./declarations.mjs";
 
 /**
  * Returns one message per breaking change from `before` to `after`, each prefixed with the
@@ -17,12 +17,12 @@ export function breakingChanges(before, after) {
   for (const [name, oldDef] of Object.entries(before.defs ?? {})) {
     const newDef = after.defs?.[name];
     if (!newDef) problems.push(`#${name}: the definition was removed`);
-    else compareDefinition(`#${name}`, oldDef, newDef, problems);
+    else compareDefinition(`#${name}`, oldDef, newDef, problems, namespaceGroup(after.id ?? before.id ?? ""));
   }
   return problems;
 }
 
-function compareDefinition(path, before, after, problems) {
+function compareDefinition(path, before, after, problems, group) {
   if (before.type !== after.type) {
     problems.push(`${path}: the type changed from ${before.type} to ${after.type}`);
     return;
@@ -45,7 +45,7 @@ function compareDefinition(path, before, after, problems) {
       }
       return;
     case "permission-set":
-      comparePermissionSet(path, before, after, problems);
+      comparePermissionSet(path, before, after, problems, group);
       return;
     case "space":
       compareSpace(path, before, after, problems);
@@ -182,9 +182,11 @@ function compareSpace(path, before, after, problems) {
 }
 
 // Every grant the old set made must still be made by some permission in the new one.
-function comparePermissionSet(path, before, after, problems) {
-  const newPermissions = after.permissions ?? [];
-  for (const permission of before.permissions ?? []) {
+function comparePermissionSet(path, before, after, problems, group) {
+  // An authorization server ignores an entry it can't read, so a malformed one grants nothing.
+  const granted = (set) => (set.permissions ?? []).filter((permission) => permissionProblems(permission, group).length === 0);
+  const newPermissions = granted(after);
+  for (const permission of granted(before)) {
     for (const grant of grants(permission)) {
       if (!newPermissions.some((candidate) => covers(candidate, grant))) {
         problems.push(`${path}.permissions: the set no longer grants ${grant.label}`);

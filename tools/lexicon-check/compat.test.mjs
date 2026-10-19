@@ -249,7 +249,7 @@ test("narrowing a space permission breaks", () => {
   assert.deepEqual(
     editSet((permissions) => {
       permissions[2].action = ["read_self"];
-      permissions[2].manage = [];
+      delete permissions[2].manage;
     }),
     narrowed,
   );
@@ -268,6 +268,37 @@ test("listing a space permission's collections where it used the declared ones b
     editSet((permissions) => (permissions[2].collection = ["*"])),
     [],
   );
+});
+
+test("a malformed permission grants nothing, so a typo that drops a grant breaks", () => {
+  const lostRepo = ["app.logdate.actor.profile", "app.logdate.share.item"].flatMap((collection) =>
+    ["create", "update", "delete"].map((action) => `#main.permissions: the set no longer grants repo ${action} on ${collection}`),
+  );
+  assert.deepEqual(
+    editSet((permissions) => {
+      permissions[0].collections = permissions[0].collection;
+      delete permissions[0].collection;
+    }),
+    lostRepo,
+  );
+  assert.deepEqual(
+    editSet((permissions) => (permissions[0].action = "create")),
+    lostRepo,
+  );
+  assert.deepEqual(
+    editSet((permissions) => (permissions[2].authority = ["*"])),
+    [
+      `#main.permissions: the set no longer grants read in ${circles}`,
+      `#main.permissions: the set no longer grants create of the space type's declared collections in ${circles}`,
+      `#main.permissions: the set no longer grants manage=create of ${circles}`,
+    ],
+  );
+});
+
+test("fixing a malformed permission isn't breaking", () => {
+  const malformed = clone(permissionSet);
+  malformed.defs.main.permissions[2].authority = ["*"];
+  assert.deepEqual(breakingChanges(malformed, permissionSet), []);
 });
 
 test("read covers read_self", () => {
