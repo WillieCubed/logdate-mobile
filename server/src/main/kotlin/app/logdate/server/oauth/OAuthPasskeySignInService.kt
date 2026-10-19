@@ -3,6 +3,7 @@ package app.logdate.server.oauth
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.passkeys.OAUTH_AUTHORIZATION_CHALLENGE_TYPE
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.shared.model.AuthenticatorAssertionResponse
 import app.logdate.shared.model.PasskeyAssertionResponse
@@ -84,7 +85,7 @@ class OAuthPasskeySignInService(
         val hintedAccount = prompt.loginHint?.let { findHintedAccount(it) }
         val options =
             webAuthnService.generateBoundAuthenticationOptions(
-                purpose = CHALLENGE_PURPOSE,
+                purpose = OAUTH_AUTHORIZATION_CHALLENGE_TYPE,
                 binding = challengeBinding(prompt.requestUri),
                 credentialOwner = hintedAccount?.id,
             )
@@ -114,7 +115,7 @@ class OAuthPasskeySignInService(
             webAuthnService.verifyBoundAuthentication(
                 challenge = challenge,
                 authenticationResponse = credential.toAuthenticationResponse(),
-                purpose = CHALLENGE_PURPOSE,
+                purpose = OAUTH_AUTHORIZATION_CHALLENGE_TYPE,
                 binding = challengeBinding(prompt.requestUri),
             )
         val accountId = verification.userId
@@ -187,9 +188,6 @@ class OAuthPasskeySignInService(
     private companion object {
         const val USER_VERIFICATION_REQUIRED = "required"
         const val DID_PREFIX = "did:"
-
-        /** Keeps authorization-page challenges apart from app sign-in challenges; fits the 20-character column. */
-        const val CHALLENGE_PURPOSE = "oauth_authorize"
 
         // Failure reasons reported by WebAuthnPasskeyService.verifyAuthentication.
         const val CREDENTIAL_NOT_FOUND = "Credential not found"
