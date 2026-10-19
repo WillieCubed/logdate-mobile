@@ -11,7 +11,7 @@ import app.logdate.server.openapi.ApiTags
 import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.SpaceDeleteRecordInput
 import app.logdate.server.routes.SpacePutRecordInput
-import app.logdate.server.routes.bearerOrDpopOperation
+import app.logdate.server.routes.bearerOperation
 import app.logdate.server.routes.binarySchema
 import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
@@ -36,8 +36,9 @@ internal object XrpcSpaceDocs {
     private val sealed = Sealed(ciphertext = Bytes(ByteArray(528)), keyId = "ck-2026-09", nonce = Bytes(ByteArray(12)), version = 1)
 
     private const val OWNER_ONLY =
-        "Only the space's owner can use it: send their access token. Any other space, including another " +
-            "account's, answers exactly as a missing record does, so nobody learns whether it exists."
+        "Only the space's owner can use it, from their own LogDate devices: send the LogDate access token from " +
+            "**Authentication** as `Authorization: Bearer`. Any other space, including another account's, answers " +
+            "exactly as a missing record does, so nobody learns whether it exists."
 
     private val recordNotFound =
         ErrorCase(
@@ -50,6 +51,14 @@ internal object XrpcSpaceDocs {
             "BlobNotFound",
             "No blob with that CID is in the space, or the space isn't yours. The two cases answer identically.",
             "Not found",
+        )
+    private val logDateTokenRequired =
+        ErrorCase(
+            "AuthRequired",
+            "No LogDate access token was sent, or it is invalid or expired. OAuth DPoP tokens, AT Protocol session " +
+                "tokens and linked device tokens are refused the same way: personal spaces are only for the owner's " +
+                "own LogDate devices. Refresh the access token and retry once; if that also fails, sign in again.",
+            "A LogDate access token is required",
         )
     private val invalidSpace = ErrorCase("InvalidRequest", "`space` is missing or isn't a space URI.", "space must be a space URI")
     private val invalidRecord =
@@ -73,7 +82,7 @@ internal object XrpcSpaceDocs {
         )
 
     val putRecord: RouteConfig.() -> Unit = {
-        bearerOrDpopOperation(
+        bearerOperation(
             "putSpaceRecord",
             ApiTags.XRPC,
             "Store one sealed record in your personal space",
@@ -99,11 +108,16 @@ internal object XrpcSpaceDocs {
             ok("The record is stored.", PutRecordOutput(cid = CID, seq = 42))
             pdsError(
                 HttpStatusCode.BadRequest,
-                ErrorCase("InvalidRequest", "The body isn't valid input, or `space` or `rkey` is malformed.", "rkey must be a record key"),
+                ErrorCase(
+                    "InvalidRequest",
+                    "The body isn't valid JSON input, `space` isn't a space URI, `rkey` isn't a record key, a value in `blobs` or " +
+                        "`swapCid` isn't a CID, or `blobs` lists more than 64 CIDs. The `message` says which.",
+                    "rkey must be a record key",
+                ),
                 invalidRecord,
                 recordNotFound,
             )
-            authRequired()
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(HttpStatusCode.Conflict, swapConflict)
             pdsError(
                 HttpStatusCode.PayloadTooLarge,
@@ -114,7 +128,7 @@ internal object XrpcSpaceDocs {
     }
 
     val deleteRecord: RouteConfig.() -> Unit = {
-        bearerOrDpopOperation(
+        bearerOperation(
             "deleteSpaceRecord",
             ApiTags.XRPC,
             "Delete a record from your personal space",
@@ -134,17 +148,21 @@ internal object XrpcSpaceDocs {
             ok("The record is deleted.", DeleteRecordOutput(seq = 43))
             pdsError(
                 HttpStatusCode.BadRequest,
-                ErrorCase("InvalidRequest", "The body isn't valid input, or `space` is malformed.", "Invalid deleteRecord input"),
+                ErrorCase(
+                    "InvalidRequest",
+                    "The body isn't valid JSON input, `space` isn't a space URI, `rkey` isn't a record key, or `swapCid` isn't a CID.",
+                    "rkey must be a record key",
+                ),
                 recordNotFound,
             )
-            authRequired()
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(HttpStatusCode.Conflict, swapConflict)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
 
     val getRecord: RouteConfig.() -> Unit = {
-        bearerOrDpopOperation(
+        bearerOperation(
             "getSpaceRecord",
             ApiTags.XRPC,
             "Read a record from your personal space",
@@ -165,16 +183,20 @@ internal object XrpcSpaceDocs {
             ok("The sealed record.", GetRecordOutput(cid = CID, seq = 42, value = sealed))
             pdsError(
                 HttpStatusCode.BadRequest,
-                ErrorCase("InvalidRequest", "`space` or `rkey` is missing or malformed.", "rkey is required"),
+                ErrorCase(
+                    "InvalidRequest",
+                    "`space` is missing or isn't a space URI, or `rkey` is missing or isn't a record key.",
+                    "rkey must be a record key",
+                ),
                 recordNotFound,
             )
-            authRequired()
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
 
     val listRepoOps: RouteConfig.() -> Unit = {
-        bearerOrDpopOperation(
+        bearerOperation(
             "listSpaceChanges",
             ApiTags.XRPC,
             "List changes in your personal space",
@@ -219,27 +241,28 @@ internal object XrpcSpaceDocs {
                 ),
                 recordNotFound,
             )
-            authRequired()
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
 
     val uploadBlob: RouteConfig.() -> Unit = {
-        bearerOrDpopOperation(
+        bearerOperation(
             "uploadSpaceBlob",
             ApiTags.XRPC,
             "Upload an encrypted file to your personal space",
             """
             `app.logdate.space.uploadBlob`. Stores an encrypted file, such as a photo sealed on the device, and
             returns the blob reference to keep inside a sealed record. Send the raw bytes as the body. List the
-            CID in `blobs` when you store the record; a blob no record refers to is deleted after a grace
-            period. Only the space's owner can upload: any other space answers `BlobNotFound`.
+            CID in `blobs` when you store the record: blobs that no record refers to are deleted by periodic
+            cleanup. Uploading bytes the space already holds stores them once. Only the space's owner can upload,
+            with a LogDate access token: any other space answers `BlobNotFound`.
             """,
         )
         request {
             spaceParameter()
             body(binarySchema()) {
-                description = "The encrypted file's bytes, at most 100 MiB."
+                description = "The encrypted file's bytes, at most 100 MiB (104,857,600 bytes)."
                 required = true
                 mediaTypes(ContentType.Application.OctetStream)
             }
@@ -247,27 +270,29 @@ internal object XrpcSpaceDocs {
         response {
             ok(
                 "The blob is stored. Its CID is the hash of the bytes sent.",
-                UploadBlobOutput(Blob(CidLink(Cid.require(BLOB_CID)), "application/octet-stream", 2_483_113)),
+                UploadBlobOutput(
+                    blob = Blob(ref = CidLink(cid = Cid.require(BLOB_CID)), mimeType = "application/octet-stream", size = 2_483_113),
+                ),
             )
             pdsError(HttpStatusCode.BadRequest, invalidSpace, blobNotFound)
-            authRequired()
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(
                 HttpStatusCode.PayloadTooLarge,
-                ErrorCase("BlobTooLarge", "The file is larger than 100 MiB.", "Blobs can be at most 100 MiB"),
+                ErrorCase("BlobTooLarge", "The file is larger than 100 MiB.", "Blobs can be at most 104857600 bytes"),
             )
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
 
     val getBlob: RouteConfig.() -> Unit = {
-        bearerOrDpopOperation(
+        bearerOperation(
             "getSpaceBlob",
             ApiTags.XRPC,
             "Download an encrypted file from your personal space",
             """
             `app.logdate.space.getBlob`. Returns the encrypted bytes of a blob in your personal space, to
-            decrypt on the device. Only the space's owner can download: any other space answers exactly as a
-            missing blob does.
+            decrypt on the device. Only the space's owner can download, with a LogDate access token: any other
+            space answers exactly as a missing blob does.
             """,
         )
         request {
@@ -285,10 +310,14 @@ internal object XrpcSpaceDocs {
             }
             pdsError(
                 HttpStatusCode.BadRequest,
-                ErrorCase("InvalidRequest", "`space` or `cid` is missing or malformed.", "cid is required"),
+                ErrorCase(
+                    "InvalidRequest",
+                    "`space` is missing or isn't a space URI, or `cid` is missing or isn't a CID.",
+                    "cid must be a CID",
+                ),
                 blobNotFound,
             )
-            authRequired()
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }

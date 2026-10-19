@@ -36,6 +36,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
 import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
@@ -59,14 +60,12 @@ internal const val MAX_SPACE_RECORD_REQUEST_BYTES: Long = 6L * 1024 * 1024
 
 private const val DEFAULT_CHANGES_LIMIT = 200
 private const val MAX_RECORD_BLOBS = 64
+private const val MAX_CID_LENGTH = 255
 private const val RECORD_NOT_FOUND = "RecordNotFound"
 private const val BLOB_NOT_FOUND = "BlobNotFound"
 private const val SPACE_BLOB_MIME_TYPE = "application/octet-stream"
 
 private val spaceJson = Json { ignoreUnknownKeys = true }
-
-/** Finds the signed-in account, or answers the call itself and returns null. */
-typealias SpaceAuth = suspend ApplicationCall.() -> Account?
 
 /**
  * The body of `app.logdate.space.putRecord`. Its record stays JSON, so the server stores exactly
@@ -93,18 +92,18 @@ internal data class SpaceDeleteRecordInput(
 /**
  * The `app.logdate.space.*` XRPC methods. Each account reaches only its own personal space; any
  * other space, including another account's, answers exactly as a missing record or blob does, so
- * nobody learns whether it exists. With [enabled] off, or without a [store], every method answers
- * `501 MethodNotImplemented`; the blob methods also need [blobStorage]. Every method checks the
- * access token first, so a caller without an account's token gets `401` whether or not the
- * feature is on.
- *
- * [auth] answers the call itself when there's no signed-in account and returns null.
+ * nobody learns whether it exists. Only the owner's own LogDate devices get in: [auth] accepts
+ * LogDate access tokens and nothing else. With [enabled] off, or without a [store], every method
+ * answers `501 MethodNotImplemented`; the blob methods also need [blobStorage]. Every method checks
+ * the access token first, so a caller without one gets `401` whether or not the feature is on.
+ * Blobs larger than [maxBlobBytes] answer `413 BlobTooLarge`.
  */
 fun Route.spaceXrpcRoutes(
     enabled: Boolean,
     store: SpaceStore?,
     blobStorage: LogDateBlobStorage?,
-    auth: SpaceAuth,
+    auth: LogDateAccountAuth,
+    maxBlobBytes: Long = MAX_SPACE_BLOB_BYTES,
 ) {
     val records = store?.takeIf { enabled }
     val objects = blobStorage?.takeIf { records != null }
@@ -113,7 +112,7 @@ fun Route.spaceXrpcRoutes(
         deleteRecord(records, auth)
         getRecord(records, auth)
         listRepoOps(records, auth)
-        uploadBlob(records, objects, auth)
+        uploadBlob(records, objects, auth, maxBlobBytes)
         getBlob(records, objects, auth)
     }
 }
@@ -121,19 +120,20 @@ fun Route.spaceXrpcRoutes(
 @OptIn(ExperimentalUuidApi::class)
 private fun Route.putRecord(
     records: SpaceStore?,
-    auth: SpaceAuth,
+    auth: LogDateAccountAuth,
 ) {
     post("/app.logdate.space.putRecord", XrpcSpaceDocs.putRecord) {
-        val account = call.auth() ?: return@post
+        val account = auth.requireLogDateAccount(call) ?: return@post
         val store = records ?: return@post call.respondNotImplemented()
         val bytes =
             call.receiveBytesUpTo(MAX_SPACE_RECORD_REQUEST_BYTES)
                 ?: return@post call.respond(HttpStatusCode.PayloadTooLarge, PdsErrorResponse("RecordTooLarge", "The record is too large"))
         val input = decodeOrNull<SpacePutRecordInput>(bytes) ?: return@post call.respondInvalid("Invalid putRecord input")
         val space = call.ownSpace(input.space, account, RECORD_NOT_FOUND) ?: return@post
-        if (RecordKey.parse(input.rkey).isFailure) return@post call.respondInvalid("rkey must be a record key")
+        if (!isRecordKey(input.rkey)) return@post call.respondInvalid("rkey must be a record key")
         val blobs = input.blobs.orEmpty()
         if (blobs.size > MAX_RECORD_BLOBS) return@post call.respondInvalid("A record can refer to at most $MAX_RECORD_BLOBS blobs")
+        if (!blobs.all(::isCid) || input.swapCid?.let(::isCid) == false) return@post call.respondInvalid("blobs and swapCid must be CIDs")
         checkSealedRecord(input.record)?.let { return@post call.respondInvalidRecord(it) }
         val write =
             SpaceRecordWrite(
@@ -163,16 +163,18 @@ private fun Route.putRecord(
 @OptIn(ExperimentalUuidApi::class)
 private fun Route.deleteRecord(
     records: SpaceStore?,
-    auth: SpaceAuth,
+    auth: LogDateAccountAuth,
 ) {
     post("/app.logdate.space.deleteRecord", XrpcSpaceDocs.deleteRecord) {
-        val account = call.auth() ?: return@post
+        val account = auth.requireLogDateAccount(call) ?: return@post
         val store = records ?: return@post call.respondNotImplemented()
         val bytes =
             call.receiveBytesUpTo(MAX_SPACE_RECORD_REQUEST_BYTES)
                 ?: return@post call.respondInvalid("Invalid deleteRecord input")
         val input = decodeOrNull<SpaceDeleteRecordInput>(bytes) ?: return@post call.respondInvalid("Invalid deleteRecord input")
         val space = call.ownSpace(input.space, account, RECORD_NOT_FOUND) ?: return@post
+        if (!isRecordKey(input.rkey)) return@post call.respondInvalid("rkey must be a record key")
+        if (input.swapCid?.let(::isCid) == false) return@post call.respondInvalid("swapCid must be a CID")
         val seq =
             try {
                 store.delete(account.id.toJavaUUID(), space.uri, space.authority, input.rkey, input.swapCid)
@@ -185,13 +187,15 @@ private fun Route.deleteRecord(
 
 private fun Route.getRecord(
     records: SpaceStore?,
-    auth: SpaceAuth,
+    auth: LogDateAccountAuth,
 ) {
     get("/app.logdate.space.getRecord", XrpcSpaceDocs.getRecord) {
-        val account = call.auth() ?: return@get
+        val account = auth.requireLogDateAccount(call) ?: return@get
         val store = records ?: return@get call.respondNotImplemented()
         val space = call.ownSpace(call.request.queryParameters["space"], account, RECORD_NOT_FOUND) ?: return@get
-        val rkey = call.request.queryParameters["rkey"] ?: return@get call.respondInvalid("rkey is required")
+        val rkey =
+            call.request.queryParameters["rkey"]?.takeIf(::isRecordKey)
+                ?: return@get call.respondInvalid("rkey must be a record key")
         val stored = store.get(space.uri, space.authority, rkey) ?: return@get call.respondMissing(RECORD_NOT_FOUND)
         call.respond(GetRecordOutput(cid = stored.cid, seq = stored.seq, value = stored.record.toSealed()))
     }
@@ -199,10 +203,10 @@ private fun Route.getRecord(
 
 private fun Route.listRepoOps(
     records: SpaceStore?,
-    auth: SpaceAuth,
+    auth: LogDateAccountAuth,
 ) {
     get("/app.logdate.space.listRepoOps", XrpcSpaceDocs.listRepoOps) {
-        val account = call.auth() ?: return@get
+        val account = auth.requireLogDateAccount(call) ?: return@get
         val store = records ?: return@get call.respondNotImplemented()
         val space = call.ownSpace(call.request.queryParameters["space"], account, RECORD_NOT_FOUND) ?: return@get
         val since =
@@ -214,7 +218,10 @@ private fun Route.listRepoOps(
                 param.toIntOrNull()?.coerceIn(1, MAX_SPACE_CHANGES_LIMIT) ?: return@get call.respondInvalid("limit must be a whole number")
             } ?: DEFAULT_CHANGES_LIMIT
         val page = store.changes(space.uri, space.authority, since, limit)
-        val ops = page.changes.map { ListRepoOpsChange(it.cid, it.deleted, it.rkey, it.seq, it.record?.toSealed()) }
+        val ops =
+            page.changes.map {
+                ListRepoOpsChange(cid = it.cid, deleted = it.deleted, rkey = it.rkey, seq = it.seq, value = it.record?.toSealed())
+            }
         call.respond(ListRepoOpsOutput(cursor = page.cursor, hasMore = page.hasMore, ops = ops))
     }
 }
@@ -223,41 +230,56 @@ private fun Route.listRepoOps(
 private fun Route.uploadBlob(
     records: SpaceStore?,
     objects: LogDateBlobStorage?,
-    auth: SpaceAuth,
+    auth: LogDateAccountAuth,
+    maxBlobBytes: Long,
 ) {
     post("/app.logdate.space.uploadBlob", XrpcSpaceDocs.uploadBlob) {
-        val account = call.auth() ?: return@post
+        val account = auth.requireLogDateAccount(call) ?: return@post
         val store = records ?: return@post call.respondNotImplemented()
         val storage = objects ?: return@post call.respondNotImplemented()
         val space = call.ownSpace(call.request.queryParameters["space"], account, BLOB_NOT_FOUND) ?: return@post
         val bytes =
-            call.receiveBytesUpTo(MAX_SPACE_BLOB_BYTES)
+            call.receiveBytesUpTo(maxBlobBytes)
                 ?: return@post call.respond(
                     HttpStatusCode.PayloadTooLarge,
-                    PdsErrorResponse("BlobTooLarge", "Blobs can be at most 100 MiB"),
+                    PdsErrorResponse("BlobTooLarge", "Blobs can be at most $maxBlobBytes bytes"),
                 )
         val cid = Cid.rawSha256(bytes).value
         val ownerId = account.id.toJavaUUID()
         val request =
-            LogDateBlobWriteRequest(ownerId, LogDateBlobNamespace.SPACE, "$cid-${Uuid.random()}", null, SPACE_BLOB_MIME_TYPE, bytes)
+            LogDateBlobWriteRequest(
+                ownerId = ownerId,
+                namespace = LogDateBlobNamespace.SPACE,
+                blobId = "$cid-${Uuid.random()}",
+                fileName = null,
+                contentType = SPACE_BLOB_MIME_TYPE,
+                bytes = bytes,
+            )
         val path = withContext(Dispatchers.IO) { storage.putBlob(request) }
-        val stored = store.putBlob(ownerId, space.uri, SpaceBlob(cid, SPACE_BLOB_MIME_TYPE, bytes.size.toLong(), path))
+        val blob = SpaceBlob(cid = cid, mimeType = SPACE_BLOB_MIME_TYPE, size = bytes.size.toLong(), storagePath = path)
+        val stored =
+            runCatching { store.putBlob(ownerId, space.uri, blob) }.getOrElse { error ->
+                withContext(NonCancellable + Dispatchers.IO) {
+                    runCatching { storage.deleteBlobIfExists(path) }.exceptionOrNull()?.let(error::addSuppressed)
+                }
+                throw error
+            }
         if (stored.storagePath != path) withContext(Dispatchers.IO) { storage.deleteBlobIfExists(path) }
-        call.respond(UploadBlobOutput(Blob(CidLink(Cid.require(cid)), stored.mimeType, stored.size)))
+        call.respond(UploadBlobOutput(blob = Blob(ref = CidLink(cid = Cid.require(cid)), mimeType = stored.mimeType, size = stored.size)))
     }
 }
 
 private fun Route.getBlob(
     records: SpaceStore?,
     objects: LogDateBlobStorage?,
-    auth: SpaceAuth,
+    auth: LogDateAccountAuth,
 ) {
     get("/app.logdate.space.getBlob", XrpcSpaceDocs.getBlob) {
-        val account = call.auth() ?: return@get
+        val account = auth.requireLogDateAccount(call) ?: return@get
         val store = records ?: return@get call.respondNotImplemented()
         val storage = objects ?: return@get call.respondNotImplemented()
         val space = call.ownSpace(call.request.queryParameters["space"], account, BLOB_NOT_FOUND) ?: return@get
-        val cid = call.request.queryParameters["cid"] ?: return@get call.respondInvalid("cid is required")
+        val cid = call.request.queryParameters["cid"]?.takeIf(::isCid) ?: return@get call.respondInvalid("cid must be a CID")
         val bytes =
             store.getBlob(space.uri, cid)?.let { withContext(Dispatchers.IO) { storage.getBlob(it.storagePath) } }
                 ?: return@get call.respondMissing(BLOB_NOT_FOUND)
@@ -286,6 +308,11 @@ private suspend fun ApplicationCall.ownSpace(
     }
     return space
 }
+
+private fun isRecordKey(value: String): Boolean = RecordKey.parse(value).isSuccess
+
+/** CIDs are stored in 255-character columns, so a longer value can't name anything. */
+private fun isCid(value: String): Boolean = value.length <= MAX_CID_LENGTH && value == value.trim() && Cid.parse(value).isSuccess
 
 /** Up to [limit] bytes of the request body, or null when it's longer. */
 private suspend fun ApplicationCall.receiveBytesUpTo(limit: Long): ByteArray? {

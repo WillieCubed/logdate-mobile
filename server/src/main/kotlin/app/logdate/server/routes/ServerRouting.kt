@@ -109,15 +109,11 @@ internal fun Application.atprotoRoutes() {
     personalSpaceRoutes()
 }
 
-/** `app.logdate.space.*` XRPC, owner-only and answering 501 until the server flag is on. */
+/** `app.logdate.space.*` XRPC for the owner's own LogDate devices, answering 501 until the server flag is on. */
 private fun Application.personalSpaceRoutes() {
     val accountRepository by inject<AccountRepository>()
     val tokenService by inject<TokenService>()
     val atprotoIdentityService by inject<AtprotoIdentityService>()
-    val atprotoSessionTokenService by inject<AtprotoSessionTokenService>()
-    val oauthAccessTokenService by inject<OAuthAccessTokenService>()
-    val oauthDpopVerifier by inject<OAuthDpopVerifier>()
-    val oauthNonceService by inject<OAuthNonceService>()
     val descriptorConfig by inject<ServerDescriptorConfig>()
     val spaceStore by inject<SpaceStore>()
     val blobStorage by inject<LogDateBlobStorage>()
@@ -127,17 +123,7 @@ private fun Application.personalSpaceRoutes() {
             enabled = descriptorConfig.personalSpaceEnabled,
             store = spaceStore,
             blobStorage = blobStorage,
-            auth = {
-                requireAuthenticatedAccount(
-                    identityService = atprotoIdentityService,
-                    accountRepository = accountRepository,
-                    tokenService = tokenService,
-                    atprotoSessionTokenService = atprotoSessionTokenService,
-                    oauthAccessTokenService = oauthAccessTokenService,
-                    oauthDpopVerifier = oauthDpopVerifier,
-                    oauthNonceService = oauthNonceService,
-                )
-            },
+            auth = LogDateAccountAuth(tokenService, accountRepository, atprotoIdentityService),
         )
     }
 }

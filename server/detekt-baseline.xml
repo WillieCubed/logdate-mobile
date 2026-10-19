@@ -23,7 +23,7 @@
     <ID>LongMethod:TranscriptionRoutes.kt:fun Route.transcriptionRoutes</ID>
     <ID>LongMethod:WebAuthnPasskeyService.kt:WebAuthnPasskeyService$private fun verifyAuthenticationStrict: AuthenticationResult</ID>
     <ID>LongMethod:WebAuthnPasskeyService.kt:WebAuthnPasskeyService$private fun verifyRegistrationStrictOnly: VerificationOutcome</ID>
-    <ID>LongMethod:XrpcRoutes.kt:@OptIn(kotlin.uuid.ExperimentalUuidApi::class) internal suspend fun io.ktor.server.application.ApplicationCall.requireAuthenticatedAccount: Account?</ID>
+    <ID>LongMethod:XrpcRoutes.kt:@OptIn(kotlin.uuid.ExperimentalUuidApi::class) private suspend fun io.ktor.server.application.ApplicationCall.requireAuthenticatedAccount: Account?</ID>
     <ID>LongMethod:XrpcRoutes.kt:fun Route.xrpcRoutes</ID>
   </CurrentIssues>
 </SmellBaseline>

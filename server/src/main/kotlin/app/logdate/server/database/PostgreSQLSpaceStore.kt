@@ -161,7 +161,8 @@ class PostgreSQLSpaceStore : SpaceStore {
     ): SpaceBlob =
         withContext(Dispatchers.IO) {
             repeat(PUT_BLOB_ATTEMPTS) {
-                transaction { tryPutBlob(accountId, space, blob) }?.let { return@withContext it }
+                transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) { tryPutBlob(accountId, space, blob) }
+                    ?.let { return@withContext it }
             }
             error("Blob ${blob.cid} was purged during every attempt to store it")
         }
