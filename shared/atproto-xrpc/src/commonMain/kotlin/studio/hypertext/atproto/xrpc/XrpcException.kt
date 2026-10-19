@@ -23,11 +23,14 @@ public class XrpcTransportException : XrpcException {
  * @property statusCode HTTP status code.
  * @property error Optional protocol error code.
  * @property errorMessage Optional protocol error message.
+ * @property retryAfterSeconds How long the server asked the caller to wait before trying again, from
+ *   a `Retry-After` header given in seconds; null when it gave none, or gave a date instead.
  */
 public class XrpcProtocolException(
     public val statusCode: Int,
     public val error: String? = null,
     public val errorMessage: String? = null,
+    public val retryAfterSeconds: Long? = null,
 ) : XrpcException(
         buildString {
             append("XRPC request failed with HTTP ")

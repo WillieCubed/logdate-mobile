@@ -91,7 +91,7 @@ public class KtorXrpcClient(
             val response = block()
             val body = response.bodyAsText()
             if (response.status.value !in 200..299) {
-                throw protocolException(response.status, body)
+                throw protocolException(response.status, body, response.headers[HttpHeaders.RetryAfter])
             }
             body
         } catch (exception: XrpcException) {
@@ -126,6 +126,7 @@ public class KtorXrpcClient(
     private fun protocolException(
         status: HttpStatusCode,
         body: String,
+        retryAfter: String?,
     ): XrpcProtocolException {
         val errorPayload: JsonObject? =
             try {
@@ -138,6 +139,13 @@ public class KtorXrpcClient(
             statusCode = status.value,
             error = errorPayload?.get("error")?.jsonPrimitive?.contentOrNull,
             errorMessage = errorPayload?.get("message")?.jsonPrimitive?.contentOrNull,
+            retryAfterSeconds = retryAfterSeconds(retryAfter),
         )
     }
 }
+
+/**
+ * Reads a `Retry-After` header given as a number of seconds. The HTTP-date form is left out: it
+ * depends on the caller's clock, and every server this client talks to sends seconds.
+ */
+public fun retryAfterSeconds(header: String?): Long? = header?.trim()?.toLongOrNull()?.takeIf { it >= 0 }

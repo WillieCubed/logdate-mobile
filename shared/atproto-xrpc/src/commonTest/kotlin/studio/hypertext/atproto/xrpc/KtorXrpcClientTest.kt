@@ -117,6 +117,63 @@ class KtorXrpcClientTest {
         }
 
     @Test
+    fun `a rate-limited answer carries the server's Retry-After seconds`(): Unit =
+        runTest {
+            val client =
+                KtorXrpcClient(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content = """{"error":"RateLimitExceeded","message":"slow down"}""",
+                                    status = HttpStatusCode.TooManyRequests,
+                                    headers =
+                                        headersOf(
+                                            HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
+                                            HttpHeaders.RetryAfter to listOf("42"),
+                                        ),
+                                )
+                            },
+                        ),
+                    baseUrl = "https://example.com",
+                )
+
+            val exception =
+                assertFailsWith<XrpcProtocolException> {
+                    client.query<ResolveHandleResponse>(Nsid.require("com.atproto.identity.resolveHandle"))
+                }
+
+            assertEquals(429, exception.statusCode)
+            assertEquals(42L, exception.retryAfterSeconds)
+        }
+
+    @Test
+    fun `a Retry-After that isn't a number of seconds is left out`(): Unit =
+        runTest {
+            val client =
+                KtorXrpcClient(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content = "",
+                                    status = HttpStatusCode.ServiceUnavailable,
+                                    headers = headersOf(HttpHeaders.RetryAfter, "Wed, 21 Oct 2026 07:28:00 GMT"),
+                                )
+                            },
+                        ),
+                    baseUrl = "https://example.com",
+                )
+
+            val exception =
+                assertFailsWith<XrpcProtocolException> {
+                    client.query<ResolveHandleResponse>(Nsid.require("com.atproto.identity.resolveHandle"))
+                }
+
+            assertEquals(null, exception.retryAfterSeconds)
+        }
+
+    @Test
     fun `maps transport serialization and plain text protocol failures`(): Unit =
         runTest {
             val transportClient =
