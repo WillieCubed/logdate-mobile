@@ -32,15 +32,22 @@ Here is what happens when an app resolves `alice.logdate.app`:
    `*.logdate.app/*` route. The same Worker already serves people's public pages at those hosts.
 2. The website route `apps/web/src/app/.well-known/atproto-did/route.ts` in the
    `TheHypertextStudio/logdate-web` repository sees that the host is a single label directly under
-   its handle domain (`LOGDATE_HANDLE_DOMAIN`). It asks the server
+   its handle domain (`LOGDATE_HANDLE_DOMAIN`) and is not a reserved name (see
+   [Reserved names](#reserved-names)). It asks the server
    `GET https://cloud.logdate.app/xrpc/com.atproto.identity.resolveHandle?handle=alice.logdate.app`.
-3. The server looks the handle up in the accounts table and returns the DID, or `HandleNotFound`.
-4. The website returns the DID as `text/plain` with status 200, status 404 when the server does not
-   know the handle, or status 502 when the server cannot be reached. A server outage is never
-   reported as a missing handle, because an app could then treat a real account as nonexistent.
+3. The server looks the handle up with one indexed query and returns the DID, or `HandleNotFound`
+   (status 400) when no account with a complete identity owns it. When the lookup itself fails, for
+   example because the database is unreachable, the server logs `SERVER_HANDLE_RESOLUTION_FAILED`
+   and answers status 500 `InternalServerError` instead.
+4. The website returns the DID as `text/plain` with status 200, status 404 for `HandleNotFound`, and
+   status 502 for any other server answer or when the server cannot be reached.
 
-The server is the only authority. The website stores nothing and sends `Cache-Control: no-store`, so
-every request reflects the accounts table at that moment.
+At no step is an outage reported as a missing handle, because an app could then treat a real
+account as nonexistent. The server is the only authority. The website stores nothing and sends
+`Cache-Control: no-store`, so every request reflects the accounts table at that moment.
+
+Resolving a handle only reads. An anonymous request never creates or publishes an identity, and a
+lookup for a made-up name costs the same single query as any other.
 
 ### Why the website answers instead of the server
 
@@ -63,6 +70,39 @@ We considered three designs.
 The server's own `/.well-known/atproto-did` route stays. It is what a self-hosted LogDate server
 uses when its handle domain points straight at it. In LogDate's own deployments that route receives
 no handle traffic.
+
+## Reserved names
+
+Every handle is also a host on the website, so some labels can never be handles: the hosts other
+systems own (`cloud`, `api`, `cloud-staging`, `mail`, ...), the website's own hosts (`www`, `app`),
+and the names of its public pages (`about`, `pricing`, `delete-account`, ...). The server's list is
+`HandleLabels.RESERVED` in `server/src/main/kotlin/app/logdate/server/identity/HandleLabels.kt`,
+and it must include every entry of `RESERVED_SUBDOMAINS` in logdate-web's
+`apps/web/src/lib/site.ts`. A test pins that.
+
+The server also refuses labels starting with `xn--`. Those are punycode, which browsers display as
+non-ASCII text, so they could imitate another person's handle.
+
+The server applies both rules when someone signs up, changes their username, or creates an account
+through `com.atproto.server.createAccount`. A username maps to its label by lowercasing it and
+turning `_` into `-`, so `delete_account` and `xn__name` are refused too. The website refuses
+reserved labels and its own hostnames before asking the server anything.
+
+These rules only stop new names. They do not change an existing account's handle. To check whether
+anyone already holds a newly reserved name, an operator can run this read-only query against the
+production database:
+
+```sql
+SELECT id, handle, created_at FROM accounts
+WHERE split_part(handle, '.', 1) IN ('cloud-staging', 'about', 'contact', 'download', 'support',
+      'report', 'security', 'sitemap', 'pricing', 'delete-account', 'privacy', 'terms')
+   OR handle LIKE 'xn--%';
+```
+
+If it returns rows, contact each owner before changing anything, then move them to a suffixed handle
+as a deliberate, logged identity change. That change publishes a PLC operation when publishing is
+on. Until then, the website does not resolve those names, so the affected handles show as
+unverified elsewhere.
 
 ## Staging
 
@@ -87,12 +127,37 @@ wildcard record never overrides an explicit one.
   changing a username does not change the handle.
 - **Deletion.** Deleting an account removes its row, the server returns `HandleNotFound`, and the
   website returns 404.
-- **Old accounts without a handle.** Accounts created before AT Protocol identities existed have no
-  stored handle. The first lookup of their username-based handle assigns one. That lookup only scans
-  accounts that still have no handle, so a flood of lookups for made-up names stays cheap.
+- **Old accounts without an identity.** Accounts created before AT Protocol identities existed have
+  no handle or DID, so their handles do not resolve. They get an identity the next time their owner
+  signs in, or when an operator runs the backfill described below. Resolving a handle never assigns
+  one. Within one server process, two requests that provision the same account at once wait for
+  each other, so they never create two DIDs. The lock does not span server instances.
 
 Other apps keep their own caches. Bluesky, for example, remembers a resolved handle for hours, so a
 deleted handle can keep appearing there for a while even though LogDate stopped answering for it.
+
+`did:web` identities have one more delay. The website's per-handle `/.well-known/did.json` proxy
+caches DID documents for 5 minutes and may serve a stale copy for up to an hour while it refreshes.
+After a handle changes or an account is deleted, a `did:web` document can keep naming the old handle
+for up to an hour. Hosted accounts use `did:plc` by default, so this only affects deployments that
+set `ATPROTO_HOSTED_DID_METHOD=web`.
+
+### Backfilling old accounts
+
+`./run deploy:backfill-identities --contract-file <contract> --dry-run` runs
+`scripts/identity-backfill-job.py`. It renders the environment's deployment contract with
+`scripts/render-cloud-run-contract.sh` first. The script then runs the server image once as a Cloud
+Run job with `--backfill-identities`, against that environment's own database and secrets.
+
+- With `--dry-run`, the job only counts. Its log says
+  `Identity backfill dry run: N accounts need an identity`.
+- Without it, the job provisions each account the way sign-in does and logs
+  `Identity backfill complete: N provisioned, M failed`. It exits non-zero if any account failed.
+  Running it again is safe, because it only picks up accounts that still lack an identity.
+- While the server publishes PLC operations (`ATPROTO_PLC_PUBLISH_ENABLED=true`), every new identity
+  goes to the public PLC directory. A real run then refuses to start
+  (`SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING`) unless `--allow-plc-publishing` is given. With
+  publishing off, nothing leaves the server.
 
 ## Checking that it works
 
@@ -101,7 +166,10 @@ deleted handle can keep appearing there for a while even though LogDate stopped 
 outside app would, and reports each step as `[PASS]` or `[FAIL]`:
 
 - the server resolves the handle (`--expect-did` pins the exact DID);
-- `https://<handle>/.well-known/atproto-did` returns that same DID with status 200 and no redirect;
+- `https://<handle>/.well-known/atproto-did` returns that same DID with status 200. The AT Protocol
+  allows a handle host to redirect, but LogDate's hosts always answer directly. This check is
+  stricter than the protocol and reports a redirect as a failure, because one means the request hit
+  something else, such as a sign-in wall;
 - a random label under the same domain returns 404, which proves the website is not answering for
   names nobody owns;
 - `_atproto.<handle>` has no TXT record, or one that agrees, because a stray record would override
@@ -111,14 +179,18 @@ outside app would, and reports each step as `[PASS]` or `[FAIL]`:
 Staging runs this check through `.github/workflows/check-handle-resolution.yml` after every
 successful staging deploy and once a day. It resolves the account named by the repository variable
 `LOGDATE_STAGING_RESOLUTION_HANDLE` and, when `LOGDATE_STAGING_RESOLUTION_DID` is set, requires that
-exact DID. The job is skipped until the handle variable exists.
+exact DID. The server origin comes from `LOGDATE_PUBLIC_ORIGIN` in `infra/terraform/staging.tfvars`.
+The job is skipped until the handle variable exists. The workflow runs only on this repository's
+events. A website deploy that breaks staging resolution is not caught until the next daily run, so
+run the workflow by hand after deploying the staging website.
 
 Production uses a Cloud Monitoring uptime check defined in `infra/terraform/main.tf`. When
 `handle_resolution_monitor` names a canary account's handle and DID in `production.tfvars`, Cloud
 Monitoring fetches `https://<handle>/.well-known/atproto-did` every five minutes from several
 regions and requires the body to be exactly that DID. If the check keeps failing for ten minutes,
 the alert policy notifies the operator email channel from `cleanup_operator_email` and any channels
-in `handle_resolution_notification_channels`. Use a dedicated canary account rather than a person's
+in `handle_resolution_notification_channels`. Terraform refuses to create the alert when neither is
+set. The alert's runbook names the environment's own `LOGDATE_PUBLIC_ORIGIN` as the server to check. Use a dedicated canary account rather than a person's
 account, so the monitor does not break when someone deletes or renames their own account.
 
 ## Known limit: the DID document
@@ -148,6 +220,10 @@ The code is in place. These steps change shared infrastructure, so an operator r
 3. Create a staging canary account, set the repository variables `LOGDATE_STAGING_RESOLUTION_HANDLE`
    and `LOGDATE_STAGING_RESOLUTION_DID`, and run the **Check Handle Resolution** workflow by hand
    once.
-4. Create a production canary account, add `handle_resolution_monitor = { handle = "...", did =
+4. Run the identity backfill with `--dry-run` in staging and then in production. If it reports
+   accounts, run it again without `--dry-run`, while PLC publishing is off.
+5. Run the reserved-name query under [Reserved names](#reserved-names) against production. Follow up
+   with the owner of any account it finds.
+6. Create a production canary account, add `handle_resolution_monitor = { handle = "...", did =
    "..." }` to `infra/terraform/production.tfvars`, and apply Terraform for production. Confirm the
    uptime check turns green in Cloud Monitoring.
