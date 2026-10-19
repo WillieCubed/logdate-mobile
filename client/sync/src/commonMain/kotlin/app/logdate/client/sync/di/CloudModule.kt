@@ -42,12 +42,12 @@ import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
-import app.logdate.client.sync.space.AccountStorageModeSource
 import app.logdate.client.sync.space.RoomSpaceSwapStore
 import app.logdate.client.sync.space.SpaceDataHomes
 import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceMediaDataSource
 import app.logdate.client.sync.space.SpaceRecordRegistry
+import app.logdate.client.sync.space.SpaceRoute
 import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
 import app.logdate.client.sync.space.SpaceSwapStore
 import app.logdate.client.sync.space.SpaceSyncDependencies
@@ -70,8 +70,6 @@ val spaceSyncModule =
         single { SpaceRecordRegistry(getAll<SpaceKind<*>>()) }
         single<SpaceDataHomes> { XrpcSpaceDataHomes(get<io.ktor.client.HttpClient>()) }
         single<SpaceSwapStore> { RoomSpaceSwapStore(get<LogDateDatabase>().spaceRecordStateDao()) }
-        // Replaced by the account's reported storage mode once the account endpoint returns it.
-        single<AccountStorageModeSource> { AccountStorageModeSource.NotReported }
         single {
             val flags = get<FeatureFlagStore>()
             val config = get<LogDateConfigRepository>()
@@ -80,7 +78,7 @@ val spaceSyncModule =
                 serverOffersPersonalSpace = {
                     config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_V1) == true
                 },
-                storageMode = get(),
+                storageMode = get<ServerAccountStorageMode>()::currentMode,
             )
         }
         single {
@@ -200,7 +198,7 @@ val cloudModule =
             SpaceRoutingMediaDataSource(
                 legacy = DefaultCloudMediaDataSource(get(), get()),
                 space = SpaceMediaDataSource(get(), get(), spaceLocation(get(), get<SpaceSyncDependencies>().accountDid)),
-                uploadsToSpace = { registry.forEntityType(EntityType.NOTE) != null && gate.isOpen() },
+                uploadsToSpace = { registry.forEntityType(EntityType.NOTE) != null && gate.route() == SpaceRoute.Space },
             )
         }
         single {

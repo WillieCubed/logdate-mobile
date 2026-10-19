@@ -28,6 +28,9 @@ sealed interface SyncIssue {
 
         data object MediaTooLarge : Failure
 
+        /** The server stores the account in a way this device can't sync; nothing syncs until that changes. */
+        data object AccountStorage : Failure
+
         data object Conflict : Failure
 
         data object LocalData : Failure
@@ -59,6 +62,7 @@ fun SyncStatus.issue(): SyncIssue? {
         SyncErrorType.AUTHENTICATION_ERROR -> return SyncIssue.Failure.SignIn
         SyncErrorType.KEY_RECOVERY_ERROR -> return SyncIssue.Failure.KeyRecovery
         SyncErrorType.MEDIA_TOO_LARGE_ERROR -> return SyncIssue.Failure.MediaTooLarge
+        SyncErrorType.ACCOUNT_STORAGE_ERROR -> return SyncIssue.Failure.AccountStorage
         SyncErrorType.STORAGE_ERROR -> return SyncIssue.Failure.CloudStorage
         SyncErrorType.CONFLICT_ERROR -> return SyncIssue.Failure.Conflict
         SyncErrorType.NETWORK_ERROR -> return SyncIssue.Failure.Connection

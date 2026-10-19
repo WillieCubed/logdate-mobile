@@ -72,6 +72,9 @@ sealed class SyncPresentation {
     /** A specific attachment cannot upload until the person replaces it with a smaller file. */
     data object MediaTooLarge : SyncPresentation()
 
+    /** The server stores the account in a way this version can't sync, so nothing syncs until the app is updated. */
+    data object AccountStorageUnsupported : SyncPresentation()
+
     /** Edit conflicts present. Banner with a "Review conflicts" action. */
     data class ConflictError(
         val conflictCount: Int,

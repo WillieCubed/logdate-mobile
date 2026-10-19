@@ -42,6 +42,8 @@ internal suspend fun DefaultSyncManager.runFullSyncPhase(
             )
         }
 
+        accountStorageBlocked()?.let { return it }
+
         syncStateFlow.value = SyncState.Syncing
         beforeAccessToken()
 
@@ -59,6 +61,17 @@ internal suspend fun DefaultSyncManager.runFullSyncPhase(
             syncStateFlow.value = SyncState.Idle
         }
     }
+
+/**
+ * Refuses to sync anything when the account's storage mode rules out both the personal space and
+ * the per-kind endpoints: syncing either way would split the account's data between two stores.
+ */
+private suspend fun DefaultSyncManager.accountStorageBlocked(): SyncResult? {
+    val blocked = space?.blocked() ?: return null
+    val error = SyncError(SyncErrorType.ACCOUNT_STORAGE_ERROR, blocked.reason, retryable = false)
+    lastErrorFlow.value = error
+    return SyncResult(success = false, errors = listOf(error))
+}
 
 internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
     runFullSyncPhase(
@@ -210,6 +223,7 @@ internal suspend fun DefaultSyncManager.syncEntityType(
 ): SyncResult =
     syncMutex.withLock {
         disabledOrUnauthenticated()?.let { return@withLock it }
+        accountStorageBlocked()?.let { return@withLock it }
 
         syncStateFlow.value = SyncState.Syncing
         try {

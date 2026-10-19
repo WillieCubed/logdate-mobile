@@ -91,8 +91,11 @@ internal class SpaceSync(
     /** The registered kind for [entityType], when this device syncs it through the personal space now. */
     suspend fun activeKind(entityType: EntityType): SpaceKind<*>? {
         val kind = dependencies.registry.forEntityType(entityType) ?: return null
-        return kind.takeIf { dependencies.gate.isOpen() }
+        return kind.takeIf { dependencies.gate.route() == SpaceRoute.Space }
     }
+
+    /** Why nothing may sync for the signed-in account, when its storage mode rules out both transports. */
+    suspend fun blocked(): SpaceRoute.Blocked? = dependencies.gate.route() as? SpaceRoute.Blocked
 
     /**
      * Uploads [kind]'s outbox entries.

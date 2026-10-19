@@ -1,5 +1,6 @@
 package app.logdate.client.sync.space
 
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.diagnostics.DiagnosticReason
 import kotlinx.coroutines.flow.first
@@ -160,9 +161,9 @@ class SpaceDownloadTest {
         }
 
     @Test
-    fun `while the gate is closed the space isn't read`() =
+    fun `an account in legacy storage doesn't read the space`() =
         runTest {
-            val device = SpaceDevice(FakeDataHome()).apply { gateOpen = false }
+            val device = SpaceDevice(FakeDataHome()).apply { mode = AccountStorageMode.LEGACY }
             device.home.putFromAnotherDevice(JOURNAL_COLLECTION, Uuid.random().toString(), journalRecord("From the tablet"))
 
             device.manager.downloadRemoteChanges()

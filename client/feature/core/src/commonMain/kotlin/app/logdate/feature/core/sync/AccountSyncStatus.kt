@@ -26,6 +26,7 @@ enum class AccountSyncStatus {
     CONFLICT,
     LOCAL_DATA_UNAVAILABLE,
     MEDIA_TOO_LARGE,
+    ACCOUNT_STORAGE_UNSUPPORTED,
     UNKNOWN,
     DISABLED,
 }
@@ -48,6 +49,7 @@ internal fun accountSyncStatus(
         SyncIssue.Failure.JournalAccess -> return AccountSyncStatus.DEVICE_ACCESS_REQUIRED
         SyncIssue.Failure.KeyRecovery -> return AccountSyncStatus.KEY_RECOVERY_REQUIRED
         SyncIssue.Failure.MediaTooLarge -> return AccountSyncStatus.MEDIA_TOO_LARGE
+        SyncIssue.Failure.AccountStorage -> return AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED
         SyncIssue.Failure.DeviceLink -> return AccountSyncStatus.DEVICE_LINK_REQUIRED
         SyncIssue.Failure.CloudStorage -> return AccountSyncStatus.STORAGE_FULL
         SyncIssue.Failure.Conflict -> return AccountSyncStatus.CONFLICT

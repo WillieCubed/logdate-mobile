@@ -44,6 +44,7 @@ import logdate.client.feature.core.generated.resources.data_settings_sync_failur
 import logdate.client.feature.core.generated.resources.data_settings_sync_failure_unknown
 import logdate.client.feature.core.generated.resources.sync_account_media_too_large
 import logdate.client.feature.core.generated.resources.sync_account_recovery_required
+import logdate.client.feature.core.generated.resources.sync_account_storage_unsupported
 import org.jetbrains.compose.resources.StringResource
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -303,6 +304,7 @@ private fun describeSyncFailure(type: SyncErrorType?): StringResource =
         SyncErrorType.NETWORK_ERROR -> Res.string.data_settings_sync_failure_network
         SyncErrorType.KEY_RECOVERY_ERROR -> Res.string.sync_account_recovery_required
         SyncErrorType.MEDIA_TOO_LARGE_ERROR -> Res.string.sync_account_media_too_large
+        SyncErrorType.ACCOUNT_STORAGE_ERROR -> Res.string.sync_account_storage_unsupported
         SyncErrorType.SERVER_ERROR -> Res.string.data_settings_sync_failure_server
         SyncErrorType.STORAGE_ERROR -> Res.string.data_settings_sync_failure_storage
         SyncErrorType.CONFLICT_ERROR -> Res.string.data_settings_sync_failure_conflict

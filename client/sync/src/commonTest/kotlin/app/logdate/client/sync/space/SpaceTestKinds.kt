@@ -27,6 +27,7 @@ import app.logdate.client.sync.test.fakeCloudApiClient
 import app.logdate.client.sync.test.testDefaultSyncManager
 import app.logdate.lexicon.app.logdate.DefsMedia
 import app.logdate.lexicon.app.logdate.crypto.SealedPayload
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.Journal
 import app.logdate.space.SealedRecordCodec
 import kotlinx.io.buffered
@@ -335,7 +336,13 @@ internal class SpaceDevice(
     val mediaRefs = InMemoryMediaSyncRefStore()
     private val homes = SpaceDataHomes { _, token -> home.signedIn(token) }
     val deadLetters = InMemorySyncDeadLetterStore()
-    var gateOpen = true
+
+    /** The account's storage mode as the server reports it, and whether the server offers personal spaces. */
+    var mode: AccountStorageMode? = AccountStorageMode.PERSONAL_SPACE_V1
+    var serverOffersSpaces = true
+
+    /** Whether this build syncs personal spaces. */
+    var spaceEnabled = true
     var identityKey: ByteArray = TEST_IDENTITY_KEY
 
     val scope: UploadScope get() = UploadScope("test-account-id", sessions.currentOrigin)
@@ -362,12 +369,12 @@ internal class SpaceDevice(
                             AesGcmMediaPayloadCrypto(TEST_MEDIA_KEY),
                             { SpaceLocation(sessions.currentOrigin, TEST_SPACE) },
                         ),
-                    uploadsToSpace = { gateOpen },
+                    uploadsToSpace = { mode == AccountStorageMode.PERSONAL_SPACE_V1 },
                 ),
             spaceSync =
                 SpaceSyncDependencies(
                     registry = SpaceRecordRegistry(listOf(journalKind(journals, resolver), noteKind(notes))),
-                    gate = SpaceTransportGate({ gateOpen }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
+                    gate = SpaceTransportGate({ spaceEnabled }, { serverOffersSpaces }, { mode }),
                     homes = homes,
                     swapStore = swapStore,
                     accountDid = { did },

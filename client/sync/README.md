@@ -33,8 +33,12 @@ the download inbox, conflict resolvers and each kind's apply step all stay the s
 2. the connected server advertises the `personalSpaceV1` protocol feature;
 3. the server reports that the signed-in account is stored in a personal space.
 
-The third check reads `AccountStorageModeSource`, which reports no mode until the account endpoint
-returns one, so today every account keeps syncing through the per-kind endpoints.
+The third check reads the account's `AccountStorageMode`, which the server reports and the app saves
+when sync starts. The gate then picks one of three routes: `PERSONAL_SPACE_V1` syncs through the
+space (when the first two checks also hold), `LEGACY` syncs through the per-kind endpoints, and
+anything else (an unrecognized mode, a mode not yet reported, or a space account this device can't
+reach) blocks sync and shows the `ACCOUNT_STORAGE_ERROR` issue. Nothing syncs on a blocked route, so
+an account's data is never split between two stores.
 
 ### How a kind of data plugs in
 

@@ -40,6 +40,7 @@ internal class SyncRunDiagnostics(
                     SyncErrorType.CONFLICT_ERROR -> DiagnosticReason.CONFLICT
                     SyncErrorType.KEY_RECOVERY_ERROR -> DiagnosticReason.KEY_RECOVERY_REQUIRED
                     SyncErrorType.MEDIA_TOO_LARGE_ERROR -> DiagnosticReason.MEDIA_TOO_LARGE
+                    SyncErrorType.ACCOUNT_STORAGE_ERROR -> DiagnosticReason.UNSUPPORTED_FORMAT
                     SyncErrorType.STORAGE_ERROR -> DiagnosticReason.QUOTA_EXCEEDED
                     SyncErrorType.UNKNOWN_ERROR -> DiagnosticReason.UNKNOWN
                     null -> if (result.success) DiagnosticReason.NONE else DiagnosticReason.UNKNOWN
