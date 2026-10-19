@@ -98,6 +98,42 @@ class IdentityRoutesTest {
         }
 
     @Test
+    fun `handle resolution follows a changed handle and stops after account deletion`() =
+        testApplication {
+            val env = configureAuthV1TestApp()
+            val account =
+                runBlocking {
+                    env.atprotoIdentityService.ensureIdentity(
+                        env.accountRepository.save(
+                            Account(id = Uuid.random(), username = "dana", displayName = "Dana", createdAt = Clock.System.now()),
+                        ),
+                    )
+                }
+            val did = requireNotNull(account.did)
+
+            suspend fun wellKnownDid(host: String) =
+                client.get("/.well-known/atproto-did") {
+                    header(HttpHeaders.Host, host)
+                }
+
+            suspend fun xrpcDid(handle: String) = client.get("/xrpc/com.atproto.identity.resolveHandle?handle=$handle")
+
+            assertEquals(did, wellKnownDid("dana.logdate.app").bodyAsText())
+
+            runBlocking { env.accountRepository.save(account.copy(handle = "dana-renamed.logdate.app")) }
+
+            assertEquals(HttpStatusCode.NotFound, wellKnownDid("dana.logdate.app").status)
+            assertTrue(xrpcDid("dana.logdate.app").bodyAsText().contains("HandleNotFound"))
+            assertEquals(did, wellKnownDid("dana-renamed.logdate.app").bodyAsText())
+            assertTrue(xrpcDid("dana-renamed.logdate.app").bodyAsText().contains(did))
+
+            runBlocking { env.accountRepository.deleteAccount(account.id) }
+
+            assertEquals(HttpStatusCode.NotFound, wellKnownDid("dana-renamed.logdate.app").status)
+            assertTrue(xrpcDid("dana-renamed.logdate.app").bodyAsText().contains("HandleNotFound"))
+        }
+
+    @Test
     fun `xrpc resolveHandle returns expected success and errors`() =
         testApplication {
             val env = configureAuthV1TestApp()
