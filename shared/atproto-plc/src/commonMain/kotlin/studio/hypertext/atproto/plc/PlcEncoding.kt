@@ -46,6 +46,19 @@ public object PlcEncoding {
         return AtprotoDid.require("did:plc:$suffix")
     }
 
+    /**
+     * Computes the CID of a signed [operation]: a CIDv1 over the operation's DAG-CBOR bytes with a
+     * SHA-256 multihash, written in lowercase base32 with the `b` multibase prefix.
+     *
+     * This is the value the PLC directory reports as `cid` for the operation and the value the next
+     * operation names as `prev`, so a chain can be built and checked without the directory.
+     */
+    public fun operationCid(operation: PlcOperation): String {
+        val digest = encodeSigned(operation).toByteString().sha256().toByteArray()
+        val cidBytes = CID_V1_DAG_CBOR_SHA256_PREFIX + digest
+        return "b${encodeBase32(cidBytes)}"
+    }
+
     private fun encodeCanonicalJson(encoded: String): ByteArray = encodeJsonElement(json.parseToJsonElement(encoded))
 
     private fun encodeJsonElement(element: JsonElement): ByteArray =
@@ -149,6 +162,9 @@ public object PlcEncoding {
     }
 
     private const val PLC_SUFFIX_LENGTH: Int = 24
+
+    /** CID version 1, the `dag-cbor` codec (0x71), then a SHA-256 multihash header (0x12, 32 bytes). */
+    private val CID_V1_DAG_CBOR_SHA256_PREFIX: ByteArray = byteArrayOf(0x01, 0x71, 0x12, 0x20)
     private const val MAJOR_TYPE_SHIFT: Int = 5
     private const val MAJOR_TYPE_UNSIGNED_INT: Int = 0
     private const val MAJOR_TYPE_NEGATIVE_INT: Int = 1
