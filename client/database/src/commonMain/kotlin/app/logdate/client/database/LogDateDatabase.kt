@@ -54,6 +54,7 @@ import app.logdate.client.database.dao.rewind.ReflectionPromptResponseDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
 import app.logdate.client.database.dao.sync.DownloadInboxDao
 import app.logdate.client.database.dao.sync.PeerDeliveryDao
+import app.logdate.client.database.dao.sync.SpaceRecordStateDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.database.entities.AudioTagEntity
@@ -101,6 +102,7 @@ import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
 import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.database.entities.sync.PeerDeliveryEntity
 import app.logdate.client.database.entities.sync.PendingUploadEntity
+import app.logdate.client.database.entities.sync.SpaceRecordStateEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
 import app.logdate.client.database.migrations.MIGRATION_10_11
 import app.logdate.client.database.migrations.MIGRATION_11_12
@@ -151,6 +153,7 @@ import app.logdate.client.database.migrations.MIGRATION_51_52
 import app.logdate.client.database.migrations.MIGRATION_52_53
 import app.logdate.client.database.migrations.MIGRATION_53_54
 import app.logdate.client.database.migrations.MIGRATION_54_55
+import app.logdate.client.database.migrations.MIGRATION_55_56
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -199,6 +202,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         DownloadInboxEntity::class,
         DownloadCheckpointEntity::class,
         PeerDeliveryEntity::class,
+        SpaceRecordStateEntity::class,
         // Others
         TranscriptionEntity::class,
         TranscriptionSegmentEntity::class,
@@ -227,7 +231,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         // Moments marked on the watch
         MarkedMomentEntity::class,
     ],
-    version = 55,
+    version = 56,
     exportSchema = true,
 )
 @TypeConverters(
@@ -285,6 +289,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun syncMetadataDao(): SyncMetadataDao
 
     abstract fun peerDeliveryDao(): PeerDeliveryDao
+
+    abstract fun spaceRecordStateDao(): SpaceRecordStateDao
 
     abstract fun markedMomentDao(): MarkedMomentDao
 
@@ -442,4 +448,5 @@ private fun databaseMigrations() =
         MIGRATION_52_53,
         MIGRATION_53_54,
         MIGRATION_54_55,
+        MIGRATION_55_56,
     )
