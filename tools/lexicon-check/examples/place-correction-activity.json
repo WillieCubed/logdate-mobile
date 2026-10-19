@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.place.correction",
+  "rkey": "6d7e8f9a-0b1c-4d2e-8f3a-4b5c6d7e8f9a",
   "record": {
     "$type": "app.logdate.place.correction",
     "evidenceId": "derived:journey:owner-1:6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b:a8c1f2e3-4d5b-4c6a-9e7f-8b9a0c1d2e3f:b9d2a3f4-5e6c-4d7b-8f80-9cab1d2e3f40",

@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.crypto.sealed",
+  "rkey": "n4mi5n4etheqzgucpsng6icwjf",
   "record": {
     "$type": "app.logdate.crypto.sealed",
     "version": 1,

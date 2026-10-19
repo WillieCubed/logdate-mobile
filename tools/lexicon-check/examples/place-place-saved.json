@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.place.place",
+  "rkey": "0b8f3c1e-6a2d-4e9f-8c7b-1d2e3f4a5b6c",
   "record": {
     "$type": "app.logdate.place.place",
     "name": "Grandma's house",

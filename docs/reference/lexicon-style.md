@@ -109,7 +109,12 @@ Activity Streams 2.0 type it maps to, or `null` when it has no Activity Streams 
 rules are in [LogDate lexicons](./lexicons.md#activity-streams-mapping).
 
 **Examples.** Add an example record to `tools/lexicon-check/examples/` for any record type with
-unions, nested objects or media, so the check proves a real record validates.
+unions, nested objects or media, so the check proves a real record validates. Each example names
+the `collection`, the `rkey` it would be stored under, and the `record`. The check refuses a key
+that breaks the schema's key rule or, for records built from what they connect, LogDate's key
+format: transcripts `<entry>:<block>`, memberships `<journal>:<entry>`, entry links
+`<entry>:<SHA-256 of the evidence id>`, and sample hours `<UTC hour>:<device>` with `:<part>` for
+parts after the first. Those formats are in `tools/lexicon-check/keys.mjs`.
 
 ## Space declarations and permission sets
 

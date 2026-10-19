@@ -17,6 +17,7 @@ import {
   spaceDeclarationProblems,
   values,
 } from "./declarations.mjs";
+import { recordKeyProblems } from "./keys.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -159,12 +160,14 @@ for (const nsid of Object.keys(mapping)) {
 
 for (const path of (await jsonFiles(examplesDir)).sort()) {
   const where = relative(root, path);
-  const { collection, record } = await readJson(path);
+  const { collection, rkey, record } = await readJson(path);
   try {
     lexicons.assertValidRecord(collection, jsonToLex(record));
   } catch (error) {
     report(where, error.message);
   }
+  const keyRule = lexicons.getDef(collection)?.key;
+  recordKeyProblems(collection, keyRule, rkey, record).forEach((problem) => report(where, problem));
 }
 
 // Published schemas may only change compatibly. Each is compared with its version where this

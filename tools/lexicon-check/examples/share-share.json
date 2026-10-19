@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.share.share",
+  "rkey": "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b",
   "record": {
     "$type": "app.logdate.share.share",
     "item": { "collection": "app.logdate.journal.entry", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },

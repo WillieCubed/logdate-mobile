@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.people.person",
+  "rkey": "4c5d6e7f-8a9b-4c0d-9e1f-2a3b4c5d6e7f",
   "record": {
     "$type": "app.logdate.people.person",
     "name": "Sam Rivera",

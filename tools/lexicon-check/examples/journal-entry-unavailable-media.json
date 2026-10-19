@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.journal.entry",
+  "rkey": "9f8e7d6c-5b4a-4398-8776-655443322110",
   "record": {
     "$type": "app.logdate.journal.entry",
     "blocks": [
