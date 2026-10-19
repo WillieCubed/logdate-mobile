@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.place.place",
+  "rkey": "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
   "record": {
     "$type": "app.logdate.place.place",
     "name": "Lakeside Coffee",

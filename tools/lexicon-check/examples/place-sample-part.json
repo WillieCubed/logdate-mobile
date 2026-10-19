@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.place.sample",
+  "rkey": "2026-10-10T13:6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b:2",
   "record": {
     "$type": "app.logdate.place.sample",
     "device": "6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b",

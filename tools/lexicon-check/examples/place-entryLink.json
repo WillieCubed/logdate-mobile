@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.place.entryLink",
+  "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:9175595460c850a00653607049ea486af805e8711ae252cdaeac3bdaf47cec66",
   "record": {
     "$type": "app.logdate.place.entryLink",
     "entry": { "collection": "app.logdate.journal.entry", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },

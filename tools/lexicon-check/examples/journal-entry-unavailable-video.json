@@ -1,0 +1,22 @@
+{
+  "collection": "app.logdate.journal.entry",
+  "rkey": "6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d",
+  "record": {
+    "$type": "app.logdate.journal.entry",
+    "blocks": [
+      {
+        "$type": "app.logdate.journal.entry#videoBlock",
+        "id": "6a7b8c9d-0e1f-4a2b-8c3d-4e5f6a7b8c9d",
+        "caption": "First steps across the kitchen",
+        "durationMs": 21400
+      }
+    ],
+    "location": {
+      "geo": { "latitude": "40.6782", "longitude": "-73.9442" },
+      "accuracyCentimeters": 650
+    },
+    "timeZone": "America/New_York",
+    "createdAt": "2025-02-09T18:02:11.000Z",
+    "updatedAt": "2026-10-02T16:00:00.000Z"
+  }
+}

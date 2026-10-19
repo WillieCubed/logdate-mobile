@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.actor.profile",
+  "rkey": "self",
   "record": {
     "$type": "app.logdate.actor.profile",
     "displayName": "Alice",

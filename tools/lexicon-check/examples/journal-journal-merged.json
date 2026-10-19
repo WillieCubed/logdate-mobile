@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.journal.journal",
+  "rkey": "7b8c9d0e-1f2a-4b3c-8d4e-5f6a7b8c9d0e",
   "record": {
     "$type": "app.logdate.journal.journal",
     "title": "Lake trips",

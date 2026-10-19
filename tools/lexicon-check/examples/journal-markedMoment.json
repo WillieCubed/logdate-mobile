@@ -1,5 +1,6 @@
 {
   "collection": "app.logdate.journal.markedMoment",
+  "rkey": "2e3f4a5b-6c7d-4e8f-9a0b-1c2d3e4f5a6b",
   "record": {
     "$type": "app.logdate.journal.markedMoment",
     "state": "filled",
