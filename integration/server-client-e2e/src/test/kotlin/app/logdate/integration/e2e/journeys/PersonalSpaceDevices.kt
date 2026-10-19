@@ -67,6 +67,8 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -119,8 +121,15 @@ internal suspend fun ServerClientE2EHarness.signUpForSpace(): SpaceAccount {
  */
 internal class SpaceDevice(
     account: SpaceAccount,
-    scope: CoroutineScope,
+    testScope: CoroutineScope,
 ) : AutoCloseable {
+    /**
+     * Everything this device runs in the background, such as watching its queue and its journals. It
+     * is stopped before the database closes, so nothing queries a closed database.
+     */
+    private val background = SupervisorJob(testScope.coroutineContext[Job])
+    private val scope = CoroutineScope(testScope.coroutineContext + background)
+
     private val file = Files.createTempFile("personal-space-device", ".db")
     val database = getRoomDatabase(Room.databaseBuilder<LogDateDatabase>(file.toString()))
     private val config = DefaultLogDateConfigRepository(initialBackendUrl = account.origin)
@@ -289,6 +298,7 @@ internal class SpaceDevice(
         )
 
     override fun close() {
+        background.cancel()
         http.close()
         database.close()
         Files.deleteIfExists(file)
