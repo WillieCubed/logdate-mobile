@@ -83,6 +83,19 @@ over the owner and key to detect corruption. Conflicting database key copies pre
 recovery. Backfill validates retained identity and media copies against the primary keys before
 writing, and preserves conflicting or malformed material. Key files are replaced atomically, and incomplete replacements are excluded from backup.
 
+For local database-key recovery, startup tries the primary key, the committed portable copy, and
+any complete key left in `passphrase_backup.part` by an interrupted write. It changes neither
+portable file until SQLCipher opens the journal. If the pending file supplies the accepted key,
+confirmation syncs and atomically promotes that file without truncating its only surviving copy.
+Malformed pending material also prevents generation of a replacement key. Pending files remain
+excluded from Android backup; this repairs local interruption, not a key omitted from a transfer.
+
+Missing database keys must be recognized through dependency wrappers in `ApplicationStartupGate`.
+That surface runs before database-backed navigation and explains how to repeat the transfer from
+an updated original device or restore a complete backup, while retaining the encrypted journal.
+An identity recovery phrase does not recover the independent SQLCipher database key. Never invoke
+the storage-reset controller automatically or replace retained content with an empty database.
+
 ## Provider credential cleanup
 
 Sign-out records an installation-local cleanup obligation before changing the backed restore
@@ -333,6 +346,13 @@ bytes and offline playback across another process restart. Test IDs travel as in
 arguments; the application's recovery record and source ZIP must arrive through native backup.
 
 ## Android platform testing methods
+
+Native recovery fixtures must isolate `filesDir`, database paths, `noBackupFilesDir`, and
+`applicationInfo.dataDir` wherever recovery reads those roots. Do not reload the application's
+shared `databaseModule` value into a test Koin graph: its singleton factories can reuse the live
+application's key provider, and closing the test graph can clear those shared factories. Construct
+the real key provider with fixture storage when testing key recovery, and use explicit encrypted
+files for SQLCipher checks. Test worker construction against the live graph separately.
 
 Follow Android's [backup and restore testing guide](https://developer.android.com/identity/data/testingbackup)
 when choosing what each emulator run proves. Cloud backup can be exercised on one device; a

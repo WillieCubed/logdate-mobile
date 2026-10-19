@@ -273,4 +273,87 @@ class DatabasePassphraseRecoveryTest {
             assertContentEquals(openedKey, store.read())
             coVerify(exactly = 1) { secureStorage.putString(any(), any()) }
         }
+
+    @Test
+    fun `key stranded before atomic rename opens the retained journal without generating a replacement`() =
+        runTest {
+            val originalKey = ByteArray(32) { 11 }
+            val pending = pendingKeyFile(Base64.encode(originalKey))
+            coEvery { secureStorage.getString("db_encryption_key") } returns null
+            val provider = DatabasePassphraseProvider(secureStorage, store) { true }
+
+            val candidates = provider.getPassphraseCandidates()
+
+            assertContentEquals(originalKey, candidates.single())
+            assertEquals(Base64.encode(originalKey), pending.readText())
+            assertFalse(File(directory, "db_recovery/passphrase_backup").exists())
+            provider.confirmOpenedDatabasePassphrase(candidates.single())
+            assertContentEquals(originalKey, store.read())
+            assertFalse(pending.exists())
+        }
+
+    @Test
+    fun `pending key remains a candidate when the primary and committed backup are both wrong`() =
+        runTest {
+            val primary = ByteArray(32) { 7 }
+            val committed = ByteArray(32) { 8 }
+            val original = ByteArray(32) { 9 }
+            store.write(committed)
+            val pending = pendingKeyFile(Base64.encode(original))
+            coEvery { secureStorage.getString("db_encryption_key") } returns Base64.encode(primary)
+
+            val candidates = DatabasePassphraseProvider(secureStorage, store) { true }.getPassphraseCandidates()
+
+            assertEquals(3, candidates.size)
+            assertContentEquals(primary, candidates[0])
+            assertContentEquals(committed, candidates[1])
+            assertContentEquals(original, candidates[2])
+            assertContentEquals(committed, store.read())
+            assertEquals(Base64.encode(original), pending.readText())
+        }
+
+    @Test
+    fun `malformed pending key prevents creation of a replacement even before database creation`() =
+        runTest {
+            val pending = pendingKeyFile("interrupted")
+            coEvery { secureStorage.getString("db_encryption_key") } returns null
+
+            assertFailsWith<IllegalStateException> { DatabasePassphraseProvider(secureStorage, store).getPassphraseCandidates() }
+
+            assertEquals("interrupted", pending.readText())
+            assertFalse(File(directory, "db_recovery/passphrase_backup").exists())
+        }
+
+    private fun pendingKeyFile(encoded: String): File =
+        File(directory, "db_recovery/passphrase_backup.part").apply {
+            parentFile?.mkdirs()
+            writeText(encoded)
+        }
+
+    @Test
+    fun `confirming the only surviving pending key never opens it for writing`() =
+        runTest {
+            val original = ByteArray(32) { 12 }
+            val pending = pendingKeyFile(Base64.encode(original))
+            assertTrue(pending.setReadOnly())
+
+            DatabasePassphraseProvider(secureStorage, store) { true }.confirmOpenedDatabasePassphrase(original)
+
+            assertContentEquals(original, store.read())
+            assertFalse(pending.exists())
+        }
+
+    @Test
+    fun `failed promotion leaves the only surviving pending key intact`() =
+        runTest {
+            val original = ByteArray(32) { 13 }
+            val pending = pendingKeyFile(Base64.encode(original))
+            File(directory, "db_recovery/passphrase_backup").apply { mkdirs() }.resolve("retained").writeText("retained")
+
+            assertFailsWith<IOException> {
+                DatabasePassphraseProvider(secureStorage, store) { true }.confirmOpenedDatabasePassphrase(original)
+            }
+
+            assertEquals(Base64.encode(original), pending.readText())
+        }
 }

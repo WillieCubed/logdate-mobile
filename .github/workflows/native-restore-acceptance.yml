@@ -13,6 +13,9 @@ on:
       - 'app/android-main/src/androidTest/**/CloudArchiveWorkerFixture.kt'
       - 'app/android-main/src/androidTest/**/RestoredJournalLockRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredAppLockEnrollmentRuntimeTest.kt'
+      - 'app/android-main/src/androidTest/**/InterruptedDatabaseKeyRecoveryTest.kt'
+      - 'app/android-main/src/androidTest/**/LegacyPlaintextMigrationTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeRecoveryWorkStateTest.kt'
       - 'app/android-main/src/main/**'
       - 'app/compose-main/src/androidMain/**'
       - 'app/compose-main/src/commonMain/**'
@@ -188,6 +191,21 @@ jobs:
             --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
             --output "$RUNNER_TEMP/native-missing-media-recovery" \
             --synthetic-data
+
+      - name: Verify database keys and restart-safe native recovery
+        shell: bash
+        run: |
+          test "$(adb -s emulator-5558 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          mkdir -p "$RUNNER_TEMP/native-key-recovery"
+          adb -s emulator-5558 shell am instrument -w -r \
+            -e class app.logdate.client.e2e.NativeRecoveryWorkStateTest,app.logdate.client.e2e.LegacyPlaintextMigrationTest,app.logdate.client.e2e.InterruptedDatabaseKeyRecoveryTest \
+            studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
+            > "$RUNNER_TEMP/native-key-recovery/runtime.log"
+          grep -Eq '^OK \(10 tests\)$' "$RUNNER_TEMP/native-key-recovery/runtime.log"
+          if grep -Fq 'INSTRUMENTATION_STATUS_CODE: -3' "$RUNNER_TEMP/native-key-recovery/runtime.log"; then
+            echo 'Native key and restart recovery must run without skipped cases' >&2
+            exit 1
+          fi
 
       - name: Verify restored journal privacy and native device security
         shell: bash
@@ -385,6 +403,7 @@ jobs:
             ${{ runner.temp }}/native-missing-media-recovery/**/environment-before.json
             ${{ runner.temp }}/native-missing-media-recovery/acceptance.json
             ${{ runner.temp }}/native-lock-recovery/*.log
+            ${{ runner.temp }}/native-key-recovery/*.log
             ${{ runner.temp }}/native-restore-missing-keys/*.log
             ${{ runner.temp }}/native-restore-missing-keys/*fixture.json
             ${{ runner.temp }}/native-restore-missing-keys/*files*.json

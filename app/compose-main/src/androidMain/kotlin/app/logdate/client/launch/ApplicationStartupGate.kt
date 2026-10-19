@@ -1,17 +1,21 @@
 package app.logdate.client.launch
 
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.client.database.NativeRestoreInProgressException
+import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.theme.LogDateTheme
@@ -35,9 +39,24 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
                 if (failure != null) {
                     AlertDialog(
                         onDismissRequest = {},
-                        title = { Text(stringResource(R.string.application_startup_failed_title)) },
+                        title = {
+                            Text(
+                                stringResource(
+                                    if (applicationStartupFailureMessage(failure.cause) ==
+                                        ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY
+                                    ) {
+                                        R.string.database_key_recovery_title
+                                    } else {
+                                        R.string.application_startup_failed_title
+                                    },
+                                ),
+                            )
+                        },
                         text = {
-                            Text(stringResource(applicationStartupFailureMessage(failure.cause).stringResource()))
+                            Text(
+                                stringResource(applicationStartupFailureMessage(failure.cause).stringResource()),
+                                modifier = Modifier.verticalScroll(rememberScrollState()),
+                            )
                         },
                         confirmButton = {
                             TextButton(onClick = startup::start) {
@@ -60,13 +79,17 @@ internal enum class ApplicationStartupFailureMessage {
     NATIVE_RESTORE_PENDING,
     NATIVE_MEDIA_PENDING,
     STORAGE_FULL,
+    DATABASE_KEY_RECOVERY,
 }
 
 internal fun applicationStartupFailureMessage(cause: Throwable): ApplicationStartupFailureMessage =
     when {
-        cause.hasNativeMediaQuarantinePending() && cause.hasStorageFullCause() -> ApplicationStartupFailureMessage.STORAGE_FULL
+        cause.hasStorageFullCause() -> ApplicationStartupFailureMessage.STORAGE_FULL
         cause.hasNativeMediaQuarantinePending() -> ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING
         cause.hasNativeRestoreInProgress() -> ApplicationStartupFailureMessage.NATIVE_RESTORE_PENDING
+        cause.causesAndSuppressed().any {
+            it is DatabaseKeyRecoveryRequiredException
+        } -> ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY
         else -> ApplicationStartupFailureMessage.GENERIC
     }
 
@@ -76,6 +99,7 @@ private fun ApplicationStartupFailureMessage.stringResource(): Int =
         ApplicationStartupFailureMessage.NATIVE_RESTORE_PENDING -> R.string.native_restore_startup_incomplete_message
         ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING -> R.string.native_media_quarantine_pending_message
         ApplicationStartupFailureMessage.STORAGE_FULL -> R.string.native_media_quarantine_storage_message
+        ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY -> R.string.database_key_recovery_message
     }
 
 private fun Throwable.hasNativeRestoreInProgress(): Boolean = causesAndSuppressed().any { it is NativeRestoreInProgressException }
@@ -84,7 +108,7 @@ private fun Throwable.hasNativeMediaQuarantinePending(): Boolean = causesAndSupp
 
 private fun Throwable.hasStorageFullCause(): Boolean =
     causesAndSuppressed().any { cause ->
-        cause.javaClass.simpleName in setOf("SQLiteFullException", "SQLiteDiskIOException") ||
+        cause.javaClass.simpleName == "SQLiteFullException" ||
             cause.message
                 ?.lowercase()
                 ?.let { "no space left" in it || "disk is full" in it || "database or disk is full" in it } == true

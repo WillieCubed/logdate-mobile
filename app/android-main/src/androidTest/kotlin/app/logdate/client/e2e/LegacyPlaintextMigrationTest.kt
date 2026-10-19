@@ -5,8 +5,8 @@ import android.content.ContextWrapper
 import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import app.logdate.client.database.databaseModule
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
+import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.database.migratePlaintextDatabaseIfNeeded
 import app.logdate.client.device.storage.SecureStorage
 import io.mockk.coEvery
@@ -14,9 +14,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.koin.android.ext.koin.androidContext
-import org.koin.dsl.koinApplication
-import org.koin.dsl.module
 import java.io.File
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -44,11 +41,8 @@ class LegacyPlaintextMigrationTest {
                 }
             val storage = mockk<SecureStorage>(relaxed = true)
             coEvery { storage.getString(any()) } returns null
-            val graph =
-                koinApplication {
-                    androidContext(context)
-                    modules(databaseModule, module { single<SecureStorage> { storage } })
-                }
+            val backup = PassphraseBackupStore(context)
+            val provider = DatabasePassphraseProvider(storage, backup)
             try {
                 val file = context.getDatabasePath("logdate")
                 SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
@@ -56,12 +50,10 @@ class LegacyPlaintextMigrationTest {
                     db.execSQL("INSERT INTO legacy_entries VALUES ('Retained legacy journal')")
                     db.version = 17
                 }
-                val key =
-                    graph.koin
-                        .get<DatabasePassphraseProvider>()
-                        .getPassphraseCandidates()
-                        .single()
+                val key = provider.getPassphraseCandidates().single()
                 assertEquals(32, key.size)
+                assertContentEquals(key, backup.read())
+                assertTrue(folder.resolve("db_recovery/passphrase_backup").isFile)
                 migratePlaintextDatabaseIfNeeded(context, key)
                 assertFalse(file.inputStream().use { it.readNBytes(16) }.contentEquals("SQLite format 3\u0000".encodeToByteArray()))
                 CipherDatabase
@@ -75,7 +67,6 @@ class LegacyPlaintextMigrationTest {
                     }
                 assertTrue(folder.listFiles().orEmpty().any { it.name.startsWith("logdate.plaintext-backup-") })
             } finally {
-                graph.close()
                 folder.deleteRecursively()
             }
         }

@@ -4,8 +4,13 @@ import android.Manifest
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.os.Build
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
+import app.logdate.client.MainActivity
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.database.LogDateDatabase
@@ -449,6 +454,16 @@ private suspend fun verifyMissingRecoveryKeys(
         recovery.detail.contains("original encryption key"),
         "Recovery should identify the missing journal key without exposing key material",
     )
+    ActivityScenario.launch(MainActivity::class.java).use { activity ->
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        assertTrue(
+            device.wait(Until.hasObject(By.text("Finish restoring your journal")), 15_000),
+            "Missing-key recovery must be reachable before the database-backed application graph",
+        )
+        assertTrue(device.hasObject(By.textContains("original device")), "Recovery must explain how to obtain the original key")
+        activity.recreate()
+        assertTrue(device.wait(Until.hasObject(By.text("Finish restoring your journal")), 15_000))
+    }
     assertNull(koin.get<SecureStorage>().getString("db_encryption_key"), "Startup persisted a replacement database key")
     assertTrue(databaseFile.isFile, "Recovery handling deleted the retained encrypted journal")
     assertContentEquals(
