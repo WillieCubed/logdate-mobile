@@ -7,7 +7,7 @@ database and secrets, taken from the immutable deployment contract that
 scripts/render-cloud-run-contract.sh produces. Run it with --dry-run first: that only counts the
 accounts that need an identity. A real run refuses to start while the server publishes PLC
 operations unless --allow-plc-publishing is given, because every new identity is then sent to the
-public PLC directory. The job's log shows the counts; see docs/reference/handle-resolution.md.
+public PLC directory. The job's log shows the counts; see docs/runbook/handle-resolution.md.
 """
 import argparse
 import importlib.util

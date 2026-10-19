@@ -7,7 +7,7 @@
 # LogDate answers the HTTPS method; the logdate.app website serves that path for every handle
 # host and asks the LogDate server which account owns the handle. This script asks the server
 # directly, then asks the handle host the way an outside app would, and requires the two to agree.
-# See docs/reference/handle-resolution.md.
+# See docs/runbook/handle-resolution.md.
 
 set -uo pipefail
 

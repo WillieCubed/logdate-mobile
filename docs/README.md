@@ -8,6 +8,7 @@ module's `README.md`; start with [`app/README.md`](../app/README.md) and the mod
 
 | Folder | What it holds | Start with |
 | --- | --- | --- |
+| [`explanation/`](explanation/) | Concepts: how a system works and why it was built that way | [Handle resolution](explanation/handle-resolution.md) |
 | [`reference/`](reference/) | How things work today: architecture, platform integration, and standards | [Development standards](reference/standards/README.md) |
 | [`feature-design/`](feature-design/) | Product behavior and design decisions for a feature | [Android OS integration](feature-design/android-os-integration.md) |
 | [`testing/`](testing/) | How to write and run each kind of test | [Testing introduction](testing/introduction.md), [Screenshot tests](testing/screenshot-tests.md) |
@@ -16,7 +17,7 @@ module's `README.md`; start with [`app/README.md`](../app/README.md) and the mod
 | [`environment/`](environment/) | Setting up a development machine | [Setup](environment/setup.md) |
 | [`performance/`](performance/) | Benchmarks and performance plans | [Performance index](performance/README.md) |
 | [`observability/`](observability/) | Logging, metrics, and error reporting | |
-| [`runbook/`](runbook/) | Operational procedures | |
+| [`runbook/`](runbook/) | Operational procedures | [Handle resolution](runbook/handle-resolution.md) |
 | [`plans/`](plans/) and [`superpowers/`](superpowers/) | Dated implementation plans and design specs | |
 
 ## Reference highlights
