@@ -32,7 +32,8 @@
           },
           "createdAt": {
             "type": "string",
-            "format": "datetime"
+            "format": "datetime",
+            "description": "When the profile was first written. Absent for a profile written before LogDate recorded it, or by an app that doesn't, as AT Protocol profiles commonly leave it out; a profile is edited in place, so this is never a time it was last changed."
           }
         }
       }
