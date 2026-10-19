@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "An unfinished entry, as it stands in the editor. Drafts sync between the owner's devices so writing can continue on another one, and are never shared or published. Each block keeps its own capture time and location, because each becomes its own entry when the draft is saved.",
+      "description": "An unfinished entry, as it stands in the editor. Drafts sync between the owner's devices so writing can continue on another one, and are never shared or published. Each block keeps its own capture time and location, because each becomes its own entry when the draft is saved. A draft too large for one sealed record isn't written: the device shows a RecordTooLarge sync error and keeps the draft locally, and never trims it.",
       "key": "any",
       "record": {
         "type": "object",

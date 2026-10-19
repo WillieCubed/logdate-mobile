@@ -296,6 +296,21 @@ in centimeters per second, and bearing in hundredths of a degree. Each is the de
 bearing is reduced modulo 36,000, so 359.996° becomes 0. Digits below a centimeter, which a float
 can carry, are dropped: they're finer than any location sensor measures.
 
+### Records too large to seal
+
+A sealed record holds at most about 3.99 MB once encoded. Location samples are the only records
+built to stay under that: an hour is split into parts. Any other record can still be too large,
+most likely a transcript of a recording many hours long (word timings take room), or a draft or
+entry with many long blocks or captions.
+
+Such a record is refused, never trimmed or split. The device doesn't write it, shows a sync error
+for that record (the server's `RecordTooLarge`, or the same check on the device before sending), and
+keeps the record as it is locally. Everything else keeps syncing. For an entry or draft, the person
+can shorten it or split it into several. A transcript that's too large stays on the device that
+made it; the recording itself still syncs. Splitting transcripts into parts the way samples are
+split would mean a second way to store them for a rare case, so it waits until real recordings
+need it.
+
 ## Data the sharing features add
 
 These don't exist yet. They come from the [social model](../feature-design/social-model.md).
@@ -565,6 +580,7 @@ Streams form.
 | 2026-10-18 | **Media is encrypted with the account's media key.** Blobs are encrypted on the device in 64 KiB chunks with the account-wide media key (`LDCE2`), not with the content key of the record that refers to them. `mimeType` comes from the file when it's uploaded. |
 | 2026-10-18 | **A missing file doesn't lose the block.** `media` is optional on an entry's photo, video and audio blocks. Its absence means no device has the file, such as a note restored from an archive without its media, and the block keeps its caption, length and transcript. |
 | 2026-10-18 | **Long text is refused, never cut short.** The app doesn't limit an entry's text, captions, journal titles and descriptions, place names and descriptions, or correction labels, so they all share the text block's limits (1,000,000 bytes, 100,000 characters). On any sync write, during the first move or later, a record with a longer value isn't written: the device shows a sync error naming the field, and keeps syncing everything else. Cutting text short would lose the person's words without telling them. |
+| 2026-10-18 | **Records too large to seal are refused.** Apart from location samples, which are split into parts, a record that's larger than a sealed record can hold (about 3.99 MB) is never trimmed or split. The device doesn't write it, shows a `RecordTooLarge` sync error for that record, keeps it locally, and keeps syncing everything else. The likeliest cases are a transcript of a recording many hours long and a draft or entry with many long blocks. |
 | 2026-10-18 | **Transcripts keep full detail.** Segment ids, words, speakers, the recognition pass of each segment and the engine are all stored, because a transcript is costly to produce again. Speaker colors aren't: they're a display choice nothing sets. The first recognition pass maps to `inProgress` and the second to `refining`. A transcript is keyed `<entry>:<block>`, so an entry can hold a transcript for each recording. |
 | 2026-10-18 | **Merged journals leave a redirect.** The merged-away journal stays as a record with `mergedInto`, so every device can move what it still has in that journal, however long it was offline. It's deleted with the surviving journal, and points at the newest survivor when merges chain. In a circle of merges, the journal with the smallest record key survives. |
 | 2026-10-18 | **Records that two devices may both create have keys built from what they connect.** Memberships are keyed `<journal>:<entry>`, entry links `<entry>:<SHA-256 of the evidence id>` and transcripts `<entry>:<block>`, so the same fact is always one record. They are written create-only (`createOnly`), and an existing record is left as it is, so a membership's optional `createdAt` is the first one written and both devices settle on the same bytes. |
