@@ -11,7 +11,8 @@ trap 'rm -r "$work"' EXIT
 # A copy of the working tree's schemas and checker, sharing the installed packages.
 mkdir -p "$work/tools/lexicon-check"
 cp -R "$root/lexicons" "$work/lexicons"
-cp -R "$root/tools/lexicon-check/check.mjs" "$root/tools/lexicon-check/compat.mjs" "$root/tools/lexicon-check/examples" \
+cp -R "$root/tools/lexicon-check/check.mjs" "$root/tools/lexicon-check/compat.mjs" "$root/tools/lexicon-check/declarations.mjs" \
+    "$root/tools/lexicon-check/examples" \
     "$work/tools/lexicon-check/"
 ln -s "$root/tools/lexicon-check/node_modules" "$work/tools/lexicon-check/node_modules"
 

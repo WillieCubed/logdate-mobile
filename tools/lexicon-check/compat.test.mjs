@@ -159,3 +159,168 @@ test("a nullable field that stops being nullable breaks", () => {
   nullableBase.defs.main.record.nullable = ["text"];
   assert.deepEqual(breakingChanges(nullableBase, base), ["#main.record.text: the field is no longer nullable"]);
 });
+
+const permissionSet = {
+  lexicon: 1,
+  id: "app.logdate.authExample",
+  defs: {
+    main: {
+      type: "permission-set",
+      title: "Example",
+      detail: "Example access.",
+      permissions: [
+        { type: "permission", resource: "repo", collection: ["app.logdate.actor.profile", "app.logdate.share.item"] },
+        { type: "permission", resource: "rpc", lxm: ["app.logdate.space.getRecord"], inheritAud: true },
+        {
+          type: "permission",
+          resource: "space",
+          spaceType: "app.logdate.space.circle",
+          authority: "*",
+          action: ["read", "create"],
+          manage: ["create"],
+        },
+      ],
+    },
+  },
+};
+const editSet = (change) => {
+  const next = clone(permissionSet);
+  change(next.defs.main.permissions, next.defs.main);
+  return breakingChanges(permissionSet, next);
+};
+const circles = "app.logdate.space.circle spaces (authority *, skey *)";
+
+test("a permission set may gain permissions and change its wording", () => {
+  assert.deepEqual(
+    editSet((permissions, main) => {
+      main.title = "Better example";
+      main.detail = "Clearer words.";
+      permissions[0].collection.push("app.logdate.share.reply");
+      permissions[2].action.push("update");
+      permissions[2].manage.push("delete");
+      permissions.push({ type: "permission", resource: "repo", collection: ["app.logdate.graph.mute"] });
+    }),
+    [],
+  );
+});
+
+test("a permission set may regroup the same grants differently", () => {
+  assert.deepEqual(
+    editSet((permissions) => {
+      permissions[0] = { type: "permission", resource: "repo", collection: ["app.logdate.actor.profile"] };
+      permissions.push({
+        type: "permission",
+        resource: "repo",
+        collection: ["app.logdate.share.item"],
+        action: ["create", "update", "delete"],
+      });
+      permissions[2].action = ["read", "create", "update", "delete"];
+    }),
+    [],
+  );
+});
+
+test("removing a permission from a published set breaks", () => {
+  assert.deepEqual(
+    editSet((permissions) => permissions.splice(1, 1)),
+    ["#main.permissions: the set no longer grants rpc app.logdate.space.getRecord for the app's audience"],
+  );
+});
+
+test("narrowing a repo permission breaks", () => {
+  assert.deepEqual(
+    editSet((permissions) => {
+      permissions[0].collection = ["app.logdate.actor.profile"];
+      permissions.push({ type: "permission", resource: "repo", collection: ["app.logdate.share.item"], action: ["create"] });
+    }),
+    [
+      "#main.permissions: the set no longer grants repo update on app.logdate.share.item",
+      "#main.permissions: the set no longer grants repo delete on app.logdate.share.item",
+    ],
+  );
+});
+
+test("narrowing a space permission breaks", () => {
+  const narrowed = [
+    `#main.permissions: the set no longer grants read in ${circles}`,
+    `#main.permissions: the set no longer grants create of the space type's declared collections in ${circles}`,
+    `#main.permissions: the set no longer grants manage=create of ${circles}`,
+  ];
+  assert.deepEqual(
+    editSet((permissions) => {
+      permissions[2].action = ["read_self"];
+      permissions[2].manage = [];
+    }),
+    narrowed,
+  );
+  assert.deepEqual(
+    editSet((permissions) => delete permissions[2].authority),
+    narrowed,
+  );
+});
+
+test("listing a space permission's collections where it used the declared ones breaks, and * covers them", () => {
+  assert.deepEqual(
+    editSet((permissions) => (permissions[2].collection = ["app.logdate.crypto.sealed"])),
+    [`#main.permissions: the set no longer grants create of the space type's declared collections in ${circles}`],
+  );
+  assert.deepEqual(
+    editSet((permissions) => (permissions[2].collection = ["*"])),
+    [],
+  );
+});
+
+test("read covers read_self", () => {
+  const readSelf = clone(permissionSet);
+  readSelf.defs.main.permissions[2].action = ["read_self", "create"];
+  assert.deepEqual(breakingChanges(readSelf, permissionSet), []);
+  assert.deepEqual(breakingChanges(permissionSet, readSelf), [`#main.permissions: the set no longer grants read in ${circles}`]);
+});
+
+const space = {
+  lexicon: 1,
+  id: "app.logdate.space.circle",
+  defs: {
+    main: {
+      type: "space",
+      key: "any",
+      name: "Shared with people",
+      collections: ["app.logdate.crypto.sealed", "app.logdate.crypto.wrappedKey"],
+    },
+  },
+};
+const editSpace = (change) => {
+  const next = clone(space);
+  change(next.defs.main);
+  return breakingChanges(space, next);
+};
+
+test("a space declaration may gain collections and change its names", () => {
+  assert.deepEqual(
+    editSpace((main) => {
+      main.collections.push("app.logdate.share.reaction");
+      main.name = "Things you share";
+      main["name:lang"] = { es: "Lo que compartes" };
+      main.description = "Better words.";
+    }),
+    [],
+  );
+});
+
+test("narrowing a space's collections or changing its key breaks", () => {
+  assert.deepEqual(
+    editSpace((main) => (main.collections = ["app.logdate.crypto.sealed"])),
+    ["#main.collections: app.logdate.crypto.wrappedKey was removed"],
+  );
+  assert.deepEqual(
+    editSpace((main) => (main.key = "tid")),
+    ["#main: the space key changed from any to tid"],
+  );
+});
+
+test("a space declaration can't become another kind of definition", () => {
+  assert.deepEqual(
+    editSpace((main) => (main.type = "token")),
+    ["#main: the type changed from space to token"],
+  );
+});

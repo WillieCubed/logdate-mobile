@@ -169,6 +169,9 @@ importers:
       '@atproto/lexicon':
         specifier: 0.7.14
         version: 0.7.14
+      '@atproto/syntax':
+        specifier: 0.7.6
+        version: 0.7.6
 
 packages:
 

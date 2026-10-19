@@ -2,13 +2,15 @@
 
 // Validates every lexicon under lexicons/ with the AT Protocol reference implementation,
 // checks LogDate's own conventions, validates the example records against their schemas, and
-// refuses breaking changes to published schemas (see compat.mjs).
+// refuses breaking changes to published schemas (see compat.mjs). Permission sets and space
+// declarations are also checked against their own specifications (see declarations.mjs).
 import { execFileSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { jsonToLex, Lexicons, parseLexiconDoc } from "@atproto/lexicon";
 import { breakingChanges } from "./compat.mjs";
+import { permissionSetProblems, spaceDeclarationProblems, values } from "./declarations.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -38,6 +40,8 @@ const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 
 const lexicons = new Lexicons();
 const ownRecords = new Set();
+const spaces = new Map();
+const permissionSets = new Map();
 
 for (const path of (await jsonFiles(lexiconRoot)).filter((p) => p !== mappingFile && p !== publishedFile).sort()) {
   const where = relative(root, path);
@@ -46,8 +50,22 @@ for (const path of (await jsonFiles(lexiconRoot)).filter((p) => p !== mappingFil
   const expectedId = relative(lexiconRoot, path).replace(/\.json$/, "").split(sep).join(".");
   if (doc.id !== expectedId) report(where, `id ${doc.id} doesn't match its path (expected ${expectedId})`);
 
+  // The stable reference implementation doesn't know space declarations yet (Spaces is an alpha), so
+  // a space's main definition is checked by declarations.mjs and the rest of its file goes on.
+  let referenceDoc = doc;
+  if (doc.defs?.main?.type === "space") {
+    spaces.set(doc.id, doc.defs.main);
+    for (const problem of spaceDeclarationProblems(doc.defs.main)) report(where, problem);
+    const { main, ...rest } = doc.defs;
+    referenceDoc = Object.keys(rest).length > 0 ? { ...doc, defs: rest } : null;
+  }
+  if (doc.defs?.main?.type === "permission-set") {
+    permissionSets.set(doc.id, doc.defs.main);
+    for (const problem of permissionSetProblems(doc.id, doc.defs.main)) report(where, problem);
+  }
+
   try {
-    lexicons.add(parseLexiconDoc(doc));
+    if (referenceDoc) lexicons.add(parseLexiconDoc(referenceDoc));
   } catch (error) {
     const issues = error.issues?.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
     report(where, issues?.join("; ") ?? error.message);
@@ -58,7 +76,7 @@ for (const path of (await jsonFiles(lexiconRoot)).filter((p) => p !== mappingFil
 
   if (!doc.description) report(where, "every LogDate lexicon needs a top-level description");
   for (const [name, def] of Object.entries(doc.defs)) {
-    if (["object", "record", "token", "permission-set"].includes(def.type) && !def.description && !def.title) {
+    if (["object", "record", "token", "permission-set", "space"].includes(def.type) && !def.description && !def.title) {
       report(where, `#${name} needs a description`);
     }
   }
@@ -85,6 +103,37 @@ for (const doc of lexicons) {
   for (const ref of references(doc.defs)) {
     const target = ref.startsWith("#") ? `${doc.id}${ref}` : ref;
     if (!lexicons.getDef(target)) report(doc.id, `reference ${ref} doesn't resolve`);
+  }
+}
+
+// Spaces and permission sets name record types, methods and spaces by NSID, not by reference, so
+// LogDate's own are checked here: each must name something this folder defines.
+const defines = (nsid, ...types) => types.includes(lexicons.getDef(nsid)?.type);
+for (const [id, space] of spaces) {
+  if (!id.startsWith(ownNamespace)) continue;
+  for (const collection of space.collections ?? []) {
+    if (!defines(collection, "record")) report(id, `space collection ${collection} isn't a record type here`);
+  }
+}
+for (const [id, set] of permissionSets) {
+  if (!id.startsWith(ownNamespace)) continue;
+  for (const permission of set.permissions ?? []) {
+    if (permission.resource === "repo") {
+      for (const collection of values(permission.collection)) {
+        if (!defines(collection, "record")) report(id, `repo collection ${collection} isn't a record type here`);
+      }
+    }
+    if (permission.resource === "rpc") {
+      for (const method of values(permission.lxm)) {
+        if (!defines(method, "query", "procedure", "subscription")) report(id, `rpc method ${method} isn't defined here`);
+      }
+    }
+    if (permission.resource === "space") {
+      if (!spaces.has(permission.spaceType)) report(id, `space type ${permission.spaceType} isn't declared here`);
+      for (const collection of values(permission.collection)) {
+        if (collection !== "*" && !defines(collection, "record")) report(id, `space collection ${collection} isn't a record type here`);
+      }
+    }
   }
 }
 
@@ -130,7 +179,7 @@ if (baseRef) {
 }
 for (const nsid of published) {
   const where = lexiconPath(nsid);
-  if (!lexicons.getDef(nsid) || !nsid.startsWith(ownNamespace)) {
+  if (!(lexicons.getDef(nsid) || spaces.has(nsid)) || !nsid.startsWith(ownNamespace)) {
     report(relative(root, publishedFile), `${nsid} isn't a LogDate schema in this folder`);
     continue;
   }
@@ -152,5 +201,6 @@ if (problems.length > 0) {
 }
 console.log(
   `Lexicon check passed: ${ownRecords.size} LogDate record types, all mapped and valid; ` +
+    `${spaces.size} space declaration(s) and ${permissionSets.size} permission set(s); ` +
     `${published.length} published schema(s) checked for breaking changes.`,
 );
