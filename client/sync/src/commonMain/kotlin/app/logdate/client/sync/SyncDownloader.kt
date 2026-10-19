@@ -19,12 +19,14 @@ import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.SPACE_CHECKPOINT
 import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceStagedRecords
 import app.logdate.client.sync.space.SpaceSync
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * The concrete per-[EntityType] download side of sync: journals and notes fit
@@ -136,13 +138,21 @@ internal class SyncDownloader(
                         applyDelete = { id ->
                             if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalRepository.delete(id)
                         },
+                        checkpoint = if (spaceRead != null) SPACE_CHECKPOINT else EntityType.JOURNAL.name,
+                        settle = spaceRead?.let { read -> read::settle },
+                        settleFailed = { id -> spaceRead?.settleFailed(id) },
                     ),
                 accessToken = accessToken,
                 since = since,
             )
-        spaceRead?.settle()
         journalRepository.reconcileJournalRedirects(mergeScope)
         return result
+    }
+
+    /** Runs one download pass, in which the personal space's change feed is pulled once for every kind. */
+    suspend fun <R> downloadPass(block: suspend () -> R): R {
+        val sync = space ?: return block()
+        return sync.downloadPass(block)
     }
 
     /** Reads [entityType]'s records from the personal space, when this device syncs that kind there now. */
@@ -154,23 +164,28 @@ internal class SyncDownloader(
         return SpaceRead(sync, kind as SpaceKind<T>)
     }
 
-    /** One download's read of a kind's staged personal-space records, settled once they are applied. */
+    /** One download's read of a kind's staged personal-space records, settled as each item is applied. */
     private class SpaceRead<T : Any>(
         private val sync: SpaceSync,
         private val kind: SpaceKind<T>,
     ) {
         private var staged: SpaceStagedRecords<T>? = null
 
-        suspend fun page(): Result<ChangesPage<T>> =
-            sync.read(kind).map { records ->
-                staged = records
-                val page = records.page()
-                // One pass applies everything due; rows left for later are offered again by the next sync.
-                ChangesPage(page.changes, page.deletions, page.readAt, hasMore = false)
-            }
+        suspend fun page(): Result<ChangesPage<T>> {
+            val records = staged ?: sync.read(kind).getOrElse { return Result.failure(it) }.also { staged = it }
+            val page = records.page()
+            return Result.success(ChangesPage(page.changes, page.deletions, page.readAt, page.hasMore))
+        }
 
-        suspend fun settle() {
-            staged?.settle()
+        suspend fun settle(
+            id: Uuid,
+            outcome: RemoteOutcome,
+        ) {
+            staged?.settle(id, outcome)
+        }
+
+        suspend fun settleFailed(id: Uuid) {
+            staged?.settleFailed(id)
         }
     }
 
@@ -214,67 +229,68 @@ internal class SyncDownloader(
     ): SyncResult {
         val syncableRepository = journalNotesRepository as? SyncableJournalNotesRepository
         val spaceRead = spaceRead<JournalNote>(EntityType.NOTE)
-        val result =
-            downloadEngine.download(
-                strategy =
-                    DownloadStrategy(
-                        entityType = EntityType.NOTE,
-                        logLabel = "note",
-                        fetchChanges =
-                            spaceRead?.let { read -> { _, _ -> read.page() } } ?: { token, cursor ->
-                                tokenRefresher
-                                    .withFreshToken(
-                                        { t -> cloudContentDataSource.getContentChanges(t, cursor, SYNC_PAGE_SIZE) },
-                                        "getContentChanges",
-                                    ).map {
-                                        ChangesPage(
-                                            it.changes,
-                                            it.deletions,
-                                            it.lastSyncTimestamp,
-                                            it.hasMore,
-                                            it.unreadable,
-                                            it.failures,
-                                            it.unreadableVersions,
-                                        )
-                                    }
-                            },
-                        localItems = { journalNotesRepository.allNotesObserved.first().associateBy { it.uid } },
-                        localItem = journalNotesRepository::getNoteById,
-                        idOf = { it.uid },
-                        syncVersionOf = { it.syncVersion },
-                        lastUpdatedOf = { it.lastUpdated },
-                        conflictResolver = noteConflictResolver,
-                        sameUploadedFields = ::sameNoteFields,
-                        sameCreateBaseFields = ::sameAudioCreateBaseFields,
-                        acknowledgeUpload = ::acknowledgeNoteCreate,
-                        hydrate = ::hydrateNote,
-                        applyCreate = { note ->
-                            if (syncableRepository != null) syncableRepository.createFromSync(note) else journalNotesRepository.create(note)
-                        },
-                        // Notes have no update-in-place sync path -- a replacement is always applied as
-                        // remove-then-recreate, matching how a fresh download from the server is applied.
-                        applyReplace = { existing, replacement ->
-                            if (syncableRepository != null) {
-                                syncableRepository.deleteFromSync(existing.uid)
-                                syncableRepository.createFromSync(replacement)
-                            } else {
-                                journalNotesRepository.remove(existing)
-                                journalNotesRepository.create(replacement)
-                            }
-                        },
-                        applyDelete = { id ->
-                            if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalNotesRepository.removeById(id)
-                        },
-                        afterDelete = { id -> mediaSyncRefStore.delete(id) },
-                        appliesRemoteCreate = remoteApplyFilter::appliesNote,
-                        enqueuesMediaRecovery = downloadsMedia,
-                    ),
-                accessToken = accessToken,
-                since = since,
-            )
-        spaceRead?.settle()
-        return result
+        return downloadEngine.download(
+            strategy =
+                DownloadStrategy(
+                    entityType = EntityType.NOTE,
+                    logLabel = "note",
+                    fetchChanges = spaceRead?.let { read -> { _, _ -> read.page() } } ?: { _, cursor -> fetchContentChanges(cursor) },
+                    localItems = { journalNotesRepository.allNotesObserved.first().associateBy { it.uid } },
+                    localItem = journalNotesRepository::getNoteById,
+                    idOf = { it.uid },
+                    syncVersionOf = { it.syncVersion },
+                    lastUpdatedOf = { it.lastUpdated },
+                    conflictResolver = noteConflictResolver,
+                    sameUploadedFields = ::sameNoteFields,
+                    sameCreateBaseFields = ::sameAudioCreateBaseFields,
+                    acknowledgeUpload = ::acknowledgeNoteCreate,
+                    // A note joined from personal-space records is the whole note, transcript included.
+                    hydrate = if (spaceRead != null) { _, note -> note } else ::hydrateNote,
+                    applyCreate = { note ->
+                        if (syncableRepository != null) syncableRepository.createFromSync(note) else journalNotesRepository.create(note)
+                    },
+                    // Notes have no update-in-place sync path -- a replacement is always applied as
+                    // remove-then-recreate, matching how a fresh download from the server is applied.
+                    applyReplace = { existing, replacement ->
+                        if (syncableRepository != null) {
+                            syncableRepository.deleteFromSync(existing.uid)
+                            syncableRepository.createFromSync(replacement)
+                        } else {
+                            journalNotesRepository.remove(existing)
+                            journalNotesRepository.create(replacement)
+                        }
+                    },
+                    applyDelete = { id ->
+                        if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalNotesRepository.removeById(id)
+                    },
+                    afterDelete = { id -> mediaSyncRefStore.delete(id) },
+                    appliesRemoteCreate = remoteApplyFilter::appliesNote,
+                    enqueuesMediaRecovery = downloadsMedia,
+                    checkpoint = if (spaceRead != null) SPACE_CHECKPOINT else EntityType.NOTE.name,
+                    settle = spaceRead?.let { read -> read::settle },
+                    settleFailed = { id -> spaceRead?.settleFailed(id) },
+                ),
+            accessToken = accessToken,
+            since = since,
+        )
     }
+
+    private suspend fun fetchContentChanges(cursor: Instant): Result<ChangesPage<JournalNote>> =
+        tokenRefresher
+            .withFreshToken(
+                { token -> cloudContentDataSource.getContentChanges(token, cursor, SYNC_PAGE_SIZE) },
+                "getContentChanges",
+            ).map {
+                ChangesPage(
+                    it.changes,
+                    it.deletions,
+                    it.lastSyncTimestamp,
+                    it.hasMore,
+                    it.unreadable,
+                    it.failures,
+                    it.unreadableVersions,
+                )
+            }
 
     private suspend fun hydrateNote(
         accessToken: String,

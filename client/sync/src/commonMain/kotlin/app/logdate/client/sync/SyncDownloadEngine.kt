@@ -74,7 +74,34 @@ internal class DownloadStrategy<T : Any>(
     val appliesRemoteCreate: (T) -> Boolean = { true },
     /** Whether an applied record's media is queued for download; off where media is fetched on demand. */
     val enqueuesMediaRecovery: Boolean = true,
+    /** The download checkpoint whose fetch failure this download reports. */
+    val checkpoint: String = entityType.name,
+    /**
+     * Settles the records behind each remote item inside the transaction that applied it, in place of
+     * the inbox row under the item's id. A personal-space read records the versions it applied here.
+     */
+    val settle: (suspend (id: Uuid, outcome: RemoteOutcome) -> Unit)? = null,
+    /** Reports an item that failed to apply, for a [settle] strategy. */
+    val settleFailed: suspend (id: Uuid) -> Unit = {},
 )
+
+/** What became of one remote item or deletion. */
+internal enum class RemoteOutcome {
+    /** The remote version is now the local one. */
+    STORED,
+
+    /** The resolver merged it into the local copy, which is queued to upload. */
+    MERGED,
+
+    /** The resolver kept the local copy, which is queued to upload over it. */
+    KEPT_LOCAL,
+
+    /** Not applied: a local change waits, a newer copy is here, the conflict awaits review, or this device doesn't keep it. */
+    DECLINED,
+
+    /** The deletion was applied. */
+    DELETED,
+}
 
 /**
  * Runs the download-paginate-resolve-conflicts sequence shared by every [EntityType] whose
@@ -182,22 +209,25 @@ internal class SyncDownloadEngine(
                             errors = errors,
                         )
                     }
-                val fetchFailure = downloadInbox?.fetchFailure(strategy.entityType.name)
+                val fetchFailure = downloadInbox?.fetchFailure(strategy.checkpoint)
                 if (fetchFailure != null && fetchFailure != DiagnosticReason.NONE) {
                     errors.add(
                         SyncError(
-                            if (fetchFailure ==
-                                DiagnosticReason.SIGN_IN_REQUIRED
-                            ) {
-                                SyncErrorType.AUTHENTICATION_ERROR
-                            } else {
-                                SyncErrorType.SERVER_ERROR
+                            when (fetchFailure) {
+                                DiagnosticReason.SIGN_IN_REQUIRED -> SyncErrorType.AUTHENTICATION_ERROR
+                                DiagnosticReason.OFFLINE -> SyncErrorType.NETWORK_ERROR
+                                else -> SyncErrorType.SERVER_ERROR
                             },
                             "Remote fetch failed; saved records are still being recovered",
                         ),
                     )
                 }
-                val rows = downloadInbox?.pending(strategy.entityType.name).orEmpty().associateBy { it.entityId }
+                val rows =
+                    if (strategy.settle != null) {
+                        emptyMap()
+                    } else {
+                        downloadInbox?.pending(strategy.entityType.name).orEmpty().associateBy { it.entityId }
+                    }
                 val hydrated =
                     page.changes.map { remote ->
                         val result =
@@ -235,6 +265,7 @@ internal class SyncDownloadEngine(
                             try {
                                 transactionManager.withTransaction {
                                     ensureScope(downloadScope)
+                                    var outcome = RemoteOutcome.STORED
                                     run record@{
                                         val item = hydration.getOrThrow()
                                         val id = strategy.idOf(item)
@@ -256,10 +287,12 @@ internal class SyncDownloadEngine(
 
                                         if (existing == null && pendingLocal) {
                                             skippedIds += id.toString()
+                                            outcome = RemoteOutcome.DECLINED
                                             return@record
                                         }
                                         if (existing == null && !strategy.appliesRemoteCreate(item)) {
                                             outsideWindowIds += id.toString()
+                                            outcome = RemoteOutcome.DECLINED
                                             return@record
                                         }
                                         if (existing != null &&
@@ -267,11 +300,13 @@ internal class SyncDownloadEngine(
                                             strategy.syncVersionOf(existing) >= strategy.syncVersionOf(item)
                                         ) {
                                             if (existing != item || pendingLocal) skippedIds += id.toString()
+                                            outcome = RemoteOutcome.DECLINED
                                             return@record
                                         }
                                         if (existing != null) {
                                             val hasPendingLocal = pendingLocal
                                             if (hasPendingLocal) {
+                                                outcome = RemoteOutcome.DECLINED
                                                 skippedIds += id.toString()
                                                 conflictsResolved++
                                                 Napier.w("Remote update conflicts with pending local work")
@@ -310,6 +345,7 @@ internal class SyncDownloadEngine(
                                                     Napier.d("Conflict resolved using remote version")
                                                 }
                                                 is ConflictResolution.KeepLocal -> {
+                                                    outcome = RemoteOutcome.KEPT_LOCAL
                                                     // Keeping the local copy is only half the resolution:
                                                     // without re-queueing it the server keeps its own
                                                     // version, the next download resolves the same conflict
@@ -323,6 +359,7 @@ internal class SyncDownloadEngine(
                                                     Napier.d("Conflict resolved using local version")
                                                 }
                                                 is ConflictResolution.Merge -> {
+                                                    outcome = RemoteOutcome.MERGED
                                                     strategy.applyReplace(existing, resolution.merged)
                                                     syncMetadataService.enqueuePending(
                                                         entityId = id.toString(),
@@ -334,6 +371,7 @@ internal class SyncDownloadEngine(
                                                     Napier.d("Conflict resolved by merging")
                                                 }
                                                 is ConflictResolution.RequiresManualResolution -> {
+                                                    outcome = RemoteOutcome.DECLINED
                                                     Napier.w(
                                                         "Conflict requires review",
                                                     )
@@ -356,6 +394,7 @@ internal class SyncDownloadEngine(
                                         }
                                     }
                                     ensureScope(downloadScope)
+                                    strategy.settle?.invoke(recordId, outcome)
                                     rows[recordId.toString()]?.let { row ->
                                         downloadInbox?.applied(
                                             strategy.entityType.name,
@@ -397,6 +436,7 @@ internal class SyncDownloadEngine(
                                     report(failure, source)
                                 }
                                 failedIds += recordId.toString()
+                                if (strategy.settle != null) strategy.settleFailed(recordId)
                                 batchErrors.add(
                                     SyncError(
                                         SyncErrorType.UNKNOWN_ERROR,
@@ -419,6 +459,7 @@ internal class SyncDownloadEngine(
                             try {
                                 transactionManager.withTransaction {
                                     ensureScope(downloadScope)
+                                    var outcome = RemoteOutcome.DELETED
                                     run deletion@{
                                         val existing = strategy.localItem(id)
                                         val deletionVersion = rows[id.toString()]?.version
@@ -427,12 +468,14 @@ internal class SyncDownloadEngine(
                                             strategy.syncVersionOf(existing) > deletionVersion
                                         ) {
                                             skippedIds += id.toString()
+                                            outcome = RemoteOutcome.DECLINED
                                             return@deletion
                                         }
                                         val hasPendingLocal =
                                             existing != null && syncMetadataService.hasPending(strategy.entityType, id.toString())
 
                                         if (hasPendingLocal) {
+                                            outcome = RemoteOutcome.DECLINED
                                             val item = requireNotNull(existing)
                                             conflictsResolved++
                                             Napier.w("Remote deletion conflicts with pending local work")
@@ -455,6 +498,7 @@ internal class SyncDownloadEngine(
                                         Napier.d("Remote deletion applied")
                                     }
                                     ensureScope(downloadScope)
+                                    strategy.settle?.invoke(id, outcome)
                                     rows[id.toString()]?.let { row ->
                                         downloadInbox?.applied(
                                             strategy.entityType.name,
@@ -493,6 +537,7 @@ internal class SyncDownloadEngine(
                                     report(failure, source)
                                 }
                                 failedIds += id.toString()
+                                if (strategy.settle != null) strategy.settleFailed(id)
                                 batchErrors.add(
                                     SyncError(
                                         SyncErrorType.UNKNOWN_ERROR,
