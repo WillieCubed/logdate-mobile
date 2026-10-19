@@ -191,6 +191,7 @@ val atprotoModulePaths =
         ":shared:atproto-lexicon",
         ":shared:atproto-pds",
         ":shared:atproto-pds-runtime",
+        ":shared:atproto-oauth-client",
     )
 
 val androidScreenshotValidationTasks =
