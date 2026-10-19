@@ -34,6 +34,8 @@ your IDE once Gradle has synced:
 | a definition `#textBlock` in that document | class `EntryTextBlock` |
 | `community.lexicon.location.geo` | package `app.logdate.lexicon.community.lexicon.location`, class `Geo` |
 | a `record` | a data class with `TYPE` (its collection) and `KEY` (its record-key rule) |
+| a `space` declaration, such as `app.logdate.space.personal` | an object `Personal` with `TYPE` (the space type), `NAME`, `KEY` (its space-key rule) and `COLLECTIONS` |
+| a `permission-set`, such as `app.logdate.authFull` | an object `AuthFull` with `SCOPE`, the OAuth scope an app asks for it with |
 | a `union` | a sealed interface with one wrapper per allowed type, plus `Unknown` if the union is open |
 | `blob`, `cid-link`, `bytes` | `Blob`, `CidLink`, `Bytes` |
 | an optional field | a nullable property that defaults to `null` |

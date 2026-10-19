@@ -90,6 +90,62 @@ rules are in [LogDate lexicons](./lexicons.md#activity-streams-mapping).
 **Examples.** Add an example record to `tools/lexicon-check/examples/` for any record type with
 unions, nested objects or media, so the check proves a real record validates.
 
+## Space declarations and permission sets
+
+Two kinds of lexicon describe access instead of data. Neither defines fields, so neither becomes a
+data class: the generated Kotlin is an object of constants.
+
+**A space declaration** names a kind of AT Protocol space. Its `main` definition has
+`"type": "space"` and needs:
+
+- a `description` for developers;
+- a `name` of at most 64 characters, which people see when an app asks for access to spaces of this
+  kind, optionally translated in `name:lang`;
+- a `key` rule for its spaces' keys, written like a record key rule: `literal:self` for one space
+  per account, `any` for spaces with random keys;
+- `collections`, the record types apps should expect inside. No `*`. Private LogDate spaces list
+  only `app.logdate.crypto.sealed`, because everything in them is sealed.
+
+```json
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.personal",
+  "description": "The owner's own space, which only they can read.",
+  "defs": {
+    "main": {
+      "type": "space",
+      "description": "The owner's own space, which only they can read.",
+      "key": "literal:self",
+      "name": "Your LogDate journal",
+      "collections": ["app.logdate.crypto.sealed"]
+    }
+  }
+}
+```
+
+The generated `Personal` object holds `TYPE`, `NAME`, `KEY` and `COLLECTIONS`. Code that builds
+space URIs uses `Personal.TYPE` rather than a copy of the string.
+
+Spaces is still an alpha in the AT Protocol, and the stable reference implementation doesn't read
+space declarations yet. Until it does, `./run lint:lexicons` checks them with its own rules from
+the Spaces proposal.
+
+**A permission set** bundles access an app asks for as one scope, `include:<set NSID>`. Its `main`
+definition has `"type": "permission-set"`, a `title` and `detail` written for the people approving
+the app, and a list of `permissions`. The rules come from the
+[permission specification](https://atproto.com/specs/permission):
+
+- A set can only grant record types, methods and space types in its own namespace or below it:
+  `app.logdate.authFull` can grant anything under `app.logdate.`. A space permission's `collection`
+  is the one exception, and may name any record type.
+- No `*` for a collection, a method or a space type.
+- No `blob`, `account` or `identity` permissions; apps ask for those directly.
+- An `rpc` permission uses `"inheritAud": true` instead of naming a service.
+
+Prefer leaving out a space permission's `collection`. It then grants the collections the space
+declaration lists, and follows the declaration when it grows. What each LogDate set grants, and
+why, is in [LogDate lexicons](./lexicons.md#permission-sets).
+
 ## Changing a schema
 
 Until a schema is published, it's a draft: change anything you need to, and update the examples and
@@ -108,6 +164,16 @@ rules for evolution:
 - **Experiments stay unpublished.** A schema being tried out stays a draft in this folder until it's
   stable.
 
+Space declarations and permission sets are read again while apps' sessions are live, so a change
+reaches every app that already has access. Adding access is allowed; taking any away isn't:
+
+- **Allowed:** adding a collection to a space declaration, adding a permission to a set, widening a
+  permission (more collections, more actions, `authority: "*"`), and rewording names, titles and
+  details.
+- **Not allowed:** removing a collection from a space declaration, changing its `key` rule, and
+  removing or narrowing anything a published set grants. The lint names each grant that would
+  disappear, such as `the set no longer grants repo delete on app.logdate.actor.profile`.
+
 A schema counts as published once its NSID is listed in
 [`lexicons/published.json`](../../lexicons/published.json). From then on, `./run lint:lexicons`,
 which CI also runs, compares it with its version where your branch left `main`, and fails on any
@@ -123,5 +189,6 @@ Run the check before you commit:
 ```
 
 It validates each file with the AT Protocol reference implementation, checks that every reference
-resolves and every record type has an Activity Streams mapping, and validates the example records
-against their schemas.
+resolves and every record type has an Activity Streams mapping, checks space declarations and
+permission sets against their own rules and that everything they name is defined in `lexicons/`,
+and validates the example records against their schemas.
