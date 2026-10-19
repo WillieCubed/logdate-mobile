@@ -504,8 +504,19 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Notes**:
   - Browsers only offer a passkey on a page whose host is the relying-party ID or a subdomain of it. The page is served from the OAuth issuer (`ATPROTO_OAUTH_ISSUER`), so the issuer's host must sit inside `WEBAUTHN_RP_ID`. For example, `https://cloud.logdate.app` works with `WEBAUTHN_RP_ID=logdate.app`. If it doesn't, the server refuses to start and names both values.
   - The issuer's origin is added to the origins passkey verification accepts automatically; it does not need to be listed in `WEBAUTHN_ALLOWED_ORIGINS`.
-  - An approved app gets an `atproto` token for the account's repository. While journal records are still stored there, the app can read and change them, and the page says so. Turn this on with that in mind.
+  - The server also refuses to start when passkey verification is not strict, because the page would then accept an assertion without checking it. Set `WEBAUTHN_STRICT_VERIFICATION=true` (the production default).
+  - An approved app never sees or changes the LogDate journal. With the `atproto` scope alone it only learns which account signed in; with `transition:generic` it can also upload files. This holds whether or not the flag is on.
   - Design: `docs/superpowers/specs/2026-10-19-passkey-atproto-sign-in-design.md`.
+
+### `LOGDATE_OAUTH_TRUSTED_CLIENT_IDS`
+- **Description**: OAuth client IDs (the URLs of their client metadata documents) that LogDate trusts. The authorization page names a trusted app by its own `client_name`; every other app is named by its full client ID URL, because a self-reported name can claim to be anything. Refresh tokens issued to trusted apps last 30 days instead of 14.
+- **Type**: Comma-separated list of URLs
+- **Default**: empty (no app is trusted)
+- **Example**: `LOGDATE_OAUTH_TRUSTED_CLIENT_IDS=https://bsky.app/oauth-client-metadata.json`
+- **Required**: No
+- **Notes**:
+  - Each entry must match the app's `client_id` exactly.
+  - Trust only changes how the app is named and how long its refresh token lasts. It grants no extra scope.
 
 ---
 
