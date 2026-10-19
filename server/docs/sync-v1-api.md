@@ -39,6 +39,26 @@ Response:
 Every code each endpoint can return is listed on that endpoint in `/docs`, with what it means and
 what to do about it. The overview's Errors section has the cross-cutting table.
 
+## Storage Modes
+
+Each account has a storage mode: `legacy`, or `personalSpaceV1` for accounts whose journal data lives
+in their personal space. The mode is chosen when the account is created and only the server's
+migration task changes it afterwards; signing in, saving the profile and setting up the account's
+identity never do. Apps read it from `GET /auth/me` when they sign in and each time sync starts.
+
+The per-kind sync routes serve only `legacy` accounts. An account in any other mode, including a mode
+this server does not recognize, gets `403 SYNC_STORAGE_MODE_MISMATCH` on every one of them and
+nothing is read or written. An app that sees this code reads `/auth/me` again and syncs the way the
+mode says. An account in `personalSpaceV1` keeps that mode when `LOGDATE_PERSONAL_SPACE_ENABLED` is
+turned off.
+
+## Linked Watch Removal
+
+A removed or expired watch session is refused with `401 DEVICE_SESSION_REVOKED`. Each server instance
+caches whether a session is active for 30 seconds and only the instance that handled the removal
+clears its cache at once, so a removed watch can keep reaching the sync routes and the personal space
+methods for up to 30 seconds on the other instances.
+
 ## Backup Purge Contract
 `POST /api/v1/ops/backups:purge?keepPerDevice=3&maxAgeDays=90`
 
