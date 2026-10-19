@@ -35,7 +35,10 @@ export async function loadLexicons() {
   for (const path of (await jsonFiles(lexiconRoot)).filter((p) => !notSchemas.has(p))) {
     const doc = await readJson(path);
     docs.set(doc.id, doc);
-    lexicons.add(parseLexiconDoc(structuredClone(doc)));
+    // The reference implementation doesn't know space declarations yet, and no record refers to one.
+    const { main, ...others } = doc.defs;
+    const known = main?.type === "space" ? { ...doc, defs: others } : doc;
+    if (Object.keys(known.defs).length > 0) lexicons.add(parseLexiconDoc(structuredClone(known)));
   }
   return { docs, lexicons };
 }
