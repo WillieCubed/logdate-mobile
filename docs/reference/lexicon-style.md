@@ -70,16 +70,29 @@ location schema does.
 Every client converts a fractional value to one of these integers the same way, so the Kotlin and
 Swift apps write identical records:
 
-1. If the value is NaN or infinite, refuse it: leave the field out, because it measures nothing.
-2. Multiply by the field's scale: 100 for centimeters and hundredths of a degree, 1000 for
+1. Work in 64-bit double arithmetic. A 32-bit `Float`, which is what Android reports for accuracy,
+   speed and bearing, is widened to a `Double` first; widening is exact, so 3.79f becomes
+   3.7899999618530273, not 3.79.
+2. If the value is NaN or infinite, refuse it: leave the field out, because it measures nothing.
+3. For a bearing, first reduce the degrees into 0 to 360 with `fmod` on the double (Kotlin `%` or
+   `rem` on a `Double`, Swift `truncatingRemainder(dividingBy:)`), adding 360 when the result is
+   negative. Any finite bearing has a place in that range, so a bearing is never refused for size.
+4. Multiply by the field's scale: 100 for centimeters and hundredths of a degree, 1000 for
    thousandths.
-3. Round to the nearest integer, with halves rounded away from zero (2.5 becomes 3, −2.5 becomes
-   −3). Kotlin's `roundToLong()` rounds halves up instead, so Kotlin code rounds the absolute value
-   and puts the sign back; Swift's `rounded()` already rounds this way.
-4. Bring the result into the field's range. A bearing in hundredths of a degree is reduced with a
-   true modulo into 0 to 35,999, whatever its sign or size (Kotlin `mod`, not `%`): −1 becomes
-   35,999, −36,050 (below −360°) becomes 35,950, and 36,000 becomes 0. A confidence is clamped to 0 to 1000. Accuracy, speed and radius
-   become 0 when negative.
+5. Round to the nearest integer, with halves rounded away from zero (2.5 becomes 3, −2.5 becomes
+   −3). Kotlin's `roundToLong()` rounds halves up instead, and `floor(x + 0.5)` is wrong for
+   0.49999999999999994, so take `trunc(x)` and compare the leftover `x − trunc(x)`, which is exact,
+   with ±0.5. Swift's `rounded()` already rounds this way.
+6. If the rounded value is outside −(2^53 − 1) to 2^53 − 1, the largest integers every client and
+   JSON represent exactly, refuse it like NaN: leave the field out. Never saturate it to a limit,
+   and never let the conversion throw.
+7. Bring the result into the field's range. A bearing that rounds to 36,000, from a reduced bearing just under 360°, becomes 0.
+   A confidence is clamped to 0 to 1000. Accuracy, speed and radius become 0 when negative.
+
+`tools/lexicon-check/convert.mjs` is the reference implementation, and
+`tools/lexicon-check/conversion-vectors.json` lists known answers, including widened floats, halves,
+bearings below −360° and values too large to keep. The Kotlin and Swift conversions should be
+tested against the same file.
 
 **Limits on every string and array.** Give strings a `maxLength` (bytes) and, for text people
 write, a `maxGraphemes` (visible characters). Give arrays a `maxLength`. Limits stop one bad record

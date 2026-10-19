@@ -33,7 +33,7 @@
           "radiusCentimeters": {
             "type": "integer",
             "minimum": 0,
-            "description": "How far from the center still counts as being at the place, in centimeters: the saved radius in meters times 100, rounded to the nearest whole number with halves away from zero, and 0 if it was negative, and left out when it is NaN or infinite. There's no upper limit, because the app sets none. When absent, apps use their usual distance for telling whether someone stayed somewhere."
+            "description": "How far from the center still counts as being at the place, in centimeters: the saved radius in meters times 100, rounded to the nearest whole number with halves away from zero, and 0 if it was negative, and left out when it is NaN, infinite, or beyond 2^53 - 1 once scaled. There's no upper limit, because the app sets none. When absent, apps use their usual distance for telling whether someone stayed somewhere."
           },
           "locality": {
             "type": "string",
