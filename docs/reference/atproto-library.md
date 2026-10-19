@@ -161,8 +161,9 @@ Every write produces a commit that matches the
 The JVM tests check this with the reference implementation itself. They export repositories as CAR
 files and run [`tools/atproto-repo-verify/verify.mjs`](../../tools/atproto-repo-verify/verify.mjs),
 which uses the pinned `@atproto/repo` package to check block hashes, the commit shape, the
-signature, the revision and the record tree's shape. The check needs Node.js and pnpm on your PATH;
-Gradle installs the pinned packages before the tests run:
+signature, the revision and the record tree's shape. The check needs Node.js 22 or newer on your
+PATH, which `./run setup` checks. Gradle installs the pinned packages before the tests run, with
+pnpm if you have it and otherwise with the pinned pnpm version through `npx`:
 
 ```bash
 ./gradlew :shared:atproto-repo:jvmTest

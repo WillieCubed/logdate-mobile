@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
-# The passkey verifier venv and the lexicon checker's Node packages, needed by
-# scripts/tests/run-all.sh.
+# The passkey verifier venv and the Node packages of the AT Protocol reference tools: the lexicon
+# checker (scripts/tests/run-all.sh) and the repository verifier (the atproto-repo JVM tests).
 
 TEST_DEPS_VENV="$LOGDATE_REPO_ROOT/scripts/passkey-verify/.venv"
 TEST_DEPS_REQUIREMENTS="$LOGDATE_REPO_ROOT/scripts/passkey-verify/requirements.txt"
-TEST_DEPS_LEXICON_CHECK="$LOGDATE_REPO_ROOT/tools/lexicon-check"
+TEST_DEPS_NODE_TOOLS=(tools/lexicon-check tools/atproto-repo-verify)
+# The oldest Node.js the pinned @atproto packages support.
+TEST_DEPS_NODE_MAJOR=22
 
 test_deps_describe() {
-    printf 'Script tests can run: the passkey verifier venv and lexicon checker packages are installed'
+    printf 'Tests can run: the passkey verifier venv, Node.js %s or newer, and the AT Protocol reference tools are installed' \
+        "$TEST_DEPS_NODE_MAJOR"
 }
 
 test_deps_check() {
-    local drift=0
+    local drift=0 tool
     if [[ ! -x "$TEST_DEPS_VENV/bin/python" ]]; then
         printf 'No passkey verifier venv at %s\n' "${TEST_DEPS_VENV#"$LOGDATE_REPO_ROOT"/}"
         drift=1
@@ -19,30 +22,53 @@ test_deps_check() {
         printf 'The passkey verifier venv is missing packages from requirements.txt\n'
         drift=1
     fi
-    if [[ ! -d "$TEST_DEPS_LEXICON_CHECK/node_modules/@atproto/lexicon" ]]; then
-        printf 'The lexicon checker packages in tools/lexicon-check are not installed\n'
-        drift=1
-    fi
+    test_deps_check_node || drift=1
+    for tool in "${TEST_DEPS_NODE_TOOLS[@]}"; do
+        if [[ ! -d "$LOGDATE_REPO_ROOT/$tool/node_modules/@atproto" ]]; then
+            printf 'The packages in %s are not installed\n' "$tool"
+            drift=1
+        fi
+    done
     return "$drift"
+}
+
+# Node.js has to be new enough for the pinned @atproto packages. pnpm itself is optional: without
+# it, the version a tool's package.json pins runs through npx.
+test_deps_check_node() {
+    if ! command -v node >/dev/null 2>&1; then
+        printf 'Node.js is not installed (needs %s or newer)\n' "$TEST_DEPS_NODE_MAJOR"
+        return 1
+    fi
+    local major
+    major="$(node -p 'process.versions.node.split(".")[0]')"
+    if (( major < TEST_DEPS_NODE_MAJOR )); then
+        printf 'Node.js %s is too old; the AT Protocol reference tools need %s or newer\n' "$major" "$TEST_DEPS_NODE_MAJOR"
+        return 1
+    fi
+    command -v pnpm >/dev/null 2>&1 || command -v npx >/dev/null 2>&1 || {
+        printf 'Neither pnpm nor npx is on the PATH\n'
+        return 1
+    }
 }
 
 test_deps_apply() {
     command -v python3 >/dev/null 2>&1 || { printf 'Install Python 3, then re-run.\n'; return 2; }
     [[ -x "$TEST_DEPS_VENV/bin/python" ]] || python3 -m venv "$TEST_DEPS_VENV"
     "$TEST_DEPS_VENV/bin/pip" install --quiet -r "$TEST_DEPS_REQUIREMENTS"
-    test_deps_install_lexicon_check
+    test_deps_check_node >/dev/null || {
+        test_deps_check_node
+        printf 'Install Node.js %s or newer (brew install node), then re-run.\n' "$TEST_DEPS_NODE_MAJOR"
+        return 2
+    }
+    local tool
+    for tool in "${TEST_DEPS_NODE_TOOLS[@]}"; do
+        test_deps_install_node_tool "$LOGDATE_REPO_ROOT/$tool" || return
+    done
 }
 
-# Uses pnpm when it's installed, and otherwise the version tools/lexicon-check/package.json pins,
-# run through npx. (corepack can't be used: it may fetch a different pnpm than the pin, which
-# pnpm then refuses to run under.)
-test_deps_install_lexicon_check() {
-    command -v node >/dev/null 2>&1 || { printf 'Install Node.js, then re-run.\n'; return 2; }
-    local pnpm=(pnpm)
-    if ! command -v pnpm >/dev/null 2>&1; then
-        local pinned
-        pinned="$(node -p 'require(process.argv[1]).packageManager' "$TEST_DEPS_LEXICON_CHECK/package.json")"
-        pnpm=(npx --yes "$pinned")
-    fi
-    "${pnpm[@]}" --dir "$TEST_DEPS_LEXICON_CHECK" install --frozen-lockfile --silent
+# Installs one tool's locked packages with the same script the atproto-repo Gradle build uses. It
+# runs pnpm when it's installed, and otherwise the pnpm version the tool's package.json pins,
+# through npx.
+test_deps_install_node_tool() {
+    "$LOGDATE_REPO_ROOT/tools/atproto-repo-verify/install.sh" "$1"
 }

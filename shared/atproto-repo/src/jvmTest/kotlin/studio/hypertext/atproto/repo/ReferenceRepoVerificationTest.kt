@@ -14,6 +14,7 @@ import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 import studio.hypertext.atproto.syntax.Tid
 import java.io.File
+import java.nio.file.Files
 import java.security.interfaces.ECPublicKey
 import java.util.Base64
 import java.util.concurrent.TimeUnit
@@ -184,22 +185,25 @@ class ReferenceRepoVerificationTest {
         val script =
             System.getProperty("atproto.referenceVerifier")
                 ?: fail("atproto.referenceVerifier is not set; run this test through Gradle's jvmTest task")
-        val car = File.createTempFile("repo-export", ".car")
+        val workDir = Files.createTempDirectory("repo-export").toFile()
         try {
-            car.writeBytes(CarCodec.write(engine.export(repo).getOrThrow()))
+            val car = File(workDir, "export.car").apply { writeBytes(CarCodec.write(engine.export(repo).getOrThrow())) }
+            val stdout = File(workDir, "stdout.txt")
+            val stderr = File(workDir, "stderr.txt")
             val command = listOfNotNull("node", script, car.absolutePath, repo.toString(), didKey, previousRev)
+            // Output goes to files, not pipes: a child that fills a pipe nobody is reading yet
+            // blocks forever, and the timeout below could never fire.
             val process =
-                runCatching { ProcessBuilder(command).start() }
+                runCatching { ProcessBuilder(command).redirectOutput(stdout).redirectError(stderr).start() }
                     .getOrElse { error -> fail("Could not start Node.js to run the reference verifier: ${error.message}") }
-            val stdout = process.inputStream.bufferedReader().readText()
-            val stderr = process.errorStream.bufferedReader().readText()
             if (!process.waitFor(VERIFIER_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                process.destroy()
-                fail("Reference verifier did not finish within $VERIFIER_TIMEOUT_SECONDS seconds")
+                process.destroyForcibly().waitFor()
+                fail("Reference verifier did not finish within $VERIFIER_TIMEOUT_SECONDS seconds: ${stderr.readText().trim()}")
             }
-            return VerifierResult(process.exitValue(), stdout.trim(), stderr.trim())
+            return VerifierResult(process.exitValue(), stdout.readText().trim(), stderr.readText().trim())
         } finally {
-            car.delete()
+            workDir.listFiles()?.forEach(File::delete)
+            workDir.delete()
         }
     }
 
