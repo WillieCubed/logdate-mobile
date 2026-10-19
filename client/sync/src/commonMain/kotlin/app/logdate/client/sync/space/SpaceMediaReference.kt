@@ -1,5 +1,6 @@
 package app.logdate.client.sync.space
 
+import app.logdate.lexicon.app.logdate.DefsAspectRatio
 import app.logdate.lexicon.app.logdate.DefsMedia
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
@@ -30,6 +31,9 @@ import kotlin.uuid.Uuid
  * @property mimeType the type of the decrypted file, such as `image/jpeg`.
  * @property storedSize the size of the stored ciphertext in bytes.
  * @property size the size of the decrypted file in bytes, when known.
+ * @property alt the text alternative another device wrote for the file, which the note has no field
+ *   for, so the reference keeps it and the next upload writes it back.
+ * @property aspectRatio the width and height ratio another device recorded, kept the same way.
  */
 data class SpaceMediaReference(
     val cid: String,
@@ -37,6 +41,8 @@ data class SpaceMediaReference(
     val mimeType: String,
     val storedSize: Long,
     val size: Long? = null,
+    val alt: String? = null,
+    val aspectRatio: DefsAspectRatio? = null,
 ) {
     fun format(): String =
         URLBuilder(protocol = URLProtocol.HTTPS, host = HOST)
@@ -46,11 +52,14 @@ data class SpaceMediaReference(
                 parameters.append(TYPE, mimeType)
                 parameters.append(STORED_SIZE, storedSize.toString())
                 size?.let { parameters.append(SIZE, it.toString()) }
+                alt?.let { parameters.append(ALT, it) }
+                aspectRatio?.let { parameters.append(ASPECT_RATIO, "${it.width}x${it.height}") }
             }.buildString()
 
     /**
      * The file as a record's `app.logdate.defs#media` names it. The blob is the stored ciphertext,
-     * typed as opaque bytes; [mimeType] and [size] describe the decrypted file.
+     * typed as opaque bytes; [mimeType] and [size] describe the decrypted file. [alt] replaces the
+     * reference's own text alternative when given.
      */
     fun toMedia(
         owner: String,
@@ -64,7 +73,8 @@ data class SpaceMediaReference(
             blob = Blob(ref = CidLink(link), mimeType = STORED_MIME_TYPE, size = storedSize),
             mimeType = mimeType,
             size = size,
-            alt = alt,
+            alt = alt ?: this.alt,
+            aspectRatio = aspectRatio,
         )
     }
 
@@ -75,6 +85,8 @@ data class SpaceMediaReference(
         private const val TYPE = "type"
         private const val STORED_SIZE = "storedSize"
         private const val SIZE = "size"
+        private const val ALT = "alt"
+        private const val ASPECT_RATIO = "ratio"
 
         /** Every blob in a personal space is ciphertext, whatever file it decrypts to. */
         const val STORED_MIME_TYPE = "application/octet-stream"
@@ -93,14 +105,33 @@ data class SpaceMediaReference(
                 url.parameters[SIZE]?.let { value ->
                     value.toLongOrNull()?.takeIf { it >= 0 } ?: return null
                 }
-            return SpaceMediaReference(segments[1], contentId, mimeType, storedSize, size)
+            val aspectRatio =
+                url.parameters[ASPECT_RATIO]?.let { value ->
+                    parseAspectRatio(value) ?: return null
+                }
+            return SpaceMediaReference(segments[1], contentId, mimeType, storedSize, size, url.parameters[ALT], aspectRatio)
         }
 
         /** The file [media] names, belonging to [contentId]. */
         fun fromMedia(
             contentId: Uuid,
             media: DefsMedia,
-        ): SpaceMediaReference = SpaceMediaReference(media.blob.ref.cid.value, contentId, media.mimeType, media.blob.size, media.size)
+        ): SpaceMediaReference =
+            SpaceMediaReference(
+                media.blob.ref.cid.value,
+                contentId,
+                media.mimeType,
+                media.blob.size,
+                media.size,
+                media.alt,
+                media.aspectRatio,
+            )
+
+        private fun parseAspectRatio(value: String): DefsAspectRatio? {
+            val width = value.substringBefore('x', "").toLongOrNull()?.takeIf { it > 0 } ?: return null
+            val height = value.substringAfter('x', "").toLongOrNull()?.takeIf { it > 0 } ?: return null
+            return DefsAspectRatio(height = height, width = width)
+        }
     }
 }
 
