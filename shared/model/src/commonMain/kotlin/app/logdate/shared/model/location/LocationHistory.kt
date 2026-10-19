@@ -18,6 +18,7 @@ data class LocationObservation(
     val timeZoneId: String? = null,
     val source: String = "UNKNOWN",
     val isMock: Boolean = false,
+    val altitudeMeters: Double? = null,
 )
 
 @Serializable
@@ -101,7 +102,12 @@ enum class HistoryField {
     DELETE,
 }
 
-/** Immutable edits retain their parent IDs so concurrent changes remain distinguishable. */
+/**
+ * Immutable edits retain their parent IDs so concurrent changes remain distinguishable.
+ *
+ * @property createdAt When the person made the correction, when known. Corrections made on this
+ *   device don't record it; one that arrives from another device keeps it.
+ */
 @Serializable
 data class HistoryCorrection(
     val id: String,
@@ -109,20 +115,56 @@ data class HistoryCorrection(
     val field: HistoryField,
     val value: String,
     val supersedes: List<String> = emptyList(),
+    val createdAt: Instant? = null,
 )
 
+/** @property createdAt When the entry was connected, when known; only a link from another device has it. */
 @Serializable
 data class VisitMemoryLink(
     val noteId: String,
     val targetEvidenceId: String,
+    val createdAt: Instant? = null,
 )
 
+/**
+ * A visit the person added to their history.
+ *
+ * @property latitude Where exactly the person was, when it differs from the place's center. A
+ *   visit added on this device never has it; one from another device can. Both coordinates or neither.
+ * @property createdAt When the visit was added, when known; only a visit from another device has it.
+ */
 @Serializable
 data class ManualVisit(
     val id: String,
     val start: Instant,
     val end: Instant,
     val placeId: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val createdAt: Instant? = null,
+) {
+    init {
+        require((latitude == null) == (longitude == null)) { "A visit's own location needs both a latitude and a longitude" }
+    }
+}
+
+/**
+ * Travel between two visits that the person's apps recorded. Nothing writes one yet; the record
+ * type exists so that a device that does will find the others reading it.
+ *
+ * @property fromVisitId The manual visit the journey started from.
+ * @property toVisitId The manual visit it ended at.
+ */
+@Serializable
+data class HistoryJourney(
+    val id: String,
+    val start: Instant,
+    val createdAt: Instant,
+    val fromVisitId: String? = null,
+    val toVisitId: String? = null,
+    val end: Instant? = null,
+    val mode: TravelMode? = null,
+    val distanceMeters: Long? = null,
 )
 
 @Serializable
@@ -165,5 +207,10 @@ sealed interface HistoryPayload {
     @Serializable
     data class Manual(
         val value: ManualVisit,
+    ) : HistoryPayload
+
+    @Serializable
+    data class Journey(
+        val value: HistoryJourney,
     ) : HistoryPayload
 }

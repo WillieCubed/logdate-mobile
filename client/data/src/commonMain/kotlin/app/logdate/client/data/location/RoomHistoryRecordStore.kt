@@ -35,6 +35,21 @@ class RoomHistoryRecordStore(
         id: String,
     ): HistoryRecord? = dao.record(ownerId, origin, id)?.toRecord()
 
+    override suspend fun recordsOfType(
+        ownerId: String,
+        origin: String,
+        recordType: String,
+    ): List<HistoryRecord> = dao.recordsOfType(ownerId, origin, recordType).map { it.toRecord() }
+
+    override suspend fun recordsBetween(
+        ownerId: String,
+        origin: String,
+        recordType: String,
+        deviceId: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): List<HistoryRecord> = dao.recordsBetween(ownerId, origin, recordType, deviceId, startMillis, endMillis).map { it.toRecord() }
+
     override suspend fun put(
         ownerId: String,
         origin: String,
@@ -108,12 +123,25 @@ class RoomHistoryRecordStore(
     }
 }
 
-private fun HistoryRecordEntity.toRecord() = HistoryRecord(id, recordType, payload, deviceId, deviceVersion, serverVersion, deleted, dirty)
+private fun HistoryRecordEntity.toRecord() =
+    HistoryRecord(id, recordType, payload, deviceId, deviceVersion, serverVersion, deleted, dirty, observedAt)
 
 private fun HistoryRecord.toEntity(
     owner: String,
     origin: String,
-) = HistoryRecordEntity(owner, origin, id, recordType, payload, deviceId, deviceVersion, serverVersion, deleted, dirty, observationTime())
+) = HistoryRecordEntity(
+    owner,
+    origin,
+    id,
+    recordType,
+    payload,
+    deviceId,
+    deviceVersion,
+    serverVersion,
+    deleted,
+    dirty,
+    observationTime() ?: observedAtMillis,
+)
 
 private fun HistoryRecord.observationTime(): Long? =
     payload?.let {

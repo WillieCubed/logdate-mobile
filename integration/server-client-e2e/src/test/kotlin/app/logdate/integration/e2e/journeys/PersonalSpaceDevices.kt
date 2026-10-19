@@ -5,6 +5,8 @@ package app.logdate.integration.e2e.journeys
 import androidx.room.Room
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
+import app.logdate.client.data.location.RoomHistoryRecordStore
+import app.logdate.client.data.moments.OfflineFirstMarkedMomentRepository
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
 import app.logdate.client.database.LogDateDatabase
@@ -18,6 +20,7 @@ import app.logdate.client.media.MediaPayload
 import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.networking.LocationHistoryApiClientContract
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalNote
@@ -34,10 +37,12 @@ import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
+import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.space.RoomSpaceSwapStore
@@ -48,10 +53,19 @@ import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.mappers.HistoryScope
+import app.logdate.client.sync.space.mappers.HistoryScopeProvider
 import app.logdate.client.sync.space.mappers.draftSpaceKind
 import app.logdate.client.sync.space.mappers.journalSpaceKind
+import app.logdate.client.sync.space.mappers.locationSamplesSpaceKind
+import app.logdate.client.sync.space.mappers.markedMomentSpaceKind
 import app.logdate.client.sync.space.mappers.membershipSpaceKind
 import app.logdate.client.sync.space.mappers.noteSpaceKind
+import app.logdate.client.sync.space.mappers.placeCorrectionSpaceKind
+import app.logdate.client.sync.space.mappers.placeEntryLinkSpaceKind
+import app.logdate.client.sync.space.mappers.placeJourneySpaceKind
+import app.logdate.client.sync.space.mappers.placeSpaceKind
+import app.logdate.client.sync.space.mappers.placeVisitSpaceKind
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
 import app.logdate.shared.config.DefaultLogDateConfigRepository
@@ -59,6 +73,9 @@ import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.sync.LocationHistoryChangesResponse
+import app.logdate.shared.model.sync.LocationHistoryRecord
+import app.logdate.shared.model.sync.LocationHistoryUpload
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -188,6 +205,14 @@ internal class SpaceDevice(
             transactions,
         )
     val media = FileReadingMediaManager()
+
+    /** This device's id as location history names it. */
+    val deviceId: String = Uuid.random().toString()
+
+    /** The location history records, saved places and marked moments this device keeps. */
+    val historyStore = RoomHistoryRecordStore(database.historyRecordDao())
+    val marks = OfflineFirstMarkedMomentRepository(database.markedMomentDao(), transactions, metadata)
+    private val historyScope = HistoryScopeProvider { HistoryScope(account.owner, account.origin) }
     val mediaRefs = InMemoryMediaRefs()
     val conflicts = ListedConflicts()
 
@@ -278,6 +303,17 @@ internal class SpaceDevice(
             dataUsagePolicy = UnrestrictedData,
             downloadInbox = inbox,
             syncScope = scope,
+            locationHistorySyncEngine =
+                LocationHistorySyncEngine(
+                    apiFactory = { UnusedHistoryEndpoints },
+                    store = historyStore,
+                    cipher = mockk(relaxed = true),
+                    sessions = sessions,
+                    config = config,
+                    enabled = { true },
+                    savedPlaceIds = { database.userPlaceDao().getAllPlaces().map { it.id } },
+                ),
+            momentSyncConfig = MomentSyncConfig(mockk(relaxed = true), marks) { false },
             spaceSync =
                 SpaceSyncDependencies(
                     registry =
@@ -287,6 +323,13 @@ internal class SpaceDevice(
                                 noteSpaceKind(notes, noteResolver),
                                 membershipSpaceKind(content),
                                 draftSpaceKind(realJournals),
+                                markedMomentSpaceKind(marks),
+                                placeSpaceKind(historyScope, historyStore, database.userPlaceDao()) { deviceId },
+                                placeVisitSpaceKind(historyScope, historyStore) { deviceId },
+                                placeCorrectionSpaceKind(historyScope, historyStore) { deviceId },
+                                placeEntryLinkSpaceKind(historyScope, historyStore) { deviceId },
+                                placeJourneySpaceKind(historyScope, historyStore) { deviceId },
+                                locationSamplesSpaceKind(historyScope, historyStore, { account.owner }) { deviceId },
                             ),
                         ),
                     gate = SpaceTransportGate({ true }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
@@ -305,6 +348,20 @@ internal class SpaceDevice(
         Files.deleteIfExists(file.resolveSibling("${file.fileName}-wal"))
         Files.deleteIfExists(file.resolveSibling("${file.fileName}-shm"))
     }
+}
+
+/** The location history endpoints, which an account kept in a personal space never reaches. */
+private object UnusedHistoryEndpoints : LocationHistoryApiClientContract {
+    override suspend fun upload(
+        accessToken: String,
+        records: List<LocationHistoryUpload>,
+    ): List<LocationHistoryRecord> = error("Location history syncs through the personal space")
+
+    override suspend fun changes(
+        accessToken: String,
+        since: Long,
+        limit: Int,
+    ): LocationHistoryChangesResponse = error("Location history syncs through the personal space")
 }
 
 /** Unmetered, unrestricted data, so media syncs. */

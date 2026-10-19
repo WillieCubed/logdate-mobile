@@ -1,6 +1,7 @@
 package app.logdate.client.sync.di
 
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.dao.UserPlaceDao
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
@@ -17,6 +18,7 @@ import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.repository.location.ActivityHistoryRepository
 import app.logdate.client.repository.location.HistoryOwnerAdoptionRepair
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.moments.SyncableMarkedMomentRepository
 import app.logdate.client.sync.AutomaticMediaRecovery
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
@@ -59,17 +61,33 @@ import app.logdate.client.sync.space.SpaceSwapStore
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.mappers.HistoryScope
+import app.logdate.client.sync.space.mappers.HistoryScopeProvider
 import app.logdate.client.sync.space.mappers.draftSpaceKind
 import app.logdate.client.sync.space.mappers.journalSpaceKind
+import app.logdate.client.sync.space.mappers.locationSamplesSpaceKind
+import app.logdate.client.sync.space.mappers.markedMomentSpaceKind
 import app.logdate.client.sync.space.mappers.membershipSpaceKind
 import app.logdate.client.sync.space.mappers.noteSpaceKind
+import app.logdate.client.sync.space.mappers.placeCorrectionSpaceKind
+import app.logdate.client.sync.space.mappers.placeEntryLinkSpaceKind
+import app.logdate.client.sync.space.mappers.placeJourneySpaceKind
+import app.logdate.client.sync.space.mappers.placeSpaceKind
+import app.logdate.client.sync.space.mappers.placeVisitSpaceKind
 import app.logdate.client.sync.space.spaceLocation
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.ServerProtocolFeature
 import org.koin.core.qualifier.named
+import org.koin.core.scope.Scope
 import org.koin.dsl.module
 import kotlin.time.Clock
+
+/** This device's id as location history names it. */
+private fun Scope.historyDeviceId(): () -> String? {
+    val device = get<DeviceIdProvider>()
+    return { device.getDeviceId().value.toString() }
+}
 
 /**
  * The personal-space transport: which kinds use it, whether it is open, and how to reach the space.
@@ -90,6 +108,35 @@ val spaceSyncModule =
         }
         single<SpaceKind<*>>(named("draftSpaceKind")) {
             draftSpaceKind(get<JournalRepository>())
+        }
+        single<SpaceKind<*>>(named("markedMomentSpaceKind")) {
+            markedMomentSpaceKind(get<SyncableMarkedMomentRepository>())
+        }
+        single {
+            val sessions = get<SessionStorage>()
+            val config = get<LogDateConfigRepository>()
+            HistoryScopeProvider {
+                sessions.getSession()?.let { HistoryScope(it.accountId, config.getCurrentBackendUrl().trimEnd('/')) }
+            }
+        }
+        single<SpaceKind<*>>(named("placeSpaceKind")) {
+            placeSpaceKind(get(), get(), get<UserPlaceDao>(), deviceId = historyDeviceId())
+        }
+        single<SpaceKind<*>>(named("placeVisitSpaceKind")) {
+            placeVisitSpaceKind(get(), get(), deviceId = historyDeviceId())
+        }
+        single<SpaceKind<*>>(named("placeCorrectionSpaceKind")) {
+            placeCorrectionSpaceKind(get(), get(), deviceId = historyDeviceId())
+        }
+        single<SpaceKind<*>>(named("placeEntryLinkSpaceKind")) {
+            placeEntryLinkSpaceKind(get(), get(), deviceId = historyDeviceId())
+        }
+        single<SpaceKind<*>>(named("placeJourneySpaceKind")) {
+            placeJourneySpaceKind(get(), get(), deviceId = historyDeviceId())
+        }
+        single<SpaceKind<*>>(named("locationSamplesSpaceKind")) {
+            val sessions = get<SessionStorage>()
+            locationSamplesSpaceKind(get(), get(), ownerId = { sessions.getSession()?.accountId }, deviceId = historyDeviceId())
         }
         single<SpaceKind<*>>(named("noteSpaceKind")) {
             noteSpaceKind(
@@ -186,6 +233,7 @@ val cloudModule =
             val flags = get<FeatureFlagStore>()
             val stager = get<LocationHistoryStager>()
             val adoption = get<HistoryOwnerAdoptionRepair>()
+            val places = get<UserPlaceDao>()
             LocationHistorySyncEngine(
                 apiFactory = { config -> LocationHistoryApiClient(httpClient, config) },
                 store = get(),
@@ -197,6 +245,7 @@ val cloudModule =
                     adoption.reconcile(owner, origin)
                     stager.stage(owner, origin)
                 },
+                savedPlaceIds = { places.getAllPlaces().map { it.id } },
             )
         }
         single { MarkedMomentPayloadCodec(get()) }

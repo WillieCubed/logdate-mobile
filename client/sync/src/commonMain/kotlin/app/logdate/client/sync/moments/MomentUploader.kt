@@ -19,6 +19,7 @@ import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.SpaceSync
 import app.logdate.shared.model.sync.DeviceId
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Clock
@@ -33,8 +34,11 @@ internal class MomentUploader(
     private val profile: SyncProfile,
     private val device: () -> DeviceId,
     private val inbox: DownloadInbox,
+    private val space: SpaceSync? = null,
 ) {
     suspend fun upload(): SyncResult {
+        val kind = space?.activeKind(TYPE)
+        if (space != null && kind != null) return space.uploadKind(kind, profile.uploadsUpdates)
         if (!config.enabled()) return SyncResult(success = true)
         val errors = mutableListOf<SyncError>()
         var uploaded = 0

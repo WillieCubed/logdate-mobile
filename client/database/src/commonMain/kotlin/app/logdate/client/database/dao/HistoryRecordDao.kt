@@ -67,6 +67,26 @@ abstract class HistoryRecordDao {
         end: Long,
     ): List<HistoryRecordEntity>
 
+    @Query("SELECT * FROM history_records WHERE ownerId = :owner AND origin = :origin AND recordType = :recordType")
+    abstract suspend fun recordsOfType(
+        owner: String,
+        origin: String,
+        recordType: String,
+    ): List<HistoryRecordEntity>
+
+    @Query(
+        "SELECT * FROM history_records WHERE ownerId = :owner AND origin = :origin AND recordType = :recordType " +
+            "AND deviceId = :device AND observedAt >= :start AND observedAt < :end",
+    )
+    abstract suspend fun recordsBetween(
+        owner: String,
+        origin: String,
+        recordType: String,
+        device: String,
+        start: Long,
+        end: Long,
+    ): List<HistoryRecordEntity>
+
     @Upsert
     abstract suspend fun upsert(record: HistoryRecordEntity)
 
@@ -74,7 +94,8 @@ abstract class HistoryRecordDao {
     open suspend fun putPreservingTombstone(incoming: HistoryRecordEntity) {
         val existing = record(incoming.ownerId, incoming.origin, incoming.id)
         if (existing?.deleted == true && !incoming.deleted) return
-        upsert(incoming)
+        // A deletion removes the payload, so it keeps the time the record had to stay findable by its hour.
+        upsert(if (incoming.deleted && incoming.observedAt == null) incoming.copy(observedAt = existing?.observedAt) else incoming)
         purgeDeletedObservation(incoming)
     }
 
@@ -142,7 +163,7 @@ abstract class HistoryRecordDao {
                 if (local?.deleted == true) {
                     upsert(local.copy(serverVersion = incoming.serverVersion, dirty = !incoming.deleted))
                 } else if (incoming.deleted || local?.dirty != true) {
-                    upsert(incoming)
+                    upsert(if (incoming.deleted && incoming.observedAt == null) incoming.copy(observedAt = local?.observedAt) else incoming)
                 } else {
                     upsert(local.copy(serverVersion = incoming.serverVersion))
                 }

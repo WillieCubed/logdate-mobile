@@ -492,6 +492,12 @@ class DefaultSyncManager(
             SpaceSync(it, tokenRefresher, syncMetadataService, retryCoordinator, downloadInbox, statusPublisher::recordProgress)
         }
 
+    /** Location history syncing through the personal space, when this device syncs location history at all. */
+    internal val locationHistorySpace =
+        space?.let { sync ->
+            historyEngine?.forSpace(sync, syncMetadataService, transactionManager, downloadInbox, profile.uploadsUpdates)
+        }
+
     internal val downloader =
         SyncDownloader(
             journalRepository = journalRepository,

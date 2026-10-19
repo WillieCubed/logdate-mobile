@@ -99,7 +99,7 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
             }
         val associationResult = uploader.uploadAssociations(accessToken)
         val draftResult = if (profile.syncsDrafts) uploader.uploadDrafts(accessToken) else SyncResult(success = true)
-        val historyResult = historyEngine?.upload(accessToken) ?: SyncResult(success = true)
+        val historyResult = uploadLocationHistory(accessToken)
         val momentResult = momentUploader?.upload() ?: SyncResult(success = true)
         val totalUploaded =
             journalResult.uploadedItems +
@@ -134,6 +134,28 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
         )
     }
 
+/** What one download pass brought, kind by kind. */
+private data class RemoteDownloads(
+    val journals: SyncResult,
+    val content: SyncResult,
+    val associations: SyncResult,
+    val locationHistory: SyncResult,
+    val moments: SyncResult,
+)
+
+/** Location history goes through the personal space when the account's data lives there, and through its own endpoints otherwise. */
+private suspend fun DefaultSyncManager.uploadLocationHistory(accessToken: String): SyncResult {
+    val engine = historyEngine ?: return SyncResult(success = true)
+    val viaSpace = locationHistorySpace?.takeIf { it.isActive() } ?: return engine.upload(accessToken)
+    return engine.uploadToSpace(accessToken, viaSpace)
+}
+
+private suspend fun DefaultSyncManager.downloadLocationHistory(accessToken: String): SyncResult {
+    val engine = historyEngine ?: return SyncResult(success = true)
+    val viaSpace = locationHistorySpace?.takeIf { it.isActive() } ?: return engine.download(accessToken)
+    return engine.downloadFromSpace(accessToken, viaSpace)
+}
+
 internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
     runFullSyncPhase(
         operationName = "Download",
@@ -147,19 +169,20 @@ internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
         // Sequential for the same reason as the upload side: these share one server
         // instance whose per-request cost is proportional to repo size, and fanning out
         // was enough on its own to starve every request thread it had.
-        val (journalResult, contentResult, associationResult) =
+        val downloads =
             downloader.downloadPass {
-                Triple(
+                RemoteDownloads(
                     downloader.downloadJournals(accessToken, journalSince),
                     downloader.downloadContent(accessToken, contentSince),
                     downloader.downloadAssociations(accessToken, associationSince),
+                    downloadLocationHistory(accessToken),
+                    momentDownloader?.download() ?: SyncResult(success = true),
                 )
             }
+        val (journalResult, contentResult, associationResult, historyResult, momentResult) = downloads
         if (journalResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.JOURNAL)
         if (contentResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.NOTE)
         if (associationResult.success) legacyBackfill?.enqueueMembershipsIfNeeded()
-        val historyResult = historyEngine?.download(accessToken) ?: SyncResult(success = true)
-        val momentResult = momentDownloader?.download() ?: SyncResult(success = true)
         recoverMedia(accessToken, EntityType.NOTE)
         recoverMedia(accessToken, EntityType.JOURNAL)
         val totalDownloaded =
