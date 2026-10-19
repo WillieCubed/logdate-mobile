@@ -1,0 +1,31 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.uploadBlob",
+  "description": "Uploads an encrypted file to a space and returns the blob reference to store in a sealed record.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Uploads an encrypted file to a space and returns the blob reference to store in a sealed record.",
+      "parameters": {
+        "type": "params",
+        "required": ["space"],
+        "properties": {
+          "space": { "type": "string", "maxLength": 512 }
+        }
+      },
+      "input": {
+        "encoding": "*/*"
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["blob"],
+          "properties": {
+            "blob": { "type": "blob" }
+          }
+        }
+      }
+    }
+  }
+}

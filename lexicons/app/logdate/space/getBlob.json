@@ -1,0 +1,23 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.getBlob",
+  "description": "Downloads an encrypted file from the caller's own space by its CID.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Downloads an encrypted file from the caller's own space by its CID.",
+      "parameters": {
+        "type": "params",
+        "required": ["space", "cid"],
+        "properties": {
+          "space": { "type": "string", "maxLength": 512 },
+          "cid": { "type": "string", "format": "cid" }
+        }
+      },
+      "output": {
+        "encoding": "*/*"
+      },
+      "errors": [{ "name": "BlobNotFound" }]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.getRecord",
+  "description": "Reads one sealed record from the caller's own repository in a space.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Reads one sealed record from the caller's own repository in a space.",
+      "parameters": {
+        "type": "params",
+        "required": ["space", "rkey"],
+        "properties": {
+          "space": { "type": "string", "maxLength": 512 },
+          "rkey": { "type": "string", "format": "record-key" }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["cid", "seq", "value"],
+          "properties": {
+            "cid": { "type": "string", "format": "cid" },
+            "seq": { "type": "integer", "minimum": 1 },
+            "value": { "type": "ref", "ref": "app.logdate.crypto.sealed" }
+          }
+        }
+      },
+      "errors": [{ "name": "RecordNotFound" }]
+    }
+  }
+}

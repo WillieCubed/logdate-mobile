@@ -1,0 +1,34 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.deleteRecord",
+  "description": "Deletes one sealed record from the caller's own repository in a space. The deletion is kept as a change so other devices learn about it.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Deletes one sealed record from the caller's own repository in a space.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["space", "rkey"],
+          "properties": {
+            "space": { "type": "string", "maxLength": 512, "description": "The space URI, such as at://did:plc:abc/space/app.logdate.space.personal/self." },
+            "rkey": { "type": "string", "format": "record-key", "description": "The sealed record's key." },
+            "swapCid": { "type": "string", "format": "cid", "description": "Delete only if the current record has this CID." }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["seq"],
+          "properties": {
+            "seq": { "type": "integer", "minimum": 1 }
+          }
+        }
+      },
+      "errors": [{ "name": "InvalidSwap" }]
+    }
+  }
+}

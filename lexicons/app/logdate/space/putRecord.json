@@ -1,0 +1,38 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.putRecord",
+  "description": "Creates or replaces one sealed record in the caller's own repository in a space.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Creates or replaces one sealed record in the caller's own repository in a space.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["space", "rkey", "record"],
+          "properties": {
+            "space": { "type": "string", "maxLength": 512, "description": "The space URI, such as at://did:plc:abc/space/app.logdate.space.personal/self." },
+            "rkey": { "type": "string", "format": "record-key", "description": "The sealed record's key." },
+            "record": { "type": "ref", "ref": "app.logdate.crypto.sealed" },
+            "blobs": { "type": "array", "maxLength": 64, "items": { "type": "string", "format": "cid" }, "description": "Blobs the record refers to, so unreferenced ones can be deleted." },
+            "swapCid": { "type": "string", "format": "cid", "description": "Write only if the current record has this CID." },
+            "createOnly": { "type": "boolean", "description": "Write only if no live record has this key." }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["cid", "seq"],
+          "properties": {
+            "cid": { "type": "string", "format": "cid" },
+            "seq": { "type": "integer", "minimum": 1 }
+          }
+        }
+      },
+      "errors": [{ "name": "InvalidSwap" }, { "name": "InvalidRecord" }]
+    }
+  }
+}

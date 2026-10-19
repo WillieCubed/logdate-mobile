@@ -1,0 +1,44 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.listRepoOps",
+  "description": "Lists every change to the caller's own repository in a space after a sequence number, deletions included. Paging from zero exports the whole repository.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Lists every change to the caller's own repository in a space after a sequence number, deletions included.",
+      "parameters": {
+        "type": "params",
+        "required": ["space"],
+        "properties": {
+          "space": { "type": "string", "maxLength": 512 },
+          "since": { "type": "integer", "minimum": 0, "default": 0 },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 500, "default": 200 }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["ops", "cursor", "hasMore"],
+          "properties": {
+            "ops": { "type": "array", "items": { "type": "ref", "ref": "#change" } },
+            "cursor": { "type": "integer", "minimum": 0 },
+            "hasMore": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "description": "One write or deletion in the repository. Deletions carry no cid or value.",
+      "required": ["rkey", "seq", "deleted"],
+      "properties": {
+        "rkey": { "type": "string", "format": "record-key" },
+        "seq": { "type": "integer", "minimum": 1 },
+        "deleted": { "type": "boolean" },
+        "cid": { "type": "string", "format": "cid" },
+        "value": { "type": "ref", "ref": "app.logdate.crypto.sealed" }
+      }
+    }
+  }
+}

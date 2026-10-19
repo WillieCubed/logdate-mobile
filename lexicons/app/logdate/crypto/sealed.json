@@ -55,7 +55,7 @@
         "rkey": {
           "type": "string",
           "format": "record-key",
-          "description": "The inner record's key. The sealed record's own key is random and unrelated."
+          "description": "The inner record's key. The sealed record's own key is derived from it with a secret, so the server can't link the two."
         },
         "record": {
           "type": "unknown",
