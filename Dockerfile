@@ -20,6 +20,8 @@ COPY --link build-logic/ build-logic/
 # Copy only the modules required to build the server artifact.
 COPY --link client/util/ client/util/
 COPY --link shared/ shared/
+# shared/lexicon generates its models from the lexicon schemas at build time.
+COPY --link lexicons/ lexicons/
 COPY --link server/ server/
 
 # Build only the runnable server artifact plus the OpenAPI verification we need
