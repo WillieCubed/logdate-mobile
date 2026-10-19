@@ -15,8 +15,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -63,6 +66,8 @@ import app.logdate.ui.provenance.showsWatchProvenance
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.draft_deleted
+import logdate.client.feature.editor.generated.resources.editor_entry_changed
+import logdate.client.feature.editor.generated.resources.editor_save_separately
 import logdate.client.feature.editor.generated.resources.media_import_unreadable
 import logdate.client.feature.editor.generated.resources.media_import_unsupported
 import logdate.client.feature.editor.generated.resources.undo
@@ -180,6 +185,23 @@ fun EntryEditorContent(
     LaunchedEffect(editorState.errorMessage) {
         editorState.errorMessage?.let { error ->
             snackbarHostState.showSnackbar(error.resolve())
+        }
+    }
+
+    LaunchedEffect(editorState.entryEditConflict) {
+        if (editorState.entryEditConflict) {
+            val result =
+                snackbarHostState.showSnackbar(
+                    message = getString(Res.string.editor_entry_changed),
+                    actionLabel = getString(Res.string.editor_save_separately),
+                    withDismissAction = true,
+                    duration = SnackbarDuration.Indefinite,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.saveConflictingVersionSeparately()
+            } else {
+                viewModel.dismissEntryEditConflict()
+            }
         }
     }
 
@@ -398,10 +420,12 @@ fun EntryEditorContent(
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        ) { data ->
+            Snackbar(snackbarData = data, actionOnNewLine = true)
+        }
     }
 }

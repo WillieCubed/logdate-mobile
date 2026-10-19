@@ -5,6 +5,7 @@ import app.logdate.client.domain.location.LogCurrentLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.media.MediaManager
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -39,12 +40,14 @@ class AddNoteUseCase(
         journalIds: List<Uuid> = emptyList(),
         attachments: List<String> = emptyList(),
         captureCurrentLocation: Boolean = true,
+        editBase: EntryEditBase? = null,
     ) {
         invoke(
             notes = notes.toTypedArray(),
             journalIds = journalIds.toTypedArray(),
             attachments = attachments,
             captureCurrentLocation = captureCurrentLocation,
+            editBase = editBase,
         )
     }
 
@@ -53,6 +56,7 @@ class AddNoteUseCase(
         journalIds: Array<out Uuid>,
         attachments: List<String> = emptyList(),
         captureCurrentLocation: Boolean = true,
+        editBase: EntryEditBase? = null,
     ) = coroutineScope {
         val shouldTrackLocation =
             captureCurrentLocation && runCatching { settingsRepository.getSettings().autoTrackForJournalEntries }.getOrDefault(true)
@@ -64,7 +68,13 @@ class AddNoteUseCase(
                 async {
                     try {
                         // Create the note
-                        repository.create(note)
+                        val updated =
+                            if (editBase == null) {
+                                repository.create(note)
+                                false
+                            } else {
+                                repository.persistEditorNote(note, editBase)
+                            }
 
                         // Associate with journals if any are specified
                         if (journalIds.isNotEmpty()) {
@@ -79,7 +89,7 @@ class AddNoteUseCase(
                         }
 
                         // Log current location when note is created
-                        if (shouldTrackLocation) {
+                        if (shouldTrackLocation && !updated && note.uid != editBase?.copyNoteId) {
                             try {
                                 logLocationUseCase() // For activity timeline
                                 // For location history with automatic retry

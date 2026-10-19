@@ -6,6 +6,7 @@ import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.journals.PendingMediaType
@@ -31,6 +32,7 @@ data class LoadedDraft(
     val selectedJournalIds: List<Uuid> = emptyList(),
     val visitContext: VisitMemoryContext? = null,
     val markId: String? = null,
+    val editBase: EntryEditBase? = null,
 )
 
 /**
@@ -90,6 +92,7 @@ class DraftManager(
                         selectedJournalIds = state.selectedJournalIds,
                         visitContext = state.visitContext,
                         markId = state.markId,
+                        editBase = state.entryEditBase,
                     )
                     pendingDraftId = null
                     draft.id
@@ -103,6 +106,7 @@ class DraftManager(
                         selectedJournalIds = state.selectedJournalIds,
                         visitContext = state.visitContext,
                         markId = state.markId,
+                        editBase = state.entryEditBase,
                     ).also {
                         pendingDraftId = null
                     }
@@ -139,6 +143,7 @@ class DraftManager(
                     selectedJournalIds = draft.selectedJournalIds,
                     visitContext = draft.visitContext,
                     markId = draft.markId,
+                    editBase = draft.editBase,
                 )
             }
         } catch (cancellation: CancellationException) {

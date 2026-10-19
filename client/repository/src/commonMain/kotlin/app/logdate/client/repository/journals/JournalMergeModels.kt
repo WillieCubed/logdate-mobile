@@ -1,8 +1,10 @@
 package app.logdate.client.repository.journals
 
 import app.logdate.shared.model.Journal
+import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
+@Serializable
 data class JournalMergeScope(
     val ownerId: String,
     val serverOrigin: String,

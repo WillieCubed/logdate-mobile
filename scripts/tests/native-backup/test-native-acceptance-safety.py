@@ -4,11 +4,13 @@
 import argparse
 import importlib.util
 import io
+import os
 from pathlib import Path
 import subprocess
 import stat
 import tarfile
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 
@@ -26,6 +28,47 @@ D2D_SPEC.loader.exec_module(D2D)
 
 
 class NativeAcceptanceSafetyTest(unittest.TestCase):
+    def test_retained_key_acceptance_rejects_skips_despite_a_success_summary(self):
+        workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
+        step = workflow.split("- name: Verify retained keys under Android storage failures", 1)[1]
+        step = step.split("\n      - name:", 1)[0]
+        script = textwrap.dedent(step.split("run: |\n", 1)[1])
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "native-key-recovery").mkdir()
+            fake_adb = root / "adb"
+            fake_adb.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os, sys\n"
+                "arguments = ' '.join(sys.argv[1:])\n"
+                "if 'getprop ro.kernel.qemu' in arguments:\n"
+                "    print('1')\n"
+                "elif 'shell am instrument' in arguments:\n"
+                "    status = os.environ['FAKE_INSTRUMENTATION_STATUS']\n"
+                "    ending = os.environ.get('FAKE_STATUS_CR', '')\n"
+                "    sys.stdout.write('INSTRUMENTATION_STATUS_CODE: ' + status + ending + '\\n\\nOK (7 tests)\\n')\n"
+                "else:\n"
+                "    raise SystemExit('Unexpected test command')\n"
+            )
+            fake_adb.chmod(0o700)
+            for status, ending in (("0", ""), ("-3", ""), ("-4", ""), ("-3", "\r"), ("-4", "\r")):
+                with self.subTest(status=status, carriage_return=bool(ending)):
+                    environment = dict(
+                        os.environ,
+                        PATH=str(root) + os.pathsep + os.environ["PATH"],
+                        RUNNER_TEMP=str(root),
+                        FAKE_INSTRUMENTATION_STATUS=status,
+                        FAKE_STATUS_CR=ending,
+                    )
+                    result = subprocess.run(
+                        ["bash", "-e", "-o", "pipefail", "-c", script],
+                        env=environment,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    self.assertEqual(status == "0", result.returncode == 0, result.stderr)
+
     def test_d2d_acceptance_refuses_non_emulators_before_device_access(self):
         for serial in ("38191FDJG00FNY", "192.0.2.1:5555", "adb-phone._tcp"):
             with self.subTest(serial=serial), patch.object(D2D.HARNESS, "adb") as adb:
@@ -211,7 +254,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertIn("adb -s emulator-5562 logcat -d -b all", callback)
         self.assertIn("install_api36_apk app", callback)
         self.assertIn("install_api36_apk android-test", callback)
-        self.assertIn("shell am instrument --user 0 -w -r", callback)
+        self.assertIn("shell am instrument --user 0 --no-hidden-api-checks -w -r", callback)
         self.assertIn("NativeBackgroundCredentialCallbackTest", callback)
         self.assertIn("api36-1-*-install-attempt-*.log", workflow)
 
@@ -220,7 +263,8 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             ROOT
             / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundCredentialCallbackTest.kt"
         ).read_text()
-        self.assertIn("Build.VERSION.SDK_INT < 36", probe)
+        self.assertIn("if (!supportsFullRestoreInput()) return", probe)
+        self.assertIn("Build.VERSION.SDK_INT >= 36 && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1", probe)
         self.assertIn("assertNotNull(", probe)
         self.assertIn("android.app.backup.FullRestoreDataInput", probe)
 

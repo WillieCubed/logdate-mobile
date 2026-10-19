@@ -24,8 +24,6 @@ import app.logdate.client.device.restore.NativeRestorePrivacyGuard
 import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
-import io.mockk.every
-import io.mockk.mockkClass
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -85,7 +83,7 @@ class NativeBackgroundCredentialCallbackTest {
     fun modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable() {
         assertTrue(context.cacheDir.isDirectory, "The callback's isolated cache directory must exist")
         assertTrue(context.cacheDir.canWrite(), "The callback's isolated cache directory must be writable")
-        if (Build.VERSION.SDK_INT < 36) return
+        if (!supportsFullRestoreInput()) return
         val inputType =
             assertNotNull(
                 try {
@@ -93,7 +91,7 @@ class NativeBackgroundCredentialCallbackTest {
                 } catch (_: ClassNotFoundException) {
                     null
                 },
-                "API 36+ must provide FullRestoreDataInput for native full restore",
+                "API 36.1+ must provide FullRestoreDataInput for native full restore",
             )
 
         val content = "modern Android full restore callback".encodeToByteArray()
@@ -101,13 +99,7 @@ class NativeBackgroundCredentialCallbackTest {
         val destination = context.getDatabasePath("logdate")
         destination.parentFile?.mkdirs()
         val descriptor = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY)
-        val input = mockkClass(inputType.kotlin, relaxed = true)
-        every { inputType.getMethod("getData").invoke(input) } returns descriptor
-        every { inputType.getMethod("getDestination").invoke(input) } returns destination
-        every { inputType.getMethod("getSize").invoke(input) } returns content.size.toLong()
-        every { inputType.getMethod("getType").invoke(input) } returns BackupAgent.TYPE_FILE
-        every { inputType.getMethod("getMode").invoke(input) } returns 0x1A4L
-        every { inputType.getMethod("getModificationTimeSeconds").invoke(input) } returns 1L
+        val input = fullRestoreInput(inputType, descriptor, destination, content.size.toLong(), 0x1A4L)
 
         var accountRecoveryStarted = false
         val agent =
@@ -348,15 +340,10 @@ class NativeBackgroundCredentialCallbackTest {
         source: File,
     ) {
         ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
-            if (Build.VERSION.SDK_INT >= 36) {
+            if (supportsFullRestoreInput()) {
                 val inputType = Class.forName("android.app.backup.FullRestoreDataInput")
-                val input = mockkClass(inputType.kotlin, relaxed = true)
-                every { inputType.getMethod("getData").invoke(input) } returns descriptor
-                every { inputType.getMethod("getDestination").invoke(input) } returns File(context.filesDir, "logdate.preferences_pb")
-                every { inputType.getMethod("getSize").invoke(input) } returns source.length()
-                every { inputType.getMethod("getType").invoke(input) } returns BackupAgent.TYPE_FILE
-                every { inputType.getMethod("getMode").invoke(input) } returns 0x180L
-                every { inputType.getMethod("getModificationTimeSeconds").invoke(input) } returns 1L
+                val input =
+                    fullRestoreInput(inputType, descriptor, File(context.filesDir, "logdate.preferences_pb"), source.length(), 0x180L)
                 NativeBackupAgent::class.java.getDeclaredMethod("onRestoreFile", inputType).invoke(agent, input)
                 return
             }
@@ -370,6 +357,29 @@ class NativeBackgroundCredentialCallbackTest {
             )
         }
     }
+
+    private fun supportsFullRestoreInput(): Boolean =
+        Build.VERSION.SDK_INT >= 36 && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1
+
+    private fun fullRestoreInput(
+        inputType: Class<*>,
+        descriptor: ParcelFileDescriptor,
+        destination: File,
+        size: Long,
+        mode: Long,
+    ): Any =
+        inputType
+            .getDeclaredConstructor(
+                ParcelFileDescriptor::class.java,
+                java.lang.Long.TYPE,
+                File::class.java,
+                Integer.TYPE,
+                java.lang.Long.TYPE,
+                java.lang.Long.TYPE,
+                java.lang.Long.TYPE,
+                Integer.TYPE,
+                String::class.java,
+            ).newInstance(descriptor, size, destination, BackupAgent.TYPE_FILE, mode, 1L, 1L, 0, "")
 
     private suspend fun incomingPreferences(policy: String?): File {
         val file = File(folder, "incoming-${Uuid.random()}.preferences_pb")

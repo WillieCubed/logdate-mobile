@@ -136,6 +136,7 @@ internal fun EntryEditorViewModel.loadDraftImpl(draftId: Uuid) {
                         } else {
                             currentState.copy(
                                 blocks = recoveredBlocks,
+                                entryEditBase = loaded.editBase,
                                 selectedJournalIds = loaded.selectedJournalIds,
                                 visitContext = loaded.visitContext,
                                 markId = loaded.markId,

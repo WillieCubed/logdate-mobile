@@ -16,6 +16,12 @@ import kotlin.uuid.Uuid
  *
  */
 interface EntryDraftRepository {
+    /** Commits all editor fields together, preserving creation time for an existing draft. */
+    suspend fun saveDraftSnapshot(draft: EntryDraft): Uuid {
+        check(draft.editBase == null) { "This draft repository cannot preserve entry edit history" }
+        return createDraft(draft.id, draft.notes, draft.pendingMedia, draft.selectedJournalIds, draft.visitContext, draft.markId)
+    }
+
     /**
      * Returns a flow containing all of the current user's entry drafts.
      */
@@ -187,6 +193,7 @@ data class EntryDraft(
     > = emptyList(),
     val visitContext: VisitMemoryContext? = null,
     val markId: String? = null,
+    val editBase: EntryEditBase? = null,
 )
 
 /** Type of pending media. Currently only audio is wired; camera/video will follow. */

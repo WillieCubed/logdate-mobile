@@ -229,4 +229,6 @@
     <string name="camera_error_capture_failed">Couldn&apos;t capture photo. Try again.</string>
     <string name="camera_error_recording_failed">Couldn&apos;t record video. Try again.</string>
     <string name="camera_error_unknown">Camera error: %1$s</string>
+    <string name="editor_entry_changed">This entry changed elsewhere. Your version is saved in Drafts.</string>
+    <string name="editor_save_separately">Save separately</string>
 </resources>

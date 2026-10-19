@@ -254,6 +254,8 @@ internal fun EntryEditorViewModel.currentDraftPersistenceState(template: EditorS
     val selectedJournalIds = authoritativeSelectedJournalIds(current, combined)
     return template.copy(
         blocks = current.blocks,
+        entryEditBase = current.entryEditBase,
+        entryEditConflict = current.entryEditConflict,
         markId = current.markId,
         readOnlyBlocks = combined.readOnlyBlocks,
         selectedJournalIds = selectedJournalIds,

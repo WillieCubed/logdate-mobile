@@ -173,6 +173,7 @@ internal fun EntryEditorViewModel.loadExistingEntryImpl(
                         contentRevision = currentState.contentRevision + 1,
                         expandedBlockId = null,
                         blocks = listOf(loaded.block),
+                        entryEditBase = loaded.editBase,
                         capturedOnWatch = loaded.capturedOnWatch,
                         selectedJournalIds = journalId?.let(::listOf) ?: currentState.selectedJournalIds,
                         hasJournalSelectionChanges = false,

@@ -2,9 +2,11 @@ package app.logdate.client.domain.notes.drafts
 
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.shared.model.location.VisitMemoryContext
+import kotlinx.coroutines.flow.first
 import kotlin.uuid.Uuid
 
 /**
@@ -37,8 +39,21 @@ class UpdateEntryDraftUseCase(
         overwrite: Boolean = true,
         visitContext: VisitMemoryContext? = null,
         markId: String? = null,
+        editBase: EntryEditBase? = null,
     ): Uuid =
-        if (markId == null) {
+        if (editBase != null) {
+            val original = entryDraftRepository.getDraft(draftId).first().getOrThrow()
+            entryDraftRepository.saveDraftSnapshot(
+                original.copy(
+                    notes = content,
+                    pendingMedia = pendingMedia,
+                    selectedJournalIds = selectedJournalIds,
+                    visitContext = visitContext,
+                    markId = markId,
+                    editBase = editBase,
+                ),
+            )
+        } else if (markId == null) {
             entryDraftRepository.updateDraft(
                 uid = draftId,
                 notes = content,
@@ -70,5 +85,6 @@ class UpdateEntryDraftUseCase(
             selectedJournalIds = content.selectedJournalIds,
             visitContext = content.visitContext,
             markId = content.markId,
+            editBase = content.editBase,
         )
 }
