@@ -1,55 +1,16 @@
 {
   "lexicon": 1,
   "id": "app.logdate.space.group",
-  "description": "A group: a shared space for one occasion, such as a wedding or a class trip.",
+  "description": "A group's shared space. Its members can see each other and everything shared into it.",
   "defs": {
     "main": {
-      "type": "record",
-      "description": "A group: a shared space for one occasion, such as a wedding or a class trip.",
-      "key": "literal:self",
-      "record": {
-        "type": "object",
-        "required": [
-          "name",
-          "owner",
-          "sharing",
-          "createdAt"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 1000,
-            "maxGraphemes": 100
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 10000,
-            "maxGraphemes": 1000
-          },
-          "owner": {
-            "type": "string",
-            "format": "did",
-            "description": "The person who started the group."
-          },
-          "sharing": {
-            "type": "string",
-            "knownValues": [
-              "everyone",
-              "ownerOnly"
-            ],
-            "description": "Who can share into the group."
-          },
-          "endsAt": {
-            "type": "string",
-            "format": "datetime",
-            "description": "After this time nothing new can be shared into the group."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "datetime"
-          }
-        }
-      }
+      "type": "space",
+      "description": "A group's shared space, for one occasion such as a wedding or a class trip. The person who started the group is the space's authority, and each group gets its own random space key. Its members can see each other and everything shared into it. Every record in it, including the group's app.logdate.space.groupProfile and its app.logdate.space.member records, is an app.logdate.crypto.sealed envelope.",
+      "key": "any",
+      "name": "LogDate groups",
+      "collections": [
+        "app.logdate.crypto.sealed"
+      ]
     }
   }
 }

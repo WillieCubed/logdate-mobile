@@ -1,9 +1,11 @@
 package app.logdate.space
 
-/** The kinds of space LogDate stores records in. */
+import app.logdate.lexicon.app.logdate.space.Personal
+
+/** The kinds of space LogDate stores records in, from their space declarations in `lexicons/`. */
 public object SpaceTypes {
     /** The owner's own space. Only they can read it, and every record in it is sealed. */
-    public const val PERSONAL: String = "app.logdate.space.personal"
+    public const val PERSONAL: String = Personal.TYPE
 }
 
 /**

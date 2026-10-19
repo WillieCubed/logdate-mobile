@@ -102,7 +102,7 @@ These don't exist yet. They come from the [social model](../feature-design/socia
 | Mutes | `app.logdate.graph.mute` | Only the owner | Personal space |
 | Blocks | `app.logdate.graph.block` | Only the owner | Personal space |
 | Circles and their members | `app.logdate.graph.circle`, `app.logdate.graph.circleMember` | Only the owner | Personal space |
-| Groups | `app.logdate.space.group`, with an `app.logdate.space.member` record per member | The group's members | Group space |
+| Groups | `app.logdate.space.groupProfile`, with an `app.logdate.space.member` record per member | The group's members | Group space |
 | A shared item | `app.logdate.share.share`, the author's record of what they shared and with whom | Only the author | Personal space |
 | What recipients receive | `app.logdate.share.item`, plus copies of the shared records under their usual types | The people it was shared with | Circle or group space |
 | Reactions and replies | `app.logdate.share.reaction`, `app.logdate.share.reply` | The author and the person responding | Circle or group space |
@@ -136,9 +136,73 @@ All new schemas use the `app.logdate.*` namespace. Each group below is its own a
 | `app.logdate.actor` | `profile`, `settings` |
 | `app.logdate.graph` | `connection`, `mute`, `block`, `circle`, `circleMember` |
 | `app.logdate.share` | `share`, `item`, `reaction`, `reply` |
-| `app.logdate.space` | `defs` (the `personal`, `circle` and `group` space kinds), `group`, `member`, and the personal-space methods listed below |
+| `app.logdate.space` | `groupProfile`, `member`, the `personal`, `circle` and `group` space declarations, and the personal-space methods listed below |
 | `app.logdate.crypto` | `keyDeclaration`, `sealed` (the envelope every private record is stored in), `wrappedKey` |
 | Permission sets | `app.logdate.authFull`, `app.logdate.authShare` |
+
+### Space declarations
+
+AT Protocol Spaces names every space by three parts: the DID that controls it (its authority), a
+space type and a space key, as in `at://{authority}/space/{spaceType}/{skey}`. A space type is
+itself a lexicon, a *space declaration*: a file whose `main` definition has `"type": "space"`. It
+gives the kind of space a name people see when an app asks for access, says how its spaces are
+keyed, and lists the record collections apps should expect inside. Spaces is still an alpha in the
+AT Protocol, so these follow its proposal as it stands and may change with it.
+
+| Space type | Name people see | Space key | Collections | What it holds |
+|---|---|---|---|---|
+| `app.logdate.space.personal` | Your LogDate journal | `literal:self`: one per account | `app.logdate.crypto.sealed` | Everything private, sealed |
+| `app.logdate.space.circle` | Things shared in LogDate | `any`: a random key per share | `app.logdate.crypto.sealed` | Something shared with a circle or with people, and the recipients' reactions and replies |
+| `app.logdate.space.group` | LogDate groups | `any`: a random key per group | `app.logdate.crypto.sealed` | Everything shared into a group, its `groupProfile` and its `member` records |
+
+Every record in these spaces is sealed, so each declaration lists only `app.logdate.crypto.sealed`.
+The records inside the envelopes, such as entries, share items and group profiles, are not
+collections the server or another app can see. Where a recipient's `app.logdate.crypto.wrappedKey`
+records live is decided by End-to-end encrypted sharing. If they go into circle or group spaces
+unsealed, adding them to those declarations' collections is a compatible change.
+
+The group's own description used to be the record `app.logdate.space.group`. That name is now the
+group space type, so the description record is `app.logdate.space.groupProfile`.
+
+### Permission sets
+
+A permission set bundles the access an app asks for into one OAuth scope, `include:<set NSID>`,
+with a title and a summary that the account's server shows when someone approves the app (see
+the [permission specification](https://atproto.com/specs/permission)). A set may only grant access
+inside its own namespace, so LogDate's sets can't grant anything outside `app.logdate.*`; an app
+that also wants, say, `site.standard.*` for published stories asks for that separately.
+
+Both sets leave out a space permission's `collection` and `action`, so they grant read access and
+writes to the collections the space declaration lists. That way a collection added to a
+declaration reaches existing sessions without asking people to approve the app again.
+
+**`app.logdate.authFull`, "Use LogDate"**, is everything LogDate's own apps need:
+
+- writing the public profile (`app.logdate.actor.profile`) and the public sharing keys
+  (`app.logdate.crypto.keyDeclaration`) to the account's public repository;
+- the account's own personal space, including creating it (`manage`);
+- circle and group spaces under any authority, because what other people share with you is stored
+  in their spaces, including creating, changing and deleting circle and group spaces.
+
+**`app.logdate.authShare`, "Share with your people"**, is for another app that lets people share
+through LogDate, such as a camera app. It grants only what sharing needs:
+
+- circle spaces under any authority, including creating, changing and deleting your own: sharing
+  something, seeing what others shared with you, and reacting or replying;
+- group spaces under any authority, without `manage`: seeing and sharing into groups you're in.
+
+It deliberately leaves out:
+
+- **the personal space**, so the app can never read the journal;
+- **the public profile and the sharing keys**, because replacing someone's sharing keys would let
+  an app read what is shared with them later. Reading other people's keys to encrypt to them needs
+  no permission, because they are public;
+- **creating and running groups**, which stay in LogDate's own apps, because a group's owner
+  decides who is in it.
+
+Neither set includes `rpc` permissions. The personal-space methods below only accept LogDate's own
+access tokens today, and once LogDate moves onto Spaces those calls are covered by the space
+permissions.
 
 ### Personal-space methods
 
@@ -224,7 +288,7 @@ yet.
 | `graph.block` | `Block` |
 | `graph.circle` | `Collection` of actors; always private |
 | `graph.circleMember` | `Add` of the actor to the circle's collection; always private |
-| `space.group` | `Group`; invitations are `Invite` |
+| `space.groupProfile` | `Group`; invitations are `Invite` |
 | `space.member` | `Join` (and `Leave` when removed) |
 | `share.share` | `Create` of the shared object, with recipients in `to`; only the author has this form |
 | `share.item` | `Create` of the shared object as a recipient sees it, with no other recipients listed |
@@ -251,3 +315,5 @@ Streams form.
 | 2026-10-10 | **References inside private spaces use `recordRef`.** Records in personal, circle and group spaces point at each other by type and key (`app.logdate.defs#recordRef`), because they have no public AT URI or CID. |
 | 2026-10-10 | **Encrypted media keeps its real type separately.** `app.logdate.defs#media` stores the blob, which is ciphertext in private spaces, next to the decrypted file's `mimeType`. |
 | 2026-10-10 | **No floats.** Measurements are integers with the unit in the field name, confidences are in thousandths, and coordinates are decimal strings, matching the AT Protocol data model and the community location schema. |
+| 2026-10-18 | **Space kinds are space declarations.** `app.logdate.space.personal`, `circle` and `group` are AT Protocol space declarations instead of tokens, and the group's description record is `app.logdate.space.groupProfile`. Each declaration lists only `app.logdate.crypto.sealed`, because every record in those spaces is sealed. |
+| 2026-10-18 | **Sharing apps never get the journal or the keys.** `app.logdate.authShare` grants circle and group spaces only. The personal space, the profile, the sharing keys and running groups stay with `app.logdate.authFull`, LogDate's own apps. |

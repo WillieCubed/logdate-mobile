@@ -1,0 +1,16 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.circle",
+  "description": "Where something shared with a circle or with individual people is stored, encrypted to the people it was shared with.",
+  "defs": {
+    "main": {
+      "type": "space",
+      "description": "Where something shared with a circle or with individual people is stored, encrypted to the people it was shared with. The person sharing is the space's authority, and each share gets its own random space key. Every record in it is an app.logdate.crypto.sealed envelope; recipients write their reactions and replies into the same space.",
+      "key": "any",
+      "name": "Things shared in LogDate",
+      "collections": [
+        "app.logdate.crypto.sealed"
+      ]
+    }
+  }
+}

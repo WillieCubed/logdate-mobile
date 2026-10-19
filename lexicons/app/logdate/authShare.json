@@ -1,22 +1,29 @@
 {
   "lexicon": 1,
   "id": "app.logdate.authShare",
-  "description": "Sharing without access to the journal.",
+  "description": "What another app needs to share through LogDate: sharing with people, taking part in groups and responding to what others share, without the journal, the profile or the sharing keys.",
   "defs": {
     "main": {
       "type": "permission-set",
       "title": "Share with your people",
-      "detail": "Send, receive and respond to things shared with you. This doesn't give access to your journal.",
+      "detail": "Share things with people you choose, see what they share with you, and respond. This doesn't give access to your journal.",
       "permissions": [
         {
           "type": "permission",
-          "resource": "repo",
-          "collection": [
-            "app.logdate.share.item",
-            "app.logdate.share.reaction",
-            "app.logdate.share.reply",
-            "app.logdate.crypto.wrappedKey"
+          "resource": "space",
+          "spaceType": "app.logdate.space.circle",
+          "authority": "*",
+          "manage": [
+            "create",
+            "update",
+            "delete"
           ]
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "app.logdate.space.group",
+          "authority": "*"
         }
       ]
     }

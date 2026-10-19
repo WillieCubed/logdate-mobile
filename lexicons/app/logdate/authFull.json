@@ -1,24 +1,51 @@
 {
   "lexicon": 1,
   "id": "app.logdate.authFull",
-  "description": "Everything a LogDate app needs.",
+  "description": "Everything LogDate's own apps need: the journal in the personal space, sharing with people and groups, and the public profile and sharing keys.",
   "defs": {
     "main": {
       "type": "permission-set",
       "title": "Use LogDate",
-      "detail": "Read and write your LogDate journal, profile and sharing. Your journal stays encrypted; the app needs your devices' keys to read it.",
+      "detail": "Read and write your LogDate journal, your profile and everything you share. Your journal stays encrypted, and only your own devices can read it.",
       "permissions": [
         {
           "type": "permission",
           "resource": "repo",
           "collection": [
             "app.logdate.actor.profile",
-            "app.logdate.crypto.keyDeclaration",
-            "app.logdate.crypto.sealed",
-            "app.logdate.share.item",
-            "app.logdate.share.reaction",
-            "app.logdate.share.reply",
-            "app.logdate.crypto.wrappedKey"
+            "app.logdate.crypto.keyDeclaration"
+          ]
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "app.logdate.space.personal",
+          "manage": [
+            "create",
+            "update",
+            "delete"
+          ]
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "app.logdate.space.circle",
+          "authority": "*",
+          "manage": [
+            "create",
+            "update",
+            "delete"
+          ]
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "app.logdate.space.group",
+          "authority": "*",
+          "manage": [
+            "create",
+            "update",
+            "delete"
           ]
         }
       ]

@@ -21,8 +21,9 @@ Check everything with:
 ```
 
 That validates each file with the AT Protocol reference implementation, checks that every
-reference resolves and every record type has an Activity Streams mapping, and validates the example
-records in `tools/lexicon-check/examples/` against their schemas.
+reference resolves and every record type has an Activity Streams mapping, checks the space
+declarations and permission sets, and validates the example records in
+`tools/lexicon-check/examples/` against their schemas.
 
 What each record is for, and where it's allowed to live, is in
 [docs/reference/lexicons.md](../docs/reference/lexicons.md). How to write and change a schema is in
