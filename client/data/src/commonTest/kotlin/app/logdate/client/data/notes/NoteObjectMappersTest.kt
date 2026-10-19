@@ -52,4 +52,20 @@ class NoteObjectMappersTest {
 
         assertEquals("Nowhere/Newly_Created", text.toEntity().timeZoneId)
     }
+
+    @Test
+    fun aVideoKeepsItsLengthThroughTheEntity() {
+        val video = JournalNote.Video(creationTimestamp = created, lastUpdated = created, mediaRef = "media/a.mp4", durationMs = 12_345)
+
+        assertEquals(12_345, video.toEntity().durationMs)
+        assertEquals(video, video.toEntity().toModel())
+    }
+
+    @Test
+    fun aVideoOfUnknownLengthStaysUnknown() {
+        val video = JournalNote.Video(creationTimestamp = created, lastUpdated = created, mediaRef = "media/a.mp4")
+
+        assertNull(video.toEntity().durationMs)
+        assertNull(video.toEntity().toModel().durationMs)
+    }
 }

@@ -119,6 +119,7 @@ fun VideoNoteEntity.toModel(
     uid = uid,
     mediaRef = contentUri,
     caption = caption,
+    durationMs = durationMs,
     creationTimestamp = created,
     lastUpdated = lastUpdated,
     syncVersion = syncVersion,
@@ -132,6 +133,7 @@ fun JournalNote.Video.toEntity() =
     VideoNoteEntity(
         uid = uid,
         contentUri = mediaRef,
+        durationMs = durationMs,
         created = creationTimestamp,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,

@@ -185,7 +185,7 @@ class OfflineFirstJournalNotesRepository(
                 }
 
                 is JournalNote.Video -> {
-                    videoNoteDao.addNote(note.toEntity())
+                    videoNoteDao.addNote(note.withDurationFrom(pendingMediaIndex).toEntity())
                     if (note.caption.isNotEmpty()) {
                         mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
                     }
@@ -201,6 +201,12 @@ class OfflineFirstJournalNotesRepository(
         )
 
         return noteId
+    }
+
+    private fun JournalNote.Video.withDurationFrom(pendingMediaIndex: PendingMediaIndex?): JournalNote.Video {
+        if (durationMs != null) return this
+        val duration = (pendingMediaIndex as? PendingMediaIndex.Video)?.duration ?: return this
+        return copy(durationMs = duration.inWholeMilliseconds)
     }
 
     private suspend fun buildPendingMediaIndex(note: JournalNote): PendingMediaIndex? {

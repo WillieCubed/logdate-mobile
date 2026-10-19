@@ -358,6 +358,12 @@ sealed class JournalNote(
         @EncodeDefault(EncodeDefault.Mode.NEVER)
         @Serializable(with = LenientCaptureActivitySerializer::class)
         override val capturedDuring: CaptureActivity? = null,
+        /**
+         * Length of the video in milliseconds, or null when it isn't known. Left out of the note's JSON
+         * while null, so notes without it encode as they did before it existed.
+         */
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val durationMs: Long? = null,
     ) : JournalNote(NoteType.VIDEO)
 
     @Serializable
