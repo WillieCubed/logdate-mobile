@@ -13,6 +13,6 @@
     <string name="labs_activity_permission_description">Activity awareness needs it to tell when you walk, ride or travel.</string>
     <string name="labs_activity_permission_action">Allow</string>
     <string name="labs_identity_recovery_key_title">Recovery key for your identity</string>
-    <string name="labs_identity_recovery_key_description">Account gets a Recovery key page where your recovery phrase can overrule the server that hosts your account. It appears only when that server supports it.</string>
+    <string name="labs_identity_recovery_key_description">Account gets a Recovery key page where you can add a key from your recovery phrase that ranks above the server's key for your identity. It appears only when that server supports it and this device can confirm with a passkey.</string>
     <string name="labs_watch_experience_description">The new watch app and its phone screens, on this phone and your watch.</string>
 </resources>

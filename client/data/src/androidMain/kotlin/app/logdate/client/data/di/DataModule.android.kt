@@ -7,6 +7,8 @@ import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.account.DefaultServerScopedAccounts
 import app.logdate.client.data.account.HistoryOwnerAdoption
+import app.logdate.client.data.account.PasskeyCredentialCodec
+import app.logdate.client.data.account.PasskeyIdentityStepUp
 import app.logdate.client.data.account.RestoreCredentialLifecycle
 import app.logdate.client.data.account.RestoreCredentialRenewal
 import app.logdate.client.data.account.ServerScopedAccounts
@@ -412,7 +414,20 @@ actual val dataModule: Module =
                 deviceName = { context.userVisibleDeviceName() },
             )
         }
-        single<AccountIdentityRepository> { DefaultAccountIdentityRepository(get(), get(), get(), get()) }
+        single<AccountIdentityRepository> {
+            DefaultAccountIdentityRepository(
+                apiClient = get(),
+                sessionStorage = get(),
+                plcRecoveryKeyManager = get(),
+                stepUp =
+                    PasskeyIdentityStepUp(
+                        beginStepUp = get<IdentityApiClientContract>()::beginRecoveryKeyStepUp,
+                        passkeyManager = get(),
+                        credentialCodec = PasskeyCredentialCodec(Json { ignoreUnknownKeys = true }),
+                    ),
+                json = get(),
+            )
+        }
 
         // Quota
         factory<RemoteQuotaDataSource> { AndroidRemoteQuotaDataSource(get(), get()) }

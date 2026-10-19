@@ -44,6 +44,7 @@ kotlin {
             // Project dependencies
             implementation(projects.shared.model)
             implementation(projects.shared.config)
+            implementation(projects.shared.atprotoPlc)
             implementation(projects.client.domain)
             implementation(projects.client.repository)
             implementation(projects.client.database)

@@ -2,44 +2,57 @@
 <resources>
     <!-- Account row -->
     <string name="recovery_key_title">Recovery key</string>
-    <string name="recovery_key_row_on">On. Your recovery phrase can overrule the server.</string>
-    <string name="recovery_key_row_off">Not set up. The server alone controls your identity.</string>
+    <string name="recovery_key_row_on">On. Your recovery key ranks above the server's key.</string>
+    <string name="recovery_key_row_off">Off. Only the server's key can change your identity.</string>
     <string name="recovery_key_row_checking">Checking…</string>
     <string name="recovery_key_row_unknown">Couldn't check. Open to try again.</string>
 
     <!-- Explanation -->
-    <string name="recovery_key_intro">Your identity is @%1$s, the name people and apps know you by. %2$s hosts your account, and right now it is the only one that can change your identity. A recovery key lets you overrule it.</string>
-    <string name="recovery_key_from_phrase">Your recovery key comes from your 12-word recovery phrase, so there is nothing new to write down. %1$s only receives a public part of the key, which lets it recognize your key but not use it.</string>
-    <string name="recovery_key_warning">Anyone with your 12 words can take control of @%1$s. Store them where only you can get to them.</string>
+    <string name="recovery_key_intro">Your identity is @%1$s, the name people and apps know you by. %2$s hosts your account and holds the key that can change your identity.</string>
+    <string name="recovery_key_what_it_does">A recovery key is a second key that ranks above %1$s's key. With it, you can replace %1$s's key for @%2$s if that key is lost or you stop trusting it.</string>
+    <string name="recovery_key_from_phrase">Your recovery key comes from your 12-word recovery phrase, so there is nothing new to write down. %1$s only gets the public part of the key, which lets it recognize your key but not use it.</string>
+    <string name="recovery_key_limits">For now, %1$s keeps the only record of your identity, so every change to it, including the ones on this page, goes through %1$s. Undoing a change to your identity isn't available yet. When it is, a change can only be undone within 72 hours of being made.</string>
+    <string name="recovery_key_warning">Anyone with your 12 words can use your recovery key for @%1$s. Store them where only you can get to them.</string>
 
     <!-- Setting up -->
     <string name="recovery_key_setup_section">Set up</string>
     <string name="recovery_key_phrase_step_title">Save your recovery phrase</string>
     <string name="recovery_key_phrase_confirmed">Saved and confirmed</string>
     <string name="recovery_key_phrase_not_confirmed">Write down your 12 words, then type them back to confirm</string>
-    <string name="recovery_key_phrase_missing">This device doesn't have your recovery phrase yet. Enter it first.</string>
+    <string name="recovery_key_phrase_missing">This device doesn't have a recovery phrase yet. Open Recovery phrase to set one up.</string>
     <string name="recovery_key_turn_on">Turn on recovery key</string>
     <string name="recovery_key_turn_on_needs_phrase">Save and confirm your recovery phrase first.</string>
     <string name="recovery_key_turn_on_confirm_title">Turn on your recovery key?</string>
-    <string name="recovery_key_turn_on_confirm_body">%1$s will add your recovery key to @%2$s and rank it above its own key. From then on, your recovery phrase can overrule changes the server makes to your identity, and the server can't swap your key for a different one.</string>
+    <string name="recovery_key_turn_on_confirm_body">%1$s will add your recovery key to @%2$s, ranked above its own key. You'll confirm with your passkey first. After that, this device can use your recovery phrase to replace %1$s's key.</string>
     <string name="recovery_key_turn_on_confirm_action">Turn on</string>
 
     <!-- On -->
     <string name="recovery_key_status_section">Status</string>
     <string name="recovery_key_on_title">Recovery key is on</string>
-    <string name="recovery_key_on_body">Your recovery phrase can overrule %1$s for @%2$s.</string>
+    <string name="recovery_key_on_body">Your recovery key ranks above %1$s's key for @%2$s.</string>
     <string name="recovery_key_other_phrase_title">This device's phrase doesn't match</string>
-    <string name="recovery_key_other_phrase_body">@%1$s has a recovery key made from a different recovery phrase, so this device can't use it. You need the phrase you turned it on with.</string>
-    <string name="recovery_key_without_phrase_body">To use your recovery key on this device, enter your recovery phrase.</string>
-    <string name="recovery_key_enter_phrase">Enter recovery phrase</string>
+    <string name="recovery_key_other_phrase_body">@%1$s has a recovery key made from a different recovery phrase, so this device can't use it. If you still have that phrase, use it on the device that has it.</string>
+    <string name="recovery_key_without_phrase_title">This device has no recovery phrase</string>
+    <string name="recovery_key_without_phrase_body">This device can't use your recovery key without the recovery phrase you turned it on with. Use a device that has that phrase.</string>
 
-    <!-- Taking back control -->
-    <string name="recovery_key_recover_section">Take back control</string>
-    <string name="recovery_key_recover_body">If you think someone else changed your identity, or you no longer trust the key %1$s uses for it, replace that key with a new one. Your recovery phrase approves the change on this device.</string>
+    <!-- Replacing a lost recovery key -->
+    <string name="recovery_key_replace_key_section">Lost the other phrase?</string>
+    <string name="recovery_key_replace_key_body">Replace the recovery key on @%1$s with one made from this device's recovery phrase. %2$s makes this change with its own key, and you confirm with your passkey.</string>
+    <string name="recovery_key_replace_key_needs_phrase">Save and confirm this device's recovery phrase first.</string>
+    <string name="recovery_key_replace_key_action">Replace recovery key</string>
+    <string name="recovery_key_replace_key_confirm_title">Replace your recovery key?</string>
+    <string name="recovery_key_replace_key_confirm_body">The recovery key on @%2$s will be replaced with one made from this device's recovery phrase. The old phrase will no longer work for @%2$s. %1$s makes the change with its own key, and you'll confirm with your passkey.</string>
+    <string name="recovery_key_replace_key_confirm_action">Replace</string>
+    <string name="recovery_key_replaced_key">Done. @%1$s now uses the recovery key from this device's phrase.</string>
+
+    <!-- Replacing the server's key -->
+    <string name="recovery_key_recover_section">Replace the server's key</string>
+    <string name="recovery_key_recover_body">If %1$s's key for @%2$s is lost, or you think someone else used it, replace it with a new key. Your recovery phrase approves the change on this device, and you confirm with your passkey.</string>
     <string name="recovery_key_recover_action">Replace the server's key</string>
     <string name="recovery_key_recover_confirm_title">Replace the server's key?</string>
     <string name="recovery_key_recover_confirm_intro">Here is what will happen:</string>
-    <string name="recovery_key_recover_confirm_step_sign">This device approves the change with your recovery phrase. The phrase never leaves this device.</string>
+    <string name="recovery_key_recover_confirm_step_check">This device checks that the change only replaces the server's key, then approves it with your recovery phrase. The phrase never leaves this device.</string>
+    <string name="recovery_key_recover_confirm_step_passkey">You confirm with your passkey.</string>
     <string name="recovery_key_recover_confirm_step_replace">The key %1$s uses for @%2$s stops working, and a new one replaces it.</string>
     <string name="recovery_key_recover_confirm_step_rank">Your recovery key still ranks above the new key.</string>
     <string name="recovery_key_recover_confirm_step_unchanged">Your journal, sign-in methods and devices don't change.</string>
@@ -47,17 +60,28 @@
     <string name="recovery_key_recovered">Done. %1$s now uses a new key for @%2$s, and the old key can no longer change your identity.</string>
 
     <!-- Problems -->
+    <string name="recovery_key_not_offered">Recovery keys aren't available here. They need a server that supports them and a device that can confirm with a passkey.</string>
     <string name="recovery_key_load_failed">Couldn't load your identity from %1$s. Check your connection and try again.</string>
+    <string name="recovery_key_phrase_unreadable">This device couldn't read its recovery phrase, so nothing was changed. Try again. If it keeps happening, restart LogDate.</string>
+    <string name="recovery_key_phrase_cannot_derive">This device couldn't make your recovery key from its recovery phrase, so nothing was changed. Try again. If it keeps happening, restart LogDate.</string>
+    <string name="recovery_key_phrase_confirmation_unreadable">This device couldn't check whether you confirmed your recovery phrase. Try again.</string>
     <string name="recovery_key_try_again">Try again</string>
     <string name="recovery_key_dismiss">Dismiss</string>
-    <string name="recovery_key_error_not_available">%1$s doesn't support recovery keys.</string>
-    <string name="recovery_key_error_already_set">@%1$s already has a different recovery key. Use the recovery phrase you turned it on with.</string>
+    <string name="recovery_key_error_not_available">%1$s doesn't support recovery keys, so nothing was changed.</string>
+    <string name="recovery_key_error_already_set">@%1$s already has a different recovery key, so nothing was changed. If you no longer have the phrase it came from, replace it below.</string>
     <string name="recovery_key_error_not_set">@%1$s doesn't have a recovery key yet. Turn it on first.</string>
-    <string name="recovery_key_error_key_removed">@%1$s no longer lists your recovery key, so it can't approve this change.</string>
-    <string name="recovery_key_error_phrase_mismatch">The recovery phrase on this device doesn't match the recovery key on @%1$s.</string>
+    <string name="recovery_key_error_key_removed">@%1$s no longer lists your recovery key, so it can't approve this change. Nothing was changed. Ask the people who run %2$s to repair your identity.</string>
+    <string name="recovery_key_error_phrase_mismatch">The recovery phrase on this device doesn't match the recovery key on @%1$s, so nothing was changed. Use the device with the phrase you turned the key on with.</string>
+    <string name="recovery_key_error_signature_rejected">%1$s didn't accept this device's approval, so nothing was changed. Try again. If it keeps happening, contact %1$s support.</string>
+    <string name="recovery_key_error_unexpected_change">This device stopped the change because %1$s asked it to approve more than replacing its key. Nothing was changed. Contact %1$s support before trying again.</string>
+    <string name="recovery_key_error_server_key_missing">%1$s can't change @%2$s right now because its own key is no longer listed. Nothing was changed. Contact %1$s support.</string>
     <string name="recovery_key_error_identity_changed">@%1$s changed while this was in progress, so nothing was replaced. Try again.</string>
     <string name="recovery_key_error_signed_out">You're signed out. Sign in, then try again.</string>
     <string name="recovery_key_error_unreachable">Couldn't reach %1$s. Check your connection and try again.</string>
-    <string name="recovery_key_error_device">This device couldn't use its recovery phrase. Check it on the Recovery phrase page.</string>
-    <string name="recovery_key_error_refused">%1$s refused the change. Try again later.</string>
+    <string name="recovery_key_error_device">This device couldn't use its recovery phrase, so nothing was changed. Try again. If it keeps happening, restart LogDate.</string>
+    <string name="recovery_key_error_refused">%1$s couldn't make the change, so nothing was changed. Try again in a few minutes.</string>
+    <string name="recovery_key_error_step_up_cancelled">You closed the passkey prompt, so nothing was changed. Try again and confirm with your passkey.</string>
+    <string name="recovery_key_error_step_up_failed">Your passkey confirmation wasn't accepted, so nothing was changed. Try again.</string>
+    <string name="recovery_key_error_step_up_unavailable">This device can't confirm changes with a passkey, so nothing was changed. Use a phone or tablet that has your passkey.</string>
+    <string name="recovery_key_error_passkey_required">Changing your recovery key needs a passkey. Add one in Sign-in methods, then try again.</string>
 </resources>

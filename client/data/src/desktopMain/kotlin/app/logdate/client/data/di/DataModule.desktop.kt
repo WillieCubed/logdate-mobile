@@ -1,6 +1,8 @@
 package app.logdate.client.data.di
 
 import app.logdate.client.data.account.DefaultAccountIdentityRepository
+import app.logdate.client.data.account.PasskeyCredentialCodec
+import app.logdate.client.data.account.PasskeyIdentityStepUp
 import app.logdate.client.data.account.ServerScopedAccount
 import app.logdate.client.data.account.ServerScopedAccounts
 import app.logdate.client.data.account.UnavailableAccountRepository
@@ -330,7 +332,17 @@ actual val dataModule: Module =
         // Account
         single<AccountRepository> { UnavailableAccountRepository() }
         single<AccountIdentityRepository> {
-            DefaultAccountIdentityRepository(apiClient = get(), sessionStorage = get(), plcRecoveryKeyManager = get())
+            DefaultAccountIdentityRepository(
+                apiClient = get(),
+                sessionStorage = get(),
+                plcRecoveryKeyManager = get(),
+                stepUp =
+                    PasskeyIdentityStepUp(
+                        beginStepUp = get<IdentityApiClientContract>()::beginRecoveryKeyStepUp,
+                        passkeyManager = get(),
+                        credentialCodec = PasskeyCredentialCodec(Json { ignoreUnknownKeys = true }),
+                    ),
+            )
         }
         single<PasskeyAccountRepository> { UnavailablePasskeyAccountRepository() }
         single<ServerScopedAccounts> {

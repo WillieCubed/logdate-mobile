@@ -40,6 +40,7 @@ import app.logdate.feature.core.settings.account.move.MoveServerViewModel
 import app.logdate.feature.core.settings.account.move.ServerMove
 import app.logdate.feature.core.settings.account.move.ServerMoveStore
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseViewModel
+import app.logdate.feature.core.settings.account.recoverykey.passkeysSupported
 import app.logdate.feature.core.settings.account.recoverykey.recoveryKeyOffered
 import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
@@ -105,7 +106,8 @@ actual val coreFeatureModule: Module =
                 hasRecoveryPhrase = { get<IdentityKeyManager>().hasIdentityKey() },
                 isEmailVerificationAvailable = { get<EmailVerificationAvailability>().isAvailable() },
                 verifyEmail = { get<VerifyEmailUseCase>()() },
-                isRecoveryKeyOffered = recoveryKeyOffered(featureFlags = get(), connectedServer = get()),
+                isRecoveryKeyOffered =
+                    recoveryKeyOffered(featureFlags = get(), connectedServer = get(), passkeysSupported = passkeysSupported(get())),
                 hasRecoveryKey = { get<AccountIdentityRepository>().getIdentityStatus().getOrThrow().plcRecoveryDidKey != null },
             )
         }
