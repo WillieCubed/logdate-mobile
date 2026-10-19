@@ -10,7 +10,7 @@ import java.util.Base64
 import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Issues and validates ES256-signed OAuth access tokens backed by the server JWKS.
@@ -104,7 +104,8 @@ class OAuthAccessTokenService(
     }
 
     private companion object {
-        private val ACCESS_TOKEN_TTL: Duration = 1.hours
+        // Access tokens cannot be revoked, so they stay short; refresh tokens carry the session.
+        private val ACCESS_TOKEN_TTL: Duration = 15.minutes
         private const val JWT_SEGMENT_COUNT = 3
         private const val JWS_ALGORITHM = "ES256"
         private const val JWS_SIGNATURE_ALGORITHM = "SHA256withECDSAinP1363Format"

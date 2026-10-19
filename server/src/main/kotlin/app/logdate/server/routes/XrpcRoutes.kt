@@ -10,6 +10,7 @@ import app.logdate.server.logging.IdentityNotices
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.oauth.OAuthScopes
 import app.logdate.server.oauth.OAuthUseDpopNonceException
 import app.logdate.server.routes.docs.XrpcDocs
 import app.logdate.server.routes.docs.XrpcRepoDocs
@@ -46,6 +47,7 @@ import studio.hypertext.atproto.pds.GetRecordRequest
 import studio.hypertext.atproto.pds.GetRepoRequest
 import studio.hypertext.atproto.pds.GetRepoStatusRequest
 import studio.hypertext.atproto.pds.ListRecordsRequest
+import studio.hypertext.atproto.pds.ListRecordsResponse
 import studio.hypertext.atproto.pds.PdsBlobService
 import studio.hypertext.atproto.pds.PdsDiscoveryService
 import studio.hypertext.atproto.pds.PdsErrorResponse
@@ -81,8 +83,8 @@ fun Route.xrpcRoutes(
     suspend fun ApplicationCall.requireRepoOwner(
         repo: String,
         respondAsMissing: suspend ApplicationCall.() -> Unit,
-    ): Boolean {
-        val account =
+    ): XrpcPrincipal? {
+        val principal =
             requireAuthenticatedAccount(
                 identityService = identityService,
                 accountRepository = accountRepository,
@@ -91,10 +93,10 @@ fun Route.xrpcRoutes(
                 oauthAccessTokenService = oauthAccessTokenService,
                 oauthDpopVerifier = oauthDpopVerifier,
                 oauthNonceService = oauthNonceService,
-            ) ?: return false
-        if (ownsRepo(account, repo)) return true
+            ) ?: return null
+        if (ownsRepo(principal.account, repo)) return principal
         respondAsMissing()
-        return false
+        return null
     }
 
     route("/xrpc") {
@@ -248,7 +250,12 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            call.respond(HttpStatusCode.OK, repoDescription)
+            call.respond(
+                HttpStatusCode.OK,
+                repoDescription.copy(
+                    collections = repoDescription.collections.filterNot { OAuthScopes.isPrivateCollection(it.toString()) },
+                ),
+            )
         }
 
         get("/com.atproto.sync.getRepo", XrpcRepoDocs.getRepo) {
@@ -276,7 +283,8 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "Invalid did or since"))
                 return@get
             }
-            if (!call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) }) return@get
+            val principal = call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) } ?: return@get
+            if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result = syncApi.getRepo(GetRepoRequest(did = did, since = since))
             val export = result.getOrNull()
             if (export == null) {
@@ -305,7 +313,8 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
                 return@get
             }
-            if (!call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) }) return@get
+            val principal = call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) } ?: return@get
+            if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result = syncApi.getLatestCommit(GetLatestCommitRequest(did))
             val latestCommit = result.getOrNull()
             if (latestCommit == null) {
@@ -330,7 +339,8 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
                 return@get
             }
-            if (!call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) }) return@get
+            val principal = call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) } ?: return@get
+            if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result = syncApi.getRepoStatus(GetRepoStatusRequest(did))
             val repoStatus = result.getOrNull()
             if (repoStatus == null) {
@@ -372,10 +382,13 @@ fun Route.xrpcRoutes(
                     PdsErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
                 )
             }
-            if (!call.requireRepoOwner(repoValue, respondInvalidRecordId)) return@get
+            val principal = call.requireRepoOwner(repoValue, respondInvalidRecordId) ?: return@get
             val recordId =
                 parseRecordId(identityService, repoValue, collectionValue, recordKeyValue)
                     ?: return@get call.respondInvalidRecordId()
+            if (principal.oauth != null && OAuthScopes.isPrivateCollection(recordId.collection.toString())) {
+                return@get call.respondRecordNotFound()
+            }
 
             val recordResult =
                 repoApi.getRecord(
@@ -393,14 +406,7 @@ fun Route.xrpcRoutes(
                 call.respondForRepoError(recordResult.exceptionOrNull())
                 return@get
             }
-            val record = recordResult.getOrNull()
-            if (record == null) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    PdsErrorResponse("RecordNotFound", "Record not found"),
-                )
-                return@get
-            }
+            val record = recordResult.getOrNull() ?: return@get call.respondRecordNotFound()
 
             call.respond(HttpStatusCode.OK, record)
         }
@@ -433,12 +439,15 @@ fun Route.xrpcRoutes(
                     PdsErrorResponse("InvalidRequest", "Invalid repo or collection"),
                 )
             }
-            if (!call.requireRepoOwner(repoValue, respondInvalidRepoOrCollection)) return@get
+            val principal = call.requireRepoOwner(repoValue, respondInvalidRepoOrCollection) ?: return@get
             val repo = resolveRepoDid(identityService, repoValue)
             val collection = Nsid.parse(collectionValue).getOrNull()
             if (repo == null || collection == null) {
                 call.respondInvalidRepoOrCollection()
                 return@get
+            }
+            if (principal.oauth != null && OAuthScopes.isPrivateCollection(collection.toString())) {
+                return@get call.respond(HttpStatusCode.OK, ListRecordsResponse(records = emptyList()))
             }
 
             val result =
@@ -473,7 +482,7 @@ fun Route.xrpcRoutes(
                     HttpStatusCode.NotImplemented,
                     PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
-            val authenticatedAccount =
+            val principal =
                 call.requireAuthenticatedAccount(
                     identityService = identityService,
                     accountRepository = accountRepository,
@@ -484,13 +493,14 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val wireRequest = call.receive<CreateRecordInput>()
+            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString())) return@post
             val repo =
                 resolveRepoDid(identityService, wireRequest.repo)
                     ?: return@post call.respond(
                         HttpStatusCode.BadRequest,
                         PdsErrorResponse("InvalidRequest", "Invalid repo"),
                     )
-            if (!ownsRepo(authenticatedAccount, wireRequest.repo)) {
+            if (!ownsRepo(principal.account, wireRequest.repo)) {
                 call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
@@ -521,7 +531,7 @@ fun Route.xrpcRoutes(
                     HttpStatusCode.NotImplemented,
                     PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
-            val authenticatedAccount =
+            val principal =
                 call.requireAuthenticatedAccount(
                     identityService = identityService,
                     accountRepository = accountRepository,
@@ -532,13 +542,14 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val wireRequest = call.receive<PutRecordInput>()
+            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString())) return@post
             val repo =
                 resolveRepoDid(identityService, wireRequest.repo)
                     ?: return@post call.respond(
                         HttpStatusCode.BadRequest,
                         PdsErrorResponse("InvalidRequest", "Invalid repo"),
                     )
-            if (!ownsRepo(authenticatedAccount, wireRequest.repo)) {
+            if (!ownsRepo(principal.account, wireRequest.repo)) {
                 call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
@@ -569,7 +580,7 @@ fun Route.xrpcRoutes(
                     HttpStatusCode.NotImplemented,
                     PdsErrorResponse("Unsupported", "Repo service is not configured"),
                 )
-            val authenticatedAccount =
+            val principal =
                 call.requireAuthenticatedAccount(
                     identityService = identityService,
                     accountRepository = accountRepository,
@@ -580,13 +591,14 @@ fun Route.xrpcRoutes(
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
             val wireRequest = call.receive<DeleteRecordInput>()
+            if (!call.allowOAuthWrite(principal, wireRequest.collection.toString())) return@post
             val repo =
                 resolveRepoDid(identityService, wireRequest.repo)
                     ?: return@post call.respond(
                         HttpStatusCode.BadRequest,
                         PdsErrorResponse("InvalidRequest", "Invalid repo"),
                     )
-            if (!ownsRepo(authenticatedAccount, wireRequest.repo)) {
+            if (!ownsRepo(principal.account, wireRequest.repo)) {
                 call.respond(HttpStatusCode.Forbidden, PdsErrorResponse("RepoMismatch", "Authenticated account does not own repo"))
                 return@post
             }
@@ -614,7 +626,7 @@ fun Route.xrpcRoutes(
                     HttpStatusCode.NotImplemented,
                     PdsErrorResponse("Unsupported", "Blob service is not configured"),
                 )
-            val authenticatedAccount =
+            val principal =
                 call.requireAuthenticatedAccount(
                     identityService = identityService,
                     accountRepository = accountRepository,
@@ -624,7 +636,11 @@ fun Route.xrpcRoutes(
                     oauthDpopVerifier = oauthDpopVerifier,
                     oauthNonceService = oauthNonceService,
                 ) ?: return@post
-            val repoDid = authenticatedAccount.did?.let(AtprotoDid::parse)?.getOrNull()
+            if (!call.allowOAuthWrite(principal, collection = null)) return@post
+            val repoDid =
+                principal.account.did
+                    ?.let(AtprotoDid::parse)
+                    ?.getOrNull()
             if (repoDid == null) {
                 call.respond(
                     HttpStatusCode.BadRequest,
@@ -685,7 +701,8 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            if (!call.requireRepoOwner(didValue) { respondBlobNotFound() }) return@get
+            val principal = call.requireRepoOwner(didValue) { respondBlobNotFound() } ?: return@get
+            if (principal.oauth != null) return@get call.respondClosedToOAuthApps()
             val result =
                 pdsBlobService.getBlob(
                     GetBlobRequest(
@@ -758,7 +775,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
     oauthAccessTokenService: OAuthAccessTokenService?,
     oauthDpopVerifier: OAuthDpopVerifier?,
     oauthNonceService: OAuthNonceService?,
-): Account? {
+): XrpcPrincipal? {
     if (accountRepository == null) {
         respond(
             HttpStatusCode.NotImplemented,
@@ -814,12 +831,15 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
             return null
         }
         val account =
-            accountRepository.findByDid(accessClaims.subjectDid)?.let { identityService.ensureIdentity(it) }
+            accountRepository
+                .findByDid(accessClaims.subjectDid)
+                ?.takeIf(Account::isActive)
+                ?.let { identityService.ensureIdentity(it) }
         if (account == null) {
             respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "Account not found for DPoP access token"))
             return null
         }
-        return account
+        return XrpcPrincipal(account, OAuthGrant(clientId = accessClaims.clientId, scopes = OAuthScopes.parse(accessClaims.scope)))
     }
 
     if (!authHeader.startsWith("Bearer ")) {
@@ -839,7 +859,7 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
         atprotoSessionTokenService
             ?.getAccessAccount(bearerToken, accountRepository, identityService)
     if (atprotoAccount != null) {
-        return atprotoAccount
+        return XrpcPrincipal(atprotoAccount, oauth = null)
     }
 
     val subject = tokenService?.validateAccessToken(bearerToken)
@@ -857,7 +877,59 @@ private suspend fun io.ktor.server.application.ApplicationCall.requireAuthentica
         return null
     }
 
-    return account
+    return XrpcPrincipal(account, oauth = null)
+}
+
+/**
+ * Who is calling an XRPC method: the account, and for an app signed in through OAuth, which app
+ * and what it was granted. LogDate app and AT Protocol session tokens carry no [oauth] grant.
+ */
+internal data class XrpcPrincipal(
+    val account: Account,
+    val oauth: OAuthGrant?,
+)
+
+/** What an app signed in through OAuth was granted. */
+internal data class OAuthGrant(
+    val clientId: String,
+    val scopes: Set<String>,
+) {
+    /** `atproto` alone only confirms the identity; writing needs `transition:generic`. */
+    val canWrite: Boolean get() = OAuthScopes.TRANSITION_GENERIC in scopes
+}
+
+/**
+ * Lets LogDate sessions write anything they own. An OAuth app needs `transition:generic` and may
+ * never touch a journal [collection]; a `null` collection is a file upload.
+ */
+private suspend fun ApplicationCall.allowOAuthWrite(
+    principal: XrpcPrincipal,
+    collection: String?,
+): Boolean {
+    val grant = principal.oauth ?: return true
+    if (!grant.canWrite) {
+        respond(
+            HttpStatusCode.Forbidden,
+            PdsErrorResponse("InsufficientScope", "This app was only granted the atproto scope, which does not allow writes"),
+        )
+        return false
+    }
+    if (collection != null && OAuthScopes.isPrivateCollection(collection)) {
+        respond(
+            HttpStatusCode.Forbidden,
+            PdsErrorResponse("Forbidden", "Apps signed in through OAuth cannot change LogDate journal records"),
+        )
+        return false
+    }
+    return true
+}
+
+private suspend fun ApplicationCall.respondClosedToOAuthApps() {
+    respond(HttpStatusCode.Forbidden, PdsErrorResponse("Forbidden", "This method is not available to apps signed in through OAuth"))
+}
+
+private suspend fun ApplicationCall.respondRecordNotFound() {
+    respond(HttpStatusCode.BadRequest, PdsErrorResponse("RecordNotFound", "Record not found"))
 }
 
 private fun io.ktor.server.application.ApplicationCall.absoluteRequestUrl(): String {

@@ -33,6 +33,27 @@ import studio.hypertext.atproto.syntax.Tid
  * session methods live in [XrpcDocs].
  */
 internal object XrpcRepoDocs {
+    private val closedToOAuthApps =
+        ErrorCase(
+            "Forbidden",
+            "The caller is an app signed in through OAuth. Repository export, commit and status reads, and blob downloads are " +
+                "only open to the account's own LogDate sessions.",
+            "This method is not available to apps signed in through OAuth",
+        )
+    private val insufficientScope =
+        ErrorCase(
+            "InsufficientScope",
+            "The caller is an app signed in through OAuth with only the `atproto` scope. Writing records and uploading files " +
+                "also needs `transition:generic`.",
+            "This app was only granted the atproto scope, which does not allow writes",
+        )
+    private val journalClosed =
+        ErrorCase(
+            "Forbidden",
+            "The caller is an app signed in through OAuth and the collection is part of the LogDate journal " +
+                "(`studio.hypertext.logdate.*`), which only the account's own LogDate sessions can change.",
+            "Apps signed in through OAuth cannot change LogDate journal records",
+        )
     // ---- Repository sync -----------------------------------------------------------------------
 
     val getRepo: RouteConfig.() -> Unit = {
@@ -65,6 +86,7 @@ internal object XrpcRepoDocs {
                 ErrorCase("InvalidRequest", "`did` is missing, or `did` or `since` is malformed.", "Invalid did or since"),
             )
             authRequired()
+            pdsError(HttpStatusCode.Forbidden, closedToOAuthApps)
             pdsError(HttpStatusCode.NotFound, repoNotFound)
             notConfigured()
         }
@@ -87,6 +109,7 @@ internal object XrpcRepoDocs {
             ok("The head of the repository.", GetLatestCommitResponse(cid = Cid.require(COMMIT_CID), rev = Tid.require(REV)))
             pdsError(HttpStatusCode.BadRequest, ErrorCase("InvalidRequest", "`did` is missing or malformed.", "did is required"))
             authRequired()
+            pdsError(HttpStatusCode.Forbidden, closedToOAuthApps)
             pdsError(HttpStatusCode.NotFound, repoNotFound)
             notConfigured()
         }
@@ -109,6 +132,7 @@ internal object XrpcRepoDocs {
             ok("The repository's status.", GetRepoStatusResponse(did = did, active = true, rev = Tid.require(REV)))
             pdsError(HttpStatusCode.BadRequest, ErrorCase("InvalidRequest", "`did` is missing or malformed.", "did is required"))
             authRequired()
+            pdsError(HttpStatusCode.Forbidden, closedToOAuthApps)
             pdsError(HttpStatusCode.NotFound, repoNotFound)
             notConfigured()
         }
@@ -126,7 +150,8 @@ internal object XrpcRepoDocs {
             *collection* is a lexicon ID such as `studio.hypertext.logdate.content`; the *record key* is the
             record's ID within it. Records are returned as the JSON the writer stored, plus the `at://` URI and
             the CID (content hash) of this version. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist.
+            repository answers exactly as if it did not exist. To an app signed in through OAuth, LogDate journal
+            records (`studio.hypertext.logdate.*`) answer `RecordNotFound`.
             """,
         )
         request {
@@ -172,7 +197,8 @@ internal object XrpcRepoDocs {
             `com.atproto.repo.listRecords`. Pages through the records in one collection of one repository.
             Pass the `cursor` from each response to get the next page; an absent cursor means you have reached
             the end. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist.
+            repository answers exactly as if it did not exist. To an app signed in through OAuth, LogDate journal
+            collections (`studio.hypertext.logdate.*`) are always empty.
             """,
         )
         request {
@@ -228,7 +254,9 @@ internal object XrpcRepoDocs {
             the commit CID you last saw to fail instead of writing over a change you have not seen.
 
             Authenticate with either a LogDate access token (`Authorization: Bearer`) or an OAuth token
-            (`Authorization: DPoP` plus a `DPoP` proof). The `repo` must be your own DID or handle.
+            (`Authorization: DPoP` plus a `DPoP` proof). The `repo` must be your own DID or handle. An app
+            signed in through OAuth needs the `transition:generic` scope and can never write LogDate journal
+            collections (`studio.hypertext.logdate.*`).
             """,
         )
         request {
@@ -249,7 +277,7 @@ internal object XrpcRepoDocs {
                 invalidSwap,
             )
             authRequired()
-            pdsError(HttpStatusCode.Forbidden, repoMismatch)
+            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, journalClosed)
             notConfigured()
         }
     }
@@ -289,7 +317,7 @@ internal object XrpcRepoDocs {
                 invalidSwap,
             )
             authRequired()
-            pdsError(HttpStatusCode.Forbidden, repoMismatch)
+            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, journalClosed)
             notConfigured()
         }
     }
@@ -323,7 +351,7 @@ internal object XrpcRepoDocs {
                 invalidSwap,
             )
             authRequired()
-            pdsError(HttpStatusCode.Forbidden, repoMismatch)
+            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, journalClosed)
             notConfigured()
         }
     }
@@ -339,6 +367,7 @@ internal object XrpcRepoDocs {
             `com.atproto.repo.uploadBlob`. Stores a binary file (an image, say) in your repository and returns
             a *blob reference* to embed in a record. Send the raw bytes as the body with the file's
             `Content-Type`; there is no multipart wrapper. Blobs that no record references may be cleaned up.
+            An app signed in through OAuth needs the `transition:generic` scope.
             """,
         )
         request {
@@ -364,6 +393,7 @@ internal object XrpcRepoDocs {
                 ),
             )
             authRequired()
+            pdsError(HttpStatusCode.Forbidden, insufficientScope)
             notConfigured()
         }
     }
@@ -397,6 +427,7 @@ internal object XrpcRepoDocs {
                 ErrorCase("InvalidRequest", "`did` or `cid` is missing or malformed.", "did and cid are required"),
             )
             authRequired()
+            pdsError(HttpStatusCode.Forbidden, closedToOAuthApps)
             pdsError(
                 HttpStatusCode.NotFound,
                 ErrorCase(

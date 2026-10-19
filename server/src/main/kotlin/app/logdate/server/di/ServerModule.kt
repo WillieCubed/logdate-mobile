@@ -224,7 +224,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single {
             OAuthConfig
                 .fromEnvironment(defaultIssuer = get<AtprotoIdentityConfig>().pdsServiceEndpoint)
-                .copy(passkeySignInEnabled = OAuthConfig.passkeySignInEnabledFromEnvironment())
+                .copy(
+                    passkeySignInEnabled = OAuthConfig.passkeySignInEnabledFromEnvironment(),
+                    trustedClientIds = OAuthConfig.trustedClientIdsFromEnvironment(),
+                )
         }
         single { HttpClient(OkHttp) }
         single<OAuthSigningKeyRepository> {
@@ -258,6 +261,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 nonceService = get(),
                 authorizationServerIssuer = config.normalizedIssuer,
                 runtimeStateRepository = get(),
+                trustedClientIds = config.trustedClientIds,
             )
         }
         single {

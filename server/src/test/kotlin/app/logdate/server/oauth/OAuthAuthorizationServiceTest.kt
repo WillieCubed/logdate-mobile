@@ -78,7 +78,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-81"),
                     codeChallengeMethod = "S256",
                     state = "state-123",
                     loginHint = "alice.logdate.app",
@@ -105,7 +105,7 @@ class OAuthAuthorizationServiceTest {
                     code = code,
                     redirectUri = redirectUri,
                     clientId = clientId,
-                    codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    codeVerifier = "example-verifier-81",
                     dpopProof =
                         createDpopProof(
                             clientKeyPair,
@@ -213,7 +213,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-216"),
                     codeChallengeMethod = "S256",
                     state = "confidential-state",
                     loginHint = "alice.logdate.app",
@@ -249,7 +249,7 @@ class OAuthAuthorizationServiceTest {
                     code = code,
                     redirectUri = redirectUri,
                     clientId = clientId,
-                    codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    codeVerifier = "example-verifier-216",
                     clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
                     clientAssertion =
                         createClientAssertion(
@@ -384,7 +384,7 @@ class OAuthAuthorizationServiceTest {
                         redirectUri = redirectUri,
                         scope = "profile",
                         responseType = "token",
-                        codeChallenge = "challenge",
+                        codeChallenge = "example-challenge-387",
                         codeChallengeMethod = "plain",
                         state = null,
                         loginHint = null,
@@ -400,7 +400,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-403"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = "brie.logdate.app",
@@ -416,7 +416,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-419"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = "other.logdate.app",
@@ -435,7 +435,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-438"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = null,
@@ -509,7 +509,7 @@ class OAuthAuthorizationServiceTest {
                         redirectUri = redirectUri,
                         scope = "atproto",
                         responseType = "code",
-                        codeChallenge = "challenge",
+                        codeChallenge = "example-challenge-512",
                         codeChallengeMethod = "plain",
                         state = null,
                         loginHint = null,
@@ -525,7 +525,7 @@ class OAuthAuthorizationServiceTest {
                         redirectUri = redirectUri,
                         scope = "profile",
                         responseType = "code",
-                        codeChallenge = "challenge",
+                        codeChallenge = "example-challenge-528",
                         codeChallengeMethod = "S256",
                         state = null,
                         loginHint = null,
@@ -541,7 +541,7 @@ class OAuthAuthorizationServiceTest {
                         redirectUri = "https://viewer.example.com/other",
                         scope = "atproto",
                         responseType = "code",
-                        codeChallenge = "challenge",
+                        codeChallenge = "example-challenge-544",
                         codeChallengeMethod = "S256",
                         state = null,
                         loginHint = null,
@@ -557,7 +557,7 @@ class OAuthAuthorizationServiceTest {
                         redirectUri = redirectUri,
                         scope = "atproto email",
                         responseType = "code",
-                        codeChallenge = "challenge",
+                        codeChallenge = "example-challenge-560",
                         codeChallengeMethod = "S256",
                         state = null,
                         loginHint = null,
@@ -573,7 +573,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-576"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = null,
@@ -589,7 +589,7 @@ class OAuthAuthorizationServiceTest {
                         code = "missing",
                         redirectUri = redirectUri,
                         clientId = clientId,
-                        codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                        codeVerifier = "example-verifier-576",
                         dpopProof =
                             createDpopProof(
                                 keyPair,
@@ -627,7 +627,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-630"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = null,
@@ -645,7 +645,7 @@ class OAuthAuthorizationServiceTest {
                         code = mismatchCode,
                         redirectUri = "https://viewer.example.com/other",
                         clientId = clientId,
-                        codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                        codeVerifier = "example-verifier-630",
                         dpopProof =
                             createDpopProof(
                                 keyPair,
@@ -665,7 +665,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-668"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = null,
@@ -682,7 +682,7 @@ class OAuthAuthorizationServiceTest {
                     code = nextCode,
                     redirectUri = redirectUri,
                     clientId = clientId,
-                    codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    codeVerifier = "example-verifier-668",
                     dpopProof =
                         createDpopProof(
                             keyPair,
@@ -773,7 +773,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-776"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = null,
@@ -809,7 +809,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = redirectUri,
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-812"),
                     codeChallengeMethod = "S256",
                     state = null,
                     loginHint = null,
@@ -826,7 +826,7 @@ class OAuthAuthorizationServiceTest {
                         code = nextCode,
                         redirectUri = redirectUri,
                         clientId = clientId,
-                        codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                        codeVerifier = "example-verifier-812",
                         dpopProof =
                             createDpopProof(
                                 otherKeyPair,
@@ -864,7 +864,7 @@ class OAuthAuthorizationServiceTest {
                     redirectUri = "$redirectUri?mode=1",
                     scope = "atproto",
                     responseType = "code",
-                    codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                    codeChallenge = pkceChallenge("example-verifier-867"),
                     codeChallengeMethod = "S256",
                     state = "state",
                     loginHint = null,
@@ -881,7 +881,7 @@ class OAuthAuthorizationServiceTest {
                     code = successCode,
                     redirectUri = "$redirectUri?mode=1",
                     clientId = clientId,
-                    codeVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+                    codeVerifier = "example-verifier-867",
                     dpopProof =
                         createDpopProof(
                             keyPair,
@@ -1064,3 +1064,14 @@ class OAuthAuthorizationServiceTest {
             else -> type.isAssignableFrom(value.javaClass)
         }
 }
+
+/** The PKCE `S256` challenge for [verifier]; every pushed request needs its own. */
+private fun pkceChallenge(verifier: String): String =
+    java.util.Base64
+        .getUrlEncoder()
+        .withoutPadding()
+        .encodeToString(
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(verifier.toByteArray()),
+        )

@@ -200,6 +200,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             accessTokenService = oauthAccessTokenService,
             nonceService = oauthNonceService,
             authorizationServerIssuer = oauthConfig.normalizedIssuer,
+            trustedClientIds = oauthConfig.trustedClientIds,
         )
     val oauthPasskeySignIn =
         if (oauthPasskeySignInEnabled) {
@@ -278,6 +279,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     emailVerificationService = emailVerificationService,
                     deviceLinkService = deviceLinkService,
                     accessTokenVerifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
+                    oauthGrantRevoker = oauthAuthorizationService,
                 )
                 identityApiRoutes(
                     accountRepository = accountRepository,

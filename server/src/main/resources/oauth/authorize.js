@@ -39,7 +39,7 @@
 
     const expiredMessage = () =>
         new PageError(
-            `This sign-in link has expired. Go back to ${request.client_name} and start signing in again.`,
+            `This sign-in link has expired. Go back to ${request.client_label} and start signing in again.`,
             true,
         );
 
@@ -52,11 +52,14 @@
         });
         const payload = await response.json().catch(() => null);
         if (response.ok) return payload;
-        if (payload && payload.error === "access_denied" && payload.error_description) {
-            throw new PageError(payload.error_description);
-        }
+        const described = payload && payload.error_description;
+        if (payload && payload.error === "access_denied" && described) throw new PageError(described);
+        if (response.status === 429 && described) throw new PageError(described);
         if (payload && payload.error === "invalid_request") throw expiredMessage();
-        throw new PageError("Passkey sign-in isn't available right now. Try again in a moment.");
+        if (response.status === 501) {
+            throw new PageError("Passkey sign-in isn't turned on for this LogDate server. Go back to the app and choose another way to sign in.", true);
+        }
+        throw new PageError("Something went wrong on the LogDate server. Try again in a moment.");
     };
 
     const signIn = async () => {
@@ -87,7 +90,7 @@
                 },
             },
         });
-        show(`Signed in. Returning to ${request.client_name}…`, "success");
+        show(`Signed in. Returning to ${request.client_label}…`, "success");
         window.location.assign(approval.redirect_uri);
     };
 

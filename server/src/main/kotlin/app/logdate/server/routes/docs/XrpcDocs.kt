@@ -18,7 +18,6 @@ import studio.hypertext.atproto.pds.DescribeServerResponse
 import studio.hypertext.atproto.pds.EmptyPdsResponse
 import studio.hypertext.atproto.pds.ResolveHandleResponse
 import studio.hypertext.atproto.pds.SessionInfoResponse
-import studio.hypertext.atproto.syntax.Nsid
 
 /**
  * Documentation for the AT Protocol XRPC methods in `XrpcRoutes.kt`. Method names are lexicon IDs
@@ -86,9 +85,9 @@ internal object XrpcDocs {
             "Describe a repository",
             """
             `com.atproto.repo.describeRepo`. Returns a repository's handle, DID, DID document and the record
-            collections it contains. A *repository* is one person's signed, content-addressed store of records;
-            LogDate keeps entries, journals, links and drafts in it under the `studio.hypertext.logdate.*`
-            collections.
+            collections it contains. A *repository* is one person's signed, content-addressed store of records.
+            Anyone can call this, so the private LogDate journal collections (`studio.hypertext.logdate.*`) are
+            never listed; `collections` only names public ones and is empty for most accounts today.
             """,
         )
         request { repoParameter() }
@@ -99,13 +98,7 @@ internal object XrpcDocs {
                     handle = DocExamples.HANDLE,
                     did = did,
                     didDoc = IdentityDocs.didDocumentExample,
-                    collections =
-                        listOf(
-                            Nsid.require("studio.hypertext.logdate.content"),
-                            Nsid.require("studio.hypertext.logdate.journal"),
-                            Nsid.require("studio.hypertext.logdate.association"),
-                            Nsid.require("studio.hypertext.logdate.draft"),
-                        ),
+                    collections = emptyList(),
                     handleIsCorrect = true,
                 ),
             )

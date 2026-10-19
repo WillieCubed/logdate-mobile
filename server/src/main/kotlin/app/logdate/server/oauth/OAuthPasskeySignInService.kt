@@ -12,14 +12,17 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.URI
+import java.security.MessageDigest
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Lets a person approve another app's authorization request on the browser authorization page by
  * signing in with a passkey, so accounts without a password can still use their identity.
  *
  * Signing in with the passkey is the approval. The page never holds a session of its own: every
- * request is approved by its own passkey ceremony.
+ * request is approved by its own passkey ceremony, over a challenge that is only valid for that
+ * request.
  */
 @OptIn(ExperimentalUuidApi::class)
 class OAuthPasskeySignInService(
@@ -29,7 +32,14 @@ class OAuthPasskeySignInService(
     private val accountRepository: AccountRepository,
     private val identityService: AtprotoIdentityService,
 ) {
+    private val trustedClientIds = config.trustedClientIds
+
     init {
+        check(webAuthnService.strictVerificationEnabled) {
+            "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED is on, but passkey verification is not strict. Without " +
+                "WEBAUTHN_STRICT_VERIFICATION=true an assertion is not checked cryptographically, so anyone could approve " +
+                "apps on someone else's behalf. Turn strict verification on or turn the flag off."
+        }
         val relyingPartyId = webAuthnService.relyingPartyId
         val origin =
             checkNotNull(config.passkeySignInOrigin(relyingPartyId)) {
@@ -53,24 +63,31 @@ class OAuthPasskeySignInService(
                 .getOrElse { return OAuthPasskeyPage.RequestExpired }
         if (clientId != null && clientId != prompt.clientId) return OAuthPasskeyPage.ClientMismatch
 
+        val clientLabel = clientLabel(prompt.clientId, prompt.clientName)
         val hint = prompt.loginHint
         val hintedAccount = hint?.let { findHintedAccount(it) }
         if (hint != null && hintedAccount == null) {
-            return OAuthPasskeyPage.UnknownAccount(clientName = prompt.clientName, requestedAccount = displayAccount(hint))
+            return OAuthPasskeyPage.UnknownAccount(clientLabel = clientLabel, requestedAccount = displayAccount(hint))
         }
         return OAuthPasskeyPage.SignIn(
             requestUri = prompt.requestUri,
-            clientName = prompt.clientName,
+            clientLabel = clientLabel,
             clientAddress = clientAddress(prompt.clientId),
             accountHandle = hintedAccount?.handle,
+            canWrite = OAuthScopes.TRANSITION_GENERIC in OAuthScopes.parse(prompt.scope),
         )
     }
 
-    /** Issues a passkey challenge for [requestUri], limited to the hinted account's passkeys when there is one. */
+    /** Issues a passkey challenge that only approves [requestUri], limited to the hinted account's passkeys when there is one. */
     suspend fun options(requestUri: String): OAuthPasskeyOptionsResponse {
         val prompt = authorizationService.describeAuthorizationRequest(requestUri)
         val hintedAccount = prompt.loginHint?.let { findHintedAccount(it) }
-        val options = webAuthnService.generateAuthenticationOptions(userId = hintedAccount?.id)
+        val options =
+            webAuthnService.generateBoundAuthenticationOptions(
+                purpose = CHALLENGE_PURPOSE,
+                binding = challengeBinding(prompt.requestUri),
+                credentialOwner = hintedAccount?.id,
+            )
         return OAuthPasskeyOptionsResponse(
             challenge = options.challenge,
             rpId = webAuthnService.relyingPartyId,
@@ -93,7 +110,13 @@ class OAuthPasskeySignInService(
         credential: PasskeyAssertionResponse,
     ): String {
         val prompt = authorizationService.describeAuthorizationRequest(requestUri)
-        val verification = webAuthnService.verifyAuthentication(challenge, credential.toAuthenticationResponse())
+        val verification =
+            webAuthnService.verifyBoundAuthentication(
+                challenge = challenge,
+                authenticationResponse = credential.toAuthenticationResponse(),
+                purpose = CHALLENGE_PURPOSE,
+                binding = challengeBinding(prompt.requestUri),
+            )
         val accountId = verification.userId
         if (!verification.success || accountId == null) {
             Napier.w("Authorization page passkey sign-in failed for client ${prompt.clientId}: ${verification.error}")
@@ -112,8 +135,8 @@ class OAuthPasskeySignInService(
         if (hint != null && !loginHintMatches(hint, subjectDid = did, subjectHandle = handle)) {
             val requested = findHintedAccount(hint)?.handle?.let { "@$it" } ?: displayAccount(hint)
             throw OAuthAccessDeniedException(
-                "This passkey is for @$handle, but ${prompt.clientName} asked to sign in as $requested. " +
-                    "Use the passkey for $requested.",
+                "This passkey is for @$handle, but ${clientLabel(prompt.clientId, prompt.clientName)} asked to sign in as " +
+                    "$requested. Use the passkey for $requested.",
                 HttpStatusCode.Forbidden,
             )
         }
@@ -133,6 +156,10 @@ class OAuthPasskeySignInService(
     /** Cancels [requestUri] and returns the app's redirect URI carrying `error=access_denied`. */
     suspend fun deny(requestUri: String): String = authorizationService.denyAuthorization(requestUri)
 
+    /**
+     * Looks the hinted account up without creating anything: nobody has proven who they are yet,
+     * so the page and the challenge only read what already exists.
+     */
     private suspend fun findHintedAccount(loginHint: String): Account? {
         val hint = loginHint.trim().removePrefix("@").lowercase()
         val account =
@@ -141,8 +168,14 @@ class OAuthPasskeySignInService(
             } else {
                 accountRepository.findByHandle(hint)
             }
-        return account?.takeIf(Account::isActive)?.let { identityService.ensureIdentity(it) }
+        return account?.takeIf(Account::isActive)
     }
+
+    /** Names a trusted app by its own name and every other app by the client ID URL it cannot fake. */
+    private fun clientLabel(
+        clientId: String,
+        clientName: String,
+    ): String = if (clientId in trustedClientIds) clientName else clientId
 
     private fun failureMessage(error: String?): String =
         when (error) {
@@ -155,22 +188,35 @@ class OAuthPasskeySignInService(
         const val USER_VERIFICATION_REQUIRED = "required"
         const val DID_PREFIX = "did:"
 
+        /** Keeps authorization-page challenges apart from app sign-in challenges; fits the 20-character column. */
+        const val CHALLENGE_PURPOSE = "oauth_authorize"
+
         // Failure reasons reported by WebAuthnPasskeyService.verifyAuthentication.
         const val CREDENTIAL_NOT_FOUND = "Credential not found"
         const val INVALID_CHALLENGE = "Invalid challenge"
     }
 }
 
+/** A stable ID for [requestUri], so its challenge cannot be spent on any other request. */
+@OptIn(ExperimentalUuidApi::class)
+private fun challengeBinding(requestUri: String): Uuid =
+    Uuid.fromByteArray(MessageDigest.getInstance("SHA-256").digest(requestUri.toByteArray()).copyOf(UUID_BYTES))
+
+private const val UUID_BYTES = 16
+
 /** What the browser authorization page shows. */
 sealed interface OAuthPasskeyPage {
-    /** The request is valid: offer passkey sign-in to [clientName]. */
+    /** The request is valid: offer passkey sign-in to the app named [clientLabel]. */
     data class SignIn(
         val requestUri: String,
-        val clientName: String,
-        /** Where the app's client metadata lives, so a person can tell a real app from a look-alike name. */
+        /** The app's own name when it is trusted, otherwise its client ID URL. */
+        val clientLabel: String,
+        /** Where the app's client metadata lives, so a person can tell a real app from a look-alike. */
         val clientAddress: String,
         /** The account the app asked for, when it named one that exists here. */
         val accountHandle: String?,
+        /** Whether the request asks to publish records and upload files, not only to confirm the identity. */
+        val canWrite: Boolean,
     ) : OAuthPasskeyPage
 
     /** The request is unknown, already used, or expired. */
@@ -181,7 +227,7 @@ sealed interface OAuthPasskeyPage {
 
     /** The app asked for an account that is not hosted here. */
     data class UnknownAccount(
-        val clientName: String,
+        val clientLabel: String,
         val requestedAccount: String,
     ) : OAuthPasskeyPage
 }

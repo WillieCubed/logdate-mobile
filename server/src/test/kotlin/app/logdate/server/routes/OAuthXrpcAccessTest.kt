@@ -1,0 +1,272 @@
+package app.logdate.server.routes
+
+import app.logdate.server.AuthV1TestEnvironment
+import app.logdate.server.auth.Account
+import app.logdate.server.configureAuthV1TestApp
+import app.logdate.server.oauth.createDpopProof
+import app.logdate.server.oauth.generateP256KeyPair
+import app.logdate.server.oauth.publicJwk
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.server.testing.ApplicationTestBuilder
+import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+/**
+ * What an app signed in through OAuth may do with the account's repository: never anything in the
+ * LogDate journal, writes only with `transition:generic`, and no repository export.
+ */
+@OptIn(ExperimentalUuidApi::class)
+class OAuthXrpcAccessTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `journal collections look empty to an OAuth app but not to the owner`() =
+        testApplication {
+            val fixture = setUp()
+
+            val ownerList = fixture.bearerGet("/xrpc/com.atproto.repo.listRecords?repo=$HANDLE&collection=$CONTENT")
+            val appList = fixture.oauthGet("/xrpc/com.atproto.repo.listRecords?repo=$HANDLE&collection=$CONTENT", GENERIC)
+
+            assertEquals(1, ownerList.records())
+            assertEquals(HttpStatusCode.OK, appList.status)
+            assertEquals(0, appList.records())
+        }
+
+    @Test
+    fun `a journal record is not found for an OAuth app`() =
+        testApplication {
+            val fixture = setUp()
+            val path = "/xrpc/com.atproto.repo.getRecord?repo=$HANDLE&collection=$CONTENT&rkey=entry-1"
+
+            assertEquals(HttpStatusCode.OK, fixture.bearerGet(path).status)
+            val appRead = fixture.oauthGet(path, GENERIC)
+
+            assertEquals(HttpStatusCode.BadRequest, appRead.status)
+            assertTrue("RecordNotFound" in appRead.bodyAsText(), appRead.bodyAsText())
+        }
+
+    @Test
+    fun `an OAuth app cannot delete a journal record`() =
+        testApplication {
+            val fixture = setUp()
+
+            val delete =
+                fixture.oauthPost(
+                    "/xrpc/com.atproto.repo.deleteRecord",
+                    GENERIC,
+                    """{"repo":"$HANDLE","collection":"$CONTENT","rkey":"entry-1"}""",
+                )
+
+            assertEquals(HttpStatusCode.Forbidden, delete.status)
+            assertEquals(
+                HttpStatusCode.OK,
+                fixture.bearerGet("/xrpc/com.atproto.repo.getRecord?repo=$HANDLE&collection=$CONTENT&rkey=entry-1").status,
+            )
+        }
+
+    @Test
+    fun `the atproto scope alone does not allow writes or uploads`() =
+        testApplication {
+            val fixture = setUp()
+
+            val create =
+                fixture.oauthPost(
+                    "/xrpc/com.atproto.repo.createRecord",
+                    ATPROTO,
+                    """{"repo":"$HANDLE","collection":"com.example.note","record":{"text":"hi"}}""",
+                )
+            val upload = fixture.oauthPost("/xrpc/com.atproto.repo.uploadBlob", ATPROTO, "hello", ContentType.Text.Plain)
+
+            assertEquals(HttpStatusCode.Forbidden, create.status)
+            assertTrue("InsufficientScope" in create.bodyAsText(), create.bodyAsText())
+            assertEquals(HttpStatusCode.Forbidden, upload.status)
+        }
+
+    @Test
+    fun `transition generic allows uploads`() =
+        testApplication {
+            val fixture = setUp()
+
+            val upload = fixture.oauthPost("/xrpc/com.atproto.repo.uploadBlob", GENERIC, "hello", ContentType.Text.Plain)
+
+            assertEquals(HttpStatusCode.OK, upload.status, upload.bodyAsText())
+        }
+
+    @Test
+    fun `repository export commit status and blob reads are closed to OAuth apps`() =
+        testApplication {
+            val fixture = setUp()
+            val did = fixture.account.did!!
+            val paths =
+                listOf(
+                    "/xrpc/com.atproto.sync.getRepo?did=$did",
+                    "/xrpc/com.atproto.sync.getLatestCommit?did=$did",
+                    "/xrpc/com.atproto.sync.getRepoStatus?did=$did",
+                    "/xrpc/com.atproto.sync.getBlob?did=$did&cid=bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy",
+                )
+
+            paths.forEach { path ->
+                val response = fixture.oauthGet(path, GENERIC)
+                assertEquals(HttpStatusCode.Forbidden, response.status, "$path: ${response.bodyAsText()}")
+            }
+            assertEquals(HttpStatusCode.OK, fixture.bearerGet("/xrpc/com.atproto.sync.getLatestCommit?did=$did").status)
+        }
+
+    @Test
+    fun `a deactivated account's OAuth token stops working`() =
+        testApplication {
+            val fixture = setUp()
+            runBlocking { fixture.env.accountRepository.deactivateAccount(fixture.account.id) }
+
+            val upload = fixture.oauthPost("/xrpc/com.atproto.repo.uploadBlob", GENERIC, "hello", ContentType.Text.Plain)
+
+            assertEquals(HttpStatusCode.Unauthorized, upload.status)
+        }
+
+    @Test
+    fun `describing a repository never lists journal collections`() =
+        testApplication {
+            setUp()
+
+            val description = client.get("/xrpc/com.atproto.repo.describeRepo?repo=$HANDLE")
+
+            assertEquals(HttpStatusCode.OK, description.status)
+            val collections =
+                json
+                    .parseToJsonElement(description.bodyAsText())
+                    .jsonObject
+                    .getValue("collections")
+                    .jsonArray
+                    .map { it.jsonPrimitive.content }
+            assertFalse(collections.any { it.startsWith("studio.hypertext.logdate.") }, collections.toString())
+        }
+
+    private class Fixture(
+        val test: ApplicationTestBuilder,
+        val env: AuthV1TestEnvironment,
+        val account: Account,
+        val bearer: String,
+    ) {
+        private val dpopKey = generateP256KeyPair()
+
+        suspend fun bearerGet(path: String): HttpResponse = test.client.get(path) { header(HttpHeaders.Authorization, "Bearer $bearer") }
+
+        suspend fun oauthGet(
+            path: String,
+            scope: String,
+        ): HttpResponse {
+            val token = accessToken(scope)
+            return test.client.get(path) {
+                header(HttpHeaders.Authorization, "DPoP $token")
+                header("DPoP", proof("GET", path, token))
+            }
+        }
+
+        suspend fun oauthPost(
+            path: String,
+            scope: String,
+            body: String,
+            type: ContentType = ContentType.Application.Json,
+        ): HttpResponse {
+            val token = accessToken(scope)
+            return test.client.post(path) {
+                header(HttpHeaders.Authorization, "DPoP $token")
+                header("DPoP", proof("POST", path, token))
+                contentType(type)
+                setBody(body)
+            }
+        }
+
+        private fun accessToken(scope: String): String =
+            env.oauthAccessTokenService
+                .issueAccessToken(
+                    subjectDid = account.did!!,
+                    clientId = "https://viewer.example.com/client.json",
+                    scope = scope,
+                    keyThumbprint = env.oauthDpopVerifier.jwkThumbprint(publicJwk(dpopKey)),
+                ).token
+
+        private fun proof(
+            method: String,
+            path: String,
+            token: String,
+        ): String =
+            createDpopProof(
+                keyPair = dpopKey,
+                method = method,
+                htu = "http://localhost${path.substringBefore('?')}",
+                nonce = env.oauthNonceService.currentNonce(),
+                ath = env.oauthDpopVerifier.accessTokenHash(token),
+            )
+    }
+
+    private suspend fun HttpResponse.records(): Int =
+        json
+            .parseToJsonElement(bodyAsText())
+            .jsonObject
+            .getValue("records")
+            .jsonArray.size
+
+    private suspend fun ApplicationTestBuilder.setUp(): Fixture {
+        val env = configureAuthV1TestApp()
+        val account =
+            runBlocking {
+                val saved =
+                    env.accountRepository.save(
+                        Account(id = Uuid.random(), username = "alice", displayName = "Alice", createdAt = Clock.System.now()),
+                    )
+                env.atprotoIdentityService.ensureIdentity(saved)
+            }
+        val bearer = env.tokenService.generateAccessToken(account.id.toString())
+        val created =
+            client.post("/xrpc/com.atproto.repo.createRecord") {
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer $bearer")
+                setBody(
+                    """
+                    {
+                      "repo": "$HANDLE",
+                      "collection": "$CONTENT",
+                      "rkey": "entry-1",
+                      "record": {
+                        "${'$'}type": "$CONTENT",
+                        "type": "TEXT",
+                        "content": "a private journal entry",
+                        "createdAt": 1,
+                        "lastUpdated": 1
+                      }
+                    }
+                    """.trimIndent(),
+                )
+            }
+        check(created.status == HttpStatusCode.OK) { "Seeding the journal failed: ${created.bodyAsText()}" }
+        return Fixture(this, env, account, bearer)
+    }
+
+    private companion object {
+        const val HANDLE = "alice.logdate.app"
+        const val CONTENT = "studio.hypertext.logdate.content"
+        const val ATPROTO = "atproto"
+        const val GENERIC = "atproto transition:generic"
+    }
+}

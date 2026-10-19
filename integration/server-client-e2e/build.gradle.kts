@@ -60,6 +60,8 @@ tasks.withType<Test>().configureEach {
     // The server reads its feature flags from the environment, so the in-process test server needs these set.
     environment("LOGDATE_PERSONAL_SPACE_ENABLED", "true")
     environment("LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED", "true")
+    // The authorization page refuses to run without cryptographic passkey checks; the fixtures sign real ceremonies.
+    environment("WEBAUTHN_STRICT_VERIFICATION", "true")
     if (System.getenv("LOGDATE_LARGE_BACKUP_TEST") == "1") {
         maxHeapSize = "512m"
     }

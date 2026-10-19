@@ -28,6 +28,9 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+private const val AUTHENTICATION_TYPE = "authentication"
+private const val REGISTRATION_TYPE = "registration"
+
 /** Matches the `passkeys.nickname` column width. */
 private const val MAX_NICKNAME_LENGTH = 100
 
@@ -44,7 +47,8 @@ class WebAuthnPasskeyService(
     val relyingPartyId: String = "logdate.app",
     private val relyingPartyName: String = "LogDate",
     private val origins: Set<String> = setOf("https://app.logdate.com"),
-    private val strictVerificationEnabled: Boolean =
+    /** Whether assertions and attestations are checked cryptographically with WebAuthn4J. */
+    val strictVerificationEnabled: Boolean =
         profileAwareBoolEnv(
             name = "WEBAUTHN_STRICT_VERIFICATION",
             productionDefault = true,
@@ -119,7 +123,7 @@ class WebAuthnPasskeyService(
         displayName: String,
         excludeCredentials: List<String> = emptyList(),
     ): PasskeyRegistrationOptions {
-        val challenge = challengeStore.issue(userId, "registration")
+        val challenge = challengeStore.issue(userId, REGISTRATION_TYPE)
 
         return PasskeyRegistrationOptions(
             challenge = challenge,
@@ -147,7 +151,7 @@ class WebAuthnPasskeyService(
         userId: Uuid? = null,
         allowedCredentials: List<String> = emptyList(),
     ): PasskeyAuthenticationOptions {
-        val challenge = challengeStore.issue(userId ?: Uuid.random(), "authentication")
+        val challenge = challengeStore.issue(userId ?: Uuid.random(), AUTHENTICATION_TYPE)
 
         val allowCredentials =
             when {
@@ -244,11 +248,45 @@ class WebAuthnPasskeyService(
     fun verifyAuthentication(
         challenge: String,
         authenticationResponse: PasskeyAuthenticationResponse,
+    ): AuthenticationResult = verifyAuthentication(challenge, authenticationResponse, AUTHENTICATION_TYPE, expectedBinding = null)
+
+    /**
+     * Issues a challenge that only [verifyBoundAuthentication] with the same [purpose] and
+     * [binding] accepts, so it cannot be spent on any other sign-in. [credentialOwner] limits the
+     * allowed credentials to that account's passkeys; `null` allows any discoverable passkey.
+     */
+    fun generateBoundAuthenticationOptions(
+        purpose: String,
+        binding: Uuid,
+        credentialOwner: Uuid?,
+    ): PasskeyAuthenticationOptions {
+        require(purpose != AUTHENTICATION_TYPE && purpose != REGISTRATION_TYPE) { "A bound challenge needs its own purpose" }
+        return PasskeyAuthenticationOptions(
+            challenge = challengeStore.issue(binding, purpose),
+            rpId = relyingPartyId,
+            allowCredentials = credentialOwner?.let(::getUserCredentials).orEmpty(),
+            timeout = 300_000L,
+        )
+    }
+
+    /** Verifies an assertion over a challenge from [generateBoundAuthenticationOptions] with the same [purpose] and [binding]. */
+    fun verifyBoundAuthentication(
+        challenge: String,
+        authenticationResponse: PasskeyAuthenticationResponse,
+        purpose: String,
+        binding: Uuid,
+    ): AuthenticationResult = verifyAuthentication(challenge, authenticationResponse, purpose, binding)
+
+    private fun verifyAuthentication(
+        challenge: String,
+        authenticationResponse: PasskeyAuthenticationResponse,
+        expectedType: String,
+        expectedBinding: Uuid?,
     ): AuthenticationResult =
         if (strictVerificationEnabled) {
-            verifyAuthenticationStrict(challenge, authenticationResponse)
+            verifyAuthenticationStrict(challenge, authenticationResponse, expectedType, expectedBinding)
         } else {
-            verifyAuthenticationSimplified(challenge, authenticationResponse)
+            verifyAuthenticationSimplified(challenge, authenticationResponse, expectedType, expectedBinding)
         }
 
     fun getPasskeysForUser(userId: Uuid): List<PasskeyInfo> = runBlocking { passkeyRepository.getPasskeysForUser(userId) }
@@ -273,7 +311,7 @@ class WebAuthnPasskeyService(
         return try {
             challengeStore.consume(
                 challenge = challenge,
-                expectedType = "registration",
+                expectedType = REGISTRATION_TYPE,
                 expectedUserId = userId,
             ) ?: return VerificationOutcome.Failure("Invalid challenge")
 
@@ -308,7 +346,7 @@ class WebAuthnPasskeyService(
         return try {
             challengeStore.consume(
                 challenge = challenge,
-                expectedType = "registration",
+                expectedType = REGISTRATION_TYPE,
                 expectedUserId = userId,
             ) ?: return VerificationOutcome.Failure("Invalid challenge")
 
@@ -379,12 +417,14 @@ class WebAuthnPasskeyService(
     private fun verifyAuthenticationSimplified(
         challenge: String,
         authenticationResponse: PasskeyAuthenticationResponse,
+        expectedType: String,
+        expectedBinding: Uuid?,
     ): AuthenticationResult {
         return try {
             challengeStore.consume(
                 challenge = challenge,
-                expectedType = "authentication",
-                expectedUserId = null,
+                expectedType = expectedType,
+                expectedUserId = expectedBinding,
             ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
 
             val (userId, storedData) =
@@ -404,12 +444,14 @@ class WebAuthnPasskeyService(
     private fun verifyAuthenticationStrict(
         challenge: String,
         authenticationResponse: PasskeyAuthenticationResponse,
+        expectedType: String,
+        expectedBinding: Uuid?,
     ): AuthenticationResult {
         return try {
             challengeStore.consume(
                 challenge = challenge,
-                expectedType = "authentication",
-                expectedUserId = null,
+                expectedType = expectedType,
+                expectedUserId = expectedBinding,
             ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
 
             val credentialIdBytes =
