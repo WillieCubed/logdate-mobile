@@ -21,16 +21,19 @@
           "resource": "space",
           "spaceType": "app.logdate.space.personal",
           "manage": [
-            "create",
-            "update",
-            "delete"
+            "create"
           ]
         },
         {
           "type": "permission",
           "resource": "space",
           "spaceType": "app.logdate.space.circle",
-          "authority": "*",
+          "authority": "*"
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "app.logdate.space.circle",
           "manage": [
             "create",
             "update",
@@ -41,7 +44,12 @@
           "type": "permission",
           "resource": "space",
           "spaceType": "app.logdate.space.group",
-          "authority": "*",
+          "authority": "*"
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "app.logdate.space.group",
           "manage": [
             "create",
             "update",

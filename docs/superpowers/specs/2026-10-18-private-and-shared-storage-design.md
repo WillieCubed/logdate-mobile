@@ -265,17 +265,15 @@ space.
 ### 6. Space declarations
 
 Spaces declares a space type as a lexicon whose `main` definition has `"type": "space"`. The schema
-tools don't support that yet. That work is the existing task "Support permission sets and Spaces in
-the schema tools". Until it lands, `app.logdate.space.defs` stays as tokens.
+tools support these declarations, and `app.logdate.space.defs` and its tokens are gone:
 
-When it lands:
-
-- `app.logdate.space.personal`, `app.logdate.space.circle` and `app.logdate.space.group` become
-  space declarations;
-- the group's own description record moves from `app.logdate.space.group` to
+- `app.logdate.space.personal`, `app.logdate.space.circle` and `app.logdate.space.group` are space
+  declarations;
+- the group's own description record moved from `app.logdate.space.group` to
   `app.logdate.space.groupProfile`.
 
-Nothing is published yet, so these renames are free.
+Nothing was published, so these renames were free. The declarations and the permission sets that
+grant them are described in [LogDate lexicons](../../reference/lexicons.md#space-declarations).
 
 ## Found along the way
 
