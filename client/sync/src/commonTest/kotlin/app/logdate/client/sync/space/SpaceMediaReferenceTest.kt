@@ -1,5 +1,6 @@
 package app.logdate.client.sync.space
 
+import app.logdate.lexicon.app.logdate.DefsAspectRatio
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -40,7 +41,28 @@ class SpaceMediaReferenceTest {
         assertEquals("video/mp4", media.mimeType)
         assertEquals(4_096, media.size)
         assertEquals("A lake", media.alt)
-        assertEquals(withSize, SpaceMediaReference.fromMedia(contentId, media))
+        assertEquals(withSize.copy(alt = "A lake"), SpaceMediaReference.fromMedia(contentId, media))
+    }
+
+    @Test
+    fun `a file's text alternative and aspect ratio stay with its reference`() {
+        val reference =
+            SpaceMediaReference(
+                helloWorldCid,
+                contentId,
+                "image/jpeg",
+                storedSize = 4_131,
+                size = 4_096,
+                alt = "A lake & a pier, 100% calm; \"still\" 🌅",
+                aspectRatio = DefsAspectRatio(height = 3, width = 4),
+            )
+
+        assertEquals(reference, SpaceMediaReference.parse(reference.format()))
+        val media = reference.toMedia("app.logdate.journal.entry/n1")
+        assertEquals(reference.alt, media.alt)
+        assertEquals(DefsAspectRatio(height = 3, width = 4), media.aspectRatio)
+        assertEquals(reference, SpaceMediaReference.fromMedia(contentId, media))
+        assertNull(SpaceMediaReference.parse(reference.format().replace("ratio=4x3", "ratio=4x0")))
     }
 
     @Test
