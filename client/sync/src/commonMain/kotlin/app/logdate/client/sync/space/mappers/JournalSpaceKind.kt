@@ -1,5 +1,6 @@
 package app.logdate.client.sync.space.mappers
 
+import app.logdate.client.repository.journals.JournalMergeOperation
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.conflict.ConflictResolution
 import app.logdate.client.sync.conflict.ConflictResolver
@@ -70,8 +71,22 @@ private class StoredJournals(
     private val journals: SyncableJournalRepository,
     override val conflictResolver: ConflictResolver<SpaceJournal>,
 ) : SpaceLocalRecords<SpaceJournal> {
-    override suspend fun load(entityId: String): SpaceJournal? =
-        Uuid.parseOrNull(entityId)?.let { journals.getJournalById(it) }?.let { SpaceJournal(it) }
+    /**
+     * The journal with this id, or the merge that retired it. The repository answers for a retired
+     * journal with the journal it was merged into, so a merge this device hasn't sent yet is
+     * looked for first, and nothing else is read as another journal's record.
+     */
+    override suspend fun load(entityId: String): SpaceJournal? {
+        val id = Uuid.parseOrNull(entityId) ?: return null
+        journals.pendingJournalMerges().firstOrNull { it.sourceId == id }?.let { return mergedSource(it) }
+        return journals.getJournalById(id)?.takeIf { it.id == id }?.let { SpaceJournal(it) }
+    }
+
+    private suspend fun mergedSource(merge: JournalMergeOperation): SpaceJournal {
+        val source = merge.source ?: Journal(id = merge.sourceId, title = merge.sourceTitle)
+        val survivor = journals.resolveJournalId(merge.sourceId).takeIf { it != merge.sourceId } ?: merge.destinationId
+        return SpaceJournal(source, mergedInto = survivor)
+    }
 
     override fun lastUpdatedOf(item: SpaceJournal): Instant = item.journal.lastUpdated
 
