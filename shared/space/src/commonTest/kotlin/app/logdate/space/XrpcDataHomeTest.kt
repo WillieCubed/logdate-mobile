@@ -29,6 +29,8 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -352,6 +354,81 @@ class XrpcDataHomeTest {
 
             assertEquals(false, found)
             assertEquals(0L, sink.size)
+        }
+
+    @Test
+    fun `every method reports a rate limit with the seconds to wait`() =
+        runTest {
+            val home =
+                failingHome {
+                    respond(
+                        """{"error":"RateLimitExceeded","message":"Too many requests. Try again in 30 seconds."}""",
+                        HttpStatusCode.TooManyRequests,
+                        headersOf(HttpHeaders.ContentType to listOf("application/json"), HttpHeaders.RetryAfter to listOf("30")),
+                    )
+                }
+            val calls: List<suspend () -> Unit> =
+                listOf(
+                    { home.putRecord(space, "abc", sealed) },
+                    { home.deleteRecord(space, "abc") },
+                    { home.getRecord(space, "abc") },
+                    { home.listChanges(space, since = 0) },
+                    { home.uploadBlob(space, byteArrayOf(1)) },
+                    { home.getBlob(space, "bafyblob") },
+                )
+            calls.forEach { call ->
+                val limited = assertFailsWith<DataHomeRateLimitedException> { call() }
+                assertEquals(30L, limited.retryAfterSeconds)
+                assertEquals("Too many requests. Try again in 30 seconds.", limited.message)
+                assertEquals(429, assertIs<XrpcProtocolException>(limited.cause).statusCode)
+            }
+        }
+
+    @Test
+    fun `a rate limit without Retry-After has no wait`() =
+        runTest {
+            val limited =
+                assertFailsWith<DataHomeRateLimitedException> {
+                    home(HttpStatusCode.TooManyRequests, """{"error":"RateLimitExceeded","message":"slow down"}""").getRecord(space, "abc")
+                }
+            assertNull(limited.retryAfterSeconds)
+        }
+
+    @Test
+    fun `writes and uploads past the storage quota report it`() =
+        runTest {
+            val body = """{"error":"QuotaExceeded","message":"Storage quota exceeded: 10 of 10 bytes in use."}"""
+            val record =
+                assertFailsWith<DataHomeQuotaExceededException> {
+                    home(
+                        HttpStatusCode.PaymentRequired,
+                        body,
+                    ).putRecord(space, "abc", sealed)
+                }
+            assertFalse("10 of 10" in record.message.orEmpty(), "the server's wording never reaches the app")
+            assertEquals("QuotaExceeded", assertIs<XrpcProtocolException>(record.cause).error)
+            assertFailsWith<DataHomeQuotaExceededException> { home(HttpStatusCode.PaymentRequired, body).uploadBlob(space, byteArrayOf(1)) }
+        }
+
+    @Test
+    fun `file transfers report a busy server with the seconds to wait`() =
+        runTest {
+            val home =
+                failingHome {
+                    respond(
+                        """{"error":"ServerBusy","message":"The server is busy with other file transfers. Try again in 5 seconds."}""",
+                        HttpStatusCode.ServiceUnavailable,
+                        headersOf(HttpHeaders.ContentType to listOf("application/json"), HttpHeaders.RetryAfter to listOf("5")),
+                    )
+                }
+            listOf<suspend () -> Unit>(
+                { home.uploadBlob(space, byteArrayOf(1)) },
+                { home.getBlob(space, "bafyblob") },
+            ).forEach { call ->
+                val busy = assertFailsWith<DataHomeBusyException> { call() }
+                assertEquals(5L, busy.retryAfterSeconds)
+                assertEquals(503, assertIs<XrpcProtocolException>(busy.cause).statusCode)
+            }
         }
 
     @Test

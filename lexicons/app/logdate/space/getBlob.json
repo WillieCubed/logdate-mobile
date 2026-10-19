@@ -17,7 +17,11 @@
       "output": {
         "encoding": "*/*"
       },
-      "errors": [{ "name": "BlobNotFound" }]
+      "errors": [
+        { "name": "BlobNotFound" },
+        { "name": "RateLimitExceeded", "description": "The account sent too many requests of this kind recently. Wait the seconds in the Retry-After header, then retry. Record writes, reads and blob uploads are counted separately." },
+        { "name": "ServerBusy", "description": "The server is already moving as many files as it can hold. Wait the seconds in the Retry-After header, then retry. It isn't counted against the account." }
+      ]
     }
   }
 }

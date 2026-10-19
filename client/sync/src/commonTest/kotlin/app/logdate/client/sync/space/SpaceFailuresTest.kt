@@ -6,7 +6,10 @@ import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.FakeJournalRepository
+import app.logdate.space.DataHomeBusyException
 import app.logdate.space.DataHomeConflictException
+import app.logdate.space.DataHomeQuotaExceededException
+import app.logdate.space.DataHomeRateLimitedException
 import studio.hypertext.atproto.xrpc.XrpcProtocolException
 import studio.hypertext.atproto.xrpc.XrpcSerializationException
 import studio.hypertext.atproto.xrpc.XrpcTransportException
@@ -33,6 +36,23 @@ class SpaceFailuresTest {
 
         assertEquals(30_000L, failure.retryAfterMillis)
         assertEquals(SyncErrorType.SERVER_ERROR, failure.spaceErrorType())
+    }
+
+    @Test
+    fun `the data home's typed refusals are reported as the failures they wrap`() {
+        val limited = XrpcProtocolException(429, "RateLimitExceeded", retryAfterSeconds = 30)
+        val busy = XrpcProtocolException(503, "ServerBusy", retryAfterSeconds = 5)
+        val full = XrpcProtocolException(402, "QuotaExceeded")
+
+        assertEquals(
+            30_000L,
+            assertIs<CloudApiException>(translateSpaceFailure(DataHomeRateLimitedException("slow", 30, limited))).retryAfterMillis,
+        )
+        assertEquals(5_000L, assertIs<CloudApiException>(translateSpaceFailure(DataHomeBusyException("busy", 5, busy))).retryAfterMillis)
+        assertEquals(
+            STORAGE_QUOTA_EXCEEDED,
+            assertIs<CloudApiException>(translateSpaceFailure(DataHomeQuotaExceededException(full))).errorCode,
+        )
     }
 
     @Test

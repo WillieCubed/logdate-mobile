@@ -88,6 +88,48 @@ internal object XrpcSpaceDocs {
             "`swapCid` or `createOnly` no longer matches the stored record: another device wrote in between. Read it again and retry.",
             "The record changed",
         )
+    private val rateLimited =
+        ErrorCase(
+            "RateLimitExceeded",
+            "This account has sent too many requests of this kind in the last minute. Wait the number of seconds in " +
+                "the `Retry-After` header, then retry. Record writes, reads and blob uploads are counted separately, " +
+                "and each allows far more than a device syncing as fast as it can.",
+            "Too many requests. Try again in 12 seconds.",
+        )
+    private val quotaExceeded =
+        ErrorCase(
+            "QuotaExceeded",
+            "Storing this would take the account past its storage quota. Writes that store no more than they " +
+                "replace, and deletes, still work. Free space or change plans, then retry.",
+            "Storage quota exceeded: 5368709120 of 5368709120 bytes in use.",
+        )
+    private val uploadQuotaExceeded =
+        ErrorCase(
+            "QuotaExceeded",
+            "The upload's `Content-Length` doesn't fit in what's left of the account's storage quota, counting " +
+                "other uploads in progress, or the file didn't fit once received. Free space or change plans, then retry.",
+            "Storage quota exceeded: 5368709120 of 5368709120 bytes in use.",
+        )
+    private val lengthRequired =
+        ErrorCase(
+            "LengthRequired",
+            "The upload had no `Content-Length` header. The server holds the file's room against the storage quota " +
+                "before it receives anything, so it needs to know the length first. Send the length with the request.",
+            "Send the file's length in a Content-Length header",
+        )
+    private val uploadStalled =
+        ErrorCase(
+            "UploadStalled",
+            "The upload sent nothing for too long, so the server ended it and freed its place. Send the file again.",
+            "The upload sent nothing for too long; send it again",
+        )
+    private val serverBusy =
+        ErrorCase(
+            "ServerBusy",
+            "This server instance is already moving as many files as it can hold. Wait the number of seconds in the " +
+                "`Retry-After` header, then retry. It isn't counted against the account.",
+            "The server is busy with other file transfers. Try again in 5 seconds.",
+        )
     private val notEnabled =
         ErrorCase(
             "MethodNotImplemented",
@@ -132,11 +174,13 @@ internal object XrpcSpaceDocs {
                 recordNotFound,
             )
             pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
+            pdsError(HttpStatusCode.PaymentRequired, quotaExceeded)
             pdsError(HttpStatusCode.Conflict, swapConflict)
             pdsError(
                 HttpStatusCode.PayloadTooLarge,
                 ErrorCase("RecordTooLarge", "The request is larger than the largest sealed record can be.", "The record is too large"),
             )
+            pdsError(HttpStatusCode.TooManyRequests, rateLimited)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
@@ -176,6 +220,7 @@ internal object XrpcSpaceDocs {
                 HttpStatusCode.PayloadTooLarge,
                 ErrorCase("RecordTooLarge", "The request is larger than 16 KiB, far more than a delete needs.", "The request is too large"),
             )
+            pdsError(HttpStatusCode.TooManyRequests, rateLimited)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
@@ -210,6 +255,7 @@ internal object XrpcSpaceDocs {
                 recordNotFound,
             )
             pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
+            pdsError(HttpStatusCode.TooManyRequests, rateLimited)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
@@ -271,6 +317,7 @@ internal object XrpcSpaceDocs {
                 ),
             )
             pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
+            pdsError(HttpStatusCode.TooManyRequests, rateLimited)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
@@ -284,8 +331,10 @@ internal object XrpcSpaceDocs {
             `app.logdate.space.uploadBlob`. Stores an encrypted file, such as a photo sealed on the device, and
             returns the blob reference to keep inside a sealed record. Send the raw bytes as the body. List the
             CID in `blobs` when you store the record: blobs that no record refers to are deleted by periodic
-            cleanup. Uploading bytes the space already holds stores them once. Only the space's owner can upload,
-            with a LogDate access token: any other space answers `BlobNotFound`.
+            cleanup. Uploading bytes the space already holds stores them once and doesn't count against the
+            storage quota again, though the upload's `Content-Length` must still fit in what's left of the
+            quota while it's received. Only the space's owner can upload, with a LogDate access token: any
+            other space answers `BlobNotFound`.
             """,
         )
         request {
@@ -305,11 +354,16 @@ internal object XrpcSpaceDocs {
             )
             pdsError(HttpStatusCode.BadRequest, invalidSpace, blobNotFound)
             pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
+            pdsError(HttpStatusCode.LengthRequired, lengthRequired)
+            pdsError(HttpStatusCode.PaymentRequired, uploadQuotaExceeded)
+            pdsError(HttpStatusCode.RequestTimeout, uploadStalled)
             pdsError(
                 HttpStatusCode.PayloadTooLarge,
                 ErrorCase("BlobTooLarge", "The file is larger than 100 MiB.", "Blobs can be at most 104857600 bytes"),
             )
+            pdsError(HttpStatusCode.TooManyRequests, rateLimited)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
+            pdsError(HttpStatusCode.ServiceUnavailable, serverBusy)
         }
     }
 
@@ -347,7 +401,9 @@ internal object XrpcSpaceDocs {
                 blobNotFound,
             )
             pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
+            pdsError(HttpStatusCode.TooManyRequests, rateLimited)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
+            pdsError(HttpStatusCode.ServiceUnavailable, serverBusy)
         }
     }
 

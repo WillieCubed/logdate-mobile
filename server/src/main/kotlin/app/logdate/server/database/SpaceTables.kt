@@ -77,3 +77,16 @@ object SpaceBlobsTable : Table("space_blobs") {
         index("idx_space_blobs_created", false, createdAt)
     }
 }
+
+/** Room held against an account's quota while an upload is in progress; it stops counting at [expiresAt]. */
+object SpaceUploadReservationsTable : Table("space_upload_reservations") {
+    val id = javaUUID("id")
+    val accountId = javaUUID("account_id").references(AccountsTable.id, onDelete = ReferenceOption.CASCADE)
+    val bytes = long("bytes")
+    val expiresAt = timestamp("expires_at")
+    override val primaryKey = PrimaryKey(id)
+
+    init {
+        index("idx_space_upload_reservations_account", false, accountId)
+    }
+}

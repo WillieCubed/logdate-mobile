@@ -26,7 +26,10 @@
           }
         }
       },
-      "errors": [{ "name": "RecordNotFound" }]
+      "errors": [
+        { "name": "RecordNotFound" },
+        { "name": "RateLimitExceeded", "description": "The account sent too many requests of this kind recently. Wait the seconds in the Retry-After header, then retry. Record writes, reads and blob uploads are counted separately." }
+      ]
     }
   }
 }

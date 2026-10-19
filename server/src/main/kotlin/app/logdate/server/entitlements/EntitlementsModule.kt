@@ -50,5 +50,7 @@ fun entitlementsModule(
 internal object UnlimitedUsageCalculator : UsageCalculator {
     override suspend fun storageBytes(accountId: java.util.UUID): Long = 0L
 
+    override suspend fun storageBytesOutsideSpaces(accountId: java.util.UUID): Long = 0L
+
     override suspend fun backupCount(accountId: java.util.UUID): Int = 0
 }

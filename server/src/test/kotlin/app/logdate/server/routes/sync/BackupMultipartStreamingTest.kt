@@ -17,9 +17,11 @@ import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.writeFully
 import io.ktor.utils.io.writeStringUtf8
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.time.Duration.Companion.milliseconds
 
 class BackupMultipartStreamingTest {
     @Test
@@ -103,6 +105,45 @@ class BackupMultipartStreamingTest {
             val response = client.post("/backup") { setBody(backupBody(1, manifestBytes = 300 * 1024)) }
             assertEquals(HttpStatusCode.BadRequest, response.status)
         }
+
+    @Test
+    fun `an upload whose client stops sending is ended with a timeout and leaves no file behind`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    post("/backup") {
+                        val parsed = call.receiveBackupMultipartFile(idleTimeout = 300.milliseconds) ?: return@post
+                        deletePrivateBackupTempFile(parsed.path)
+                        call.respondText("unexpected acceptance")
+                    }
+                }
+            }
+            val before = backupTempFiles()
+            val response =
+                client.post("/backup") {
+                    setBody(
+                        object : OutgoingContent.WriteChannelContent() {
+                            override val contentType = ContentType.MultiPart.FormData.withParameter("boundary", "stall")
+
+                            override suspend fun writeTo(channel: ByteWriteChannel) {
+                                channel.writeStringUtf8("--stall\r\nContent-Disposition: form-data; name=\"deviceId\"\r\n\r\nphone")
+                                channel.flush()
+                                delay(5_000)
+                            }
+                        },
+                    )
+                }
+            assertEquals(HttpStatusCode.RequestTimeout, response.status, response.bodyAsText())
+            assertEquals(before, backupTempFiles())
+        }
+
+    private fun backupTempFiles(): Set<String> =
+        java.io
+            .File(System.getProperty("java.io.tmpdir"))
+            .list { _, name -> name.startsWith("logdate-backup-upload-") }
+            .orEmpty()
+            .toSet()
 
     private fun backupBody(
         size: Long,

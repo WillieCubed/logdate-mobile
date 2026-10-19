@@ -50,6 +50,53 @@ class FilesystemLogDateBlobStorage(
         return relative
     }
 
+    override fun openBlob(storagePath: String): LogDateBlobStream? {
+        val file = rootPath.resolve(storagePath)
+        val input =
+            try {
+                Files.newInputStream(file)
+            } catch (_: NoSuchFileException) {
+                return null
+            }
+        return try {
+            LogDateBlobStream(Files.size(file), input)
+        } catch (error: Exception) {
+            input.close()
+            throw error
+        }
+    }
+
+    override fun openBlobWriter(request: LogDateBlobStreamRequest): LogDateBlobWriter {
+        val relative = relativePath(request.namespace, request.ownerId.toString(), request.blobId)
+        val absolute = rootPath.resolve(relative)
+        absolute.parent.createDirectories()
+        val pending = Files.createTempFile(absolute.parent, ".logdate-blob-", ".pending")
+        val output = ChecksummingOutputStream(Files.newOutputStream(pending).buffered())
+        return object : LogDateBlobWriter {
+            override val storagePath = relative
+            override val output = output
+
+            override fun commit() {
+                output.close()
+                if (Files.size(pending) != output.size) {
+                    Files.deleteIfExists(pending)
+                    throw LogDateBlobIntegrityException("Stored size differs from bytes written")
+                }
+                try {
+                    Files.move(pending, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(pending, absolute, StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+
+            override fun abort() {
+                runCatching { output.close() }
+                Files.deleteIfExists(pending)
+                Files.deleteIfExists(absolute)
+            }
+        }
+    }
+
     override fun getBlobFile(
         storagePath: String,
         destination: Path,

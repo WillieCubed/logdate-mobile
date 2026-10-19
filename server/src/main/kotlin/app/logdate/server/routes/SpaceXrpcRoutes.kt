@@ -6,53 +6,44 @@ import app.logdate.lexicon.app.logdate.space.GetRecordOutput
 import app.logdate.lexicon.app.logdate.space.ListRepoOpsChange
 import app.logdate.lexicon.app.logdate.space.ListRepoOpsOutput
 import app.logdate.lexicon.app.logdate.space.PutRecordOutput
-import app.logdate.lexicon.app.logdate.space.UploadBlobOutput
 import app.logdate.server.auth.Account
 import app.logdate.server.database.toJavaUUID
-import app.logdate.server.logdate.LogDateBlobNamespace
+import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.logdate.LogDateBlobStorage
-import app.logdate.server.logdate.LogDateBlobWriteRequest
+import app.logdate.server.ratelimit.FixedWindowRateLimiter
 import app.logdate.server.routes.docs.XrpcSpaceDocs
 import app.logdate.server.space.MAX_SPACE_CHANGES_LIMIT
-import app.logdate.server.space.SpaceBlob
 import app.logdate.server.space.SpaceCursorTooOldException
 import app.logdate.server.space.SpaceInvalidRecordException
 import app.logdate.server.space.SpaceMissingBlobException
+import app.logdate.server.space.SpaceQuotaExceededException
 import app.logdate.server.space.SpaceRecordWrite
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.space.SpaceSwapException
 import app.logdate.server.space.checkSealedRecord
+import app.logdate.server.transfer.TransferSlots
 import app.logdate.space.SpaceRef
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.request.receiveChannel
-import io.ktor.server.response.header
 import io.ktor.server.response.respond
-import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
 import io.ktor.utils.io.readRemaining
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
-import studio.hypertext.atproto.lexicon.data.Blob
-import studio.hypertext.atproto.lexicon.data.CidLink
 import studio.hypertext.atproto.pds.PdsErrorResponse
 import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.syntax.RecordKey
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /** The largest blob a space accepts. */
 internal const val MAX_SPACE_BLOB_BYTES: Long = 100L * 1024 * 1024
@@ -69,9 +60,8 @@ private const val MAX_RECORD_BLOBS = 64
 /** CIDs are stored in 255-character columns, so a longer value can't name anything. */
 private const val MAX_CID_LENGTH = 255
 private const val RECORD_NOT_FOUND = "RecordNotFound"
-private const val BLOB_NOT_FOUND = "BlobNotFound"
+internal const val BLOB_NOT_FOUND = "BlobNotFound"
 private const val CURSOR_TOO_OLD = "CursorTooOld"
-private const val SPACE_BLOB_MIME_TYPE = "application/octet-stream"
 
 private val spaceJson = Json { ignoreUnknownKeys = true }
 
@@ -105,34 +95,88 @@ internal data class SpaceDeleteRecordInput(
  * answers `501 MethodNotImplemented`; the blob methods also need [blobStorage]. Every method checks
  * the access token first, so a caller without one gets `401` whether or not the feature is on.
  * Blobs larger than [maxBlobBytes] answer `413 BlobTooLarge`.
+ *
+ * Each account's requests are counted against [rateLimits] by [rateLimiter]; past a budget, a method
+ * answers `429 RateLimitExceeded` with `Retry-After`. With an [entitlementEnforcer], a record write
+ * or blob upload that would take the account past its storage quota answers `402 QuotaExceeded`; the
+ * store checks it in the same transaction as the write. Blob transfers past this instance's
+ * [transfers] answer `503 ServerBusy` with `Retry-After`, without spending a budget.
  */
 fun Route.spaceXrpcRoutes(
     enabled: Boolean,
     store: SpaceStore?,
     blobStorage: LogDateBlobStorage?,
     auth: LogDateAccountAuth,
+    entitlementEnforcer: EntitlementEnforcer? = null,
+    rateLimiter: FixedWindowRateLimiter = FixedWindowRateLimiter(),
+    rateLimits: SpaceRateLimits = SpaceRateLimits(),
+    transfers: TransferSlots = TransferSlots(),
     maxBlobBytes: Long = MAX_SPACE_BLOB_BYTES,
 ) {
     val records = store?.takeIf { enabled }
-    val objects = blobStorage?.takeIf { records != null }
+    val blobs = records?.let { recordStore -> blobStorage?.let { SpaceObjects(recordStore, it, transfers) } }
+    val gate = SpaceGate(auth, rateLimiter, rateLimits)
     route("/xrpc") {
-        putRecord(records, auth)
-        deleteRecord(records, auth)
-        getRecord(records, auth)
-        listRepoOps(records, auth)
-        uploadBlob(records, objects, auth, maxBlobBytes)
-        getBlob(records, objects, auth)
+        putRecord(records, gate, entitlementEnforcer)
+        deleteRecord(records, gate)
+        getRecord(records, gate)
+        listRepoOps(records, gate)
+        uploadBlob(blobs, gate, entitlementEnforcer, maxBlobBytes)
+        getBlob(blobs, gate)
     }
+}
+
+/** What every space method checks first: the caller's LogDate access token, then its request budget. */
+internal class SpaceGate(
+    private val auth: LogDateAccountAuth,
+    private val limiter: FixedWindowRateLimiter,
+    private val limits: SpaceRateLimits,
+) {
+    /**
+     * The calling account and [service], or null after answering: `401` without a valid LogDate access
+     * token, `501` when [service] is missing because the feature is off, and `429` once the account has
+     * spent its [budget]. A request the server can't perform never spends a budget.
+     */
+    suspend fun <T : Any> admit(
+        call: ApplicationCall,
+        service: T?,
+        budget: SpaceBudget,
+    ): Pair<Account, T>? {
+        val admitted = authorize(call, service) ?: return null
+        if (!spend(call, admitted.first, budget)) return null
+        return admitted
+    }
+
+    /** The calling account and [service], or null after answering `401` or `501`; spends nothing. */
+    suspend fun <T : Any> authorize(
+        call: ApplicationCall,
+        service: T?,
+    ): Pair<Account, T>? {
+        val account = auth.requireLogDateAccount(call) ?: return null
+        if (service == null) {
+            call.respondNotImplemented()
+            return null
+        }
+        return account to service
+    }
+
+    /** Counts one request against [account]'s [budget], or answers `429` and returns false. */
+    @OptIn(ExperimentalUuidApi::class)
+    suspend fun spend(
+        call: ApplicationCall,
+        account: Account,
+        budget: SpaceBudget,
+    ): Boolean = call.spendSpaceBudget(limiter, limits, budget, account.id.toString())
 }
 
 @OptIn(ExperimentalUuidApi::class)
 private fun Route.putRecord(
     records: SpaceStore?,
-    auth: LogDateAccountAuth,
+    gate: SpaceGate,
+    quota: EntitlementEnforcer?,
 ) {
     post("/app.logdate.space.putRecord", XrpcSpaceDocs.putRecord) {
-        val account = auth.requireLogDateAccount(call) ?: return@post
-        val store = records ?: return@post call.respondNotImplemented()
+        val (account, store) = gate.admit(call, records, SpaceBudget.RECORD_WRITES) ?: return@post
         val bytes =
             call.receiveBytesUpTo(MAX_SPACE_RECORD_REQUEST_BYTES)
                 ?: return@post call.respond(HttpStatusCode.PayloadTooLarge, PdsErrorResponse("RecordTooLarge", "The record is too large"))
@@ -157,12 +201,15 @@ private fun Route.putRecord(
                 blobs = blobs,
                 swapCid = input.swapCid,
                 createOnly = input.createOnly == true,
+                quota = quota?.spaceQuota(account.id.toJavaUUID()),
             )
         val stored =
             try {
                 store.put(write)
             } catch (e: SpaceSwapException) {
                 return@post call.respondSwapConflict(e)
+            } catch (e: SpaceQuotaExceededException) {
+                return@post call.respondSpaceQuotaExceeded(e)
             } catch (e: SpaceInvalidRecordException) {
                 return@post call.respondInvalidRecord(e.reason)
             } catch (e: SpaceMissingBlobException) {
@@ -175,11 +222,10 @@ private fun Route.putRecord(
 @OptIn(ExperimentalUuidApi::class)
 private fun Route.deleteRecord(
     records: SpaceStore?,
-    auth: LogDateAccountAuth,
+    gate: SpaceGate,
 ) {
     post("/app.logdate.space.deleteRecord", XrpcSpaceDocs.deleteRecord) {
-        val account = auth.requireLogDateAccount(call) ?: return@post
-        val store = records ?: return@post call.respondNotImplemented()
+        val (account, store) = gate.admit(call, records, SpaceBudget.RECORD_WRITES) ?: return@post
         val bytes =
             call.receiveBytesUpTo(MAX_SPACE_DELETE_REQUEST_BYTES)
                 ?: return@post call.respond(HttpStatusCode.PayloadTooLarge, PdsErrorResponse("RecordTooLarge", "The request is too large"))
@@ -199,11 +245,10 @@ private fun Route.deleteRecord(
 
 private fun Route.getRecord(
     records: SpaceStore?,
-    auth: LogDateAccountAuth,
+    gate: SpaceGate,
 ) {
     get("/app.logdate.space.getRecord", XrpcSpaceDocs.getRecord) {
-        val account = auth.requireLogDateAccount(call) ?: return@get
-        val store = records ?: return@get call.respondNotImplemented()
+        val (account, store) = gate.admit(call, records, SpaceBudget.READS) ?: return@get
         val space = call.ownSpace(call.request.queryParameters["space"], account, RECORD_NOT_FOUND) ?: return@get
         val rkey =
             call.request.queryParameters["rkey"]?.takeIf(::isRecordKey)
@@ -215,11 +260,10 @@ private fun Route.getRecord(
 
 private fun Route.listRepoOps(
     records: SpaceStore?,
-    auth: LogDateAccountAuth,
+    gate: SpaceGate,
 ) {
     get("/app.logdate.space.listRepoOps", XrpcSpaceDocs.listRepoOps) {
-        val account = auth.requireLogDateAccount(call) ?: return@get
-        val store = records ?: return@get call.respondNotImplemented()
+        val (account, store) = gate.admit(call, records, SpaceBudget.READS) ?: return@get
         val space = call.ownSpace(call.request.queryParameters["space"], account, RECORD_NOT_FOUND) ?: return@get
         val since =
             call.request.queryParameters["since"]?.let { param ->
@@ -247,72 +291,11 @@ private fun Route.listRepoOps(
     }
 }
 
-@OptIn(ExperimentalUuidApi::class)
-private fun Route.uploadBlob(
-    records: SpaceStore?,
-    objects: LogDateBlobStorage?,
-    auth: LogDateAccountAuth,
-    maxBlobBytes: Long,
-) {
-    post("/app.logdate.space.uploadBlob", XrpcSpaceDocs.uploadBlob) {
-        val account = auth.requireLogDateAccount(call) ?: return@post
-        val store = records ?: return@post call.respondNotImplemented()
-        val storage = objects ?: return@post call.respondNotImplemented()
-        val space = call.ownSpace(call.request.queryParameters["space"], account, BLOB_NOT_FOUND) ?: return@post
-        val bytes =
-            call.receiveBytesUpTo(maxBlobBytes)
-                ?: return@post call.respond(
-                    HttpStatusCode.PayloadTooLarge,
-                    PdsErrorResponse("BlobTooLarge", "Blobs can be at most $maxBlobBytes bytes"),
-                )
-        val cid = Cid.rawSha256(bytes).value
-        val ownerId = account.id.toJavaUUID()
-        val request =
-            LogDateBlobWriteRequest(
-                ownerId = ownerId,
-                namespace = LogDateBlobNamespace.SPACE,
-                blobId = "$cid-${Uuid.random()}",
-                fileName = null,
-                contentType = SPACE_BLOB_MIME_TYPE,
-                bytes = bytes,
-            )
-        val path = withContext(Dispatchers.IO) { storage.putBlob(request) }
-        val blob = SpaceBlob(cid = cid, mimeType = SPACE_BLOB_MIME_TYPE, size = bytes.size.toLong(), storagePath = path)
-        val stored =
-            runCatching { store.putBlob(ownerId, space.uri, blob) }.getOrElse { error ->
-                withContext(NonCancellable + Dispatchers.IO) { storage.deleteUnsavedUpload(store, space.uri, cid, path, error) }
-                throw error
-            }
-        if (stored.storagePath != path) withContext(Dispatchers.IO) { storage.deleteBlobIfExists(path) }
-        call.respond(UploadBlobOutput(blob = Blob(ref = CidLink(cid = Cid.require(cid)), mimeType = stored.mimeType, size = stored.size)))
-    }
-}
-
-private fun Route.getBlob(
-    records: SpaceStore?,
-    objects: LogDateBlobStorage?,
-    auth: LogDateAccountAuth,
-) {
-    get("/app.logdate.space.getBlob", XrpcSpaceDocs.getBlob) {
-        val account = auth.requireLogDateAccount(call) ?: return@get
-        val store = records ?: return@get call.respondNotImplemented()
-        val storage = objects ?: return@get call.respondNotImplemented()
-        val space = call.ownSpace(call.request.queryParameters["space"], account, BLOB_NOT_FOUND) ?: return@get
-        val cid = call.request.queryParameters["cid"]?.takeIf(::isCid) ?: return@get call.respondInvalid("cid must be CID-shaped")
-        val bytes =
-            store.getBlob(space.uri, cid)?.let { withContext(Dispatchers.IO) { storage.getBlob(it.storagePath) } }
-                ?: return@get call.respondMissing(BLOB_NOT_FOUND)
-        // Decrypted on the device only; nothing between it and the server should keep a copy.
-        call.response.header(HttpHeaders.CacheControl, "private, no-store")
-        call.respondBytes(bytes, ContentType.Application.OctetStream)
-    }
-}
-
 /**
  * The account's own personal space, named by [uri]. A URI that isn't a space is an invalid request;
  * any other space answers as missing with [notFoundCode], exactly as a missing record or blob does.
  */
-private suspend fun ApplicationCall.ownSpace(
+internal suspend fun ApplicationCall.ownSpace(
     uri: String?,
     account: Account,
     notFoundCode: String,
@@ -330,27 +313,8 @@ private suspend fun ApplicationCall.ownSpace(
     return space
 }
 
-/**
- * Deletes the object at [path] after a failed metadata write, unless the write saved a row that
- * points at it anyway, as when the call is cancelled after the transaction commits. When the row
- * can't be read, the object stays: an orphaned object is harmless, a row without its object isn't.
- * Failures here are added to [error] rather than replacing it.
- */
-private suspend fun LogDateBlobStorage.deleteUnsavedUpload(
-    store: SpaceStore,
-    space: String,
-    cid: String,
-    path: String,
-    error: Throwable,
-) {
-    val saved = runCatching { store.getBlob(space, cid)?.storagePath == path }
-    saved.exceptionOrNull()?.let(error::addSuppressed)
-    if (saved.getOrNull() != false) return
-    runCatching { deleteBlobIfExists(path) }.exceptionOrNull()?.let(error::addSuppressed)
-}
-
 /** Lowercase base32 multibase is all [Cid.parse] checks, so this is a shape check, not a full parse. */
-private fun isCid(value: String): Boolean = value.length <= MAX_CID_LENGTH && value == value.trim() && Cid.parse(value).isSuccess
+internal fun isCid(value: String): Boolean = value.length <= MAX_CID_LENGTH && value == value.trim() && Cid.parse(value).isSuccess
 
 private fun isRecordKey(value: String): Boolean = RecordKey.parse(value).isSuccess
 
@@ -377,9 +341,9 @@ private fun JsonObject.toSealed(): Sealed = spaceJson.decodeFromJsonElement(this
 private suspend fun ApplicationCall.respondNotImplemented() =
     respond(HttpStatusCode.NotImplemented, PdsErrorResponse("MethodNotImplemented", "Personal spaces aren't enabled on this server"))
 
-private suspend fun ApplicationCall.respondMissing(code: String) = respond(HttpStatusCode.BadRequest, PdsErrorResponse(code, "Not found"))
+internal suspend fun ApplicationCall.respondMissing(code: String) = respond(HttpStatusCode.BadRequest, PdsErrorResponse(code, "Not found"))
 
-private suspend fun ApplicationCall.respondInvalid(message: String) =
+internal suspend fun ApplicationCall.respondInvalid(message: String) =
     respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", message))
 
 private suspend fun ApplicationCall.respondInvalidRecord(reason: String) =

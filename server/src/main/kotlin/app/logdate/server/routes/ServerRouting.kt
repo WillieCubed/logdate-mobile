@@ -47,6 +47,7 @@ import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.LocationHistoryRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.transcription.cloudTranscriptionSessionProviderFromEnvironment
+import app.logdate.server.transfer.TransferSlots
 import io.ktor.client.HttpClient
 import io.ktor.server.application.Application
 import io.ktor.server.routing.route
@@ -134,6 +135,8 @@ private fun Application.personalSpaceRoutes() {
     val descriptorConfig by inject<ServerDescriptorConfig>()
     val spaceStore by inject<SpaceStore>()
     val blobStorage by inject<LogDateBlobStorage>()
+    val entitlementEnforcer by inject<EntitlementEnforcer>()
+    val transfers by inject<TransferSlots>()
 
     routing {
         spaceXrpcRoutes(
@@ -141,6 +144,8 @@ private fun Application.personalSpaceRoutes() {
             store = spaceStore,
             blobStorage = blobStorage,
             auth = LogDateAccountAuth(accessTokenVerifier, accountRepository, atprotoIdentityService),
+            entitlementEnforcer = entitlementEnforcer,
+            transfers = transfers,
         )
     }
 }
@@ -228,6 +233,7 @@ internal fun Application.contentApiRoutes() {
     val accessTokenVerifier by inject<AccessTokenVerifier>()
     val momentsRepository by inject<LogDateMomentsRepository>()
     val syncRateLimiter = SlidingWindowRateLimiter()
+    val transfers by inject<TransferSlots>()
 
     routing {
         route("/api/v1") {
@@ -241,16 +247,11 @@ internal fun Application.contentApiRoutes() {
                 backupRepository = logDateBackupRepository,
                 entitlementEnforcer = entitlementEnforcer,
                 rateLimiter = syncRateLimiter,
-                diagnosticReportService =
-                    diagnosticReportAvailability.keyring
-                        ?.takeIf { diagnosticReportAvailability.enabled }
-                        ?.let {
-                            app.logdate.server.diagnostics
-                                .DiagnosticReportService(diagnosticReportStore, it)
-                        },
+                diagnosticReportService = diagnosticReportService(diagnosticReportAvailability, diagnosticReportStore),
                 accessTokenVerifier = accessTokenVerifier,
                 momentsRepository = momentsRepository,
                 storageModes = accountRepository.storageModes(),
+                transfers = transfers,
             )
             quotaRoutes(
                 tokenService = tokenService,
@@ -270,6 +271,17 @@ internal fun Application.contentApiRoutes() {
         }
     }
 }
+
+private fun diagnosticReportService(
+    availability: app.logdate.server.diagnostics.DiagnosticReportAvailability,
+    store: app.logdate.server.diagnostics.DiagnosticReportStore,
+): app.logdate.server.diagnostics.DiagnosticReportService? =
+    availability.keyring
+        ?.takeIf { availability.enabled }
+        ?.let {
+            app.logdate.server.diagnostics
+                .DiagnosticReportService(store, it)
+        }
 
 private fun Application.serverDescriptor() =
     inject<ServerDescriptorConfig>().value.toDescriptor(

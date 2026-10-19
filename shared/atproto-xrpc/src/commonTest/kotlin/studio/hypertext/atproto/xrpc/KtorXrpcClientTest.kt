@@ -14,6 +14,7 @@ import studio.hypertext.atproto.syntax.Nsid
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 /**
  * Integration tests for the Ktor-based XRPC client implementation.
@@ -114,6 +115,41 @@ class KtorXrpcClientTest {
             assertEquals(400, exception.statusCode)
             assertEquals("InvalidRequest", exception.error)
             assertEquals("missing handle", exception.errorMessage)
+            assertNull(exception.retryAfterSeconds)
+        }
+
+    @Test
+    fun `a protocol error carries the seconds from Retry-After`(): Unit =
+        runTest {
+            fun client(retryAfter: String) =
+                KtorXrpcClient(
+                    httpClient =
+                        HttpClient(
+                            MockEngine {
+                                respond(
+                                    content = """{"error":"RateLimitExceeded","message":"Too many requests"}""",
+                                    status = HttpStatusCode.TooManyRequests,
+                                    headers =
+                                        headersOf(
+                                            HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
+                                            HttpHeaders.RetryAfter to listOf(retryAfter),
+                                        ),
+                                )
+                            },
+                        ),
+                    baseUrl = "https://example.com",
+                )
+            val nsid = Nsid.require("com.atproto.identity.resolveHandle")
+
+            val limited = assertFailsWith<XrpcProtocolException> { client("12").query<ResolveHandleResponse>(nsid) }
+            assertEquals(429, limited.statusCode)
+            assertEquals("RateLimitExceeded", limited.error)
+            assertEquals(12L, limited.retryAfterSeconds)
+            val dated =
+                assertFailsWith<XrpcProtocolException> {
+                    client("Wed, 21 Oct 2026 07:28:00 GMT").query<ResolveHandleResponse>(nsid)
+                }
+            assertNull(dated.retryAfterSeconds, "an HTTP date isn't a number of seconds")
         }
 
     @Test

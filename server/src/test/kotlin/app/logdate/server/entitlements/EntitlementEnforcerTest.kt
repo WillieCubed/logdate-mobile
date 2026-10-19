@@ -1,10 +1,12 @@
 package app.logdate.server.entitlements
 
+import app.logdate.server.space.SpaceQuota
 import kotlinx.coroutines.test.runTest
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -54,6 +56,28 @@ class EntitlementEnforcerTest {
                 )
             val result = enforcer.checkMediaUpload(accountId, pendingBytes = 50_000L)
             assertIs<QuotaCheck.Allowed>(result)
+        }
+
+    @Test
+    fun `the space quota is the plan's storage limit less what media and backups take`() =
+        runTest {
+            val enforcer =
+                EntitlementEnforcer(
+                    entitlementService = FakeService(entitlement = tier(storage = 1_000L)),
+                    usageCalculator = StaticUsage(bytes = 5_000L, outsideSpaces = 400L),
+                )
+            assertEquals(SpaceQuota(limitBytes = 1_000L, otherBytes = 400L), enforcer.spaceQuota(accountId))
+        }
+
+    @Test
+    fun `a plan without a storage limit has no space quota`() =
+        runTest {
+            val enforcer =
+                EntitlementEnforcer(
+                    entitlementService = FakeService(entitlement = tier(storage = null)),
+                    usageCalculator = StaticUsage(bytes = 5_000L),
+                )
+            assertNull(enforcer.spaceQuota(accountId))
         }
 
     @Test
@@ -166,8 +190,11 @@ class EntitlementEnforcerTest {
     private class StaticUsage(
         val bytes: Long = 0L,
         val backups: Int = 0,
+        val outsideSpaces: Long = bytes,
     ) : UsageCalculator {
         override suspend fun storageBytes(accountId: UUID): Long = bytes
+
+        override suspend fun storageBytesOutsideSpaces(accountId: UUID): Long = outsideSpaces
 
         override suspend fun backupCount(accountId: UUID): Int = backups
     }

@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    id("app.logdate.test-database-environment")
 }
 
 kotlin {

@@ -14,6 +14,8 @@ import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.SyncStorageDocs
 import app.logdate.server.sync.SyncMetricsRegistry
+import app.logdate.server.transfer.TransferLimits
+import app.logdate.server.transfer.TransferSlots
 import app.logdate.shared.model.sync.BackupInfoResponse
 import app.logdate.shared.model.sync.BackupListResponse
 import app.logdate.shared.model.sync.BackupUploadResponse
@@ -24,7 +26,9 @@ import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondOutputStream
 import io.ktor.server.routing.Route
@@ -49,6 +53,7 @@ internal fun Route.syncBackupRoutes(
     entitlementEnforcer: EntitlementEnforcer?,
     rateLimiter: SlidingWindowRateLimiter?,
     config: SyncRouteConfig,
+    transfers: TransferSlots,
 ) {
     val mediaAccessPolicy = config.mediaAccessPolicy
     route("/backups") {
@@ -60,117 +65,123 @@ internal fun Route.syncBackupRoutes(
             var bytes = 0L
             try {
                 val userId = extractUserId(call, tokenService) ?: return@post
-
-                if (rateLimiter != null && !rateLimiter.allow("backup-upload:$userId", BACKUP_UPLOAD_RATE_LIMIT)) {
-                    return@post respondRateLimited(call, rateLimiter, "backup-upload:$userId", BACKUP_UPLOAD_RATE_LIMIT)
-                }
-
-                val req = call.receiveBackupMultipartFile() ?: return@post
+                // Backups pass through temporary files, which Cloud Run keeps in memory, so each instance
+                // runs only as many as its buffered transfer slots allow. A refused one spends no budget.
+                val slot = transfers.tryBuffered() ?: return@post call.respondTransferBusy(transfers.limits)
                 try {
-                    bytes = req.sizeBytes
-
-                    if (entitlementEnforcer != null) {
-                        val quota = entitlementEnforcer.checkBackupUpload(userId, bytes)
-                        if (quota is QuotaCheck.Denied) {
-                            return@post respondQuotaExceeded(call, quota)
-                        }
+                    if (rateLimiter != null && !rateLimiter.allow("backup-upload:$userId", BACKUP_UPLOAD_RATE_LIMIT)) {
+                        return@post respondRateLimited(call, rateLimiter, "backup-upload:$userId", BACKUP_UPLOAD_RATE_LIMIT)
                     }
 
-                    val storage =
-                        mediaStorage ?: return@post call.respond(
-                            HttpStatusCode.ServiceUnavailable,
-                            error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
-                        )
-
-                    val backupId = UUID.randomUUID()
-
-                    val encryptedFile = createPrivateBackupTempFile("logdate-backup-encrypted-", ".bin")
+                    val req = call.receiveBackupMultipartFile(transfers.limits.idleTimeout) ?: return@post
                     try {
-                        try {
-                            encryptionService
-                                .processBackupUpload(
-                                    req.path,
-                                    encryptedFile,
-                                    userId.toString(),
-                                    backupId.toString(),
-                                    checkActive,
-                                )
-                        } catch (cancellation: CancellationException) {
-                            throw cancellation
-                        } catch (failure: Exception) {
-                            Napier.e("Failed to encrypt backup")
-                            return@post call.respond(
-                                HttpStatusCode.InternalServerError,
-                                error("BACKUP_ENCRYPT_FAILED", "Failed to encrypt backup"),
-                            )
+                        bytes = req.sizeBytes
+
+                        if (entitlementEnforcer != null) {
+                            val quota = entitlementEnforcer.checkBackupUpload(userId, bytes)
+                            if (quota is QuotaCheck.Denied) {
+                                return@post respondQuotaExceeded(call, quota)
+                            }
                         }
 
-                        val storagePath =
+                        val storage =
+                            mediaStorage ?: return@post call.respond(
+                                HttpStatusCode.ServiceUnavailable,
+                                error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
+                            )
+
+                        val backupId = UUID.randomUUID()
+
+                        val encryptedFile = createPrivateBackupTempFile("logdate-backup-encrypted-", ".bin")
+                        try {
                             try {
-                                storage.putBlobFile(
-                                    LogDateBlobFileWriteRequest(
-                                        ownerId = userId,
-                                        namespace = LogDateBlobNamespace.BACKUP,
-                                        blobId = backupId.toString(),
-                                        fileName = null,
-                                        contentType = "application/octet-stream",
-                                        path = encryptedFile,
-                                        checkActive = checkActive,
-                                    ),
-                                )
+                                encryptionService
+                                    .processBackupUpload(
+                                        req.path,
+                                        encryptedFile,
+                                        userId.toString(),
+                                        backupId.toString(),
+                                        checkActive,
+                                    )
                             } catch (cancellation: CancellationException) {
                                 throw cancellation
                             } catch (failure: Exception) {
-                                Napier.e("Failed to store backup blob")
+                                Napier.e("Failed to encrypt backup")
                                 return@post call.respond(
                                     HttpStatusCode.InternalServerError,
-                                    error("BACKUP_STORAGE_FAILED", "Failed to store backup"),
+                                    error("BACKUP_ENCRYPT_FAILED", "Failed to encrypt backup"),
                                 )
                             }
 
-                        val record =
-                            try {
-                                backupRepository.createBackup(
-                                    userId,
-                                    LogDateBackup(
-                                        id = backupId,
-                                        userId = userId,
-                                        deviceId = req.deviceId,
-                                        manifest = req.manifest,
-                                        storagePath = storagePath,
-                                        createdAt = System.currentTimeMillis(),
-                                        sizeBytes = bytes,
-                                    ),
-                                )
-                            } catch (cancellation: CancellationException) {
-                                runCatching { storage.deleteBlob(storagePath) }
-                                throw cancellation
-                            } catch (failure: Exception) {
-                                if (!runCatching { storage.deleteBlob(storagePath) }.getOrDefault(false)) {
-                                    Napier.w("Failed to roll back backup blob after metadata write failure")
+                            val storagePath =
+                                try {
+                                    storage.putBlobFile(
+                                        LogDateBlobFileWriteRequest(
+                                            ownerId = userId,
+                                            namespace = LogDateBlobNamespace.BACKUP,
+                                            blobId = backupId.toString(),
+                                            fileName = null,
+                                            contentType = "application/octet-stream",
+                                            path = encryptedFile,
+                                            checkActive = checkActive,
+                                        ),
+                                    )
+                                } catch (cancellation: CancellationException) {
+                                    throw cancellation
+                                } catch (failure: Exception) {
+                                    Napier.e("Failed to store backup blob")
+                                    return@post call.respond(
+                                        HttpStatusCode.InternalServerError,
+                                        error("BACKUP_STORAGE_FAILED", "Failed to store backup"),
+                                    )
                                 }
-                                Napier.e("Failed to persist backup metadata")
-                                return@post call.respond(
-                                    HttpStatusCode.InternalServerError,
-                                    error("BACKUP_METADATA_WRITE_FAILED", "Failed to store backup metadata"),
-                                )
-                            }
 
-                        call.response.headers.append(HttpHeaders.Location, "/api/v1/backups/${record.id}")
-                        call.respond(
-                            HttpStatusCode.Created,
-                            BackupUploadResponse(
-                                id = record.id.toString(),
-                                createdAt = record.createdAt,
-                                sizeBytes = record.sizeBytes,
-                            ),
-                        )
-                        success = true
+                            val record =
+                                try {
+                                    backupRepository.createBackup(
+                                        userId,
+                                        LogDateBackup(
+                                            id = backupId,
+                                            userId = userId,
+                                            deviceId = req.deviceId,
+                                            manifest = req.manifest,
+                                            storagePath = storagePath,
+                                            createdAt = System.currentTimeMillis(),
+                                            sizeBytes = bytes,
+                                        ),
+                                    )
+                                } catch (cancellation: CancellationException) {
+                                    runCatching { storage.deleteBlob(storagePath) }
+                                    throw cancellation
+                                } catch (failure: Exception) {
+                                    if (!runCatching { storage.deleteBlob(storagePath) }.getOrDefault(false)) {
+                                        Napier.w("Failed to roll back backup blob after metadata write failure")
+                                    }
+                                    Napier.e("Failed to persist backup metadata")
+                                    return@post call.respond(
+                                        HttpStatusCode.InternalServerError,
+                                        error("BACKUP_METADATA_WRITE_FAILED", "Failed to store backup metadata"),
+                                    )
+                                }
+
+                            call.response.headers.append(HttpHeaders.Location, "/api/v1/backups/${record.id}")
+                            call.respond(
+                                HttpStatusCode.Created,
+                                BackupUploadResponse(
+                                    id = record.id.toString(),
+                                    createdAt = record.createdAt,
+                                    sizeBytes = record.sizeBytes,
+                                ),
+                            )
+                            success = true
+                        } finally {
+                            deletePrivateBackupTempFile(encryptedFile)
+                        }
                     } finally {
-                        deletePrivateBackupTempFile(encryptedFile)
+                        deletePrivateBackupTempFile(req.path)
                     }
                 } finally {
-                    deletePrivateBackupTempFile(req.path)
+                    slot.release()
                 }
             } finally {
                 metrics.recordOperation("sync.backup.upload", System.currentTimeMillis() - start, success, bytes)
@@ -248,58 +259,65 @@ internal fun Route.syncBackupRoutes(
                         error("BACKUP_STORAGE_UNAVAILABLE", "Backup storage not configured"),
                     )
 
-                val encryptedFile = createPrivateBackupTempFile("logdate-backup-download-", ".bin")
-                val decryptedFile = createPrivateBackupTempFile("logdate-backup-verified-", ".bin")
+                val slot = transfers.tryBuffered() ?: return@get call.respondTransferBusy(transfers.limits)
+                var leased = false
                 try {
-                    val found =
+                    val encryptedFile = createPrivateBackupTempFile("logdate-backup-download-", ".bin")
+                    val decryptedFile = createPrivateBackupTempFile("logdate-backup-verified-", ".bin")
+                    try {
+                        val found =
+                            try {
+                                storage.getBlobFile(record.storagePath, encryptedFile, checkActive)
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (failure: Exception) {
+                                Napier.e("Failed to read backup blob")
+                                return@get call.respond(
+                                    HttpStatusCode.InternalServerError,
+                                    error("BACKUP_STORAGE_FAILED", "Failed to read backup"),
+                                )
+                            }
+                        if (!found) {
+                            return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup file not found"))
+                        }
                         try {
-                            storage.getBlobFile(record.storagePath, encryptedFile, checkActive)
+                            encryptionService.processBackupDownload(
+                                encryptedFile,
+                                decryptedFile,
+                                shouldDecrypt = true,
+                                checkActive = checkActive,
+                            )
                         } catch (cancellation: CancellationException) {
                             throw cancellation
                         } catch (failure: Exception) {
-                            Napier.e("Failed to read backup blob")
+                            Napier.e("Failed to decrypt backup")
                             return@get call.respond(
                                 HttpStatusCode.InternalServerError,
-                                error("BACKUP_STORAGE_FAILED", "Failed to read backup"),
+                                error("BACKUP_DECRYPT_FAILED", "Failed to decrypt backup"),
                             )
                         }
-                    if (!found) {
-                        return@get call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Backup file not found"))
-                    }
-                    try {
-                        encryptionService.processBackupDownload(
-                            encryptedFile,
-                            decryptedFile,
-                            shouldDecrypt = true,
-                            checkActive = checkActive,
-                        )
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (failure: Exception) {
-                        Napier.e("Failed to decrypt backup")
-                        return@get call.respond(
-                            HttpStatusCode.InternalServerError,
-                            error("BACKUP_DECRYPT_FAILED", "Failed to decrypt backup"),
-                        )
-                    }
-                    val responseLease = BackupResponseFileLease(decryptedFile)
-                    call.respondOutputStream(ContentType.Application.OctetStream) {
-                        try {
-                            Files.newInputStream(decryptedFile).buffered().use { source ->
-                                copyBackupFile(source, this) {
-                                    if (Thread.currentThread().isInterrupted) {
-                                        throw CancellationException("Backup response interrupted")
+                        val responseLease = BackupResponseFileLease(decryptedFile, onClose = slot::release)
+                        leased = true
+                        call.respondOutputStream(ContentType.Application.OctetStream) {
+                            try {
+                                Files.newInputStream(decryptedFile).buffered().use { source ->
+                                    copyBackupFile(source, this) {
+                                        if (Thread.currentThread().isInterrupted) {
+                                            throw CancellationException("Backup response interrupted")
+                                        }
                                     }
                                 }
+                            } finally {
+                                responseLease.close()
                             }
-                        } finally {
-                            responseLease.close()
                         }
+                        success = true
+                    } finally {
+                        deletePrivateBackupTempFile(encryptedFile)
+                        if (!success) deletePrivateBackupTempFile(decryptedFile)
                     }
-                    success = true
                 } finally {
-                    deletePrivateBackupTempFile(encryptedFile)
-                    if (!success) deletePrivateBackupTempFile(decryptedFile)
+                    if (!leased) slot.release()
                 }
             } finally {
                 metrics.recordOperation("sync.backup.download", System.currentTimeMillis() - start, success)
@@ -346,4 +364,13 @@ private suspend fun io.ktor.server.application.ApplicationCall.parseBackupId(): 
         respond(HttpStatusCode.BadRequest, error("INVALID_ID", "Invalid backupId"))
         null
     }
+}
+
+/** Answers `503 SERVER_BUSY`: this instance is running as many file transfers through temporary files as it can hold. */
+private suspend fun ApplicationCall.respondTransferBusy(limits: TransferLimits) {
+    response.header(HttpHeaders.RetryAfter, limits.retryAfterSeconds.toString())
+    respond(
+        HttpStatusCode.ServiceUnavailable,
+        error("SERVER_BUSY", "The server is busy with other file transfers. Try again in ${limits.retryAfterSeconds} seconds."),
+    )
 }

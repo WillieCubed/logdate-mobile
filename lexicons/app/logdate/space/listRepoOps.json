@@ -49,7 +49,8 @@
       },
       "errors": [
         { "name": "RecordNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing record." },
-        { "name": "CursorTooOld", "description": "Deletions after since were purged, so paging on from it would miss them. List again from since=0." }
+        { "name": "CursorTooOld", "description": "Deletions after since were purged, so paging on from it would miss them. List again from since=0." },
+        { "name": "RateLimitExceeded", "description": "The account sent too many requests of this kind recently. Wait the seconds in the Retry-After header, then retry. Record writes, reads and blob uploads are counted separately." }
       ]
     },
     "change": {

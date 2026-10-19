@@ -56,6 +56,10 @@ gradlePlugin {
             id = "app.logdate.lexicon-models"
             implementationClass = "app.logdate.LexiconModelsPlugin"
         }
+        register("testDatabaseEnvironment") {
+            id = "app.logdate.test-database-environment"
+            implementationClass = "app.logdate.TestDatabaseEnvironmentPlugin"
+        }
         register("androidRelease") {
             id = "app.logdate.android-release"
             implementationClass = "app.logdate.LogDateReleasePlugin"

@@ -4,8 +4,11 @@ import app.logdate.client.device.crypto.IdentityKeyNotFoundException
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.MediaTooLargeException
+import app.logdate.space.DataHomeBusyException
 import app.logdate.space.DataHomeConflictException
 import app.logdate.space.DataHomeCursorTooOldException
+import app.logdate.space.DataHomeQuotaExceededException
+import app.logdate.space.DataHomeRateLimitedException
 import studio.hypertext.atproto.xrpc.XrpcProtocolException
 import studio.hypertext.atproto.xrpc.XrpcSerializationException
 import studio.hypertext.atproto.xrpc.XrpcTransportException
@@ -103,6 +106,8 @@ internal fun translateSpaceFailure(error: Throwable): Throwable =
     when (error) {
         is DataHomeConflictException, is DataHomeCursorTooOldException -> error
         is XrpcProtocolException -> error.toCloudFailure()
+        is DataHomeRateLimitedException, is DataHomeBusyException, is DataHomeQuotaExceededException ->
+            (error.cause as? XrpcProtocolException)?.toCloudFailure() ?: error
         is XrpcTransportException -> CloudApiException("NETWORK_ERROR", "The personal space couldn't be reached", cause = error)
         is XrpcSerializationException ->
             CloudApiException("INVALID_RESPONSE", "The server's personal space sent a response this version can't read", cause = error)

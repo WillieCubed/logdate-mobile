@@ -486,6 +486,15 @@ A server only answers these methods when its operator has turned on
 [`LOGDATE_PERSONAL_SPACE_ENABLED`](../../server/docs/environment-variables.md#logdate_personal_space_enabled).
 Until then they answer `501 MethodNotImplemented`.
 
+Every method can also answer `RateLimitExceeded` when an account sends far more requests than a
+syncing device does; the device waits the seconds in the `Retry-After` header and tries again.
+`putRecord` and `uploadBlob` answer `QuotaExceeded` when storing what was sent would take the
+account past its storage quota. `uploadBlob` and `getBlob` answer `ServerBusy` when the server is
+already moving as many files as it can hold; the device waits the `Retry-After` seconds and tries
+again. An `uploadBlob` request must carry a `Content-Length` header, because the server holds the
+file's room against the quota before it receives a byte; without one it answers `LengthRequired`. An
+upload that sends nothing for too long is ended with `UploadStalled` and can be sent again.
+
 **Reused as they are:** `community.lexicon.location.*` inside places and entries,
 `community.lexicon.calendar.event` and `rsvp` for events, `com.atproto.repo.strongRef` for
 references, and `site.standard.publication` / `document` for published stories only.

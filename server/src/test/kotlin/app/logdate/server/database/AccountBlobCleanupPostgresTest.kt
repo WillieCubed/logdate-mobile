@@ -4,10 +4,10 @@ package app.logdate.server.database
 
 import app.logdate.server.auth.AccountBlobCleanup
 import app.logdate.server.auth.requireAccountBlobCleanupSchema
+import app.logdate.server.database.support.localTestPostgresDataSource
+import app.logdate.server.database.support.withOwnPostgresDatabase
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.LogDateBlobStorage
-import com.zaxxer.hikari.HikariDataSource
-import org.junit.Assume.assumeTrue
 import java.sql.Connection
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
@@ -307,19 +307,21 @@ class AccountBlobCleanupPostgresTest {
             }
         }
 
-    private fun withDatabase(action: (Connection) -> Unit) {
-        val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-        assumeTrue(url != null && System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true")
-        require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
-        val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
-        try {
-            DatabaseConfig.initializeDatabase(source, autoMigrate = true)
-            source.connection.use {
-                it.autoCommit = true
-                action(it)
+    /**
+     * Runs [action] in a database of its own: deleted accounts stay in the cleanup queue on purpose, and
+     * one test changes the queue table's constraints.
+     */
+    private fun withDatabase(action: (Connection) -> Unit) =
+        withOwnPostgresDatabase("logdate_agent_blob_cleanup_") { url ->
+            val source = localTestPostgresDataSource(url)
+            try {
+                DatabaseConfig.initializeDatabase(source, autoMigrate = true)
+                source.connection.use {
+                    it.autoCommit = true
+                    action(it)
+                }
+            } finally {
+                source.close()
             }
-        } finally {
-            source.close()
         }
-    }
 }

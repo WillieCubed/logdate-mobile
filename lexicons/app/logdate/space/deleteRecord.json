@@ -35,7 +35,8 @@
       "errors": [
         { "name": "InvalidSwap" },
         { "name": "RecordNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing record." },
-        { "name": "RecordTooLarge", "description": "The request is larger than 16 KiB, far more than a delete needs." }
+        { "name": "RecordTooLarge", "description": "The request is larger than 16 KiB, far more than a delete needs." },
+        { "name": "RateLimitExceeded", "description": "The account sent too many requests of this kind recently. Wait the seconds in the Retry-After header, then retry. Record writes, reads and blob uploads are counted separately." }
       ]
     }
   }

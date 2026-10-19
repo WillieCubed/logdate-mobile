@@ -11,6 +11,11 @@ import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+
+/** How long an upload may send nothing before it gives up its place, unless the route sets its own. */
+private val DEFAULT_BACKUP_IDLE_TIMEOUT = 20.seconds
 
 internal data class ParsedBackupMultipartFile(
     val deviceId: String,
@@ -80,11 +85,16 @@ private val BACKUP_TEMP_PREFIXES =
 private const val BACKUP_TEMP_MAX_AGE_MILLIS = 24L * 60 * 60 * 1000
 private const val BACKUP_TEMP_SWEEP_INTERVAL_MILLIS = 6L * 60 * 60 * 1000
 
-internal suspend fun ApplicationCall.receiveBackupMultipartFile(): ParsedBackupMultipartFile? =
+internal suspend fun ApplicationCall.receiveBackupMultipartFile(
+    idleTimeout: Duration = DEFAULT_BACKUP_IDLE_TIMEOUT,
+): ParsedBackupMultipartFile? =
     try {
-        streamBackupMultipart()
+        streamBackupMultipart(idleTimeout)
     } catch (cancelled: CancellationException) {
         throw cancelled
+    } catch (_: BackupUploadStalled) {
+        respond(HttpStatusCode.RequestTimeout, error("UPLOAD_STALLED", "The upload sent nothing for too long; send it again"))
+        null
     } catch (invalid: InvalidBackupMultipart) {
         respond(HttpStatusCode.BadRequest, error("VALIDATION_ERROR", invalid.reason))
         null

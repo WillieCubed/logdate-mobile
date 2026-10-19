@@ -111,6 +111,8 @@ class QuotaRoutesTest {
                     repository.listAllMediaForUser(accountId).sumOf { it.sizeBytes } +
                         repository.listBackups(accountId).sumOf { it.sizeBytes }
 
+                override suspend fun storageBytesOutsideSpaces(accountId: UUID): Long = storageBytes(accountId)
+
                 override suspend fun backupCount(accountId: UUID): Int = repository.listBackups(accountId).size
             }
         application {
