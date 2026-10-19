@@ -1,7 +1,12 @@
 // Tests for the permission-set and space-declaration rules in declarations.mjs. Run with `node --test`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { namespaceGroup, permissionSetProblems, spaceDeclarationProblems } from "./declarations.mjs";
+import {
+  authShareProblems,
+  namespaceGroup,
+  permissionSetProblems,
+  spaceDeclarationProblems,
+} from "./declarations.mjs";
 
 const space = (overrides = {}) => ({
   type: "space",
@@ -149,7 +154,7 @@ test("permission parameters must hold allowed values", () => {
       ),
     ),
     [
-      "#main.permissions[0]: a repo permission needs at least one collection",
+      "#main.permissions[0]: collection can't be an empty list",
       '#main.permissions[0]: action "read" isn\'t one of create, update, delete',
       "#main.permissions[0]: action create is listed twice",
       "#main.permissions[1]: an rpc permission needs aud: *, or inheritAud: true",
@@ -169,4 +174,106 @@ test("localized titles and details must be keyed by language", () => {
     permissionSetProblems("app.logdate.authFull", { ...set(), "title:lang": { fr: "Exemple" }, "detail:lang": ["x"] }),
     ["#main: detail:lang must be an object keyed by language"],
   );
+});
+
+test("parameters a resource doesn't take are refused, since servers would drop the entry", () => {
+  assert.deepEqual(
+    permissionSetProblems(
+      "app.logdate.authFull",
+      set(
+        { type: "permission", resource: "repo", collections: ["app.logdate.actor.profile"] },
+        { type: "permission", resource: "rpc", lxm: ["app.logdate.a.b"], inheritAud: true, audience: "*" },
+        { type: "permission", resource: "space", spaceType: "app.logdate.space.circle", actions: ["read"], skey: "*" },
+      ),
+    ),
+    [
+      '#main.permissions[0]: "collections" isn\'t a parameter of repo permissions',
+      "#main.permissions[0]: a repo permission needs at least one collection",
+      '#main.permissions[1]: "audience" isn\'t a parameter of rpc permissions',
+      '#main.permissions[2]: "actions" isn\'t a parameter of space permissions',
+    ],
+  );
+});
+
+test("lists and single values must have the right shape", () => {
+  assert.deepEqual(
+    permissionSetProblems(
+      "app.logdate.authFull",
+      set(
+        { type: "permission", resource: "repo", collection: "app.logdate.actor.profile", action: [] },
+        { type: "permission", resource: "rpc", lxm: ["app.logdate.a.b", 3], aud: ["*"] },
+        { type: "permission", resource: "rpc", lxm: ["app.logdate.a.b"], inheritAud: "true" },
+        {
+          type: "permission",
+          resource: "space",
+          spaceType: ["app.logdate.space.circle"],
+          authority: ["*"],
+          skey: 7,
+          collection: "*",
+          action: "read",
+          manage: [],
+        },
+      ),
+    ),
+    [
+      "#main.permissions[0]: collection must be a list, even for one value",
+      "#main.permissions[0]: action can't be an empty list",
+      "#main.permissions[1]: lxm must list only strings",
+      "#main.permissions[1]: aud must be a single value, not a list",
+      "#main.permissions[2]: inheritAud must be true or false",
+      "#main.permissions[2]: an rpc permission needs aud: *, or inheritAud: true",
+      "#main.permissions[3]: spaceType must be a single value, not a list",
+      "#main.permissions[3]: authority must be a single value, not a list",
+      "#main.permissions[3]: skey must be a string",
+      "#main.permissions[3]: collection must be a list, even for one value",
+      "#main.permissions[3]: action must be a list, even for one value",
+      "#main.permissions[3]: manage can't be an empty list",
+    ],
+  );
+});
+
+const sealedOnly = { collections: ["app.logdate.crypto.sealed"] };
+const sharedSpaces = (circle = sealedOnly, group = sealedOnly) =>
+  new Map([
+    ["app.logdate.space.circle", circle],
+    ["app.logdate.space.group", group],
+  ]);
+
+test("authShare as written stays away from the journal", () => {
+  const authShare = set(
+    { type: "permission", resource: "space", spaceType: "app.logdate.space.circle", authority: "*" },
+    { type: "permission", resource: "space", spaceType: "app.logdate.space.circle", manage: ["create", "update"] },
+    { type: "permission", resource: "space", spaceType: "app.logdate.space.group", authority: "*" },
+  );
+  assert.deepEqual(authShareProblems(authShare, sharedSpaces()), []);
+});
+
+test("authShare can't name the personal space, repo permissions, journal methods or group management", () => {
+  const authShare = set(
+    { type: "permission", resource: "space", spaceType: "app.logdate.space.personal", action: ["read_self"] },
+    { type: "permission", resource: "repo", collection: ["app.logdate.crypto.keyDeclaration"] },
+    { type: "permission", resource: "rpc", lxm: ["app.logdate.space.getRecord"], inheritAud: true },
+    { type: "permission", resource: "space", spaceType: "app.logdate.space.group", authority: "self", manage: ["create"] },
+    { type: "permission", resource: "space", spaceType: "app.logdate.space.circle", collection: ["*"] },
+  );
+  const at = (index) => `app.logdate.authShare#main.permissions[${index}]`;
+  assert.deepEqual(authShareProblems(authShare, sharedSpaces()), [
+    { where: at(0), message: "authShare can't grant the personal space, which holds the journal" },
+    { where: at(1), message: "authShare can't grant repo permissions; they reach the public profile and sharing keys" },
+    { where: at(2), message: "authShare can't grant the personal-space methods; they read the journal" },
+    { where: at(3), message: "authShare can't manage groups; running a group stays in LogDate's own apps" },
+    { where: at(4), message: "collection * widens app.logdate.authShare" },
+  ]);
+});
+
+test("a collection added to the circle or group declaration widens authShare", () => {
+  const widened = { collections: ["app.logdate.crypto.sealed", "app.logdate.journal.entry"] };
+  const authShare = set({ type: "permission", resource: "space", spaceType: "app.logdate.space.group", authority: "*" });
+  const message =
+    "collection app.logdate.journal.entry widens app.logdate.authShare; review the set, then add it to " +
+    "authShareReviewedCollections in tools/lexicon-check/declarations.mjs";
+  assert.deepEqual(authShareProblems(authShare, sharedSpaces(widened, widened)), [
+    { where: "app.logdate.space.circle", message },
+    { where: "app.logdate.space.group", message },
+  ]);
 });

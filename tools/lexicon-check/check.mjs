@@ -10,7 +10,13 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { jsonToLex, Lexicons, parseLexiconDoc } from "@atproto/lexicon";
 import { breakingChanges } from "./compat.mjs";
-import { permissionSetProblems, spaceDeclarationProblems, values } from "./declarations.mjs";
+import {
+  authShareId,
+  authShareProblems,
+  permissionSetProblems,
+  spaceDeclarationProblems,
+  values,
+} from "./declarations.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -135,6 +141,12 @@ for (const [id, set] of permissionSets) {
       }
     }
   }
+}
+
+// app.logdate.authShare is what third-party apps get, so it may never reach the journal.
+const authShare = permissionSets.get(authShareId);
+if (authShare) {
+  for (const { where, message } of authShareProblems(authShare, spaces)) report(where, message);
 }
 
 const mapping = await readJson(mappingFile);
