@@ -78,14 +78,21 @@ systems own (`cloud`, `api`, `cloud-staging`, `mail`, ...), the website's own ho
 and the names of its public pages (`about`, `pricing`, `delete-account`, ...). The server's list is
 `HandleLabels.RESERVED` in `server/src/main/kotlin/app/logdate/server/identity/HandleLabels.kt`,
 and it must include every entry of `RESERVED_SUBDOMAINS` in logdate-web's
-`apps/web/src/lib/site.ts`. A test pins that.
+`apps/web/src/lib/site.ts`. This repository's build cannot read the website's source, so
+`HandleLabelsTest` keeps a hand-copied list of the website's entries and fails when the server
+misses one. When you add a name to either list, add it to the other list and to that copy in the
+same change.
 
 The server also refuses labels starting with `xn--`. Those are punycode, which browsers display as
 non-ASCII text, so they could imitate another person's handle.
 
 The server applies both rules when someone signs up, changes their username, or creates an account
-through `com.atproto.server.createAccount`. A username maps to its label by lowercasing it and
-turning `_` into `-`, so `delete_account` and `xn__name` are refused too. The website refuses
+through `com.atproto.server.createAccount`. A username maps to its label by lowercasing it,
+turning each run of characters other than `a-z`, `0-9` and `-` (including `_`) into a single `-`,
+and trimming hyphens from both ends. `delete_account` therefore maps to `delete-account` and is
+refused. `xn__name` maps to `xn-name`, which is not punycode, but the server refuses it anyway: it
+also checks the username with each `_` read as `-`, so a later change to the mapping cannot open
+the `xn--` prefix. The website refuses
 reserved labels and its own hostnames before asking the server anything.
 
 These rules only stop new names. They do not change an existing account's handle. To check whether
@@ -127,11 +134,20 @@ wildcard record never overrides an explicit one.
   changing a username does not change the handle.
 - **Deletion.** Deleting an account removes its row, the server returns `HandleNotFound`, and the
   website returns 404.
-- **Old accounts without an identity.** Accounts created before AT Protocol identities existed have
-  no handle or DID, so their handles do not resolve. They get an identity the next time their owner
-  signs in, or when an operator runs the backfill described below. Resolving a handle never assigns
-  one. Within one server process, two requests that provision the same account at once wait for
-  each other, so they never create two DIDs. The lock does not span server instances.
+- **Old accounts without an identity.** Accounts created before AT Protocol identities existed lack
+  a handle, DID or signing key, so they do not resolve. Looking an account up by handle or by DID
+  only finds accounts with all three; an account that has a DID but no signing key is invisible to
+  both lookups. The same applies to signing in: an AT Protocol client that signs in with the
+  handle (`com.atproto.server.createSession` with a dotted identifier) gets the same "Invalid
+  login" error as for a wrong password. Signing in with the username or email address still works, and it gives
+  the account its identity. The operator backfill described below does the same for everyone at
+  once. Resolving a handle never assigns an identity.
+- **Two requests provisioning one account.** Provisioning re-reads the account under a lock, so two
+  requests in one server process wait for each other. Across server instances, the identity is
+  written with a conditional update that succeeds only while the stored identity is still the one
+  that was read, so only one DID is ever assigned and a deleted account is never written back. The
+  losing instance has still created a DID of its own, which nothing uses; with PLC publishing on,
+  that DID also exists in the public directory.
 
 Other apps keep their own caches. Bluesky, for example, remembers a resolved handle for hours, so a
 deleted handle can keep appearing there for a while even though LogDate stopped answering for it.
@@ -152,8 +168,16 @@ Run job with `--backfill-identities`, against that environment's own database an
 - With `--dry-run`, the job only counts. Its log says
   `Identity backfill dry run: N accounts need an identity`.
 - Without it, the job provisions each account the way sign-in does and logs
-  `Identity backfill complete: N provisioned, M failed`. It exits non-zero if any account failed.
+  `Identity backfill complete: N provisioned, S skipped, M failed`. An account deleted after the job
+  listed it is skipped and stays deleted. Each failed account is logged as
+  `SERVER_IDENTITY_BACKFILL_ACCOUNT_FAILED` and the job moves on to the next one. Production logs
+  never name an account, so the notice carries no account ID; a failed account still lacks an
+  identity, so the next dry run counts it again. The job exits non-zero if any account failed.
   Running it again is safe, because it only picks up accounts that still lack an identity.
+- Run one backfill at a time, and only while PLC publishing is off. The conditional write keeps
+  each account to one assigned DID, but a second job, or a sign-in on a server instance, racing
+  the same account creates a DID that is then discarded. With publishing off, that DID never
+  leaves the server.
 - While the server publishes PLC operations (`ATPROTO_PLC_PUBLISH_ENABLED=true`), every new identity
   goes to the public PLC directory. A real run then refuses to start
   (`SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING`) unless `--allow-plc-publishing` is given. With
