@@ -93,7 +93,7 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
         val contentResult = uploader.uploadContent(accessToken)
         val mergeResult =
             if (journalResult.success && contentResult.success) {
-                mergeUploader?.uploadPending() ?: SyncResult(success = true)
+                mergeUploader.uploadPending()
             } else {
                 SyncResult(success = false)
             }

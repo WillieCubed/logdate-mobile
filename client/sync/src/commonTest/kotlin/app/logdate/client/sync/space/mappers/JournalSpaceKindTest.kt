@@ -1,5 +1,7 @@
 package app.logdate.client.sync.space.mappers
 
+import app.logdate.client.repository.journals.JournalMergeOperation
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.conflict.ConflictResolution
@@ -65,6 +67,39 @@ class JournalSpaceKindTest {
         }
 
     @Test
+    fun `a journal retired by a merge here is loaded as the merge and never as its survivor`() =
+        runTest {
+            val survivor = Journal(id = survivor, title = "River", created = created, lastUpdated = created)
+            repository.create(survivor)
+            val source = journal.copy(description = "Every swim", isFavorited = true)
+            repository.pending =
+                listOf(
+                    JournalMergeOperation(
+                        Uuid.random(),
+                        source.id,
+                        survivor.id,
+                        emptySet(),
+                        JournalMergeScope("owner", "origin"),
+                        source.title,
+                        survivor.title,
+                        source,
+                    ),
+                )
+
+            assertEquals(SpaceJournal(source, mergedInto = survivor.id), kind.local.load(source.id.toString()))
+            assertEquals(SpaceJournal(survivor), kind.local.load(survivor.id.toString()))
+        }
+
+    @Test
+    fun `a journal the repository answers for with another journal is not loaded`() =
+        runTest {
+            repository.create(Journal(id = survivor, title = "River", created = created, lastUpdated = created))
+            repository.answersWith = survivor
+
+            assertNull(kind.local.load(journal.id.toString()))
+        }
+
+    @Test
     fun `an upload is acknowledged with the version the space gave it`() =
         runTest {
             repository.create(journal)
@@ -115,6 +150,17 @@ class JournalSpaceKindTest {
         val createdFromSync = mutableListOf<Uuid>()
         val updatedFromSync = mutableListOf<Uuid>()
         val redirects = mutableListOf<Pair<Uuid, Uuid>>()
+        var pending: List<JournalMergeOperation> = emptyList()
+
+        /** A journal id the repository answers for any other id with, as it does for a retired journal. */
+        var answersWith: Uuid? = null
+
+        override suspend fun pendingJournalMerges(): List<JournalMergeOperation> = pending
+
+        override suspend fun resolveJournalId(journalId: Uuid): Uuid =
+            pending.firstOrNull { it.sourceId == journalId }?.destinationId ?: journalId
+
+        override suspend fun getJournalById(id: Uuid): Journal? = base.getJournalById(answersWith?.takeIf { id != it } ?: id)
 
         override suspend fun createFromSync(journal: Journal) {
             createdFromSync += journal.id
@@ -140,7 +186,7 @@ class JournalSpaceKindTest {
         override suspend fun applyJournalRedirect(
             sourceId: Uuid,
             destinationId: Uuid,
-            expectedScope: app.logdate.client.repository.journals.JournalMergeScope?,
+            expectedScope: JournalMergeScope?,
         ) {
             redirects += sourceId to destinationId
         }

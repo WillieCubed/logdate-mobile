@@ -3,6 +3,7 @@
 package app.logdate.integration.e2e.journeys
 
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.repository.journals.JournalMergeResult
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.sync.SyncErrorType
@@ -210,6 +211,70 @@ class PersonalSpaceSyncE2ETest {
             assertEquals(emptyList(), phone.content.observeJournalsForContent(note.uid).first())
             assertNull(phone.journals.getDraft(draft.id))
             assertEquals(0, phone.inbox.count())
+        }
+
+    @Test
+    fun `journals merged on one device are merged on another`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val lake = Journal(title = "Lake", created = later(0), lastUpdated = later(0))
+            val river = Journal(title = "River", created = later(0), lastUpdated = later(0))
+            val swim = JournalNote.Text(creationTimestamp = later(0), lastUpdated = later(0), content = "Swim")
+            val both = JournalNote.Text(creationTimestamp = later(0), lastUpdated = later(0), content = "Both")
+            listOf(lake, river).forEach { phone.journals.create(it) }
+            listOf(swim, both).forEach { phone.notes.create(it) }
+            phone.content.addContentToJournal(swim.uid, lake.id)
+            phone.content.addContentToJournal(both.uid, lake.id)
+            phone.content.addContentToJournal(both.uid, river.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+
+            val merged = phone.journals.merge(assertNotNull(phone.journals.previewMerge(lake.id, river.id)), Uuid.random())
+            assertIs<JournalMergeResult.Merged>(merged)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertEquals(emptyList(), phone.journals.pendingJournalMerges(), "The merge is still waiting to upload")
+
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertEquals(
+                listOf(river.id),
+                tablet.journals.allJournalsObserved
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(
+                setOf(swim.uid, both.uid),
+                tablet.content
+                    .observeContentForJournal(river.id)
+                    .first()
+                    .map { it.uid }
+                    .toSet(),
+            )
+            assertEquals(
+                listOf(river.id),
+                tablet.content
+                    .observeJournalsForContent(both.uid)
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(0, tablet.inbox.count())
+
+            val fresh = device(account)
+            assertSynced(fresh.manager.downloadRemoteChanges())
+            assertEquals(
+                listOf(river.id),
+                fresh.journals.allJournalsObserved
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(
+                setOf(swim.uid, both.uid),
+                fresh.content
+                    .observeContentForJournal(river.id)
+                    .first()
+                    .map { it.uid }
+                    .toSet(),
+            )
         }
 
     @Test
