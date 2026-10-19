@@ -1030,7 +1030,7 @@ class IdentityApiRoutesTest {
 
             assertEquals(HttpStatusCode.Conflict, response.status)
             assertEquals(
-                "PLC_RECOVERY_KEY_CONFLICT",
+                "RECOVERY_KEYS_UNAVAILABLE",
                 json
                     .parseToJsonElement(response.bodyAsText())
                     .jsonObject["error"]

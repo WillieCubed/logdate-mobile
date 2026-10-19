@@ -6,6 +6,7 @@ import studio.hypertext.atproto.crypto.EcCurve
 import studio.hypertext.atproto.crypto.EcKeySupport
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.plc.PlcDirectoryClient
+import studio.hypertext.atproto.plc.PlcEncoding
 import studio.hypertext.atproto.plc.PlcIndexedOperation
 import studio.hypertext.atproto.plc.PlcLogEntry
 import studio.hypertext.atproto.plc.PlcOperation
@@ -80,10 +81,10 @@ class PlcIdentityServiceTest {
                 provisioned.publicKeyDidKey,
                 provisioned.operation.verificationMethods.getValue("atproto"),
             )
-            assertEquals(listOf(provisioned.publicKeyDidKey, recoveryDidKey), provisioned.operation.rotationKeys)
+            assertEquals(listOf(recoveryDidKey, provisioned.publicKeyDidKey), provisioned.operation.rotationKeys)
             assertEquals(AtprotoDid.require(provisioned.did), service.documentFor(provisioned).id)
             assertEquals(2, operationRepository.listByDid(provisioned.did).size)
-            assertEquals(null, operationRepository.listByDid(provisioned.did).first().cid)
+            assertEquals(PlcEncoding.operationCid(provisioned.operation), operationRepository.listByDid(provisioned.did).first().cid)
         }
 
     @Test
@@ -249,7 +250,7 @@ class PlcIdentityServiceTest {
             assertEquals(rotated.publicKeyMultibase, active.publicKeyMultibase)
             assertEquals("cid-1", update.prev)
             assertEquals(rotated.publicKeyDidKey, update.verificationMethods.getValue("atproto"))
-            assertEquals(listOf(rotated.publicKeyDidKey, recoveryDidKey), update.rotationKeys)
+            assertEquals(listOf(recoveryDidKey, rotated.publicKeyDidKey), update.rotationKeys)
             assertTrue(update.isSigned)
             assertEquals(2, operationRepository.listByDid(provisioned.did).size)
             assertEquals("cid-1", operationRepository.listByDid(provisioned.did).last().prevCid)
@@ -324,7 +325,7 @@ class PlcIdentityServiceTest {
             assertEquals(activeBefore.id, activeAfter.id)
             assertEquals("cid-1", update.prev)
             assertEquals(provisioned.publicKeyDidKey, update.verificationMethods.getValue("atproto"))
-            assertEquals(listOf(provisioned.publicKeyDidKey, recoveryDidKey), update.rotationKeys)
+            assertEquals(listOf(recoveryDidKey, provisioned.publicKeyDidKey), update.rotationKeys)
             assertEquals(2, operationRepository.listByDid(provisioned.did).size)
             assertEquals("cid-2", operationRepository.listByDid(provisioned.did).last().cid)
         }
@@ -381,6 +382,12 @@ class PlcIdentityServiceTest {
             val provisioned = service.provisionHostedDid(accountId = accountId, handle = "alice.logdate.app")
             val recoveryKey = signingKeyService.generateKeyPair(curve = EcCurve.P256)
             val recoveryDidKey = didKeyFor(recoveryKey.publicKeyMultibase)
+            service.updateHostedRecoveryKey(
+                accountId = accountId,
+                did = AtprotoDid.require(provisioned.did),
+                handle = "alice.logdate.app",
+                recoveryDidKey = recoveryDidKey,
+            )
             val prepared =
                 service.prepareHostedRecoveryImport(
                     accountId = accountId,
@@ -408,11 +415,11 @@ class PlcIdentityServiceTest {
                     signature = signature,
                 )
 
-            assertEquals("cid-1", prepared.unsignedOperation.prev)
+            assertEquals("cid-2", prepared.unsignedOperation.prev)
             assertEquals("did:key:zNextSigning", prepared.nextSigningKeyDidKey)
             assertEquals("did:key:zNextSigning", signed.verificationMethods.getValue("atproto"))
-            assertEquals(listOf("did:key:zNextSigning", recoveryDidKey), signed.rotationKeys)
+            assertEquals(listOf(recoveryDidKey, "did:key:zNextSigning"), signed.rotationKeys)
             assertTrue(signed.isSigned)
-            assertEquals("cid-2", operationRepository.listByDid(provisioned.did).last().cid)
+            assertEquals("cid-3", operationRepository.listByDid(provisioned.did).last().cid)
         }
 }

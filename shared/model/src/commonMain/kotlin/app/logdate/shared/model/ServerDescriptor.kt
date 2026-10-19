@@ -53,6 +53,16 @@ object ServerProtocolFeature {
      */
     const val ATPROTO_PLC_PUBLISHING_V1 = "atprotoPlcPublishingV1"
 
+    /**
+     * People can register their own recovery key on their hosted identity
+     * (`POST /identity/plc/recovery-key`) and use it to replace the server's key
+     * (`POST /identity/recovery-key/recover/prepare` and `/complete`). The recovery key is listed
+     * ahead of the server's key, so it can overrule it. This works without
+     * [ATPROTO_PLC_PUBLISHING_V1]. Without this flag those requests are refused, and clients must not
+     * offer them.
+     */
+    const val ATPROTO_RECOVERY_KEYS_V1 = "atprotoRecoveryKeysV1"
+
     /** Legacy flag retained for compatibility; servers never advertise server custody of keys. */
     const val ACCOUNT_KEY_VAULT_V1 = "accountKeyVaultV1"
 

@@ -6,6 +6,8 @@ package app.logdate.server.identity
  */
 class IdentityLifecycleConflictException(
     message: String,
+    /** A specific error code for the response, or `null` to use the route's general conflict code. */
+    val code: String? = null,
 ) : IllegalStateException(message)
 
 /**
@@ -20,4 +22,6 @@ class IdentityAccountMissingException : IllegalStateException("The account no lo
 class IdentityLifecycleValidationException(
     message: String,
     cause: Throwable? = null,
+    /** A specific error code for the response, or `null` to use the route's general validation code. */
+    val code: String? = null,
 ) : IllegalArgumentException(message, cause)

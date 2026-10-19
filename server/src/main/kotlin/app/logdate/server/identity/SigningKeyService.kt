@@ -1,6 +1,7 @@
 package app.logdate.server.identity
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import studio.hypertext.atproto.crypto.EcCurve
 import studio.hypertext.atproto.crypto.EcKeySupport
 import java.security.PrivateKey
@@ -13,6 +14,8 @@ import javax.crypto.spec.SecretKeySpec
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -24,9 +27,71 @@ class SigningKeyService(
     private val repository: SigningKeyRepository,
     encryptionKeySeed: String,
     decryptOnlyEncryptionKeySeeds: List<String> = emptyList(),
+    private val clock: Clock = Clock.System,
 ) {
     private val secureRandom = SecureRandom()
     private val atRestCipher = AtRestKeyCipher(encryptionKeySeed, decryptOnlyEncryptionKeySeeds, secureRandom)
+    private val sealJson = Json { ignoreUnknownKeys = true }
+
+    /**
+     * Seals a key from [prepareKey] into an opaque token the client returns to finish a two-step
+     * change, so the server stores nothing in between. The token is encrypted with the key-encryption
+     * key, names its account and the operation it was prepared on, and expires after
+     * [PREPARED_KEY_LIFETIME].
+     */
+    fun sealPreparedKey(
+        key: StoredSigningKey,
+        prevCid: String,
+    ): String =
+        atRestCipher.encrypt(
+            sealJson
+                .encodeToString(
+                    SealedPreparedKey.serializer(),
+                    SealedPreparedKey(
+                        accountId = key.accountId.toString(),
+                        algorithm = key.algorithm,
+                        publicKeyMultibase = key.publicKeyMultibase,
+                        privateKeyEncrypted = key.privateKeyEncrypted,
+                        prevCid = prevCid,
+                        sealedAtEpochSeconds = clock.now().epochSeconds,
+                    ),
+                ).encodeToByteArray(),
+        )
+
+    /**
+     * Opens a token from [sealPreparedKey] for [accountId]. A token that was altered, sealed by
+     * another deployment or for another account is refused as invalid; an old one as expired.
+     */
+    fun openPreparedKey(
+        accountId: Uuid,
+        token: String,
+    ): OpenedPreparedKey {
+        val sealed =
+            try {
+                sealJson.decodeFromString(SealedPreparedKey.serializer(), atRestCipher.decrypt(token).decodeToString())
+            } catch (exception: Exception) {
+                throw IdentityLifecycleValidationException("The prepared key is not valid", exception, code = PREPARED_KEY_INVALID)
+            }
+        if (sealed.accountId != accountId.toString()) {
+            throw IdentityLifecycleValidationException("The prepared key belongs to a different account", code = PREPARED_KEY_INVALID)
+        }
+        val age = clock.now().epochSeconds - sealed.sealedAtEpochSeconds
+        if (age > PREPARED_KEY_LIFETIME.inWholeSeconds) {
+            throw IdentityLifecycleConflictException("The prepared key has expired; start again", code = PREPARED_KEY_EXPIRED)
+        }
+        return OpenedPreparedKey(
+            key =
+                StoredSigningKey(
+                    id = Uuid.random(),
+                    accountId = accountId,
+                    algorithm = sealed.algorithm,
+                    publicKeyMultibase = sealed.publicKeyMultibase,
+                    privateKeyEncrypted = sealed.privateKeyEncrypted,
+                    createdAt = clock.now(),
+                ),
+            prevCid = sealed.prevCid,
+        )
+    }
 
     fun generateKeyPair(curve: EcCurve = DEFAULT_SIGNING_CURVE): GeneratedSigningKey {
         val keyPair = EcKeySupport.generateKeyPair(curve = curve, secureRandom = secureRandom)
@@ -198,7 +263,32 @@ class SigningKeyService(
         val iterations: Int = EXPORT_KDF_ITERATIONS,
     )
 
-    private companion object {
+    /** A key from [sealPreparedKey], ready to activate, and the operation it was prepared on. */
+    data class OpenedPreparedKey(
+        val key: StoredSigningKey,
+        val prevCid: String,
+    )
+
+    @Serializable
+    private data class SealedPreparedKey(
+        val accountId: String,
+        val algorithm: String,
+        val publicKeyMultibase: String,
+        val privateKeyEncrypted: String,
+        val prevCid: String,
+        val sealedAtEpochSeconds: Long,
+    )
+
+    companion object {
+        /** The prepared key token is altered, unreadable or for another account. */
+        const val PREPARED_KEY_INVALID: String = "PREPARED_KEY_INVALID"
+
+        /** The prepared key token is older than [PREPARED_KEY_LIFETIME]. */
+        const val PREPARED_KEY_EXPIRED: String = "PREPARED_KEY_EXPIRED"
+
+        /** How long a prepared key token can be completed. */
+        val PREPARED_KEY_LIFETIME: Duration = 30.minutes
+
         private val DEFAULT_SIGNING_CURVE: EcCurve = EcCurve.K256
         private const val AES_ALGORITHM = "AES"
         private const val AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"

@@ -20,6 +20,7 @@ data class AtprotoIdentityConfig(
     val hostedAccountDidMethod: HostedAccountDidMethod = HostedAccountDidMethod.PLC,
     val publishHostedPlcOperations: Boolean = false,
     val plcDirectoryUrl: String = "https://plc.directory",
+    val recoveryKeysEnabled: Boolean = false,
 ) {
     init {
         require(handleDomain.isNotBlank()) { "handleDomain must not be blank" }
@@ -39,6 +40,14 @@ data class AtprotoIdentityConfig(
     val publishesPlcOperations: Boolean =
         hostedAccountDidMethod == HostedAccountDidMethod.PLC && publishHostedPlcOperations
 
+    /**
+     * Whether people can register their own recovery key on a hosted `did:plc` identity and use it to
+     * replace the server's key. It works from the server's own operation log, so it does not need
+     * PLC publishing; a server that publishes has always supported it.
+     */
+    val supportsRecoveryKeys: Boolean =
+        hostedAccountDidMethod == HostedAccountDidMethod.PLC && (recoveryKeysEnabled || publishHostedPlcOperations)
+
     companion object {
         fun fromEnvironment(
             handleDomain: String? = System.getenv("ATPROTO_HANDLE_DOMAIN"),
@@ -46,6 +55,7 @@ data class AtprotoIdentityConfig(
             hostedAccountDidMethod: String? = System.getenv("ATPROTO_HOSTED_DID_METHOD"),
             publishHostedPlcOperations: String? = System.getenv("ATPROTO_PLC_PUBLISH_ENABLED"),
             plcDirectoryUrl: String? = System.getenv("ATPROTO_PLC_DIRECTORY_URL"),
+            recoveryKeysEnabled: String? = System.getenv("ATPROTO_RECOVERY_KEYS_ENABLED"),
         ): AtprotoIdentityConfig {
             val normalizedHandleDomain =
                 handleDomain
@@ -73,6 +83,7 @@ data class AtprotoIdentityConfig(
                         .orEmpty()
                         .ifBlank { "https://plc.directory" }
                         .removeSuffix("/"),
+                recoveryKeysEnabled = recoveryKeysEnabled?.trim()?.equals("true", ignoreCase = true) == true,
             )
         }
     }

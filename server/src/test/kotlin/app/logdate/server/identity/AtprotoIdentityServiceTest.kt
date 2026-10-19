@@ -879,7 +879,7 @@ class AtprotoIdentityServiceTest {
             assertEquals(recoveryDidKey, registered.account.plcRecoveryDidKey)
             assertNotNull(registered.plcOperation)
             assertEquals(
-                listOf("did:key:${registered.account.signingKeyPublic}", recoveryDidKey),
+                listOf(recoveryDidKey, "did:key:${registered.account.signingKeyPublic}"),
                 registered.plcOperation.rotationKeys,
             )
         }

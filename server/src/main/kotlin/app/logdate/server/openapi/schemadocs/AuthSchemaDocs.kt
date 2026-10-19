@@ -532,6 +532,36 @@ internal object AuthSchemaDocs {
                         "signature" to "The recovery key's signature over `signingPayloadBase64Url`, base64url.",
                     ),
                 ),
+            "PrepareIdentityRecoveryResponse" to
+                SchemaDoc(
+                    "The recovery to sign.",
+                    mapOf(
+                        "success" to SUCCESS_FLAG,
+                        "data" to "What to sign, and the sealed key it installs.",
+                    ),
+                ),
+            "PrepareIdentityRecoveryData" to
+                SchemaDoc(
+                    "An unsigned PLC operation that replaces the server's key, the bytes the recovery key must sign, and the sealed new key.",
+                    mapOf(
+                        "did" to "The identity's DID.",
+                        "handle" to "The identity's handle.",
+                        "recoveryDidKey" to "The registered recovery key that must produce the signature.",
+                        "nextPublicKeyDidKey" to "The server's new public key, which the operation installs.",
+                        "unsignedOperationJson" to "The PLC operation as JSON, for inspection.",
+                        "signingPayloadBase64Url" to "The exact bytes to sign with the recovery key, base64url.",
+                        "preparedKey" to
+                            "The new key sealed by the server. Send it back unchanged to complete the recovery within 30 minutes.",
+                    ),
+                ),
+            "CompleteIdentityRecoveryRequest" to
+                SchemaDoc(
+                    "The signed recovery.",
+                    mapOf(
+                        "preparedKey" to "`preparedKey` from the prepare step, unchanged.",
+                        "signature" to "The recovery key's signature over `signingPayloadBase64Url`: raw r||s with a low s, base64url.",
+                    ),
+                ),
             "RegisterPlcRecoveryKeyRequest" to
                 SchemaDoc("A recovery key to register.", mapOf("recoveryDidKey" to "The public recovery key as a `did:key`.")),
             "RegisterPlcRecoveryKeyResponse" to
