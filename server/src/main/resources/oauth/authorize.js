@@ -56,6 +56,9 @@
         if (payload && payload.error === "access_denied" && described) throw new PageError(described);
         if (response.status === 429 && described) throw new PageError(described);
         if (payload && payload.error === "invalid_request") throw expiredMessage();
+        if (response.status === 503) {
+            throw new PageError("The LogDate server can't finish signing in right now. Try again in a moment.");
+        }
         if (response.status === 501) {
             throw new PageError("Passkey sign-in isn't turned on for this LogDate server. Go back to the app and choose another way to sign in.", true);
         }

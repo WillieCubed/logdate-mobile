@@ -6,6 +6,7 @@ import app.logdate.server.audit.AuditLogger
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateMediaBlobRepository
+import app.logdate.server.oauth.OAuthGrantRevoker
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,6 +22,7 @@ class AccountDeletionService(
     private val backupRepository: LogDateBackupRepository,
     private val blobStorage: LogDateBlobStorage?,
     private val blobCleanup: AccountBlobCleanup? = null,
+    private val oauthGrantRevoker: OAuthGrantRevoker? = null,
 ) {
     data class Summary(
         val mediaBlobsDeleted: Int,
@@ -30,6 +32,8 @@ class AccountDeletionService(
 
     suspend fun deleteAccount(accountId: Uuid): Summary {
         val owner = accountId.toJavaUuid()
+        // Apps the account approved lose access before the account itself goes.
+        accountRepository.findById(accountId)?.did?.let { did -> oauthGrantRevoker?.revokeAllForSubject(did) }
         // PostgreSQL's BEFORE DELETE trigger captures all references, including soft deletes.
         // Non-database development runs have no durable queue and must enumerate successfully.
         val mediaPaths = if (blobCleanup == null) mediaBlobRepository.listMedia(owner).mapNotNull { it.storagePath } else emptyList()

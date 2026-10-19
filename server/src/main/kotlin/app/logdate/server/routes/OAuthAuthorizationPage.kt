@@ -36,7 +36,12 @@ internal suspend fun ApplicationCall.respondAuthorizationPage(page: OAuthPasskey
     response.header("X-Content-Type-Options", "nosniff")
     response.header("Referrer-Policy", "no-referrer")
     response.header(HttpHeaders.CacheControl, "no-store")
-    val status = if (page is OAuthPasskeyPage.SignIn) HttpStatusCode.OK else HttpStatusCode.BadRequest
+    val status =
+        when (page) {
+            is OAuthPasskeyPage.SignIn -> HttpStatusCode.OK
+            OAuthPasskeyPage.ServerError -> HttpStatusCode.ServiceUnavailable
+            else -> HttpStatusCode.BadRequest
+        }
     respondText(renderAuthorizationPage(page, nonce), ContentType.Text.Html.withCharset(Charsets.UTF_8), status)
 }
 
@@ -53,6 +58,14 @@ internal fun renderAuthorizationPage(
                 body =
                     "Sign-in links only last a few minutes, and each one works once. Go back to the app you were " +
                         "signing in to and start signing in again.",
+            )
+        OAuthPasskeyPage.ServerError ->
+            messagePage(
+                nonce = nonce,
+                title = "Sign-in isn't available right now",
+                body =
+                    "The LogDate server couldn't load this sign-in request. Try again in a few minutes from the app you " +
+                        "were signing in to.",
             )
         OAuthPasskeyPage.ClientMismatch ->
             messagePage(
@@ -83,12 +96,9 @@ private fun signInPage(
             .takeUnless { page.clientLabel.contains(it) }
             ?.let { " <span class=\"address\">${it.escapeHtml()}</span>" }
             .orEmpty()
-    val access =
-        if (page.canWrite) {
-            "If you continue, this app can upload files to your account. It can't see or change your journal."
-        } else {
-            "If you continue, this app learns which LogDate account you are. It can't see or change anything in your account."
-        }
+    // No scope opens anything beyond the identity yet: no collection is open to apps and uploads
+    // are refused, so every request gets the same, accurate sentence.
+    val access = "If you continue, this app learns which LogDate account you are. It can't see or change anything in your account."
     val pageData =
         buildJsonObject {
             put("request_uri", page.requestUri)

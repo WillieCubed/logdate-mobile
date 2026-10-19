@@ -25,6 +25,7 @@ import io.ktor.serialization.ContentConvertException
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.ContentTransformationException
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -90,7 +91,7 @@ private fun Route.redeemLinkRoute(
     post("/link/redeem", DeviceLinkDocs.redeemLink) {
         call.response.headers.append(HttpHeaders.CacheControl, "no-store")
         val address =
-            call.request.local.remoteHost
+            call.request.origin.remoteHost
                 .ifBlank { "unknown" }
                 .sha256()
         if (!rateLimiter.allow("device-link-redeem:$address", DEVICE_LINK_REDEEM_RATE_LIMIT)) {

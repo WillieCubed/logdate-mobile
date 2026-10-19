@@ -3,6 +3,7 @@ package app.logdate.server.routes
 import app.logdate.server.AuthV1TestEnvironment
 import app.logdate.server.auth.Account
 import app.logdate.server.configureAuthV1TestApp
+import app.logdate.server.installForwardedClientAddress
 import app.logdate.server.oauth.OAuthClientMetadataResolver
 import app.logdate.server.oauth.PasskeyTestAuthenticator
 import app.logdate.server.oauth.clientMetadataJson
@@ -126,15 +127,15 @@ class OAuthPasskeySignInRoutesTest {
         }
 
     @Test
-    fun `the page describes write access only when the app asked for it`() =
+    fun `the page promises no more than the identity even when the app asks for more`() =
         testApplication {
             configureApp()
             val requestUri = pushAuthorizationRequest(loginHint = null, scope = "atproto transition:generic").requestUri
 
             val body = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }.bodyAsText()
 
-            assertTrue("can upload files to your account" in body, body)
-            assertTrue("can't see or change your journal" in body, body)
+            assertTrue("learns which LogDate account you are" in body, body)
+            assertFalse("upload" in body, body)
         }
 
     @Test
@@ -216,37 +217,7 @@ class OAuthPasskeySignInRoutesTest {
             val alice = createAccount(env, "alice")
             val passkey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
             val spare = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
-            val pushed = pushAuthorizationRequest(loginHint = null)
-            val challenge = passkeyOptions(pushed.requestUri).getValue("challenge").jsonPrimitive.content
-            val redirect =
-                Url(
-                    json
-                        .parseToJsonElement(approveWithPasskey(pushed.requestUri, challenge, passkey.assert(challenge)).bodyAsText())
-                        .jsonObject
-                        .getValue("redirect_uri")
-                        .jsonPrimitive.content,
-                )
-            val token =
-                client.post("/oauth/token") {
-                    header("DPoP", createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = pushed.nonce))
-                    setBody(
-                        FormDataContent(
-                            Parameters.build {
-                                append("grant_type", "authorization_code")
-                                append("code", assertNotNull(redirect.parameters["code"]))
-                                append("redirect_uri", REDIRECT_URI)
-                                append("client_id", CLIENT_ID)
-                                append("code_verifier", pushed.verifier)
-                            },
-                        ),
-                    )
-                }
-            val refreshToken =
-                json
-                    .parseToJsonElement(token.bodyAsText())
-                    .jsonObject
-                    .getValue("refresh_token")
-                    .jsonPrimitive.content
+            val grant = approveAndExchange(passkey)
 
             val delete =
                 client.delete("/api/v1/auth/me/passkeys/${spare.credentialIdB64}") {
@@ -254,31 +225,133 @@ class OAuthPasskeySignInRoutesTest {
                 }
             assertEquals(HttpStatusCode.NoContent, delete.status, delete.bodyAsText())
 
-            val refresh =
-                client.post("/oauth/token") {
-                    header(
-                        "DPoP",
-                        createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = token.headers["DPoP-Nonce"]),
-                    )
-                    setBody(
-                        FormDataContent(
-                            Parameters.build {
-                                append("grant_type", "refresh_token")
-                                append("refresh_token", refreshToken)
-                                append("client_id", CLIENT_ID)
-                            },
-                        ),
-                    )
+            assertRefreshRefused(grant)
+        }
+
+    @Test
+    fun `deleting the account revokes every app it approved`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val passkey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val grant = approveAndExchange(passkey)
+
+            val delete =
+                client.delete("/api/v1/auth/me") {
+                    header(HttpHeaders.Authorization, "Bearer ${env.base.tokenService.generateAccessToken(alice.id.toString())}")
                 }
-            assertEquals(HttpStatusCode.BadRequest, refresh.status)
-            assertEquals(
-                "invalid_grant",
+            assertEquals(HttpStatusCode.NoContent, delete.status, delete.bodyAsText())
+
+            assertRefreshRefused(grant)
+        }
+
+    private class AppGrant(
+        val pushed: PushedRequest,
+        val refreshToken: String,
+        val nonce: String?,
+    )
+
+    /** Signs in through the page with [passkey] and exchanges the code, as the app would. */
+    private suspend fun ApplicationTestBuilder.approveAndExchange(passkey: PasskeyTestAuthenticator): AppGrant {
+        val pushed = pushAuthorizationRequest(loginHint = null)
+        val challenge = passkeyOptions(pushed.requestUri).getValue("challenge").jsonPrimitive.content
+        val redirect =
+            Url(
                 json
-                    .parseToJsonElement(refresh.bodyAsText())
-                    .jsonObject["error"]
-                    ?.jsonPrimitive
-                    ?.content,
+                    .parseToJsonElement(approveWithPasskey(pushed.requestUri, challenge, passkey.assert(challenge)).bodyAsText())
+                    .jsonObject
+                    .getValue("redirect_uri")
+                    .jsonPrimitive.content,
             )
+        val token =
+            client.post("/oauth/token") {
+                header("DPoP", createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = pushed.nonce))
+                setBody(
+                    FormDataContent(
+                        Parameters.build {
+                            append("grant_type", "authorization_code")
+                            append("code", assertNotNull(redirect.parameters["code"]))
+                            append("redirect_uri", REDIRECT_URI)
+                            append("client_id", CLIENT_ID)
+                            append("code_verifier", pushed.verifier)
+                        },
+                    ),
+                )
+            }
+        check(token.status == HttpStatusCode.OK) { "Token exchange failed: ${token.bodyAsText()}" }
+        val refreshToken =
+            json
+                .parseToJsonElement(token.bodyAsText())
+                .jsonObject
+                .getValue("refresh_token")
+                .jsonPrimitive.content
+        return AppGrant(pushed, refreshToken, token.headers["DPoP-Nonce"])
+    }
+
+    private suspend fun ApplicationTestBuilder.assertRefreshRefused(grant: AppGrant) {
+        val refresh =
+            client.post("/oauth/token") {
+                header("DPoP", createDpopProof(grant.pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = grant.nonce))
+                setBody(
+                    FormDataContent(
+                        Parameters.build {
+                            append("grant_type", "refresh_token")
+                            append("refresh_token", grant.refreshToken)
+                            append("client_id", CLIENT_ID)
+                        },
+                    ),
+                )
+            }
+        assertEquals(HttpStatusCode.BadRequest, refresh.status, refresh.bodyAsText())
+        assertEquals(
+            "invalid_grant",
+            json
+                .parseToJsonElement(refresh.bodyAsText())
+                .jsonObject["error"]
+                ?.jsonPrimitive
+                ?.content,
+        )
+    }
+
+    @Test
+    fun `passkey attempts are limited per client address, not per proxy`() =
+        testApplication {
+            configureApp()
+            application { installForwardedClientAddress() }
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            suspend fun options(forwardedFor: String) =
+                client.post("/oauth/authorize/passkey/options") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    header(HttpHeaders.XForwardedFor, forwardedFor)
+                    setBody(buildJsonObject { put("request_uri", requestUri) }.toString())
+                }
+
+            repeat(10) { assertEquals(HttpStatusCode.OK, options("203.0.113.5").status) }
+            val spoofed = options("198.51.100.77, 203.0.113.5")
+            val otherClient = options("203.0.113.6")
+
+            assertEquals(HttpStatusCode.TooManyRequests, spoofed.status, "an invented leading address must not reset the limit")
+            assertEquals(HttpStatusCode.OK, otherClient.status, "another client has its own limit")
+        }
+
+    @Test
+    fun `app sign-in attempts are limited per client address, not per proxy`() =
+        testApplication {
+            configureApp()
+            application { installForwardedClientAddress() }
+
+            suspend fun begin(forwardedFor: String) =
+                client.post("/api/v1/auth/signin/passkey/begin") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    header(HttpHeaders.XForwardedFor, forwardedFor)
+                    setBody("{}")
+                }
+
+            repeat(10) { assertEquals(HttpStatusCode.OK, begin("203.0.113.5").status) }
+
+            assertEquals(HttpStatusCode.TooManyRequests, begin("198.51.100.77, 203.0.113.5").status)
+            assertEquals(HttpStatusCode.OK, begin("203.0.113.6").status)
         }
 
     @Test
@@ -330,10 +403,7 @@ class OAuthPasskeySignInRoutesTest {
             val options = passkeyOptions(pushed.requestUri)
             assertEquals("logdate.app", options["rp_id"]?.jsonPrimitive?.content)
             assertEquals("required", options["user_verification"]?.jsonPrimitive?.content)
-            assertEquals(
-                listOf(authenticator.credentialIdB64),
-                options["allow_credentials"]?.jsonArray?.map { it.jsonPrimitive.content },
-            )
+            assertEquals(emptyList(), options["allow_credentials"]?.jsonArray?.map { it.jsonPrimitive.content })
             val challenge = options.getValue("challenge").jsonPrimitive.content
 
             val approval = approveWithPasskey(pushed.requestUri, challenge, authenticator.assert(challenge))

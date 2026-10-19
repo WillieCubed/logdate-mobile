@@ -59,9 +59,14 @@ class OAuthPasskeySignInService(
         requestUri: String,
         clientId: String?,
     ): OAuthPasskeyPage {
+        // Only an unknown or expired request means "expired"; anything else is a server failure
+        // and reaches the caller, which shows the server-error page.
         val prompt =
-            runCatching { authorizationService.describeAuthorizationRequest(requestUri) }
-                .getOrElse { return OAuthPasskeyPage.RequestExpired }
+            try {
+                authorizationService.describeAuthorizationRequest(requestUri)
+            } catch (_: OAuthInvalidRequestException) {
+                return OAuthPasskeyPage.RequestExpired
+            }
         if (clientId != null && clientId != prompt.clientId) return OAuthPasskeyPage.ClientMismatch
 
         val clientLabel = clientLabel(prompt.clientId, prompt.clientName)
@@ -75,19 +80,22 @@ class OAuthPasskeySignInService(
             clientLabel = clientLabel,
             clientAddress = clientAddress(prompt.clientId),
             accountHandle = hintedAccount?.handle,
-            canWrite = OAuthScopes.TRANSITION_GENERIC in OAuthScopes.parse(prompt.scope),
         )
     }
 
-    /** Issues a passkey challenge that only approves [requestUri], limited to the hinted account's passkeys when there is one. */
+    /**
+     * Issues a passkey challenge that only approves [requestUri].
+     *
+     * The options never list credential IDs, so anyone can push a request naming any handle
+     * without learning which passkeys that account has. The browser offers the person's
+     * discoverable passkeys instead, and [approve] refuses one that belongs to another account.
+     */
     suspend fun options(requestUri: String): OAuthPasskeyOptionsResponse {
         val prompt = authorizationService.describeAuthorizationRequest(requestUri)
-        val hintedAccount = prompt.loginHint?.let { findHintedAccount(it) }
         val options =
             webAuthnService.generateBoundAuthenticationOptions(
                 purpose = OAUTH_AUTHORIZATION_CHALLENGE_TYPE,
                 binding = challengeBinding(prompt.requestUri),
-                credentialOwner = hintedAccount?.id,
             )
         return OAuthPasskeyOptionsResponse(
             challenge = options.challenge,
@@ -213,8 +221,6 @@ sealed interface OAuthPasskeyPage {
         val clientAddress: String,
         /** The account the app asked for, when it named one that exists here. */
         val accountHandle: String?,
-        /** Whether the request asks to publish records and upload files, not only to confirm the identity. */
-        val canWrite: Boolean,
     ) : OAuthPasskeyPage
 
     /** The request is unknown, already used, or expired. */
@@ -222,6 +228,9 @@ sealed interface OAuthPasskeyPage {
 
     /** The browser URL names a different app from the one that pushed the request. */
     data object ClientMismatch : OAuthPasskeyPage
+
+    /** The server could not load the request, for example because its database is unreachable. */
+    data object ServerError : OAuthPasskeyPage
 
     /** The app asked for an account that is not hosted here. */
     data class UnknownAccount(

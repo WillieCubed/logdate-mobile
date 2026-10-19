@@ -111,6 +111,7 @@ object OAuthAuthorizationCodesTable : Table("oauth_authorization_codes") {
     val clientAuthKeyId = text("client_auth_key_id").nullable()
     val clientAuthKeyThumbprint = varchar("client_auth_key_thumbprint", 255).nullable()
     val expiresAt = timestamp("expires_at")
+    val grantedAt = timestamp("granted_at")
 
     override val primaryKey = PrimaryKey(code)
 }
@@ -138,6 +139,14 @@ object OAuthUsedValuesTable : Table("oauth_used_values") {
     }
 }
 
+/** When each account last had all of its OAuth grants revoked; grants approved at or before it are dead. */
+object OAuthSubjectRevocationsTable : Table("oauth_subject_revocations") {
+    val subjectDid = varchar("subject_did", 255)
+    val revokedAt = timestamp("revoked_at")
+
+    override val primaryKey = PrimaryKey(subjectDid)
+}
+
 object OAuthRefreshTokensTable : Table("oauth_refresh_tokens") {
     val token = varchar("token", 255)
     val clientId = text("client_id")
@@ -148,6 +157,7 @@ object OAuthRefreshTokensTable : Table("oauth_refresh_tokens") {
     val clientAuthKeyThumbprint = varchar("client_auth_key_thumbprint", 255).nullable()
     val expiresAt = timestamp("expires_at")
     val revokedAt = timestamp("revoked_at").nullable()
+    val grantedAt = timestamp("granted_at")
 
     override val primaryKey = PrimaryKey(token)
 

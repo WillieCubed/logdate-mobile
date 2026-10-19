@@ -17,6 +17,7 @@ import app.logdate.server.oauth.OAuthPasskeySignInService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.routes.docs.OAuthDocs
+import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.HttpHeaders
@@ -133,7 +134,12 @@ fun Route.oauthRoutes(
                 if (requestUri.isBlank()) {
                     OAuthPasskeyPage.RequestExpired
                 } else {
-                    passkeySignIn.page(requestUri, clientId = call.request.queryParameters["client_id"]?.trim())
+                    try {
+                        passkeySignIn.page(requestUri, clientId = call.request.queryParameters["client_id"]?.trim())
+                    } catch (error: Exception) {
+                        Napier.e("Could not load the authorization page", error)
+                        OAuthPasskeyPage.ServerError
+                    }
                 }
             call.respondAuthorizationPage(page)
             return@get
@@ -391,9 +397,26 @@ private suspend fun ApplicationCall.respondOAuthError(error: Throwable) {
         respond(oauthError.status, OAuthErrorResponse(oauthError.error, oauthError.message))
         return
     }
-
-    respond(HttpStatusCode.InternalServerError, OAuthErrorResponse("server_error", error.message ?: "OAuth request failed"))
+    respondServerFailure(error)
 }
+
+/**
+ * Answers a failure that is the server's, not the caller's. The details go to the log; the caller
+ * gets a stable error code and no internal text such as SQL.
+ */
+private suspend fun ApplicationCall.respondServerFailure(error: Throwable) {
+    Napier.e("OAuth request failed on the server", error)
+    if (error.isDatabaseFailure()) {
+        respond(
+            HttpStatusCode.ServiceUnavailable,
+            OAuthErrorResponse("temporarily_unavailable", "The server could not reach its database. Try again shortly."),
+        )
+        return
+    }
+    respond(HttpStatusCode.InternalServerError, OAuthErrorResponse("server_error", "The server could not complete this request."))
+}
+
+private fun Throwable.isDatabaseFailure(): Boolean = generateSequence(this) { it.cause }.any { it is java.sql.SQLException }
 
 /** A browser arriving from another app has no LogDate bearer token; the LogDate apps always send one. */
 private fun ApplicationCall.isBrowserWithoutLogDateSession(): Boolean = request.header(HttpHeaders.Authorization) == null
@@ -434,7 +457,7 @@ private suspend fun ApplicationCall.allowPasskeyAttempt(
     limiter: SlidingWindowRateLimiter,
     operation: String,
 ): Boolean {
-    val key = "oauth.passkey.$operation:${request.local.remoteHost.ifBlank { "unknown" }.sha256Hex()}"
+    val key = "oauth.passkey.$operation:${request.origin.remoteHost.ifBlank { "unknown" }.sha256Hex()}"
     if (limiter.allow(key, SIGNIN_RATE_LIMIT)) return true
     response.header(HttpHeaders.RetryAfter, limiter.retryAfterSeconds(key, SIGNIN_RATE_LIMIT).toString())
     respond(

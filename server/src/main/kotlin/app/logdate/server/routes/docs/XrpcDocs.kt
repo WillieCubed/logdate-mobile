@@ -86,8 +86,9 @@ internal object XrpcDocs {
             """
             `com.atproto.repo.describeRepo`. Returns a repository's handle, DID, DID document and the record
             collections it contains. A *repository* is one person's signed, content-addressed store of records.
-            Anyone can call this, so the private LogDate journal collections (`studio.hypertext.logdate.*`) are
-            never listed; `collections` only names public ones and is empty for most accounts today.
+            Anyone can call this, so it only lists collections that are open to other apps, and never the LogDate
+            journal (`studio.hypertext.logdate.*` or `app.logdate.*`). No collection is open to apps yet, so
+            `collections` is empty today.
             """,
         )
         request { repoParameter() }

@@ -256,7 +256,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 InMemoryOAuthRuntimeStateRepository()
             }
         }
-        single { OAuthClientMetadataResolver(httpClient = get()) }
+        single { OAuthClientMetadataResolver(httpClient = get(), usedClientAssertions = get()) }
         single { OAuthAccessTokenService(config = get(), keyService = get()) }
         single {
             val config: OAuthConfig = get()
@@ -403,6 +403,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                     } else {
                         null
                     },
+                oauthGrantRevoker = get<OAuthAuthorizationService>(),
             )
         }
 

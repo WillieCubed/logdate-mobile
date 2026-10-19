@@ -49,7 +49,11 @@ internal class PostgreSQLOAuthReplayStore(
                 .limit(CLEANUP_BATCH)
                 .map { it[OAuthUsedValuesTable.valueHash] }
         if (expired.isEmpty()) return
-        OAuthUsedValuesTable.deleteWhere { OAuthUsedValuesTable.valueHash inList expired }
+        // Another instance may record one of these values again after the select, so the delete
+        // re-checks expiry and leaves a fresh record alone.
+        OAuthUsedValuesTable.deleteWhere {
+            (OAuthUsedValuesTable.valueHash inList expired) and (OAuthUsedValuesTable.expiresAt lessEq now)
+        }
     }
 
     private companion object {

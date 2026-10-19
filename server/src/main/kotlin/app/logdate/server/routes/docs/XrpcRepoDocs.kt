@@ -43,18 +43,24 @@ internal object XrpcRepoDocs {
     private val insufficientScope =
         ErrorCase(
             "InsufficientScope",
-            "The caller is an app signed in through OAuth with only the `atproto` scope. Writing records and uploading files " +
-                "also needs `transition:generic`.",
-            "This app was only granted the atproto scope, which does not allow writes",
+            "The caller is an app signed in through OAuth with only the `atproto` scope, which confirms the identity and " +
+                "nothing more. Reading or writing the repository also needs `transition:generic`.",
+            "This app was only granted the atproto scope, which does not include the repository",
         )
-    private val journalClosed =
+    private val closedCollection =
         ErrorCase(
             "Forbidden",
-            "The caller is an app signed in through OAuth and the collection is part of the LogDate journal " +
-                "(`studio.hypertext.logdate.*`), which only the account's own LogDate sessions can change.",
-            "Apps signed in through OAuth cannot change LogDate journal records",
+            "The caller is an app signed in through OAuth and the collection is not open to apps. No collection is open " +
+                "yet; the LogDate journal (`studio.hypertext.logdate.*` and `app.logdate.*`) never will be.",
+            "Apps signed in through OAuth cannot write to this collection",
         )
-    // ---- Repository sync -----------------------------------------------------------------------
+    private val uploadsClosed =
+        ErrorCase(
+            "Forbidden",
+            "The caller is an app signed in through OAuth. Apps cannot upload files until a collection open to them refers " +
+                "to files.",
+            "Apps signed in through OAuth cannot upload files yet, because no collection open to apps refers to files",
+        )
 
     val getRepo: RouteConfig.() -> Unit = {
         bearerOrDpopOperation(
@@ -150,8 +156,9 @@ internal object XrpcRepoDocs {
             *collection* is a lexicon ID such as `studio.hypertext.logdate.content`; the *record key* is the
             record's ID within it. Records are returned as the JSON the writer stored, plus the `at://` URI and
             the CID (content hash) of this version. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist. To an app signed in through OAuth, LogDate journal
-            records (`studio.hypertext.logdate.*`) answer `RecordNotFound`.
+            repository answers exactly as if it did not exist. An app signed in through OAuth needs
+            `transition:generic`, and a record in a collection that is not open to apps answers `RecordNotFound`.
+            No collection is open to apps yet.
             """,
         )
         request {
@@ -184,6 +191,7 @@ internal object XrpcRepoDocs {
                 ),
             )
             authRequired()
+            pdsError(HttpStatusCode.Forbidden, insufficientScope)
             notConfigured()
         }
     }
@@ -197,8 +205,9 @@ internal object XrpcRepoDocs {
             `com.atproto.repo.listRecords`. Pages through the records in one collection of one repository.
             Pass the `cursor` from each response to get the next page; an absent cursor means you have reached
             the end. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist. To an app signed in through OAuth, LogDate journal
-            collections (`studio.hypertext.logdate.*`) are always empty.
+            repository answers exactly as if it did not exist. An app signed in through OAuth needs
+            `transition:generic`, and a collection that is not open to apps is always empty. No collection is open
+            to apps yet.
             """,
         )
         request {
@@ -239,6 +248,7 @@ internal object XrpcRepoDocs {
                 ),
             )
             authRequired()
+            pdsError(HttpStatusCode.Forbidden, insufficientScope)
             notConfigured()
         }
     }
@@ -255,8 +265,8 @@ internal object XrpcRepoDocs {
 
             Authenticate with either a LogDate access token (`Authorization: Bearer`) or an OAuth token
             (`Authorization: DPoP` plus a `DPoP` proof). The `repo` must be your own DID or handle. An app
-            signed in through OAuth needs the `transition:generic` scope and can never write LogDate journal
-            collections (`studio.hypertext.logdate.*`).
+            signed in through OAuth needs the `transition:generic` scope and may only write a collection open to
+            apps. None is open yet, and the LogDate journal never will be.
             """,
         )
         request {
@@ -277,7 +287,7 @@ internal object XrpcRepoDocs {
                 invalidSwap,
             )
             authRequired()
-            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, journalClosed)
+            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, closedCollection)
             notConfigured()
         }
     }
@@ -317,7 +327,7 @@ internal object XrpcRepoDocs {
                 invalidSwap,
             )
             authRequired()
-            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, journalClosed)
+            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, closedCollection)
             notConfigured()
         }
     }
@@ -351,7 +361,7 @@ internal object XrpcRepoDocs {
                 invalidSwap,
             )
             authRequired()
-            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, journalClosed)
+            pdsError(HttpStatusCode.Forbidden, repoMismatch, insufficientScope, closedCollection)
             notConfigured()
         }
     }
@@ -367,7 +377,7 @@ internal object XrpcRepoDocs {
             `com.atproto.repo.uploadBlob`. Stores a binary file (an image, say) in your repository and returns
             a *blob reference* to embed in a record. Send the raw bytes as the body with the file's
             `Content-Type`; there is no multipart wrapper. Blobs that no record references may be cleaned up.
-            An app signed in through OAuth needs the `transition:generic` scope.
+            Apps signed in through OAuth cannot upload files yet.
             """,
         )
         request {
@@ -393,7 +403,7 @@ internal object XrpcRepoDocs {
                 ),
             )
             authRequired()
-            pdsError(HttpStatusCode.Forbidden, insufficientScope)
+            pdsError(HttpStatusCode.Forbidden, uploadsClosed)
             notConfigured()
         }
     }
