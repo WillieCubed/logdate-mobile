@@ -242,5 +242,8 @@ enum class SyncErrorType {
     KEY_RECOVERY_ERROR,
     MEDIA_TOO_LARGE_ERROR,
     STORAGE_ERROR,
+
+    /** The server stores the account in a way this device can't sync, so nothing syncs. */
+    ACCOUNT_STORAGE_ERROR,
     UNKNOWN_ERROR,
 }

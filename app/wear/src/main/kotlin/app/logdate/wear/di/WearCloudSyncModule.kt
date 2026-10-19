@@ -56,11 +56,11 @@ import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
-import app.logdate.client.sync.space.AccountStorageModeSource
 import app.logdate.client.sync.space.RoomSpaceSwapStore
 import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceMediaDataSource
 import app.logdate.client.sync.space.SpaceRecordRegistry
+import app.logdate.client.sync.space.SpaceRoute
 import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
@@ -148,8 +148,7 @@ val wearCloudSyncModule =
                         serverOffersPersonalSpace = {
                             config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_V1) == true
                         },
-                        // Replaced by the account's reported storage mode once the account endpoint returns it.
-                        storageMode = AccountStorageModeSource.NotReported,
+                        storageMode = get<ServerAccountStorageMode>()::currentMode,
                     ),
                 homes = XrpcSpaceDataHomes(httpClient),
                 swapStore = RoomSpaceSwapStore(get<LogDateDatabase>().spaceRecordStateDao()),
@@ -175,7 +174,7 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
             SpaceRoutingMediaDataSource(
                 legacy = DefaultCloudMediaDataSource(get(WatchCloud), get()),
                 space = SpaceMediaDataSource(space.homes, get(), spaceLocation(sessions, space.accountDid)),
-                uploadsToSpace = { space.registry.forEntityType(EntityType.NOTE) != null && space.gate.isOpen() },
+                uploadsToSpace = { space.registry.forEntityType(EntityType.NOTE) != null && space.gate.route() == SpaceRoute.Space },
             ),
         cloudDraftDataSource = DefaultCloudDraftDataSource(durable, cipher),
         cloudAccountRepository = get(WatchCloud),

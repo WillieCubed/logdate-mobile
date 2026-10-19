@@ -62,6 +62,7 @@ internal fun SyncStatus.toPresentation(): SyncPresentation {
             SyncErrorType.AUTHENTICATION_ERROR -> SyncPresentation.AuthError
             SyncErrorType.KEY_RECOVERY_ERROR -> SyncPresentation.NeedsRecovery
             SyncErrorType.MEDIA_TOO_LARGE_ERROR -> SyncPresentation.MediaTooLarge
+            SyncErrorType.ACCOUNT_STORAGE_ERROR -> SyncPresentation.AccountStorageUnsupported
             SyncErrorType.STORAGE_ERROR -> SyncPresentation.StorageError(pendingCount = pendingUploads)
             SyncErrorType.CONFLICT_ERROR -> SyncPresentation.ConflictError(conflictCount = conflictCount.coerceAtLeast(1))
             SyncErrorType.NETWORK_ERROR -> SyncPresentation.NetworkError(pendingCount = pendingUploads)

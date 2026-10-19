@@ -124,6 +124,7 @@ internal fun SyncPresentation.accountSummaryResource(): StringResource? =
         SyncPresentation.NeedsRecovery -> AccountSyncStatus.KEY_RECOVERY_REQUIRED.messageResource()
         is SyncPresentation.StorageError -> AccountSyncStatus.STORAGE_FULL.messageResource()
         SyncPresentation.MediaTooLarge -> AccountSyncStatus.MEDIA_TOO_LARGE.messageResource()
+        SyncPresentation.AccountStorageUnsupported -> AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED.messageResource()
         is SyncPresentation.ConflictError -> AccountSyncStatus.CONFLICT.messageResource()
         is SyncPresentation.NetworkError -> AccountSyncStatus.CONNECTION_UNAVAILABLE.messageResource()
     }

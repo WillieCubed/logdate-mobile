@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Storage
@@ -46,6 +47,7 @@ import app.logdate.ui.common.MessageBanner
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.last_sync_failed
 import logdate.client.feature.core.generated.resources.sync_account_media_too_large
+import logdate.client.feature.core.generated.resources.sync_account_storage_unsupported
 import logdate.client.feature.core.generated.resources.sync_banner_conflicts
 import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_banner_manage
@@ -103,6 +105,7 @@ fun SyncStatusButton(
         SyncPresentation.NeedsRecovery,
         is SyncPresentation.StorageError,
         SyncPresentation.MediaTooLarge,
+        SyncPresentation.AccountStorageUnsupported,
         is SyncPresentation.ConflictError,
         -> return
 
@@ -283,6 +286,16 @@ private fun SyncPresentation.toBannerVisual(): BannerVisual? {
                 containerColor = scheme.errorContainer,
                 contentColor = scheme.onErrorContainer,
                 action = stringResource(Res.string.sync_banner_enter_recovery_phrase) to SyncAction.EnterRecoveryPhrase,
+                dismissible = false,
+            )
+
+        SyncPresentation.AccountStorageUnsupported ->
+            BannerVisual(
+                message = stringResource(Res.string.sync_account_storage_unsupported),
+                icon = Icons.Filled.CloudOff,
+                containerColor = scheme.errorContainer,
+                contentColor = scheme.onErrorContainer,
+                action = null,
                 dismissible = false,
             )
 

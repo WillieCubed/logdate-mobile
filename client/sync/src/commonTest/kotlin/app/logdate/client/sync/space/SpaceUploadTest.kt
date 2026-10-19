@@ -3,6 +3,7 @@ package app.logdate.client.sync.space
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonObject
@@ -219,9 +220,9 @@ class SpaceUploadTest {
         }
 
     @Test
-    fun `while the gate is closed nothing goes to the space`() =
+    fun `an account in legacy storage sends nothing to the space`() =
         runTest {
-            val device = SpaceDevice(FakeDataHome()).apply { gateOpen = false }
+            val device = SpaceDevice(FakeDataHome()).apply { mode = AccountStorageMode.LEGACY }
             device.create(Journal(title = "Weekend walks", created = created, lastUpdated = created))
 
             device.manager.uploadPendingChanges()

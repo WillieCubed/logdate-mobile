@@ -12,6 +12,7 @@ import logdate.client.feature.core.generated.resources.sync_account_recovery_req
 import logdate.client.feature.core.generated.resources.sync_account_retrying
 import logdate.client.feature.core.generated.resources.sync_account_signed_out
 import logdate.client.feature.core.generated.resources.sync_account_storage_full
+import logdate.client.feature.core.generated.resources.sync_account_storage_unsupported
 import logdate.client.feature.core.generated.resources.sync_account_unknown
 import logdate.client.feature.core.generated.resources.sync_account_waiting
 import logdate.client.feature.core.generated.resources.sync_account_wifi
@@ -40,6 +41,7 @@ internal fun AccountSyncStatus.messageResource(): StringResource =
         AccountSyncStatus.CONFLICT -> Res.string.sync_account_unknown
         AccountSyncStatus.LOCAL_DATA_UNAVAILABLE -> Res.string.sync_account_unknown
         AccountSyncStatus.MEDIA_TOO_LARGE -> Res.string.sync_account_media_too_large
+        AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Res.string.sync_account_storage_unsupported
         AccountSyncStatus.UNKNOWN -> Res.string.sync_account_unknown
         AccountSyncStatus.DISABLED -> Res.string.sync_account_disabled
     }

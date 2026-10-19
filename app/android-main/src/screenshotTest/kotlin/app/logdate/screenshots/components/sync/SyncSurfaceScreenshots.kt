@@ -130,6 +130,13 @@ fun Banner_ConflictError_many() {
     BannerHarness(SyncPresentation.ConflictError(conflictCount = 9))
 }
 
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun Banner_AccountStorageUnsupported() {
+    BannerHarness(SyncPresentation.AccountStorageUnsupported)
+}
+
 // ─── Inset regression: banner under a TopAppBar with a faked status bar ─────────
 @OptIn(ExperimentalMaterial3Api::class)
 @PreviewTest

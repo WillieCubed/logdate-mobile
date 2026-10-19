@@ -60,7 +60,7 @@ internal fun BackupStatusItem(
             AccountSyncStatus.STORAGE_FULL -> Res.string.sync_heading_storage
             AccountSyncStatus.UNKNOWN, AccountSyncStatus.SERVER_UNAVAILABLE, AccountSyncStatus.CONNECTION_UNAVAILABLE,
             AccountSyncStatus.DEVICE_ACCESS_REQUIRED, AccountSyncStatus.CONFLICT, AccountSyncStatus.LOCAL_DATA_UNAVAILABLE,
-            AccountSyncStatus.MEDIA_TOO_LARGE,
+            AccountSyncStatus.MEDIA_TOO_LARGE, AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED,
             -> Res.string.sync_heading_failed
             else -> status.messageResource()
         }

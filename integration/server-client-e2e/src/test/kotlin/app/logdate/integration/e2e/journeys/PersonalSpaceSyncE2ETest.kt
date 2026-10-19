@@ -28,7 +28,6 @@ import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.recovery.DurableCloudApiClient
-import app.logdate.client.sync.space.AccountStorageMode
 import app.logdate.client.sync.space.RoomSpaceSwapStore
 import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceLocalRecords
@@ -41,6 +40,7 @@ import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
 import app.logdate.integration.e2e.harness.withServerClientHarness
 import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.Journal
 import io.ktor.client.request.get
