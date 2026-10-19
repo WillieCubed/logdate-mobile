@@ -25,7 +25,11 @@
             "blob": { "type": "blob" }
           }
         }
-      }
+      },
+      "errors": [
+        { "name": "BlobNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing blob." },
+        { "name": "BlobTooLarge", "description": "The file is larger than the server accepts: 100 MiB on LogDate Cloud." }
+      ]
     }
   }
 }

@@ -406,7 +406,7 @@ class SpaceXrpcRoutesTest {
                     bearer(token)
                     parameter("space", space)
                     parameter("since", "3")
-                    parameter("limit", "9999")
+                    parameter("limit", "500")
                 }
             val tombstone = Json.parseToJsonElement(rest.bodyAsText()).jsonObject
             assertTrue(""""deleted":true""" in rest.bodyAsText().replace(" ", ""))
@@ -419,6 +419,16 @@ class SpaceXrpcRoutesTest {
                 }
             assertEquals(HttpStatusCode.BadRequest, badLimit.status)
             assertEquals("InvalidRequest", badLimit.errorCode())
+            listOf("0", "501", "9999", "-1").forEach { limit ->
+                val outOfRange =
+                    client.get("/xrpc/app.logdate.space.listRepoOps") {
+                        bearer(token)
+                        parameter("space", space)
+                        parameter("limit", limit)
+                    }
+                assertEquals(HttpStatusCode.BadRequest, outOfRange.status, "limit=$limit")
+                assertEquals("InvalidRequest", outOfRange.errorCode(), "limit=$limit")
+            }
         }
 
     @Test

@@ -215,12 +215,14 @@ internal object XrpcSpaceDocs {
         request {
             spaceParameter()
             queryParameter<Long>("since") {
-                description = "Return changes after this sequence number. Defaults to 0, the start of the space."
+                description =
+                    "Return changes with a sequence number greater than this one; the change at `since` itself isn't " +
+                    "repeated. Defaults to 0, the start of the space."
                 required = false
                 example("First page") { value = 0L }
             }
             queryParameter<Int>("limit") {
-                description = "The most changes to return. Defaults to 200; values outside 1 to 500 are clamped."
+                description = "The most changes to return, from 1 to 500. Defaults to 200; any other value answers `InvalidRequest`."
                 required = false
                 example("Default") { value = 200 }
             }
@@ -242,8 +244,9 @@ internal object XrpcSpaceDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase(
                     "InvalidRequest",
-                    "`space` is malformed, or `since` or `limit` isn't a whole number.",
-                    "limit must be a whole number",
+                    "`space` is malformed, `since` isn't a whole number of 0 or more, or `limit` isn't a whole number " +
+                        "from 1 to 500.",
+                    "limit must be a whole number from 1 to 500",
                 ),
                 recordNotFound,
                 ErrorCase(

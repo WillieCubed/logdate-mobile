@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Deletes one sealed record from the caller's own repository in a space.",
+      "description": "Deletes one sealed record from the caller's own repository in a space. Deleting a key with no live record changes nothing and returns the current sequence number.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -24,11 +24,18 @@
           "type": "object",
           "required": ["seq"],
           "properties": {
-            "seq": { "type": "integer", "minimum": 1 }
+            "seq": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The deletion's sequence number. For a key with no live record, the repository's current sequence number: the existing tombstone's, or 0 in an empty repository."
+            }
           }
         }
       },
-      "errors": [{ "name": "InvalidSwap" }]
+      "errors": [
+        { "name": "InvalidSwap" },
+        { "name": "RecordNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing record." }
+      ]
     }
   }
 }
