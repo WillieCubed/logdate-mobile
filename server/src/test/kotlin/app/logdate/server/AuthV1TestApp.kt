@@ -46,11 +46,12 @@ import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.routes.LogDateAccountAuth
+import app.logdate.server.routes.MAX_SPACE_BLOB_BYTES
 import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
 import app.logdate.server.routes.oauthRoutes
-import app.logdate.server.routes.requireAuthenticatedAccount
 import app.logdate.server.routes.spaceXrpcRoutes
 import app.logdate.server.routes.xrpcRoutes
 import app.logdate.server.space.InMemorySpaceStore
@@ -93,6 +94,7 @@ data class AuthV1TestEnvironment(
     val oauthAuthorizationService: OAuthAuthorizationService,
     val blobStorage: LogDateBlobStorage,
     val spaceStore: SpaceStore,
+    val atprotoSessionTokenService: AtprotoSessionTokenService,
 )
 
 @OptIn(ExperimentalUuidApi::class)
@@ -116,6 +118,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     deviceLinkService: DeviceLinkService? = null,
     accessTokenVerifier: AccessTokenVerifier? = null,
     personalSpaceEnabled: Boolean = false,
+    spaceStore: SpaceStore = InMemorySpaceStore(),
+    spaceMaxBlobBytes: Long = MAX_SPACE_BLOB_BYTES,
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
@@ -129,7 +133,6 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
         )
     val repoBlockStore = InMemoryRepoBlockStore()
     val blobStorage = InMemoryLogDateBlobStorage()
-    val spaceStore = InMemorySpaceStore()
     val atprotoBlobRepository = InMemoryLogDateAtprotoBlobRepository()
     val mediaRepository = InMemoryLogDateMediaRepository()
     val mediaBlobRepository =
@@ -241,17 +244,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 enabled = personalSpaceEnabled,
                 store = spaceStore,
                 blobStorage = blobStorage,
-                auth = {
-                    requireAuthenticatedAccount(
-                        identityService = atprotoIdentityService,
-                        accountRepository = accountRepository,
-                        tokenService = tokenService,
-                        atprotoSessionTokenService = atprotoSessionTokenService,
-                        oauthAccessTokenService = oauthAccessTokenService,
-                        oauthDpopVerifier = oauthDpopVerifier,
-                        oauthNonceService = oauthNonceService,
-                    )
-                },
+                auth = LogDateAccountAuth(tokenService, accountRepository, atprotoIdentityService),
+                maxBlobBytes = spaceMaxBlobBytes,
             )
             route("/api/v1") {
                 authV1Routes(
@@ -296,5 +290,6 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
         oauthAuthorizationService = oauthAuthorizationService,
         blobStorage = blobStorage,
         spaceStore = spaceStore,
+        atprotoSessionTokenService = atprotoSessionTokenService,
     )
 }

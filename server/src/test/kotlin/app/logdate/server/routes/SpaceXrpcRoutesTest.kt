@@ -2,9 +2,17 @@
 
 package app.logdate.server.routes
 
+import app.logdate.lexicon.app.logdate.space.DeleteRecordInput
+import app.logdate.lexicon.app.logdate.space.PutRecordInput
 import app.logdate.server.AuthV1TestEnvironment
 import app.logdate.server.auth.Account
 import app.logdate.server.configureAuthV1TestApp
+import app.logdate.server.oauth.createDpopProof
+import app.logdate.server.oauth.generateP256KeyPair
+import app.logdate.server.oauth.publicJwk
+import app.logdate.server.space.InMemorySpaceStore
+import app.logdate.server.space.SpaceBlob
+import app.logdate.server.space.SpaceStore
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -17,10 +25,14 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.contentType
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.writeFully
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -402,6 +414,227 @@ class SpaceXrpcRoutesTest {
             assertEquals(
                 HttpStatusCode.Unauthorized,
                 client.get("/xrpc/app.logdate.space.listRepoOps") { parameter("space", space) }.status,
+            )
+        }
+
+    @Test
+    fun `OAuth, AT Protocol session and linked device tokens are refused on every method`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val account = runBlocking { requireNotNull(env.accountRepository.findByDid(did)) }
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, ByteArray(600)).status)
+
+            val clientKey = generateP256KeyPair()
+            val oauthToken =
+                env.oauthAccessTokenService
+                    .issueAccessToken(
+                        subjectDid = did,
+                        clientId = "https://viewer.example.com/client.json",
+                        scope = "atproto",
+                        keyThumbprint = env.oauthDpopVerifier.jwkThumbprint(publicJwk(clientKey)),
+                    ).token
+            var proofs = 0
+            val dpop: HttpRequestBuilder.(String, String) -> Unit = { method, path ->
+                header(HttpHeaders.Authorization, "DPoP $oauthToken")
+                header(
+                    "DPoP",
+                    createDpopProof(
+                        keyPair = clientKey,
+                        method = method,
+                        htu = "http://localhost$path",
+                        nonce = env.oauthNonceService.currentNonce(),
+                        ath = env.oauthDpopVerifier.accessTokenHash(oauthToken),
+                        jti = "space-proof-${proofs++}",
+                    ),
+                )
+            }
+            val sessionToken = runBlocking { env.atprotoSessionTokenService.createSession(account).accessJwt }
+            val session: HttpRequestBuilder.(String, String) -> Unit = { _, _ -> bearer(sessionToken) }
+            val deviceToken = env.tokenService.generateDeviceAccessToken(account.id.toString(), did, Uuid.random().toString())
+            val device: HttpRequestBuilder.(String, String) -> Unit = { _, _ -> bearer(deviceToken) }
+
+            val listRecords = "/xrpc/com.atproto.repo.listRecords"
+            val collection = "studio.hypertext.logdate.content"
+            assertEquals(
+                HttpStatusCode.OK,
+                client.get("$listRecords?repo=$did&collection=$collection") { dpop("GET", listRecords) }.status,
+                "the OAuth token works on the AT Protocol repository",
+            )
+            assertEquals(
+                HttpStatusCode.OK,
+                client.get("$listRecords?repo=$did&collection=$collection") { session("GET", listRecords) }.status,
+                "the AT Protocol session token works on the AT Protocol repository",
+            )
+
+            val unauthenticated = everySpaceMethod(space) { _, _ -> }
+            mapOf("OAuth DPoP" to dpop, "AT Protocol session" to session, "linked device" to device).forEach { (kind, authorize) ->
+                everySpaceMethod(space, authorize).forEach { (method, response) ->
+                    assertEquals(HttpStatusCode.Unauthorized, response.status, "$kind token on $method")
+                    assertEquals("AuthRequired", response.errorCode(), "$kind token on $method")
+                    assertContentEquals(unauthenticated.getValue(method).bodyAsBytes(), response.bodyAsBytes(), "$kind token on $method")
+                }
+            }
+            everySpaceMethod(space) { _, _ -> bearer(token) }.forEach { (method, response) ->
+                assertTrue(response.status.value in 200..299, "LogDate token on $method answered ${response.status}")
+            }
+        }
+
+    @Test
+    fun `the request bodies use the lexicon's field names`() {
+        assertEquals(
+            PutRecordInput
+                .serializer()
+                .descriptor.elementNames
+                .toSet(),
+            SpacePutRecordInput
+                .serializer()
+                .descriptor.elementNames
+                .toSet(),
+        )
+        assertEquals(
+            DeleteRecordInput
+                .serializer()
+                .descriptor.elementNames
+                .toSet(),
+            SpaceDeleteRecordInput
+                .serializer()
+                .descriptor.elementNames
+                .toSet(),
+        )
+    }
+
+    @Test
+    fun `an upload whose metadata can't be stored leaves no object behind`() =
+        testApplication {
+            val store =
+                object : SpaceStore by InMemorySpaceStore() {
+                    override suspend fun putBlob(
+                        accountId: java.util.UUID,
+                        space: String,
+                        blob: SpaceBlob,
+                    ): SpaceBlob = error("The metadata store is down")
+                }
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceStore = store)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val outcome = runCatching { uploadBlob(token, space, ByteArray(600)) }
+            assertTrue(outcome.isFailure || outcome.getOrThrow().status == HttpStatusCode.InternalServerError, "$outcome")
+            val ownerId = runBlocking { requireNotNull(env.accountRepository.findByDid(did)) }.id.toString()
+            assertEquals(emptyList(), env.blobStorage.listOwnerBlobPaths(java.util.UUID.fromString(ownerId)))
+        }
+
+    @Test
+    fun `a chunked upload over the limit is refused`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceMaxBlobBytes = 1024)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val tooLarge = uploadChunked(token, space, ByteArray(1025))
+            assertEquals(HttpStatusCode.PayloadTooLarge, tooLarge.status)
+            assertEquals("BlobTooLarge", tooLarge.errorCode())
+            assertEquals(HttpStatusCode.OK, uploadChunked(token, space, ByteArray(1024)).status)
+            assertEquals(HttpStatusCode.PayloadTooLarge, uploadBlob(token, space, ByteArray(1025)).status)
+        }
+
+    @Test
+    fun `malformed keys and CIDs are invalid for the owner and missing for anyone else`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true)
+            val (did, owner) = env.signedInAccount("alice")
+            val (_, other) = env.signedInAccount("bob")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val badKey = "no spaces/allowed"
+            val badCid = "not-a-cid"
+
+            fun deleteRecord(token: String) =
+                runBlocking {
+                    client.post("/xrpc/app.logdate.space.deleteRecord") {
+                        bearer(token)
+                        json("""{"space":"$space","rkey":"$badKey"}""")
+                    }
+                }
+
+            fun putWithBadSwap(token: String) =
+                runBlocking {
+                    client.post("/xrpc/app.logdate.space.putRecord") {
+                        bearer(token)
+                        json("""{"space":"$space","rkey":"abc","record":${sealedJson()},"swapCid":"$badCid"}""")
+                    }
+                }
+            assertEquals("InvalidRequest", getRecord(owner, space, badKey).errorCode())
+            assertEquals("InvalidRequest", getBlob(owner, space, badCid).errorCode())
+            assertEquals("InvalidRequest", deleteRecord(owner).errorCode())
+            assertEquals("InvalidRequest", putWithBadSwap(owner).errorCode())
+            assertEquals("RecordNotFound", getRecord(other, space, badKey).errorCode())
+            assertEquals("BlobNotFound", getBlob(other, space, badCid).errorCode())
+            assertEquals("RecordNotFound", deleteRecord(other).errorCode())
+            assertEquals("RecordNotFound", putWithBadSwap(other).errorCode())
+        }
+
+    private suspend fun ApplicationTestBuilder.everySpaceMethod(
+        space: String,
+        authorize: HttpRequestBuilder.(method: String, path: String) -> Unit,
+    ): Map<String, HttpResponse> {
+        val bytes = ByteArray(600)
+        val cid = Cid.rawSha256(bytes).value
+
+        fun path(method: String) = "/xrpc/app.logdate.space.$method"
+        return linkedMapOf(
+            "putRecord" to
+                client.post(path("putRecord")) {
+                    authorize("POST", path("putRecord"))
+                    json("""{"space":"$space","rkey":"abc","record":${sealedJson()},"blobs":["$cid"]}""")
+                },
+            "getRecord" to
+                client.get(path("getRecord")) {
+                    authorize("GET", path("getRecord"))
+                    parameter("space", space)
+                    parameter("rkey", "abc")
+                },
+            "listRepoOps" to
+                client.get(path("listRepoOps")) {
+                    authorize("GET", path("listRepoOps"))
+                    parameter("space", space)
+                },
+            "uploadBlob" to
+                client.post(path("uploadBlob")) {
+                    authorize("POST", path("uploadBlob"))
+                    parameter("space", space)
+                    header(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString())
+                    setBody(bytes)
+                },
+            "getBlob" to
+                client.get(path("getBlob")) {
+                    authorize("GET", path("getBlob"))
+                    parameter("space", space)
+                    parameter("cid", cid)
+                },
+            "deleteRecord" to
+                client.post(path("deleteRecord")) {
+                    authorize("POST", path("deleteRecord"))
+                    json("""{"space":"$space","rkey":"abc"}""")
+                },
+        )
+    }
+
+    private suspend fun ApplicationTestBuilder.uploadChunked(
+        token: String,
+        space: String,
+        bytes: ByteArray,
+    ): HttpResponse =
+        client.post("/xrpc/app.logdate.space.uploadBlob") {
+            bearer(token)
+            parameter("space", space)
+            setBody(
+                object : OutgoingContent.WriteChannelContent() {
+                    override val contentType = ContentType.Application.OctetStream
+
+                    override suspend fun writeTo(channel: ByteWriteChannel) {
+                        bytes.asList().chunked(256).forEach { channel.writeFully(it.toByteArray()) }
+                    }
+                },
             )
         }
 
