@@ -32,7 +32,12 @@
           }
         }
       },
-      "errors": [{ "name": "InvalidSwap" }, { "name": "InvalidRecord" }]
+      "errors": [
+        { "name": "InvalidSwap" },
+        { "name": "InvalidRecord" },
+        { "name": "RecordNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing record." },
+        { "name": "RecordTooLarge", "description": "The request is larger than the largest sealed record can be." }
+      ]
     }
   }
 }

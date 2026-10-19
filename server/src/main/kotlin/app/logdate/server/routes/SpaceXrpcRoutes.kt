@@ -223,7 +223,8 @@ private fun Route.listRepoOps(
             } ?: 0L
         val limit =
             call.request.queryParameters["limit"]?.let { param ->
-                param.toIntOrNull()?.coerceIn(1, MAX_SPACE_CHANGES_LIMIT) ?: return@get call.respondInvalid("limit must be a whole number")
+                param.toIntOrNull()?.takeIf { it in 1..MAX_SPACE_CHANGES_LIMIT }
+                    ?: return@get call.respondInvalid("limit must be a whole number from 1 to $MAX_SPACE_CHANGES_LIMIT")
             } ?: DEFAULT_CHANGES_LIMIT
         val page =
             try {
