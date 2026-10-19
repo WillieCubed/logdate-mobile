@@ -21,88 +21,90 @@
   "valid": [
     {
       "name": "minimal",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a5646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6c7261646975734d657465727307",
-      "cid": "bafyreih2cmbieg7uj4wsvvbqvxvy2crrrdex27pr6tjzwze3upmj2b24di"
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"}},
+      "dagCbor": "a3646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530",
+      "cid": "bafyreid2tejdgo5itcp4f6q4k7tdbwy5kzttxqw37ejmwwrlb3d2qp7p7i"
     },
     {
       "name": "every-field",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","description":"Pancakes at the lake","location":{"latitude":"44.9778","longitude":"-93.2650","altitude":"Pancakes at the lake","name":"Lake house"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a7646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea4646e616d656a4c616b6520686f75736568616c7469747564657450616e63616b657320617420746865206c616b65686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6b6465736372697074696f6e7450616e63616b657320617420746865206c616b656c7261646975734d657465727307",
-      "cid": "bafyreicmb7nfqrju2gqgfbjrxaomcpdwpiirsmcgkvq4lolt7eslqq2eay"
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","description":"Pancakes at the lake","location":{"latitude":"44.9778","longitude":"-93.2650","altitude":"Pancakes at the lake","name":"Lake house"},"radiusCentimeters":7,"locality":"Pancakes at the lake","externalId":"Pancakes at the lake","userConfirmed":true,"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "aa646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f63616c6974797450616e63616b657320617420746865206c616b65686c6f636174696f6ea4646e616d656a4c616b6520686f75736568616c7469747564657450616e63616b657320617420746865206c616b65686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6a65787465726e616c49647450616e63616b657320617420746865206c616b656b6465736372697074696f6e7450616e63616b657320617420746865206c616b656d75736572436f6e6669726d6564f57172616469757343656e74696d657465727307",
+      "cid": "bafyreiagjvb4z4bibkjnc5iyxrkynsxj3cbtritu3iargz5kermdu5cnyq"
     },
     {
       "name": "unknown-field-from-a-newer-version",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
-      "dagCbor": "a6646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6c7261646975734d65746572730772756e6b6e6f776e4675747572654669656c646769676e6f726564",
-      "cid": "bafyreidruqudwqvyynif4cmywfy5xyhtai7klccdl5xtuzkgkpkh5ytjze",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"unknownFutureField":"ignored"},
+      "dagCbor": "a4646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e3236353072756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreiauxqeqmslfuyni4xyfpp5pnl66zf3tr4t4bggbroahlizmy7xmza",
       "modelRoundTrip": false
+    },
+    {
+      "name": "example-place-place-saved",
+      "record": {"$type":"app.logdate.place.place","name":"Grandma's house","description":"The blue one at the end of the road.","location":{"latitude":"46.7867","longitude":"-92.1005"},"radiusCentimeters":7500,"userConfirmed":true,"createdAt":"2026-03-02T17:45:00.000Z","updatedAt":"2026-09-30T11:12:00.000Z"},
+      "dagCbor": "a8646e616d656f4772616e646d61277320686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea2686c617469747564656734362e37383637696c6f6e676974756465682d39322e31303035696372656174656441747818323032362d30332d30325431373a34353a30302e3030305a697570646174656441747818323032362d30392d33305431313a31323a30302e3030305a6b6465736372697074696f6e782454686520626c7565206f6e652061742074686520656e64206f662074686520726f61642e6d75736572436f6e6669726d6564f57172616469757343656e74696d6574657273191d4c",
+      "cid": "bafyreiey6yvl3hv5jwbeu2cyykkh34ublf4cebqspskemvzxokgndjyszm"
+    },
+    {
+      "name": "example-place-place",
+      "record": {"$type":"app.logdate.place.place","name":"Lakeside Coffee","location":{"latitude":"44.9781","longitude":"-93.2649"},"locality":"1200 Lake St, Minneapolis","externalId":"ChIJ7cv00DwsDogRAMDACa2m4K8","userConfirmed":false},
+      "dagCbor": "a6646e616d656f4c616b657369646520436f66666565652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f63616c697479781931323030204c616b652053742c204d696e6e6561706f6c6973686c6f636174696f6ea2686c617469747564656734342e39373831696c6f6e676974756465682d39332e323634396a65787465726e616c4964781b4368494a3763763030447773446f6752414d44414361326d344b386d75736572436f6e6669726d6564f4",
+      "cid": "bafyreiaykfkgeylyu7wkjyh6mck67lqfhlez73bnftftia34qthzujszae"
     }
   ],
   "invalid": [
     {
       "name": "wrong-record-type",
-      "record": {"$type":"app.logdate.not.this","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.not.this","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"}},
       "failure": {"kind":"wrong-record-type","path":"/$type"}
     },
     {
       "name": "missing-name",
-      "record": {"$type":"app.logdate.place.place","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.place.place","location":{"latitude":"44.9778","longitude":"-93.2650"}},
       "failure": {"kind":"missing-required","path":"/name"}
     },
     {
       "name": "wrong-type-name",
-      "record": {"$type":"app.logdate.place.place","name":42,"location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.place.place","name":42,"location":{"latitude":"44.9778","longitude":"-93.2650"}},
       "failure": {"kind":"wrong-type","path":"/name"}
     },
     {
-      "name": "too-long-name",
-      "record": {"$type":"app.logdate.place.place","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"too-long","path":"/name"}
-    },
-    {
       "name": "missing-location",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.place.place","name":"Lake house"},
       "failure": {"kind":"missing-required","path":"/location"}
     },
     {
       "name": "wrong-type-location",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":"not the right type","radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":"not the right type"},
       "failure": {"kind":"wrong-type","path":"/location"}
     },
     {
       "name": "missing-location-latitude",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"longitude":"-93.2650"}},
       "failure": {"kind":"missing-required","path":"/location/latitude"}
     },
     {
-      "name": "missing-radiusMeters",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"missing-required","path":"/radiusMeters"}
+      "name": "wrong-type-radiusCentimeters",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusCentimeters":"seven"},
+      "failure": {"kind":"wrong-type","path":"/radiusCentimeters"}
     },
     {
-      "name": "wrong-type-radiusMeters",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":"seven","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"wrong-type","path":"/radiusMeters"}
+      "name": "below-minimum-radiusCentimeters",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusCentimeters":-1},
+      "failure": {"kind":"out-of-range","path":"/radiusCentimeters"}
     },
     {
-      "name": "below-minimum-radiusMeters",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":0,"createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"out-of-range","path":"/radiusMeters"}
+      "name": "too-long-locality",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"locality":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "failure": {"kind":"too-long","path":"/locality"}
     },
     {
-      "name": "above-maximum-radiusMeters",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":100001,"createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"out-of-range","path":"/radiusMeters"}
-    },
-    {
-      "name": "missing-createdAt",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7},
-      "failure": {"kind":"missing-required","path":"/createdAt"}
+      "name": "wrong-type-userConfirmed",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"userConfirmed":"yes"},
+      "failure": {"kind":"wrong-type","path":"/userConfirmed"}
     },
     {
       "name": "invalid-format-createdAt",
-      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"yesterday afternoon"},
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"createdAt":"yesterday afternoon"},
       "failure": {"kind":"invalid-format","path":"/createdAt"}
     }
   ]
