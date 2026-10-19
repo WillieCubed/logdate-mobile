@@ -56,6 +56,7 @@ test|screenshots:os|Capture real system UI (launcher, shade, bubbles) on managed
 test|screenshots:desktop|Capture LogDate in Android desktop windowing on its own tablet emulator into docs/screenshots|./scripts/desktop-windowing-screenshots.sh
 test|screenshots:hub|Capture the Capture widget on the lock screen hub of the desktop emulator into docs/screenshots|./scripts/hub-widget-screenshots.sh
 test|location-replay|Replay exported location history through old and current reconstruction|./scripts/location-replay.sh
+test|identity:rehearse|Rehearse publishing identities against a PLC directory on this machine, never the public one|./scripts/identity-publishing-rehearsal.sh
 
 quality|lint|Run Android lint|./gradlew lint
 quality|lint:check|Check Kotlin code style|./gradlew ktlintCheck
@@ -79,6 +80,7 @@ deploy|deploy:bootstrap|Bootstrap a fresh GCP LogDate Cloud instance|./scripts/b
 deploy|deploy:production|Interactive turnkey production deploy (autoconfigures project, Cloudflare DNS, secrets)|./scripts/deploy-production.sh
 deploy|deploy:backfill-identities|Count (--dry-run) or assign AT Protocol identities for accounts that predate them (--contract-file)|./scripts/identity-backfill-job.py
 deploy|deploy:check-handle|Check that a handle resolves to its DID for other AT Protocol apps (--handle, --service-url)|./scripts/check-handle-resolution.sh
+deploy|identity:publish-job|Check, dry-run or publish identities as a Cloud Run job from a deployment contract|python3 ./scripts/identity-publishing-job.py
 
 setup|setup|Set up this machine; add staging or production to prepare that environment|./scripts/setup/main.sh
 setup|setup:hooks|Configure git hooks for commit validation|./scripts/setup-hooks.sh
