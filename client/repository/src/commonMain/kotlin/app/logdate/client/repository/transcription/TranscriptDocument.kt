@@ -1,6 +1,7 @@
 package app.logdate.client.repository.transcription
 
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /**
  * Durable transcript shape used by live recognition, refinement, search, and sync.
@@ -23,6 +24,12 @@ data class TranscriptDocument(
     val speakers: List<TranscriptSpeaker> = emptyList(),
     /** Recognition engine metadata, when reported by the local or cloud recognizer. */
     val engine: TranscriptEngineMetadata? = null,
+    /** Non-speech sounds detected in the recording, such as laughter or rain. */
+    val soundTags: List<TranscriptSoundTag> = emptyList(),
+    /** When the transcript was first produced, when known. */
+    val createdAt: Instant? = null,
+    /** When the transcript last changed, when known. */
+    val updatedAt: Instant? = null,
 ) {
     /** User-visible text assembled from timestamp order. */
     val plainText: String
@@ -201,4 +208,17 @@ data class TranscriptEngineMetadata(
     val name: String,
     val modelId: String? = null,
     val version: String? = null,
+)
+
+/** A non-speech sound detected in a recording, such as laughter or rain. */
+@Serializable
+data class TranscriptSoundTag(
+    /** What the sound is. */
+    val name: String,
+    /** When the sound starts, relative to the beginning of the recording. */
+    val startMs: Long,
+    /** How long the sound lasts, when known. */
+    val durationMs: Long? = null,
+    /** Detection confidence from 0.0 to 1.0 when available. */
+    val confidence: Float? = null,
 )
