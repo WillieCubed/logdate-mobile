@@ -14,14 +14,25 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.writeFully
+import kotlinx.io.Buffer
+import kotlinx.io.RawSink
+import kotlinx.io.RawSource
+import kotlinx.io.buffered
+import kotlinx.io.readByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -36,6 +47,7 @@ import studio.hypertext.atproto.xrpc.XrpcSerializationException
 import studio.hypertext.atproto.xrpc.XrpcTransportException
 import studio.hypertext.atproto.xrpc.procedure
 import studio.hypertext.atproto.xrpc.query
+import studio.hypertext.atproto.xrpc.retryAfterSeconds
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -154,13 +166,7 @@ public class XrpcDataHome(
                 if (!response.status.isSuccess()) throw response.failure()
                 response.bodyAsText()
             }
-        return try {
-            json
-                .decodeFromString<UploadBlobOutput>(body)
-                .blob.ref.cid.value
-        } catch (e: IllegalArgumentException) {
-            throw XrpcSerializationException("Failed to decode the uploadBlob response", e)
-        }
+        return blobCid(body)
     }
 
     /**
@@ -185,6 +191,76 @@ public class XrpcDataHome(
             throw failure
         }
     }
+
+    /**
+     * @throws XrpcTransportException if the request fails before a response arrives, including when
+     *   [open] can't be read; the read failure is the cause.
+     * @throws XrpcSerializationException if the response isn't a blob reference.
+     * @throws IllegalStateException if [auth] supplies no bearer token.
+     */
+    override suspend fun uploadBlob(
+        space: SpaceRef,
+        sizeBytes: Long,
+        open: () -> RawSource,
+    ): String {
+        require(sizeBytes >= 0) { "A blob can't have a negative size" }
+        val token = bearerToken(auth())
+        val body =
+            transport {
+                val response =
+                    httpClient.post(url(UPLOAD_BLOB)) {
+                        parameter("space", space.uri)
+                        bearer(token)
+                        setBody(StreamedBlob(sizeBytes, open))
+                    }
+                if (!response.status.isSuccess()) throw response.failure()
+                response.bodyAsText()
+            }
+        return blobCid(body)
+    }
+
+    /**
+     * @throws XrpcTransportException if the request fails before the whole blob arrives.
+     * @throws IllegalStateException if [auth] supplies no bearer token.
+     */
+    override suspend fun downloadBlob(
+        space: SpaceRef,
+        cid: String,
+        sink: RawSink,
+    ): Boolean {
+        val token = bearerToken(auth())
+        return transport {
+            httpClient
+                .prepareGet(url(GET_BLOB)) {
+                    parameter("space", space.uri)
+                    parameter("cid", cid)
+                    bearer(token)
+                }.execute { response ->
+                    if (!response.status.isSuccess()) {
+                        val failure = response.failure()
+                        if (failure.error == BLOB_NOT_FOUND) return@execute false
+                        throw failure
+                    }
+                    val channel = response.bodyAsChannel()
+                    val buffer = Buffer()
+                    while (!channel.isClosedForRead) {
+                        buffer.write(channel.readRemaining(CHUNK_BYTES.toLong()).readByteArray())
+                        sink.write(buffer, buffer.size)
+                    }
+                    sink.flush()
+                    true
+                }
+        }
+    }
+
+    private fun blobCid(body: String): String =
+        try {
+            json
+                .decodeFromString<UploadBlobOutput>(body)
+                .blob.ref.cid.value
+        } catch (e: IllegalArgumentException) {
+            throw XrpcSerializationException("Failed to decode the uploadBlob response", e)
+        }
 
     private fun url(nsid: Nsid): String = "${baseUrl.trimEnd('/')}/xrpc/${nsid.value}"
 
@@ -216,7 +292,29 @@ public class XrpcDataHome(
             statusCode = status.value,
             error = payload?.get("error")?.jsonPrimitive?.contentOrNull,
             errorMessage = payload?.get("message")?.jsonPrimitive?.contentOrNull,
+            retryAfterSeconds = retryAfterSeconds(headers[HttpHeaders.RetryAfter]),
         )
+    }
+
+    /** A request body read from [open] as it is written, so the blob is never held whole in memory. */
+    private class StreamedBlob(
+        private val sizeBytes: Long,
+        private val open: () -> RawSource,
+    ) : OutgoingContent.WriteChannelContent() {
+        override val contentLength: Long get() = sizeBytes
+
+        override val contentType: ContentType get() = ContentType.Application.OctetStream
+
+        override suspend fun writeTo(channel: ByteWriteChannel) {
+            open().buffered().use { source ->
+                val chunk = ByteArray(CHUNK_BYTES)
+                while (true) {
+                    val read = source.readAtMostTo(chunk)
+                    if (read == -1) break
+                    channel.writeFully(chunk, 0, read)
+                }
+            }
+        }
     }
 
     private inline fun <T> conflicts(block: () -> T): T =
@@ -228,6 +326,7 @@ public class XrpcDataHome(
         }
 
     private companion object {
+        const val CHUNK_BYTES = 64 * 1024
         const val INVALID_SWAP = "InvalidSwap"
         const val RECORD_NOT_FOUND = "RecordNotFound"
         const val BLOB_NOT_FOUND = "BlobNotFound"

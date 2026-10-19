@@ -1,6 +1,8 @@
 package app.logdate.space
 
 import app.logdate.lexicon.app.logdate.crypto.Sealed
+import kotlinx.io.RawSink
+import kotlinx.io.RawSource
 
 /** The condition a write or delete must meet to go ahead. */
 public sealed interface RecordSwap {
@@ -140,4 +142,27 @@ public interface DataHome {
         space: SpaceRef,
         cid: String,
     ): ByteArray?
+
+    /**
+     * Stores [sizeBytes] encrypted bytes, read from [open] while the request is sent so the blob is
+     * never held whole in memory, and returns their content identifier.
+     *
+     * @param open called each time the body is written; returns a fresh source of exactly [sizeBytes]
+     *   bytes. A failure reading it fails the upload, with the read failure as the cause.
+     */
+    public suspend fun uploadBlob(
+        space: SpaceRef,
+        sizeBytes: Long,
+        open: () -> RawSource,
+    ): String
+
+    /**
+     * Writes the blob with content identifier [cid] into [sink] as it arrives, and returns whether
+     * there was one. Nothing is written when there isn't. [sink] is flushed but not closed.
+     */
+    public suspend fun downloadBlob(
+        space: SpaceRef,
+        cid: String,
+        sink: RawSink,
+    ): Boolean
 }

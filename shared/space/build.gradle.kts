@@ -54,6 +54,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(projects.shared.lexicon)
+            api(libs.kotlinx.io.core)
             implementation(projects.shared.atprotoRepo)
             implementation(projects.shared.atprotoXrpc)
             implementation(libs.cryptography.provider.optimal)
