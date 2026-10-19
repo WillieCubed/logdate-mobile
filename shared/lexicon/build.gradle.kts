@@ -19,6 +19,7 @@ lexiconModels {
     schemas.from(rootProject.file("lexicons/app/logdate"), rootProject.file("lexicons/community"))
     basePackage = "app.logdate.lexicon"
     recordIndex = "LogDateRecords"
+    schemaIndex = "LogDateSchemas"
 }
 
 // The conformance tests run the shared client fixtures and the lexicons they were generated from on
