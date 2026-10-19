@@ -137,6 +137,37 @@ internal object AtProtoSchemaDocs {
                         "decision" to "`approve` or `deny`.",
                     ),
                 ),
+            "OAuthPasskeyOptionsRequest" to
+                SchemaDoc(
+                    "Asks for a passkey challenge on the browser authorization page.",
+                    mapOf("request_uri" to "The `request_uri` the page was opened with."),
+                ),
+            "OAuthPasskeyOptionsResponse" to
+                SchemaDoc(
+                    "The options the authorization page passes to `navigator.credentials.get`.",
+                    mapOf(
+                        "challenge" to "The challenge to sign, base64url without padding. Send it back with the assertion.",
+                        "rp_id" to "The relying-party ID passkeys are registered under.",
+                        "allow_credentials" to
+                            "Credential IDs of the account the client named in `login_hint`, base64url; empty to allow any passkey.",
+                        "timeout" to "How long the browser should wait for the person, in milliseconds.",
+                        "user_verification" to "Always `required`.",
+                    ),
+                ),
+            "OAuthPasskeyApprovalRequest" to
+                SchemaDoc(
+                    "A passkey assertion that signs in and approves a pending authorization request.",
+                    mapOf(
+                        "request_uri" to "The `request_uri` the page was opened with.",
+                        "challenge" to "The challenge from **Get passkey options for the authorization page**.",
+                        "credential" to "The assertion `navigator.credentials.get` returned, with byte values in base64url.",
+                    ),
+                ),
+            "OAuthPasskeyApprovalResponse" to
+                SchemaDoc(
+                    "Where to send the browser after an approved passkey sign-in.",
+                    mapOf("redirect_uri" to "The client's `redirect_uri` with `code`, `state` and `iss` appended."),
+                ),
             "OAuthRevokeForm" to
                 SchemaDoc(
                     "The form body of **Revoke a refresh token**.",

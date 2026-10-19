@@ -69,6 +69,9 @@ class WebAuthnPasskeyService(
     // apk-key-hash origins. webauthn4j matches the ceremony's clientDataJSON.origin against this set.
     private val webAuthnOrigins: Set<Origin> = origins.map { Origin(it) }.toSet()
 
+    /** Returns `true` when a ceremony whose client data names [origin] can pass verification. */
+    fun acceptsOrigin(origin: String): Boolean = origin in origins
+
     data class RegistrationResult(
         val success: Boolean,
         val credentialId: String? = null,

@@ -336,6 +336,8 @@ class OpenApiContractTest {
                 "pushAuthorizationRequest",
                 "exchangeOAuthToken",
                 "revokeOAuthToken",
+                "getAuthorizationPasskeyOptions",
+                "approveAuthorizationWithPasskey",
                 "resolveResource",
                 "getOAuthAuthorizationServerMetadata",
                 "getOAuthProtectedResourceMetadata",

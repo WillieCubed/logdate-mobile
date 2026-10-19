@@ -47,6 +47,15 @@ class OAuthInvalidDpopProofException(
 ) : OAuthException(HttpStatusCode.BadRequest, "invalid_dpop_proof", message)
 
 /**
+ * Raised when the person on the authorization page could not be signed in, or signed in as an
+ * account the request was not for. [message] is shown on the page, so it is written for them.
+ */
+class OAuthAccessDeniedException(
+    message: String,
+    status: HttpStatusCode = HttpStatusCode.Unauthorized,
+) : OAuthException(status, "access_denied", message)
+
+/**
  * Raised when the server requires the client to retry with the current DPoP nonce.
  */
 class OAuthUseDpopNonceException(

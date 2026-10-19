@@ -2,6 +2,10 @@ package app.logdate.server.routes.docs
 
 import app.logdate.server.oauth.JsonWebKey
 import app.logdate.server.oauth.JsonWebKeySet
+import app.logdate.server.oauth.OAuthPasskeyApprovalRequest
+import app.logdate.server.oauth.OAuthPasskeyApprovalResponse
+import app.logdate.server.oauth.OAuthPasskeyOptionsRequest
+import app.logdate.server.oauth.OAuthPasskeyOptionsResponse
 import app.logdate.server.openapi.ApiTags
 import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.ErrorEnvelope
@@ -15,6 +19,8 @@ import app.logdate.server.routes.dpopNonceHeader
 import app.logdate.server.routes.oauthError
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.publicOperation
+import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
+import app.logdate.shared.model.PasskeyAssertionResponse
 import io.github.smiley4.ktoropenapi.config.RequestConfig
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
@@ -228,6 +234,12 @@ internal object OAuthDocs {
 
             The third-party client never sees this; it only sends the person to this URL and waits for the
             redirect.
+
+            When the server has passkey sign-in on the authorization page turned on, a browser that arrives
+            without a LogDate bearer token gets an HTML page instead. It shows which app is asking and lets the
+            person sign in with a passkey, which approves the request. See **Get passkey options for the
+            authorization page**. Send `client_id` alongside `request_uri`; the page refuses a `client_id` that
+            does not match the pushed request.
             """,
         )
         request {
@@ -275,6 +287,10 @@ internal object OAuthDocs {
             pushed request and answers a `302` redirect to the client's `redirect_uri` carrying either an
             authorization `code` (and `iss` and `state`) or an `error`. The front end follows the redirect;
             the third-party client receives it and continues with **Exchange a code or refresh token**.
+
+            With passkey sign-in on the authorization page turned on, the page itself posts here without a bearer
+            token to cancel (`decision=deny`). Approving without a bearer token is refused; the page approves by
+            signing in with a passkey instead.
             """,
         )
         request {
@@ -304,6 +320,127 @@ internal object OAuthDocs {
             bearerUnauthorized(ErrorEnvelope.OAUTH)
             oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
+        }
+    }
+
+    private val passkeySignInDisabled =
+        ErrorCase(
+            "server_error",
+            "This server has passkey sign-in on the authorization page turned off. The page is not served either, so " +
+                "only the LogDate apps can approve requests here.",
+            "Passkey sign-in on the authorization page is not enabled on this server",
+        )
+    private val expiredRequest =
+        ErrorCase(
+            "invalid_request",
+            "`request_uri` is missing, unknown, already used, or expired. The person needs to start again in the app.",
+            "request_uri is invalid or expired",
+        )
+
+    val getPasskeyOptions: RouteConfig.() -> Unit = {
+        publicOperation(
+            "getAuthorizationPasskeyOptions",
+            ApiTags.OAUTH,
+            "Get passkey options for the authorization page",
+            """
+            Called by the browser authorization page, not by third-party clients. It starts a passkey sign-in
+            for the pushed request named by `request_uri` and returns the options the page passes to
+            `navigator.credentials.get`. When the client's `login_hint` names an account on this server,
+            `allow_credentials` lists that account's passkeys; otherwise it is empty and the browser offers any
+            passkey for this relying party. User verification is always required.
+            """,
+        )
+        request {
+            body<OAuthPasskeyOptionsRequest> {
+                required = true
+                example("Example") { value = OAuthPasskeyOptionsRequest(requestUri = REQUEST_URI) }
+            }
+        }
+        response {
+            ok(
+                "The WebAuthn request options. Byte values are base64url without padding.",
+                OAuthPasskeyOptionsResponse(
+                    challenge = "kZ3Xn8yq1o0wQm1c7l9eYb2s8vR4tPq6uH0jK5aD3fE",
+                    rpId = "logdate.app",
+                    allowCredentials = listOf("AdK1nE3sR9w8bQ2x7cV5mL0pT4yU6iO1aS3dF8gH2jK"),
+                    timeout = 300_000,
+                    userVerification = "required",
+                ),
+            )
+            oauthError(HttpStatusCode.BadRequest, expiredRequest)
+            oauthError(HttpStatusCode.InternalServerError, serverError)
+            oauthError(HttpStatusCode.NotImplemented, passkeySignInDisabled)
+        }
+    }
+
+    val approveWithPasskey: RouteConfig.() -> Unit = {
+        publicOperation(
+            "approveAuthorizationWithPasskey",
+            ApiTags.OAUTH,
+            "Approve a request by signing in with a passkey",
+            """
+            Called by the browser authorization page with the passkey assertion from
+            `navigator.credentials.get`. The server verifies the assertion against the challenge from **Get
+            passkey options for the authorization page**. It then checks that the passkey's account is the one
+            the client asked for in `login_hint`, if it named one, and approves the pushed request.
+
+            Signing in is the approval. The answer is the client's `redirect_uri` with `code`, `state` and
+            `iss` appended, and the page sends the browser there. A failed or mismatched sign-in leaves the
+            request usable, so the person can try another passkey; `error_description` is written for them.
+            """,
+        )
+        request {
+            body<OAuthPasskeyApprovalRequest> {
+                required = true
+                example("Example") {
+                    value =
+                        OAuthPasskeyApprovalRequest(
+                            requestUri = REQUEST_URI,
+                            challenge = "kZ3Xn8yq1o0wQm1c7l9eYb2s8vR4tPq6uH0jK5aD3fE",
+                            credential =
+                                PasskeyAssertionResponse(
+                                    id = "AdK1nE3sR9w8bQ2x7cV5mL0pT4yU6iO1aS3dF8gH2jK",
+                                    rawId = "AdK1nE3sR9w8bQ2x7cV5mL0pT4yU6iO1aS3dF8gH2jK",
+                                    response =
+                                        PasskeyAssertionAuthenticatorResponse(
+                                            clientDataJSON = "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0In0",
+                                            authenticatorData = "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAAQ",
+                                            signature = "MEUCIQDexample",
+                                            userHandle = "",
+                                        ),
+                                ),
+                        )
+                }
+            }
+        }
+        response {
+            ok(
+                "The passkey signed in the right account and the request is approved. Send the browser to `redirect_uri`.",
+                OAuthPasskeyApprovalResponse(
+                    redirectUri = "https://journalviewer.example/callback?code=c-7f3c9a1b2d4e5f60&state=af0ifjsldkj&iss=$ISSUER",
+                ),
+            )
+            oauthError(HttpStatusCode.BadRequest, expiredRequest)
+            oauthError(
+                HttpStatusCode.Unauthorized,
+                ErrorCase(
+                    "access_denied",
+                    "The passkey could not be verified, is not registered to a LogDate account, or the challenge timed " +
+                        "out. Show `error_description` and let the person try again.",
+                    "This passkey isn't registered to a LogDate account. Choose a passkey you use for LogDate.",
+                ),
+            )
+            oauthError(
+                HttpStatusCode.Forbidden,
+                ErrorCase(
+                    "access_denied",
+                    "The passkey belongs to a different account from the one the client named in `login_hint`.",
+                    "This passkey is for @willie.logdate.app, but Journal Viewer asked to sign in as @sam.logdate.app. " +
+                        "Use the passkey for @sam.logdate.app.",
+                ),
+            )
+            oauthError(HttpStatusCode.InternalServerError, serverError)
+            oauthError(HttpStatusCode.NotImplemented, passkeySignInDisabled)
         }
     }
 

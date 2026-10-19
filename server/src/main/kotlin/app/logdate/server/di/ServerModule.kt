@@ -222,9 +222,9 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLDiagnosticReportStore() else InMemoryDiagnosticReportStore()
         }
         single {
-            OAuthConfig.fromEnvironment(
-                defaultIssuer = get<AtprotoIdentityConfig>().pdsServiceEndpoint,
-            )
+            OAuthConfig
+                .fromEnvironment(defaultIssuer = get<AtprotoIdentityConfig>().pdsServiceEndpoint)
+                .copy(passkeySignInEnabled = OAuthConfig.passkeySignInEnabledFromEnvironment())
         }
         single { HttpClient(OkHttp) }
         single<OAuthSigningKeyRepository> {

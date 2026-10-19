@@ -4,6 +4,8 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -96,6 +98,29 @@ class OAuthConfigTest {
         assertEquals("https://pds.logdate.app", defaulted.normalizedResource)
         assertEquals("https://issuer.logdate.app", overridden.normalizedIssuer)
         assertEquals("https://resource.logdate.app", overridden.normalizedResource)
+    }
+
+    @Test
+    fun `passkey sign-in runs on the issuer origin when the relying party covers it`() {
+        assertEquals("https://cloud.logdate.app", OAuthConfig(issuer = "https://cloud.logdate.app/").passkeySignInOrigin("logdate.app"))
+        assertEquals("https://logdate.app", OAuthConfig(issuer = "https://logdate.app").passkeySignInOrigin("logdate.app"))
+        assertEquals(
+            "https://cloud.logdate.app:8443",
+            OAuthConfig(issuer = "https://Cloud.LogDate.app:8443").passkeySignInOrigin("LogDate.app"),
+        )
+        assertNull(OAuthConfig(issuer = "https://cloud-staging.logdate.app").passkeySignInOrigin("staging.logdate.app"))
+        assertNull(OAuthConfig(issuer = "https://evillogdate.app").passkeySignInOrigin("logdate.app"))
+    }
+
+    @Test
+    fun `passkey sign-in is off unless the environment says exactly true`() {
+        assertFalse(OAuthConfig.passkeySignInEnabledFromEnvironment { null })
+        assertFalse(OAuthConfig.passkeySignInEnabledFromEnvironment { "yes" })
+        assertTrue(
+            OAuthConfig.passkeySignInEnabledFromEnvironment { name ->
+                "true".takeIf { name == "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED" }
+            },
+        )
     }
 
     @Test

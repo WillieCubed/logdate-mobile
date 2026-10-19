@@ -495,6 +495,18 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Leave it off until the client sync work that writes to personal spaces is ready to ship. Turning it on first advertises a feature no app uses yet.
   - Deletion markers in a personal space follow `SYNC_TOMBSTONE_RETENTION_DAYS`. Uploaded files that no record refers to are removed after one day. A device that was offline longer than the tombstone retention gets `CursorTooOld` and downloads the space again from the start.
 
+### `LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED`
+- **Description**: Turns on the browser authorization page. When another AT Protocol app sends a person to `/oauth/authorize`, they see which app is asking and approve it by signing in with their LogDate passkey. Without it, only the LogDate apps can approve OAuth requests, so accounts without a password can't use their identity in other apps.
+- **Type**: Boolean (only the exact value `true` enables it)
+- **Default**: `false`
+- **Example**: `LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED=true`
+- **Required**: No
+- **Notes**:
+  - Browsers only offer a passkey on a page whose host is the relying-party ID or a subdomain of it. The page is served from the OAuth issuer (`ATPROTO_OAUTH_ISSUER`), so the issuer's host must sit inside `WEBAUTHN_RP_ID`. For example, `https://cloud.logdate.app` works with `WEBAUTHN_RP_ID=logdate.app`. If it doesn't, the server refuses to start and names both values.
+  - The issuer's origin is added to the origins passkey verification accepts automatically; it does not need to be listed in `WEBAUTHN_ALLOWED_ORIGINS`.
+  - An approved app gets an `atproto` token for the account's repository. While journal records are still stored there, the app can read and change them, and the page says so. Turn this on with that in mind.
+  - Design: `docs/superpowers/specs/2026-10-19-passkey-atproto-sign-in-design.md`.
+
 ---
 
 ## Redis (Optional)

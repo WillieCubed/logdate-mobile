@@ -2,13 +2,19 @@ package app.logdate.server.oauth
 
 import studio.hypertext.atproto.pds.AuthorizationServerMetadata
 import studio.hypertext.atproto.pds.ProtectedResourceMetadata
+import java.net.URI
 
 /**
  * Server configuration and discovery metadata for AT Protocol OAuth surfaces.
+ *
+ * [passkeySignInEnabled] turns on the browser authorization page, where a person signs in with a
+ * passkey to let another app use their identity. It is off by default; see
+ * `LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED`.
  */
 data class OAuthConfig(
     val issuer: String,
     val resource: String = issuer,
+    val passkeySignInEnabled: Boolean = false,
 ) {
     init {
         require(issuer.startsWith("https://")) { "issuer must use https" }
@@ -22,6 +28,27 @@ data class OAuthConfig(
     val pushedAuthorizationRequestEndpoint: String = "$normalizedIssuer/oauth/par"
     val revocationEndpoint: String = "$normalizedIssuer/oauth/revoke"
     val jwksUri: String = "$normalizedIssuer/oauth/jwks"
+
+    /** The scheme, host and port of [issuer], which is where the authorization page is served. */
+    val issuerOrigin: String =
+        URI(normalizedIssuer).let { uri ->
+            val port = if (uri.port == -1 || uri.port == DEFAULT_HTTPS_PORT) "" else ":${uri.port}"
+            "${uri.scheme.lowercase()}://${uri.host.lowercase()}$port"
+        }
+
+    /**
+     * Returns the origin a browser presents for a passkey ceremony on the authorization page, or
+     * `null` when browsers will refuse one there.
+     *
+     * A browser only offers a passkey to a page whose host is the passkey's relying-party ID or a
+     * subdomain of it, so the issuer's host must sit inside [relyingPartyId].
+     */
+    fun passkeySignInOrigin(relyingPartyId: String): String? {
+        val host = URI(issuerOrigin).host
+        val rpId = relyingPartyId.trim().lowercase()
+        if (host != rpId && !host.endsWith(".$rpId")) return null
+        return issuerOrigin
+    }
 
     /**
      * Builds OAuth authorization server metadata for discovery.
@@ -56,6 +83,13 @@ data class OAuthConfig(
         )
 
     companion object {
+        private const val PASSKEY_SIGN_IN_FLAG = "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED"
+        private const val DEFAULT_HTTPS_PORT = 443
+
+        /** Reads `LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED`; only the exact value `true` turns it on. */
+        fun passkeySignInEnabledFromEnvironment(readEnv: (String) -> String? = System::getenv): Boolean =
+            readEnv(PASSKEY_SIGN_IN_FLAG)?.trim() == "true"
+
         /**
          * Reads OAuth discovery configuration from environment variables.
          */

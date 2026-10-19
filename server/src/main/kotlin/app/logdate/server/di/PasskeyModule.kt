@@ -4,6 +4,7 @@ import app.logdate.server.database.PostgreSQLPasskeyChallengeRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLRestoreCredentialRepository
 import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
 import app.logdate.server.passkeys.PasskeyChallengeRepository
@@ -27,7 +28,14 @@ internal fun Module.passkeyServices(isDatabaseAvailable: Boolean) {
         if (isDatabaseAvailable) PostgreSQLRestoreCredentialRepository() else InMemoryRestoreCredentialRepository()
     }
 
-    single { WebAuthnConfig.fromEnvironment(serverOrigin = get<AtprotoIdentityConfig>().pdsServiceEndpoint) }
+    single {
+        val config = WebAuthnConfig.fromEnvironment(serverOrigin = get<AtprotoIdentityConfig>().pdsServiceEndpoint)
+        // The browser authorization page runs passkey ceremonies on the OAuth issuer's origin, so
+        // verification has to accept it whenever the page is on.
+        val oauthConfig: OAuthConfig = get()
+        val pageOrigin = oauthConfig.passkeySignInOrigin(config.relyingPartyId)
+        if (oauthConfig.passkeySignInEnabled && pageOrigin != null) config.copy(origins = config.origins + pageOrigin) else config
+    }
     single { AssetLinksConfig.fromEnvironment() }
     single {
         val webAuthnConfig: WebAuthnConfig = get()

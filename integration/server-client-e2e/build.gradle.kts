@@ -57,8 +57,9 @@ tasks.register("writeAndroidHistoryHarnessClasspath") {
 }
 
 tasks.withType<Test>().configureEach {
-    // The server reads its feature flags from the environment, so the in-process test server needs this one set.
+    // The server reads its feature flags from the environment, so the in-process test server needs these set.
     environment("LOGDATE_PERSONAL_SPACE_ENABLED", "true")
+    environment("LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED", "true")
     if (System.getenv("LOGDATE_LARGE_BACKUP_TEST") == "1") {
         maxHeapSize = "512m"
     }
