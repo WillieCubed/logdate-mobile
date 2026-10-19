@@ -51,18 +51,35 @@ public data class OAuthResolvedServer(
  * Nothing is cached: sign-in flows are security-critical, and every token response is verified
  * against a fresh resolution.
  *
- * @param httpClient Only its engine is used; see [AtprotoOAuthClient] for why and for the address
- *   filtering the engine needs.
- * @param allowHttp Accept `http://` data servers and authorization servers. Only for local
- *   development.
+ * A resolver built with the public constructor creates its own HTTP client on the engine it is
+ * given; [close] it when done. The one inside [AtprotoOAuthClient] is closed with that client.
  */
-public class OAuthServerResolver(
+public class OAuthServerResolver internal constructor(
     private val identityResolver: IdentityResolver,
-    httpClient: HttpClient,
-    private val allowHttp: Boolean = false,
-) {
-    private val protocolClient = protocolHttpClient(httpClient)
+    private val protocolClient: HttpClient,
+    private val allowHttp: Boolean,
+    private val ownsProtocolClient: Boolean,
+) : AutoCloseable {
+    /**
+     * @param httpClient Only its engine is used; see [AtprotoOAuthClient] for why and for the
+     *   address filtering the engine needs.
+     * @param allowHttp Accept `http://` data servers and authorization servers. Only for local
+     *   development.
+     */
+    public constructor(
+        identityResolver: IdentityResolver,
+        httpClient: HttpClient,
+        allowHttp: Boolean = false,
+    ) : this(identityResolver, protocolHttpClient(httpClient), allowHttp, ownsProtocolClient = true)
+
     private val json = Json { ignoreUnknownKeys = true }
+
+    /**
+     * Closes the HTTP client this resolver created, leaving the engine open.
+     */
+    override fun close() {
+        if (ownsProtocolClient) protocolClient.close()
+    }
 
     /**
      * Resolves [input] — a handle, a DID, or an `https://` data server or entryway URL — to its

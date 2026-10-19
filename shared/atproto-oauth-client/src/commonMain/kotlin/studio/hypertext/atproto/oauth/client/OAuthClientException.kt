@@ -243,9 +243,9 @@ public class OAuthSessionRejectedException(
 ) : OAuthSessionEndedException(did, "The authorization server no longer accepts the OAuth session for $did", cause)
 
 /**
- * A request through [OAuthSession.httpClient] was addressed to a server other than the account's
- * data server, so it was not sent. This also happens when a renewal finds that the account moved
- * to another data server while the request was being made.
+ * A request through [OAuthSession.request] or [OAuthSession.xrpcClient] was addressed to a server
+ * other than the account's data server, so it was not sent. This also happens when a renewal finds
+ * that the account moved to another data server while the request was being made.
  *
  * @property targetOrigin Where the request was addressed.
  * @property pdsOrigin The account's data server.

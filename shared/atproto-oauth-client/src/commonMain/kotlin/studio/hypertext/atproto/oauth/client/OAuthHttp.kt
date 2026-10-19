@@ -42,8 +42,9 @@ internal fun protocolHttpClient(base: HttpClient): HttpClient =
     }
 
 /**
- * Builds [OAuthSession.httpClient]: [base]'s engine without its plugins, no redirects (the access
- * token must reach only the data server), a connect timeout, and the [plugins] given.
+ * Builds the shared data server client behind [OAuthSession.request]: [base]'s engine without its
+ * plugins, no redirects (the access token must reach only the data server), a connect timeout,
+ * and the [plugins] given.
  */
 internal fun dataServerHttpClient(
     base: HttpClient,
