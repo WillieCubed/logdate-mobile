@@ -24,7 +24,9 @@ import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceMediaReference
 import app.logdate.client.sync.space.SpaceStagedRecords
 import app.logdate.client.sync.space.SpaceSync
+import app.logdate.client.sync.space.mappers.SpaceJournal
 import app.logdate.shared.model.Journal
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -97,7 +99,7 @@ internal class SyncDownloader(
         val downloadScope = downloadInbox?.currentScope()
         val requestScope = tokenRefresher.currentRequestScope()
         val mergeScope = requestScope?.let { JournalMergeScope(it.ownerId, it.serverOrigin) }
-        val spaceRead = spaceRead<Journal>(EntityType.JOURNAL)
+        val spaceRead = spaceRead<SpaceJournal>(EntityType.JOURNAL)?.let { JournalSpaceRead(it, mergeScope) }
         val result =
             downloadEngine.download(
                 strategy =
@@ -129,7 +131,9 @@ internal class SyncDownloader(
                                 journalRepository.create(journal)
                             }
                         },
-                        applyReplace = { _, replacement ->
+                        applyReplace = { existing, remote ->
+                            // Only the personal space carries the favorite; a server's journal reads as never favorited.
+                            val replacement = if (spaceRead != null) remote else remote.copy(isFavorited = existing.isFavorited)
                             if (syncableRepository != null) {
                                 syncableRepository.updateFromSync(replacement)
                             } else {
@@ -140,8 +144,8 @@ internal class SyncDownloader(
                             if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalRepository.delete(id)
                         },
                         checkpoint = if (spaceRead != null) SPACE_CHECKPOINT else EntityType.JOURNAL.name,
-                        settle = spaceRead?.let { read -> read::settle },
-                        settleFailed = { id -> spaceRead?.settleFailed(id) },
+                        settle = spaceRead?.let { read -> read.records::settle },
+                        settleFailed = { id -> spaceRead?.records?.settleFailed(id) },
                         appliesRemoteOverUnchangedLocal = spaceRead != null,
                     ),
                 accessToken = accessToken,
@@ -189,19 +193,55 @@ internal class SyncDownloader(
         suspend fun page(): Result<ChangesPage<T>> {
             val records = staged ?: sync.read(kind).getOrElse { return Result.failure(it) }.also { staged = it }
             val page = records.page()
-            return Result.success(ChangesPage(page.changes, page.deletions, page.readAt, page.hasMore))
+            return Result.success(ChangesPage(page.changes, page.deletions.map(Uuid::parse), page.readAt, page.hasMore))
         }
 
         suspend fun settle(
             id: Uuid,
             outcome: RemoteOutcome,
         ) {
-            staged?.settle(id, outcome)
+            staged?.settle(id.toString(), outcome)
             if (outcome == RemoteOutcome.STORED || outcome == RemoteOutcome.MERGED) afterStored(id)
         }
 
         suspend fun settleFailed(id: Uuid) {
-            staged?.settleFailed(id)
+            staged?.settleFailed(id.toString())
+        }
+    }
+
+    /**
+     * Journals from the personal space. A record that says its journal was merged into another is
+     * applied as a merge, with its entries moving to the surviving journal once that journal is
+     * here, and is never offered to the download as a journal.
+     */
+    private inner class JournalSpaceRead(
+        val records: SpaceRead<SpaceJournal>,
+        private val mergeScope: JournalMergeScope?,
+    ) {
+        suspend fun page(): Result<ChangesPage<Journal>> {
+            val page = records.page().getOrElse { return Result.failure(it) }
+            val (merged, journals) = page.changes.partition { it.mergedInto != null }
+            val failure = merged.mapNotNull { applyMerge(it) }.firstOrNull()
+            if (failure != null) return Result.failure(failure)
+            return Result.success(ChangesPage(journals.map { it.journal }, page.deletions, page.lastSyncTimestamp, page.hasMore))
+        }
+
+        /** Applies the merge [item] records, or returns why it couldn't be applied. */
+        private suspend fun applyMerge(item: SpaceJournal): Exception? {
+            val id = item.journal.id
+            val survivor = requireNotNull(item.mergedInto)
+            return try {
+                transactionManager.withTransaction {
+                    journalRepository.applyJournalRedirect(id, survivor, mergeScope)
+                    records.settle(id, RemoteOutcome.STORED)
+                }
+                null
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                records.settleFailed(id)
+                error
+            }
         }
     }
 

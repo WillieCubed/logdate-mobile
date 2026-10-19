@@ -7,6 +7,7 @@ import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.repository.transcription.TranscriptDocumentStatus
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.conflict.ConflictResolution
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
@@ -16,6 +17,7 @@ import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadInboxTest
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.mappers.SpaceJournal
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.FakeJournalRepository
 import app.logdate.client.sync.test.FakeSessionStorage
@@ -51,34 +53,36 @@ internal const val ENTRY_COLLECTION = "app.logdate.journal.entry"
 internal const val TRANSCRIPT_COLLECTION = "app.logdate.journal.transcript"
 
 /** A minimal journal mapping for tests: title, description and timestamps. */
-internal object TestJournalMapper : SpaceRecordMapper<Journal> {
+internal object TestJournalMapper : SpaceRecordMapper<SpaceJournal> {
     override val collection = JOURNAL_COLLECTION
 
-    override fun rkeyOf(value: Journal): String = value.id.toString()
+    override fun rkeyOf(value: SpaceJournal): String = value.journal.id.toString()
 
-    override fun toRecord(value: Journal): JsonObject =
+    override fun toRecord(value: SpaceJournal): JsonObject =
         buildJsonObject {
             put("\$type", JOURNAL_COLLECTION)
-            put("title", value.title)
-            if (value.description.isNotEmpty()) put("description", value.description)
-            put("createdAt", value.created.toDatetime("$JOURNAL_COLLECTION createdAt"))
-            put("updatedAt", value.lastUpdated.toDatetime("$JOURNAL_COLLECTION updatedAt"))
+            put("title", value.journal.title)
+            if (value.journal.description.isNotEmpty()) put("description", value.journal.description)
+            put("createdAt", value.journal.created.toDatetime("$JOURNAL_COLLECTION createdAt"))
+            put("updatedAt", value.journal.lastUpdated.toDatetime("$JOURNAL_COLLECTION updatedAt"))
         }
 
     override fun fromRecord(
         rkey: String,
         record: JsonObject,
-    ): Journal {
+    ): SpaceJournal {
         val title =
             (record["title"] as? JsonPrimitive)?.contentOrNull ?: throw SpaceRecordMappingException("$JOURNAL_COLLECTION/$rkey: no title")
         val created = parseDatetime("$JOURNAL_COLLECTION/$rkey createdAt", record.getValue("createdAt").jsonPrimitive.content)
-        return Journal(
-            id = parseUuidKey(JOURNAL_COLLECTION, rkey),
-            title = title,
-            description = record["description"]?.jsonPrimitive?.content.orEmpty(),
-            created = created,
-            lastUpdated =
-                record["updatedAt"]?.let { parseDatetime("$JOURNAL_COLLECTION/$rkey updatedAt", it.jsonPrimitive.content) } ?: created,
+        return SpaceJournal(
+            Journal(
+                id = parseUuidKey(JOURNAL_COLLECTION, rkey),
+                title = title,
+                description = record["description"]?.jsonPrimitive?.content.orEmpty(),
+                created = created,
+                lastUpdated =
+                    record["updatedAt"]?.let { parseDatetime("$JOURNAL_COLLECTION/$rkey updatedAt", it.jsonPrimitive.content) } ?: created,
+            ),
         )
     }
 }
@@ -86,31 +90,58 @@ internal object TestJournalMapper : SpaceRecordMapper<Journal> {
 internal fun journalKind(
     journals: JournalRepository,
     resolver: ConflictResolver<Journal> = LastWriteWinsResolver(),
-): SpaceKind<Journal> =
+): SpaceKind<SpaceJournal> =
     SpaceKind.single(
         EntityType.JOURNAL,
         TestJournalMapper,
         TestJournalRecords(journals, resolver),
-    ) { journal, version -> journal.copy(syncVersion = version) }
+    ) { item, version -> item.copy(journal = item.journal.copy(syncVersion = version)) }
 
 internal class TestJournalRecords(
     private val journals: JournalRepository,
-    override val conflictResolver: ConflictResolver<Journal> = LastWriteWinsResolver(),
-) : SpaceLocalRecords<Journal> {
-    override suspend fun load(entityId: String): Journal? = Uuid.parseOrNull(entityId)?.let { journals.getJournalById(it) }
+    resolver: ConflictResolver<Journal> = LastWriteWinsResolver(),
+) : SpaceLocalRecords<SpaceJournal> {
+    override val conflictResolver: ConflictResolver<SpaceJournal> =
+        object : ConflictResolver<SpaceJournal> {
+            override fun resolve(
+                local: SpaceJournal,
+                remote: SpaceJournal,
+                localTimestamp: Instant,
+                remoteTimestamp: Instant,
+            ): ConflictResolution<SpaceJournal> =
+                when (val resolution = resolver.resolve(local.journal, remote.journal, localTimestamp, remoteTimestamp)) {
+                    is ConflictResolution.KeepLocal -> ConflictResolution.KeepLocal(SpaceJournal(resolution.value))
+                    is ConflictResolution.KeepRemote -> ConflictResolution.KeepRemote(SpaceJournal(resolution.value))
+                    is ConflictResolution.Merge -> ConflictResolution.Merge(SpaceJournal(resolution.merged))
+                    is ConflictResolution.RequiresManualResolution ->
+                        ConflictResolution.RequiresManualResolution(
+                            SpaceJournal(resolution.local),
+                            SpaceJournal(resolution.remote),
+                            resolution.reason,
+                        )
+                }
 
-    override fun lastUpdatedOf(item: Journal): Instant = item.lastUpdated
+            override fun resolveDeletion(
+                remote: SpaceJournal,
+                remoteTimestamp: Instant,
+            ) = resolver.resolveDeletion(remote.journal, remoteTimestamp)
+        }
+
+    override suspend fun load(entityId: String): SpaceJournal? =
+        Uuid.parseOrNull(entityId)?.let { journals.getJournalById(it) }?.let { SpaceJournal(it) }
+
+    override fun lastUpdatedOf(item: SpaceJournal): Instant = item.journal.lastUpdated
 
     override suspend fun acknowledgeUpload(
-        item: Journal,
+        item: SpaceJournal,
         seq: Long,
         syncedAt: Instant,
     ) {
-        journals.update(item.copy(syncVersion = seq))
+        journals.update(item.journal.copy(syncVersion = seq))
     }
 
-    override suspend fun replaceLocal(item: Journal) {
-        if (journals.getJournalById(item.id) == null) journals.create(item) else journals.update(item)
+    override suspend fun replaceLocal(item: SpaceJournal) {
+        if (journals.getJournalById(item.journal.id) == null) journals.create(item.journal) else journals.update(item.journal)
     }
 }
 

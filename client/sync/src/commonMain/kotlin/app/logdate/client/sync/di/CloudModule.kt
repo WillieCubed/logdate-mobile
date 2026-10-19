@@ -9,7 +9,9 @@ import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.LocationHistoryApiClient
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.repository.location.ActivityHistoryRepository
 import app.logdate.client.repository.location.HistoryOwnerAdoptionRepair
 import app.logdate.client.repository.location.LocationHistoryRepository
@@ -55,6 +57,7 @@ import app.logdate.client.sync.space.SpaceSwapStore
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.mappers.journalSpaceKind
 import app.logdate.client.sync.space.mappers.noteSpaceKind
 import app.logdate.client.sync.space.spaceLocation
 import app.logdate.shared.config.LogDateConfigRepository
@@ -66,12 +69,19 @@ import kotlin.time.Clock
 
 /**
  * The personal-space transport: which kinds use it, whether it is open, and how to reach the space.
- * Each kind's [SpaceKind] is contributed by the module that owns its mapper; with none registered,
- * every kind keeps syncing through its own endpoints.
+ * Each kind's [SpaceKind] is contributed by the module that owns its mapper, under its own name so
+ * kinds don't replace one another; with none registered, every kind keeps syncing through its own
+ * endpoints.
  */
 val spaceSyncModule =
     module {
-        single<SpaceKind<*>> {
+        single<SpaceKind<*>>(named("journalSpaceKind")) {
+            journalSpaceKind(
+                journals = get<JournalRepository>() as SyncableJournalRepository,
+                resolver = get(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)),
+            )
+        }
+        single<SpaceKind<*>>(named("noteSpaceKind")) {
             noteSpaceKind(
                 notes = get<JournalNotesRepository>() as SyncableJournalNotesRepository,
                 resolver = get(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)),

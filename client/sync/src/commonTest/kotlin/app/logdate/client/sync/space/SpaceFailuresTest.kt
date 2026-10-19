@@ -87,12 +87,12 @@ class SpaceFailuresTest {
     fun `a kind is registered once and only after its download is wired`() {
         val journals = journalKind(FakeJournalRepository())
         val notes = noteKind(FakeJournalNotesRepository())
-        val drafts =
+        val moments =
             SpaceKind.single(
-                EntityType.DRAFT,
+                EntityType.MOMENT,
                 TestJournalMapper,
                 journals.local,
-            ) { journal, version -> journal.copy(syncVersion = version) }
+            ) { item, version -> item.copy(journal = item.journal.copy(syncVersion = version)) }
         val registry = SpaceRecordRegistry(listOf(journals, notes))
 
         assertSame(journals, registry.forCollection(JOURNAL_COLLECTION)?.kind)
@@ -106,13 +106,13 @@ class SpaceFailuresTest {
                 )?.ownerOf("6F1C2C9E-4B1A-4C55-9A39-2F0D6C3B8E71:6F1C2C9E-4B1A-4C55-9A39-2F0D6C3B8E71"),
         )
         assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(journals, journals)) }
-        assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(drafts)) }
+        assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(moments)) }
         val twoOwners =
             SpaceKind.single(
                 EntityType.NOTE,
                 TestJournalMapper,
                 journals.local,
-            ) { journal, version -> journal.copy(syncVersion = version) }
+            ) { item, version -> item.copy(journal = item.journal.copy(syncVersion = version)) }
         assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(journals, twoOwners)) }
     }
 }
