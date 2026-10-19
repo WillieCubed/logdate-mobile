@@ -113,6 +113,7 @@ include(":shared:atproto-pds-runtime")
 include(":shared:atproto-bom")
 include(":shared:config")
 include(":shared:lexicon")
+include(":shared:space")
 include(":shared:model")
 
 // Server-specific modules
