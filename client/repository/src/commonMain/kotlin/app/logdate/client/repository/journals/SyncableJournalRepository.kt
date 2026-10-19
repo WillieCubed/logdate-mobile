@@ -19,4 +19,14 @@ interface SyncableJournalRepository : JournalRepository {
         syncVersion: Long,
         syncedAt: Instant,
     )
+
+    /**
+     * Points journal [journalId]'s cover at [coverImageUri] only while it still stores [previous],
+     * without queueing an upload. Returns whether it did. Repositories that keep no covers do nothing.
+     */
+    suspend fun updateCoverImageUri(
+        journalId: Uuid,
+        previous: String,
+        coverImageUri: String,
+    ): Boolean = false
 }

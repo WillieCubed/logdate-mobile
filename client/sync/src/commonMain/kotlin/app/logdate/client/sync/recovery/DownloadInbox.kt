@@ -29,6 +29,9 @@ internal const val SPACE_MEDIA_PREFIX = "SPACE1-MEDIA:"
 /** Marks a draft media row as one for a draft applied from the personal space, whose files it refers to. */
 internal const val SPACE_DRAFT_MEDIA_PREFIX = "SPACE1-DRAFT-MEDIA"
 
+/** Marks a journal media row as one for a journal applied from the personal space, whose cover it refers to. */
+internal const val SPACE_JOURNAL_MEDIA_PREFIX = "SPACE1-JOURNAL-MEDIA"
+
 data class WireDownload(
     val id: String,
     val version: Long,
@@ -333,6 +336,23 @@ class DownloadInbox(
             val prior = dao.get(selected.owner, selected.origin, "MEDIA_DRAFT", id)
             if (prior != null && prior.version >= version) return@withTransaction
             dao.put(waitingRow(selected, "MEDIA_DRAFT", WireDownload(id, version, false, SPACE_DRAFT_MEDIA_PREFIX)))
+        }
+    }
+
+    /**
+     * Queues the cover of a journal applied from the personal space for media recovery. The journal
+     * holds no inbox row of its own, so the row only says which journal.
+     */
+    internal suspend fun enqueueSpaceJournalMedia(
+        id: String,
+        version: Long,
+        selected: DownloadScope = scope(),
+    ) {
+        transactions.withTransaction {
+            check(selected == scope()) { "Download scope changed" }
+            val prior = dao.get(selected.owner, selected.origin, "MEDIA_JOURNAL", id)
+            if (prior != null && prior.version >= version) return@withTransaction
+            dao.put(waitingRow(selected, "MEDIA_JOURNAL", WireDownload(id, version, false, SPACE_JOURNAL_MEDIA_PREFIX)))
         }
     }
 

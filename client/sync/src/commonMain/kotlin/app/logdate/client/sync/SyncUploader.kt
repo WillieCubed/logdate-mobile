@@ -22,6 +22,7 @@ import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceMediaReference
 import app.logdate.client.sync.space.SpaceSync
 import app.logdate.client.sync.space.mappers.SpaceDraft
+import app.logdate.client.sync.space.mappers.SpaceJournal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
@@ -108,6 +109,8 @@ internal class SyncUploader(
     private val noteMediaUpload =
         NoteMediaUpload(dataUsagePolicy, tokenRefresher, mediaTransfer, retryCoordinator, setMediaDeferredForNetwork)
 
+    private val coverUpload = JournalCoverUpload(tokenRefresher, mediaTransfer, retryCoordinator)
+
     private val conditionalCreates = ConditionalCreateSettler(retryCoordinator, recordProgress)
 
     /**
@@ -133,8 +136,24 @@ internal class SyncUploader(
     suspend fun uploadJournals(accessToken: String): SyncResult =
         uploadPass("Upload journals") {
             val spaceKind = space?.activeKind(EntityType.JOURNAL)
-            if (spaceKind != null) space.uploadKind(spaceKind, profile.uploadsUpdates) else journalUploader.uploadPending()
+            if (spaceKind != null) uploadJournalsToSpace(space, spaceKind) else journalUploader.uploadPending()
         }
+
+    /** Journals in the personal space: a cover is uploaded as a space file before the journal is written. */
+    private suspend fun uploadJournalsToSpace(
+        space: SpaceSync,
+        kind: SpaceKind<*>,
+    ): SyncResult {
+        @Suppress("UNCHECKED_CAST")
+        val journals = kind as SpaceKind<SpaceJournal>
+        return space.upload(journals, profile.uploadsUpdates, begin = {
+            pending,
+            item,
+            errors,
+            ->
+            coverUpload.prepare(pending, item, errors)
+        })
+    }
 
     /** Notes in the personal space: their media is uploaded first, as a space blob, exactly as [uploadContent] does. */
     private suspend fun uploadNotesToSpace(

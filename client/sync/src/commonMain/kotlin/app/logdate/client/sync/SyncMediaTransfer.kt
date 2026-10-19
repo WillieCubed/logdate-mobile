@@ -19,6 +19,7 @@ import app.logdate.client.sync.cloud.MediaReadException
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableImageBlock
@@ -120,6 +121,21 @@ internal class SyncMediaTransfer(
                             else -> block
                         }
                     },
+            )
+        }
+
+    /**
+     * Uploads a journal's cover if it isn't uploaded yet and returns the journal with the uploaded
+     * file as its cover. A cover keeps its upload under the journal's id, as a draft block's file does.
+     */
+    suspend fun uploadJournalCoverIfNeeded(
+        accessToken: String,
+        journal: Journal,
+        reusable: (String) -> Boolean = { true },
+    ): Result<Journal> =
+        runCatching {
+            journal.copy(
+                coverImageUri = uploadDraftAsset(accessToken, journal.id, journal.id, JOURNAL_COVER_KIND, journal.coverImageUri, reusable),
             )
         }
 
@@ -583,6 +599,9 @@ internal sealed interface DraftMediaHydrationResult {
         val mappings: List<DraftAssetMapping>,
     ) : DraftMediaHydrationResult
 }
+
+/** The kind a journal's cover is stored under in the draft asset references. */
+internal const val JOURNAL_COVER_KIND = "journal-cover"
 
 internal class DraftMediaFailure(
     val reason: DiagnosticReason,

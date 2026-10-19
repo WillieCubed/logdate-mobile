@@ -273,6 +273,18 @@ class OfflineFirstJournalRepository(
         }
     }
 
+    override suspend fun updateCoverImageUri(
+        journalId: Uuid,
+        previous: String,
+        coverImageUri: String,
+    ): Boolean =
+        withContext(dispatcher) {
+            withJournalTransaction {
+                journalDao.updateCoverImageUriIfUnchanged(journalId, previous, coverImageUri)
+                journalDao.getJournalById(journalId)?.coverImageUri == coverImageUri
+            }
+        }
+
     override suspend fun applyJournalRedirect(
         sourceId: Uuid,
         destinationId: Uuid,

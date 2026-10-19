@@ -214,6 +214,40 @@ class PersonalSpaceSyncE2ETest {
         }
 
     @Test
+    fun `a journal with a cover reaches another device with the cover file`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val picture = ByteArray(250_000) { (it % 173).toByte() }
+            val local = phone.media.saveMedia(MediaPayload("cover.jpg", "image/jpeg", picture.size.toLong(), picture))
+            val journal = Journal(title = "Lake trips", coverImageUri = local, created = later(0), lastUpdated = later(0))
+            phone.journals.create(journal)
+            val stored = assertNotNull(phone.journals.getJournalById(journal.id)?.coverImageUri)
+
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertTrue(phone.metadata.getPendingUploads(EntityType.JOURNAL).isEmpty(), "The journal is still waiting to upload")
+            assertEquals(stored, phone.journals.getJournalById(journal.id)?.coverImageUri)
+
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            val cover = assertNotNull(tablet.journals.getJournalById(journal.id)?.coverImageUri)
+            assertFalse(cover.startsWith("https://"), "The cover was recovered into the media store")
+            assertContentEquals(picture, tablet.media.readMedia(cover).data)
+            assertEquals(0, tablet.inbox.count())
+
+            tablet.journals.update(
+                tablet.journals.getJournalById(journal.id)!!.copy(title = "Lake and river trips", lastUpdated = later(1)),
+            )
+            assertSynced(tablet.manager.uploadPendingChanges())
+            assertSynced(phone.manager.downloadRemoteChanges())
+            assertEquals("Lake and river trips", phone.journals.getJournalById(journal.id)?.title)
+            assertContentEquals(
+                picture,
+                phone.media.readMedia(assertNotNull(phone.journals.getJournalById(journal.id)?.coverImageUri)).data,
+            )
+            assertEquals(0, phone.inbox.count())
+        }
+
+    @Test
     fun `journals merged on one device are merged on another`() =
         spaceTest { account ->
             val phone = device(account)

@@ -435,6 +435,15 @@ class DefaultSyncManager(
                         mediaSyncRefStore,
                         transactionManager,
                     ).recover(accessToken)
+            EntityType.JOURNAL ->
+                app.logdate.client.sync.recovery
+                    .SyncJournalCoverRecovery(
+                        inbox,
+                        journalRepository,
+                        mediaTransfer,
+                        mediaSyncRefStore,
+                        transactionManager,
+                    ).recover(accessToken)
             EntityType.DRAFT ->
                 app.logdate.client.sync.recovery
                     .SyncDraftMediaRecovery(
