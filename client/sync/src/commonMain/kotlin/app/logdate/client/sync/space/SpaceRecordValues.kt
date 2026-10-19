@@ -94,17 +94,20 @@ fun parseDatetime(
     Instant.parseOrNull(value)?.takeIf { Datetime.isValid(value) }
         ?: throw SpaceRecordMappingException("$owner isn't a valid datetime")
 
-/** [value] rounded to a whole number, halves away from zero. NaN and infinity are refused. */
+/**
+ * [value] rounded to a whole number, halves away from zero. NaN, infinity and a result beyond
+ * 2^53 - 1, the largest integer every client reads exactly, are refused rather than clamped.
+ */
 fun roundHalfAwayFromZero(
     owner: String,
     value: Double,
 ): Long {
     if (!value.isFinite()) throw SpaceRecordMappingException("$owner isn't a finite number")
-    val rounded = value.sign * floor(abs(value) + 0.5)
-    if (rounded >= Long.MAX_VALUE.toDouble() || rounded < Long.MIN_VALUE.toDouble()) {
-        throw SpaceRecordMappingException("$owner is too large to store")
-    }
-    return rounded.toLong()
+    val magnitude = abs(value)
+    val whole = floor(magnitude)
+    val rounded = if (magnitude - whole >= HALF) whole + 1 else whole
+    if (rounded > MAX_SAFE_INTEGER) throw SpaceRecordMappingException("$owner is too large to store")
+    return (value.sign * rounded).toLong()
 }
 
 /**
@@ -147,19 +150,27 @@ fun parseDecimal(
         ?: throw SpaceRecordMappingException("$owner isn't a decimal number")
 
 /** A confidence from 0 to 1 as whole thousandths, kept between 0 and 1000. */
-fun Float.toThousandths(owner: String): Long = roundHalfAwayFromZero(owner, toDouble() * THOUSANDTHS).coerceIn(0, THOUSANDTHS.toLong())
+fun Float.toThousandths(owner: String): Long = toDouble().toThousandths(owner)
+
+fun Double.toThousandths(owner: String): Long = roundHalfAwayFromZero(owner, this * THOUSANDTHS).coerceIn(0, THOUSANDTHS.toLong())
 
 fun Long.fromThousandths(): Float = (toDouble() / THOUSANDTHS).toFloat()
 
 /** A distance in meters as whole centimeters, and 0 if it's negative. */
-fun Float.toCentimeters(owner: String): Long = roundHalfAwayFromZero(owner, toDouble() * CENTIMETERS_PER_METER).coerceAtLeast(0)
+fun Float.toCentimeters(owner: String): Long = toDouble().toCentimeters(owner)
+
+fun Double.toCentimeters(owner: String): Long = roundHalfAwayFromZero(owner, this * CENTIMETERS_PER_METER).coerceAtLeast(0)
 
 fun Long.centimetersToMeters(): Float = (toDouble() / CENTIMETERS_PER_METER).toFloat()
 
-/** A bearing in degrees as whole hundredths of a degree, taken modulo a full turn into [0, 36000). */
+/**
+ * A bearing in degrees as whole hundredths of a degree, taken modulo a full turn into [0, 36000).
+ * The turn is removed before scaling, so a huge finite bearing is kept rather than refused.
+ */
 fun Double.toBearingHundredths(owner: String): Long {
-    val hundredths = roundHalfAwayFromZero(owner, this * HUNDREDTHS_PER_DEGREE)
-    return ((hundredths % FULL_TURN_HUNDREDTHS) + FULL_TURN_HUNDREDTHS) % FULL_TURN_HUNDREDTHS
+    if (!isFinite()) throw SpaceRecordMappingException("$owner isn't a finite number")
+    val degrees = (this % FULL_TURN_DEGREES).let { if (it < 0) it + FULL_TURN_DEGREES else it }
+    return roundHalfAwayFromZero(owner, degrees * HUNDREDTHS_PER_DEGREE) % FULL_TURN_HUNDREDTHS
 }
 
 fun Long.hundredthsToBearing(): Double = toDouble() / HUNDREDTHS_PER_DEGREE
@@ -168,3 +179,6 @@ private const val THOUSANDTHS = 1000.0
 private const val CENTIMETERS_PER_METER = 100.0
 private const val HUNDREDTHS_PER_DEGREE = 100.0
 private const val FULL_TURN_HUNDREDTHS = 36_000L
+private const val FULL_TURN_DEGREES = 360.0
+private const val HALF = 0.5
+private const val MAX_SAFE_INTEGER = 9_007_199_254_740_991.0

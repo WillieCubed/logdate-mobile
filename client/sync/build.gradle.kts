@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import app.logdate.GenerateConformanceFixtures
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
@@ -11,6 +12,20 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.dokka)
 }
+
+// The conversion tests check the number rules against the same known answers the Mac and Linux apps
+// use. They are embedded at build time because common tests run on iOS too, where there is no
+// repository to read files from.
+val lexiconCheckDirectory = rootProject.layout.projectDirectory.dir("tools/lexicon-check")
+val generateConversionVectors =
+    tasks.register<GenerateConformanceFixtures>("generateConversionVectors") {
+        description = "Embed the number conversion known answers in the test sources."
+        root.set(lexiconCheckDirectory)
+        fixtures.from(rootProject.fileTree(lexiconCheckDirectory) { include("conversion-vectors.json") })
+        packageName.set("app.logdate.client.sync.space")
+        objectName.set("ConversionVectorFixtures")
+        outputDirectory.set(layout.buildDirectory.dir("generated/conversion-vectors/kotlin"))
+    }
 
 kotlin {
     android {
@@ -78,6 +93,10 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.client.logging)
+        }
+
+        commonTest {
+            kotlin.srcDir(generateConversionVectors.flatMap { it.outputDirectory })
         }
 
         commonTest.dependencies {
