@@ -5,6 +5,7 @@ package app.logdate.server.atproto
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.HandleLabels
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -440,6 +441,8 @@ public class AtprotoPdsSessionService(
         val normalized = handle.trim().trim('.').lowercase()
         val supportedDomain = identityService.config.normalizedHandleDomain
         require(normalized.endsWith(".$supportedDomain")) { "UnsupportedDomain" }
+        val label = normalized.removeSuffix(".$supportedDomain")
+        require(hostedHandleLabel.matches(label) && !HandleLabels.isReserved(label)) { "InvalidHandle" }
         return normalized
     }
 
@@ -483,6 +486,7 @@ public class AtprotoPdsSessionService(
 
     private companion object {
         private val nonUsernameCharacters = Regex("[^a-z0-9-]")
+        private val hostedHandleLabel = Regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
     }
 }
 

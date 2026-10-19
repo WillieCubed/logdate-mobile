@@ -30,6 +30,7 @@ import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
 import app.logdate.server.identity.AtprotoIdentityService
+import app.logdate.server.identity.HandleLabels
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.ratelimit.RateLimitPolicy
@@ -90,20 +91,6 @@ private const val USERNAME_MIN_LENGTH = 3
 private const val USERNAME_MAX_LENGTH = 50
 private const val DISPLAY_NAME_MAX_LENGTH = 100
 private val USERNAME_REGEX = Regex("^[a-zA-Z0-9_]+$")
-private val RESERVED_USERNAME_LABELS =
-    setOf(
-        "www",
-        "app",
-        "cloud",
-        "api",
-        "studio",
-        "admin",
-        "mail",
-        "blog",
-        "docs",
-        "status",
-        "staging",
-    )
 private const val EMAIL_BINDING_SOURCE_GOOGLE = "google_id_token"
 internal val SIGNUP_RATE_LIMIT = RateLimitPolicy(maxRequests = 5, windowSeconds = 60 * 60)
 internal val SIGNIN_RATE_LIMIT = RateLimitPolicy(maxRequests = 10, windowSeconds = 60)
@@ -1819,7 +1806,7 @@ private fun validateUsername(username: String): String? {
         return "Username can only contain letters, numbers, and underscores"
     }
 
-    if (username.lowercase() in RESERVED_USERNAME_LABELS) {
+    if (HandleLabels.isReservedUsername(username)) {
         return "Username is reserved"
     }
 

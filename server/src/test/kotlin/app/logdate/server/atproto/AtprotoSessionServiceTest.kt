@@ -94,6 +94,21 @@ class AtprotoSessionServiceTest {
             assertNotNull(afterDelete)
         }
 
+    @Test
+    fun `create account refuses reserved punycode and nested handles`() =
+        runTest {
+            val context = sessionContext()
+
+            for (handle in listOf("about.logdate.app", "cloud.logdate.app", "xn--lookalike.logdate.app", "a.b.logdate.app")) {
+                val error =
+                    context.service
+                        .createAccount(CreateAccountRequest(handle = handle, password = "password-1"))
+                        .exceptionOrNull()
+                assertEquals("InvalidHandle", error?.message, handle)
+                assertEquals(null, context.accountRepository.findByHandle(handle), handle)
+            }
+        }
+
     private fun sessionContext(): SessionContext {
         val accountRepository = InMemoryAccountRepository()
         val passwordRepository = InMemoryAtprotoPasswordCredentialRepository()

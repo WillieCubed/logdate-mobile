@@ -2,6 +2,9 @@ package app.logdate.server.identity
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import studio.hypertext.atproto.crypto.Multikey
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.DidDocument
@@ -30,12 +33,26 @@ class AtprotoIdentityService(
     private val plcIdentityService: PlcIdentityService = PlcIdentityService(signingKeyService = signingKeyService, config = config),
 ) : PdsIdentityService {
     private var repoCollectionsResolver: suspend (String) -> List<Nsid> = { emptyList() }
+    private val provisioningLocks = Array(PROVISIONING_LOCK_STRIPES) { Mutex() }
 
     fun setRepoCollectionsResolver(resolver: suspend (String) -> List<Nsid>) {
         repoCollectionsResolver = resolver
     }
 
+    /**
+     * Returns [account] with a canonical handle, DID, and signing key, provisioning whatever is
+     * missing. Provisioning for one account is serialized within this process, so two concurrent
+     * calls never create two DIDs for the same account; the second call sees the first one's result.
+     */
     suspend fun ensureIdentity(account: Account): Account {
+        if (hasCanonicalIdentity(account)) return account
+        return provisioningLockFor(account.id).withLock {
+            val current = accountRepository.findById(account.id)
+            if (current != null && hasCanonicalIdentity(current)) current else ensureIdentityLocked(account)
+        }
+    }
+
+    private suspend fun ensureIdentityLocked(account: Account): Account {
         val existingHandle = account.handle?.let(::canonicalizeHandle)
         val existingDid = account.did?.let(::canonicalizeDid)
         val existingRecoveryDidKey = account.plcRecoveryDidKey?.let(::canonicalizeDidKey)
@@ -87,36 +104,61 @@ class AtprotoIdentityService(
         )
     }
 
-    suspend fun backfillMissingIdentities() {
-        accountRepository.getAllAccounts().forEach { ensureIdentity(it) }
+    private fun hasCanonicalIdentity(account: Account): Boolean {
+        val handle = account.handle ?: return false
+        val did = account.did ?: return false
+        return account.signingKeyPublic != null &&
+            canonicalizeHandle(handle) == handle &&
+            canonicalizeDid(did) == did &&
+            account.plcRecoveryDidKey?.let(::canonicalizeDidKey) == account.plcRecoveryDidKey
     }
 
+    private fun provisioningLockFor(accountId: Uuid): Mutex = provisioningLocks[Math.floorMod(accountId.hashCode(), provisioningLocks.size)]
+
+    /**
+     * Provisions every active account that still lacks a handle, DID, or signing key, the same way
+     * sign-in does. Each account is attempted once; failures are counted and the run continues.
+     */
+    suspend fun backfillMissingIdentities(): IdentityBackfillResult {
+        var provisioned = 0
+        var failed = 0
+        accountRepository.findAccountsMissingIdentity().forEach { account ->
+            try {
+                ensureIdentity(account)
+                provisioned++
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                failed++
+            }
+        }
+        return IdentityBackfillResult(provisioned = provisioned, failed = failed)
+    }
+
+    /** Active accounts that still lack a handle, DID, or signing key. Reads only. */
+    suspend fun accountsMissingIdentity(): List<Account> = accountRepository.findAccountsMissingIdentity()
+
+    /**
+     * The account that owns [handle], when it has a complete identity. Reads only: an anonymous
+     * lookup never provisions or publishes anything, and it costs one indexed query whatever the
+     * handle is. Accounts without an identity get one at sign-in or from the operator backfill.
+     */
     suspend fun findByHandle(handle: String): Account? {
         val normalizedHandle = canonicalizeHandle(handle) ?: return null
-        val direct = accountRepository.findByHandle(normalizedHandle)
-        if (direct != null) {
-            return ensureIdentity(direct)
-        }
-
-        return accountRepository
-            .findAccountsWithoutHandle()
-            .firstNotNullOfOrNull { account ->
-                if (account.did != null || account.signingKeyPublic != null) return@firstNotNullOfOrNull null
-                if (provisionedHandleFor(account) != normalizedHandle) return@firstNotNullOfOrNull null
-                ensureIdentity(account)
-            }
+        return accountRepository.findByHandle(normalizedHandle)?.takeIf(::hasCompleteIdentity)
     }
 
+    /** The account that owns [did], when it has a complete identity. Reads only. */
     suspend fun findByDid(did: String): Account? {
         val normalizedDid = canonicalizeDid(did) ?: return null
-        val direct = accountRepository.findByDid(normalizedDid)
-        if (direct != null) {
-            return ensureIdentity(direct)
-        }
+        accountRepository.findByDid(normalizedDid)?.takeIf(::hasCompleteIdentity)?.let { return it }
 
         val handle = handleFromDid(normalizedDid) ?: return null
-        return findByHandle(handle)
+        return findByHandle(handle)?.takeIf { it.did == normalizedDid }
     }
+
+    private fun hasCompleteIdentity(account: Account): Boolean =
+        account.handle != null && account.did != null && account.signingKeyPublic != null
 
     fun didForHandle(handle: String): AtprotoDid = AtprotoDid.require("did:web:${requireNotNull(canonicalizeHandle(handle))}")
 
@@ -507,15 +549,9 @@ class AtprotoIdentityService(
         username: String,
         maxLength: Int = MAX_HANDLE_LABEL_LENGTH,
     ): String {
-        val sanitized =
-            username
-                .trim()
-                .lowercase()
-                .replace(invalidLabelCharacterRegex, "-")
-                .trim('-')
-                .ifBlank { DEFAULT_HANDLE_LABEL }
+        val sanitized = HandleLabels.labelForUsername(username).ifBlank { DEFAULT_HANDLE_LABEL }
         val label = sanitized.take(maxLength.coerceAtLeast(1)).trim('-').ifBlank { DEFAULT_HANDLE_LABEL }
-        return if (label in RESERVED_HANDLE_LABELS) DEFAULT_HANDLE_LABEL else label
+        return if (HandleLabels.isReserved(label)) DEFAULT_HANDLE_LABEL else label
     }
 
     private fun canonicalizeHandle(handle: String): String? {
@@ -557,23 +593,15 @@ class AtprotoIdentityService(
         private const val DID_KEY_PREFIX = "did:key:"
         private const val MAX_HANDLE_LABEL_LENGTH = 63
         private const val HANDLE_COLLISION_SUFFIX_LENGTH = 8
-        private val invalidLabelCharacterRegex = Regex("[^a-z0-9-]+")
-        private val RESERVED_HANDLE_LABELS =
-            setOf(
-                "www",
-                "app",
-                "cloud",
-                "api",
-                "studio",
-                "admin",
-                "mail",
-                "blog",
-                "docs",
-                "status",
-                "staging",
-            )
+        private const val PROVISIONING_LOCK_STRIPES = 64
     }
 }
+
+/** Outcome of [AtprotoIdentityService.backfillMissingIdentities]. */
+data class IdentityBackfillResult(
+    val provisioned: Int,
+    val failed: Int,
+)
 
 data class RotatedIdentitySigningKey(
     val account: Account,

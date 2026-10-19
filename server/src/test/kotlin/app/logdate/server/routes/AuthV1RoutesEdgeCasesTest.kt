@@ -62,6 +62,12 @@ class AuthV1RoutesEdgeCasesTest {
             val mixedCaseStaging = client.get("/api/v1/auth/signup/username/Staging/available")
             assertEquals(HttpStatusCode.BadRequest, mixedCaseStaging.status)
 
+            // Website hosts and punycode labels can never become handles, whatever the underscores.
+            for (username in listOf("about", "Delete_Account", "pricing_", "xn__lookalike", "XN__abc")) {
+                val response = client.get("/api/v1/auth/signup/username/$username/available")
+                assertEquals(HttpStatusCode.BadRequest, response.status, username)
+            }
+
             val available = client.get("/api/v1/auth/signup/username/free_user/available")
             assertEquals(HttpStatusCode.OK, available.status)
 

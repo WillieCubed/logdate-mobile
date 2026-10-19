@@ -2,6 +2,8 @@ package app.logdate.server.identity
 
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.InMemoryAccountRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import studio.hypertext.atproto.crypto.EcCurve
 import studio.hypertext.atproto.crypto.EcKeySupport
 import studio.hypertext.atproto.identity.AtprotoDid
@@ -486,7 +488,9 @@ class AtprotoIdentityServiceTest {
                     ),
                 )
 
-            service.backfillMissingIdentities()
+            assertEquals(listOf(saved.id), service.accountsMissingIdentity().map { it.id })
+            assertEquals(IdentityBackfillResult(provisioned = 1, failed = 0), service.backfillMissingIdentities())
+            assertEquals(emptyList(), service.accountsMissingIdentity())
 
             val backfilled = accountRepository.findById(saved.id)
             assertEquals("kara.logdate.app", backfilled?.handle)
@@ -977,17 +981,53 @@ class AtprotoIdentityServiceTest {
             service.ensureIdentity(
                 delegate.save(Account(id = Uuid.random(), username = "provisioned", displayName = "P", createdAt = Clock.System.now())),
             )
-            delegate.save(Account(id = Uuid.random(), username = "legacy", displayName = "L", createdAt = Clock.System.now()))
+            val legacy =
+                delegate.save(Account(id = Uuid.random(), username = "legacy", displayName = "L", createdAt = Clock.System.now()))
+            accountRepository.lookups = 0
 
             assertNull(service.findByHandle("unknown.logdate.app"))
+            assertEquals(1, accountRepository.lookups)
             assertTrue(service.findByHandle("provisioned.logdate.app")?.did?.startsWith("did:plc:") == true)
-            assertTrue(service.findByHandle("legacy.logdate.app")?.did?.startsWith("did:plc:") == true)
+            // An account without an identity is not resolvable, and looking it up never creates one.
+            assertNull(service.findByHandle("legacy.logdate.app"))
+            assertEquals(legacy, delegate.findById(legacy.id))
+        }
+
+    @Test
+    fun `concurrent ensureIdentity calls provision one identity`() =
+        kotlinx.coroutines.test.runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val service =
+                AtprotoIdentityService(
+                    accountRepository = accountRepository,
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
+                )
+            val account =
+                accountRepository.save(Account(id = Uuid.random(), username = "race", displayName = "R", createdAt = Clock.System.now()))
+
+            val results =
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    (1..16).map { async { service.ensureIdentity(account) } }.awaitAll()
+                }
+
+            assertEquals(1, results.map { it.did }.toSet().size)
+            assertEquals(results.first().did, accountRepository.findById(account.id)?.did)
         }
 
     private class FullScanForbiddenAccountRepository(
         private val delegate: InMemoryAccountRepository,
     ) : app.logdate.server.auth.AccountRepository by delegate {
+        var lookups = 0
+
+        override suspend fun findByHandle(handle: String): Account? {
+            lookups++
+            return delegate.findByHandle(handle)
+        }
+
         override suspend fun getAllAccounts(): List<Account> = error("Handle resolution must not load every account")
+
+        override suspend fun findAccountsMissingIdentity(): List<Account> = error("Handle resolution must not scan accounts")
     }
 
     private fun decodeBase64Url(value: String): ByteArray {
