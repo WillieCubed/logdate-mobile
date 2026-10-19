@@ -7,6 +7,7 @@ import app.logdate.server.database.SpaceRecordBlobsTable
 import app.logdate.server.database.SpaceRecordsTable
 import app.logdate.server.database.SpaceStatesTable
 import app.logdate.server.database.support.withH2Database
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -129,6 +130,52 @@ abstract class SpaceStoreContractTest {
             assertNotNull(store.getBlob(space, "bafyused"))
             assertNull(store.getBlob(space, "bafyorphan"))
             assertEquals(listOf("a"), store.changes(space, author, 0, 10).changes.map { it.rkey })
+        }
+
+    @Test
+    fun `put referencing an unknown blob is refused`() =
+        withStore { store, account ->
+            store.putBlob(account, space, SpaceBlob("bafyknown", "application/octet-stream", 10, "path/known"))
+            store.putBlob(account, "at://did:plc:other/space/app.logdate.space.personal/self", SpaceBlob("bafyelsewhere", "x", 1, "p"))
+            val missing =
+                assertFailsWith<SpaceMissingBlobException> {
+                    store.put(write(account, "a", blobs = listOf("bafyknown", "bafyelsewhere")))
+                }
+            assertEquals("bafyelsewhere", missing.cid)
+            assertNull(store.get(space, author, "a"))
+            assertEquals(emptyList(), store.changes(space, author, 0, 10).changes)
+            assertEquals(1L, store.put(write(account, "a", blobs = listOf("bafyknown"))).seq)
+        }
+
+    @Test
+    fun `put refuses a record that isn't a sealed envelope`() =
+        withStore { store, account ->
+            val plain = SpaceRecordWrite(account, space, author, "a", buildJsonObject { put("text", "hello") }, emptyList(), null, false)
+            val refused = assertFailsWith<SpaceInvalidRecordException> { store.put(plain) }
+            assertEquals("Not an app.logdate.crypto.sealed record", refused.reason)
+            assertNull(store.get(space, author, "a"))
+        }
+
+    @Test
+    fun `changes requires a limit from 1 to the maximum`() =
+        withStore { store, account ->
+            store.put(write(account, "a"))
+            assertFailsWith<IllegalArgumentException> { store.changes(space, author, 0, 0) }
+            assertFailsWith<IllegalArgumentException> { store.changes(space, author, 0, MAX_SPACE_CHANGES_LIMIT + 1) }
+            assertEquals(1, store.changes(space, author, 0, MAX_SPACE_CHANGES_LIMIT).changes.size)
+        }
+
+    @Test
+    fun `putting an existing blob keeps its storage path and restarts its grace period`() =
+        withStore { store, account ->
+            store.putBlob(account, space, SpaceBlob("bafyblob", "application/octet-stream", 10, "path/original"))
+            delay(5)
+            val between = Clock.System.now()
+            delay(5)
+            store.putBlob(account, space, SpaceBlob("bafyblob", "image/jpeg", 12, "path/second"))
+            assertEquals(SpaceBlob("bafyblob", "image/jpeg", 12, "path/original"), store.getBlob(space, "bafyblob"))
+            assertEquals(emptyList(), store.purge(tombstonesBefore = between, unreferencedBlobsBefore = between))
+            assertNotNull(store.getBlob(space, "bafyblob"))
         }
 
     @Test

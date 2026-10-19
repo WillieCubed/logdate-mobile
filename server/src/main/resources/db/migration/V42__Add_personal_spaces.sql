@@ -7,6 +7,7 @@ CREATE TABLE space_states (
     last_seq BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (space_uri, author_did)
 );
+CREATE INDEX idx_space_states_account ON space_states(account_id);
 
 CREATE TABLE space_records (
     space_uri TEXT NOT NULL,
@@ -22,6 +23,7 @@ CREATE TABLE space_records (
     PRIMARY KEY (space_uri, author_did, rkey)
 );
 CREATE INDEX idx_space_records_seq ON space_records(space_uri, author_did, seq);
+CREATE INDEX idx_space_records_account ON space_records(account_id);
 
 CREATE TABLE space_record_blobs (
     space_uri TEXT NOT NULL,
@@ -31,6 +33,8 @@ CREATE TABLE space_record_blobs (
     PRIMARY KEY (space_uri, author_did, rkey, cid),
     FOREIGN KEY (space_uri, author_did, rkey) REFERENCES space_records(space_uri, author_did, rkey) ON DELETE CASCADE
 );
+-- Purging checks whether any record still refers to a blob.
+CREATE INDEX idx_space_record_blobs_cid ON space_record_blobs(space_uri, cid);
 
 CREATE TABLE space_blobs (
     space_uri TEXT NOT NULL,
@@ -42,6 +46,8 @@ CREATE TABLE space_blobs (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (space_uri, cid)
 );
+CREATE INDEX idx_space_blobs_account ON space_blobs(account_id);
+CREATE INDEX idx_space_blobs_created ON space_blobs(created_at);
 
 -- Account deletion must also delete space blobs from object storage.
 CREATE OR REPLACE FUNCTION enqueue_account_blob_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$

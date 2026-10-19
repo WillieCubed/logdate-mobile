@@ -25,7 +25,7 @@ internal fun checkSealedRecord(record: JsonObject): String? {
             return "Not an app.logdate.crypto.sealed record"
         }
     // The generated class defaults its type, so an untyped record decodes; check what was sent.
-    if ((record["\$type"] as? JsonPrimitive)?.contentOrNull != Sealed.TYPE || sealed.lexiconType != Sealed.TYPE) {
+    if ((record["\$type"] as? JsonPrimitive)?.contentOrNull != Sealed.TYPE) {
         return "Only app.logdate.crypto.sealed records can be stored in a space"
     }
     if (sealed.version != 1L) return "Envelope version ${sealed.version} isn't supported"

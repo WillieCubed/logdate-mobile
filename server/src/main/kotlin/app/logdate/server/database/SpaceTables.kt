@@ -12,6 +12,10 @@ object SpaceStatesTable : Table("space_states") {
     val accountId = javaUUID("account_id").references(AccountsTable.id, onDelete = ReferenceOption.CASCADE)
     val lastSeq = long("last_seq").default(0L)
     override val primaryKey = PrimaryKey(spaceUri, authorDid)
+
+    init {
+        index("idx_space_states_account", false, accountId)
+    }
 }
 
 /** Sealed records and their tombstones. [record] holds the DAG-CBOR bytes of a live record. */
@@ -30,6 +34,7 @@ object SpaceRecordsTable : Table("space_records") {
 
     init {
         index("idx_space_records_seq", false, spaceUri, authorDid, seq)
+        index("idx_space_records_account", false, accountId)
     }
 }
 
@@ -48,6 +53,7 @@ object SpaceRecordBlobsTable : Table("space_record_blobs") {
             rkey to SpaceRecordsTable.rkey,
             onDelete = ReferenceOption.CASCADE,
         )
+        index("idx_space_record_blobs_cid", false, spaceUri, cid)
     }
 }
 
@@ -61,4 +67,9 @@ object SpaceBlobsTable : Table("space_blobs") {
     val storagePath = text("storage_path")
     val createdAt = timestamp("created_at")
     override val primaryKey = PrimaryKey(spaceUri, cid)
+
+    init {
+        index("idx_space_blobs_account", false, accountId)
+        index("idx_space_blobs_created", false, createdAt)
+    }
 }

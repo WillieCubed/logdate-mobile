@@ -57,6 +57,19 @@ class SpaceSwapException(
     message: String,
 ) : RuntimeException(message)
 
+/** A write whose record isn't a valid sealed envelope; [reason] says why. */
+class SpaceInvalidRecordException(
+    val reason: String,
+) : RuntimeException(reason)
+
+/** A write that refers to a blob [cid] that isn't stored in the record's space. */
+class SpaceMissingBlobException(
+    val cid: String,
+) : RuntimeException("Blob $cid isn't stored in this space")
+
+/** The most changes one [SpaceStore.changes] call returns. */
+const val MAX_SPACE_CHANGES_LIMIT = 500
+
 /** An encrypted blob uploaded to a space; its bytes are in object storage at [storagePath]. */
 data class SpaceBlob(
     val cid: String,
@@ -70,7 +83,11 @@ data class SpaceBlob(
  * client can page through every change since the last sequence number it saw.
  */
 interface SpaceStore {
-    /** Writes a record and returns it with its new sequence number. Throws [SpaceSwapException]. */
+    /**
+     * Writes a record and returns it with its new sequence number. Throws [SpaceInvalidRecordException]
+     * for a record that isn't a sealed envelope, [SpaceSwapException] when a write condition fails,
+     * and [SpaceMissingBlobException] when the record refers to a blob the space doesn't hold.
+     */
     suspend fun put(write: SpaceRecordWrite): StoredSpaceRecord
 
     /**
@@ -94,7 +111,7 @@ interface SpaceStore {
         rkey: String,
     ): StoredSpaceRecord?
 
-    /** Up to [limit] changes with a sequence number greater than [since]. */
+    /** Up to [limit] changes with a sequence number greater than [since]; [limit] is 1 to [MAX_SPACE_CHANGES_LIMIT]. */
     suspend fun changes(
         space: String,
         author: String,
@@ -102,7 +119,10 @@ interface SpaceStore {
         limit: Int,
     ): SpaceChangePage
 
-    /** Records a blob's metadata, restarting its unreferenced grace period if it already exists. */
+    /**
+     * Records a blob's metadata. For a blob already in the space, it keeps the original storage path
+     * and restarts the unreferenced grace period.
+     */
     suspend fun putBlob(
         accountId: UUID,
         space: String,
@@ -132,6 +152,16 @@ internal fun recordCid(record: JsonObject): Pair<String, ByteArray> {
     return Cid.sha256(DAG_CBOR_CODEC, bytes).value to bytes
 }
 
+/** Throws [SpaceInvalidRecordException] unless [record] is a valid sealed envelope. */
+internal fun requireSealedRecord(record: JsonObject) {
+    checkSealedRecord(record)?.let { throw SpaceInvalidRecordException(it) }
+}
+
+/** Throws unless [limit] is a page size [SpaceStore.changes] accepts. */
+internal fun requireChangesLimit(limit: Int) {
+    require(limit in 1..MAX_SPACE_CHANGES_LIMIT) { "limit must be 1 to $MAX_SPACE_CHANGES_LIMIT" }
+}
+
 /** Decodes stored DAG-CBOR bytes, so every read returns the same form of a record. */
 internal fun decodeRecord(bytes: ByteArray): JsonObject = DagCborCodec.decode(bytes).jsonObject
 
@@ -152,10 +182,15 @@ class InMemorySpaceStore : SpaceStore {
 
     override suspend fun put(write: SpaceRecordWrite): StoredSpaceRecord =
         mutex.withLock {
+            requireSealedRecord(write.record)
             val key = Triple(write.space, write.author, write.rkey)
             val live = records[key]?.takeIf { it.deletedAt == null }
             if (write.createOnly && live != null) throw SpaceSwapException("A record with this key exists")
             if (write.swapCid != null && live?.cid != write.swapCid) throw SpaceSwapException("The record changed")
+            write.blobs
+                .sorted()
+                .firstOrNull { (write.space to it) !in blobs }
+                ?.let { throw SpaceMissingBlobException(it) }
             val (cid, bytes) = recordCid(write.record)
             val seq = nextSeq(write.space, write.author)
             records[key] = Row(seq, cid, bytes, deletedAt = null)
@@ -197,8 +232,9 @@ class InMemorySpaceStore : SpaceStore {
         author: String,
         since: Long,
         limit: Int,
-    ): SpaceChangePage =
-        mutex.withLock {
+    ): SpaceChangePage {
+        requireChangesLimit(limit)
+        return mutex.withLock {
             val rows =
                 records
                     .filter { (key, row) -> key.first == space && key.second == author && row.seq > since }
@@ -211,13 +247,17 @@ class InMemorySpaceStore : SpaceStore {
                 }
             SpaceChangePage(page, page.lastOrNull()?.seq ?: since, rows.size > limit)
         }
+    }
 
     override suspend fun putBlob(
         accountId: UUID,
         space: String,
         blob: SpaceBlob,
     ) {
-        mutex.withLock { blobs[space to blob.cid] = blob to Clock.System.now() }
+        mutex.withLock {
+            val storagePath = blobs[space to blob.cid]?.first?.storagePath ?: blob.storagePath
+            blobs[space to blob.cid] = blob.copy(storagePath = storagePath) to Clock.System.now()
+        }
     }
 
     override suspend fun getBlob(

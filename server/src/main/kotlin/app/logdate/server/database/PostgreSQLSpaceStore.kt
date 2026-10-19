@@ -3,12 +3,15 @@ package app.logdate.server.database
 import app.logdate.server.space.SpaceBlob
 import app.logdate.server.space.SpaceChange
 import app.logdate.server.space.SpaceChangePage
+import app.logdate.server.space.SpaceMissingBlobException
 import app.logdate.server.space.SpaceRecordWrite
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.space.SpaceSwapException
 import app.logdate.server.space.StoredSpaceRecord
 import app.logdate.server.space.decodeRecord
 import app.logdate.server.space.recordCid
+import app.logdate.server.space.requireChangesLimit
+import app.logdate.server.space.requireSealedRecord
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.Op
@@ -17,6 +20,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.notExists
 import org.jetbrains.exposed.v1.jdbc.batchInsert
@@ -27,6 +31,7 @@ import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import java.sql.Connection
 import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -36,14 +41,16 @@ import kotlin.time.Instant
  * taking the next sequence number, so concurrent writes never share one.
  */
 class PostgreSQLSpaceStore : SpaceStore {
-    override suspend fun put(write: SpaceRecordWrite): StoredSpaceRecord =
-        withContext(Dispatchers.IO) {
+    override suspend fun put(write: SpaceRecordWrite): StoredSpaceRecord {
+        requireSealedRecord(write.record)
+        return withContext(Dispatchers.IO) {
             transaction {
                 val lastSeq = lockState(write.accountId, write.space, write.author)
                 val existing = lockedRecordRow(write.space, write.author, write.rkey)
                 val liveCid = existing?.takeUnless { it[SpaceRecordsTable.deleted] }?.get(SpaceRecordsTable.cid)
                 if (write.createOnly && liveCid != null) throw SpaceSwapException("A record with this key exists")
                 if (write.swapCid != null && liveCid != write.swapCid) throw SpaceSwapException("The record changed")
+                lockBlobs(write.space, write.blobs)
                 val (cid, bytes) = recordCid(write.record)
                 val seq = advanceState(write.space, write.author, lastSeq)
                 if (existing == null) {
@@ -79,6 +86,7 @@ class PostgreSQLSpaceStore : SpaceStore {
                 StoredSpaceRecord(write.rkey, cid, seq, decodeRecord(bytes))
             }
         }
+    }
 
     override suspend fun delete(
         accountId: UUID,
@@ -125,8 +133,9 @@ class PostgreSQLSpaceStore : SpaceStore {
         author: String,
         since: Long,
         limit: Int,
-    ): SpaceChangePage =
-        withContext(Dispatchers.IO) {
+    ): SpaceChangePage {
+        requireChangesLimit(limit)
+        return withContext(Dispatchers.IO) {
             transaction {
                 val rows =
                     SpaceRecordsTable
@@ -141,6 +150,7 @@ class PostgreSQLSpaceStore : SpaceStore {
                 SpaceChangePage(page, page.lastOrNull()?.seq ?: since, rows.size > limit)
             }
         }
+    }
 
     override suspend fun putBlob(
         accountId: UUID,
@@ -165,7 +175,6 @@ class PostgreSQLSpaceStore : SpaceStore {
                     SpaceBlobsTable.update({ (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq blob.cid) }) {
                         it[mimeType] = blob.mimeType
                         it[sizeBytes] = blob.size
-                        it[storagePath] = blob.storagePath
                         it[createdAt] = now
                     }
                 }
@@ -201,23 +210,63 @@ class PostgreSQLSpaceStore : SpaceStore {
         withContext(Dispatchers.IO) {
             transaction {
                 SpaceRecordsTable.deleteWhere { (deleted eq true) and (deletedAt less tombstonesBefore) }
-                val candidates =
-                    SpaceBlobsTable
-                        .selectAll()
-                        .where { (SpaceBlobsTable.createdAt less unreferencedBlobsBefore) and unreferenced() }
-                        .map { Triple(it[SpaceBlobsTable.spaceUri], it[SpaceBlobsTable.cid], it[SpaceBlobsTable.storagePath]) }
-                // Each delete repeats the reference check, so a record that refers to a blob after the
-                // selection keeps it.
-                candidates.mapNotNull { (space, cid, path) ->
-                    val deleted =
-                        SpaceBlobsTable.deleteWhere {
-                            (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq cid) and
-                                (SpaceBlobsTable.createdAt less unreferencedBlobsBefore) and unreferenced()
-                        }
-                    path.takeIf { deleted > 0 }
-                }
             }
+            val candidates =
+                transaction {
+                    SpaceBlobsTable
+                        .select(SpaceBlobsTable.spaceUri, SpaceBlobsTable.cid)
+                        .where { (SpaceBlobsTable.createdAt less unreferencedBlobsBefore) and unreferenced() }
+                        .orderBy(SpaceBlobsTable.spaceUri to SortOrder.ASC, SpaceBlobsTable.cid to SortOrder.ASC)
+                        .map { it[SpaceBlobsTable.spaceUri] to it[SpaceBlobsTable.cid] }
+                }
+            candidates.mapNotNull { (space, cid) -> purgeBlob(space, cid, unreferencedBlobsBefore) }
         }
+
+    /**
+     * Deletes one unreferenced blob row and returns its storage path, or null if it's gone or now
+     * referenced. A write that refers to the blob locks its row first, so taking the same lock waits
+     * for that write to commit; the delete is a separate statement, so under read committed it sees
+     * the committed reference and keeps the blob.
+     */
+    private fun purgeBlob(
+        space: String,
+        cid: String,
+        createdBefore: Instant,
+    ): String? =
+        transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
+            val key = (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq cid)
+            val path =
+                SpaceBlobsTable
+                    .select(SpaceBlobsTable.storagePath)
+                    .where { key }
+                    .forUpdate()
+                    .singleOrNull()
+                    ?.get(SpaceBlobsTable.storagePath) ?: return@transaction null
+            val deleted = SpaceBlobsTable.deleteWhere { key and (createdAt less createdBefore) and unreferenced() }
+            path.takeIf { deleted > 0 }
+        }
+
+    /**
+     * Locks the space blobs [cids] refers to, in key order, and throws [SpaceMissingBlobException] for
+     * one that doesn't exist. Purging takes the same row lock, so it can't delete a blob this write
+     * is about to refer to.
+     */
+    private fun lockBlobs(
+        space: String,
+        cids: List<String>,
+    ) {
+        val wanted = cids.distinct().sorted()
+        if (wanted.isEmpty()) return
+        val found =
+            SpaceBlobsTable
+                .select(SpaceBlobsTable.cid)
+                .where { (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid inList wanted) }
+                .orderBy(SpaceBlobsTable.cid to SortOrder.ASC)
+                .forUpdate()
+                .map { it[SpaceBlobsTable.cid] }
+                .toSet()
+        wanted.firstOrNull { it !in found }?.let { throw SpaceMissingBlobException(it) }
+    }
 
     /** Creates the state row if needed, locks it, and returns its last sequence number. */
     private fun lockState(
