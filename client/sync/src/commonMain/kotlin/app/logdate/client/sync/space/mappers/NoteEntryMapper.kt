@@ -52,8 +52,8 @@ import kotlin.uuid.Uuid
  *
  * A location's place is written as the place's key plus a copy of its name and center, so the
  * note reads back the same on a device that doesn't have the place. A record with a place and no
- * copy reads back with a place whose name is empty and whose center is NaN, and is written back
- * without the copy.
+ * copy reads back as a place with only its id, and is written back without the copy. A place with
+ * a name but no center, or a center but no name, can't be written as a copy and is refused.
  *
  * A note whose file no device has (an empty media reference, or an unavailable one from a restore)
  * becomes an entry whose block has no media. It reads back with
@@ -65,8 +65,11 @@ import kotlin.uuid.Uuid
  * - An audio note's `transcription` is the editor's working text, which sync never sends.
  * - Accuracy is stored in whole centimeters, rounded to the nearest one, and 0 if it was negative.
  *   An accuracy with no coordinates to describe is left out.
- * - Text written as `plain` is refused, because the app reads every note as Markdown and writing
- *   it back would change what it shows.
+ * - Text written as `plain` reads as the equivalent Markdown: every character that Markdown would
+ *   act on is escaped and each line break is a hard break, so it shows as it was written. It is
+ *   written back as Markdown, so `plain` round-trips as equivalent `markdown`. A line that starts
+ *   with spaces or a tab is refused, because Markdown drops leading whitespace and the note would
+ *   lose its indentation.
  *
  * A media file's text alternative and aspect ratio travel in its [SpaceMediaReference], so they
  * are written back as they arrived.
@@ -188,12 +191,11 @@ class NoteEntryMapper(
         owner: String,
     ): JournalNote.Text {
         requireBlockId(block.id, context.uid, owner)
-        requireTextFormat(block.format, owner)
         return JournalNote.Text(
             uid = context.uid,
             creationTimestamp = context.created,
             lastUpdated = context.updated,
-            content = block.text,
+            content = markdownOf(block, owner),
             location = context.location,
             timeZoneId = context.timeZoneId,
             capturedOn = context.capturedOn,
@@ -289,17 +291,30 @@ class NoteEntryMapper(
                 },
             accuracyCentimeters = coordinates?.accuracy?.toCentimeters("$owner accuracy"),
             place = location.place?.let { recordRef(Place.TYPE, it.id) },
-            placeDetails =
-                location.place?.takeIf { it.hasCenter }?.let {
-                    DefsPlaceDetails(
-                        name = it.name,
-                        geo =
-                            Geo(
-                                latitude = it.latitude.toDecimalString("$owner place latitude"),
-                                longitude = it.longitude.toDecimalString("$owner place longitude"),
-                            ),
-                    )
-                },
+            placeDetails = location.place?.let { placeDetailsOf(it, owner) },
+        )
+    }
+
+    private fun placeDetailsOf(
+        place: NotePlace,
+        owner: String,
+    ): DefsPlaceDetails? {
+        val name = place.name
+        val latitude = place.latitude
+        val longitude = place.longitude
+        if (name == null && latitude == null) return null
+        if (name == null || latitude == null || longitude == null) {
+            throw SpaceRecordMappingException(
+                "$owner: its place ${place.id} has only some of a name and a center, which a record can't hold",
+            )
+        }
+        return DefsPlaceDetails(
+            name = name,
+            geo =
+                Geo(
+                    latitude = latitude.toDecimalString("$owner place latitude"),
+                    longitude = longitude.toDecimalString("$owner place longitude"),
+                ),
         )
     }
 
@@ -334,7 +349,7 @@ class NoteEntryMapper(
             throw SpaceRecordMappingException("$owner: the location's place is a ${ref.collection}, not a ${Place.TYPE}")
         }
         val placeId = parseUuidKey(Place.TYPE, ref.rkey)
-        details ?: return NotePlace(id = placeId, name = "", latitude = Double.NaN, longitude = Double.NaN)
+        details ?: return NotePlace(id = placeId)
         return NotePlace(
             id = placeId,
             name = details.name,
@@ -364,14 +379,17 @@ class NoteEntryMapper(
         }
     }
 
-    private fun requireTextFormat(
-        format: String?,
+    private fun markdownOf(
+        block: EntryTextBlock,
         owner: String,
-    ) {
-        if (format != null && format != MARKDOWN) {
-            throw SpaceRecordMappingException("$owner: this version of LogDate can't show $format text")
+    ): String =
+        when (block.format) {
+            null, MARKDOWN -> block.text
+            PLAIN ->
+                plainTextAsMarkdown(block.text)
+                    ?: throw SpaceRecordMappingException("$owner: its plain text has a line that starts with whitespace")
+            else -> throw SpaceRecordMappingException("$owner: this version of LogDate can't show ${block.format} text")
         }
-    }
 
     private fun requireDuration(
         durationMs: Long,
@@ -381,8 +399,6 @@ class NoteEntryMapper(
     }
 
     private fun isUnavailable(mediaRef: String): Boolean = mediaRef.isBlank() || UnavailableMediaReferences.isUnavailable(mediaRef)
-
-    private val NotePlace.hasCenter: Boolean get() = !latitude.isNaN() && !longitude.isNaN()
 
     private data class NoteContext(
         val uid: Uuid,
@@ -396,6 +412,7 @@ class NoteEntryMapper(
 
     private companion object {
         const val MARKDOWN = "markdown"
+        const val PLAIN = "plain"
 
         fun presentationValue(presentation: PhotoPresentation): String =
             when (presentation) {

@@ -22,7 +22,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -241,11 +240,19 @@ class NoteEntryMapperTest {
 
         val note = mapper.fromRecord(mapper.rkeyOf(fullNotes[0]), record)
 
-        val place = assertNotNull(assertLocation(note).place)
-        assertEquals(home.id, place.id)
-        assertEquals("", place.name)
-        assertEquals(true, place.latitude.isNaN() && place.longitude.isNaN())
+        assertEquals(NotePlace(home.id), assertLocation(note).place)
+        assertNull(assertLocation(note).place?.name)
+        assertNull(assertLocation(note).place?.latitude)
         assertEquals(record, mapper.toRecord(note))
+    }
+
+    @Test
+    fun `a place with only some of a name and a center is refused rather than half written`() {
+        listOf(NotePlace(home.id, name = "Home"), NotePlace(home.id, latitude = 1.0, longitude = 2.0)).forEach { partial ->
+            val note = fullNotes[0].withLocation(NoteLocation(place = partial))
+
+            assertFailsWith<SpaceRecordMappingException> { mapper.toRecord(note) }
+        }
     }
 
     @Test
@@ -421,11 +428,66 @@ class NoteEntryMapperTest {
     }
 
     @Test
-    fun `text marked as plain is refused because writing it back would make it markdown`() {
-        val note = fullNotes[0]
-        val record = mapper.toRecord(note).withBlock { it + ("format" to JsonPrimitive("plain")) }
+    fun `plain text reads as markdown that shows the same characters`() {
+        val texts =
+            mapOf(
+                "*not bold*" to "\\*not bold\\*",
+                "# not a heading" to "\\# not a heading",
+                "1. not a list" to "1\\. not a list",
+                "2) not a list" to "2\\) not a list",
+                "- not a bullet" to "\\- not a bullet",
+                "> not a quote" to "\\> not a quote",
+                "---" to "\\---",
+                "snake_case and `code` and [link](x) and <b>" to "snake\\_case and \\`code\\` and \\[link](x) and \\<b>",
+                "Tom & Jerry &amp; co" to "Tom & Jerry \\&amp; co",
+                "back\\slash" to "back\\\\slash",
+                "a | b ~~c~~" to "a \\| b \\~\\~c\\~\\~",
+                "Wow! 100% 3.5 - fine" to "Wow! 100% 3.5 - fine",
+            )
 
-        assertFailsWith<SpaceRecordMappingException> { mapper.fromRecord(mapper.rkeyOf(note), record) }
+        texts.forEach { (plain, markdown) ->
+            val note = fullNotes[0] as JournalNote.Text
+            val record = mapper.toRecord(note).withBlock { it + ("text" to JsonPrimitive(plain)) + ("format" to JsonPrimitive("plain")) }
+
+            val read = mapper.fromRecord(mapper.rkeyOf(note), record) as JournalNote.Text
+
+            assertEquals(markdown, read.content, plain)
+            assertEquals(markdown, writtenText(read), "plain text round-trips as equivalent markdown")
+        }
+    }
+
+    @Test
+    fun `plain text keeps its line breaks and blank lines`() {
+        assertEquals("one\\\ntwo\n\nthree\\\n\\# four", plainTextAsMarkdown("one\ntwo\n\nthree\r\n# four"))
+        assertEquals("a\n\n\nb", plainTextAsMarkdown("a\n  \n\nb"))
+        assertEquals("", plainTextAsMarkdown(""))
+    }
+
+    @Test
+    fun `escaped plain text reads back as the characters it was written with`() {
+        val samples =
+            listOf(
+                "*not bold* _nor this_ ~~nor~~ `nor` [nor](this) <nor> a|b \\ end\\",
+                "# h\n## h\n> q\n- b\n+ b\n1. l\n10) l\n=== \n--\n&copy; &#35; &x",
+                "plain 日本語 👨‍👩‍👧 text, with: punctuation! (and) {braces} #hash 2.5 a-b",
+            )
+
+        samples.forEach { plain -> assertEquals(plain, readMarkdownEscapes(plainTextAsMarkdown(plain)!!), plain) }
+    }
+
+    @Test
+    fun `plain text with an indented line is refused because markdown drops the indentation`() {
+        val note = fullNotes[0]
+        val record =
+            mapper.toRecord(note).withBlock {
+                it + ("text" to JsonPrimitive("poem\n  indented")) +
+                    ("format" to JsonPrimitive("plain"))
+            }
+
+        val failure = assertFailsWith<SpaceRecordMappingException> { mapper.fromRecord(mapper.rkeyOf(note), record) }
+
+        assertFalse("indented" in failure.message.orEmpty())
+        assertNull(plainTextAsMarkdown("\tcode"))
     }
 
     @Test
@@ -561,6 +623,41 @@ class NoteEntryMapperTest {
             listOf("blocks[0].caption: longer than 100000 graphemes"),
             lexiconIssues(mapper.collection, mapper.toRecord(image.copy(caption = longest + "é"))),
         )
+    }
+
+    private fun writtenText(note: JournalNote.Text): String =
+        mapper
+            .toRecord(note)
+            .getValue("blocks")
+            .jsonArray[0]
+            .jsonObject
+            .getValue("text")
+            .jsonPrimitive.content
+
+    /** The text Markdown shows for [markdown] made only of escapes and hard breaks, as the CommonMark spec reads them. */
+    private fun readMarkdownEscapes(markdown: String): String {
+        val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+        val out = StringBuilder()
+        var index = 0
+        while (index < markdown.length) {
+            val char = markdown[index]
+            val next = markdown.getOrNull(index + 1)
+            when {
+                char == '\\' && next != null && next in punctuation -> {
+                    out.append(next)
+                    index += 2
+                }
+                char == '\\' && next == '\n' -> {
+                    out.append('\n')
+                    index += 2
+                }
+                else -> {
+                    out.append(char)
+                    index++
+                }
+            }
+        }
+        return out.toString()
     }
 
     private fun assertLocation(note: JournalNote): NoteLocation = note.location ?: error("no location")
