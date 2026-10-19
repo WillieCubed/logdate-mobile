@@ -1,28 +1,16 @@
 package app.logdate.client.sync.v2.link
 
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
-import app.logdate.client.device.crypto.link.LinkHandshake
-import app.logdate.client.sync.datalayer.v2.Decoded
-import app.logdate.client.sync.datalayer.v2.LinkAccept
 import app.logdate.client.sync.datalayer.v2.LinkBundle
-import app.logdate.client.sync.datalayer.v2.LinkConfirm
 import app.logdate.client.sync.datalayer.v2.LinkMode
-import app.logdate.client.sync.datalayer.v2.LinkNonceLedger
-import app.logdate.client.sync.datalayer.v2.LinkOffer
 import app.logdate.client.sync.datalayer.v2.LinkRefusal
-import app.logdate.client.sync.datalayer.v2.SealedLinkBundle
-import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearPaths
-import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.client.sync.peer.link.PhoneLinkExchange
-import app.logdate.client.sync.peer.link.WatchLinkExchange
-import app.logdate.client.sync.peer.link.valueOrNull
 import app.logdate.client.sync.peer.state.PeerLinkState
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.StateDocument
 import app.logdate.client.sync.peer.state.WatchState
-import app.logdate.client.sync.v2.MemoryKeyValueStorage
 import app.logdate.client.sync.v2.MemoryPairKeyVault
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,8 +28,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.Clock
-import kotlin.time.Instant
+import app.logdate.client.sync.v2.link.PHONE_LINK_TEST_ACCOUNT as ACCOUNT
+import app.logdate.client.sync.v2.link.PHONE_LINK_TEST_PHONE as PHONE
+import app.logdate.client.sync.v2.link.PHONE_LINK_TEST_WATCH as WATCH
 
 /**
  * Tests [PhoneLinkInitiator] against the watch's half of the real exchange: a watch is linked once,
@@ -49,13 +38,96 @@ import kotlin.time.Instant
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneLinkInitiatorTest {
-    private val cloud =
-        object : LinkBundleSource {
-            override fun changes() = kotlinx.coroutines.flow.flowOf(Unit)
+    private val cloud = TestCloudLinkBundleSource(ACCOUNT)
 
-            override suspend fun plan(watchFeatures: Set<String>) = LinkPlan(LinkMode.CLOUD, ACCOUNT)
+    @Test
+    fun `a restored linked record without its local pair key starts a fresh exchange`() =
+        runTest {
+            val initiator = initiator()
+            initiator.reconcile(emptyMap())
+            val oldLink = assertNotNull(store.get(WATCH)?.linkId)
+            pairKeys.remove(WATCH)
 
-            override suspend fun bundle(plan: LinkPlan) = LinkBundleResult.Ready(LinkBundle(mode = LinkMode.CLOUD, accountId = ACCOUNT))
+            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.PAIRED, null, clock.millis + 1)))
+
+            assertEquals(4, watch.requests.size)
+            assertTrue(oldLink != store.get(WATCH)?.linkId)
+            assertContentEquals(assertNotNull(watch.pairKey), pairKeys.keys[WATCH])
+        }
+
+    @Test
+    fun `a failed repair waits before retrying the missing pair key`() =
+        runTest {
+            val initiator = initiator()
+            initiator.reconcile(emptyMap())
+            pairKeys.remove(WATCH)
+            watch.reachable = false
+
+            initiator.reconcile(emptyMap())
+            initiator.reconcile(emptyMap())
+
+            assertEquals(3, watch.requests.size)
+            assertEquals(PhoneLinkFailure.WATCH_UNREACHABLE, store.get(WATCH)?.failure)
+            clock.millis += 60_000
+            initiator.reconcile(emptyMap())
+            assertEquals(4, watch.requests.size)
+        }
+
+    @Test
+    fun `forgetting a watch during the exchange prevents local trust resurrection`() =
+        runTest {
+            watch.afterOffer = { store.forget(WATCH) }
+
+            initiator().reconcile(emptyMap())
+
+            assertTrue(store.removalSuppressed(WATCH))
+            assertNull(store.get(WATCH))
+            assertNull(pairKeys.keys[WATCH])
+            assertTrue(notifier.events.isEmpty())
+        }
+
+    @Test
+    fun `reallowing a forgotten watch cannot accept the old in flight exchange`() =
+        runTest {
+            watch.afterOffer = {
+                store.forget(WATCH)
+                store.allowRelink(WATCH)
+            }
+            initiator().reconcile(emptyMap())
+            assertNull(store.get(WATCH))
+            assertNull(pairKeys.keys[WATCH])
+            assertTrue(notifier.events.isEmpty())
+        }
+
+    @Test
+    fun `temporary storage failure retries a quiet watch without another document event`() =
+        runTest {
+            preferences.readFailure = IOException("temporarily unavailable")
+            val job = initiator().start(backgroundScope)
+            runCurrent()
+            assertTrue(job.isActive)
+            assertTrue(watch.requests.isEmpty())
+            preferences.readFailure = null
+            clock.millis += 60_000
+            advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(2, watch.requests.size)
+            assertNotNull(pairKeys.get(WATCH))
+        }
+
+    @Test
+    fun `a completed storage observation restarts and still schedules watch retries`() =
+        runTest {
+            preferences.breakObservationOnce = true
+            watch.reachable = false
+            val job = initiator().start(backgroundScope)
+            runCurrent()
+            assertTrue(job.isActive)
+            assertEquals(1, watch.requests.size)
+            clock.millis += 60_000
+            advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(2, watch.requests.size)
         }
 
     @Test
@@ -84,7 +156,11 @@ class PhoneLinkInitiatorTest {
         runTest {
             val initiator = initiator(bundles = cloud)
             initiator.reconcile(emptyMap())
-            val failed = mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, problem = "DEVICE_LIMIT_REACHED", at = clock.millis + 1))
+            val failed =
+                mapOf(
+                    WATCH to
+                        watchDocument(PeerLinkState.NEEDS_RELINK, problem = "DEVICE_LIMIT_REACHED", at = clock.millis + 1),
+                )
 
             initiator.reconcile(failed)
             initiator.reconcile(failed)
@@ -99,11 +175,19 @@ class PhoneLinkInitiatorTest {
         runTest {
             val initiator = initiator(bundles = cloud)
             initiator.reconcile(emptyMap())
-            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1)))
+            initiator.reconcile(
+                mapOf(
+                    WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1),
+                ),
+            )
             val first = assertNotNull(store.get(WATCH))
             clock.millis = first.nextAttemptAt
             initiator.reconcile(emptyMap())
-            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1)))
+            initiator.reconcile(
+                mapOf(
+                    WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1),
+                ),
+            )
             val second = assertNotNull(store.get(WATCH))
 
             assertEquals(2, second.attempts)
@@ -116,7 +200,11 @@ class PhoneLinkInitiatorTest {
         runTest {
             val initiator = initiator(bundles = cloud)
             initiator.reconcile(emptyMap())
-            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1)))
+            initiator.reconcile(
+                mapOf(
+                    WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1),
+                ),
+            )
             clock.millis = assertNotNull(store.get(WATCH)).nextAttemptAt
             initiator.reconcile(emptyMap())
             initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.LINKED, null, clock.millis + 1)))
@@ -135,7 +223,8 @@ class PhoneLinkInitiatorTest {
     private val handshake = BouncyCastleLinkHandshake()
     private val watch = FakeWatch(handshake, clock)
     private val pairKeys = MemoryPairKeyVault()
-    private val store = PhoneWatchLinkStore(MemoryKeyValueStorage(), pairKeys)
+    private val preferences = RecoverableLinkPreferences()
+    private val store = PhoneWatchLinkStore(preferences, pairKeys)
     private val notifier = RecordingNotifier()
     private val enabledFlow = MutableStateFlow(true)
     private val capableFlow = MutableStateFlow(true)
@@ -404,86 +493,4 @@ class PhoneLinkInitiatorTest {
 
     private fun unlinkedDocument(at: Long) =
         StateDocument(role = PeerRole.WATCH, writtenAt = at, watch = WatchState(link = PeerLinkState.UNLINKED))
-
-    /** The watch's side of the exchange, answering the way the watch app does. */
-    private class FakeWatch(
-        handshake: LinkHandshake,
-        clock: Clock,
-    ) : LinkRequester {
-        private val exchange = WatchLinkExchange(handshake, LinkNonceLedger(clock), clock)
-        private var accepted: WatchLinkExchange.Accepted? = null
-        val requests = mutableListOf<String>()
-        var reachable = true
-        var refuseOffersWith: LinkRefusal? = null
-        var corruptConfirmation = false
-        var pairKey: ByteArray? = null
-        var linkId: String? = null
-        var afterOffer: suspend () -> Unit = {}
-
-        override suspend fun request(
-            nodeId: String,
-            path: String,
-            payload: ByteArray,
-        ): Result<ByteArray> {
-            requests += path
-            if (!reachable) return Result.failure(IOException("The watch is out of reach"))
-            return Result.success(
-                when (path) {
-                    WearPaths.LINK_OFFER -> answerOffer(nodeId, payload).also { afterOffer() }
-                    WearPaths.LINK_BUNDLE -> answerBundle(payload)
-                    else -> error("Unexpected request $path")
-                },
-            )
-        }
-
-        private suspend fun answerOffer(
-            nodeId: String,
-            payload: ByteArray,
-        ): ByteArray {
-            refuseOffersWith?.let { return LinkWire.refusal(it) }
-            val offer = (WearJson.decode(payload, WearProtocol.LINK_SCHEMA, LinkOffer.serializer()) as Decoded.Supported).value
-            val step = checkNotNull(exchange.accept(offer, watchNode = nodeId, phoneNode = offer.phoneNode).valueOrNull())
-            accepted = step
-            return LinkWire.write(LinkAccept.serializer(), step.reply)
-        }
-
-        private fun answerBundle(payload: ByteArray): ByteArray {
-            val sealed = (WearJson.decode(payload, WearProtocol.LINK_SCHEMA, SealedLinkBundle.serializer()) as Decoded.Supported).value
-            val opened = checkNotNull(exchange.open(checkNotNull(accepted), sealed).valueOrNull())
-            pairKey = opened.pairKey
-            linkId = opened.linkId
-            val confirm = if (corruptConfirmation) LinkConfirm(mac = LinkWire.encodeKey(ByteArray(32))) else opened.confirm
-            return LinkWire.write(LinkConfirm.serializer(), confirm)
-        }
-    }
-
-    private class RecordingNotifier : WatchLinkNotifier {
-        val events = mutableListOf<String>()
-
-        override fun linked(
-            target: LinkTarget,
-            mode: LinkMode,
-        ) {
-            events += "linked ${target.displayName} $mode"
-        }
-
-        override fun needsAttention(
-            target: LinkTarget,
-            failure: PhoneLinkFailure,
-        ) {
-            events += "attention ${target.displayName} $failure"
-        }
-    }
-
-    private class MutableClock(
-        var millis: Long,
-    ) : Clock {
-        override fun now(): Instant = Instant.fromEpochMilliseconds(millis)
-    }
-
-    private companion object {
-        const val ACCOUNT = "5f0c3a52-0000-4000-8000-000000000001"
-        const val PHONE = "phone-node"
-        const val WATCH = "watch-node"
-    }
 }

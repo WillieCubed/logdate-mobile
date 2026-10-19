@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud.account
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudRequestBinding
 import app.logdate.client.sync.cloud.CloudRequestLocation
@@ -29,7 +30,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
 import kotlin.time.Instant
@@ -39,16 +41,17 @@ import kotlin.uuid.Uuid
  * Default implementation of [CloudAccountRepository].
  *
  * This implementation uses the [CloudApiClient] for network operations and
- * securely stores credentials using [KeyValueStorage].
+ * keeps account metadata in [KeyValueStorage]. Credentials belong to [SessionStorage].
  *
  * @param apiClient The client for LogDate Cloud API communication.
- * @param secureStorage The storage for secure data like tokens.
+ * @param accountMetadata Non-secret account metadata retained for offline use.
  */
 class DefaultCloudAccountRepository(
     private val apiClient: CloudApiClient,
-    private val secureStorage: KeyValueStorage,
+    private val accountMetadata: KeyValueStorage,
     private val configRepository: LogDateConfigRepository = DefaultLogDateConfigRepository(),
     private val coroutineScope: CoroutineScope = CoroutineScope(platformIODispatcher),
+    private val sessionStorage: SessionStorage,
 ) : CloudAccountRepository,
     CloudRequestLocationProvider,
     SessionRefreshingAccountRepository {
@@ -63,68 +66,41 @@ class DefaultCloudAccountRepository(
 
     private val accountFlow = MutableStateFlow<CloudAccount?>(null)
 
-    /**
-     * Key constants for secure storage.
-     */
-    private object StorageKeys {
-        const val ACCESS_TOKEN = "cloud_access_token"
-        const val REFRESH_TOKEN = "cloud_refresh_token"
-        const val ACCOUNT_ID = "cloud_account_id"
-        const val ACCOUNT_USERNAME = "cloud_username"
-        const val ACCOUNT_DISPLAY_NAME = "cloud_display_name"
-        const val ACCOUNT_BIO = "cloud_account_bio"
-        const val ACCOUNT_ORIGINAL_BIO = "cloud_account_original_bio"
-        const val ACCOUNT_DID = "cloud_account_did"
-        const val ACCOUNT_HANDLE = "cloud_account_handle"
-        const val USER_ID = "cloud_user_id"
-        const val CREATED_AT = "cloud_created_at"
-        const val UPDATED_AT = "cloud_updated_at"
-        const val PASSKEY_IDS = "cloud_passkey_ids"
-        const val ACCOUNT_STORAGE_MODE = "cloud_account_storage_mode"
-    }
-
     init {
-        // Initialize with a coroutine to avoid blocking the main thread
         coroutineScope.launch {
-            loadStoredAccount()
-        }
-        coroutineScope.launch {
-            // A LogDate installation has one active Cloud identity. Backend selection is a
-            // user-level routing choice, not an account switcher: never revive credentials that
-            // happen to be stored for another origin when the user changes servers. Local data
-            // remains available offline and the user can explicitly authenticate on the new
-            // server if that server represents the same canonical identity.
-            configRepository.backendUrl.drop(1).collect {
-                accountFlow.value = null
-            }
+            combine(configRepository.backendUrl, sessionStorage.getSessionFlow()) { origin, _ -> origin }
+                .collectLatest {
+                    accountFlow.value = null
+                    loadStoredAccount()
+                }
         }
     }
 
     /**
-     * Loads account information from secure storage if available.
+     * Loads metadata only for the current canonical secure session.
      */
     private suspend fun loadStoredAccount() {
         try {
             val backendUrl = configRepository.getCurrentBackendUrl()
-            migrateLegacyKeysIfNeeded(backendUrl)
+            accountMetadata.migrateLegacyAccountMetadata(backendUrl)
 
             // Check if we have stored credentials
-            val accessToken = secureStorage.getString(scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl))
-            val accountId = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl))
-            val username = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl))
-            val displayName = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
-            val bio = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl))
-            val originalBio = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
-            val did = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
-            val handle = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
-            val userIdString = secureStorage.getString(scopedKey(StorageKeys.USER_ID, backendUrl))
-            val createdAtString = secureStorage.getString(scopedKey(StorageKeys.CREATED_AT, backendUrl))
-            val updatedAtString = secureStorage.getString(scopedKey(StorageKeys.UPDATED_AT, backendUrl))
-            val passkeyIdsString = secureStorage.getString(scopedKey(StorageKeys.PASSKEY_IDS, backendUrl))
-            val storageMode = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_STORAGE_MODE, backendUrl))
+            val session = sessionStorage.getOriginBoundSession()?.takeIf { it.origin == backendUrl }
+            val accountId = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_ID, backendUrl))
+            val username = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_USERNAME, backendUrl))
+            val displayName = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
+            val bio = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_BIO, backendUrl))
+            val originalBio = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
+            val did = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_DID, backendUrl))
+            val handle = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_HANDLE, backendUrl))
+            val userIdString = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.USER_ID, backendUrl))
+            val createdAtString = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.CREATED_AT, backendUrl))
+            val updatedAtString = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.UPDATED_AT, backendUrl))
+            val passkeyIdsString = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.PASSKEY_IDS, backendUrl))
+            val storageMode = accountMetadata.getString(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_STORAGE_MODE, backendUrl))
 
-            if (accessToken != null &&
-                accountId != null &&
+            if (session != null &&
+                accountId == session.session.accountId &&
                 username != null &&
                 displayName != null &&
                 userIdString != null &&
@@ -134,16 +110,10 @@ class DefaultCloudAccountRepository(
                 val userId = Uuid.parse(userIdString)
                 val createdAt = Instant.parse(createdAtString)
                 val updatedAt = Instant.parse(updatedAtString)
-                val passkeyIds =
-                    passkeyIdsString
-                        ?.split(",")
-                        ?.mapNotNull { runCatching { Uuid.parse(it) }.getOrNull() }
-                        ?: emptyList()
-
                 // Convert String IDs to UUIDs
                 val account =
                     CloudAccount(
-                        id = Uuid.parse(accountId),
+                        id = Uuid.parse(checkNotNull(accountId)),
                         username = username,
                         displayName = displayName,
                         bio = bio,
@@ -153,15 +123,19 @@ class DefaultCloudAccountRepository(
                         userId = userId,
                         createdAt = createdAt,
                         updatedAt = updatedAt,
-                        passkeyCredentialIds = passkeyIds,
+                        passkeyCredentialIds = parseCloudPasskeyIds(passkeyIdsString),
                         storageMode = storageMode?.let(AccountStorageMode::fromWireValue) ?: AccountStorageMode.UNRECOGNIZED,
                     )
 
-                accountFlow.value = account
+                sessionStorage.runIfSessionCurrent(session) {
+                    if (isCurrentOrigin(backendUrl)) accountFlow.value = account
+                }
                 Napier.d("Loaded stored account")
             } else {
                 accountFlow.value = null
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to load stored account")
             // If loading fails, we just keep the account as null
@@ -298,7 +272,7 @@ class DefaultCloudAccountRepository(
                         )
 
                     // Store the account and credentials
-                    storeAccountAndCredentials(account, credentials)
+                    accountMetadata.storeCloudAccount(account, configRepository.getCurrentBackendUrl())
 
                     // Update the current account flow
                     accountFlow.value = account
@@ -345,9 +319,8 @@ class DefaultCloudAccountRepository(
             val origin = binding?.location?.origin ?: configRepository.getCurrentBackendUrl()
             val result = apiClient.refreshAccessToken(refreshToken)
 
-            result.onSuccess { newToken ->
+            result.onSuccess {
                 check(isCurrentOrigin(origin)) { "Cloud request origin changed" }
-                secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, origin), newToken)
             }
 
             result
@@ -358,8 +331,8 @@ class DefaultCloudAccountRepository(
         }
 
     /**
-     * Refreshes the session and stores both tokens for the server it came from. Against a cloud client
-     * without session refresh it falls back to refreshing the access token alone.
+     * Returns refreshed credentials to the caller, which commits them to the canonical session vault
+     * only while the originating session is still current. Never stores tokens in account preferences.
      */
     override suspend fun refreshSession(refreshToken: String): Result<RefreshedSession> =
         try {
@@ -376,10 +349,8 @@ class DefaultCloudAccountRepository(
                     rotated
                 }
 
-            result.onSuccess { session ->
+            result.onSuccess {
                 check(isCurrentOrigin(origin)) { "Cloud request origin changed" }
-                secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, origin), session.accessToken)
-                session.refreshToken?.let { secureStorage.putString(scopedKey(StorageKeys.REFRESH_TOKEN, origin), it) }
             }
 
             result
@@ -398,20 +369,20 @@ class DefaultCloudAccountRepository(
         try {
             val backendUrl = configRepository.getCurrentBackendUrl()
             // Clear all stored account information
-            secureStorage.remove(scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.REFRESH_TOKEN, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.USER_ID, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.CREATED_AT, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.UPDATED_AT, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.PASSKEY_IDS, backendUrl))
-            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_STORAGE_MODE, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCESS_TOKEN, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.REFRESH_TOKEN, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_ID, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_USERNAME, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_BIO, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_DID, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_HANDLE, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.USER_ID, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.CREATED_AT, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.UPDATED_AT, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.PASSKEY_IDS, backendUrl))
+            accountMetadata.remove(cloudAccountScopedKey(CloudAccountStorageKeys.ACCOUNT_STORAGE_MODE, backendUrl))
 
             // Clear the current account
             accountFlow.value = null
@@ -466,7 +437,10 @@ class DefaultCloudAccountRepository(
         // This would typically involve API calls to associate the user ID with the account
         // For now, we'll just store the association locally
         return try {
-            secureStorage.putString(scopedKey(StorageKeys.USER_ID, configRepository.getCurrentBackendUrl()), userId.toString())
+            accountMetadata.putString(
+                cloudAccountScopedKey(CloudAccountStorageKeys.USER_ID, configRepository.getCurrentBackendUrl()),
+                userId.toString(),
+            )
             Result.success(true)
         } catch (e: Exception) {
             Napier.e("Error associating user identity")
@@ -475,128 +449,11 @@ class DefaultCloudAccountRepository(
     }
 
     /**
-     * Stores account and credentials information securely.
+     * Decodes the account identifier returned by WebAuthn.
      */
-    private suspend fun storeAccountAndCredentials(
-        account: CloudAccount,
-        credentials: AccountCredentials,
-    ) {
-        val backendUrl = configRepository.getCurrentBackendUrl()
-        secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl), credentials.accessToken)
-        secureStorage.putString(scopedKey(StorageKeys.REFRESH_TOKEN, backendUrl), credentials.refreshToken)
-        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl), account.id.toString())
-        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl), account.username)
-        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl), account.displayName)
-        account.bio?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl), it) }
-            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl))
-        account.originalBio?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl), it) }
-            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
-        account.did?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl), it) }
-            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
-        account.handle?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl), it) }
-            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
-        secureStorage.putString(scopedKey(StorageKeys.USER_ID, backendUrl), account.userId.toString())
-        secureStorage.putString(scopedKey(StorageKeys.CREATED_AT, backendUrl), account.createdAt.toString())
-        secureStorage.putString(scopedKey(StorageKeys.UPDATED_AT, backendUrl), account.updatedAt.toString())
-        secureStorage.putString(
-            scopedKey(StorageKeys.PASSKEY_IDS, backendUrl),
-            account.passkeyCredentialIds.joinToString(",") { it.toString() },
-        )
-        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_STORAGE_MODE, backendUrl), account.storageMode.wireValue)
-    }
-
     private fun decodeWebAuthnUserId(encodedUserId: String): Uuid? =
         runCatching {
             val raw = Base64.decode(encodedUserId)
             Uuid.parse(raw.decodeToString())
         }.getOrNull()
-
-    private suspend fun migrateLegacyKeysIfNeeded(backendUrl: String) {
-        if (secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl)) != null) {
-            return
-        }
-
-        val legacyAccountId = secureStorage.getString(StorageKeys.ACCOUNT_ID) ?: return
-        copyLegacyValue(
-            sourceKey = StorageKeys.ACCESS_TOKEN,
-            destinationKey = scopedKey(StorageKeys.ACCESS_TOKEN, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.REFRESH_TOKEN,
-            destinationKey = scopedKey(StorageKeys.REFRESH_TOKEN, backendUrl),
-        )
-        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl), legacyAccountId)
-        copyLegacyValue(
-            sourceKey = StorageKeys.ACCOUNT_USERNAME,
-            destinationKey = scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.ACCOUNT_DISPLAY_NAME,
-            destinationKey = scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.ACCOUNT_BIO,
-            destinationKey = scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.ACCOUNT_ORIGINAL_BIO,
-            destinationKey = scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.ACCOUNT_DID,
-            destinationKey = scopedKey(StorageKeys.ACCOUNT_DID, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.ACCOUNT_HANDLE,
-            destinationKey = scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.USER_ID,
-            destinationKey = scopedKey(StorageKeys.USER_ID, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.CREATED_AT,
-            destinationKey = scopedKey(StorageKeys.CREATED_AT, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.UPDATED_AT,
-            destinationKey = scopedKey(StorageKeys.UPDATED_AT, backendUrl),
-        )
-        copyLegacyValue(
-            sourceKey = StorageKeys.PASSKEY_IDS,
-            destinationKey = scopedKey(StorageKeys.PASSKEY_IDS, backendUrl),
-        )
-
-        listOf(
-            StorageKeys.ACCESS_TOKEN,
-            StorageKeys.REFRESH_TOKEN,
-            StorageKeys.ACCOUNT_ID,
-            StorageKeys.ACCOUNT_USERNAME,
-            StorageKeys.ACCOUNT_DISPLAY_NAME,
-            StorageKeys.ACCOUNT_BIO,
-            StorageKeys.ACCOUNT_ORIGINAL_BIO,
-            StorageKeys.ACCOUNT_DID,
-            StorageKeys.ACCOUNT_HANDLE,
-            StorageKeys.USER_ID,
-            StorageKeys.CREATED_AT,
-            StorageKeys.UPDATED_AT,
-            StorageKeys.PASSKEY_IDS,
-        ).forEach { key ->
-            secureStorage.remove(key)
-        }
-    }
-
-    private suspend fun copyLegacyValue(
-        sourceKey: String,
-        destinationKey: String,
-    ) {
-        secureStorage.getString(sourceKey)?.let { value ->
-            secureStorage.putString(destinationKey, value)
-        }
-    }
-
-    private fun scopedKey(
-        baseKey: String,
-        backendUrl: String,
-    ): String = "${baseKey}_${backendUrl.trim().removePrefix("https://").removePrefix("http://").replace(Regex("[^A-Za-z0-9]"), "_")}"
 }

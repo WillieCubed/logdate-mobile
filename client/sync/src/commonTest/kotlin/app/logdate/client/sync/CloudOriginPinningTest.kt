@@ -131,6 +131,7 @@ class CloudOriginPinningTest {
                             InMemoryKeyValueStorage(),
                             config,
                             backgroundScope,
+                            sessionStorage = sessions,
                         )
                     var calls = 0
                     val result =
@@ -210,7 +211,8 @@ class CloudOriginPinningTest {
                 },
             ).use { http ->
                 val api = LogDateCloudApiClient(config, http, sessions)
-                val accounts = DefaultCloudAccountRepository(api, InMemoryKeyValueStorage(), config, backgroundScope)
+                val accounts =
+                    DefaultCloudAccountRepository(api, InMemoryKeyValueStorage(), config, backgroundScope, sessionStorage = sessions)
                 val refresher = SyncTokenRefresher(sessions, accounts)
                 for (scope in listOf(
                     UploadScope("owner-b", serverA),
@@ -305,7 +307,8 @@ class CloudOriginPinningTest {
                         currentOrigin = serverA
                         saveSession(UserSession("a-access", "a-refresh", "owner-a"))
                     }
-                val accounts = DefaultCloudAccountRepository(api, InMemoryKeyValueStorage(), config, backgroundScope)
+                val accounts =
+                    DefaultCloudAccountRepository(api, InMemoryKeyValueStorage(), config, backgroundScope, sessionStorage = sessions)
 
                 SyncTokenRefresher(sessions, accounts).withFreshToken(api::getAccountInfo, "getAccountInfo")
             }
@@ -340,7 +343,7 @@ class CloudOriginPinningTest {
                         currentOrigin = serverA
                         saveSession(UserSession("a-access", "a-refresh", "owner-a"))
                     }
-                val accounts = DefaultCloudAccountRepository(api, storage, config, backgroundScope)
+                val accounts = DefaultCloudAccountRepository(api, storage, config, backgroundScope, sessionStorage = sessions)
 
                 SyncTokenRefresher(sessions, accounts).withFreshToken(api::getAccountInfo, "getAccountInfo")
 

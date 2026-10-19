@@ -1,29 +1,11 @@
 package app.logdate.client.sync.cloud.account
 
 import app.logdate.client.sync.InMemoryKeyValueStorage
-import app.logdate.client.sync.cloud.CheckUsernameAvailabilityResponse
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudApiException
-import app.logdate.client.sync.cloud.ContentChangesResponse
-import app.logdate.client.sync.cloud.ContentUpdateRequest
-import app.logdate.client.sync.cloud.ContentUpdateResponse
-import app.logdate.client.sync.cloud.ContentUploadRequest
-import app.logdate.client.sync.cloud.ContentUploadResponse
-import app.logdate.client.sync.cloud.DraftUploadRequest
-import app.logdate.client.sync.cloud.JournalChangesResponse
-import app.logdate.client.sync.cloud.JournalUpdateRequest
-import app.logdate.client.sync.cloud.JournalUpdateResponse
-import app.logdate.client.sync.cloud.JournalUploadRequest
-import app.logdate.client.sync.cloud.JournalUploadResponse
-import app.logdate.client.sync.cloud.MediaDownloadResponse
-import app.logdate.client.sync.cloud.MediaUpload
-import app.logdate.client.sync.cloud.MediaUploadResponse
 import app.logdate.client.sync.cloud.RefreshedSession
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.AccountStorageMode
-import app.logdate.shared.model.BeginAccountCreationRequest
-import app.logdate.shared.model.BeginAccountCreationResponse
-import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -51,6 +33,10 @@ class DefaultCloudAccountRepositoryTest {
                     modules(
                         org.koin.dsl.module {
                             single<app.logdate.client.datastore.KeyValueStorage> { InMemoryKeyValueStorage() }
+                            single<app.logdate.client.datastore.SessionStorage> {
+                                app.logdate.client.sync.test
+                                    .FakeSessionStorage(false)
+                            }
                             single<app.logdate.shared.config.LogDateConfigRepository> { config }
                             single<CloudApiClient> { FakeCloudApiClient() }
                         },
@@ -105,8 +91,9 @@ class DefaultCloudAccountRepositoryTest {
                                         ),
                                 ),
                         ),
-                    secureStorage = storage,
+                    accountMetadata = storage,
                     configRepository = configRepository,
+                    sessionStorage = accountSessions(configRepository),
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
 
@@ -129,8 +116,9 @@ class DefaultCloudAccountRepositoryTest {
             val reloaded =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(),
-                    secureStorage = storage,
+                    accountMetadata = storage,
                     configRepository = configRepository,
+                    sessionStorage = accountSessions(configRepository),
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
             testScheduler.advanceUntilIdle()
@@ -178,16 +166,69 @@ class DefaultCloudAccountRepositoryTest {
             assertEquals(AccountStorageMode.UNRECOGNIZED, reloaded.getCurrentAccount()?.storageMode)
         }
 
-    private fun kotlinx.coroutines.test.TestScope.repository(
+    @Test
+    fun `protected session loading after metadata construction restores offline account context`() =
+        runTest {
+            val metadata = InMemoryKeyValueStorage()
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            repository(metadata, config, createdAccount(AccountStorageMode.PERSONAL_SPACE_V1))
+                .completeAccountCreation("session", "cred-1", "client", "attestation")
+            val sessions =
+                app.logdate.client.sync.test
+                    .FakeSessionStorage(false)
+                    .apply { currentOrigin = config.getCurrentBackendUrl() }
+            val account = DefaultCloudAccountRepository(FakeCloudApiClient(), metadata, config, backgroundScope, sessions)
+            testScheduler.runCurrent()
+            assertNull(account.getCurrentAccount())
+
+            sessions.saveSession(
+                app.logdate.client.datastore
+                    .UserSession("vault-access", "vault-refresh", "550e8400-e29b-41d4-a716-446655440000"),
+            )
+            testScheduler.runCurrent()
+            assertEquals("tester", account.getCurrentAccount()?.username)
+
+            sessions.clearSession()
+            testScheduler.runCurrent()
+            assertNull(account.getCurrentAccount())
+        }
+
+    @Test
+    fun `copied preference tokens cannot authenticate retained account metadata`() =
+        runTest {
+            val metadata = InMemoryKeyValueStorage()
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            repository(metadata, config, createdAccount(AccountStorageMode.PERSONAL_SPACE_V1))
+                .completeAccountCreation("session", "cred-1", "client", "attestation")
+            metadata.putString(scopedKey("cloud_access_token", config.getCurrentBackendUrl()), "copied-access")
+            val sessions =
+                app.logdate.client.sync.test
+                    .FakeSessionStorage(false)
+            val account = DefaultCloudAccountRepository(FakeCloudApiClient(), metadata, config, backgroundScope, sessions)
+            testScheduler.runCurrent()
+            assertNull(account.getCurrentAccount())
+        }
+
+    private suspend fun kotlinx.coroutines.test.TestScope.repository(
         storage: InMemoryKeyValueStorage,
         configRepository: DefaultLogDateConfigRepository,
         created: CompleteAccountCreationResponse? = null,
     ) = DefaultCloudAccountRepository(
         apiClient = FakeCloudApiClient(completeAccountCreationResult = created),
-        secureStorage = storage,
+        accountMetadata = storage,
         configRepository = configRepository,
+        sessionStorage = accountSessions(configRepository),
         coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
     )
+
+    private suspend fun accountSessions(config: DefaultLogDateConfigRepository) =
+        app.logdate.client.sync.test.FakeSessionStorage().apply {
+            currentOrigin = config.getCurrentBackendUrl()
+            saveSession(
+                app.logdate.client.datastore
+                    .UserSession("vault-access", "vault-refresh", "550e8400-e29b-41d4-a716-446655440000"),
+            )
+        }
 
     private fun createdAccount(storageMode: AccountStorageMode) =
         CompleteAccountCreationResponse(
@@ -227,8 +268,9 @@ class DefaultCloudAccountRepositoryTest {
             val repository =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(),
-                    secureStorage = storage,
+                    accountMetadata = storage,
                     configRepository = configRepository,
+                    sessionStorage = accountSessions(configRepository),
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
 
@@ -239,21 +281,22 @@ class DefaultCloudAccountRepositoryTest {
         }
 
     @Test
-    fun `a rotated refresh token is stored for its server`() =
+    fun `rotated credentials are returned without being copied into account preferences`() =
         runTest {
             val storage = InMemoryKeyValueStorage()
             val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
             val repository =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(refreshSessionResult = Result.success(RefreshedSession("access-2", "refresh-2"))),
-                    secureStorage = storage,
+                    accountMetadata = storage,
                     configRepository = config,
+                    sessionStorage = accountSessions(config),
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
 
             assertEquals(RefreshedSession("access-2", "refresh-2"), repository.refreshSession("refresh-1").getOrThrow())
-            assertEquals("access-2", storage.getString(scopedKey("cloud_access_token", config.getCurrentBackendUrl())))
-            assertEquals("refresh-2", storage.getString(scopedKey("cloud_refresh_token", config.getCurrentBackendUrl())))
+            assertNull(storage.getString(scopedKey("cloud_access_token", config.getCurrentBackendUrl())))
+            assertNull(storage.getString(scopedKey("cloud_refresh_token", config.getCurrentBackendUrl())))
         }
 
     @Test
@@ -264,13 +307,14 @@ class DefaultCloudAccountRepositoryTest {
             val repository =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(),
-                    secureStorage = storage,
+                    accountMetadata = storage,
                     configRepository = config,
+                    sessionStorage = accountSessions(config),
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
 
             assertEquals(RefreshedSession("access", null), repository.refreshSession("refresh-1").getOrThrow())
-            assertEquals("access", storage.getString(scopedKey("cloud_access_token", config.getCurrentBackendUrl())))
+            assertNull(storage.getString(scopedKey("cloud_access_token", config.getCurrentBackendUrl())))
             assertNull(storage.getString(scopedKey("cloud_refresh_token", config.getCurrentBackendUrl())))
         }
 
@@ -283,8 +327,9 @@ class DefaultCloudAccountRepositoryTest {
             val repository =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(refreshSessionResult = Result.failure(revoked)),
-                    secureStorage = storage,
+                    accountMetadata = storage,
                     configRepository = config,
+                    sessionStorage = accountSessions(config),
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
 
@@ -331,8 +376,9 @@ class DefaultCloudAccountRepositoryTest {
             val reloadedRepository =
                 DefaultCloudAccountRepository(
                     apiClient = FakeCloudApiClient(),
-                    secureStorage = storage,
+                    accountMetadata = storage,
                     configRepository = configRepository,
+                    sessionStorage = accountSessions(configRepository),
                     coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
                 )
             testScheduler.advanceUntilIdle()
@@ -358,115 +404,4 @@ private fun scopedKey(
 
 /**
  * A fake [CloudApiClient] for testing account repository operations.
- */
-private class FakeCloudApiClient(
-    private val completeAccountCreationResult: CompleteAccountCreationResponse? = null,
-    private val refreshSessionResult: Result<RefreshedSession>? = null,
-) : CloudApiClient {
-    override suspend fun refreshSession(refreshToken: String): Result<RefreshedSession> =
-        refreshSessionResult ?: Result.failure(UnsupportedOperationException("No session refresh configured"))
-
-    override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> =
-        Result.success(CheckUsernameAvailabilityResponse(available = true, username = username))
-
-    override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationResponse> =
-        Result.failure(NotImplementedError())
-
-    override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationResponse> =
-        Result.success(requireNotNull(completeAccountCreationResult))
-
-    override suspend fun refreshAccessToken(refreshToken: String): Result<String> = Result.success("access")
-
-    override suspend fun getAccountInfo(accessToken: String): Result<app.logdate.shared.model.LogDateAccount> =
-        Result.failure(NotImplementedError())
-
-    override suspend fun uploadContent(
-        accessToken: String,
-        content: ContentUploadRequest,
-    ): Result<ContentUploadResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun getContentChanges(
-        accessToken: String,
-        since: Long,
-        limit: Int?,
-    ): Result<ContentChangesResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun updateContent(
-        accessToken: String,
-        contentId: String,
-        content: ContentUpdateRequest,
-    ): Result<ContentUpdateResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun deleteContent(
-        accessToken: String,
-        contentId: String,
-    ): Result<Unit> = Result.failure(NotImplementedError())
-
-    override suspend fun uploadJournal(
-        accessToken: String,
-        journal: JournalUploadRequest,
-    ): Result<JournalUploadResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun getJournalChanges(
-        accessToken: String,
-        since: Long,
-        limit: Int?,
-    ): Result<JournalChangesResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun updateJournal(
-        accessToken: String,
-        journalId: String,
-        journal: JournalUpdateRequest,
-    ): Result<JournalUpdateResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun deleteJournal(
-        accessToken: String,
-        journalId: String,
-    ): Result<Unit> = Result.failure(NotImplementedError())
-
-    override suspend fun uploadAssociations(
-        accessToken: String,
-        associations: app.logdate.client.sync.cloud.AssociationUploadRequest,
-    ): Result<app.logdate.client.sync.cloud.AssociationUploadResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun getAssociationChanges(
-        accessToken: String,
-        since: Long,
-        limit: Int?,
-    ): Result<app.logdate.client.sync.cloud.AssociationChangesResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun deleteAssociations(
-        accessToken: String,
-        associations: app.logdate.client.sync.cloud.AssociationDeleteRequest,
-    ): Result<Unit> = Result.failure(NotImplementedError())
-
-    override suspend fun uploadMedia(
-        accessToken: String,
-        media: MediaUpload,
-    ): Result<MediaUploadResponse> = Result.failure(NotImplementedError())
-
-    override suspend fun uploadDraft(
-        accessToken: String,
-        draft: DraftUploadRequest,
-    ) = TODO()
-
-    override suspend fun getDraftChanges(
-        accessToken: String,
-        since: Long,
-        limit: Int?,
-    ) = TODO()
-
-    override suspend fun deleteDraft(
-        accessToken: String,
-        draftId: String,
-    ) = TODO()
-
-    override suspend fun downloadMedia(
-        accessToken: String,
-        mediaId: String,
-    ): Result<MediaDownloadResponse> = Result.failure(NotImplementedError())
-}
-
-/**
- * An in-memory implementation of [KeyValueStorage] for unit testing.
  */

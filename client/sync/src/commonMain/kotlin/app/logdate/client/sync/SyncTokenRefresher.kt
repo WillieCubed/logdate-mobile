@@ -130,9 +130,7 @@ internal class SyncTokenRefresher(
         // A sign-out or a new sign-in may finish while the refresh request is in flight.
         if (sessionStorage.getSession() != currentSession) return initialResult
 
-        // Store the refreshed tokens. The account repository persists them under its own storage keys,
-        // which the session storage never reads, so without this the session keeps handing out the
-        // token the server just rejected, and a linked device loses the refresh token it rotated to.
+        // Commit rotated credentials only to the canonical vault while the original session owns it.
         if (binding != null && !isStillBound(binding, locationProvider)) return Result.failure(scopeChanged())
         val updatedSession =
             currentSession.copy(

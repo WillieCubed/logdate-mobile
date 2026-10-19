@@ -412,3 +412,25 @@ idempotency; deleting a delivered Google restore key still requires the dedicate
 - [Restore Credentials implementation](https://developer.android.com/identity/sign-in/restore-credentials-implementation-common)
 - [BackupAgent API](https://developer.android.com/reference/android/app/backup/BackupAgent)
 - [Testing native backup and restore](https://developer.android.com/identity/data/testingbackup)
+
+### Installation credentials and watch links
+
+The canonical session vault owns access and refresh tokens. Account preferences retain only metadata,
+including the account DID used for synchronization, and expose it only while the matching secure
+session and backend remain current. Account loading follows asynchronous session initialization and
+sign-out; copied metadata cannot establish a session.
+
+Legacy token keys from both cloud-account and DataStore-session implementations are removed for all
+server origins on the first normal preferences read, before a native full backup, and during restore
+completion. Restore cleanup runs even when the old preferences contain no device ID. Do not migrate
+those token copies into secure storage or replace this cleanup with a signed-out-screen assertion.
+
+Watch removal choices remain preferences. Successful watch-link records require the local pair key,
+which stays outside native backup. If a copied record has no local key, reconciliation starts a new
+handshake using the current account and linking policy. Failed repairs retain retry backoff. A pending record is committed before replacing a pair key,
+so an interrupted final write cannot leave an old successful record with a different key. Storage
+errors and interrupted observation reconnect automatically with capped backoff. Forget and relink
+actions invalidate exchanges already in flight; confirmation must match the current link.
+Storage read failures must propagate through trust guards instead of becoming an absent key or a
+false removal preference. The installation-trust emulator fixtures use their own preferences files
+and uniquely named secure keys, without opening or resetting the journal database.

@@ -64,13 +64,33 @@ class NativeRestorePreferencesTest {
                 val sourceDevice = DefaultDeviceIdProvider(storage).getDeviceId().value
                 storage.putString("identity.canonical_owner_bound", "true")
                 storage.putString("unrelated.preference", "keep this")
+                val credentialKeys =
+                    listOf(
+                        "cloud_access_token",
+                        "cloud_refresh_token",
+                        "cloud_access_token_first_logdate_app",
+                        "cloud_refresh_token_second_logdate_app",
+                        "access_token",
+                        "refresh_token",
+                        "access_token_bGVnYWN5",
+                        "refresh_token_bGVnYWN5",
+                    )
+                credentialKeys.forEach { storage.putString(it, "synthetic-token") }
+
+                resetRestoredInstallationState(preferences, null)
+                credentialKeys.forEach { assertEquals(null, storage.getString(it)) }
+                assertEquals(sourceDevice, DefaultDeviceIdProvider(storage).getDeviceId().value)
 
                 resetRestoredInstallationState(preferences, sourceDevice.toString())
 
+                credentialKeys.forEach { assertEquals(null, storage.getString(it)) }
                 assertEquals(sourceOwner, DefaultCanonicalOwnerProvider(storage).getCanonicalOwnerId())
                 assertEquals("keep this", storage.getString("unrelated.preference"))
                 assertEquals("true", storage.getString("identity.canonical_owner_bound"))
-                assertNotEquals(sourceDevice, DefaultDeviceIdProvider(storage).getDeviceId().value)
+                val replacement = DefaultDeviceIdProvider(storage).getDeviceId().value
+                assertNotEquals(sourceDevice, replacement)
+                resetRestoredInstallationState(preferences, sourceDevice.toString())
+                assertEquals(replacement, DefaultDeviceIdProvider(storage).getDeviceId().value)
             } finally {
                 scope.cancel()
                 job.join()

@@ -32,6 +32,12 @@ interface KeyValueStorage {
     /** Read durable content without converting storage failures into an absent value. */
     suspend fun getStringOrThrow(key: String): String? = getString(key)
 
+    /** Read a safety decision without converting storage failure into a default. */
+    suspend fun getBooleanOrThrow(
+        key: String,
+        defaultValue: Boolean = false,
+    ): Boolean = getBoolean(key, defaultValue)
+
     /** Persist durable content without hiding write failures. */
     suspend fun putStringOrThrow(
         key: String,
