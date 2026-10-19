@@ -25,7 +25,7 @@
           "createdAt": {
             "type": "string",
             "format": "datetime",
-            "description": "When the entry was added to the journal, when known. Two devices can add the same entry to the same journal at different times and write the same record; a device that finds a membership already present keeps the earlier createdAt instead of replacing it, so every device settles on the same record."
+            "description": "When the entry was added to the journal, when known. Two devices can add the same entry to the same journal at different times and write the same record; a device writes a membership create-only (createOnly), and when one is already present it leaves that record as it is, so the first createdAt written is the one every device sees. A device that later finds two copies with different createdAt values keeps the earlier."
           }
         }
       }

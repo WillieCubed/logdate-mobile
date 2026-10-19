@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "Connects an entry to a visit in the person's location history, so the entry appears with that visit even when its time or location alone wouldn't put it there. Only the owner sees it. The record key is the entry's key and the lowercase hexadecimal SHA-256 of the UTF-8 evidenceId, joined by a colon (<entry>:<sha256>), so linking the same entry to the same visit twice, on any device, writes the same record. The evidence id is hashed because it can be too long for a record key or hold characters a key can't.",
+      "description": "Connects an entry to a visit in the person's location history, so the entry appears with that visit even when its time or location alone wouldn't put it there. Only the owner sees it. The record key is the entry's key and the lowercase hexadecimal SHA-256 of the UTF-8 evidenceId, joined by a colon (<entry>:<sha256>), so linking the same entry to the same visit twice, on any device, writes the same record. Devices write it create-only (createOnly) and leave an existing one as it is. The evidence id is hashed because it can be too long for a record key or hold characters a key can't.",
       "key": "any",
       "record": {
         "type": "object",
