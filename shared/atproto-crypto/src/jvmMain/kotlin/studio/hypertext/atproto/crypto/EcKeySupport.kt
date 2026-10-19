@@ -127,12 +127,20 @@ public object EcKeySupport {
 
     /**
      * Verifies a SHA-256 ECDSA signature for [payload].
+     *
+     * Every ECDSA signature `(r, s)` has a twin `(r, n - s)` that verifies just as well. The AT
+     * Protocol accepts only the "low-S" form, where `s` is at most half the curve order, so that each
+     * message has exactly one valid signature; repository commits and PLC operations must be
+     * checked that way, and this function rejects high-S signatures by default. JOSE (JWTs, DPoP
+     * proofs) does not require low-S, and browsers' Web Crypto produces either form, so callers
+     * checking those pass [allowHighS] = true.
      */
     public fun verifySha256(
         publicKey: PublicKey,
         curve: EcCurve,
         payload: ByteArray,
         signature: ByteArray,
+        allowHighS: Boolean = false,
     ): Boolean {
         require(signature.size == curve.coordinateBytes * 2) { "Unexpected ECDSA signature size" }
         val digest = sha256(payload)
@@ -149,6 +157,7 @@ public object EcKeySupport {
         val coordinateWidth = curve.coordinateBytes
         val r = BigInteger(1, signature.copyOfRange(0, coordinateWidth))
         val s = BigInteger(1, signature.copyOfRange(coordinateWidth, signature.size))
+        if (!allowHighS && s > domain.n.shiftRight(1)) return false
         return signer.verifySignature(digest, r, s)
     }
 
