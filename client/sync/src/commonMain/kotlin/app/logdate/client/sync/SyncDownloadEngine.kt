@@ -83,6 +83,13 @@ internal class DownloadStrategy<T : Any>(
     val settle: (suspend (id: Uuid, outcome: RemoteOutcome) -> Unit)? = null,
     /** Reports an item that failed to apply, for a [settle] strategy. */
     val settleFailed: suspend (id: Uuid) -> Unit = {},
+    /**
+     * Whether a remote change to an item with no local change waiting is applied as it is. The
+     * personal space only offers changes made since this device last applied the item, so with
+     * nothing changed here there is nothing to resolve; a local change still waiting is resolved
+     * when it uploads, against the version it then finds.
+     */
+    val appliesRemoteOverUnchangedLocal: Boolean = false,
 )
 
 /** What became of one remote item or deletion. */
@@ -322,6 +329,12 @@ internal class SyncDownloadEngine(
                                                 return@record
                                             }
 
+                                            if (strategy.appliesRemoteOverUnchangedLocal) {
+                                                strategy.applyReplace(existing, item)
+                                                localById[id] = item
+                                                downloadedCount++
+                                                return@record
+                                            }
                                             val (localTimestamp, remoteTimestamp) =
                                                 conflictTimestamps(
                                                     localSyncVersion = strategy.syncVersionOf(existing),

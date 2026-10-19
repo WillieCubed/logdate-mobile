@@ -142,6 +142,7 @@ internal class SyncDownloader(
                         checkpoint = if (spaceRead != null) SPACE_CHECKPOINT else EntityType.JOURNAL.name,
                         settle = spaceRead?.let { read -> read::settle },
                         settleFailed = { id -> spaceRead?.settleFailed(id) },
+                        appliesRemoteOverUnchangedLocal = spaceRead != null,
                     ),
                 accessToken = accessToken,
                 since = since,
@@ -242,7 +243,6 @@ internal class SyncDownloader(
         accessToken: String,
         since: Instant,
     ): SyncResult {
-        val syncableRepository = journalNotesRepository as? SyncableJournalNotesRepository
         val spaceRead = spaceRead<JournalNote>(EntityType.NOTE, ::enqueueSpaceMedia)
         return downloadEngine.download(
             strategy =
@@ -261,33 +261,46 @@ internal class SyncDownloader(
                     acknowledgeUpload = ::acknowledgeNoteCreate,
                     // A note joined from personal-space records is the whole note, transcript included.
                     hydrate = if (spaceRead != null) { _, note -> note } else ::hydrateNote,
-                    applyCreate = { note ->
-                        if (syncableRepository != null) syncableRepository.createFromSync(note) else journalNotesRepository.create(note)
-                    },
+                    applyCreate = ::createNote,
                     // Notes have no update-in-place sync path -- a replacement is always applied as
                     // remove-then-recreate, matching how a fresh download from the server is applied.
-                    applyReplace = { existing, replacement ->
-                        if (syncableRepository != null) {
-                            syncableRepository.deleteFromSync(existing.uid)
-                            syncableRepository.createFromSync(replacement)
-                        } else {
-                            journalNotesRepository.remove(existing)
-                            journalNotesRepository.create(replacement)
-                        }
-                    },
-                    applyDelete = { id ->
-                        if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalNotesRepository.removeById(id)
-                    },
+                    applyReplace = ::replaceNote,
+                    applyDelete = ::deleteNote,
                     afterDelete = { id -> mediaSyncRefStore.delete(id) },
                     appliesRemoteCreate = remoteApplyFilter::appliesNote,
                     enqueuesMediaRecovery = downloadsMedia,
                     checkpoint = if (spaceRead != null) SPACE_CHECKPOINT else EntityType.NOTE.name,
                     settle = spaceRead?.let { read -> read::settle },
                     settleFailed = { id -> spaceRead?.settleFailed(id) },
+                    appliesRemoteOverUnchangedLocal = spaceRead != null,
                 ),
             accessToken = accessToken,
             since = since,
         )
+    }
+
+    private suspend fun createNote(note: JournalNote) {
+        val syncable = journalNotesRepository as? SyncableJournalNotesRepository
+        if (syncable != null) syncable.createFromSync(note) else journalNotesRepository.create(note)
+    }
+
+    private suspend fun replaceNote(
+        existing: JournalNote,
+        replacement: JournalNote,
+    ) {
+        val syncable = journalNotesRepository as? SyncableJournalNotesRepository
+        if (syncable != null) {
+            syncable.deleteFromSync(existing.uid)
+            syncable.createFromSync(replacement)
+        } else {
+            journalNotesRepository.remove(existing)
+            journalNotesRepository.create(replacement)
+        }
+    }
+
+    private suspend fun deleteNote(id: Uuid) {
+        val syncable = journalNotesRepository as? SyncableJournalNotesRepository
+        if (syncable != null) syncable.deleteFromSync(id) else journalNotesRepository.removeById(id)
     }
 
     private suspend fun fetchContentChanges(cursor: Instant): Result<ChangesPage<JournalNote>> =

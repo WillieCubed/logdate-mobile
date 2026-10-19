@@ -36,6 +36,24 @@ class SpaceDownloadTest {
         }
 
     @Test
+    fun `an edit from another device replaces a copy nothing here has changed`() =
+        runTest {
+            val device = SpaceDevice(FakeDataHome())
+            val id = Uuid.random()
+            device.home.putFromAnotherDevice(JOURNAL_COLLECTION, id.toString(), journalRecord("From the tablet"))
+            device.manager.downloadRemoteChanges()
+
+            val edited = device.home.putFromAnotherDevice(JOURNAL_COLLECTION, id.toString(), journalRecord("Renamed on the tablet"))
+            val result = device.manager.downloadRemoteChanges()
+
+            assertTrue(result.success, result.errors.toString())
+            assertEquals(0, result.conflictsResolved)
+            assertEquals("Renamed on the tablet", device.journal(id)?.title)
+            assertEquals(edited.seq, device.journal(id)?.syncVersion)
+            assertEquals(edited.cid, device.swapStore.get(device.scope, JOURNAL_COLLECTION, id.toString())?.cid)
+        }
+
+    @Test
     fun `this device's own write isn't applied again`() =
         runTest {
             val device = SpaceDevice(FakeDataHome())
