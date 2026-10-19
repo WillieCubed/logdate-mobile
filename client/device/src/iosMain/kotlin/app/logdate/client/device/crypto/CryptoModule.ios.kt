@@ -6,6 +6,6 @@ import org.koin.dsl.module
 actual fun platformCryptoModule(): Module =
     module {
         single<CryptoManager> { IosCryptoManager() }
-        single<PlcRecoveryKeyManager> { IosPlcRecoveryKeyManager() }
+        single<PlcRecoveryKeyManager> { DeterministicPlcRecoveryKeyManager(get(), platformPlcRecoveryKeySupport()) }
         single<IdentityKeyBackupStore> { IosIdentityKeyBackupStore() }
     }

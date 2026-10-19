@@ -80,3 +80,5 @@ internal class JvmPlcRecoveryKeySupport : PlcRecoveryKeySupport {
         private const val SHA_256_ALGORITHM: String = "SHA-256"
     }
 }
+
+internal actual fun platformPlcRecoveryKeySupport(): PlcRecoveryKeySupport = JvmPlcRecoveryKeySupport()
