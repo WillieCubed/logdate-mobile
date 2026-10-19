@@ -21,63 +21,70 @@
   "valid": [
     {
       "name": "minimal",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
+      "dagCbor": "a3652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279",
+      "cid": "bafyreihkgbvgrdj6hfx3hr3zql5asho4b6wxu3xd43yacokppep3pg2amm"
+    },
+    {
+      "name": "every-field",
       "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
       "dagCbor": "a4652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
       "cid": "bafyreiewpob27cm7imh4e6y6o4qubu42iq4xqiiyxnjmz4izdqiatudqfi"
     },
     {
       "name": "unknown-field-from-a-newer-version",
-      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
-      "dagCbor": "a5652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
-      "cid": "bafyreihdfrzwzniyvbtkzxsmdq7sflpcanzky7i6eec4cbwyv7vdrypcye",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"unknownFutureField":"ignored"},
+      "dagCbor": "a4652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727972756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreibhq6ozmbhwi5u7b5aygmildnsyx5lkewwfyxhxhwi42bidez2ql4",
       "modelRoundTrip": false
+    },
+    {
+      "name": "example-journal-membership",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.journal","rkey":"5f2e8c1a-9b3d-4a7e-8f6c-2d1b0a9e8c7d"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"},"createdAt":"2026-10-10T14:20:02.000Z"},
+      "dagCbor": "a4652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b6579782433613163326234642d356536662d346137622d386339642d3065316632613362346335646a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b6579782435663265386331612d396233642d346137652d386636632d3264316230613965386337646a636f6c6c656374696f6e781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c696372656174656441747818323032362d31302d31305431343a32303a30322e3030305a",
+      "cid": "bafyreigeecnskrkb36v72hayfjqlyxv2tegfcnhdm3xi5zxecoljtamhde"
     }
   ],
   "invalid": [
     {
       "name": "wrong-record-type",
-      "record": {"$type":"app.logdate.not.this","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.not.this","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"wrong-record-type","path":"/$type"}
     },
     {
       "name": "missing-journal",
-      "record": {"$type":"app.logdate.journal.membership","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.journal.membership","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"missing-required","path":"/journal"}
     },
     {
       "name": "wrong-type-journal",
-      "record": {"$type":"app.logdate.journal.membership","journal":"not the right type","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.journal.membership","journal":"not the right type","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"wrong-type","path":"/journal"}
     },
     {
       "name": "missing-journal-collection",
-      "record": {"$type":"app.logdate.journal.membership","journal":{"rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.journal.membership","journal":{"rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"missing-required","path":"/journal/collection"}
     },
     {
       "name": "wrong-type-journal-collection",
-      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":42,"rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":42,"rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"wrong-type","path":"/journal/collection"}
     },
     {
       "name": "invalid-format-journal-collection",
-      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"invalid-format","path":"/journal/collection"}
     },
     {
       "name": "invalid-format-journal-rkey",
-      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"invalid-format","path":"/journal/rkey"}
     },
     {
       "name": "missing-entry",
-      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
       "failure": {"kind":"missing-required","path":"/entry"}
-    },
-    {
-      "name": "missing-createdAt",
-      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
-      "failure": {"kind":"missing-required","path":"/createdAt"}
     },
     {
       "name": "invalid-format-createdAt",

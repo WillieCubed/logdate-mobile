@@ -27,9 +27,9 @@
     },
     {
       "name": "every-field",
-      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","description":"Pancakes at the lake","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a6652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c65636f766572a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468076668656967687407657469746c6571412064617920617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6b6465736372697074696f6e7450616e63616b657320617420746865206c616b65",
-      "cid": "bafyreiegoqt7ro7npu7vr7rrzrhtgauz73lu2dwwpfv67elz3iw4ntohgu"
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","description":"Pancakes at the lake","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"favorite":true,"mergedInto":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a8652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c65636f766572a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468076668656967687407657469746c6571412064617920617420746865206c616b65686661766f72697465f5696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6a6d6572676564496e746fa264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796b6465736372697074696f6e7450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreifh5dcfi4xcikxvgpwzqctmibbvycxyc766sidr3iunv5kfioz4ae"
     },
     {
       "name": "unknown-field-from-a-newer-version",
@@ -37,6 +37,18 @@
       "dagCbor": "a4652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c657469746c6571412064617920617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
       "cid": "bafyreifv25rmbksyd37kptpktjlynwqfqbc5if34x2c67dh5wcrx65zk5y",
       "modelRoundTrip": false
+    },
+    {
+      "name": "example-journal-journal-merged",
+      "record": {"$type":"app.logdate.journal.journal","title":"Lake trips","mergedInto":{"collection":"app.logdate.journal.journal","rkey":"5f2e8c1a-9b3d-4a7e-8f6c-2d1b0a9e8c7d"},"createdAt":"2026-07-04T09:30:00.000Z","updatedAt":"2026-10-11T08:15:00.000Z"},
+      "dagCbor": "a5652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c657469746c656a4c616b65207472697073696372656174656441747818323032362d30372d30345430393a33303a30302e3030305a697570646174656441747818323032362d31302d31315430383a31353a30302e3030305a6a6d6572676564496e746fa264726b6579782435663265386331612d396233642d346137652d386636632d3264316230613965386337646a636f6c6c656374696f6e781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c",
+      "cid": "bafyreibj6e2mowlhdyonv5htrclfoghext5s6q5qc4t7qjdyqxly7vhw44"
+    },
+    {
+      "name": "example-journal-journal",
+      "record": {"$type":"app.logdate.journal.journal","title":"Summers at the lake","description":"Every trip up north, from the first one.","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":262144},"mimeType":"image/jpeg","aspectRatio":{"width":3,"height":4}},"favorite":true,"createdAt":"2026-06-01T12:00:00.000Z","updatedAt":"2026-10-10T14:20:02.000Z"},
+      "dagCbor": "a7652474797065781b6170702e6c6f67646174652e6a6f75726e616c2e6a6f75726e616c65636f766572a364626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a651a0004000065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa2657769647468036668656967687404657469746c657353756d6d65727320617420746865206c616b65686661766f72697465f5696372656174656441747818323032362d30362d30315431323a30303a30302e3030305a697570646174656441747818323032362d31302d31305431343a32303a30322e3030305a6b6465736372697074696f6e782845766572792074726970207570206e6f7274682c2066726f6d20746865206669727374206f6e652e",
+      "cid": "bafyreigsbkex3z323pxbgx7cmtugojqavjb7wepnyafja7bodygr4z3l5y"
     }
   ],
   "invalid": [
@@ -56,11 +68,6 @@
       "failure": {"kind":"wrong-type","path":"/title"}
     },
     {
-      "name": "too-long-title",
-      "record": {"$type":"app.logdate.journal.journal","title":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"too-long","path":"/title"}
-    },
-    {
       "name": "wrong-type-cover",
       "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":"not the right type"},
       "failure": {"kind":"wrong-type","path":"/cover"}
@@ -76,6 +83,11 @@
       "failure": {"kind":"wrong-type","path":"/cover/blob"}
     },
     {
+      "name": "too-long-cover-mimeType",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+      "failure": {"kind":"too-long","path":"/cover/mimeType"}
+    },
+    {
       "name": "wrong-type-cover-size",
       "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":"seven"}},
       "failure": {"kind":"wrong-type","path":"/cover/size"}
@@ -84,6 +96,21 @@
       "name": "below-minimum-cover-size",
       "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","cover":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":-1}},
       "failure": {"kind":"out-of-range","path":"/cover/size"}
+    },
+    {
+      "name": "wrong-type-favorite",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","favorite":"yes"},
+      "failure": {"kind":"wrong-type","path":"/favorite"}
+    },
+    {
+      "name": "invalid-format-mergedInto-collection",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","mergedInto":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/mergedInto/collection"}
+    },
+    {
+      "name": "invalid-format-mergedInto-rkey",
+      "record": {"$type":"app.logdate.journal.journal","title":"A day at the lake","createdAt":"2026-10-16T18:30:00.000Z","mergedInto":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/mergedInto/rkey"}
     },
     {
       "name": "missing-createdAt",

@@ -27,9 +27,9 @@
     },
     {
       "name": "every-field",
-      "record": {"$type":"app.logdate.place.journey","from":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"to":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","mode":"walking","distanceMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a862746fa264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796466726f6da264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279646d6f64656777616c6b696e6765247479706578196170702e6c6f67646174652e706c6163652e6a6f75726e657966656e647341747818323032362d31302d31365431383a33303a30302e3030305a6873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6e64697374616e63654d657465727307",
-      "cid": "bafyreidsyx34dxtpfohjfkyqtjxfad232j2fykii3h3r7pjmv2la4ln3nm"
+      "record": {"$type":"app.logdate.place.journey","from":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"to":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","mode":"still","distanceMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a862746fa264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796466726f6da264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279646d6f6465657374696c6c65247479706578196170702e6c6f67646174652e706c6163652e6a6f75726e657966656e647341747818323032362d31302d31365431383a33303a30302e3030305a6873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6e64697374616e63654d657465727307",
+      "cid": "bafyreiagboperzxxsp2byssbpvdyik3owr2ct463jfg72xzbfm2odd33hu"
     },
     {
       "name": "unknown-field-from-a-newer-version",
@@ -79,6 +79,11 @@
       "name": "invalid-format-startsAt",
       "record": {"$type":"app.logdate.place.journey","startsAt":"yesterday afternoon","createdAt":"2026-10-16T18:30:00.000Z"},
       "failure": {"kind":"invalid-format","path":"/startsAt"}
+    },
+    {
+      "name": "too-long-mode",
+      "record": {"$type":"app.logdate.place.journey","startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z","mode":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "failure": {"kind":"too-long","path":"/mode"}
     },
     {
       "name": "wrong-type-distanceMeters",

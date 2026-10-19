@@ -1,0 +1,130 @@
+{
+  "collection": "app.logdate.journal.markedMoment",
+  "recordKey": "any",
+  "recordKeys": {
+    "valid": [
+      "3jzfcijpj2z2a",
+      "self",
+      "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80",
+      "lake-house",
+      "a.b-c_d:e~f"
+    ],
+    "invalid": [
+      "",
+      ".",
+      "..",
+      "a/b",
+      "has space",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ]
+  },
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a565247479706578206170702e6c6f67646174652e6a6f75726e616c2e6d61726b65644d6f6d656e74657374617465646f70656e6874696d655a6f6e656f416d65726963612f4368696361676f696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6c6f726967696e4465766963657450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreie72qdr4sdgyuwveamyuhjis3w2bmdfzkmuxcmcrt3i3zkoxgfdny"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","caption":"Pancakes at the lake","resolvedEntries":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"location":{"geo":{"latitude":"44.9778","longitude":"-93.2650","altitude":"Pancakes at the lake","name":"Lake house"},"accuracyCentimeters":7,"place":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"placeDetails":{"name":"Lake house","geo":{"latitude":"44.9778","longitude":"-93.2650"}}},"timeZone":"America/Chicago","heartRateBpm":7,"capturedDuring":"moving","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "ab65247479706578206170702e6c6f67646174652e6a6f75726e616c2e6d61726b65644d6f6d656e74657374617465646f70656e6763617074696f6e7450616e63616b657320617420746865206c616b65686c6f636174696f6ea46367656fa4646e616d656a4c616b6520686f75736568616c7469747564657450616e63616b657320617420746865206c616b65686c617469747564656734342e39373738696c6f6e676974756465682d39332e3236353065706c616365a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796c706c61636544657461696c73a26367656fa2686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530646e616d656a4c616b6520686f75736573616363757261637943656e74696d6574657273076874696d655a6f6e656f416d65726963612f4368696361676f696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6c68656172745261746542706d076c6f726967696e4465766963657450616e63616b657320617420746865206c616b656e6361707475726564447572696e67666d6f76696e676f7265736f6c766564456e747269657381a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279",
+      "cid": "bafyreidpt5tpa2blafrb3fjeb4u5l2nokrrkohtfacjbqg4z7eikcf7uky"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a665247479706578206170702e6c6f67646174652e6a6f75726e616c2e6d61726b65644d6f6d656e74657374617465646f70656e6874696d655a6f6e656f416d65726963612f4368696361676f696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6c6f726967696e4465766963657450616e63616b657320617420746865206c616b6572756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreigmdk3dv442e3k67bvldl36dzvxs2id3c5iklg6pzn33raieum2nu",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-journal-markedMoment",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"filled","caption":"First snow of the year","resolvedEntries":[{"collection":"app.logdate.journal.entry","rkey":"8e9f0a1b-2c3d-4e5f-8a6b-7c8d9e0f1a2b"}],"location":{"geo":{"latitude":"46.7867","longitude":"-92.1005"},"accuracyCentimeters":820},"timeZone":"America/Chicago","heartRateBpm":88,"capturedDuring":"moving","originDevice":"c4d5e6f7-0a1b-4c2d-8e3f-4a5b6c7d8e9f","createdAt":"2026-10-17T15:22:48.120Z","updatedAt":"2026-10-17T20:05:13.004Z"},
+      "dagCbor": "ab65247479706578206170702e6c6f67646174652e6a6f75726e616c2e6d61726b65644d6f6d656e746573746174656666696c6c65646763617074696f6e76466972737420736e6f77206f66207468652079656172686c6f636174696f6ea26367656fa2686c617469747564656734362e37383637696c6f6e676974756465682d39322e3130303573616363757261637943656e74696d65746572731903346874696d655a6f6e656f416d65726963612f4368696361676f696372656174656441747818323032362d31302d31375431353a32323a34382e3132305a697570646174656441747818323032362d31302d31375432303a30353a31332e3030345a6c68656172745261746542706d18586c6f726967696e446576696365782463346435653666372d306131622d346332642d386533662d3461356236633764386539666e6361707475726564447572696e67666d6f76696e676f7265736f6c766564456e747269657381a264726b6579782438653966306131622d326333642d346535662d386136622d3763386439653066316132626a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279",
+      "cid": "bafyreiazvzpd7gkohdrn6tg5timrqzufypkoiyodz5ldc435dxbfk7zam4"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-state",
+      "record": {"$type":"app.logdate.journal.markedMoment","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/state"}
+    },
+    {
+      "name": "wrong-type-state",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":42,"timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/state"}
+    },
+    {
+      "name": "too-long-state",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/state"}
+    },
+    {
+      "name": "wrong-type-resolvedEntries",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","resolvedEntries":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/resolvedEntries"}
+    },
+    {
+      "name": "missing-resolvedEntries-0-collection",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","resolvedEntries":[{"rkey":"3jzfcijpj2z2a"}]},
+      "failure": {"kind":"missing-required","path":"/resolvedEntries/0/collection"}
+    },
+    {
+      "name": "invalid-format-resolvedEntries-0-collection",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","resolvedEntries":[{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}]},
+      "failure": {"kind":"invalid-format","path":"/resolvedEntries/0/collection"}
+    },
+    {
+      "name": "invalid-format-resolvedEntries-0-rkey",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","resolvedEntries":[{"collection":"app.logdate.journal.entry","rkey":"a/b"}]},
+      "failure": {"kind":"invalid-format","path":"/resolvedEntries/0/rkey"}
+    },
+    {
+      "name": "wrong-type-location",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","location":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/location"}
+    },
+    {
+      "name": "wrong-type-location-accuracyCentimeters",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","location":{"accuracyCentimeters":"seven"}},
+      "failure": {"kind":"wrong-type","path":"/location/accuracyCentimeters"}
+    },
+    {
+      "name": "below-minimum-location-accuracyCentimeters",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","location":{"accuracyCentimeters":-1}},
+      "failure": {"kind":"out-of-range","path":"/location/accuracyCentimeters"}
+    },
+    {
+      "name": "missing-timeZone",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/timeZone"}
+    },
+    {
+      "name": "above-maximum-heartRateBpm",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","heartRateBpm":401},
+      "failure": {"kind":"out-of-range","path":"/heartRateBpm"}
+    },
+    {
+      "name": "missing-originDevice",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/originDevice"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.journal.markedMoment","state":"open","timeZone":"America/Chicago","originDevice":"Pancakes at the lake","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

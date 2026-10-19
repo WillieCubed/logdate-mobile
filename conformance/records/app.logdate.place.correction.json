@@ -21,74 +21,96 @@
   "valid": [
     {
       "name": "minimal",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a4652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e66616374696f6e67636f6e6669726d66746172676574a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
-      "cid": "bafyreifannllc56vcvscljbn3djomevsqv4mjvf7vbuc7pyehwritpw3bm"
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label"},
+      "dagCbor": "a3652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e656669656c64656c6162656c6a65766964656e636549647450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreihrlck3ffb76qxdmujp2bjz66iydzxura2mtsgr7j2q6gbp3x7una"
     },
     {
       "name": "every-field",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","place":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a7652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e65706c616365a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727966616374696f6e67636f6e6669726d66656e647341747818323032362d31302d31365431383a33303a30302e3030305a66746172676574a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e7472796873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
-      "cid": "bafyreibc2hfp3ihf6timz6p2e7zqmunz2xbcb3dzmy4gbrsdxyhmi4l7ry"
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","label":"Pancakes at the lake","place":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"activity":"still","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","supersedes":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}],"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "aa652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e656669656c64656c6162656c656c6162656c7450616e63616b657320617420746865206c616b6565706c616365a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727966656e647341747818323032362d31302d31365431383a33303a30302e3030305a686163746976697479657374696c6c6873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6a65766964656e636549647450616e63616b657320617420746865206c616b656a7375706572736564657381a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279",
+      "cid": "bafyreihdgyjhq7wpwaodi7txdijibgktz463ofd67vjioeaawsheumawse"
     },
     {
       "name": "unknown-field-from-a-newer-version",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
-      "dagCbor": "a5652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e66616374696f6e67636f6e6669726d66746172676574a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
-      "cid": "bafyreihidnsvyg3kldosqtbwmtefj6phavg3wya3q6lz2k2zxogcth4w4i",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","unknownFutureField":"ignored"},
+      "dagCbor": "a4652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e656669656c64656c6162656c6a65766964656e636549647450616e63616b657320617420746865206c616b6572756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreiclrqk62r3dv3nl7dv5f6odzqlxgferfq5wgztctqckcldwgxsxcu",
       "modelRoundTrip": false
+    },
+    {
+      "name": "example-place-correction-activity",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"derived:journey:owner-1:6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b:a8c1f2e3-4d5b-4c6a-9e7f-8b9a0c1d2e3f:b9d2a3f4-5e6c-4d7b-8f80-9cab1d2e3f40","field":"activity","activity":"bus"},
+      "dagCbor": "a4652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e656669656c64686163746976697479686163746976697479636275736a65766964656e636549647886646572697665643a6a6f75726e65793a6f776e65722d313a36663163326230652d386134642d346633652d396232312d3563376438653966306131623a61386331663265332d346435622d346336612d396537662d3862396130633164326533663a62396432613366342d356536632d346437622d386638302d396361623164326533663430",
+      "cid": "bafyreidsri5ia72glgv7ohbs5f5mwwc2vteo75gxjeevffqdnh7okruf5y"
+    },
+    {
+      "name": "example-place-correction",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"place:0b8f3c1e-6a2d-4e9f-8c7b-1d2e3f4a5b6c","field":"label","label":"The good coffee place","supersedes":[{"collection":"app.logdate.place.correction","rkey":"1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f"}],"createdAt":"2026-10-12T09:00:00.000Z"},
+      "dagCbor": "a6652474797065781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e656669656c64656c6162656c656c6162656c7554686520676f6f6420636f6666656520706c616365696372656174656441747818323032362d31302d31325430393a30303a30302e3030305a6a65766964656e63654964782a706c6163653a30623866336331652d366132642d346539662d386337622d3164326533663461356236636a7375706572736564657381a264726b6579782431633264336534662d356136622d346337642d386539662d3061316232633364346535666a636f6c6c656374696f6e781c6170702e6c6f67646174652e706c6163652e636f7272656374696f6e",
+      "cid": "bafyreian5dfccsc25ztotsdzunaji4nxao3vgcbgx35sx6rfqchxg6dmca"
     }
   ],
   "invalid": [
     {
       "name": "wrong-record-type",
-      "record": {"$type":"app.logdate.not.this","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
+      "record": {"$type":"app.logdate.not.this","evidenceId":"Pancakes at the lake","field":"label"},
       "failure": {"kind":"wrong-record-type","path":"/$type"}
     },
     {
-      "name": "missing-target",
-      "record": {"$type":"app.logdate.place.correction","action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"missing-required","path":"/target"}
+      "name": "missing-evidenceId",
+      "record": {"$type":"app.logdate.place.correction","field":"label"},
+      "failure": {"kind":"missing-required","path":"/evidenceId"}
     },
     {
-      "name": "wrong-type-target",
-      "record": {"$type":"app.logdate.place.correction","target":"not the right type","action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"wrong-type","path":"/target"}
+      "name": "wrong-type-evidenceId",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":42,"field":"label"},
+      "failure": {"kind":"wrong-type","path":"/evidenceId"}
     },
     {
-      "name": "missing-target-collection",
-      "record": {"$type":"app.logdate.place.correction","target":{"rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"missing-required","path":"/target/collection"}
+      "name": "too-long-evidenceId",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","field":"label"},
+      "failure": {"kind":"too-long","path":"/evidenceId"}
     },
     {
-      "name": "wrong-type-target-collection",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":42,"rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"wrong-type","path":"/target/collection"}
+      "name": "missing-field",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake"},
+      "failure": {"kind":"missing-required","path":"/field"}
     },
     {
-      "name": "invalid-format-target-collection",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"invalid-format","path":"/target/collection"}
+      "name": "wrong-type-place",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","place":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/place"}
     },
     {
-      "name": "invalid-format-target-rkey",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"invalid-format","path":"/target/rkey"}
+      "name": "missing-place-collection",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","place":{"rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"missing-required","path":"/place/collection"}
     },
     {
-      "name": "missing-action",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
-      "failure": {"kind":"missing-required","path":"/action"}
+      "name": "invalid-format-place-collection",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","place":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/place/collection"}
+    },
+    {
+      "name": "invalid-format-place-rkey",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","place":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/place/rkey"}
     },
     {
       "name": "invalid-format-startsAt",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm","createdAt":"2026-10-16T18:30:00.000Z","startsAt":"yesterday afternoon"},
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","startsAt":"yesterday afternoon"},
       "failure": {"kind":"invalid-format","path":"/startsAt"}
     },
     {
-      "name": "missing-createdAt",
-      "record": {"$type":"app.logdate.place.correction","target":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"action":"confirm"},
-      "failure": {"kind":"missing-required","path":"/createdAt"}
+      "name": "wrong-type-supersedes",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","supersedes":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/supersedes"}
+    },
+    {
+      "name": "too-long-supersedes",
+      "record": {"$type":"app.logdate.place.correction","evidenceId":"Pancakes at the lake","field":"label","supersedes":[{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}]},
+      "failure": {"kind":"too-long","path":"/supersedes"}
     }
   ]
 }
