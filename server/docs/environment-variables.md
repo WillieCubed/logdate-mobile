@@ -2,7 +2,7 @@
 
 **Authoritative reference for all environment variables used by the LogDate server.**
 
-> Last updated: 2026-10-09
+> Last updated: 2026-10-18
 
 ---
 
@@ -482,6 +482,18 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Example**: `SYNC_TOMBSTONE_PURGE_INTERVAL_HOURS=12`
 - **Required**: No
 - **Notes**: More frequent purges = lower storage, but higher database load
+
+### `LOGDATE_PERSONAL_SPACE_ENABLED`
+- **Description**: Turns on personal spaces: the `app.logdate.space.putRecord`, `deleteRecord`, `getRecord`, `listRepoOps`, `uploadBlob` and `getBlob` methods, where a LogDate device stores its owner's end-to-end encrypted records and files.
+- **Type**: Boolean (only the exact value `true` enables it)
+- **Default**: `false`
+- **Example**: `LOGDATE_PERSONAL_SPACE_ENABLED=true`
+- **Required**: No
+- **Notes**:
+  - Off, every one of the six methods answers `501 MethodNotImplemented` to a signed-in caller, and a caller without an access token still gets `401`. The server also leaves `personalSpaceV1` out of its server description, so clients can tell the feature is unavailable before they try it.
+  - On, the server adds `personalSpaceV1` to its server description. Only the account's own LogDate devices can use the methods; every other caller is told the space doesn't exist.
+  - Leave it off until the client sync work that writes to personal spaces is ready to ship. Turning it on first advertises a feature no app uses yet.
+  - Deletion markers in a personal space follow `SYNC_TOMBSTONE_RETENTION_DAYS`. Uploaded files that no record refers to are removed after one day. A device that was offline longer than the tombstone retention gets `CursorTooOld` and downloads the space again from the start.
 
 ---
 

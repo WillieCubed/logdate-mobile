@@ -136,9 +136,31 @@ All new schemas use the `app.logdate.*` namespace. Each group below is its own a
 | `app.logdate.actor` | `profile`, `settings` |
 | `app.logdate.graph` | `connection`, `mute`, `block`, `circle`, `circleMember` |
 | `app.logdate.share` | `share`, `item`, `reaction`, `reply` |
-| `app.logdate.space` | `defs` (the `personal`, `circle` and `group` space kinds), `group`, `member` |
+| `app.logdate.space` | `defs` (the `personal`, `circle` and `group` space kinds), `group`, `member`, and the personal-space methods listed below |
 | `app.logdate.crypto` | `keyDeclaration`, `sealed` (the envelope every private record is stored in), `wrappedKey` |
 | Permission sets | `app.logdate.authFull`, `app.logdate.authShare` |
+
+### Personal-space methods
+
+`app.logdate.space` also defines the six XRPC methods a LogDate device calls to store and read its
+owner's sealed records. They are methods, not records, so they don't appear in the classification
+tables above. Every record stored through them is an `app.logdate.crypto.sealed` envelope, so the
+server stores ciphertext and never learns what a record says. Only the owner's own LogDate devices
+can call them: the server accepts a LogDate access token and nothing else, and a request for
+anyone else's space gets the same answer as a space that doesn't exist.
+
+| Method | What it does |
+|---|---|
+| `app.logdate.space.putRecord` | Creates or replaces one sealed record, optionally only if it still has the CID the caller last saw (`swapCid`) |
+| `app.logdate.space.deleteRecord` | Deletes one sealed record and leaves a deletion marker, so other devices learn it is gone |
+| `app.logdate.space.getRecord` | Reads one sealed record by its key |
+| `app.logdate.space.listRepoOps` | Lists changes after a sequence number, deletions included, one page at a time. A device starts from `since=0` to download everything. If the server has already purged deletions after the `since` a device holds, it answers `CursorTooOld` and the device lists again from 0 |
+| `app.logdate.space.uploadBlob` | Uploads one encrypted file and returns the blob reference to put in a sealed record |
+| `app.logdate.space.getBlob` | Downloads one encrypted file by its CID |
+
+A server only answers these methods when its operator has turned on
+[`LOGDATE_PERSONAL_SPACE_ENABLED`](../../server/docs/environment-variables.md#logdate_personal_space_enabled).
+Until then they answer `501 MethodNotImplemented`.
 
 **Reused as they are:** `community.lexicon.location.*` inside places and entries,
 `community.lexicon.calendar.event` and `rsvp` for events, `com.atproto.repo.strongRef` for
