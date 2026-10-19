@@ -24,9 +24,9 @@ class LogDateAccountAuth(
     private val identityService: AtprotoIdentityService,
 ) {
     /**
-     * The account [call]'s LogDate access token belongs to, with its AT Protocol identity ensured so
-     * its `did` is set. Otherwise answers `401 AuthRequired`, the same for every kind of refused or
-     * missing token, and returns null.
+     * The active account [call]'s LogDate access token belongs to, with its AT Protocol identity
+     * ensured so its `did` is set. Otherwise, including for a deactivated account, answers
+     * `401 AuthRequired`, the same for every kind of refused or missing token, and returns null.
      */
     @OptIn(ExperimentalUuidApi::class)
     suspend fun requireLogDateAccount(call: ApplicationCall): Account? {
@@ -37,7 +37,11 @@ class LogDateAccountAuth(
                 ?.removePrefix(BEARER_PREFIX)
                 ?.trim()
         val accountId = token?.let(tokenService::validateAccessToken)?.let { runCatching { Uuid.parse(it) }.getOrNull() }
-        val account = accountId?.let { accountRepository.findById(it) }?.let { identityService.ensureIdentity(it) }
+        val account =
+            accountId
+                ?.let { accountRepository.findById(it) }
+                ?.takeIf { it.isActive }
+                ?.let { identityService.ensureIdentity(it) }
         if (account == null) {
             call.respond(HttpStatusCode.Unauthorized, PdsErrorResponse("AuthRequired", "A LogDate access token is required"))
         }

@@ -31,6 +31,7 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.writeFully
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.Json
@@ -42,6 +43,7 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -469,7 +471,13 @@ class SpaceXrpcRoutesTest {
             )
 
             val unauthenticated = everySpaceMethod(space) { _, _ -> }
-            mapOf("OAuth DPoP" to dpop, "AT Protocol session" to session, "linked device" to device).forEach { (kind, authorize) ->
+            val oauthAsBearer: HttpRequestBuilder.(String, String) -> Unit = { _, _ -> bearer(oauthToken) }
+            mapOf(
+                "OAuth DPoP" to dpop,
+                "OAuth sent as Bearer" to oauthAsBearer,
+                "AT Protocol session" to session,
+                "linked device" to device,
+            ).forEach { (kind, authorize) ->
                 everySpaceMethod(space, authorize).forEach { (method, response) ->
                     assertEquals(HttpStatusCode.Unauthorized, response.status, "$kind token on $method")
                     assertEquals("AuthRequired", response.errorCode(), "$kind token on $method")
@@ -523,6 +531,71 @@ class SpaceXrpcRoutesTest {
             assertTrue(outcome.isFailure || outcome.getOrThrow().status == HttpStatusCode.InternalServerError, "$outcome")
             val ownerId = runBlocking { requireNotNull(env.accountRepository.findByDid(did)) }.id.toString()
             assertEquals(emptyList(), env.blobStorage.listOwnerBlobPaths(java.util.UUID.fromString(ownerId)))
+        }
+
+    @Test
+    fun `an upload cancelled after its row was saved keeps the object`() =
+        assertSavedUploadSurvives(CancellationException("The caller went away"))
+
+    @Test
+    fun `an upload that fails after its row was saved keeps the object`() =
+        assertSavedUploadSurvives(IllegalStateException("The response failed"))
+
+    private fun assertSavedUploadSurvives(failure: Throwable) =
+        testApplication {
+            val saving = InMemorySpaceStore()
+            var failNext = true
+            val store =
+                object : SpaceStore by saving {
+                    override suspend fun putBlob(
+                        accountId: java.util.UUID,
+                        space: String,
+                        blob: SpaceBlob,
+                    ): SpaceBlob {
+                        val stored = saving.putBlob(accountId, space, blob)
+                        if (failNext) {
+                            failNext = false
+                            throw failure
+                        }
+                        return stored
+                    }
+                }
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceStore = store)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val bytes = ByteArray(600) { 4 }
+            val cid = Cid.rawSha256(bytes).value
+            runCatching { uploadBlob(token, space, bytes) }
+            val saved = assertNotNull(saving.getBlob(space, cid))
+            assertContentEquals(bytes, env.blobStorage.getBlob(saved.storagePath), "the saved row's object survives")
+            val read = getBlob(token, space, cid)
+            assertEquals(HttpStatusCode.OK, read.status)
+            assertContentEquals(bytes, read.bodyAsBytes())
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, bytes).status)
+            assertContentEquals(bytes, getBlob(token, space, cid).bodyAsBytes())
+        }
+
+    @Test
+    fun `a deactivated account is refused`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val before =
+                client.get("/xrpc/app.logdate.space.listRepoOps") {
+                    bearer(token)
+                    parameter("space", space)
+                }
+            assertEquals(HttpStatusCode.OK, before.status)
+            runBlocking {
+                val account = requireNotNull(env.accountRepository.findByDid(did))
+                env.accountRepository.save(account.copy(isActive = false))
+            }
+            val unauthenticated = everySpaceMethod(space) { _, _ -> }
+            everySpaceMethod(space) { _, _ -> bearer(token) }.forEach { (method, response) ->
+                assertEquals(HttpStatusCode.Unauthorized, response.status, method)
+                assertContentEquals(unauthenticated.getValue(method).bodyAsBytes(), response.bodyAsBytes(), method)
+            }
         }
 
     @Test

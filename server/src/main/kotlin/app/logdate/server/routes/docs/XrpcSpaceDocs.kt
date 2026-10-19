@@ -35,6 +35,10 @@ internal object XrpcSpaceDocs {
     private const val BLOB_CID = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
     private val sealed = Sealed(ciphertext = Bytes(ByteArray(528)), keyId = "ck-2026-09", nonce = Bytes(ByteArray(12)), version = 1)
 
+    private const val CID_SHAPE =
+        "A CID-shaped value starts with `b`, the lowercase base32 prefix, and is at most 255 characters; the server " +
+            "doesn't decode it further."
+
     private const val OWNER_ONLY =
         "Only the space's owner can use it, from their own LogDate devices: send the LogDate access token from " +
             "**Authentication** as `Authorization: Bearer`. Any other space, including another account's, answers " +
@@ -111,7 +115,7 @@ internal object XrpcSpaceDocs {
                 ErrorCase(
                     "InvalidRequest",
                     "The body isn't valid JSON input, `space` isn't a space URI, `rkey` isn't a record key, a value in `blobs` or " +
-                        "`swapCid` isn't a CID, or `blobs` lists more than 64 CIDs. The `message` says which.",
+                        "`swapCid` isn't CID-shaped, or `blobs` lists more than 64 CIDs. The `message` says which. $CID_SHAPE",
                     "rkey must be a record key",
                 ),
                 invalidRecord,
@@ -150,7 +154,8 @@ internal object XrpcSpaceDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase(
                     "InvalidRequest",
-                    "The body isn't valid JSON input, `space` isn't a space URI, `rkey` isn't a record key, or `swapCid` isn't a CID.",
+                    "The body isn't valid JSON input, `space` isn't a space URI, `rkey` isn't a record key, or `swapCid` isn't " +
+                        "CID-shaped. $CID_SHAPE",
                     "rkey must be a record key",
                 ),
                 recordNotFound,
@@ -312,8 +317,8 @@ internal object XrpcSpaceDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase(
                     "InvalidRequest",
-                    "`space` is missing or isn't a space URI, or `cid` is missing or isn't a CID.",
-                    "cid must be a CID",
+                    "`space` is missing or isn't a space URI, or `cid` is missing or isn't CID-shaped. $CID_SHAPE",
+                    "cid must be CID-shaped",
                 ),
                 blobNotFound,
             )

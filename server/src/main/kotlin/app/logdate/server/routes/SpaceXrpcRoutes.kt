@@ -60,6 +60,8 @@ internal const val MAX_SPACE_RECORD_REQUEST_BYTES: Long = 6L * 1024 * 1024
 
 private const val DEFAULT_CHANGES_LIMIT = 200
 private const val MAX_RECORD_BLOBS = 64
+
+/** CIDs are stored in 255-character columns, so a longer value can't name anything. */
 private const val MAX_CID_LENGTH = 255
 private const val RECORD_NOT_FOUND = "RecordNotFound"
 private const val BLOB_NOT_FOUND = "BlobNotFound"
@@ -133,7 +135,11 @@ private fun Route.putRecord(
         if (!isRecordKey(input.rkey)) return@post call.respondInvalid("rkey must be a record key")
         val blobs = input.blobs.orEmpty()
         if (blobs.size > MAX_RECORD_BLOBS) return@post call.respondInvalid("A record can refer to at most $MAX_RECORD_BLOBS blobs")
-        if (!blobs.all(::isCid) || input.swapCid?.let(::isCid) == false) return@post call.respondInvalid("blobs and swapCid must be CIDs")
+        if (!blobs.all(::isCid) ||
+            input.swapCid?.let(::isCid) == false
+        ) {
+            return@post call.respondInvalid("blobs and swapCid must be CID-shaped")
+        }
         checkSealedRecord(input.record)?.let { return@post call.respondInvalidRecord(it) }
         val write =
             SpaceRecordWrite(
@@ -174,7 +180,7 @@ private fun Route.deleteRecord(
         val input = decodeOrNull<SpaceDeleteRecordInput>(bytes) ?: return@post call.respondInvalid("Invalid deleteRecord input")
         val space = call.ownSpace(input.space, account, RECORD_NOT_FOUND) ?: return@post
         if (!isRecordKey(input.rkey)) return@post call.respondInvalid("rkey must be a record key")
-        if (input.swapCid?.let(::isCid) == false) return@post call.respondInvalid("swapCid must be a CID")
+        if (input.swapCid?.let(::isCid) == false) return@post call.respondInvalid("swapCid must be CID-shaped")
         val seq =
             try {
                 store.delete(account.id.toJavaUUID(), space.uri, space.authority, input.rkey, input.swapCid)
@@ -259,9 +265,7 @@ private fun Route.uploadBlob(
         val blob = SpaceBlob(cid = cid, mimeType = SPACE_BLOB_MIME_TYPE, size = bytes.size.toLong(), storagePath = path)
         val stored =
             runCatching { store.putBlob(ownerId, space.uri, blob) }.getOrElse { error ->
-                withContext(NonCancellable + Dispatchers.IO) {
-                    runCatching { storage.deleteBlobIfExists(path) }.exceptionOrNull()?.let(error::addSuppressed)
-                }
+                withContext(NonCancellable + Dispatchers.IO) { storage.deleteUnsavedUpload(store, space.uri, cid, path, error) }
                 throw error
             }
         if (stored.storagePath != path) withContext(Dispatchers.IO) { storage.deleteBlobIfExists(path) }
@@ -279,7 +283,7 @@ private fun Route.getBlob(
         val store = records ?: return@get call.respondNotImplemented()
         val storage = objects ?: return@get call.respondNotImplemented()
         val space = call.ownSpace(call.request.queryParameters["space"], account, BLOB_NOT_FOUND) ?: return@get
-        val cid = call.request.queryParameters["cid"]?.takeIf(::isCid) ?: return@get call.respondInvalid("cid must be a CID")
+        val cid = call.request.queryParameters["cid"]?.takeIf(::isCid) ?: return@get call.respondInvalid("cid must be CID-shaped")
         val bytes =
             store.getBlob(space.uri, cid)?.let { withContext(Dispatchers.IO) { storage.getBlob(it.storagePath) } }
                 ?: return@get call.respondMissing(BLOB_NOT_FOUND)
@@ -309,10 +313,29 @@ private suspend fun ApplicationCall.ownSpace(
     return space
 }
 
-private fun isRecordKey(value: String): Boolean = RecordKey.parse(value).isSuccess
+/**
+ * Deletes the object at [path] after a failed metadata write, unless the write saved a row that
+ * points at it anyway, as when the call is cancelled after the transaction commits. When the row
+ * can't be read, the object stays: an orphaned object is harmless, a row without its object isn't.
+ * Failures here are added to [error] rather than replacing it.
+ */
+private suspend fun LogDateBlobStorage.deleteUnsavedUpload(
+    store: SpaceStore,
+    space: String,
+    cid: String,
+    path: String,
+    error: Throwable,
+) {
+    val saved = runCatching { store.getBlob(space, cid)?.storagePath == path }
+    saved.exceptionOrNull()?.let(error::addSuppressed)
+    if (saved.getOrNull() != false) return
+    runCatching { deleteBlobIfExists(path) }.exceptionOrNull()?.let(error::addSuppressed)
+}
 
-/** CIDs are stored in 255-character columns, so a longer value can't name anything. */
+/** Lowercase base32 multibase is all [Cid.parse] checks, so this is a shape check, not a full parse. */
 private fun isCid(value: String): Boolean = value.length <= MAX_CID_LENGTH && value == value.trim() && Cid.parse(value).isSuccess
+
+private fun isRecordKey(value: String): Boolean = RecordKey.parse(value).isSuccess
 
 /** Up to [limit] bytes of the request body, or null when it's longer. */
 private suspend fun ApplicationCall.receiveBytesUpTo(limit: Long): ByteArray? {
