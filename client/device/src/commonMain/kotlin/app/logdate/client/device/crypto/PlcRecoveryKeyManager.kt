@@ -24,6 +24,12 @@ interface PlcRecoveryKeyManager {
     ): String
 }
 
+/**
+ * The P-256 operations behind the recovery key on this platform: BouncyCastle on Android and
+ * desktop, CryptoKit on iOS. Every platform produces the same `did:key` for the same key material.
+ */
+internal expect fun platformPlcRecoveryKeySupport(): PlcRecoveryKeySupport
+
 internal interface PlcRecoveryKeySupport {
     fun isValidPrivateKey(privateKeyMaterial: ByteArray): Boolean
 
