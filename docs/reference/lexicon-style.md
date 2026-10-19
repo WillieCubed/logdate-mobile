@@ -138,13 +138,23 @@ the app, and a list of `permissions`. The rules come from the
 - A set can only grant record types, methods and space types in its own namespace or below it:
   `app.logdate.authFull` can grant anything under `app.logdate.`. A space permission's `collection`
   is the one exception, and may name any record type.
-- No `*` for a collection, a method or a space type.
+- No `*` for a `repo` permission's collection, an `rpc` method or a space type. A `space`
+  permission's `collection` may be `*`, but LogDate's sets leave it out instead.
 - No `blob`, `account` or `identity` permissions; apps ask for those directly.
 - An `rpc` permission uses `"inheritAud": true` instead of naming a service.
+- Each resource takes only its own parameters: `collection` and `action` for `repo`; `lxm`, `aud`
+  and `inheritAud` for `rpc`; `spaceType`, `authority`, `skey`, `collection`, `action` and
+  `manage` for `space`. `collection`, `action`, `lxm` and `manage` are non-empty lists, even for one
+  value; the others are single values. An authorization server silently ignores an entry it can't
+  read, so a misspelled parameter or a single value where a list belongs would quietly drop the
+  whole permission. The lint refuses both.
+- Grant `manage` only under the default authority, `self`, so an app can manage only the spaces the
+  person controls.
 
 Prefer leaving out a space permission's `collection`. It then grants the collections the space
-declaration lists, and follows the declaration when it grows. What each LogDate set grants, and
-why, is in [LogDate lexicons](./lexicons.md#permission-sets).
+declaration lists, and follows the declaration when it grows, so a change to a declaration's
+collections needs the same review as a change to the sets. What each LogDate set grants, and why,
+is in [LogDate lexicons](./lexicons.md#permission-sets).
 
 ## Changing a schema
 

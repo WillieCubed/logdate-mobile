@@ -164,6 +164,12 @@ unsealed, adding them to those declarations' collections is a compatible change.
 The group's own description used to be the record `app.logdate.space.group`. That name is now the
 group space type, so the description record is `app.logdate.space.groupProfile`.
 
+**Who may write a group's profile and members.** Every member writes into their own repository in
+the group space, and any member's app could write a record that claims to be the group's profile
+or someone's membership. Apps therefore accept `app.logdate.space.groupProfile` and
+`app.logdate.space.member` records only from the repository of the group space's authority, the
+person who started the group, and ignore copies found in any other member's repository.
+
 ### Permission sets
 
 A permission set bundles the access an app asks for into one OAuth scope, `include:<set NSID>`,
@@ -172,24 +178,46 @@ the [permission specification](https://atproto.com/specs/permission)). A set may
 inside its own namespace, so LogDate's sets can't grant anything outside `app.logdate.*`; an app
 that also wants, say, `site.standard.*` for published stories asks for that separately.
 
-Both sets leave out a space permission's `collection` and `action`, so they grant read access and
-writes to the collections the space declaration lists. That way a collection added to a
-declaration reaches existing sessions without asking people to approve the app again.
+Each grant follows least privilege along two lines:
+
+- **Records** in circle and group spaces under any authority (`authority: "*"`), because what other
+  people share with you is stored in their spaces. These permissions have no `manage`.
+- **Managing spaces** (`manage`) only under the default authority, `self`: the spaces the person
+  controls. No set can change or delete a space someone else started.
+
+**Why leaving out `collection` is safe.** Both sets leave out a space permission's `collection` and
+`action`, so they grant reading and writes to the collections the space declaration lists:
+
+- reading ignores `collection` entirely, because Spaces grants read access to a whole space or
+  nothing;
+- every record in these spaces is an `app.logdate.crypto.sealed` envelope, so the only collection a
+  write can target is the sealed one, and what an app can do with it depends on the keys it holds;
+- the boundary that matters is the space type plus the authority, which every permission names.
+
+A collection added to a declaration reaches every session holding a set without anyone approving
+the app again. That makes a change to a declaration's collections a change to the sets too, and it
+needs the same review. `./run lint:lexicons` reports any collection added to the circle or group
+declaration as widening `app.logdate.authShare` until the reviewed list in
+`tools/lexicon-check/declarations.mjs` is updated.
 
 **`app.logdate.authFull`, "Use LogDate"**, is everything LogDate's own apps need:
 
 - writing the public profile (`app.logdate.actor.profile`) and the public sharing keys
   (`app.logdate.crypto.keyDeclaration`) to the account's public repository;
-- the account's own personal space, including creating it (`manage`);
-- circle and group spaces under any authority, because what other people share with you is stored
-  in their spaces, including creating, changing and deleting circle and group spaces.
+- the account's own personal space, and creating it (`manage: ["create"]`). It can't `update` the
+  personal space, which could change who may read it, or `delete` it, which would destroy the
+  journal;
+- records in circle and group spaces under any authority;
+- creating, changing and deleting the person's own circle and group spaces.
 
 **`app.logdate.authShare`, "Share with your people"**, is for another app that lets people share
 through LogDate, such as a camera app. It grants only what sharing needs:
 
-- circle spaces under any authority, including creating, changing and deleting your own: sharing
-  something, seeing what others shared with you, and reacting or replying;
-- group spaces under any authority, without `manage`: seeing and sharing into groups you're in.
+- records in circle spaces under any authority: sharing something, seeing what others shared with
+  you, and reacting or replying;
+- creating the person's own circle spaces and changing them to add recipients
+  (`manage: ["create", "update"]`), but not deleting them;
+- records in group spaces under any authority: seeing and sharing into groups you're in.
 
 It deliberately leaves out:
 
@@ -197,12 +225,17 @@ It deliberately leaves out:
 - **the public profile and the sharing keys**, because replacing someone's sharing keys would let
   an app read what is shared with them later. Reading other people's keys to encrypt to them needs
   no permission, because they are public;
+- **deleting shares**, which stays in LogDate's own apps;
 - **creating and running groups**, which stay in LogDate's own apps, because a group's owner
   decides who is in it.
+
+`./run lint:lexicons` refuses any version of `app.logdate.authShare` that names the personal space,
+a `repo` permission, the personal-space methods or `manage` on groups.
 
 Neither set includes `rpc` permissions. The personal-space methods below only accept LogDate's own
 access tokens today, and once LogDate moves onto Spaces those calls are covered by the space
 permissions.
+
 
 ### Personal-space methods
 
@@ -316,4 +349,6 @@ Streams form.
 | 2026-10-10 | **Encrypted media keeps its real type separately.** `app.logdate.defs#media` stores the blob, which is ciphertext in private spaces, next to the decrypted file's `mimeType`. |
 | 2026-10-10 | **No floats.** Measurements are integers with the unit in the field name, confidences are in thousandths, and coordinates are decimal strings, matching the AT Protocol data model and the community location schema. |
 | 2026-10-18 | **Space kinds are space declarations.** `app.logdate.space.personal`, `circle` and `group` are AT Protocol space declarations instead of tokens, and the group's description record is `app.logdate.space.groupProfile`. Each declaration lists only `app.logdate.crypto.sealed`, because every record in those spaces is sealed. |
-| 2026-10-18 | **Sharing apps never get the journal or the keys.** `app.logdate.authShare` grants circle and group spaces only. The personal space, the profile, the sharing keys and running groups stay with `app.logdate.authFull`, LogDate's own apps. |
+| 2026-10-18 | **Sharing apps never get the journal or the keys.** `app.logdate.authShare` grants circle and group spaces only. The personal space, the profile, the sharing keys, deleting shares and running groups stay with `app.logdate.authFull`, LogDate's own apps. |
+| 2026-10-18 | **Managing spaces only under your own authority.** Both sets grant `manage` only for the person's own spaces, and `app.logdate.authFull` can only create the personal space, never change or delete it. Records in other people's spaces are reached through separate permissions without `manage`. |
+| 2026-10-18 | **Group profiles and members come from the group's authority.** Apps accept `groupProfile` and `member` records only from the repository of the person who started the group. |

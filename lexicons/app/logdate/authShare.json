@@ -12,11 +12,15 @@
           "type": "permission",
           "resource": "space",
           "spaceType": "app.logdate.space.circle",
-          "authority": "*",
+          "authority": "*"
+        },
+        {
+          "type": "permission",
+          "resource": "space",
+          "spaceType": "app.logdate.space.circle",
           "manage": [
             "create",
-            "update",
-            "delete"
+            "update"
           ]
         },
         {
