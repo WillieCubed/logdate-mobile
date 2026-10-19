@@ -742,6 +742,10 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                         ),
                 )
             } else {
+                // The Studio device testing standard's role matrix (product-standards
+                // docs/device-testing.md): oldest supported and target-SDK phones, foldable,
+                // tablet, desktop, and one phone per API level where LogDate's code branches on
+                // platform behavior (Android 12, 13, and 14).
                 ManagedDeviceProjectConfig(
                     localDevices =
                         listOf(
@@ -753,16 +757,36 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
                             ),
                             ManagedVirtualDeviceConfig(
-                                deviceName = "flagshipPhoneApi36",
+                                deviceName = "phoneApi31",
                                 hardwareProfile = "Pixel 9 Pro",
-                                apiLevel = 36,
+                                apiLevel = 31,
                                 systemImageSource = "google",
+                                pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
                             ),
-                            // Android 17: App Bubbles, the Bubble Bar, and Live Update chips. Used by
-                            // the OS integration captures (./run screenshots:os), not by test groups.
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "phoneApi33",
+                                hardwareProfile = "Pixel 9 Pro",
+                                apiLevel = 33,
+                                systemImageSource = "google",
+                                pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
+                            ),
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "phoneApi34",
+                                hardwareProfile = "Pixel 9 Pro",
+                                apiLevel = 34,
+                                systemImageSource = "google",
+                                pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
+                            ),
+                            // Android 17: also used by the OS integration captures (./run screenshots:os).
                             ManagedVirtualDeviceConfig(
                                 deviceName = "flagshipPhoneApi37",
                                 hardwareProfile = "Pixel 9 Pro",
+                                apiLevel = 37,
+                                systemImageSource = "google",
+                            ),
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "foldableApi37",
+                                hardwareProfile = "Pixel 9 Pro Fold",
                                 apiLevel = 37,
                                 systemImageSource = "google",
                             ),
@@ -773,41 +797,47 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 systemImageSource = "google",
                             ),
                             ManagedVirtualDeviceConfig(
-                                deviceName = "largeScreenTabletApi35",
-                                hardwareProfile = "Pixel Tablet",
-                                apiLevel = 35,
-                                systemImageSource = "google",
+                                deviceName = "desktopApi34",
+                                hardwareProfile = "Medium Desktop",
+                                apiLevel = 34,
+                                systemImageSource = "android-desktop",
+                                pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
                             ),
                         ),
                     groups =
                         listOf(
                             ManagedDeviceGroupConfig(
                                 groupName = "smokeDevices",
-                                targetDeviceNames =
-                                    listOf(
-                                        "flagshipPhoneApi36",
-                                        "largeScreenTabletApi35",
-                                    ),
+                                targetDeviceNames = listOf("flagshipPhoneApi37", "largeScreenTabletApi37"),
                             ),
                             ManagedDeviceGroupConfig(
                                 groupName = "phoneDevices",
-                                targetDeviceNames =
-                                    listOf(
-                                        "oldestSupportedPhoneApi30",
-                                        "flagshipPhoneApi36",
-                                    ),
+                                targetDeviceNames = listOf("oldestSupportedPhoneApi30", "flagshipPhoneApi37"),
                             ),
                             ManagedDeviceGroupConfig(
                                 groupName = "tabletDevices",
-                                targetDeviceNames = listOf("largeScreenTabletApi35"),
+                                targetDeviceNames = listOf("largeScreenTabletApi37"),
                             ),
                             ManagedDeviceGroupConfig(
                                 groupName = "deviceMatrix",
                                 targetDeviceNames =
                                     listOf(
                                         "oldestSupportedPhoneApi30",
-                                        "flagshipPhoneApi36",
-                                        "largeScreenTabletApi35",
+                                        "flagshipPhoneApi37",
+                                        "foldableApi37",
+                                        "largeScreenTabletApi37",
+                                        "desktopApi34",
+                                    ),
+                            ),
+                            ManagedDeviceGroupConfig(
+                                groupName = "apiMatrix",
+                                targetDeviceNames =
+                                    listOf(
+                                        "oldestSupportedPhoneApi30",
+                                        "phoneApi31",
+                                        "phoneApi33",
+                                        "phoneApi34",
+                                        "flagshipPhoneApi37",
                                     ),
                             ),
                         ),

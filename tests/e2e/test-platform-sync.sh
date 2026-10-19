@@ -28,8 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 VERBOSE=false
-PREFLIGHT_ONLY=false
-DEVICE_TASK="largeScreenTabletApi35DebugAndroidTest"
+DEVICE_TASK="largeScreenTabletApi37DebugAndroidTest"
 TEST_CLASS="app.logdate.client.e2e.PlatformSyncJourneyE2ETest"
 SERVER_LOG="$(mktemp -t logdate-platform-sync-server)"
 SERVER_PID=""
@@ -42,7 +41,7 @@ Usage: ./tests/e2e/test-platform-sync.sh [options]
 
 Options:
   --preflight   Only run PlatformSyncPreflightTest (device rig checks)
-  --device NAME Managed device task to run (default: largeScreenTabletApi35DebugAndroidTest)
+  --device NAME Managed device task to run (default: largeScreenTabletApi37DebugAndroidTest)
   --verbose     Show full Gradle output
   --help        Show this help message
 
@@ -53,7 +52,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --preflight) PREFLIGHT_ONLY=true; TEST_CLASS="app.logdate.client.e2e.PlatformSyncPreflightTest"; shift ;;
+        --preflight) TEST_CLASS="app.logdate.client.e2e.PlatformSyncPreflightTest"; shift ;;
         --device) DEVICE_TASK="${2:?--device needs a task name}"; shift 2 ;;
         --verbose) VERBOSE=true; shift ;;
         --help) show_help; exit 0 ;;
@@ -99,9 +98,11 @@ EMULATOR_SERVER="http://10.0.2.2:8765"
 # logdate.backendUrl makes this server the app's own default, so there is no production preset to
 # fall back to.
 info "Building app and test authenticator against $EMULATOR_SERVER"
+BUILD_QUIET=(-q)
+[ "$VERBOSE" = true ] && BUILD_QUIET=()
 ./gradlew :app:android-main:assembleDebug :tools:passkey-test-provider:assembleDebug \
     "-Plogdate.backendUrl=$EMULATOR_SERVER" \
-    --console=plain $([ "$VERBOSE" = true ] || echo "-q")
+    --console=plain ${BUILD_QUIET[@]+"${BUILD_QUIET[@]}"}
 ok "APKs built"
 
 # ---------------------------------------------------------------------------
@@ -109,7 +110,7 @@ ok "APKs built"
 #    than pinning it. A hand-copied fingerprint is exactly what
 #    scripts/android-signer-evidence.sh exists to stop going stale.
 # ---------------------------------------------------------------------------
-APKSIGNER="$(ls "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
+APKSIGNER="$(find "${ANDROID_HOME:-$HOME/Library/Android/sdk}/build-tools" -mindepth 2 -maxdepth 2 -name apksigner 2>/dev/null | sort -V | tail -1)"
 [[ -x "$APKSIGNER" ]] || { fail "apksigner not found; install Android build-tools"; exit 1; }
 
 CERT_HEX="$("$APKSIGNER" verify --print-certs \

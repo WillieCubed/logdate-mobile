@@ -112,18 +112,66 @@ pre-push hook re-runs the tests for affected modules before code leaves your mac
 ./run lint:complexity                                             # Detekt size limits
 ```
 
-Instrumented Android tests run only on Gradle Managed Devices, for example
-`./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest`. Never run
-`connectedDebugAndroidTest`. `./run test` and `./run check` run every test and check in the
-project; they take a long time and a lot of disk, so save them for changes to shared tooling or
+Instrumented Android tests run only on Gradle Managed Devices, described in [Devices](#devices).
+Never run `connectedDebugAndroidTest`. `./run test` and `./run check` run every test and check in
+the project; they take a long time and a lot of disk, so save them for changes to shared tooling or
 configuration. The [testing guides](testing/introduction.md) explain each kind of test.
+
+## Devices
+
+LogDate follows the Studio
+[device testing standard](https://github.com/TheHypertextStudio/product-standards/blob/main/docs/device-testing.md):
+every automated device run uses a Gradle Managed Device declared in the root `build.gradle.kts`.
+Gradle downloads the system image, creates the emulator, runs the tests, and removes it, so every
+machine and CI lane tests the same devices. Never create an emulator by hand.
+
+| Device | Role | Hardware profile | API level |
+| --- | --- | --- | --- |
+| `oldestSupportedPhoneApi30` | Oldest supported phone (`minSdk`) | Pixel 2 | 30 |
+| `phoneApi31` | Behavior boundary: Android 12 | Pixel 9 Pro | 31 |
+| `phoneApi33` | Behavior boundary: Android 13 | Pixel 9 Pro | 33 |
+| `phoneApi34` | Behavior boundary: Android 14 | Pixel 9 Pro | 34 |
+| `flagshipPhoneApi37` | Target phone (`targetSdk`) | Pixel 9 Pro | 37 |
+| `foldableApi37` | Foldable | Pixel 9 Pro Fold | 37 |
+| `largeScreenTabletApi37` | Tablet | Pixel Tablet | 37 |
+| `desktopApi34` | Desktop windowing | Medium Desktop | 34 |
+| `wearSmallRoundApi34` (`:app:wear`) | Watch | Wear OS Small Round | 34 |
+
+The phone behavior-boundary devices exist because LogDate's code branches on Android 12, 13, and
+14 behavior. When a minimum-SDK raise or a code change removes such a branch, remove its device too.
+
+| Group | Devices | Run it when |
+| --- | --- | --- |
+| `smokeDevices` | Target phone, tablet | Any change to Android UI |
+| `deviceMatrix` | Oldest phone, target phone, foldable, tablet, desktop | Before a release, and when adaptive behavior changes |
+| `apiMatrix` | Oldest phone, the three behavior-boundary phones, target phone | When platform-version branches change |
+| `phoneDevices`, `tabletDevices` | Phones only, tablet only | Focused runs |
+| `wearDevices` (`:app:wear`) | Watch | Any change to the Wear app |
+
+```bash
+./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest          # a group
+./gradlew :app:android-main:foldableApi37DebugAndroidTest \
+  -Plogdate.androidTestClass=app.logdate.client.DeepLinkResolverTest    # one device, one class
+./gradlew :app:wear:wearDevicesGroupDebugAndroidTest                    # the watch
+```
+
+Two scenario profiles add their own devices, selected with `-Plogdate.managedDeviceProfile`:
+`tabletOnly` (a single API 35 tablet) and `recoveryAcceptance` (three API 35 tablets for the
+backup and restore journey). Managed-device state is build output; clear it with
+`./gradlew cleanManagedDevices` once no session is running managed-device tests.
+
+**Known blocker:** on this Apple silicon host with emulator 37.2.12, API 36 and 37 16 KB-page images
+(foldable and resizable profiles) stopped booting with hanging CPU threads, while the API 34 desktop
+device boots and passes. Until that is resolved, report results from devices that cannot boot as
+unverified, and never substitute another device.
 
 ## Inspect the first workflow
 
 Passing tests do not show that the app works. After a change, check the first thing a new user
 does:
 
-1. Start an emulator and install the debug build with `ANDROID_SERIAL=<emulator> ./run android`.
+1. Install the debug build on a managed device run, or on an emulator you start from a managed
+   device, with `ANDROID_SERIAL=<emulator serial> ./run android`.
 2. Open LogDate, finishing onboarding if it appears.
 3. Write an entry with text, then add a photo or a voice recording, and save it.
 4. Confirm the entry is on Home, then restart the app and confirm it is still there.

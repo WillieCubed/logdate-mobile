@@ -9,7 +9,7 @@
 #
 # Usage:
 #   scripts/os-surface-screenshots.sh                                  # phone + tablet, every test
-#   scripts/os-surface-screenshots.sh flagshipPhoneApi36               # Android 16 phone only
+#   scripts/os-surface-screenshots.sh flagshipPhoneApi37               # Android 17 phone only
 #   OS_SURFACE_TEST=launcherShortcuts scripts/os-surface-screenshots.sh
 set -euo pipefail
 

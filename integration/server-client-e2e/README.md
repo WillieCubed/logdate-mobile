@@ -51,10 +51,10 @@ or record its response. The harness exits after 30 minutes or when its control d
    For PostgreSQL validation, pass an isolated database's `DATABASE_URL`, `DATABASE_USER`,
    `DATABASE_PASSWORD`, and `AUTO_MIGRATE=true` to that process. Database setup fails closed; it
    cannot silently fall back when a database URL was supplied.
-3. Run `:app:android-main:flagshipPhoneApi36DebugAndroidTest` with
+3. Run `:app:android-main:flagshipPhoneApi37DebugAndroidTest` with
    `-Plogdate.androidTestClass=app.logdate.client.e2e.EncryptedHistoryInstallationsE2ETest` and
    `-Pandroid.testInstrumentationRunnerArguments.historyPhase=source`.
-4. Run `:app:android-main:largeScreenTabletApi35DebugAndroidTest` with the same test class and
+4. Run `:app:android-main:largeScreenTabletApi37DebugAndroidTest` with the same test class and
    `-Pandroid.testInstrumentationRunnerArguments.historyPhase=restore`.
 5. Require both `source.complete` and `restore.complete` files, then create `stop` and wait for the
    harness to exit. Shut down only the isolated database instance created for this run.
