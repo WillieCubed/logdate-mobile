@@ -1,5 +1,6 @@
 package studio.hypertext.atproto.repo
 
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -290,7 +291,7 @@ public class DefaultRepoEngine(
                 commits.filter { commit ->
                     since == null || commit.commit.revision > since.toLong()
                 }
-            val currentBlocks = reachableBlocks(repo, snapshot.tree, commits.lastOrNull())
+            val currentBlocks = reachableBlocks(repo, snapshot.tree, head.commitCid)
             val previousBlockIds =
                 if (since == null) {
                     emptySet()
@@ -298,7 +299,7 @@ public class DefaultRepoEngine(
                     val previousCommit = commits.lastOrNull { commit -> commit.commit.revision == since.toLong() }
                     previousCommit?.let { commit ->
                         val previousTree = MerkleSearchTree.fromBlocks(commit.commit.root) { cid -> blockStore.readBlock(cid).getOrThrow() }
-                        reachableBlocks(repo, previousTree, commit).mapTo(linkedSetOf(), RepoBlock::cid)
+                        reachableBlocks(repo, previousTree, commit.cid).mapTo(linkedSetOf(), RepoBlock::cid)
                     } ?: emptySet()
                 }
             val blocks = linkedMapOf<Cid, RepoBlock>()
@@ -322,25 +323,74 @@ public class DefaultRepoEngine(
 
     override suspend fun import(export: RepoExport): Result<RepoHead> =
         runCatching {
+            // Everything is checked before anything is stored, so a rejected import leaves no trace.
+            val head = export.head
+            require(head.repo == export.repo) { "Head belongs to ${head.repo}, not ${export.repo}" }
+            export.blocks.forEach { block ->
+                require(block.cid.isCidFor(block.bytes)) { "Block ${block.cid} does not hash to its CID" }
+            }
+            val providedBlocks = export.blocks.associateBy(RepoBlock::cid)
+            val headCommit =
+                requireNotNull(export.commits.firstOrNull { it.cid == head.commitCid }) {
+                    "Head commit ${head.commitCid} is not among the exported commits"
+                }
+            require(
+                headCommit.commit.repo == export.repo &&
+                    headCommit.commit.root == head.root &&
+                    headCommit.commit.revision == head.revision,
+            ) { "Head ${head.commitCid} does not match its commit" }
+            val signedCommits =
+                export.commits.associate { commit ->
+                    val block =
+                        requireNotNull(providedBlocks[commit.cid] ?: blockStore.readBlock(commit.cid).getOrThrow()) {
+                            "Commit block ${commit.cid} is missing"
+                        }
+                    val signed = DagCborCodec.decode(block.bytes).jsonObject
+                    require(decodeCommitSignature(signed.getValue(COMMIT_SIGNATURE_FIELD)) == commit.signature) {
+                        "Commit ${commit.cid} lists a signature its block does not carry"
+                    }
+                    commit.cid to signed
+                }
+            // Only the head has to verify against the account's current key: older commits may be
+            // signed by a key the account has since rotated away from. The signature covers the
+            // stored bytes without `sig`, whatever encoding they were written with.
+            val unsignedHead = DagCborCodec.encode(JsonObject(signedCommits.getValue(headCommit.cid) - COMMIT_SIGNATURE_FIELD))
+            require(
+                signer.verify(headCommit.commit, unsignedHead, headCommit.signature),
+            ) { "Invalid commit signature for ${headCommit.cid}" }
             // The specification requires readers to check the tree of untrusted input: keys sorted,
             // each at the depth its hash gives it. Rebuilding the tree from its entries and comparing
             // roots checks both, since only the canonical shape produces the same root.
-            val providedBlocks = export.blocks.associateBy(RepoBlock::cid)
             val importedTree =
-                MerkleSearchTree.fromBlocks(export.head.root) { cid -> providedBlocks[cid] ?: blockStore.readBlock(cid).getOrThrow() }
-            require(importedTree.rootCid() == export.head.root) {
-                "Record tree ${export.head.root} is not in the canonical shape for its entries"
+                MerkleSearchTree.fromBlocks(head.root) { cid -> providedBlocks[cid] ?: blockStore.readBlock(cid).getOrThrow() }
+            require(importedTree.rootCid() == head.root) {
+                "Record tree ${head.root} is not in the canonical shape for its entries"
             }
+
             export.blocks.forEach { block ->
                 blockStore.writeBlock(export.repo, block).getOrThrow()
             }
             export.commits.forEach { commit ->
-                val commitBytes = encodeCommitPayload(commit.commit)
-                require(signer.verify(commit.commit, commitBytes, commit.signature)) { "Invalid commit signature for ${commit.cid}" }
                 blockStore.appendCommit(export.repo, commit).getOrThrow()
             }
-            blockStore.writeHead(export.head).getOrThrow()
-            export.head
+            blockStore.writeHead(head).getOrThrow()
+            head
+        }
+
+    /**
+     * Writes a new commit of [repo]'s current records, signed by the current signer, and returns
+     * the new head; null when the repository has no commits yet.
+     *
+     * The specification requires a repository's newest commit to verify against the signing key in
+     * the account's DID document, so a key rotation has to be followed by a commit signed with the
+     * new key. The records and the tree stay the same; only `rev` and `sig` change.
+     */
+    public suspend fun recommit(repo: AtprotoDid): Result<RepoHead?> =
+        runCatching {
+            retryingOnHeadConflict {
+                val snapshot = loadSnapshot(repo)
+                snapshot.head?.let { head -> persistSnapshot(repo, snapshot.tree, head, snapshot.tree) }
+            }
         }
 
     private suspend fun loadSnapshot(repo: AtprotoDid): RepoSnapshot {
@@ -381,7 +431,7 @@ public class DefaultRepoEngine(
                 repo = repo,
                 root = rootCid,
                 prev = previousHead?.commitCid,
-                revision = nextRevision(previousHead?.revision),
+                revision = nextRevision(repo, previousHead?.revision),
                 createdAtEpochMillis = clock.now().toEpochMilliseconds(),
                 recordCount = tree.entries().size,
             )
@@ -390,14 +440,6 @@ public class DefaultRepoEngine(
         val signedCommitBytes = encodeSignedCommitPayload(commit, signature)
         val commitCid = Cid.sha256(DAG_CBOR_CODEC, signedCommitBytes)
         blockStore.writeBlock(repo, RepoBlock(commitCid, signedCommitBytes)).getOrThrow()
-
-        val signedCommit =
-            SignedRepoCommit(
-                cid = commitCid,
-                commit = commit,
-                signature = signature,
-            )
-        blockStore.appendCommit(repo, signedCommit).getOrThrow()
 
         val head =
             RepoHead(
@@ -410,6 +452,10 @@ public class DefaultRepoEngine(
         if (!swapped) {
             throw RepoHeadConflictException(repo = repo, expectedRevision = previousHead?.revision)
         }
+        // Recorded only after the head moved, so the history never lists a commit that lost the
+        // race for the head. Exports read the head's commit block directly, so a failure here
+        // leaves the repository readable and exportable.
+        blockStore.appendCommit(repo, SignedRepoCommit(cid = commitCid, commit = commit, signature = signature)).getOrThrow()
         return head
     }
 
@@ -420,10 +466,21 @@ public class DefaultRepoEngine(
      * microsecond, the clock steps backwards, or the repository still carries the small counter
      * revisions it was written with before revisions were TIDs.
      */
-    private fun nextRevision(previous: Long?): Long {
+    private fun nextRevision(
+        repo: AtprotoDid,
+        previous: Long?,
+    ): Long {
         val clockRevision = Tid.fromInstant(clock.now()).toLong()
-        if (previous == null) return clockRevision
-        return maxOf(clockRevision, previous + 1)
+        if (previous == null || clockRevision > previous) return clockRevision
+        val revision = previous + 1
+        val aheadMicros = Tid.fromLong(revision).timestampMicros - Tid.fromLong(clockRevision).timestampMicros
+        if (aheadMicros > CLOCK_SKEW_WARNING_MICROS) {
+            Napier.w(
+                "Repo $repo: the previous commit's revision is ${aheadMicros / MICROS_PER_SECOND}s ahead of this clock; " +
+                    "continuing from it. Check this machine's clock, or the clock of whichever wrote that commit.",
+            )
+        }
+        return revision
     }
 
     private data class RepoSnapshot(
@@ -434,13 +491,11 @@ public class DefaultRepoEngine(
     private suspend fun reachableBlocks(
         repo: AtprotoDid,
         tree: MerkleSearchTree,
-        headCommit: SignedRepoCommit?,
+        commitCid: Cid,
     ): List<RepoBlock> {
         val blocks = linkedMapOf<Cid, RepoBlock>()
-        headCommit?.let { commit ->
-            val commitBlock = requireNotNull(blockStore.readBlock(commit.cid).getOrThrow()) { "Missing commit block ${commit.cid}" }
-            blocks[commitBlock.cid] = commitBlock
-        }
+        val commitBlock = requireNotNull(blockStore.readBlock(commitCid).getOrThrow()) { "Missing commit block $commitCid" }
+        blocks[commitBlock.cid] = commitBlock
         val graph = tree.toBlockGraph()
         graph.blocks.forEach { block ->
             blocks[block.cid] = block
@@ -454,6 +509,10 @@ public class DefaultRepoEngine(
 
     private companion object {
         private const val MAX_PAGE_SIZE: Int = 100
+        private const val MICROS_PER_SECOND: Long = 1_000_000L
+
+        /** Ordinary clock drift between servers stays well under this. */
+        private const val CLOCK_SKEW_WARNING_MICROS: Long = 5 * MICROS_PER_SECOND
 
         /**
          * Enough to ride out contention between the handful of writers one account can have in

@@ -62,6 +62,18 @@ public value class Cid(
     public fun toBytes(): ByteArray = decodeBase32(value.removePrefix(MULTIBASE_BASE32_PREFIX.toString()))
 }
 
+/**
+ * True when this CID is the SHA-256 CID of [bytes] under its own codec. Only the codecs a
+ * repository uses (DAG-CBOR and raw) are recognised; any other CID is reported as not matching.
+ */
+internal fun Cid.isCidFor(bytes: ByteArray): Boolean {
+    val raw = toBytes()
+    if (raw.size < 2) return false
+    val codec = raw[1].toInt() and 0xff
+    if (codec != DAG_CBOR_CODEC && codec != RAW_CODEC) return false
+    return Cid.sha256(codec, bytes) == this
+}
+
 internal fun encodeVarint(value: Int): ByteArray {
     var remaining = value
     val bytes = mutableListOf<Byte>()
