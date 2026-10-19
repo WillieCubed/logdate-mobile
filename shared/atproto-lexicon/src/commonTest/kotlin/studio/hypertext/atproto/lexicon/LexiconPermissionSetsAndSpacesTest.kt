@@ -187,7 +187,7 @@ class LexiconPermissionSetsAndSpacesTest {
 
         assertEquals(
             listOf(
-                "com.example.authFull#main.permissions[0]: A repo permission needs at least one collection",
+                "com.example.authFull#main.permissions[0]: collection can't be an empty list",
                 "com.example.authFull#main.permissions[0]: action 'read' isn't one of create, update, delete",
                 "com.example.authFull#main.permissions[0]: action create is listed twice",
                 "com.example.authFull#main.permissions[1]: An rpc permission needs aud: *, or inheritAud: true",
@@ -199,6 +199,60 @@ class LexiconPermissionSetsAndSpacesTest {
                 "com.example.authFull#main.permissions[4]: collection 'nope' isn't * or a valid NSID",
                 "com.example.authFull#main.permissions[4]: action 'write' isn't one of read_self, read, create, update, delete",
                 "com.example.authFull#main.permissions[4]: manage 'read' isn't one of create, update, delete",
+            ),
+            issues(set),
+        )
+    }
+
+    @Test
+    fun `parameters a resource doesn't take are refused since servers would drop the entry`() {
+        val set =
+            permissionSet(
+                """{ "type": "permission", "resource": "repo", "collections": ["com.example.journal.profile"] }""",
+                """{ "type": "permission", "resource": "rpc", "lxm": ["com.example.a.b"], "inheritAud": true, "audience": "*" }""",
+                """{ "type": "permission", "resource": "space", "spaceType": "com.example.journal", "actions": ["read"], "skey": "*" }""",
+            )
+
+        assertEquals(
+            listOf(
+                "com.example.authFull#main.permissions[0]: 'collections' isn't a parameter of repo permissions",
+                "com.example.authFull#main.permissions[0]: A repo permission needs at least one collection",
+                "com.example.authFull#main.permissions[1]: 'audience' isn't a parameter of rpc permissions",
+                "com.example.authFull#main.permissions[2]: 'actions' isn't a parameter of space permissions",
+            ),
+            issues(set),
+        )
+    }
+
+    @Test
+    fun `lists and single values must have the right shape`() {
+        val set =
+            permissionSet(
+                """{ "type": "permission", "resource": "repo", "collection": "com.example.journal.profile", "action": [] }""",
+                """{ "type": "permission", "resource": "rpc", "lxm": ["com.example.a.b", 3], "aud": ["*"] }""",
+                """{ "type": "permission", "resource": "rpc", "lxm": ["com.example.a.b"], "inheritAud": "true" }""",
+                """
+                {
+                  "type": "permission", "resource": "space", "spaceType": ["com.example.journal"],
+                  "authority": ["*"], "skey": 7, "collection": "*", "action": "read", "manage": []
+                }
+                """.trimIndent(),
+            )
+
+        assertEquals(
+            listOf(
+                "com.example.authFull#main.permissions[0]: collection must be a list, even for one value",
+                "com.example.authFull#main.permissions[0]: action can't be an empty list",
+                "com.example.authFull#main.permissions[1]: lxm must list only strings",
+                "com.example.authFull#main.permissions[1]: aud must be a single value, not a list",
+                "com.example.authFull#main.permissions[2]: inheritAud must be true or false",
+                "com.example.authFull#main.permissions[2]: An rpc permission needs aud: *, or inheritAud: true",
+                "com.example.authFull#main.permissions[3]: spaceType must be a single value, not a list",
+                "com.example.authFull#main.permissions[3]: authority must be a single value, not a list",
+                "com.example.authFull#main.permissions[3]: skey must be a string",
+                "com.example.authFull#main.permissions[3]: collection must be a list, even for one value",
+                "com.example.authFull#main.permissions[3]: action must be a list, even for one value",
+                "com.example.authFull#main.permissions[3]: manage can't be an empty list",
             ),
             issues(set),
         )
