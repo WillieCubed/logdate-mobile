@@ -432,4 +432,15 @@ internal class RepoBackedLogDateCollectionsRepository(
 }
 
 /** The repository DID sync uses for an account that has no DID of its own. */
-internal fun syntheticRepoDid(userId: UUID): String = "did:web:sync-${userId.toString().replace("-", "")}.logdate.internal"
+internal fun syntheticRepoDid(userId: UUID): String =
+    "$SYNTHETIC_REPO_DID_PREFIX${userId.toString().replace("-", "")}$SYNTHETIC_REPO_DID_SUFFIX"
+
+/**
+ * True for a [syntheticRepoDid]. Those repositories are private sync storage: the `.internal`
+ * domain never resolves, so no DID document points at them and relays can never read them.
+ */
+internal fun isSyntheticRepoDid(did: AtprotoDid): Boolean =
+    did.toString().let { it.startsWith(SYNTHETIC_REPO_DID_PREFIX) && it.endsWith(SYNTHETIC_REPO_DID_SUFFIX) }
+
+private const val SYNTHETIC_REPO_DID_PREFIX = "did:web:sync-"
+private const val SYNTHETIC_REPO_DID_SUFFIX = ".logdate.internal"
