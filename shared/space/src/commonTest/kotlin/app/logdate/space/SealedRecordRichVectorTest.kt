@@ -140,7 +140,7 @@ class SealedRecordRichVectorTest {
     }
 
     @Test
-    fun `sealing with a fixed nonce produces the known envelope, which opens to the payload`() =
+    fun `sealing with a fixed nonce produces the known envelope that opens to the payload`() =
         runTest {
             val keys = SealingKeys.personal(identityKey)
             val write = SealedRecordCodec.sealWithNonce(keys, space, author, payload, nonce)
