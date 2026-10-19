@@ -125,7 +125,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     spaceMaxBlobBytes: Long = MAX_SPACE_BLOB_BYTES,
     oauthPasskeySignInEnabled: Boolean = false,
 ): AuthV1TestEnvironment {
-    val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
+    val googleVerifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
+    val verifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled)
     val newAccountStorageMode = ServerDescriptorConfig(personalSpaceEnabled = personalSpaceEnabled).newAccountStorageMode
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
     val atprotoPasswordService = AtprotoPasswordService(InMemoryAtprotoPasswordCredentialRepository())
@@ -264,7 +265,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 enabled = personalSpaceEnabled,
                 store = spaceStore,
                 blobStorage = blobStorage,
-                auth = LogDateAccountAuth(tokenService, accountRepository, atprotoIdentityService),
+                auth = LogDateAccountAuth(verifier, accountRepository, atprotoIdentityService),
                 maxBlobBytes = spaceMaxBlobBytes,
             )
             route("/api/v1") {
@@ -277,12 +278,11 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     atprotoIdentityService = atprotoIdentityService,
                     tokenService = tokenService,
                     refreshTokenRevocationRepository = refreshTokenRevocationRepository,
-                    googleIdTokenVerifier = verifier,
+                    googleIdTokenVerifier = googleVerifier,
                     metrics = metrics,
                     entitlementService = entitlementService,
                     emailVerificationService = emailVerificationService,
                     deviceLinkService = deviceLinkService,
-                    accessTokenVerifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
                     oauthGrantRevoker = oauthAuthorizationService,
                     accountDeletionService =
                         AccountDeletionService(
@@ -292,6 +292,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                             blobStorage = blobStorage,
                             oauthGrantRevoker = oauthAuthorizationService,
                         ),
+                    accessTokenVerifier = verifier,
                     newAccountStorageMode = newAccountStorageMode,
                 )
                 identityApiRoutes(

@@ -278,7 +278,18 @@ class LinkedDeviceRouteScopeTest {
                 "DELETE /api/v1/auth/devices/self",
             )
 
-        val LINKED_DEVICE_ROUTES = SYNC_DATA_ROUTES + ACCOUNT_DEVICE_ROUTES
+        /** The account's own personal space: a linked watch is one of the owner's own devices. */
+        val PERSONAL_SPACE_ROUTES =
+            setOf(
+                "POST /xrpc/app.logdate.space.putRecord",
+                "POST /xrpc/app.logdate.space.deleteRecord",
+                "GET /xrpc/app.logdate.space.getRecord",
+                "GET /xrpc/app.logdate.space.listRepoOps",
+                "POST /xrpc/app.logdate.space.uploadBlob",
+                "GET /xrpc/app.logdate.space.getBlob",
+            )
+
+        val LINKED_DEVICE_ROUTES = SYNC_DATA_ROUTES + ACCOUNT_DEVICE_ROUTES + PERSONAL_SPACE_ROUTES
 
         /** Routes missing from the OpenAPI document that never read an access token. */
         val HIDDEN_PUBLIC_ROUTES =

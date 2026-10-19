@@ -126,10 +126,10 @@ internal fun Application.atprotoRoutes() {
     personalSpaceRoutes()
 }
 
-/** `app.logdate.space.*` XRPC for the owner's own LogDate devices, answering 501 until the server flag is on. */
+/** `app.logdate.space.*` XRPC for the owner's own LogDate devices and linked watches, answering 501 until the server flag is on. */
 private fun Application.personalSpaceRoutes() {
     val accountRepository by inject<AccountRepository>()
-    val tokenService by inject<TokenService>()
+    val accessTokenVerifier by inject<AccessTokenVerifier>()
     val atprotoIdentityService by inject<AtprotoIdentityService>()
     val descriptorConfig by inject<ServerDescriptorConfig>()
     val spaceStore by inject<SpaceStore>()
@@ -140,7 +140,7 @@ private fun Application.personalSpaceRoutes() {
             enabled = descriptorConfig.personalSpaceEnabled,
             store = spaceStore,
             blobStorage = blobStorage,
-            auth = LogDateAccountAuth(tokenService, accountRepository, atprotoIdentityService),
+            auth = LogDateAccountAuth(accessTokenVerifier, accountRepository, atprotoIdentityService),
         )
     }
 }

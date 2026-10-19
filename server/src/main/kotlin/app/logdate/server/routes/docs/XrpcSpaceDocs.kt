@@ -41,8 +41,9 @@ internal object XrpcSpaceDocs {
 
     private const val OWNER_ONLY =
         "Only the space's owner can use it, from their own LogDate devices: send the LogDate access token from " +
-            "**Authentication** as `Authorization: Bearer`. Any other space, including another account's, answers " +
-            "exactly as a missing record does, so nobody learns whether it exists."
+            "**Authentication** as `Authorization: Bearer`. A watch linked to the account sends its own linked device " +
+            "token the same way while its device session is active. Any other space, including another account's, " +
+            "answers exactly as a missing record does, so nobody learns whether it exists."
 
     private val recordNotFound =
         ErrorCase(
@@ -60,10 +61,18 @@ internal object XrpcSpaceDocs {
         ErrorCase(
             "AuthRequired",
             "No LogDate access token was sent, it is invalid or expired, or its account is deactivated. OAuth DPoP " +
-                "tokens, AT Protocol session tokens and linked device tokens are refused the same way: personal spaces " +
-                "are only for the owner's own LogDate devices. Refresh the access token and retry once; if that also " +
-                "fails, sign in again. A deactivated account is refused until it is reactivated.",
+                "tokens and AT Protocol session tokens are refused the same way: personal spaces are only for the " +
+                "owner's own LogDate devices. Refresh the access token and retry once; if that also fails, sign in " +
+                "again. A deactivated account is refused until it is reactivated.",
             "A LogDate access token is required",
+        )
+    private val deviceSessionRevoked =
+        ErrorCase(
+            "DEVICE_SESSION_REVOKED",
+            "The token belongs to a linked watch whose device session was removed or has expired. Link the watch " +
+                "from its phone again. A removal takes effect at once on the server that handled it and within 30 " +
+                "seconds on every other server, as on the sync routes.",
+            "This device was removed from the account",
         )
     private val invalidSpace = ErrorCase("InvalidRequest", "`space` is missing or isn't a space URI.", "space must be a space URI")
     private val invalidRecord =
@@ -122,7 +131,7 @@ internal object XrpcSpaceDocs {
                 invalidRecord,
                 recordNotFound,
             )
-            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
             pdsError(HttpStatusCode.Conflict, swapConflict)
             pdsError(
                 HttpStatusCode.PayloadTooLarge,
@@ -161,7 +170,7 @@ internal object XrpcSpaceDocs {
                 ),
                 recordNotFound,
             )
-            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
             pdsError(HttpStatusCode.Conflict, swapConflict)
             pdsError(
                 HttpStatusCode.PayloadTooLarge,
@@ -200,7 +209,7 @@ internal object XrpcSpaceDocs {
                 ),
                 recordNotFound,
             )
-            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
@@ -261,7 +270,7 @@ internal object XrpcSpaceDocs {
                     "Deletions after this cursor were purged; list again from 0",
                 ),
             )
-            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
@@ -295,7 +304,7 @@ internal object XrpcSpaceDocs {
                 ),
             )
             pdsError(HttpStatusCode.BadRequest, invalidSpace, blobNotFound)
-            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
             pdsError(
                 HttpStatusCode.PayloadTooLarge,
                 ErrorCase("BlobTooLarge", "The file is larger than 100 MiB.", "Blobs can be at most 104857600 bytes"),
@@ -337,7 +346,7 @@ internal object XrpcSpaceDocs {
                 ),
                 blobNotFound,
             )
-            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
+            pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired, deviceSessionRevoked)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
