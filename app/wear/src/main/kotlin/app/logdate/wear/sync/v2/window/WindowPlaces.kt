@@ -10,12 +10,15 @@ class WindowPlaces(
 ) {
     suspend fun ensure(note: JournalNote) {
         val place = note.location?.place ?: return
+        val name = place.name ?: return
+        val latitude = place.latitude ?: return
+        val longitude = place.longitude ?: return
         places.insertIfAbsent(
             PlaceEntity(
                 id = place.id,
-                name = place.name,
-                latitude = place.latitude,
-                longitude = place.longitude,
+                name = name,
+                latitude = latitude,
+                longitude = longitude,
                 created = note.creationTimestamp,
                 lastUpdated = note.lastUpdated,
             ),
