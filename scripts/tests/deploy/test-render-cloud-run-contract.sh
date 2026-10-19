@@ -1218,6 +1218,25 @@ jq '.env_vars.LOGDATE_PERSONAL_SPACE_ENABLED = "1"' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-personal-space.json"
 expect_failure invalid-personal-space staging "$RELEASE_SHA" invalid-personal-space.json \
     "LOGDATE_PERSONAL_SPACE_ENABLED must be true or false"
+# Identity publishing is a production-only opt-in, preserved verbatim.
+for enabled in true false; do
+    jq --arg enabled "$enabled" '.env_vars.ATPROTO_PLC_PUBLISH_ENABLED = $enabled' \
+        "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/plc-publishing-$enabled.json"
+    output="$TMP_DIR/plc-publishing-$enabled.out.json"
+    if ! run_renderer production "$RELEASE_SHA" "plc-publishing-$enabled.json" "$output" "$LOG_DIR/plc-publishing-$enabled.err"; then
+        cat "$LOG_DIR/plc-publishing-$enabled.err" >&2
+        fail "identity publishing opt-in could not be rendered"
+    fi
+    assert_equals "$enabled" "$(jq -r '.env_vars.ATPROTO_PLC_PUBLISH_ENABLED' "$output")"
+done
+jq '.env_vars.ATPROTO_PLC_PUBLISH_ENABLED = "yes"' \
+    "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/invalid-plc-publishing.json"
+expect_failure invalid-plc-publishing production "$RELEASE_SHA" invalid-plc-publishing.json \
+    "ATPROTO_PLC_PUBLISH_ENABLED must be true or false"
+jq '.env_vars.ATPROTO_PLC_PUBLISH_ENABLED = "true"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/staging-plc-publishing.json"
+expect_failure staging-plc-publishing staging "$RELEASE_SHA" staging-plc-publishing.json \
+    "only production may publish identities to the PLC directory"
 
 jq '.env_vars.UNEXPECTED_ENV = "value"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-env.json"
 expect_failure unexpected-env staging "$RELEASE_SHA" unexpected-env.json "environment contract contains unexpected keys"
