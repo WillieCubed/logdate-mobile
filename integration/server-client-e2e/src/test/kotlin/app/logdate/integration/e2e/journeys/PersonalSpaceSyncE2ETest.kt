@@ -2,320 +2,278 @@
 
 package app.logdate.integration.e2e.journeys
 
-import androidx.room.Room
-import app.logdate.client.data.journals.OfflineFirstJournalRepository
-import app.logdate.client.database.LogDateDatabase
-import app.logdate.client.database.getRoomDatabase
-import app.logdate.client.datastore.OriginBoundSession
-import app.logdate.client.datastore.SessionStorage
-import app.logdate.client.datastore.UserSession
-import app.logdate.client.device.identity.CanonicalOwnerProvider
-import app.logdate.client.repository.journals.JournalMergeScope
-import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.repository.journals.SyncableJournalRepository
-import app.logdate.client.sync.DefaultSyncManager
-import app.logdate.client.sync.RoomSyncTransactionManager
-import app.logdate.client.sync.cloud.CloudContentDataSource
-import app.logdate.client.sync.cloud.CloudRequestLocation
-import app.logdate.client.sync.cloud.CloudRequestLocationProvider
-import app.logdate.client.sync.cloud.ContentSyncResult
-import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
-import app.logdate.client.sync.conflict.ConflictResolver
-import app.logdate.client.sync.conflict.LastWriteWinsResolver
-import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
+import app.logdate.client.media.MediaPayload
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.transcription.TranscriptDocument
+import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.metadata.EntityType
-import app.logdate.client.sync.metadata.SyncRetryScheduleStore
-import app.logdate.client.sync.recovery.DownloadInbox
-import app.logdate.client.sync.recovery.DownloadScope
-import app.logdate.client.sync.recovery.DurableCloudApiClient
-import app.logdate.client.sync.space.RoomSpaceSwapStore
-import app.logdate.client.sync.space.SpaceKind
-import app.logdate.client.sync.space.SpaceLocalRecords
-import app.logdate.client.sync.space.SpaceRecordMapper
-import app.logdate.client.sync.space.SpaceRecordRegistry
-import app.logdate.client.sync.space.SpaceSyncDependencies
-import app.logdate.client.sync.space.SpaceTransportGate
-import app.logdate.client.sync.space.XrpcSpaceDataHomes
-import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
 import app.logdate.integration.e2e.harness.withServerClientHarness
-import app.logdate.shared.config.DefaultLogDateConfigRepository
-import app.logdate.shared.model.AccountStorageMode
-import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.server.space.SpaceStore
 import app.logdate.shared.model.Journal
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.random.Random
+import org.koin.core.context.GlobalContext
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 /**
- * Two devices of one account sync journals through its sealed personal space on a real server,
- * with real Room databases and the real sync engine. The journal mapping is a minimal one written
- * for this test; the real per-kind mappings are their own work.
+ * Devices of one account sync through its sealed personal space on a real server, with real Room
+ * databases and the real sync engine. The journal and note mappings are minimal ones written for
+ * these tests; the real per-kind mappings are their own work.
  */
 class PersonalSpaceSyncE2ETest {
     @Test
     fun `journals created, edited, raced and deleted on one device reach the other through the personal space`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val journal = Journal(title = "Lake trips", description = "Every swim this summer")
+            phone.journals.create(journal)
+            val uploaded = phone.manager.uploadPendingChanges()
+            assertSynced(uploaded)
+
+            val stored = rawChanges(account)
+            assertFalse("Lake trips" in stored, "The server received the journal's title")
+            assertFalse(JOURNAL in stored, "The server received the record's type")
+
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertEquals("Lake trips", tablet.journals.getJournalById(journal.id)?.title)
+            assertEquals("Every swim this summer", tablet.journals.getJournalById(journal.id)?.description)
+
+            tablet.journals.update(
+                tablet.journals.getJournalById(journal.id)!!.copy(title = "Lake and river trips", lastUpdated = later(1)),
+            )
+            assertSynced(tablet.manager.uploadPendingChanges())
+            assertSynced(phone.manager.downloadRemoteChanges())
+            assertEquals("Lake and river trips", phone.journals.getJournalById(journal.id)?.title)
+
+            // Both rename it before either downloads the other's change. The journal's resolver
+            // won't pick between two titles, so the conflict is listed and the space keeps the first.
+            tablet.journals.update(tablet.journals.getJournalById(journal.id)!!.copy(title = "Tablet's name", lastUpdated = later(2)))
+            assertSynced(tablet.manager.uploadPendingChanges())
+            phone.journals.update(phone.journals.getJournalById(journal.id)!!.copy(title = "Phone's name", lastUpdated = later(3)))
+            val raced = phone.manager.uploadPendingChanges()
+            assertEquals(SyncErrorType.CONFLICT_ERROR, raced.errors.single().type)
+            assertEquals(
+                journal.id.toString(),
+                phone.conflicts.records
+                    .single()
+                    .entityId,
+            )
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertEquals("Tablet's name", tablet.journals.getJournalById(journal.id)?.title)
+            // The phone's next download brings the version the space kept.
+            assertSynced(phone.manager.downloadRemoteChanges())
+            assertEquals("Tablet's name", phone.journals.getJournalById(journal.id)?.title)
+
+            phone.journals.delete(journal.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertNull(tablet.journals.getJournalById(journal.id))
+            assertEquals(0, tablet.inbox.count())
+            assertTrue(phone.metadata.getPendingUploads(EntityType.JOURNAL).isEmpty())
+        }
+
+    @Test
+    fun `a recording, its transcript and its file reach another device, change there and are deleted`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val sound = ByteArray(700_000) { (it % 211).toByte() }
+            val local = phone.media.saveMedia(MediaPayload("memo.m4a", "audio/mp4", sound.size.toLong(), sound))
+            val note =
+                JournalNote.Audio(
+                    mediaRef = local,
+                    durationMs = 4_000,
+                    creationTimestamp = later(0),
+                    lastUpdated = later(0),
+                    transcript = TranscriptDocument.fromPlainText("Swam to the far buoy"),
+                )
+            phone.notes.create(note)
+
+            val uploaded = phone.manager.uploadPendingChanges()
+            assertSynced(uploaded)
+            assertFalse("Swam" in rawChanges(account), "The server received the transcript's text")
+            val downloaded = tablet.manager.downloadRemoteChanges()
+            assertSynced(downloaded)
+
+            val applied = assertIs<JournalNote.Audio>(tablet.notes.getNoteById(note.uid))
+            assertEquals("Swam to the far buoy", applied.transcript?.plainText)
+            assertFalse(applied.mediaRef.startsWith("https://"), "The recording was recovered into the media store")
+            assertContentEquals(sound, tablet.media.readMedia(applied.mediaRef).data)
+            assertEquals(0, tablet.inbox.count())
+
+            val edited =
+                (
+                    phone.notes.getNoteById(
+                        note.uid,
+                    ) as JournalNote.Audio
+                ).copy(transcript = TranscriptDocument.fromPlainText("Swam past the far buoy"), lastUpdated = later(1))
+            phone.notes.deleteFromSync(note.uid)
+            phone.notes.createFromSync(edited)
+            phone.metadata.enqueuePending(note.uid.toString(), EntityType.NOTE, app.logdate.client.sync.metadata.PendingOperation.UPDATE)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertEquals("Swam past the far buoy", (tablet.notes.getNoteById(note.uid) as JournalNote.Audio).transcript?.plainText)
+
+            phone.notes.removeById(note.uid)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertNull(tablet.notes.getNoteById(note.uid))
+            assertEquals(0, tablet.inbox.count())
+        }
+
+    @Test
+    fun `a rate limit holds every request until its Retry-After`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            phone.journals.create(Journal(title = "Lake trips"))
+            assertSynced(phone.manager.uploadPendingChanges())
+            tablet.refuseWithRetryAfter = 120
+
+            val refused = tablet.manager.downloadRemoteChanges()
+            val requests = tablet.spaceRequests
+            tablet.journals.create(Journal(title = "River trips"))
+            tablet.manager.uploadPendingChanges()
+            tablet.manager.downloadRemoteChanges()
+
+            assertFalse(refused.success)
+            assertEquals(1, requests, "Only the refused request was sent")
+            assertEquals(requests, tablet.spaceRequests, "Nothing was sent while the limit applied")
+            assertEquals(1, tablet.metadata.getPendingUploads(EntityType.JOURNAL).size)
+        }
+
+    @Test
+    fun `a device behind purged deletions lists everything again and removes what was deleted`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val kept = Journal(title = "Kept")
+            val removed = Journal(title = "Removed")
+            phone.journals.create(kept)
+            phone.journals.create(removed)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertNotNull(tablet.journals.getJournalById(removed.id))
+
+            phone.journals.delete(removed.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            purgeDeletions()
+            phone.journals.update(phone.journals.getJournalById(kept.id)!!.copy(title = "Kept and renamed", lastUpdated = later(1)))
+            assertSynced(phone.manager.uploadPendingChanges())
+            val result = tablet.manager.downloadRemoteChanges()
+
+            assertTrue(result.success, result.errors.joinToString { it.cause?.stackTraceToString() ?: it.toString() })
+            assertNull(tablet.journals.getJournalById(removed.id))
+            assertEquals("Kept and renamed", tablet.journals.getJournalById(kept.id)?.title)
+            assertEquals(0, tablet.inbox.count())
+        }
+
+    @Test
+    fun `a journal deleted while another device couldn't read it never comes back there`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account).apply { identityKey = ByteArray(32) { 3 } }
+            val journal = Journal(title = "Deleted later")
+            phone.journals.create(journal)
+            assertSynced(phone.manager.uploadPendingChanges())
+            tablet.manager.downloadRemoteChanges()
+            assertNull(tablet.journals.getJournalById(journal.id))
+
+            phone.journals.delete(journal.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            tablet.manager.downloadRemoteChanges()
+            tablet.identityKey = IDENTITY_KEY
+            tablet.inbox.release()
+            tablet.manager.downloadRemoteChanges()
+
+            assertNull(tablet.journals.getJournalById(journal.id))
+            assertEquals(0, tablet.inbox.count())
+        }
+
+    @Test
+    fun `a journal deleted while another device waited to apply it is never applied there`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val journal = Journal(title = "Deleted later")
+            phone.journals.create(journal)
+            assertSynced(phone.manager.uploadPendingChanges())
+            tablet.journals.failApplying = true
+            assertFalse(tablet.manager.downloadRemoteChanges().success)
+            assertEquals(1, tablet.inbox.count(), "The journal waits to be applied")
+
+            phone.journals.delete(journal.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            tablet.journals.failApplying = false
+            tablet.inbox.release()
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            tablet.inbox.release()
+            tablet.manager.downloadRemoteChanges()
+
+            assertNull(tablet.journals.getJournalById(journal.id))
+            assertEquals(0, tablet.inbox.count())
+        }
+
+    private fun assertSynced(result: app.logdate.client.sync.SyncResult) =
+        assertTrue(
+            result.success,
+            result.errors.joinToString {
+                it.cause?.stackTraceToString()
+                    ?: it.toString()
+            },
+        )
+
+    private class SpaceScenario(
+        val harness: ServerClientE2EHarness,
+        val scope: kotlinx.coroutines.CoroutineScope,
+    ) {
+        val devices = mutableListOf<SpaceDevice>()
+
+        fun device(account: SpaceAccount) = SpaceDevice(account, scope).also { devices += it }
+
+        suspend fun rawChanges(account: SpaceAccount): String =
+            harness.httpClient
+                .get("${account.origin}/xrpc/app.logdate.space.listRepoOps") {
+                    parameter("space", "at://${account.did}/space/app.logdate.space.personal/self")
+                    parameter("since", "0")
+                    header(HttpHeaders.Authorization, "Bearer ${account.token}")
+                }.bodyAsText()
+
+        /** Runs the server's cleanup as if every deletion so far were old enough to purge. */
+        suspend fun purgeDeletions() {
+            GlobalContext.get().get<SpaceStore>().purge(Clock.System.now() + 1.minutes, Instant.fromEpochMilliseconds(0)) {}
+        }
+    }
+
+    private fun spaceTest(block: suspend SpaceScenario.(SpaceAccount) -> Unit) =
         runTest {
             withServerClientHarness {
-                val account = signUp()
-                val phone = Device(this, account, backgroundScope)
-                val tablet = Device(this, account, backgroundScope)
+                val scenario = SpaceScenario(this, backgroundScope)
                 try {
-                    val journal = Journal(title = "Lake trips", description = "Every swim this summer")
-                    phone.journals.create(journal)
-                    val uploaded = phone.manager.uploadPendingChanges()
-                    assertTrue(uploaded.success, uploaded.errors.joinToString { it.cause?.stackTraceToString().orEmpty() })
-
-                    val stored = rawChanges(account)
-                    assertFalse("Lake trips" in stored, "The server received the journal's title")
-                    assertFalse(JOURNAL in stored, "The server received the record's type")
-
-                    val firstDownload = tablet.manager.downloadRemoteChanges()
-                    assertTrue(firstDownload.success, firstDownload.errors.toString())
-                    assertEquals("Lake trips", tablet.journals.getJournalById(journal.id)?.title)
-                    assertEquals("Every swim this summer", tablet.journals.getJournalById(journal.id)?.description)
-
-                    val renamed = tablet.journals.getJournalById(journal.id)!!.copy(title = "Lake and river trips", lastUpdated = later(1))
-                    tablet.journals.update(renamed)
-                    assertTrue(tablet.manager.uploadPendingChanges().success)
-                    assertTrue(phone.manager.downloadRemoteChanges().success)
-                    assertEquals("Lake and river trips", phone.journals.getJournalById(journal.id)?.title)
-
-                    // Both edit before either downloads the other's change: the newer edit wins on both.
-                    tablet.journals.update(
-                        tablet.journals.getJournalById(journal.id)!!.copy(title = "Tablet's name", lastUpdated = later(2)),
-                    )
-                    assertTrue(tablet.manager.uploadPendingChanges().success)
-                    phone.journals.update(phone.journals.getJournalById(journal.id)!!.copy(title = "Phone's name", lastUpdated = later(3)))
-                    val raced = phone.manager.uploadPendingChanges()
-                    assertTrue(raced.success, raced.errors.toString())
-                    assertTrue(tablet.manager.downloadRemoteChanges().success)
-                    assertEquals("Phone's name", tablet.journals.getJournalById(journal.id)?.title)
-
-                    phone.journals.delete(journal.id)
-                    assertTrue(phone.manager.uploadPendingChanges().success)
-                    assertTrue(tablet.manager.downloadRemoteChanges().success)
-                    assertNull(tablet.journals.getJournalById(journal.id))
-                    assertEquals(0, tablet.inbox.count())
-                    assertTrue(phone.metadata.getPendingUploads(EntityType.JOURNAL).isEmpty())
+                    scenario.block(signUpForSpace())
                 } finally {
-                    phone.close()
-                    tablet.close()
+                    scenario.devices.forEach { it.close() }
                 }
             }
         }
 
-    private class Account(
-        val owner: String,
-        val did: String,
-        val token: String,
-        val refreshToken: String,
-        val origin: String,
-        val apiBaseUrl: String,
-    )
-
-    private suspend fun ServerClientE2EHarness.signUp(): Account {
-        val created = apiClient.createAccountWithSyntheticPasskey("spacesync_${Random.nextInt(100000, 999999)}").data
-        return Account(
-            owner = created.account.id.toString(),
-            did = requireNotNull(created.account.did) { "The new account has no DID" },
-            token = created.tokens.accessToken,
-            refreshToken = created.tokens.refreshToken,
-            origin = baseUrl.removeSuffix("/api/v1"),
-            apiBaseUrl = baseUrl,
-        )
-    }
-
-    private suspend fun ServerClientE2EHarness.rawChanges(account: Account): String =
-        httpClient
-            .get("${account.origin}/xrpc/app.logdate.space.listRepoOps") {
-                parameter("space", "at://${account.did}/space/app.logdate.space.personal/self")
-                parameter("since", "0")
-                header(HttpHeaders.Authorization, "Bearer ${account.token}")
-            }.bodyAsText()
-
-    /** One device: its own database, outbox, inbox and sync engine, signed in to [account]. */
-    private class Device(
-        harness: ServerClientE2EHarness,
-        account: Account,
-        scope: CoroutineScope,
-    ) : AutoCloseable {
-        private val file: Path = Files.createTempFile("personal-space-device", ".db")
-        val database = getRoomDatabase(Room.databaseBuilder<LogDateDatabase>(file.toString()))
-        private val config = DefaultLogDateConfigRepository(initialBackendUrl = account.origin)
-        private val ownerProvider = mockk<CanonicalOwnerProvider> { coEvery { getCanonicalOwnerId() } returns account.owner }
-        val metadata = DatabaseSyncMetadataService(database.syncMetadataDao(), config, ownerProvider)
-        private val transactions = RoomSyncTransactionManager(database)
-        val inbox =
-            DownloadInbox(
-                database.downloadInboxDao(),
-                transactions,
-                { DownloadScope(account.owner, account.origin) },
-                { System.currentTimeMillis() },
-            )
-        val journals =
-            OfflineFirstJournalRepository(
-                journalDao = database.journalDao(),
-                remoteDataSource = mockk(relaxed = true),
-                draftRepository = mockk(relaxed = true),
-                syncMetadataService = metadata,
-                database = database,
-                currentScope = { JournalMergeScope(account.owner, account.origin) },
-                mergeTransactionManager = transactions,
-                externalScope = scope,
-            )
-
-        private val session = UserSession(account.token, account.refreshToken, account.owner)
-        private val sessions =
-            mockk<SessionStorage> {
-                every { getSession() } returns session
-                every { getSessionFlow() } returns kotlinx.coroutines.flow.flowOf(session)
-                every { getOriginBoundSession() } returns OriginBoundSession(account.origin, session)
-            }
-        private val accounts =
-            object : CloudAccountRepository by mockk(relaxed = true), CloudRequestLocationProvider {
-                override fun captureLocation() = CloudRequestLocation(account.origin, account.apiBaseUrl)
-
-                override fun isCurrentOrigin(origin: String) = origin == account.origin
-            }
-        private val resolver = LastWriteWinsResolver<Journal>()
-        private val noNotes = mockk<JournalNotesRepository>(relaxed = true) { every { allNotesObserved } returns flowOf(emptyList()) }
-        private val noContent =
-            mockk<CloudContentDataSource> {
-                coEvery { getContentChanges(any(), any(), any()) } returns
-                    Result.success(ContentSyncResult(emptyList(), emptyList(), Instant.fromEpochMilliseconds(0)))
-            }
-
-        val manager =
-            DefaultSyncManager(
-                // Notes and memberships stay on their own endpoints in this test, and the account has none.
-                cloudContentDataSource = noContent,
-                cloudJournalDataSource = mockk(relaxed = true),
-                cloudAssociationDataSource = DefaultCloudAssociationDataSource(DurableCloudApiClient(harness.apiClient, inbox)),
-                cloudMediaDataSource = mockk(relaxed = true),
-                cloudDraftDataSource = mockk(relaxed = true),
-                cloudAccountRepository = accounts,
-                sessionStorage = sessions,
-                mediaManager = mockk(relaxed = true),
-                mediaSyncRefStore = mockk(relaxed = true),
-                journalRepository = journals,
-                journalNotesRepository = noNotes,
-                journalContentRepository = mockk(relaxed = true),
-                journalConflictResolver = resolver,
-                noteConflictResolver = mockk(relaxed = true),
-                conflictStore = mockk(relaxed = true),
-                deadLetterStore = mockk(relaxed = true),
-                retryScheduleStore = mockk<SyncRetryScheduleStore>(relaxed = true) { coEvery { nextAttemptAt(any(), any()) } returns null },
-                syncMetadataService = metadata,
-                transactionManager = transactions,
-                dataUsagePolicy = mockk(relaxed = true),
-                downloadInbox = inbox,
-                syncScope = scope,
-                spaceSync =
-                    SpaceSyncDependencies(
-                        registry =
-                            SpaceRecordRegistry(
-                                listOf(
-                                    SpaceKind.single(
-                                        EntityType.JOURNAL,
-                                        TestJournalMapper,
-                                        LocalJournals(journals, resolver),
-                                    ) { journal, version ->
-                                        journal.copy(syncVersion = version)
-                                    },
-                                ),
-                            ),
-                        gate = SpaceTransportGate({ true }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
-                        homes = XrpcSpaceDataHomes(harness.httpClient),
-                        swapStore = RoomSpaceSwapStore(database.spaceRecordStateDao()),
-                        accountDid = { account.did },
-                        identityKey = { IDENTITY_KEY },
-                    ),
-            )
-
-        override fun close() {
-            database.close()
-            Files.deleteIfExists(file)
-            Files.deleteIfExists(file.resolveSibling("${file.fileName}-wal"))
-            Files.deleteIfExists(file.resolveSibling("${file.fileName}-shm"))
-        }
-    }
-
-    /** A minimal journal mapping, written for this test: title, description and timestamps. */
-    private object TestJournalMapper : SpaceRecordMapper<Journal> {
-        override val collection = JOURNAL
-
-        override fun rkeyOf(value: Journal) = value.id.toString()
-
-        override fun toRecord(value: Journal): JsonObject =
-            buildJsonObject {
-                put("\$type", JOURNAL)
-                put("title", value.title)
-                if (value.description.isNotEmpty()) put("description", value.description)
-                put("createdAt", value.created.toString())
-                put("updatedAt", value.lastUpdated.toString())
-            }
-
-        override fun fromRecord(
-            rkey: String,
-            record: JsonObject,
-        ) = Journal(
-            id = Uuid.parse(rkey),
-            title = record.getValue("title").jsonPrimitive.content,
-            description = record["description"]?.jsonPrimitive?.content.orEmpty(),
-            created = Instant.parse(record.getValue("createdAt").jsonPrimitive.content),
-            lastUpdated = Instant.parse(record.getValue("updatedAt").jsonPrimitive.content),
-        )
-    }
-
-    private class LocalJournals(
-        private val journals: OfflineFirstJournalRepository,
-        override val conflictResolver: ConflictResolver<Journal>,
-    ) : SpaceLocalRecords<Journal> {
-        private val syncable: SyncableJournalRepository = journals
-
-        override suspend fun load(entityId: String) = journals.getJournalById(Uuid.parse(entityId))
-
-        override fun lastUpdatedOf(item: Journal) = item.lastUpdated
-
-        override suspend fun acknowledgeUpload(
-            item: Journal,
-            seq: Long,
-            syncedAt: Instant,
-        ) = syncable.updateSyncMetadata(item.id, seq, syncedAt)
-
-        override suspend fun replaceLocal(item: Journal) {
-            if (journals.getJournalById(item.id) == null) syncable.createFromSync(item) else syncable.updateFromSync(item)
-        }
-    }
-
     private companion object {
-        const val JOURNAL = "app.logdate.journal.journal"
-        val IDENTITY_KEY = ByteArray(32) { (it * 5).toByte() }
         private val start = Clock.System.now()
 
         fun later(minutes: Int): Instant = start + minutes.minutes

@@ -33,6 +33,8 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(platform(libs.koin.bom))
+    testImplementation(libs.koin.core)
 
     testImplementation(libs.ktor.server.core)
     testImplementation(libs.ktor.server.netty)
@@ -78,10 +80,10 @@ val personalSpaceTest by tasks.registering(Test::class) {
             .output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     environment("LOGDATE_PERSONAL_SPACE_ENABLED", "true")
-    filter { includeTestsMatching("*PersonalSpaceE2ETest") }
+    filter { includeTestsMatching("*PersonalSpace*E2ETest") }
 }
 
 tasks.test {
-    filter { excludeTestsMatching("*PersonalSpaceE2ETest") }
+    filter { excludeTestsMatching("*PersonalSpace*E2ETest") }
     finalizedBy(personalSpaceTest)
 }
