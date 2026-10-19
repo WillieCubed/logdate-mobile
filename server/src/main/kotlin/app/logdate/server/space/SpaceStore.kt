@@ -1,7 +1,12 @@
 package app.logdate.server.space
 
+import app.logdate.server.logging.SpacePurgeNotices
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import studio.hypertext.atproto.repo.Cid
@@ -85,6 +90,15 @@ data class SpaceBlob(
 )
 
 /**
+ * What one [SpaceStore.purge] did with unreferenced blobs. [blobsFailed] counts blobs whose object
+ * couldn't be deleted from storage; their rows stay, so the next purge tries them again.
+ */
+data class SpacePurgeResult(
+    val blobsDeleted: Int,
+    val blobsFailed: Int,
+)
+
+/**
  * Stores sealed records for spaces. Each (space, author) pair has its own increasing sequence, so a
  * client can page through every change since the last sequence number it saw.
  */
@@ -148,13 +162,17 @@ interface SpaceStore {
 
     /**
      * Deletes tombstones made before [tombstonesBefore], and blobs created before
-     * [unreferencedBlobsBefore] that no record refers to. Returns the deleted blobs' storage paths,
-     * which the caller deletes from object storage.
+     * [unreferencedBlobsBefore] that no record refers to. Each blob's object is deleted with
+     * [deleteObject] while its row is locked, and the row goes only after that succeeds, so an object
+     * is never left without a row pointing at it. When [deleteObject] throws, the failure is logged as
+     * [SpacePurgeNotices.BLOB_DELETE_FAILED] and the row stays for the next purge; [deleteObject] must
+     * therefore succeed for an object that's already gone. It blocks, and runs on [Dispatchers.IO].
      */
     suspend fun purge(
         tombstonesBefore: Instant,
         unreferencedBlobsBefore: Instant,
-    ): List<String>
+        deleteObject: (storagePath: String) -> Unit,
+    ): SpacePurgeResult
 }
 
 /** The record's CID and its DAG-CBOR bytes. */
@@ -187,6 +205,30 @@ internal fun countWithinBudget(
         if (index > 0 && total > budget) return index
     }
     return sizes.size
+}
+
+/** Wraps a failed object delete inside a purge transaction, so the transaction rolls back and keeps the row. */
+internal class SpaceObjectDeleteException(
+    cause: Throwable,
+) : RuntimeException(cause)
+
+/** Deletes the object at [path], rethrowing a failure as [SpaceObjectDeleteException]. */
+internal fun deleteObjectOrThrow(
+    deleteObject: (storagePath: String) -> Unit,
+    path: String,
+) {
+    try {
+        deleteObject(path)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        throw SpaceObjectDeleteException(e)
+    }
+}
+
+/** Logs a blob whose object couldn't be deleted. Its row stays, so the next purge retries it. */
+internal fun logObjectDeleteFailure(error: SpaceObjectDeleteException) {
+    Napier.e(SpacePurgeNotices.BLOB_DELETE_FAILED, error.cause)
 }
 
 /** Decodes stored DAG-CBOR bytes, so every read returns the same form of a record. */
@@ -302,15 +344,42 @@ class InMemorySpaceStore(
     override suspend fun purge(
         tombstonesBefore: Instant,
         unreferencedBlobsBefore: Instant,
-    ): List<String> =
-        mutex.withLock {
-            records.entries.removeAll { (_, row) -> row.deletedAt != null && row.deletedAt < tombstonesBefore }
-            val referenced = recordBlobs.flatMap { (key, cids) -> cids.map { key.first to it } }.toSet()
-            val purged =
-                blobs.filter { (key, value) -> value.second < unreferencedBlobsBefore && key !in referenced }
-            purged.keys.forEach(blobs::remove)
-            purged.values.map { it.first.storagePath }
+        deleteObject: (storagePath: String) -> Unit,
+    ): SpacePurgeResult {
+        val candidates =
+            mutex.withLock {
+                records.entries.removeAll { (_, row) -> row.deletedAt != null && row.deletedAt < tombstonesBefore }
+                blobs.keys.filter { purgeable(it, unreferencedBlobsBefore) }.sortedWith(compareBy({ it.first }, { it.second }))
+            }
+        var deleted = 0
+        var failed = 0
+        candidates.forEach { key ->
+            mutex.withLock {
+                if (!purgeable(key, unreferencedBlobsBefore)) return@withLock
+                val path = blobs.getValue(key).first.storagePath
+                try {
+                    withContext(Dispatchers.IO) { deleteObjectOrThrow(deleteObject, path) }
+                } catch (e: SpaceObjectDeleteException) {
+                    logObjectDeleteFailure(e)
+                    failed++
+                    return@withLock
+                }
+                blobs.remove(key)
+                deleted++
+            }
         }
+        return SpacePurgeResult(deleted, failed)
+    }
+
+    /** Whether the blob [key] still exists, was stored before [createdBefore], and no record refers to it. */
+    private fun purgeable(
+        key: Pair<String, String>,
+        createdBefore: Instant,
+    ): Boolean {
+        val stored = blobs[key] ?: return false
+        if (stored.second >= createdBefore) return false
+        return recordBlobs.none { (recordKey, cids) -> recordKey.first == key.first && key.second in cids }
+    }
 
     private fun nextSeq(
         space: String,

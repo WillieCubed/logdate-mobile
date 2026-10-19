@@ -25,6 +25,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 abstract class SpaceStoreContractTest {
     abstract fun withStore(
@@ -158,11 +159,34 @@ abstract class SpaceStoreContractTest {
             store.put(write(account, "a", blobs = listOf("bafyused")))
             store.put(write(account, "b"))
             store.delete(account, space, author, "b", null)
-            val purged = store.purge(tombstonesBefore = now + 1.hours, unreferencedBlobsBefore = now + 1.hours)
-            assertEquals(listOf("path/orphan"), purged)
+            val deleted = mutableListOf<String>()
+            val result = store.purge(tombstonesBefore = now + 1.hours, unreferencedBlobsBefore = now + 1.hours) { deleted += it }
+            assertEquals(listOf("path/orphan"), deleted)
+            assertEquals(SpacePurgeResult(blobsDeleted = 1, blobsFailed = 0), result)
             assertNotNull(store.getBlob(space, "bafyused"))
             assertNull(store.getBlob(space, "bafyorphan"))
             assertEquals(listOf("a"), store.changes(space, author, 0, 10).changes.map { it.rkey })
+        }
+
+    @Test
+    fun `a blob whose object can't be deleted keeps its row until a later purge deletes both`() =
+        withStore { store, account ->
+            store.putBlob(account, space, SpaceBlob("bafyfirst", "application/octet-stream", 10, "path/first"))
+            store.putBlob(account, space, SpaceBlob("bafysecond", "application/octet-stream", 10, "path/second"))
+            val later = Clock.System.now() + 1.hours
+            val deleted = mutableListOf<String>()
+            val failing =
+                store.purge(tombstonesBefore = later, unreferencedBlobsBefore = later) { path ->
+                    check(path != "path/first") { "The object store is down" }
+                    deleted += path
+                }
+            assertEquals(SpacePurgeResult(blobsDeleted = 1, blobsFailed = 1), failing)
+            assertEquals(listOf("path/second"), deleted)
+            assertEquals(SpaceBlob("bafyfirst", "application/octet-stream", 10, "path/first"), store.getBlob(space, "bafyfirst"))
+            assertNull(store.getBlob(space, "bafysecond"))
+
+            assertEquals(listOf("path/first"), store.purgeRecording(tombstonesBefore = later, unreferencedBlobsBefore = later))
+            assertNull(store.getBlob(space, "bafyfirst"))
         }
 
     @Test
@@ -209,7 +233,7 @@ abstract class SpaceStoreContractTest {
             val stored = store.putBlob(account, space, SpaceBlob("bafyblob", "image/jpeg", 12, "path/second"))
             assertEquals(SpaceBlob("bafyblob", "image/jpeg", 12, "path/original"), stored)
             assertEquals(stored, store.getBlob(space, "bafyblob"))
-            assertEquals(emptyList(), store.purge(tombstonesBefore = between, unreferencedBlobsBefore = between))
+            assertEquals(emptyList(), store.purgeRecording(tombstonesBefore = between, unreferencedBlobsBefore = between))
             assertNotNull(store.getBlob(space, "bafyblob"))
         }
 
@@ -218,7 +242,7 @@ abstract class SpaceStoreContractTest {
         withStore { store, account ->
             store.putBlob(account, space, SpaceBlob("bafyblob", "application/octet-stream", 10, "path/first"))
             val later = Clock.System.now() + 1.hours
-            assertEquals(listOf("path/first"), store.purge(tombstonesBefore = later, unreferencedBlobsBefore = later))
+            assertEquals(listOf("path/first"), store.purgeRecording(tombstonesBefore = later, unreferencedBlobsBefore = later))
             val again = SpaceBlob("bafyblob", "application/octet-stream", 10, "path/again")
             assertEquals(again, store.putBlob(account, space, again))
             assertEquals(again, store.getBlob(space, "bafyblob"))
@@ -231,10 +255,20 @@ abstract class SpaceStoreContractTest {
             store.putBlob(account, space, SpaceBlob("bafyorphan", "application/octet-stream", 10, "path/orphan"))
             store.put(write(account, "b"))
             store.delete(account, space, author, "b", null)
-            assertEquals(emptyList(), store.purge(tombstonesBefore = before, unreferencedBlobsBefore = before))
+            assertEquals(emptyList(), store.purgeRecording(tombstonesBefore = before, unreferencedBlobsBefore = before))
             assertEquals(SpaceBlob("bafyorphan", "application/octet-stream", 10, "path/orphan"), store.getBlob(space, "bafyorphan"))
             assertEquals(listOf("b"), store.changes(space, author, 0, 10).changes.map { it.rkey })
         }
+}
+
+/** Purges with a deleter that always succeeds, and returns the storage paths it was asked to delete. */
+private suspend fun SpaceStore.purgeRecording(
+    tombstonesBefore: Instant,
+    unreferencedBlobsBefore: Instant,
+): List<String> {
+    val deleted = mutableListOf<String>()
+    purge(tombstonesBefore, unreferencedBlobsBefore) { deleted += it }
+    return deleted
 }
 
 /** The largest ciphertext a sealed record can carry: 61 padding buckets of 64 KiB, plus the AES-GCM tag. */

@@ -2,7 +2,8 @@ package app.logdate.server
 
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
-import app.logdate.server.logging.SpaceBlobNotices
+import app.logdate.server.logging.SpacePurgeNotices
+import app.logdate.server.space.SpacePurgeResult
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
@@ -18,9 +19,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.koin.ktor.ext.inject
-import java.time.Duration
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 /**
@@ -102,43 +104,49 @@ internal fun startSyncMaintenance(
                     success,
                 )
             }
-            if (spaceStore != null) purgeSpacesRecorded(spaceStore, blobStorage, metrics)
-            delay(Duration.ofMinutes(intervalMinutes).toMillis())
+            if (spaceStore != null) purgeSpacesRecorded(spaceStore, blobStorage, metrics, retentionDays.days)
+            delay(intervalMinutes.minutes)
         }
     }
 }
 
-private suspend fun purgeSpacesRecorded(
+/**
+ * Runs [purgeSpaces] and records it as `maintenance.space_purge`. A run that fails, or leaves a blob
+ * it couldn't delete from storage, counts as a failure; a failure that stops the whole run is logged
+ * as [SpacePurgeNotices.PURGE_FAILED].
+ */
+internal suspend fun purgeSpacesRecorded(
     store: SpaceStore,
     blobs: LogDateBlobStorage?,
     metrics: SyncMetricsRegistry,
+    tombstoneRetention: Duration,
 ) {
     val start = System.currentTimeMillis()
     var success = false
     try {
-        purgeSpaces(store, blobs, Clock.System.now())
-        success = true
+        success = purgeSpaces(store, blobs, Clock.System.now(), tombstoneRetention).blobsFailed == 0
     } catch (e: Exception) {
         if (e is CancellationException) throw e
-        Napier.e(SpaceBlobNotices.BLOB_PURGE_FAILED, e)
+        Napier.e(SpacePurgeNotices.PURGE_FAILED, e)
     } finally {
         metrics.recordOperation("maintenance.space_purge", System.currentTimeMillis() - start, success)
     }
 }
 
-/** Tombstones older than the sync tombstone window go, and so do blobs no record has referred to for a day. */
+/**
+ * Deletes space tombstones older than [tombstoneRetention], the same window as sync tombstones, and
+ * blobs no record has referred to for a day, deleting each blob's object from [blobs] before its row.
+ */
 internal suspend fun purgeSpaces(
     store: SpaceStore,
     blobs: LogDateBlobStorage?,
     now: Instant,
-) {
-    val paths = store.purge(tombstonesBefore = now - 30.days, unreferencedBlobsBefore = now - 1.days)
-    paths.forEach { path ->
-        try {
+    tombstoneRetention: Duration,
+): SpacePurgeResult {
+    val result =
+        store.purge(tombstonesBefore = now - tombstoneRetention, unreferencedBlobsBefore = now - 1.days) { path ->
             blobs?.deleteBlobIfExists(path)
-        } catch (e: Exception) {
-            Napier.e(SpaceBlobNotices.BLOB_PURGE_FAILED, e)
         }
-    }
-    if (paths.isNotEmpty()) Napier.i(SpaceBlobNotices.BLOBS_PURGED)
+    if (result.blobsDeleted > 0) Napier.i(SpacePurgeNotices.BLOBS_PURGED)
+    return result
 }

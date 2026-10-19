@@ -53,8 +53,9 @@ private val approvedNotices =
         KeyCustodyNotices.OAUTH_KEY_ROTATION_FAILED to "SERVER_OAUTH_KEY_ROTATION_FAILED",
         DownloadUrlSigningNotices.MEDIA_SIGNING_FAILED to "SERVER_MEDIA_URL_SIGNING_FAILED",
         DownloadUrlSigningNotices.BACKUP_SIGNING_FAILED to "SERVER_BACKUP_URL_SIGNING_FAILED",
-        SpaceBlobNotices.BLOBS_PURGED to "SERVER_SPACE_BLOBS_PURGED",
-        SpaceBlobNotices.BLOB_PURGE_FAILED to "SERVER_SPACE_BLOB_PURGE_FAILED",
+        SpacePurgeNotices.BLOBS_PURGED to "SERVER_SPACE_BLOBS_PURGED",
+        SpacePurgeNotices.BLOB_DELETE_FAILED to "SERVER_SPACE_BLOB_DELETE_FAILED",
+        SpacePurgeNotices.PURGE_FAILED to "SERVER_SPACE_PURGE_FAILED",
     )
 
 /**
@@ -84,12 +85,15 @@ internal object DownloadUrlSigningNotices {
 }
 
 /**
- * Fixed log messages for the space maintenance sweep. A failed purge leaves orphaned objects in
- * storage until a later sweep removes them, so it is logged as an error rather than dropped.
+ * Fixed log messages for the space maintenance sweep, which deletes old tombstones and blobs that no
+ * record refers to. A blob's row is deleted only after its object is, so a failed object delete
+ * leaves both in place and the next sweep tries that blob again. Both failures are errors: a blob
+ * that keeps failing keeps its bytes in storage.
  */
-internal object SpaceBlobNotices {
+internal object SpacePurgeNotices {
     const val BLOBS_PURGED = "Purged space blobs that nothing refers to"
-    const val BLOB_PURGE_FAILED = "Purging space blobs failed"
+    const val BLOB_DELETE_FAILED = "Deleting a space blob from storage failed; the next sweep retries it"
+    const val PURGE_FAILED = "Purging space tombstones and blobs failed; the next sweep retries"
 }
 
 internal fun safeServerMessage(

@@ -121,6 +121,7 @@ class SyncMetricsRegistry {
                 "sync.maintenance.purge",
                 "sync.backups.purge",
                 "maintenance.tombstone_purge",
+                "maintenance.space_purge",
             )
     }
 }

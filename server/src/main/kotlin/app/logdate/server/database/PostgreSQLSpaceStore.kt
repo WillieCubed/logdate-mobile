@@ -5,12 +5,16 @@ import app.logdate.server.space.SpaceBlob
 import app.logdate.server.space.SpaceChange
 import app.logdate.server.space.SpaceChangePage
 import app.logdate.server.space.SpaceMissingBlobException
+import app.logdate.server.space.SpaceObjectDeleteException
+import app.logdate.server.space.SpacePurgeResult
 import app.logdate.server.space.SpaceRecordWrite
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.space.SpaceSwapException
 import app.logdate.server.space.StoredSpaceRecord
 import app.logdate.server.space.countWithinBudget
 import app.logdate.server.space.decodeRecord
+import app.logdate.server.space.deleteObjectOrThrow
+import app.logdate.server.space.logObjectDeleteFailure
 import app.logdate.server.space.recordCid
 import app.logdate.server.space.requireChangesLimit
 import app.logdate.server.space.requireSealedRecord
@@ -26,6 +30,7 @@ import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.lessEq
 import org.jetbrains.exposed.v1.core.notExists
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
@@ -40,6 +45,9 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 private const val PUT_BLOB_ATTEMPTS = 3
+
+/** How many purge candidates one query loads. */
+private const val PURGE_BATCH_SIZE = 500
 
 /**
  * Stores sealed space records in PostgreSQL. Every write locks its (space, author) state row before
@@ -246,44 +254,94 @@ class PostgreSQLSpaceStore(
     override suspend fun purge(
         tombstonesBefore: Instant,
         unreferencedBlobsBefore: Instant,
-    ): List<String> =
+        deleteObject: (storagePath: String) -> Unit,
+    ): SpacePurgeResult =
         withContext(Dispatchers.IO) {
             transaction {
                 SpaceRecordsTable.deleteWhere { (deleted eq true) and (deletedAt less tombstonesBefore) }
             }
-            val candidates =
-                transaction {
-                    SpaceBlobsTable
-                        .select(SpaceBlobsTable.spaceUri, SpaceBlobsTable.cid)
-                        .where { (SpaceBlobsTable.createdAt less unreferencedBlobsBefore) and unreferenced() }
-                        .orderBy(SpaceBlobsTable.spaceUri to SortOrder.ASC, SpaceBlobsTable.cid to SortOrder.ASC)
-                        .map { it[SpaceBlobsTable.spaceUri] to it[SpaceBlobsTable.cid] }
+            var deleted = 0
+            var failed = 0
+            var after: Pair<String, String>? = null
+            do {
+                val batch = purgeCandidates(unreferencedBlobsBefore, after)
+                batch.forEach { (space, cid) ->
+                    when (purgeBlob(space, cid, unreferencedBlobsBefore, deleteObject)) {
+                        BlobPurge.DELETED -> deleted++
+                        BlobPurge.FAILED -> failed++
+                        BlobPurge.KEPT -> Unit
+                    }
                 }
-            candidates.mapNotNull { (space, cid) -> purgeBlob(space, cid, unreferencedBlobsBefore) }
+                after = batch.lastOrNull()
+            } while (batch.size == PURGE_BATCH_SIZE)
+            SpacePurgeResult(deleted, failed)
         }
 
     /**
-     * Deletes one unreferenced blob row and returns its storage path, or null if it's gone or now
-     * referenced. A write that refers to the blob locks its row first, so taking the same lock waits
-     * for that write to commit; the delete is a separate statement, so under read committed it sees
-     * the committed reference and keeps the blob.
+     * The next [PURGE_BATCH_SIZE] blobs, in key order after [after], that were created before
+     * [createdBefore] and that no record refers to. Paging by key rather than restarting from the
+     * first keeps a blob whose object delete failed from being picked again in the same purge.
+     */
+    private fun purgeCandidates(
+        createdBefore: Instant,
+        after: Pair<String, String>?,
+    ): List<Pair<String, String>> =
+        transaction {
+            SpaceBlobsTable
+                .select(SpaceBlobsTable.spaceUri, SpaceBlobsTable.cid)
+                .where {
+                    val candidate = (SpaceBlobsTable.createdAt less createdBefore) and unreferenced()
+                    if (after == null) {
+                        candidate
+                    } else {
+                        val (space, cid) = after
+                        candidate and
+                            (
+                                (SpaceBlobsTable.spaceUri greater space) or
+                                    ((SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid greater cid))
+                            )
+                    }
+                }.orderBy(SpaceBlobsTable.spaceUri to SortOrder.ASC, SpaceBlobsTable.cid to SortOrder.ASC)
+                .limit(PURGE_BATCH_SIZE)
+                .map { it[SpaceBlobsTable.spaceUri] to it[SpaceBlobsTable.cid] }
+        }
+
+    private enum class BlobPurge { DELETED, KEPT, FAILED }
+
+    /**
+     * Deletes one unreferenced blob: its object first, then its row, inside one transaction that holds
+     * the row lock throughout. A write that refers to the blob locks its row first, so taking the same
+     * lock waits for that write to commit; the check after it is a separate statement, so under read
+     * committed it sees the committed reference and keeps the blob. When the object delete fails, the
+     * transaction rolls back and the row stays for the next purge.
      */
     private fun purgeBlob(
         space: String,
         cid: String,
         createdBefore: Instant,
-    ): String? =
-        transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
-            val key = (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq cid)
-            val path =
+        deleteObject: (storagePath: String) -> Unit,
+    ): BlobPurge =
+        try {
+            transaction(transactionIsolation = Connection.TRANSACTION_READ_COMMITTED) {
+                val key = (SpaceBlobsTable.spaceUri eq space) and (SpaceBlobsTable.cid eq cid)
                 SpaceBlobsTable
-                    .select(SpaceBlobsTable.storagePath)
+                    .select(SpaceBlobsTable.cid)
                     .where { key }
                     .forUpdate()
-                    .singleOrNull()
-                    ?.get(SpaceBlobsTable.storagePath) ?: return@transaction null
-            val deleted = SpaceBlobsTable.deleteWhere { key and (createdAt less createdBefore) and unreferenced() }
-            path.takeIf { deleted > 0 }
+                    .singleOrNull() ?: return@transaction BlobPurge.KEPT
+                val path =
+                    SpaceBlobsTable
+                        .select(SpaceBlobsTable.storagePath)
+                        .where { key and (SpaceBlobsTable.createdAt less createdBefore) and unreferenced() }
+                        .singleOrNull()
+                        ?.get(SpaceBlobsTable.storagePath) ?: return@transaction BlobPurge.KEPT
+                deleteObjectOrThrow(deleteObject, path)
+                SpaceBlobsTable.deleteWhere { key }
+                BlobPurge.DELETED
+            }
+        } catch (e: SpaceObjectDeleteException) {
+            logObjectDeleteFailure(e)
+            BlobPurge.FAILED
         }
 
     /**
