@@ -36,6 +36,7 @@ import javax.inject.Inject
  *     schemas.from(rootProject.file("lexicons/app/logdate"))
  *     basePackage = "app.logdate.lexicon"
  *     recordIndex = "LogDateRecords"
+ *     schemaIndex = "LogDateSchemas"
  * }
  * ```
  *
@@ -58,6 +59,7 @@ class LexiconModelsPlugin : Plugin<Project> {
                 basePackage.set(extension.basePackage)
                 namespaceLayout.set(extension.namespaceLayout)
                 recordIndex.set(extension.recordIndex)
+                schemaIndex.set(extension.schemaIndex)
                 outputDirectory.set(project.layout.buildDirectory.dir("generated/lexicon/kotlin"))
             }
 
@@ -105,6 +107,9 @@ abstract class LexiconModelsExtension {
     /** When set, also writes an object of this name mapping each record type to its serializer. */
     abstract val recordIndex: Property<String>
 
+    /** When set, also writes an object of this name holding every schema's JSON, for checking records at runtime. */
+    abstract val schemaIndex: Property<String>
+
     /** The Kotlin source set the generated code joins. Defaults to `commonMain`. */
     abstract val sourceSet: Property<String>
 
@@ -132,6 +137,10 @@ abstract class GenerateLexiconModels : DefaultTask() {
     @get:Optional
     abstract val recordIndex: Property<String>
 
+    @get:Input
+    @get:Optional
+    abstract val schemaIndex: Property<String>
+
     @get:OutputDirectory
     abstract val outputDirectory: DirectoryProperty
 
@@ -157,6 +166,7 @@ abstract class GenerateLexiconModels : DefaultTask() {
                     basePackage = basePackage.get(),
                     namespaceLayout = namespaceLayout.get(),
                     recordIndex = recordIndex.orNull,
+                    schemaIndex = schemaIndex.orNull,
                 ),
             )
         }
@@ -174,6 +184,7 @@ fun lexiconGeneratorArguments(
     basePackage: String,
     namespaceLayout: Boolean,
     recordIndex: String?,
+    schemaIndex: String? = null,
 ): List<String> =
     buildList {
         add(schemas.sortedBy { it.path }.joinToString(File.pathSeparator) { it.absolutePath })
@@ -182,6 +193,10 @@ fun lexiconGeneratorArguments(
         if (namespaceLayout) add("--namespace-layout")
         recordIndex?.let {
             add("--record-index")
+            add(it)
+        }
+        schemaIndex?.let {
+            add("--schema-index")
             add(it)
         }
     }

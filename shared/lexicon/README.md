@@ -46,6 +46,19 @@ reads records whose type it only knows at runtime, such as sync.
 Encode and decode with `LexiconData`: its `json` configuration for JSON, and
 `encodeToDagCbor` / `decodeFromDagCbor` for the AT Protocol's binary encoding.
 
+## Checking records at runtime
+
+The build also writes `LogDateSchemas`, which holds the JSON of every schema, so the apps carry the
+schemas with them on every platform, including iOS, where there is no schema file to read.
+`LogDateLexicons.validator` checks a record against its schema:
+
+```kotlin
+val issues = LogDateLexicons.validator.validateRecord(Nsid.require("app.logdate.journal.journal"), record).issues
+```
+
+Sync uses it to check every record that arrives from another device before storing it, and every
+record this device writes before sending it.
+
 ## Tests
 
 - Every example record in `tools/lexicon-check/examples/` decodes into its model and encodes back

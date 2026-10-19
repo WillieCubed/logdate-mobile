@@ -30,6 +30,24 @@ class LexiconModelsPluginTest {
     }
 
     @Test
+    fun `a schema index is passed after the record index`() {
+        val arguments =
+            lexiconGeneratorArguments(
+                schemas = listOf(File("/repo/fixture.json")),
+                outputDirectory = File("/out"),
+                basePackage = "app.logdate.lexicon",
+                namespaceLayout = false,
+                recordIndex = "LogDateRecords",
+                schemaIndex = "LogDateSchemas",
+            )
+
+        assertEquals(
+            listOf("/repo/fixture.json", "/out", "app.logdate.lexicon", "--record-index", "LogDateRecords", "--schema-index", "LogDateSchemas"),
+            arguments,
+        )
+    }
+
+    @Test
     fun `a flat layout without an index passes only the positional arguments`() {
         val arguments =
             lexiconGeneratorArguments(

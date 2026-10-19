@@ -1,5 +1,9 @@
 package studio.hypertext.atproto.lexicon
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import studio.hypertext.atproto.syntax.Nsid
 
 /**
@@ -59,6 +63,52 @@ public object LexiconCodegen {
             appendLine("}")
         }
     }
+
+    /**
+     * Generates an object named [objectName] in [packageName] whose `documents` list holds the JSON
+     * of every lexicon document in [sources], minified and sorted by NSID. Parse them with
+     * [LexiconParser] into a [LexiconRegistry] to check records with [LexiconRecordValidator] at
+     * runtime, on platforms that can't read the schema files themselves.
+     */
+    public fun generateSchemaIndex(
+        sources: List<String>,
+        packageName: String,
+        objectName: String,
+    ): String {
+        val documents =
+            sources
+                .map { source -> Json.parseToJsonElement(source).jsonObject }
+                .sortedBy { document -> document["id"]?.jsonPrimitive?.contentOrNull.orEmpty() }
+        return buildString {
+            appendLine("package $packageName")
+            appendLine()
+            appendLine("/** The lexicon documents these models were generated from. */")
+            appendLine("public object $objectName {")
+            appendLine("    /** Each document's JSON, sorted by its NSID. */")
+            appendLine("    public val documents: List<String> =")
+            appendLine("        listOf(")
+            documents.forEach { document -> appendLine("            ${kotlinStringLiteral(document.toString())},") }
+            appendLine("        )")
+            appendLine("}")
+        }
+    }
+
+    private fun kotlinStringLiteral(value: String): String =
+        buildString {
+            append('"')
+            value.forEach { character ->
+                when (character) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '$' -> append("\\$")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(character)
+                }
+            }
+            append('"')
+        }
 
     private class DocumentWriter(
         private val document: LexiconDocument,
