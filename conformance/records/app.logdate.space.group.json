@@ -1,6 +1,16 @@
 {
   "collection": "app.logdate.space.group",
   "recordKey": "literal:self",
+  "recordKeys": {
+    "valid": [
+      "self"
+    ],
+    "invalid": [
+      "",
+      "Self",
+      "other"
+    ]
+  },
   "valid": [
     {
       "name": "minimal",

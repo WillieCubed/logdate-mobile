@@ -1,5 +1,5 @@
 {
-  "description": "Whole sealed envelopes. Sealing the payload with the given nonce must produce exactly this envelope, and opening the envelope must produce exactly this payload. A payload with an `expand` entry is written compactly: replace the string at `path` with `repeat` written `times` times before encoding.",
+  "description": "Whole sealed envelopes. Sealing the payload with the given nonce must produce exactly this envelope, and opening the envelope must produce exactly this payload. A payload with an `expand` entry is written compactly: replace the string at `path` with `repeat` written `times` times before encoding. The records inside these payloads exist to exercise the encoding: they are not valid journal entries and must not be validated as entries.",
   "algorithm": {
     "payload": "DAG-CBOR of { collection, rkey, record }",
     "padding": "see padding.json",
@@ -35,6 +35,10 @@
         {
           "name": "opened for another author",
           "author": "did:plc:else"
+        },
+        {
+          "name": "opened with another identity key",
+          "identityKey": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"
         },
         {
           "name": "opened in another space",

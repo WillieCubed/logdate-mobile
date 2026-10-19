@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import app.logdate.GenerateConformanceFixtures
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -19,6 +20,30 @@ lexiconModels {
     basePackage = "app.logdate.lexicon"
     recordIndex = "LogDateRecords"
 }
+
+// The conformance tests run the shared client fixtures and the lexicons they were generated from on
+// every target. Both are embedded at build time because common tests run on iOS too, where there's
+// no repository to read files from.
+val conformanceDirectory = rootProject.layout.projectDirectory.dir("conformance")
+val lexiconsDirectory = rootProject.layout.projectDirectory.dir("lexicons")
+val generateRecordConformanceFixtures =
+    tasks.register<GenerateConformanceFixtures>("generateRecordConformanceFixtures") {
+        description = "Embed the conformance manifest and record fixtures in the test sources."
+        root.set(conformanceDirectory)
+        fixtures.from(rootProject.fileTree(conformanceDirectory) { include("manifest.json", "records/*.json") })
+        packageName.set("app.logdate.lexicon")
+        objectName.set("RecordConformanceFixtures")
+        outputDirectory.set(layout.buildDirectory.dir("generated/conformance/kotlin"))
+    }
+val generateLexiconSchemaFixtures =
+    tasks.register<GenerateConformanceFixtures>("generateLexiconSchemaFixtures") {
+        description = "Embed the lexicon schemas in the test sources."
+        root.set(lexiconsDirectory)
+        fixtures.from(rootProject.fileTree(lexiconsDirectory) { include("app/logdate/**/*.json", "community/**/*.json") })
+        packageName.set("app.logdate.lexicon")
+        objectName.set("LexiconSchemaFixtures")
+        outputDirectory.set(layout.buildDirectory.dir("generated/lexicon-schemas/kotlin"))
+    }
 
 kotlin {
     explicitApi()
@@ -48,6 +73,11 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(projects.shared.atprotoLexicon)
+        }
+
+        commonTest {
+            kotlin.srcDir(generateRecordConformanceFixtures.flatMap { it.outputDirectory })
+            kotlin.srcDir(generateLexiconSchemaFixtures.flatMap { it.outputDirectory })
         }
 
         commonTest.dependencies {

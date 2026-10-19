@@ -62,9 +62,10 @@ class SealedEnvelopeConformanceTest {
             withRefusals.forEach { entry ->
                 entry.list("refusedEnvelopes").forEach { refusal ->
                     val envelope = JsonObject(entry.obj("envelope") + (refusal["envelope"] as? JsonObject).orEmpty())
+                    val keys = refusal["identityKey"]?.let { SealingKeys.personal(it.text().hexToBytes()) } ?: keys(entry)
                     assertFailsWith<SealedRecordException>("${entry.string("name")}: ${refusal.string("name")}") {
                         SealedRecordCodec.open(
-                            keys(entry),
+                            keys,
                             refusal["space"]?.let { space(it.text()) } ?: space(entry),
                             refusal["author"]?.text() ?: entry.string("author"),
                             refusal["sealedRkey"]?.text() ?: entry.string("sealedRkey"),

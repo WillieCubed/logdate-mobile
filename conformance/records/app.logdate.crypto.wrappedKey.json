@@ -1,15 +1,26 @@
 {
   "collection": "app.logdate.crypto.wrappedKey",
   "recordKey": "any",
+  "recordKeys": {
+    "valid": [
+      "3jzfcijpj2z2a",
+      "self",
+      "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80",
+      "lake-house",
+      "a.b-c_d:e~f"
+    ],
+    "invalid": [
+      "",
+      ".",
+      "..",
+      "a/b",
+      "has space",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ]
+  },
   "valid": [
     {
       "name": "minimal",
-      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
-      "dagCbor": "a7646974656d7450616e63616b657320617420746865206c616b65652474797065781d6170702e6c6f67646174652e63727970746f2e777261707065644b657967777261707065644601020304050669616c676f726974686d7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a69726563697069656e7478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6c726563697069656e744b65797450616e63616b657320617420746865206c616b65",
-      "cid": "bafyreidltr2gmfwmm6wmjt5rvcd5vbr4lzw2i5ttexko6kxwwsglc6ebaa"
-    },
-    {
-      "name": "every-field",
       "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
       "dagCbor": "a7646974656d7450616e63616b657320617420746865206c616b65652474797065781d6170702e6c6f67646174652e63727970746f2e777261707065644b657967777261707065644601020304050669616c676f726974686d7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a69726563697069656e7478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6c726563697069656e744b65797450616e63616b657320617420746865206c616b65",
       "cid": "bafyreidltr2gmfwmm6wmjt5rvcd5vbr4lzw2i5ttexko6kxwwsglc6ebaa"
