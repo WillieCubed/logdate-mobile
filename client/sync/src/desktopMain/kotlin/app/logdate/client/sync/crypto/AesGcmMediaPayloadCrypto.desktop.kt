@@ -17,6 +17,8 @@ actual class AesGcmMediaPayloadCrypto actual constructor(
 
     actual override suspend fun streamEncryptor(): MediaStreamEncryptor = ChunkedMediaStreamEncryptor(keyBytes)
 
+    actual override suspend fun streamDecryptor(): MediaStreamDecryptor = ClientMediaStreamDecryptor(keyBytes) { decrypt(it) }
+
     actual override suspend fun decrypt(data: ByteArray): ByteArray {
         if (data.hasChunkedMediaPrefix()) return decryptChunkedMedia(keyBytes, data)
         data.requireKnownClientMediaFormat()

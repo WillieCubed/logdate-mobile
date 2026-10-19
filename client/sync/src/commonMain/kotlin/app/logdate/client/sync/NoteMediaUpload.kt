@@ -16,10 +16,12 @@ internal class NoteMediaUpload(
     private val retryCoordinator: SyncRetryCoordinator,
     private val setMediaDeferredForNetwork: (Boolean) -> Unit,
 ) {
+    /** @param reusable whether an earlier upload, named by its remote reference, can stand in for uploading again. */
     suspend fun prepare(
         pending: PendingUpload,
         note: JournalNote,
         errors: MutableList<SyncError>,
+        reusable: (String) -> Boolean = { true },
     ): JournalNote? {
         val remoteReady = mediaTransfer.resolveNativeNote(note) ?: return null
         val mediaRef = remoteReady.mediaRefOrNull()
@@ -34,7 +36,7 @@ internal class NoteMediaUpload(
         return if (needsMediaUpload) {
             val mediaUpload =
                 tokenRefresher.withFreshToken(
-                    { token -> mediaTransfer.uploadIfNeeded(token, remoteReady) },
+                    { token -> mediaTransfer.uploadIfNeeded(token, remoteReady, reusable) },
                     "uploadNoteMedia",
                     expectedScope = pending.scope,
                 )

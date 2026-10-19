@@ -36,6 +36,28 @@ interface CloudMediaDataSource {
     ): Result<MediaFile>
 }
 
+/** A media file downloaded and decrypted into [path] on this device, ready to move into the media store. */
+data class DownloadedMediaFile(
+    val contentId: Uuid,
+    val fileName: String,
+    val mimeType: String,
+    val path: kotlinx.io.files.Path,
+    val sizeBytes: Long,
+)
+
+/** A media source that downloads straight into a file, so no file is ever held whole in memory. */
+interface FileMediaDataSource {
+    /**
+     * Downloads and decrypts the file [reference] names into a new file the caller moves into the
+     * media store and then deletes, or returns null when this source reads [reference] another way.
+     */
+    suspend fun downloadMediaToFile(
+        accessToken: String,
+        reference: String,
+        mediaId: String,
+    ): Result<DownloadedMediaFile>?
+}
+
 /**
  * A media source that finds a file by its whole reference, not only the identifier the sync engine
  * reads from it. A separate interface rather than a default method, so a source that wraps another

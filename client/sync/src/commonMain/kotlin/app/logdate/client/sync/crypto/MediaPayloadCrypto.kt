@@ -19,6 +19,9 @@ interface MediaPayloadCrypto {
 
     /** Prepares a [MediaStreamEncryptor] that writes LDCE2. */
     suspend fun streamEncryptor(): MediaStreamEncryptor
+
+    /** Prepares a [MediaStreamDecryptor] that reads what [streamEncryptor] wrote, and whatever [decrypt] reads. */
+    suspend fun streamDecryptor(): MediaStreamDecryptor = ClientMediaStreamDecryptor(mediaKey = null) { decrypt(it) }
 }
 
 object NoOpMediaPayloadCrypto : MediaPayloadCrypto {
@@ -33,6 +36,8 @@ expect class AesGcmMediaPayloadCrypto(
     override suspend fun decrypt(data: ByteArray): ByteArray
 
     override suspend fun streamEncryptor(): MediaStreamEncryptor
+
+    override suspend fun streamDecryptor(): MediaStreamDecryptor
 }
 
 /** Whether [this] media is already client-encrypted, judged from its header alone. */

@@ -41,12 +41,11 @@ internal class SyncMediaRecovery(
         val attemptId = Uuid.random().toString()
         var started = false
         try {
-            val wire = Json.decodeFromString<ContentChange>(row.payload)
             val id = Uuid.parse(row.entityId)
             val owner = notes.getNoteById(id)
-            if (!inbox.isCurrentVersion("NOTE", row.entityId, row.version, scope) ||
+            if (!isCurrent(scope, row) ||
                 owner == null ||
-                owner.mediaRefOrNull() != wire.mediaUri ||
+                owner.mediaRefOrNull() != referenceOf(row) ||
                 owner.syncVersion != row.version
             ) {
                 inbox.applied("MEDIA_NOTE", row.entityId, row.version, scope)
@@ -75,6 +74,23 @@ internal class SyncMediaRecovery(
         }
     }
 
+    /** The file the note applied with this row refers to. */
+    private fun referenceOf(row: DownloadInboxEntity): String? =
+        if (row.payload.startsWith(SPACE_MEDIA_PREFIX)) {
+            row.payload.removePrefix(SPACE_MEDIA_PREFIX)
+        } else {
+            Json.decodeFromString<ContentChange>(row.payload).mediaUri
+        }
+
+    /**
+     * Whether the note version this row was queued for is still the newest. A note from the
+     * personal space has no inbox row of its own; its version is checked against the note itself.
+     */
+    private suspend fun isCurrent(
+        scope: DownloadScope,
+        row: DownloadInboxEntity,
+    ): Boolean = row.payload.startsWith(SPACE_MEDIA_PREFIX) || inbox.isCurrentVersion("NOTE", row.entityId, row.version, scope)
+
     /** Returns whether the hydrated media reference was attached to the unchanged note. */
     private suspend fun attach(
         scope: DownloadScope,
@@ -90,7 +106,7 @@ internal class SyncMediaRecovery(
             if (current?.mediaRefOrNull() == owner.mediaRefOrNull() &&
                 current?.type == owner.type &&
                 current.syncVersion == row.version &&
-                inbox.isCurrentVersion("NOTE", row.entityId, row.version, scope)
+                isCurrent(scope, row)
             ) {
                 val syncable =
                     notes as? SyncableJournalNotesRepository

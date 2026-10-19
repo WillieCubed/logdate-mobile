@@ -1,11 +1,15 @@
 package app.logdate.client.sync.space
 
+import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.MediaPayload
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.repository.transcription.TranscriptDocumentStatus
+import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
+import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.UploadScope
@@ -16,13 +20,19 @@ import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.FakeJournalRepository
 import app.logdate.client.sync.test.FakeSessionStorage
 import app.logdate.client.sync.test.FakeSyncMetadataService
+import app.logdate.client.sync.test.InMemoryMediaSyncRefStore
 import app.logdate.client.sync.test.InMemorySyncDeadLetterStore
 import app.logdate.client.sync.test.InMemorySyncRetryScheduleStore
+import app.logdate.client.sync.test.fakeCloudApiClient
 import app.logdate.client.sync.test.testDefaultSyncManager
 import app.logdate.lexicon.app.logdate.DefsMedia
 import app.logdate.lexicon.app.logdate.crypto.SealedPayload
 import app.logdate.shared.model.Journal
 import app.logdate.space.SealedRecordCodec
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readByteArray
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -321,6 +331,9 @@ internal class SpaceDevice(
     val inbox = DownloadInbox(database, database, { DownloadScope("test-account-id", sessions.currentOrigin) }, { now })
     val swapStore = InMemorySpaceSwapStore()
     val retrySchedule = InMemorySyncRetryScheduleStore()
+    val media = FileReadingMediaManager()
+    val mediaRefs = InMemoryMediaSyncRefStore()
+    private val homes = SpaceDataHomes { _, token -> home.signedIn(token) }
     val deadLetters = InMemorySyncDeadLetterStore()
     var gateOpen = true
     var identityKey: ByteArray = TEST_IDENTITY_KEY
@@ -338,11 +351,24 @@ internal class SpaceDevice(
             deadLetterStore = deadLetters,
             journalConflictResolver = resolver,
             noteConflictResolver = LastWriteWinsResolver(),
+            mediaManager = media,
+            mediaSyncRefStore = mediaRefs,
+            cloudMediaDataSource =
+                SpaceRoutingMediaDataSource(
+                    legacy = DefaultCloudMediaDataSource(fakeCloudApiClient()),
+                    space =
+                        SpaceMediaDataSource(
+                            homes,
+                            AesGcmMediaPayloadCrypto(TEST_MEDIA_KEY),
+                            { SpaceLocation(sessions.currentOrigin, TEST_SPACE) },
+                        ),
+                    uploadsToSpace = { gateOpen },
+                ),
             spaceSync =
                 SpaceSyncDependencies(
                     registry = SpaceRecordRegistry(listOf(journalKind(journals, resolver), noteKind(notes))),
                     gate = SpaceTransportGate({ gateOpen }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
-                    homes = SpaceDataHomes { _, token -> home.signedIn(token) },
+                    homes = homes,
                     swapStore = swapStore,
                     accountDid = { did },
                     identityKey = { identityKey },
@@ -386,8 +412,25 @@ internal class SpaceDevice(
 
     suspend fun pendingNotes() = metadata.getPendingUploads(EntityType.NOTE)
 
+    /** Records staged from the space and not yet applied, of every kind. */
+    fun waitingRecords() = database.rows.count { it.entityType.startsWith("SPACE_") && it.state != "APPLIED" }
+
     /** Rows staged for journals, keyed by sealed key. */
     fun stagedJournalRows() = database.rows.filter { it.entityType == spacePartsType(EntityType.JOURNAL) }
+}
+
+internal val TEST_MEDIA_KEY = ByteArray(32) { (it + 1).toByte() }
+
+/** Keeps saved media in memory, and reads a file handed to it from disk as the real stores do. */
+internal class FileReadingMediaManager : InMemoryMediaManager() {
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+    ): String {
+        val data = SystemFileSystem.source(Path(sourceFilePath)).buffered().use { it.readByteArray() }
+        return saveMedia(MediaPayload(fileName, mimeType, data.size.toLong(), data))
+    }
 }
 
 /** Opens what [this] holds under [rkey] in [collection], as another device of the owner would. */

@@ -6,6 +6,8 @@ import app.logdate.client.media.MediaFileSource
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.cloud.CloudRequestBinding
+import app.logdate.client.sync.cloud.DownloadedMediaFile
+import app.logdate.client.sync.cloud.FileMediaDataSource
 import app.logdate.client.sync.cloud.MediaDecryptionException
 import app.logdate.client.sync.cloud.MediaFile
 import app.logdate.client.sync.cloud.MediaIntegrityException
@@ -18,8 +20,15 @@ import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.NoOpMediaPayloadCrypto
 import app.logdate.client.sync.crypto.isClientEncryptedMedia
 import app.logdate.space.SpaceRef
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.algorithms.SHA256
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.io.Buffer
+import kotlinx.io.RawSink
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
 import kotlinx.io.readByteArray
 import studio.hypertext.atproto.repo.Cid
 import kotlin.coroutines.cancellation.CancellationException
@@ -43,8 +52,10 @@ class SpaceMediaDataSource(
     private val homes: SpaceDataHomes,
     private val mediaPayloadCrypto: MediaPayloadCrypto,
     private val location: suspend () -> SpaceLocation?,
+    private val workDirectory: Path = Path(SystemTemporaryDirectory, "logdate-space-media"),
 ) : CloudMediaDataSource,
-    ReferencedMediaDataSource {
+    ReferencedMediaDataSource,
+    FileMediaDataSource {
     override suspend fun uploadMedia(
         accessToken: String,
         contentId: Uuid,
@@ -78,34 +89,106 @@ class SpaceMediaDataSource(
         mediaId: String,
     ): Result<MediaFile> = Result.failure(SpaceUnavailableException("A personal-space file can only be found by its whole reference"))
 
+    /**
+     * Reads the file whole into memory, for callers that need its bytes. The media store's own path
+     * is [downloadMediaToFile], which never holds the file whole.
+     */
     override suspend fun downloadReferencedMedia(
         accessToken: String,
         reference: String,
         mediaId: String,
     ): Result<MediaFile> {
+        val downloaded = downloadMediaToFile(accessToken, reference, mediaId).getOrElse { return Result.failure(it) }
+        return try {
+            val data = SystemFileSystem.source(downloaded.path).buffered().use { it.readByteArray() }
+            Result.success(MediaFile(downloaded.contentId, downloaded.fileName, downloaded.mimeType, data.size.toLong(), data))
+        } finally {
+            SystemFileSystem.delete(downloaded.path, mustExist = false)
+        }
+    }
+
+    /**
+     * Streams the blob into a file while hashing it, checks the hash against the reference's content
+     * identifier, then decrypts the file a chunk at a time into another. Neither step holds more than
+     * one chunk, whatever the file's size.
+     */
+    override suspend fun downloadMediaToFile(
+        accessToken: String,
+        reference: String,
+        mediaId: String,
+    ): Result<DownloadedMediaFile> {
         val named =
             SpaceMediaReference.parse(reference) ?: return Result.failure(MediaIntegrityException("Not a personal-space file reference"))
+        if (named.storedSize > MAX_BLOB_BYTES) return Result.failure(tooLarge(named.contentId, named.storedSize))
         val target = location() ?: return Result.failure(SpaceUnavailableException("No personal space for the signed-in account"))
-        val buffer = Buffer()
-        val found =
-            spaceCall { homes.open(target.origin, accessToken).downloadBlob(target.space, named.cid, buffer) }
-                .getOrElse { return Result.failure(it) }
-        if (!found) return Result.failure(CloudApiException("MEDIA_NOT_FOUND", "The file is no longer stored", statusCode = 404))
-        val stored = buffer.readByteArray()
-        if (Cid.rawSha256(stored).value != named.cid) {
-            return Result.failure(MediaIntegrityException("The downloaded file doesn't match its content identifier"))
-        }
-        val decrypted =
-            try {
-                mediaPayloadCrypto.decrypt(stored)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (missing: IdentityKeyNotFoundException) {
-                return Result.failure(missing)
-            } catch (_: Exception) {
-                return Result.failure(MediaDecryptionException())
+        SystemFileSystem.createDirectories(workDirectory)
+        val stored = Path(workDirectory, "${Uuid.random()}.stored")
+        val plain = Path(workDirectory, "${Uuid.random()}.part")
+        try {
+            val download = verifiedDownload(accessToken, target, named, stored)
+            download?.let { failure ->
+                SystemFileSystem.delete(plain, mustExist = false)
+                return Result.failure(failure)
             }
-        return Result.success(MediaFile(named.contentId, named.contentId.toString(), named.mimeType, decrypted.size.toLong(), decrypted))
+            val size =
+                try {
+                    val decryptor = mediaPayloadCrypto.streamDecryptor()
+                    SystemFileSystem.source(stored).buffered().use { source ->
+                        SystemFileSystem.sink(plain).buffered().use { sink -> decryptor.decrypt(source, sink) }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (missing: IdentityKeyNotFoundException) {
+                    SystemFileSystem.delete(plain, mustExist = false)
+                    return Result.failure(missing)
+                } catch (_: Exception) {
+                    SystemFileSystem.delete(plain, mustExist = false)
+                    return Result.failure(MediaDecryptionException())
+                }
+            return Result.success(DownloadedMediaFile(named.contentId, named.contentId.toString(), named.mimeType, plain, size))
+        } catch (error: Throwable) {
+            SystemFileSystem.delete(plain, mustExist = false)
+            throw error
+        } finally {
+            SystemFileSystem.delete(stored, mustExist = false)
+        }
+    }
+
+    /** Downloads [named]'s blob into [into], or returns why it can't be used. */
+    private suspend fun verifiedDownload(
+        accessToken: String,
+        target: SpaceLocation,
+        named: SpaceMediaReference,
+        into: Path,
+    ): Throwable? {
+        val hash =
+            CryptographyProvider.Default
+                .get(SHA256)
+                .hasher()
+                .createHashFunction()
+        val written =
+            hash.use { function ->
+                val counted = CappedSink(SystemFileSystem.sink(into), named.storedSize)
+                val found =
+                    counted.use { file ->
+                        spaceCall {
+                            homes
+                                .open(
+                                    target.origin,
+                                    accessToken,
+                                ).downloadBlob(target.space, named.cid, function.updatingSink(file))
+                        }.getOrElse { return it }
+                    }
+                if (!found) return CloudApiException("MEDIA_NOT_FOUND", "The file is no longer stored", statusCode = 404)
+                if (counted.overflowed || counted.written != named.storedSize) {
+                    return MediaIntegrityException("The downloaded file isn't the size its reference names")
+                }
+                function.hashToByteArray()
+            }
+        if (Cid.fromBytes(RAW_SHA256_CID_PREFIX + written).value != named.cid) {
+            return MediaIntegrityException("The downloaded file doesn't match its content identifier")
+        }
+        return null
     }
 
     private fun uploadFailure(
@@ -123,7 +206,37 @@ class SpaceMediaDataSource(
         /** The largest blob a personal space accepts. */
         const val MAX_BLOB_BYTES = 100L * 1024 * 1024
         const val PAYLOAD_TOO_LARGE = 413
+
+        /** CID version 1, the raw codec, and a 32-byte SHA-256 multihash, ahead of the digest. */
+        val RAW_SHA256_CID_PREFIX = byteArrayOf(0x01, 0x55, 0x12, 0x20)
     }
+}
+
+/** Writes to [delegate] until [limit] bytes, then refuses the rest, so a blob can't fill the disk. */
+private class CappedSink(
+    private val delegate: RawSink,
+    private val limit: Long,
+) : RawSink {
+    var written = 0L
+        private set
+    var overflowed = false
+        private set
+
+    override fun write(
+        source: Buffer,
+        byteCount: Long,
+    ) {
+        if (written + byteCount > limit) {
+            overflowed = true
+            throw MediaIntegrityException("The downloaded file is larger than its reference names")
+        }
+        delegate.write(source, byteCount)
+        written += byteCount
+    }
+
+    override fun flush() = delegate.flush()
+
+    override fun close() = delegate.close()
 }
 
 /**
@@ -135,7 +248,8 @@ class SpaceRoutingMediaDataSource(
     private val space: CloudMediaDataSource,
     private val uploadsToSpace: suspend () -> Boolean,
 ) : CloudMediaDataSource,
-    ReferencedMediaDataSource {
+    ReferencedMediaDataSource,
+    FileMediaDataSource {
     override suspend fun uploadMedia(
         accessToken: String,
         contentId: Uuid,
@@ -147,6 +261,17 @@ class SpaceRoutingMediaDataSource(
         accessToken: String,
         mediaId: String,
     ): Result<MediaFile> = legacy.downloadMedia(accessToken, mediaId)
+
+    override suspend fun downloadMediaToFile(
+        accessToken: String,
+        reference: String,
+        mediaId: String,
+    ): Result<DownloadedMediaFile>? {
+        if (SpaceMediaReference.parse(reference) != null && space is FileMediaDataSource) {
+            return space.downloadMediaToFile(accessToken, reference, mediaId)
+        }
+        return (legacy as? FileMediaDataSource)?.downloadMediaToFile(accessToken, reference, mediaId)
+    }
 
     override suspend fun downloadReferencedMedia(
         accessToken: String,

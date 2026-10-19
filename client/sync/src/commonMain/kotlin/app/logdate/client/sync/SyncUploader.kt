@@ -19,6 +19,7 @@ import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceMediaReference
 import app.logdate.client.sync.space.SpaceSync
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
@@ -144,7 +145,8 @@ internal class SyncUploader(
         return space.upload(
             notes,
             profile.uploadsUpdates,
-            begin = { pending, note, errors -> noteMediaUpload.prepare(pending, note, errors) },
+            // A file uploaded to the per-kind endpoint before the switch is uploaded again, into the space.
+            begin = { pending, note, errors -> noteMediaUpload.prepare(pending, note, errors) { SpaceMediaReference.parse(it) != null } },
             afterDelete = { pending -> Uuid.parseOrNull(pending.entityId)?.let { mediaSyncRefStore.deleteScoped(it, pending.scope) } },
         )
     }

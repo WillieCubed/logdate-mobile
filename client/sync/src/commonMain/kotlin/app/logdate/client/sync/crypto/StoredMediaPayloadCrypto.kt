@@ -7,6 +7,8 @@ class StoredMediaPayloadCrypto(
 
     override suspend fun streamEncryptor(): MediaStreamEncryptor = getCrypto().streamEncryptor()
 
+    override suspend fun streamDecryptor(): MediaStreamDecryptor = getCrypto().streamDecryptor()
+
     private suspend fun getCrypto(): MediaPayloadCrypto {
         val key = keyProvider.getOrCreateKey()
         return try {
