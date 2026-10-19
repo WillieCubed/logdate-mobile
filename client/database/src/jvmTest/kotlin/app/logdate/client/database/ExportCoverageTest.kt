@@ -84,6 +84,7 @@ class ExportCoverageTest {
             "sync_download_inbox" to bookkeeping("Encrypted remote work awaiting application; not local journal content."),
             "sync_download_checkpoints" to bookkeeping("Account-scoped download cursors and replay progress."),
             "peer_delivery" to bookkeeping("Where each record stands between the phone and the watch."),
+            "sync_space_records" to bookkeeping("The last known version of each personal-space record, for swap checks."),
             "marked_moments" to planned("Moments marked on the watch; the export covers them once marked moments ship."),
             "search_index_metadata" to bookkeeping("Search index version."),
             "storage_metadata" to bookkeeping("Storage quota footprint."),
