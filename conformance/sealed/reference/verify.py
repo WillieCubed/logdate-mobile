@@ -40,6 +40,17 @@ def check(label, actual, expected):
         problems.append(f"{label}: expected {expected!r}, computed {actual!r}")
 
 
+def check_files(label, actual, expected):
+    """Compares two {path: sha256} maps and names each file that is missing, extra or different."""
+    for path in sorted(set(actual) | set(expected)):
+        if path not in expected:
+            problems.append(f"{label}: {path} is not in the manifest")
+        elif path not in actual:
+            problems.append(f"{label}: {path} is in the manifest but not in this checkout")
+        elif actual[path] != expected[path]:
+            problems.append(f"{label}: {path} differs from the manifest (this checkout {actual[path][:12]}, manifest {expected[path][:12]})")
+
+
 def b32(raw):
     return base64.b32encode(raw).decode().lower().rstrip("=")
 
@@ -269,7 +280,7 @@ def verify_inputs(manifest):
         for folder in ("lexicons/app/logdate", "lexicons/community", "tools/lexicon-check/examples")
         for path in (REPOSITORY / folder).rglob("*.json")
     )
-    check("input files", dict(entries), manifest["inputs"]["files"])
+    check_files("input files", dict(entries), manifest["inputs"]["files"])
     listing = "".join(f"{sha}  {name}\n" for name, sha in entries)
     check("input digest", hashlib.sha256(listing.encode()).hexdigest(), manifest["inputs"]["digest"])
 
