@@ -46,7 +46,7 @@ class SpaceDownloadTest {
             device.manager.downloadRemoteChanges()
 
             assertEquals(uploaded, device.journal(journal.id))
-            assertTrue(device.database.rows.none { it.entityType == "JOURNAL" })
+            assertTrue(device.stagedJournalRows().isEmpty())
         }
 
     @Test

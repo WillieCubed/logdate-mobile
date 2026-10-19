@@ -21,6 +21,28 @@ interface ConflictResolver<T> {
         localTimestamp: Instant,
         remoteTimestamp: Instant,
     ): ConflictResolution<T>
+
+    /**
+     * Decides what a deletion made on this device does to [remote], an edit another device made
+     * that this device hadn't seen when it deleted the entity.
+     *
+     * By default the edit is kept: the entity comes back here and the conflict is listed for review,
+     * so the user decides, just as a deletion from another device never removes an edit still
+     * waiting to upload here.
+     */
+    fun resolveDeletion(
+        remote: T,
+        remoteTimestamp: Instant,
+    ): DeletionResolution = DeletionResolution.KEEP_EDIT
+}
+
+/** What a deletion made here does to an edit made elsewhere that this device hadn't seen. */
+enum class DeletionResolution {
+    /** The edit is kept and the entity comes back on this device; the conflict is listed for review. */
+    KEEP_EDIT,
+
+    /** The deletion removes the edit too. */
+    DELETE,
 }
 
 /**

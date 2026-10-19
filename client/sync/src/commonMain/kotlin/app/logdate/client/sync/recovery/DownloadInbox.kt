@@ -5,6 +5,7 @@ import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
 import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.diagnostics.DiagnosticSource
+import app.logdate.client.sync.space.SpaceInboxPayload
 import app.logdate.shared.model.diagnostics.DiagnosticAction
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
@@ -287,6 +288,34 @@ class DownloadInbox(
         selected: DownloadScope = scope(),
     ): List<DownloadInboxEntity> = dao.pending(selected.owner, selected.origin, type, Long.MAX_VALUE)
 
+    /** The row for [id] of [type], in any state. */
+    internal suspend fun row(
+        type: String,
+        id: String,
+        selected: DownloadScope = scope(),
+    ): DownloadInboxEntity? = dao.get(selected.owner, selected.origin, type, id)
+
+    /** Replaces the payload of [id]'s row while it still holds [version] and isn't applied. */
+    internal suspend fun replacePayload(
+        type: String,
+        id: String,
+        version: Long,
+        payload: String,
+        selected: DownloadScope = scope(),
+    ) {
+        transactions.withTransaction {
+            val row = dao.get(selected.owner, selected.origin, type, id) ?: return@withTransaction
+            if (row.version != version || row.state == "APPLIED") return@withTransaction
+            dao.put(row.copy(payload = payload))
+        }
+    }
+
+    /** Every row of [type], applied or not. */
+    internal suspend fun all(
+        type: String,
+        selected: DownloadScope = scope(),
+    ): List<DownloadInboxEntity> = dao.all(selected.owner, selected.origin, type)
+
     suspend fun serverVersion(
         type: String,
         id: String,
@@ -398,6 +427,13 @@ class DownloadInbox(
                     Json.encodeToString(wire.copy(content = "", blockTypes = emptyList(), journalIds = emptyList()))
                 } else if (type == "DRAFT" && !row.deleted) {
                     row.payload
+                } else if (row.payload.startsWith(SpaceInboxPayload.PREFIX)) {
+                    // Which record it was, without its content, so a later deletion of it is still found.
+                    SpaceInboxPayload
+                        .decode(row.payload)
+                        ?.withoutContent()
+                        ?.encode()
+                        .orEmpty()
                 } else {
                     ""
                 }

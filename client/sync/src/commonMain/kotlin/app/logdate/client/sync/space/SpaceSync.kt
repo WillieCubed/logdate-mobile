@@ -4,6 +4,7 @@ import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncRetryCoordinator
 import app.logdate.client.sync.SyncTokenRefresher
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
@@ -75,11 +76,17 @@ internal class SpaceSync(
     private val downloadInbox: DownloadInbox?,
     recordProgress: (Int) -> Unit,
 ) {
+    private val rateLimit = SpaceRateLimit()
+
     private val uploader =
-        SpaceUploader(dependencies.swapStore, syncMetadataService, retryCoordinator, dependencies.validator, recordProgress)
+        SpaceUploader(dependencies.swapStore, syncMetadataService, retryCoordinator, dependencies.validator, rateLimit, recordProgress)
 
     private val downloader =
-        downloadInbox?.let { SpaceDownloader(dependencies.registry, dependencies.swapStore, it, dependencies.validator) }
+        downloadInbox?.let { SpaceDownloader(dependencies.registry, dependencies.swapStore, it, dependencies.validator, rateLimit) }
+
+    /** The pull of the current download pass, shared by every kind that reads in it. */
+    private var passPull: Result<Unit>? = null
+    private var inPass = false
 
     /** The registered kind for [entityType], when this device syncs it through the personal space now. */
     suspend fun activeKind(entityType: EntityType): SpaceKind<*>? {
@@ -106,7 +113,7 @@ internal class SpaceSync(
 
     /**
      * [upload] for a kind found by entity type. Every item it handles comes from that kind's own
-     * [SpaceLocalRecords] and goes to its own [SpaceRecordMapper], so the item type always agrees.
+     * [SpaceLocalRecords] and goes to its own record types, so the item type always agrees.
      */
     suspend fun uploadKind(
         kind: SpaceKind<*>,
@@ -116,23 +123,37 @@ internal class SpaceSync(
         return upload(kind as SpaceKind<Any>, uploadsUpdates, begin = null)
     }
 
+    /** Runs one download pass, in which the change feed is pulled once however many kinds read it. */
+    suspend fun <R> downloadPass(block: suspend () -> R): R {
+        inPass = true
+        passPull = null
+        try {
+            return block()
+        } finally {
+            inPass = false
+            passPull = null
+        }
+    }
+
     /**
-     * Stages everything new in the space's change feed, then reads [kind]'s staged records. A failed
-     * fetch still offers the records already staged, as the per-kind downloads do, and reports the
-     * failure through the inbox; a refusal of the session is returned so the token is refreshed.
+     * Stages everything new in the space's change feed, once per download pass, then reads [kind]'s
+     * staged records. A failed fetch still offers the records already staged, as the per-kind
+     * downloads do, and reports the failure through the inbox; a refusal of the session is returned
+     * so the token is refreshed.
      */
     suspend fun <T : Any> read(kind: SpaceKind<T>): Result<SpaceStagedRecords<T>> {
         val inbox = downloadInbox ?: return Result.failure(SpaceUnavailableException("The personal space needs the download inbox"))
         val pull = downloader ?: return Result.failure(SpaceUnavailableException("The personal space needs the download inbox"))
         val access = access().getOrElse { return Result.failure(it) }
         val selected = inbox.currentScope()
-        if (selected != DownloadScope(access.scope.ownerId, access.scope.serverOrigin)) {
-            return Result.failure(CancellationException("Download scope changed"))
-        }
-        val pulled = pull.pull(access, SpaceClient(tokenRefresher, dependencies.homes, access))
-        val staged = SpaceStagedRecords(kind, inbox, dependencies.swapStore, access.scope, selected)
+        if (selected != DownloadScope(access.scope.ownerId, access.scope.serverOrigin)) return Result.failure(SpaceScopeChangedException())
+        val pulled =
+            passPull?.takeIf { inPass } ?: pull.pull(access, SpaceClient(tokenRefresher, dependencies.homes, access)).also {
+                if (inPass && !it.isSessionRefusal()) passPull = it
+            }
+        val staged = SpaceStagedRecords(kind, inbox, dependencies.swapStore, access, selected)
         val failure = pulled.exceptionOrNull() ?: return Result.success(staged)
-        if (failure.isSessionRefusal() || !staged.hasPending()) return Result.failure(failure)
+        if (pulled.isSessionRefusal() || !staged.hasPending()) return Result.failure(failure)
         return Result.success(staged)
     }
 
@@ -163,4 +184,4 @@ internal class SpaceSync(
         )
 }
 
-private fun Throwable.isSessionRefusal(): Boolean = (this as? app.logdate.client.sync.cloud.CloudApiException)?.statusCode == 401
+private fun Result<Unit>.isSessionRefusal(): Boolean = (exceptionOrNull() as? CloudApiException)?.statusCode == 401

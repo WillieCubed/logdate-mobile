@@ -237,7 +237,18 @@ class PersonalSpaceSyncE2ETest {
                 syncScope = scope,
                 spaceSync =
                     SpaceSyncDependencies(
-                        registry = SpaceRecordRegistry(listOf(SpaceKind(TestJournalMapper, LocalJournals(journals, resolver)))),
+                        registry =
+                            SpaceRecordRegistry(
+                                listOf(
+                                    SpaceKind.single(
+                                        EntityType.JOURNAL,
+                                        TestJournalMapper,
+                                        LocalJournals(journals, resolver),
+                                    ) { journal, version ->
+                                        journal.copy(syncVersion = version)
+                                    },
+                                ),
+                            ),
                         gate = SpaceTransportGate({ true }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
                         homes = XrpcSpaceDataHomes(harness.httpClient),
                         swapStore = RoomSpaceSwapStore(database.spaceRecordStateDao()),
@@ -256,31 +267,28 @@ class PersonalSpaceSyncE2ETest {
 
     /** A minimal journal mapping, written for this test: title, description and timestamps. */
     private object TestJournalMapper : SpaceRecordMapper<Journal> {
-        override val entityType = EntityType.JOURNAL
         override val collection = JOURNAL
 
-        override fun rkeyOf(item: Journal) = item.id.toString()
+        override fun rkeyOf(value: Journal) = value.id.toString()
 
-        override fun toRecord(item: Journal): JsonObject =
+        override fun toRecord(value: Journal): JsonObject =
             buildJsonObject {
                 put("\$type", JOURNAL)
-                put("title", item.title)
-                if (item.description.isNotEmpty()) put("description", item.description)
-                put("createdAt", item.created.toString())
-                put("updatedAt", item.lastUpdated.toString())
+                put("title", value.title)
+                if (value.description.isNotEmpty()) put("description", value.description)
+                put("createdAt", value.created.toString())
+                put("updatedAt", value.lastUpdated.toString())
             }
 
         override fun fromRecord(
             rkey: String,
             record: JsonObject,
-            seq: Long,
         ) = Journal(
             id = Uuid.parse(rkey),
             title = record.getValue("title").jsonPrimitive.content,
             description = record["description"]?.jsonPrimitive?.content.orEmpty(),
             created = Instant.parse(record.getValue("createdAt").jsonPrimitive.content),
             lastUpdated = Instant.parse(record.getValue("updatedAt").jsonPrimitive.content),
-            syncVersion = seq,
         )
     }
 
@@ -300,7 +308,9 @@ class PersonalSpaceSyncE2ETest {
             syncedAt: Instant,
         ) = syncable.updateSyncMetadata(item.id, seq, syncedAt)
 
-        override suspend fun replaceLocal(item: Journal) = syncable.updateFromSync(item)
+        override suspend fun replaceLocal(item: Journal) {
+            if (journals.getJournalById(item.id) == null) syncable.createFromSync(item) else syncable.updateFromSync(item)
+        }
     }
 
     private companion object {

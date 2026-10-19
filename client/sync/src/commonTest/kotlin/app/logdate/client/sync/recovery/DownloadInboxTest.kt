@@ -125,6 +125,12 @@ class DownloadInboxTest {
                 it.nextAttemptAt <= now
         }
 
+        override suspend fun all(
+            owner: String,
+            origin: String,
+            type: String,
+        ) = rows.filter { it.ownerId == owner && it.serverOrigin == origin && it.entityType == type }
+
         override suspend fun count(
             owner: String,
             origin: String,

@@ -6,6 +6,7 @@ import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncRetryCoordinator
 import app.logdate.client.sync.beginAttempt
 import app.logdate.client.sync.conflict.ConflictResolution
+import app.logdate.client.sync.conflict.DeletionResolution
 import app.logdate.client.sync.dueNow
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
@@ -14,7 +15,6 @@ import app.logdate.lexicon.app.logdate.crypto.SealedPayload
 import app.logdate.space.DataHomeConflictException
 import app.logdate.space.RecordSwap
 import app.logdate.space.SealedRecordCodec
-import app.logdate.space.StoredRecord
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.JsonObject
 import studio.hypertext.atproto.lexicon.LexiconRecordValidator
@@ -23,19 +23,22 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 
 /**
- * Uploads one kind's outbox entries to the personal space as sealed records.
+ * Uploads one kind's outbox entries to the personal space as sealed records, every record of each
+ * item.
  *
- * A create is written only if the record is absent, and an update only if the record still has the
- * content identifier this device last saw. When the record changed elsewhere, the uploader reads
- * it, runs the kind's existing conflict resolver, and writes again with the version it just read.
- * Every outcome settles or retries the entry through [SyncRetryCoordinator], as the per-kind
- * uploads do.
+ * A record is created only if absent, and replaced only if it still has the content identifier
+ * this device last saw. When any record of an item changed elsewhere, the uploader reads all of
+ * them, runs the kind's conflict resolver on the item they make, and writes again over the versions
+ * it just read. A failure is the entry's alone: the rest of the outbox keeps uploading, and every
+ * outcome settles or retries the entry through [SyncRetryCoordinator], as the per-kind uploads do.
+ * Once the server refuses for rate limiting, the pass stops and the rest waits for its `Retry-After`.
  */
 internal class SpaceUploader(
     private val swapStore: SpaceSwapStore,
     private val syncMetadataService: SyncMetadataService,
     private val retryCoordinator: SyncRetryCoordinator,
     private val validator: LexiconRecordValidator,
+    private val rateLimit: SpaceRateLimit,
     private val recordProgress: (Int) -> Unit,
 ) {
     suspend fun <T : Any> upload(
@@ -49,31 +52,68 @@ internal class SpaceUploader(
         val type = kind.entityType
         val errors = mutableListOf<SyncError>()
         var uploaded = 0
+        rateLimit.refusal()?.let { return SyncResult(success = false, errors = listOf(rateLimited(it))) }
         for (pending in syncMetadataService.getPendingUploads(type).dueNow(type, retryCoordinator)) {
+            if (rateLimit.refusal() != null) break
             // An entry queued for another account or server waits until that one is signed in again.
             if (pending.scope != null && pending.scope != access.scope) continue
-            if (pending.operation == PendingOperation.DELETE) {
-                if (!retryCoordinator.beginAttempt(type, pending, errors)) continue
-                uploaded += Upload(kind, access, client, pending, errors).delete(afterDelete)
-                continue
-            }
-            if (pending.operation == PendingOperation.UPDATE && !uploadsUpdates) continue
-            val item = kind.local.load(pending.entityId)
-            if (item == null) {
-                errors += retryCoordinator.recordUnavailableOutboxEntry(type, pending)
-                continue
-            }
-            val ready =
-                if (begin != null) {
-                    begin(pending, item, errors) ?: continue
-                } else {
+            val upload = Upload(kind, access, client, pending, errors)
+            try {
+                if (pending.operation == PendingOperation.DELETE) {
                     if (!retryCoordinator.beginAttempt(type, pending, errors)) continue
-                    item
+                    uploaded += upload.delete(afterDelete)
+                    continue
                 }
-            uploaded += Upload(kind, access, client, pending, errors).write(ready)
+                if (pending.operation == PendingOperation.UPDATE && !uploadsUpdates) continue
+                val item = kind.local.load(pending.entityId)
+                if (item == null) {
+                    errors += retryCoordinator.recordUnavailableOutboxEntry(type, pending)
+                    continue
+                }
+                val ready =
+                    if (begin != null) {
+                        begin(pending, item, errors) ?: continue
+                    } else {
+                        if (!retryCoordinator.beginAttempt(type, pending, errors)) continue
+                        item
+                    }
+                uploaded += upload.write(ready)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                upload.fail(error)
+            }
         }
         return SyncResult(success = errors.isEmpty(), uploadedItems = uploaded, errors = errors)
     }
+
+    private fun rateLimited(refusal: Throwable) =
+        SyncError(
+            SyncErrorType.SERVER_ERROR,
+            "Personal space upload is waiting for the server's rate limit to lift",
+            refusal,
+            retryable = true,
+        )
+
+    /** One record to write: which record type, its key, and its content. */
+    private class Outgoing(
+        val collection: String,
+        val rkey: String,
+        val record: JsonObject,
+        val blobs: List<String>,
+    )
+
+    /** The records the space holds for an item, and the item they make, when it still has its main record. */
+    private class Remote<T>(
+        val item: T?,
+        val states: Map<RecordKey, SpaceRecordState>,
+        val latestSeq: Long,
+    )
+
+    private data class RecordKey(
+        val collection: String,
+        val rkey: String,
+    )
 
     /** One outbox entry's attempt. */
     private inner class Upload<T : Any>(
@@ -84,93 +124,210 @@ internal class SpaceUploader(
         private val errors: MutableList<SyncError>,
     ) {
         private val type = kind.entityType
-        private val collection = kind.collection
+        private val entityId = canonicalRecordKey(pending.entityId)
 
         suspend fun write(item: T): Int {
-            val rkey = kind.mapper.rkeyOf(item)
-            val sealedRkey = SealedRecordCodec.sealedRkey(access.keys, collection, rkey)
             var current = item
-            var base = swapStore.get(access.scope, collection, rkey)
+            var read: Map<RecordKey, SpaceRecordState>? = null
             repeat(MAX_WRITE_ATTEMPTS) {
-                val record = recordOf(current) ?: return 0
-                val swap = base?.let { RecordSwap.Matching(it.cid) } ?: RecordSwap.Absent
-                val sealed = SealedRecordCodec.seal(access.keys, access.space, access.author, SealedPayload(collection, record, rkey))
-                val written =
-                    client.call("putRecord($collection)") {
-                        putRecord(access.space, sealed.rkey, sealed.record, kind.mapper.blobCids(current), swap)
+                val records = recordsFor(current) ?: return 0
+                val bases = read ?: knownStates(records)
+                when (val written = writeAll(records, bases)) {
+                    is Attempt.Succeeded -> {
+                        kind.local.acknowledgeUpload(current, written.seq, Clock.System.now())
+                        retryCoordinator.markUploadSettled(type, pending, Clock.System.now(), written.seq)
+                        recordProgress(1)
+                        return 1
                     }
-                val stored = written.getOrNull()
-                if (stored != null) {
-                    swapStore.put(access.scope, SpaceRecordState(collection, rkey, sealedRkey, stored.cid, stored.seq))
-                    kind.local.acknowledgeUpload(current, stored.seq, Clock.System.now())
-                    retryCoordinator.markUploadSettled(type, pending, Clock.System.now(), stored.seq)
-                    recordProgress(1)
-                    return 1
-                }
-                val failure = written.exceptionOrNull() ?: IllegalStateException("The write returned nothing")
-                if (failure !is DataHomeConflictException) return fail(failure)
-                when (val next = resolve(current, rkey, sealedRkey, failure)) {
-                    is Next.Write -> {
-                        current = next.item
-                        base = next.base
-                    }
-                    is Next.Done -> return 0
+                    is Attempt.Failed -> return fail(written.error)
+                    is Attempt.Conflicted ->
+                        when (val next = resolve(current, written.conflict)) {
+                            is Next.Write -> {
+                                current = next.item
+                                read = next.bases
+                            }
+                            is Next.Done -> return 0
+                        }
                 }
             }
-            return fail(DataHomeConflictException("The record kept changing on other devices"))
+            return fail(DataHomeConflictException("The item kept changing on other devices"))
         }
 
         suspend fun delete(afterDelete: suspend (PendingUpload) -> Unit): Int {
-            val rkey = kind.mapper.rkeyForEntity(pending.entityId)
-            val known = swapStore.get(access.scope, collection, rkey)
-            val sealedRkey = known?.sealedRkey ?: SealedRecordCodec.sealedRkey(access.keys, collection, rkey)
-            // A deletion is the latest thing this device asked for, so it removes whatever version is there.
-            var swap: RecordSwap = known?.let { RecordSwap.Matching(it.cid) } ?: RecordSwap.Unconditional
+            var bases = knownStates(outgoing = null)
             repeat(MAX_WRITE_ATTEMPTS) {
-                val deleted = client.call("deleteRecord($collection)") { deleteRecord(access.space, sealedRkey, swap) }
-                val seq = deleted.getOrNull()
-                if (seq != null) return deleted(rkey, seq, afterDelete)
-                val failure = deleted.exceptionOrNull() ?: IllegalStateException("The deletion returned nothing")
-                if (failure !is DataHomeConflictException) return fail(failure)
-                val remote = client.call("getRecord($collection)") { getRecord(access.space, sealedRkey) }.getOrElse { return fail(it) }
-                swap = remote?.let { RecordSwap.Matching(it.cid) } ?: RecordSwap.Unconditional
+                if (bases.isEmpty()) {
+                    // This device never saw a version of it, so anything there is an edit it hasn't seen.
+                    val remote = readRemote().getOrElse { return fail(it) }
+                    if (remote.states.isEmpty()) return deleted(0, afterDelete)
+                    if (remote.item != null && keepsEdit(remote)) return keepEdit(remote, DataHomeConflictException("Edited elsewhere"))
+                    bases = remote.states
+                }
+                when (val removed = deleteAll(bases)) {
+                    is Attempt.Succeeded -> return deleted(removed.seq, afterDelete)
+                    is Attempt.Failed -> return fail(removed.error)
+                    is Attempt.Conflicted -> {
+                        val remote = readRemote().getOrElse { return fail(it) }
+                        if (remote.item != null && keepsEdit(remote)) return keepEdit(remote, removed.conflict)
+                        if (remote.states.isEmpty()) return deleted(0, afterDelete)
+                        bases = remote.states
+                    }
+                }
             }
-            return fail(DataHomeConflictException("The record kept changing on other devices"))
+            return fail(DataHomeConflictException("The item kept changing on other devices"))
+        }
+
+        private fun keepsEdit(remote: Remote<T>): Boolean {
+            val item = remote.item ?: return false
+            return kind.local.conflictResolver.resolveDeletion(item, kind.local.lastUpdatedOf(item)) == DeletionResolution.KEEP_EDIT
+        }
+
+        /** The deletion met an edit made elsewhere: the edit comes back here and the conflict is listed. */
+        private suspend fun keepEdit(
+            remote: Remote<T>,
+            conflict: DataHomeConflictException,
+        ): Int {
+            val item = requireNotNull(remote.item)
+            kind.local.replaceLocal(item)
+            remote.states.values.forEach { swapStore.put(access.scope, it) }
+            kind.local.acknowledgeUpload(item, remote.latestSeq, Clock.System.now())
+            errors += retryCoordinator.handleUploadConflict(type, pending, conflict, remote.latestSeq, kind.local.lastUpdatedOf(item))
+            return 0
         }
 
         private suspend fun deleted(
-            rkey: String,
             seq: Long,
             afterDelete: suspend (PendingUpload) -> Unit,
         ): Int {
-            swapStore.delete(access.scope, collection, rkey)
+            forgetItem()
             afterDelete(pending)
             retryCoordinator.markUploadSettled(type, pending, Clock.System.now(), seq)
             recordProgress(1)
             return 1
         }
 
-        /** Reads the version another device wrote and lets the kind's resolver decide what to write. */
+        /** The versions this device last saw of every record the item has or can have. */
+        private suspend fun knownStates(outgoing: List<Outgoing>?): Map<RecordKey, SpaceRecordState> {
+            val keys = kind.parts.flatMap { part -> part.rkeysOf(entityId).map { RecordKey(part.collection, canonicalRecordKey(it)) } }
+            val all = keys + outgoing.orEmpty().map { RecordKey(it.collection, it.rkey) }
+            return all.distinct().mapNotNull { key -> swapStore.get(access.scope, key.collection, key.rkey)?.let { key to it } }.toMap()
+        }
+
+        /**
+         * Every record [item] is stored as, checked against its schema, or null once the entry is
+         * failed: retried when the item can map later as it is, set aside when it can't.
+         */
+        private suspend fun recordsFor(item: T): List<Outgoing>? =
+            try {
+                kind.parts.flatMap { part -> outgoing(part, item) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: SpaceRecordMappingException) {
+                fail(error)
+                null
+            } catch (error: SpaceRecordInvalidException) {
+                fail(error)
+                null
+            } catch (error: Exception) {
+                // A mapper that throws anything else has a bug no retry fixes.
+                fail(SpaceRecordMappingException("The ${type.name.lowercase()} couldn't be converted to records", error))
+                null
+            }
+
+        private fun <P> outgoing(
+            part: SpacePart<T, P>,
+            item: T,
+        ): List<Outgoing> {
+            val values = part.recordsOf(item)
+            if (part === kind.main && values.size != 1) {
+                throw SpaceRecordMappingException("${part.collection}: an item must have exactly one main record, not ${values.size}")
+            }
+            return values.map { value ->
+                val rkey = canonicalRecordKey(part.mapper.rkeyOf(value))
+                val record = part.mapper.toRecord(value)
+                val problems = validator.validateRecord(Nsid.require(part.collection), record).issues
+                if (problems.isNotEmpty()) {
+                    // Paths only: an issue's message can quote the record's contents.
+                    val paths = problems.joinToString { it.path.ifEmpty { "(record)" } }
+                    throw SpaceRecordInvalidException("The ${part.collection} record this device built fails its schema at $paths")
+                }
+                Outgoing(part.collection, rkey, record, part.mapper.blobCidsOf(value))
+            }
+        }
+
+        /**
+         * Writes every record over the version in [bases] and deletes the records [bases] holds that
+         * the item no longer has. Its main record goes first, so another device never sees the
+         * item's other records before the item.
+         */
+        private suspend fun writeAll(
+            records: List<Outgoing>,
+            bases: Map<RecordKey, SpaceRecordState>,
+        ): Attempt {
+            var seq = 0L
+            for (record in records) {
+                val sealed =
+                    SealedRecordCodec.seal(
+                        access.keys,
+                        access.space,
+                        access.author,
+                        SealedPayload(record.collection, record.record, record.rkey),
+                    )
+                val base = bases[RecordKey(record.collection, record.rkey)]
+                val swap = base?.takeIf { it.sealedRkey == sealed.rkey }?.let { RecordSwap.Matching(it.cid) } ?: RecordSwap.Absent
+                val written =
+                    client.call("putRecord(${record.collection})") {
+                        putRecord(access.space, sealed.rkey, sealed.record, record.blobs, swap)
+                    }
+                val stored = written.getOrElse { return attemptFailed(it) }
+                swapStore.put(access.scope, SpaceRecordState(record.collection, record.rkey, sealed.rkey, stored.cid, stored.seq))
+                seq = maxOf(seq, stored.seq)
+                if (base != null && base.sealedRkey != sealed.rkey) {
+                    // Another client wrote the key in another case; the lowercase record replaces it.
+                    client
+                        .call(
+                            "deleteRecord(${record.collection})",
+                        ) { deleteRecord(access.space, base.sealedRkey, RecordSwap.Matching(base.cid)) }
+                        .getOrElse { return attemptFailed(it) }
+                }
+            }
+            val kept = records.map { RecordKey(it.collection, it.rkey) }.toSet()
+            val stale = bases.filterKeys { it !in kept }
+            return when (val removed = deleteAll(stale)) {
+                is Attempt.Succeeded -> Attempt.Succeeded(maxOf(seq, removed.seq))
+                else -> removed
+            }
+        }
+
+        private suspend fun deleteAll(states: Map<RecordKey, SpaceRecordState>): Attempt {
+            var seq = 0L
+            for ((key, state) in states) {
+                val deleted =
+                    client.call("deleteRecord(${key.collection})") {
+                        deleteRecord(access.space, state.sealedRkey, RecordSwap.Matching(state.cid))
+                    }
+                seq = maxOf(seq, deleted.getOrElse { return attemptFailed(it) })
+                swapStore.delete(access.scope, key.collection, key.rkey)
+            }
+            return Attempt.Succeeded(seq)
+        }
+
+        private fun attemptFailed(error: Throwable): Attempt =
+            if (error is DataHomeConflictException) Attempt.Conflicted(error) else Attempt.Failed(error)
+
+        /** Reads the item's records as other devices left them and lets the kind's resolver decide what to write. */
         private suspend fun resolve(
             local: T,
-            rkey: String,
-            sealedRkey: String,
             conflict: DataHomeConflictException,
         ): Next<T> {
-            val remote =
-                client
-                    .call(
-                        "getRecord($collection)",
-                    ) { getRecord(access.space, sealedRkey) }
-                    .getOrElse { return Next.Done(fail(it)) }
-            if (remote == null) {
+            val remote = readRemote().getOrElse { return Next.Done(fail(it)) }
+            val remoteItem = remote.item
+            if (remoteItem == null) {
                 // Deleted elsewhere while this device edited it: kept here, and listed for review.
-                swapStore.delete(access.scope, collection, rkey)
+                forgetItem()
                 errors += retryCoordinator.handleUploadConflict(type, pending, conflict, 0L, kind.local.lastUpdatedOf(local))
                 return Next.Done(0)
             }
-            val remoteItem = open(remote, rkey) ?: return Next.Done(0)
-            val remoteBase = SpaceRecordState(collection, rkey, sealedRkey, remote.cid, remote.seq)
             val resolution =
                 kind.local.conflictResolver.resolve(
                     local = local,
@@ -179,88 +336,120 @@ internal class SpaceUploader(
                     remoteTimestamp = kind.local.lastUpdatedOf(remoteItem),
                 )
             return when (resolution) {
-                is ConflictResolution.KeepLocal -> Next.Write(resolution.value, remoteBase)
+                is ConflictResolution.KeepLocal -> Next.Write(resolution.value, remote.states)
                 is ConflictResolution.Merge -> {
                     kind.local.replaceLocal(resolution.merged)
-                    Next.Write(resolution.merged, remoteBase)
+                    Next.Write(resolution.merged, remote.states)
                 }
                 is ConflictResolution.KeepRemote -> {
                     kind.local.replaceLocal(resolution.value)
-                    swapStore.put(access.scope, remoteBase)
-                    kind.local.acknowledgeUpload(resolution.value, remote.seq, Clock.System.now())
-                    retryCoordinator.markUploadSettled(type, pending, Clock.System.now(), remote.seq)
+                    remote.states.values.forEach { swapStore.put(access.scope, it) }
+                    kind.local.acknowledgeUpload(resolution.value, remote.latestSeq, Clock.System.now())
+                    retryCoordinator.markUploadSettled(type, pending, Clock.System.now(), remote.latestSeq)
                     Next.Done(0)
                 }
                 is ConflictResolution.RequiresManualResolution -> {
-                    errors += retryCoordinator.handleUploadConflict(type, pending, conflict, remote.seq, kind.local.lastUpdatedOf(local))
+                    errors +=
+                        retryCoordinator.handleUploadConflict(type, pending, conflict, remote.latestSeq, kind.local.lastUpdatedOf(local))
                     Next.Done(0)
                 }
             }
         }
 
-        /** The item [remote] holds, or null after reporting why it can't be read. */
-        private suspend fun open(
-            remote: StoredRecord,
-            rkey: String,
-        ): T? {
+        /** Every record of the item the space holds, opened and checked, and the item they make. */
+        private suspend fun readRemote(): Result<Remote<T>> {
+            val states = mutableMapOf<RecordKey, SpaceRecordState>()
+            val changes = mutableMapOf<String, MutableList<SpacePartChange<*>>>()
+            for (part in kind.parts) {
+                for (rkey in part.rkeysOf(entityId).map(::canonicalRecordKey).distinct()) {
+                    val sealedRkey = SealedRecordCodec.sealedRkey(access.keys, part.collection, rkey)
+                    val stored =
+                        client
+                            .call(
+                                "getRecord(${part.collection})",
+                            ) { getRecord(access.space, sealedRkey) }
+                            .getOrElse { return Result.failure(it) }
+                            ?: continue
+                    val payload =
+                        try {
+                            SealedRecordCodec.open(access.keys, access.space, access.author, stored.rkey, stored.record)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            return Result.failure(error)
+                        }
+                    val record = payload.record as? JsonObject
+                    if (payload.collection != part.collection ||
+                        !sameRecordKey(payload.rkey, rkey) ||
+                        record == null ||
+                        issues(part.collection, record)
+                    ) {
+                        return Result.failure(SpaceRecordInvalidException("The stored ${part.collection} record doesn't match its schema"))
+                    }
+                    val value =
+                        try {
+                            part.mapper.fromRecord(rkey, record)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
+                            return Result.failure(error)
+                        }
+                    states[RecordKey(part.collection, rkey)] = SpaceRecordState(part.collection, rkey, sealedRkey, stored.cid, stored.seq)
+                    changes.getOrPut(part.collection) { mutableListOf() } += SpacePartChange.Written(rkey, value, stored.seq)
+                }
+            }
+            val latest = states.values.maxOfOrNull { it.seq } ?: 0L
+            if (changes[kind.main.collection] == null) return Result.success(Remote(null, states, latest))
             val item =
                 try {
-                    read(remote, rkey)
+                    kind.assemble(SpaceItemChanges(entityId, changes), local = null)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
-                    fail(error)
-                    return null
+                    return Result.failure(error)
                 }
-            if (item == null) fail(SpaceRecordInvalidException("The stored $collection record doesn't match its schema"))
-            return item
+            return Result.success(Remote(item, states, latest))
         }
 
-        private suspend fun read(
-            remote: StoredRecord,
-            rkey: String,
-        ): T? {
-            val payload = SealedRecordCodec.open(access.keys, access.space, access.author, remote.rkey, remote.record)
-            val record = payload.record as? JsonObject ?: return null
-            if (payload.collection != collection || payload.rkey != rkey || issues(record).isNotEmpty()) return null
-            return kind.mapper.fromRecord(rkey, record, remote.seq)
+        private fun issues(
+            collection: String,
+            record: JsonObject,
+        ) = validator.validateRecord(Nsid.require(collection), record).issues.isNotEmpty()
+
+        private suspend fun forgetItem() {
+            for (part in kind.parts) {
+                part.rkeysOf(entityId).forEach { swapStore.delete(access.scope, part.collection, canonicalRecordKey(it)) }
+            }
         }
 
-        private suspend fun recordOf(item: T): JsonObject? {
-            val record = kind.mapper.toRecord(item)
-            val problems = issues(record)
-            if (problems.isEmpty()) return record
-            // Paths only: an issue's message can quote the record's contents.
-            val paths = problems.joinToString { it.path.ifEmpty { "(record)" } }
-            failPermanently(SpaceRecordInvalidException("The $collection record this device built fails its schema at $paths"))
-            return null
-        }
-
-        private fun issues(record: JsonObject) = validator.validateRecord(Nsid.require(collection), record).issues
-
-        private suspend fun fail(error: Throwable): Int {
+        suspend fun fail(error: Throwable): Int {
+            rateLimit.record(error)
             val movedToDeadLetter = retryCoordinator.handleRetryFailure(type, pending, error, permanent = error.isPermanentSpaceFailure())
-            errors +=
-                SyncError(
-                    error.spaceErrorType(),
-                    "Failed to upload $type to the personal space: ${error.message}",
-                    error,
-                    !movedToDeadLetter,
-                )
+            val retryable = !movedToDeadLetter && !error.isPermanentSpaceFailure()
+            errors += SyncError(error.spaceErrorType(), "Failed to upload $type to the personal space: ${error.message}", error, retryable)
             Napier.w("Personal space upload failed")
             return 0
         }
+    }
 
-        private suspend fun failPermanently(error: SpaceRecordInvalidException) {
-            retryCoordinator.handleRetryFailure(type, pending, error, permanent = true)
-            errors += SyncError(SyncErrorType.UNKNOWN_ERROR, error.message ?: "Invalid record", error, retryable = false)
-        }
+    private sealed interface Attempt {
+        class Succeeded(
+            val seq: Long,
+        ) : Attempt
+
+        class Conflicted(
+            val conflict: DataHomeConflictException,
+        ) : Attempt
+
+        class Failed(
+            val error: Throwable,
+        ) : Attempt
     }
 
     private sealed interface Next<out T> {
         class Write<T>(
             val item: T,
-            val base: SpaceRecordState,
+            val bases: Map<RecordKey, SpaceRecordState>,
         ) : Next<T>
 
         class Done(
@@ -269,7 +458,7 @@ internal class SpaceUploader(
     }
 
     private companion object {
-        /** Writes before giving up on a record other devices keep changing; the entry is retried later. */
+        /** Writes before giving up on an item other devices keep changing; the entry is retried later. */
         const val MAX_WRITE_ATTEMPTS = 3
     }
 }

@@ -4,9 +4,9 @@ import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.metadata.EntityType
-import app.logdate.shared.model.Journal
+import app.logdate.client.sync.test.FakeJournalNotesRepository
+import app.logdate.client.sync.test.FakeJournalRepository
 import app.logdate.space.DataHomeConflictException
-import kotlinx.serialization.json.JsonObject
 import studio.hypertext.atproto.xrpc.XrpcProtocolException
 import studio.hypertext.atproto.xrpc.XrpcSerializationException
 import studio.hypertext.atproto.xrpc.XrpcTransportException
@@ -65,24 +65,34 @@ class SpaceFailuresTest {
 
     @Test
     fun `a kind is registered once and only after its download is wired`() {
-        val journals =
-            SpaceKind(
-                TestJournalMapper,
-                TestJournalRecords(
-                    app.logdate.client.sync.test
-                        .FakeJournalRepository(),
-                ),
-            )
+        val journals = journalKind(FakeJournalRepository())
+        val notes = noteKind(FakeJournalNotesRepository())
         val drafts =
-            object : SpaceRecordMapper<Journal> by TestJournalMapper {
-                override val entityType = EntityType.DRAFT
-                override val collection = "app.logdate.journal.draft"
+            SpaceKind.single(
+                EntityType.DRAFT,
+                TestJournalMapper,
+                journals.local,
+            ) { journal, version -> journal.copy(syncVersion = version) }
+        val registry = SpaceRecordRegistry(listOf(journals, notes))
 
-                override fun toRecord(item: Journal): JsonObject = TestJournalMapper.toRecord(item)
-            }
-
-        assertEquals(journals, SpaceRecordRegistry(listOf(journals)).forCollection(JOURNAL_COLLECTION))
+        assertSame(journals, registry.forCollection(JOURNAL_COLLECTION)?.kind)
+        assertSame(notes, registry.forCollection(TRANSCRIPT_COLLECTION)?.kind)
+        assertEquals(false, registry.forCollection(TRANSCRIPT_COLLECTION)?.isMain)
+        assertEquals(
+            "6f1c2c9e-4b1a-4c55-9a39-2f0d6c3b8e71",
+            registry
+                .forCollection(
+                    TRANSCRIPT_COLLECTION,
+                )?.ownerOf("6F1C2C9E-4B1A-4C55-9A39-2F0D6C3B8E71:6F1C2C9E-4B1A-4C55-9A39-2F0D6C3B8E71"),
+        )
         assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(journals, journals)) }
-        assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(SpaceKind(drafts, journals.local))) }
+        assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(drafts)) }
+        val twoOwners =
+            SpaceKind.single(
+                EntityType.NOTE,
+                TestJournalMapper,
+                journals.local,
+            ) { journal, version -> journal.copy(syncVersion = version) }
+        assertFailsWith<IllegalArgumentException> { SpaceRecordRegistry(listOf(journals, twoOwners)) }
     }
 }

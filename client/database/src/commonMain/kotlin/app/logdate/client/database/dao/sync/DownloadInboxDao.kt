@@ -42,6 +42,14 @@ interface DownloadInboxDao {
         origin: String,
     ): Int
 
+    /** Every row of [type], applied or not. */
+    @Query("SELECT * FROM sync_download_inbox WHERE ownerId = :owner AND serverOrigin = :origin AND entityType = :type")
+    suspend fun all(
+        owner: String,
+        origin: String,
+        type: String,
+    ): List<DownloadInboxEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(row: DownloadInboxEntity)
 

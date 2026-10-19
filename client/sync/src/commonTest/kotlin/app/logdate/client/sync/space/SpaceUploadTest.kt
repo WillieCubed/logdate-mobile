@@ -1,5 +1,6 @@
 package app.logdate.client.sync.space
 
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.shared.model.Journal
@@ -176,7 +177,7 @@ class SpaceUploadTest {
         }
 
     @Test
-    fun `a rate-limited write waits at least as long as the server asked`() =
+    fun `a rate limit stops the whole pass and the next one until Retry-After`() =
         runTest {
             val home =
                 FakeDataHome().apply {
@@ -186,14 +187,23 @@ class SpaceUploadTest {
             val device = SpaceDevice(home)
             val journal = Journal(title = "Weekend walks", created = created, lastUpdated = created)
             device.create(journal)
+            device.create(Journal(title = "Evening runs", created = created, lastUpdated = created))
+            device.saveNote(JournalNote.Text(creationTimestamp = created, lastUpdated = created, content = "Swam"))
 
             val result = device.manager.uploadPendingChanges()
 
             assertFalse(result.success)
-            assertTrue(result.errors.single().retryable)
+            assertTrue(result.errors.all { it.retryable }, result.errors.toString())
+            assertEquals(1, home.tokensSeen.size, "Only the refused request was sent")
             val next = assertNotNull(device.retrySchedule.nextAttemptAt(EntityType.JOURNAL, journal.id.toString()))
             assertTrue(next >= (Clock.System.now() + 590.seconds).toEpochMilliseconds(), "Retried before the server's Retry-After")
-            assertEquals(1, device.pendingJournals().size)
+            assertEquals(2, device.pendingJournals().size)
+            assertEquals(1, device.pendingNotes().size)
+
+            device.manager.uploadPendingChanges()
+            device.manager.downloadRemoteChanges()
+
+            assertEquals(1, home.tokensSeen.size, "Nothing is sent while the limit applies")
         }
 
     @Test
@@ -229,13 +239,7 @@ class SpaceUploadTest {
             val result = device.manager.uploadPendingChanges()
 
             assertFalse(result.success)
-            assertTrue(
-                result.errors
-                    .single()
-                    .message
-                    .contains("DID"),
-                result.errors.toString(),
-            )
+            assertTrue(result.errors.isNotEmpty() && result.errors.all { "DID" in it.message }, result.errors.toString())
             assertEquals(1, device.pendingJournals().size)
         }
 
