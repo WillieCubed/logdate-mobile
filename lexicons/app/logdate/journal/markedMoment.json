@@ -28,8 +28,8 @@
           },
           "caption": {
             "type": "string",
-            "maxLength": 20000,
-            "maxGraphemes": 2000,
+            "maxLength": 1000000,
+            "maxGraphemes": 100000,
             "description": "A few words the person wrote about the moment. Saved while the mark is open, too, so unfinished words aren't lost."
           },
           "resolvedEntries": {

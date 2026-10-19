@@ -12,10 +12,13 @@
           "size": 61204
         },
         "durationMs": 8200,
-        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "7d0c9e7a-2f4b-4b8e-9a51-3e6f1c2d4b90" }
+        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "7d0c9e7a-2f4b-4b8e-9a51-3e6f1c2d4b90:7d0c9e7a-2f4b-4b8e-9a51-3e6f1c2d4b90" }
       }
     ],
-    "location": { "place": { "collection": "app.logdate.place.place", "rkey": "0b8f3c1e-6a2d-4e9f-8c7b-1d2e3f4a5b6c" } },
+    "location": {
+      "place": { "collection": "app.logdate.place.place", "rkey": "0b8f3c1e-6a2d-4e9f-8c7b-1d2e3f4a5b6c" },
+      "placeDetails": { "name": "Cais do Sodré station", "geo": { "latitude": "38.7060", "longitude": "-9.1445" } }
+    },
     "timeZone": "Europe/Lisbon",
     "capturedOn": "watch",
     "capturedDuring": "inVehicle",

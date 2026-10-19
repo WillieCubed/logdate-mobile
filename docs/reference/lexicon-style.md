@@ -55,6 +55,12 @@ isn't obvious.
 has `createdAt`, and records that can change have `updatedAt`. Name other times for what they mark:
 `startsAt`, `endsAt`, `measuredAt`, `sharedAt`.
 
+Make `createdAt` required unless a record's existing data has no time to put there. Never make one
+up. Today these records have an optional `createdAt`, and their descriptions say when it's absent:
+transcripts, places that only came from location history, corrections, entry links, visits the
+person added, and journal memberships, whose `createdAt` also keeps its earliest value so two
+devices writing the same membership agree.
+
 **No floating-point numbers.** The AT Protocol data model has no floats. Use integers with the unit
 in the name (`accuracyCentimeters`, `durationMs`, `speedCentimetersPerSecond`), confidences in
 thousandths (`942` means 94.2%), and decimal strings for coordinates, which is what the community

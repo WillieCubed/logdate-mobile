@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "One hour of raw location samples and activity changes recorded by one device. The record key is the UTC hour and the device's identifier joined by a colon, such as 2026-10-19T14:6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b, so each device writes its own records and a new sample only rewrites the current hour. Visits and journeys aren't stored: every device works them out from these samples.",
+      "description": "One hour of raw location samples and activity changes recorded by one device. The record key is the UTC hour and the device's identifier joined by a colon, such as 2026-10-19T14:6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b, so a new sample only rewrites the current hour. When an hour holds more than one record's limits allow, the device starts another part keyed with :2, :3 and so on after that. Visits and journeys aren't stored: every device works them out from these samples.\n\nNew samples come only from the recording device, but another device can rewrite the record to delete samples, so every write must be conditional on the record's current version (swapCid). A device whose write is refused reads the record again, merges and retries. Merging two versions of a record gives: samples = every sample in either version, minus every id in either version's deletedSampleIds; transitions likewise with deletedTransitionIds; and both deletion lists = everything in either version. Deletion lists only grow. Across the parts of one hour, the same rule applies to all parts together.",
       "key": "any",
       "record": {
         "type": "object",
@@ -22,7 +22,14 @@
           "startsAt": {
             "type": "string",
             "format": "datetime",
+            "maxLength": 40,
             "description": "The start of the UTC hour the samples fall in, such as 2026-10-19T14:00:00.000Z."
+          },
+          "part": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "description": "Which part of the hour this record is, when the hour needed more than one. Absent for the first part, whose key has no part number. Parts after the first have keys ending in :2, :3 and so on. A device adds new samples to the last part, and starts the next part when the last part's samples, transitions or deletion lists are full."
           },
           "samples": {
             "type": "array",
@@ -30,8 +37,8 @@
               "type": "ref",
               "ref": "#point"
             },
-            "maxLength": 10000,
-            "description": "The location samples, in time order."
+            "maxLength": 5000,
+            "description": "The location samples, in time order. The limits on this record's lists are set so that, with every field at its longest, the record still fits in one sealed record (about 3.99 MB)."
           },
           "transitions": {
             "type": "array",
@@ -39,7 +46,7 @@
               "type": "ref",
               "ref": "#transition"
             },
-            "maxLength": 2000,
+            "maxLength": 500,
             "description": "Changes in what the person was doing that the device detected, such as starting to walk, in time order."
           },
           "deletedSampleIds": {
@@ -48,7 +55,7 @@
               "type": "string",
               "maxLength": 128
             },
-            "maxLength": 10000,
+            "maxLength": 5000,
             "description": "Ids of samples from this hour that the person deleted. A device must not add a sample back once its id is listed here."
           },
           "deletedTransitionIds": {
@@ -57,7 +64,7 @@
               "type": "string",
               "maxLength": 128
             },
-            "maxLength": 2000,
+            "maxLength": 500,
             "description": "Ids of activity changes from this hour that were deleted. A device must not add one back once its id is listed here."
           }
         }
@@ -80,7 +87,8 @@
         },
         "at": {
           "type": "string",
-          "format": "datetime"
+          "format": "datetime",
+          "maxLength": 40
         },
         "latitude": {
           "type": "string",
@@ -100,21 +108,22 @@
         "accuracyCentimeters": {
           "type": "integer",
           "minimum": 0,
-          "description": "Horizontal accuracy, in centimeters."
+          "description": "Horizontal accuracy, in centimeters: the device's value in meters times 100, rounded to the nearest whole number, and 0 if it was negative."
         },
         "speedCentimetersPerSecond": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Speed, in centimeters per second: the device's value in meters per second times 100, rounded to the nearest whole number, and 0 if it was negative."
         },
         "bearingCentidegrees": {
           "type": "integer",
           "minimum": 0,
           "maximum": 35999,
-          "description": "Direction of travel in hundredths of a degree, clockwise from true north."
+          "description": "Direction of travel in hundredths of a degree, clockwise from true north: the device's value in degrees times 100, rounded to the nearest whole number, then reduced modulo 36000 (so 359.996 degrees becomes 0, and a negative value has 36000 added)."
         },
         "activity": {
           "type": "string",
-          "maxLength": 32,
+          "maxLength": 16,
           "knownValues": [
             "still",
             "walking",
@@ -135,7 +144,7 @@
         },
         "source": {
           "type": "string",
-          "maxLength": 64,
+          "maxLength": 32,
           "knownValues": [
             "backgroundPeriodic",
             "passiveUpdate",
@@ -174,11 +183,12 @@
         },
         "at": {
           "type": "string",
-          "format": "datetime"
+          "format": "datetime",
+          "maxLength": 40
         },
         "activity": {
           "type": "string",
-          "maxLength": 32,
+          "maxLength": 16,
           "knownValues": [
             "still",
             "walking",
@@ -192,7 +202,7 @@
         },
         "transition": {
           "type": "string",
-          "maxLength": 32,
+          "maxLength": 16,
           "knownValues": [
             "enter",
             "exit"

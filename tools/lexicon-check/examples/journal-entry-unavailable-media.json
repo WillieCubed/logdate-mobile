@@ -1,0 +1,22 @@
+{
+  "collection": "app.logdate.journal.entry",
+  "record": {
+    "$type": "app.logdate.journal.entry",
+    "blocks": [
+      {
+        "$type": "app.logdate.journal.entry#audioBlock",
+        "id": "9f8e7d6c-5b4a-4398-8776-655443322110",
+        "durationMs": 64000,
+        "caption": "Dad telling the canoe story again",
+        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "9f8e7d6c-5b4a-4398-8776-655443322110:9f8e7d6c-5b4a-4398-8776-655443322110" }
+      }
+    ],
+    "location": {
+      "geo": { "latitude": "47.9032", "longitude": "-91.8671" },
+      "accuracyCentimeters": 1830
+    },
+    "timeZone": "America/Chicago",
+    "createdAt": "2025-07-19T23:12:40.000Z",
+    "updatedAt": "2026-10-02T16:00:00.000Z"
+  }
+}

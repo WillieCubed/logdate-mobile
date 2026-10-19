@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "The transcript of an audio block: timed segments with word timings, the speakers, the engine that produced it, and detected sounds. The record key matches the key of the entry that holds the audio, so each recording has at most one transcript. The full text is the segments' text joined in time order.",
+      "description": "The transcript of an audio block: timed segments with word timings, the speakers, the engine that produced it, and detected sounds. The record key is the key of the entry that holds the audio and the audio block's id joined by a colon (<entry>:<block>), so each recording has at most one transcript and an entry with several recordings has one per recording. The full text is the segments' text joined in time order.",
       "key": "any",
       "record": {
         "type": "object",
@@ -76,7 +76,7 @@
               "complete",
               "failed"
             ],
-            "description": "Where the transcript is in its life. pending: requested but not started. inProgress: the first recognition pass is still producing segments. refining: a more accurate second pass is improving a transcript that already exists. complete: every segment is stable. failed: recognition stopped with an error."
+            "description": "Where the transcript is in its life. pending: requested but not started, with no segments yet. inProgress: the first recognition pass is still producing segments. refining: a more accurate second pass is improving a transcript that already exists. complete: every segment is stable. failed: recognition stopped with an error."
           },
           "createdAt": {
             "type": "string",
@@ -137,7 +137,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Recognition confidence, in thousandths."
+          "description": "Recognition confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number and kept between 0 and 1000."
         },
         "source": {
           "type": "string",
@@ -188,7 +188,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Recognition confidence, in thousandths."
+          "description": "Recognition confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number and kept between 0 and 1000."
         },
         "speaker": {
           "type": "string",
@@ -266,7 +266,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Detection confidence, in thousandths."
+          "description": "Detection confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number and kept between 0 and 1000."
         }
       }
     }

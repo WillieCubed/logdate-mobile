@@ -36,7 +36,7 @@
         },
         "durationMs": 41000,
         "caption": "Everyone saying hi",
-        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" }
+        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d:b4" }
       }
     ],
     "location": {
