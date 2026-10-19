@@ -3,15 +3,34 @@
   "record": {
     "$type": "app.logdate.journal.transcript",
     "entry": { "collection": "app.logdate.journal.entry", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
-    "blockId": "b3",
+    "blockId": "b4",
     "language": "en-US",
-    "text": "Okay, everyone say hi to future us.",
-    "segments": [{ "startMs": 0, "endMs": 2400, "text": "Okay, everyone say hi to future us.", "speaker": "1", "confidence": 942, "final": true }],
+    "segments": [
+      {
+        "id": "seg-0",
+        "startMs": 0,
+        "endMs": 2400,
+        "text": "Okay, everyone say hi to future us.",
+        "words": [
+          { "text": "Okay,", "normalizedText": "okay", "startMs": 0, "endMs": 380, "confidence": 961, "speaker": "s1" },
+          { "text": "everyone", "normalizedText": "everyone", "startMs": 420, "endMs": 900, "confidence": 948, "speaker": "s1" }
+        ],
+        "speaker": "s1",
+        "confidence": 942,
+        "source": "cloudRefinement",
+        "final": true
+      },
+      { "id": "seg-1", "startMs": 2600, "endMs": 3100, "text": "Hi!", "speaker": "s2", "source": "localLive", "final": false }
+    ],
+    "speakers": [
+      { "id": "s1", "label": "Speaker 1" },
+      { "id": "s2", "label": "Speaker 2" }
+    ],
+    "engine": { "name": "LogDate Cloud", "modelId": "speech-large-2", "version": "2026.10" },
     "soundTags": [{ "name": "laughter", "startMs": 2500, "durationMs": 1800, "confidence": 811 }],
-    "source": "onDevice",
-    "revision": 1,
-    "status": "complete",
-    "speakerCount": 1,
-    "createdAt": "2026-10-10T14:04:02.000Z"
+    "revision": 7,
+    "status": "refining",
+    "createdAt": "2026-10-10T14:04:02.000Z",
+    "updatedAt": "2026-10-10T14:06:40.000Z"
   }
 }

@@ -1,0 +1,9 @@
+{
+  "collection": "app.logdate.place.visit",
+  "record": {
+    "$type": "app.logdate.place.visit",
+    "place": { "collection": "app.logdate.place.place", "rkey": "0b8f3c1e-6a2d-4e9f-8c7b-1d2e3f4a5b6c" },
+    "startsAt": "2026-10-11T15:00:00.000Z",
+    "endsAt": "2026-10-11T16:30:00.000Z"
+  }
+}

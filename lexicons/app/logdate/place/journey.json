@@ -34,15 +34,19 @@
           },
           "mode": {
             "type": "string",
+            "maxLength": 32,
             "knownValues": [
+              "still",
               "walking",
               "running",
               "cycling",
+              "vehicle",
               "driving",
-              "transit",
-              "flying",
+              "bus",
+              "train",
               "unknown"
-            ]
+            ],
+            "description": "How the person traveled, with the same values as a location sample's activity."
           },
           "distanceMeters": {
             "type": "integer",

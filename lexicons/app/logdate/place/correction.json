@@ -1,52 +1,87 @@
 {
   "lexicon": 1,
   "id": "app.logdate.place.correction",
-  "description": "A change the person made to their location history, such as confirming a visit or moving it to another place. Corrections are kept separately so recomputing history never overwrites them.",
+  "description": "One change the person made to their location history, such as renaming a place, moving a visit to another place or deleting a journey.",
   "defs": {
     "main": {
       "type": "record",
-      "description": "A change the person made to their location history, such as confirming a visit or moving it to another place. Corrections are kept separately so recomputing history never overwrites them.",
+      "description": "One change the person made to their location history, such as renaming a place, moving a visit to another place or deleting a journey. Corrections are stored separately from the samples, so working the history out again never loses them. A correction is never edited: a later one replaces it by listing it in supersedes, and two corrections to the same field that don't supersede each other are shown to the person as a conflict to settle.",
       "key": "any",
       "record": {
         "type": "object",
         "required": [
-          "target",
-          "action",
-          "createdAt"
+          "evidenceId",
+          "field"
         ],
         "properties": {
-          "target": {
-            "type": "ref",
-            "ref": "app.logdate.defs#recordRef",
-            "description": "The visit or journey being corrected."
-          },
-          "action": {
+          "evidenceId": {
             "type": "string",
+            "maxLength": 512,
+            "description": "What the correction applies to. A visit or journey that LogDate worked out is named by the id of one of its location samples (an app.logdate.place.sample point id); a visit the person added, by its app.logdate.place.visit record key; a place, by place: followed by its app.logdate.place.place record key; and a journey LogDate inferred between two visits, by derived:journey: followed by the owner, the device and the ids of the samples it runs between, separated by colons."
+          },
+          "field": {
+            "type": "string",
+            "maxLength": 32,
             "knownValues": [
-              "confirm",
-              "reject",
-              "changePlace",
-              "changeTimes",
-              "merge",
-              "split"
-            ]
+              "label",
+              "place",
+              "activity",
+              "start",
+              "end",
+              "delete"
+            ],
+            "description": "What the correction changes. label: the name shown (set label). place: which place a visit, or a place merged into another, belongs to (set place). activity: how the person traveled (set activity). start and end: when it began or ended (set startsAt or endsAt). delete: removes it from the history, and needs no value."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 1000,
+            "maxGraphemes": 100,
+            "description": "The new name, when field is label."
           },
           "place": {
             "type": "ref",
             "ref": "app.logdate.defs#recordRef",
-            "description": "The place the visit belongs to after the correction."
+            "description": "The place it belongs to now, when field is place."
+          },
+          "activity": {
+            "type": "string",
+            "maxLength": 32,
+            "knownValues": [
+              "still",
+              "walking",
+              "running",
+              "cycling",
+              "vehicle",
+              "driving",
+              "bus",
+              "train",
+              "unknown"
+            ],
+            "description": "How the person traveled, when field is activity. The person choosing it confirms the journey's mode."
           },
           "startsAt": {
             "type": "string",
-            "format": "datetime"
+            "format": "datetime",
+            "description": "The new start time, when field is start."
           },
           "endsAt": {
             "type": "string",
-            "format": "datetime"
+            "format": "datetime",
+            "description": "The new end time, when field is end."
+          },
+          "supersedes": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "app.logdate.defs#recordRef"
+            },
+            "maxLength": 100,
+            "description": "Earlier corrections to the same field of the same thing that this one replaces."
           },
           "createdAt": {
             "type": "string",
-            "format": "datetime"
+            "format": "datetime",
+            "description": "When the person made the correction, when known."
           }
         }
       }

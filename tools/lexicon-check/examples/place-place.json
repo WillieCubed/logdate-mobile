@@ -1,0 +1,11 @@
+{
+  "collection": "app.logdate.place.place",
+  "record": {
+    "$type": "app.logdate.place.place",
+    "name": "Lakeside Coffee",
+    "location": { "latitude": "44.9781", "longitude": "-93.2649" },
+    "locality": "1200 Lake St, Minneapolis",
+    "externalId": "ChIJ7cv00DwsDogRAMDACa2m4K8",
+    "userConfirmed": false
+  }
+}

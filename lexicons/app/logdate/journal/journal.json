@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "A journal: a named collection of entries.",
+      "description": "A journal: a named collection of entries. When the person merges one journal into another, the merged-away journal stays as a record with mergedInto set, so every device can move what it still has in that journal to the surviving one. Apps don't show a journal that has mergedInto.",
       "key": "any",
       "record": {
         "type": "object",
@@ -27,6 +27,15 @@
           "cover": {
             "type": "ref",
             "ref": "app.logdate.defs#media"
+          },
+          "favorite": {
+            "type": "boolean",
+            "description": "True when the person marked the journal as a favorite. Favorites are listed first."
+          },
+          "mergedInto": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The journal this one was merged into. A device that finds a membership, draft or other reference to this journal points it at that journal instead. Always the final surviving journal: when that journal is merged again, every record that names it here is updated to the new survivor."
           },
           "createdAt": {
             "type": "string",

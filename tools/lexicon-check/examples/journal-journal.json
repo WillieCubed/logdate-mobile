@@ -1,0 +1,16 @@
+{
+  "collection": "app.logdate.journal.journal",
+  "record": {
+    "$type": "app.logdate.journal.journal",
+    "title": "Summers at the lake",
+    "description": "Every trip up north, from the first one.",
+    "cover": {
+      "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 262144 },
+      "mimeType": "image/jpeg",
+      "aspectRatio": { "width": 3, "height": 4 }
+    },
+    "favorite": true,
+    "createdAt": "2026-06-01T12:00:00.000Z",
+    "updatedAt": "2026-10-10T14:20:02.000Z"
+  }
+}

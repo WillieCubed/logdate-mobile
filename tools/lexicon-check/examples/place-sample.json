@@ -2,11 +2,37 @@
   "collection": "app.logdate.place.sample",
   "record": {
     "$type": "app.logdate.place.sample",
-    "date": "2026-10-10",
-    "timeZone": "America/Chicago",
+    "device": "6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b",
+    "startsAt": "2026-10-10T13:00:00.000Z",
     "samples": [
-      { "at": "2026-10-10T13:58:00.000Z", "latitude": "44.97781", "longitude": "-93.26502", "accuracyMeters": 9, "activity": "still", "source": "fused", "mock": false },
-      { "at": "2026-10-10T14:06:30.000Z", "latitude": "44.97802", "longitude": "-93.26411", "accuracyMeters": 14, "speedCentimetersPerSecond": 130, "bearingDegrees": 72, "activity": "walking" }
-    ]
+      {
+        "id": "a8c1f2e3-4d5b-4c6a-9e7f-8b9a0c1d2e3f",
+        "at": "2026-10-10T13:58:00.000Z",
+        "latitude": "44.97781",
+        "longitude": "-93.26502",
+        "accuracyCentimeters": 912,
+        "activity": "still",
+        "timeZone": "America/Chicago",
+        "source": "backgroundPeriodic",
+        "mock": false
+      },
+      {
+        "id": "b9d2a3f4-5e6c-4d7b-8f80-9cab1d2e3f40",
+        "at": "2026-10-10T13:59:30.000Z",
+        "latitude": "44.97802",
+        "longitude": "-93.26411",
+        "altitudeMeters": "262.8",
+        "accuracyCentimeters": 1430,
+        "speedCentimetersPerSecond": 131,
+        "bearingCentidegrees": 7250,
+        "activity": "walking",
+        "timeZone": "America/Chicago",
+        "source": "activityTransition"
+      }
+    ],
+    "transitions": [
+      { "id": "e7f8091a-2b3c-4d4e-9f5a-6b7c8d9e0f1a", "at": "2026-10-10T13:59:12.000Z", "activity": "walking", "transition": "enter", "timeZone": "America/Chicago" }
+    ],
+    "deletedSampleIds": ["c0e3b4a5-6f7d-4e8c-9091-adbc2e3f4051"]
   }
 }

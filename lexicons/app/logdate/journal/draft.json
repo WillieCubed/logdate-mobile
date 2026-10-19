@@ -1,11 +1,11 @@
 {
   "lexicon": 1,
   "id": "app.logdate.journal.draft",
-  "description": "An unfinished entry. Drafts sync between the owner's devices and are never shared or published.",
+  "description": "An unfinished entry, as it stands in the editor. Drafts sync between the owner's devices so writing can continue on another one, and are never shared or published.",
   "defs": {
     "main": {
       "type": "record",
-      "description": "An unfinished entry. Drafts sync between the owner's devices and are never shared or published.",
+      "description": "An unfinished entry, as it stands in the editor. Drafts sync between the owner's devices so writing can continue on another one, and are never shared or published. Each block keeps its own capture time and location, because each becomes its own entry when the draft is saved.",
       "key": "any",
       "record": {
         "type": "object",
@@ -19,22 +19,24 @@
             "items": {
               "type": "union",
               "refs": [
-                "app.logdate.journal.entry#textBlock",
-                "app.logdate.journal.entry#imageBlock",
-                "app.logdate.journal.entry#videoBlock",
-                "app.logdate.journal.entry#audioBlock"
+                "#textBlock",
+                "#imageBlock",
+                "#videoBlock",
+                "#audioBlock",
+                "#cameraBlock"
               ]
             },
-            "maxLength": 200
+            "maxLength": 200,
+            "description": "The draft's blocks, in the order the editor shows them."
           },
-          "journal": {
-            "type": "ref",
-            "ref": "app.logdate.defs#recordRef",
-            "description": "The journal the entry will be added to, if the person chose one."
-          },
-          "location": {
-            "type": "ref",
-            "ref": "app.logdate.defs#location"
+          "journals": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "app.logdate.defs#recordRef"
+            },
+            "maxLength": 100,
+            "description": "The journals the entry will be added to when it's saved, if the person chose any."
           },
           "createdAt": {
             "type": "string",
@@ -44,6 +46,194 @@
             "type": "string",
             "format": "datetime"
           }
+        }
+      }
+    },
+    "textBlock": {
+      "type": "object",
+      "description": "Text being written, in markdown.",
+      "required": [
+        "id",
+        "createdAt",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within the draft. The saved entry keeps it."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the block was started, which becomes the time of its entry."
+        },
+        "location": {
+          "type": "ref",
+          "ref": "app.logdate.defs#location",
+          "description": "Where the block was started."
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1000000,
+          "maxGraphemes": 100000
+        }
+      }
+    },
+    "imageBlock": {
+      "type": "object",
+      "description": "A photo, or a place for one the person hasn't picked yet.",
+      "required": [
+        "id",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within the draft. The saved entry keeps it."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the block was started, which becomes the time of its entry."
+        },
+        "location": {
+          "type": "ref",
+          "ref": "app.logdate.defs#location",
+          "description": "Where the block was started."
+        },
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media",
+          "description": "The photo. Absent until the person picks one."
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000,
+          "description": "What the person wrote about the photo, in markdown."
+        },
+        "presentation": {
+          "type": "string",
+          "maxLength": 32,
+          "knownValues": [
+            "edgeToEdge",
+            "framed"
+          ],
+          "description": "How the photo is framed. Defaults to edgeToEdge."
+        }
+      }
+    },
+    "videoBlock": {
+      "type": "object",
+      "description": "A video, or a place for one the person hasn't picked yet.",
+      "required": [
+        "id",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within the draft. The saved entry keeps it."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the block was started, which becomes the time of its entry."
+        },
+        "location": {
+          "type": "ref",
+          "ref": "app.logdate.defs#location",
+          "description": "Where the block was started."
+        },
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media",
+          "description": "The video. Absent until the person picks one."
+        },
+        "thumbnail": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media",
+          "description": "A still image from the video, shown while the video itself loads."
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000,
+          "description": "What the person wrote about the video, in markdown."
+        }
+      }
+    },
+    "audioBlock": {
+      "type": "object",
+      "description": "A recording, or a place for one that hasn't been recorded yet.",
+      "required": [
+        "id",
+        "createdAt",
+        "durationMs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within the draft. The saved entry keeps it."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the block was started, which becomes the time of its entry."
+        },
+        "location": {
+          "type": "ref",
+          "ref": "app.logdate.defs#location",
+          "description": "Where the block was started."
+        },
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media",
+          "description": "The recording. Absent until something has been recorded."
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Length of the recording, in milliseconds. 0 until something has been recorded."
+        },
+        "transcriptText": {
+          "type": "string",
+          "maxLength": 1000000,
+          "description": "Text recognized from the recording so far. A draft has no entry for a transcript record to refer to, so the text is kept with the block until the draft is saved."
+        }
+      }
+    },
+    "cameraBlock": {
+      "type": "object",
+      "description": "A photo or video taken with the editor's camera, or a place for one while the camera is still open. The media's mimeType says whether it's a photo or a video.",
+      "required": [
+        "id",
+        "createdAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within the draft. The saved entry keeps it."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the block was started, which becomes the time of its entry."
+        },
+        "location": {
+          "type": "ref",
+          "ref": "app.logdate.defs#location",
+          "description": "Where the block was started."
+        },
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media",
+          "description": "The captured photo or video. Absent until something is captured."
         }
       }
     }

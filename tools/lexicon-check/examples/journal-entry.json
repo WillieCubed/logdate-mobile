@@ -3,7 +3,7 @@
   "record": {
     "$type": "app.logdate.journal.entry",
     "blocks": [
-      { "$type": "app.logdate.journal.entry#textBlock", "id": "b1", "text": "Pancakes at the lake house with **everyone**." },
+      { "$type": "app.logdate.journal.entry#textBlock", "id": "b1", "text": "Pancakes at the lake house with **everyone**.", "format": "markdown" },
       {
         "$type": "app.logdate.journal.entry#imageBlock",
         "id": "b2",
@@ -14,25 +14,40 @@
           "alt": "Four people around a table on a porch",
           "aspectRatio": { "width": 4, "height": 3 }
         },
+        "caption": "The *good* syrup came out.",
         "presentation": "edgeToEdge"
       },
       {
-        "$type": "app.logdate.journal.entry#audioBlock",
+        "$type": "app.logdate.journal.entry#videoBlock",
         "id": "b3",
+        "media": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 9437184 },
+          "mimeType": "video/mp4"
+        },
+        "caption": "Jumping off the dock",
+        "durationMs": 12500
+      },
+      {
+        "$type": "app.logdate.journal.entry#audioBlock",
+        "id": "b4",
         "media": {
           "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 90210 },
           "mimeType": "audio/mp4"
         },
         "durationMs": 41000,
-        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80" }
+        "caption": "Everyone saying hi",
+        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" }
       }
     ],
     "location": {
-      "geo": { "latitude": "44.9778", "longitude": "-93.2650", "name": "Lake house" },
-      "accuracyMeters": 12,
-      "place": { "collection": "app.logdate.place.place", "rkey": "lake-house" },
-      "timeZone": "America/Chicago"
+      "geo": { "latitude": "44.9778", "longitude": "-93.2650", "altitude": "264.5" },
+      "accuracyCentimeters": 1250,
+      "place": { "collection": "app.logdate.place.place", "rkey": "lake-house" }
     },
-    "createdAt": "2026-10-10T14:03:21.000Z"
+    "timeZone": "America/Chicago",
+    "capturedOn": "phone",
+    "capturedDuring": "moving",
+    "createdAt": "2026-10-10T14:03:21.000Z",
+    "updatedAt": "2026-10-10T14:20:02.000Z"
   }
 }

@@ -1,0 +1,16 @@
+{
+  "collection": "app.logdate.journal.markedMoment",
+  "record": {
+    "$type": "app.logdate.journal.markedMoment",
+    "state": "filled",
+    "caption": "First snow of the year",
+    "resolvedEntries": [{ "collection": "app.logdate.journal.entry", "rkey": "8e9f0a1b-2c3d-4e5f-8a6b-7c8d9e0f1a2b" }],
+    "location": { "geo": { "latitude": "46.7867", "longitude": "-92.1005" }, "accuracyCentimeters": 820 },
+    "timeZone": "America/Chicago",
+    "heartRateBpm": 88,
+    "capturedDuring": "moving",
+    "originDevice": "c4d5e6f7-0a1b-4c2d-8e3f-4a5b6c7d8e9f",
+    "createdAt": "2026-10-17T15:22:48.120Z",
+    "updatedAt": "2026-10-17T20:05:13.004Z"
+  }
+}

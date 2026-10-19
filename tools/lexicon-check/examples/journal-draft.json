@@ -1,0 +1,61 @@
+{
+  "collection": "app.logdate.journal.draft",
+  "record": {
+    "$type": "app.logdate.journal.draft",
+    "blocks": [
+      {
+        "$type": "app.logdate.journal.draft#textBlock",
+        "id": "1e2d3c4b-5a69-4788-97a6-b5c4d3e2f1a0",
+        "createdAt": "2026-10-18T19:02:11.000Z",
+        "location": { "geo": { "latitude": "41.8781", "longitude": "-87.6298", "altitude": "181.2" } },
+        "text": "Started writing this on the train"
+      },
+      {
+        "$type": "app.logdate.journal.draft#imageBlock",
+        "id": "2f3e4d5c-6b7a-4899-a8b7-c6d5e4f3a2b1",
+        "createdAt": "2026-10-18T19:03:40.000Z",
+        "media": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 393216 },
+          "mimeType": "image/heic"
+        },
+        "caption": "The view from the bridge",
+        "presentation": "framed"
+      },
+      {
+        "$type": "app.logdate.journal.draft#videoBlock",
+        "id": "3a4f5e6d-7c8b-49aa-b9c8-d7e6f5a4b3c2",
+        "createdAt": "2026-10-18T19:04:02.000Z",
+        "media": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 5242880 },
+          "mimeType": "video/mp4"
+        },
+        "thumbnail": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 65536 },
+          "mimeType": "image/jpeg"
+        }
+      },
+      {
+        "$type": "app.logdate.journal.draft#audioBlock",
+        "id": "4b5a6f7e-8d9c-4abb-8ad9-e8f7a6b5c4d3",
+        "createdAt": "2026-10-18T19:05:15.000Z",
+        "media": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 131072 },
+          "mimeType": "audio/mp4"
+        },
+        "durationMs": 15300,
+        "transcriptText": "Note to self: call Grandma tomorrow."
+      },
+      {
+        "$type": "app.logdate.journal.draft#cameraBlock",
+        "id": "5c6b7a8f-9e0d-4bcc-9bea-f9a8b7c6d5e4",
+        "createdAt": "2026-10-18T19:06:00.000Z"
+      }
+    ],
+    "journals": [
+      { "collection": "app.logdate.journal.journal", "rkey": "5f2e8c1a-9b3d-4a7e-8f6c-2d1b0a9e8c7d" },
+      { "collection": "app.logdate.journal.journal", "rkey": "6a3f9d2b-0c4e-4b8f-9a7d-3e2c1b0a9f8e" }
+    ],
+    "createdAt": "2026-10-18T19:02:11.000Z",
+    "updatedAt": "2026-10-18T19:06:00.000Z"
+  }
+}

@@ -53,17 +53,18 @@ Classified from the latest Room schema. When the schema changes,
 
 | Table | Becomes | Who can see it | Origin | Lives in |
 |---|---|---|---|---|
-| `text_notes`, `image_notes`, `video_notes`, `audio_notes` | `app.logdate.journal.entry`, one entry with ordered blocks | Publishable | Authored | Personal space |
+| `text_notes`, `image_notes`, `video_notes`, `audio_notes` | `app.logdate.journal.entry`. Each note becomes one entry with a single block | Publishable | Authored | Personal space |
 | `media_captions` | Part of the entry's media block | Publishable | Authored | Personal space |
 | `transcriptions`, `transcription_segments` | `app.logdate.journal.transcript`, attached to an audio block | Shareable, with its audio | Derived, costly | Personal space |
 | `audio_tags` | Part of the transcript | Shareable, with its audio | Derived | Personal space |
 | `journals` | `app.logdate.journal.journal` | Shareable (a shared journal keeps reaching its audience) | Authored | Personal space |
 | `journal_content_links` | `app.logdate.journal.membership` | Follows the journal | Authored | Personal space |
-| `journal_merges` | Not a record | — | Bookkeeping | Device only |
+| `journal_merges` | Not a record. The merged-away journal's record gets `mergedInto` instead | — | Bookkeeping | Device only |
+| `marked_moments` | `app.logdate.journal.markedMoment` | Private only (it can hold a heart rate) | Authored | Personal space |
 | `user_places` | `app.logdate.place.place` | Private only | Authored | Personal space |
-| `history_records` | `app.logdate.place.visit`, `app.logdate.place.journey`, and `app.logdate.place.correction` for the person's corrections | Private only | Derived from sensors, with authored corrections | Personal space |
-| `location_logs` | `app.logdate.place.sample`, one record per day | Private only | Derived from sensors | Personal space |
-| `location_activity` | Part of the visit or journey it explains | Private only | Derived | Personal space |
+| `history_records` | One record type per kind of history record; see [Location history](#location-history) | Private only | Derived from sensors, with authored places, corrections, links and visits | Personal space |
+| `location_logs` | `app.logdate.place.sample`, one record per device per hour | Private only | Derived from sensors | Personal space |
+| `location_activity` | The `transitions` of `app.logdate.place.sample` | Private only | Derived from sensors | Personal space |
 | `history_cursors` | Not a record | — | Bookkeeping | Device only |
 | `places` | Not a record. Nothing writes it; drop it with the migration. | — | — | — |
 | `events` | Reused `community.lexicon.calendar.event`, plus `app.logdate.event.annotation` for LogDate's own fields | Shareable | Derived from calendars, edited by the person | Personal space |
@@ -91,6 +92,130 @@ Some data lives outside Room and also becomes records:
 | Profile (display name, photo, bio) | `app.logdate.actor.profile` | Public | Authored | Public repository |
 | Birthday | `app.logdate.actor.settings`, not the profile | Private only | Authored | Personal space |
 | Editor drafts | `app.logdate.journal.draft` | Private only | Authored, unfinished | Personal space |
+| Journal favorites | The `favorite` field of `app.logdate.journal.journal`, left out of shared copies | Private only | Authored | Personal space |
+
+## How today's synced data becomes records
+
+Today's sync sends notes, journals, journal links, drafts, marked moments and location history
+records. Each piece of that data has a field in the new records, so switching sync over loses
+nothing. This section is the field-by-field map for that switch.
+
+### Notes become entries
+
+Each note becomes one `app.logdate.journal.entry` with a single block. The entry's record key and
+the block's `id` are both the note's id. Notes aren't grouped today: each block in the editor is
+saved as its own note, with its own time, location and capture details, so merging notes into one
+entry would mix those up. Entries with several blocks stay possible for later.
+
+| Note field | Entry field |
+|---|---|
+| `creationTimestamp`, `lastUpdated` | `createdAt`, `updatedAt` |
+| Text `content` | `textBlock.text`, with `format` left out (markdown, which is what the editor writes) |
+| Photo, video or audio file | The block's `media`. The app records `mimeType` when the file is imported or uploaded |
+| Photo, video and audio `caption` | The block's `caption` |
+| Photo `presentation` (`EdgeToEdge`, `Framed`) | `imageBlock.presentation` (`edgeToEdge`, `framed`) |
+| Audio `durationMs` | `audioBlock.durationMs` |
+| Audio `transcript` | An `app.logdate.journal.transcript` with the same record key as the entry, referred to from `audioBlock.transcript` |
+| Location coordinates and accuracy | `location.geo` (latitude, longitude, altitude) and `location.accuracyCentimeters` |
+| Location place | `location.place`. A location can have a place without coordinates |
+| `timeZoneId` | `timeZone`. Today's sync leaves it out; the entry carries it |
+| `capturedOn` (`phone`, `watch`) | `capturedOn`, with the same values |
+| `capturedDuring` (`moving`, `in_vehicle`) | `capturedDuring` (`moving`, `inVehicle`) |
+
+### Transcripts
+
+A transcript keeps everything the apps store about it: every segment with its id, timing, text,
+words, speaker, confidence, recognition pass and whether it's final; the speakers; the engine's
+name, model and version; detected sounds; and the revision. Confidences become thousandths.
+
+Speaker colors aren't stored. The apps can assign a color to each speaker without one, and nothing
+sets one today.
+
+The status covers both the transcript's own lifecycle and the transcription job's:
+
+| Today | `status` |
+|---|---|
+| Job `PENDING` | `pending` |
+| Job `IN_PROGRESS`, transcript `LISTENING` (the first pass is still producing segments) | `inProgress` |
+| Transcript `REFINING` (a second pass is improving a transcript that already exists) | `refining` |
+| Job `COMPLETED`, transcript `FINAL` | `complete` |
+| `FAILED` | `failed` |
+
+Segment sources keep their order of authority: `imported`, `localLive`, `cloudLive`,
+`localRefinement`, `cloudRefinement`.
+
+### Journals and memberships
+
+A journal's `isFavorited` becomes `favorite`. When the person merges journals, the merged-away
+journal isn't deleted. Its record is rewritten with `mergedInto` naming the surviving journal, so a
+device that comes back online with entries or drafts still in the old journal can move them over.
+The device that merges also rewrites the memberships and drafts it knows about.
+
+That record is deleted when the surviving journal is deleted. If the surviving journal is itself
+merged later, every record that names it in `mergedInto` is updated to the new survivor, so a
+redirect is always one step.
+
+A membership's record key is `<journal>:<entry>`, the same pair today's journal links are keyed by.
+
+### Drafts
+
+A draft keeps each block's own start time and location, because each block becomes its own entry
+when the draft is saved. `journals` lists every journal the person picked. A video block keeps its
+thumbnail. An audio block keeps its length and the text recognized so far, in `transcriptText`,
+because a draft has no entry for a transcript record to refer to. The editor's camera block is its
+own kind, `cameraBlock`, because it holds a photo or a video and the file's `mimeType` says which.
+Blocks whose file hasn't been picked or recorded yet have no `media`.
+
+### Marked moments
+
+A moment marked on the watch becomes an `app.logdate.journal.markedMoment`. Its states become
+`open`, `dismissed` and `filled`, and its resolved note ids become `resolvedEntries`. It's private
+only: it records a place and can record a heart rate, and it's a reminder, not something to share.
+
+### Location history
+
+Today's location history is a set of `history_records`, each with a kind. Each kind becomes its own
+record type:
+
+| History record kind | Becomes | Record key |
+|---|---|---|
+| `observation` (a location sample) | A point in `app.logdate.place.sample` | The hour's record: `<UTC hour>:<device>`, such as `2026-10-19T14:<device>` |
+| `activity` (an activity change) | A transition in `app.logdate.place.sample` | The same hour's record |
+| `place` | `app.logdate.place.place` | The place's id |
+| `correction` | `app.logdate.place.correction` | The correction's id |
+| `memory-link` | `app.logdate.place.entryLink` | The link's id |
+| `manual` (a visit the person added) | `app.logdate.place.visit` | The visit's id |
+
+Deleting a sample or an activity change is no longer a deleted record of its own: the device
+rewrites the hour without it and lists its id in `deletedSampleIds` or `deletedTransitionIds`, so
+the device that recorded it never adds it back.
+
+Visits and journeys that LogDate works out from samples aren't records. Every device works them
+out again. `app.logdate.place.visit` holds only visits the person added, and
+`app.logdate.place.journey` is reserved: nothing writes it yet.
+
+Corrections and entry links name what they apply to with an evidence id, exactly as today: a sample
+id, a visit's record key, `place:<place key>`, or the `derived:journey:` id of a journey inferred
+between two visits. A correction's value moves from one string into a field of its own type:
+`label`, `place`, `activity`, `startsAt` or `endsAt`. A `delete` correction has no value.
+
+How the person moved keeps every value it has today:
+
+| `TravelMode` | `activity` and `mode` |
+|---|---|
+| `STILL`, `WALKING`, `RUNNING`, `CYCLING` | `still`, `walking`, `running`, `cycling` |
+| `VEHICLE` (a vehicle of unknown kind) | `vehicle` |
+| `DRIVING`, `BUS`, `TRAIN` | `driving`, `bus`, `train` |
+| `UNKNOWN` | `unknown` |
+
+Activity changes keep the device's own activity names (`still`, `walking`, `running`, `onFoot`,
+`onBicycle`, `inVehicle`, `unknown`) and whether the person started (`enter`) or stopped (`exit`).
+
+A suggested place keeps its address (`locality`), its map directory id (`externalId`) and whether
+the person confirmed it (`userConfirmed`). A radius is only stored for places that have their own.
+
+Fractional measurements become integers in smaller units, so no digits are lost: accuracy in
+centimeters, speed in centimeters per second, and bearing in hundredths of a degree.
 
 ## Data the sharing features add
 
@@ -126,8 +251,8 @@ All new schemas use the `app.logdate.*` namespace. Each group below is its own a
 | Group | Records |
 |---|---|
 | `app.logdate.defs` | `recordRef`, `media`, `aspectRatio`, `location` (shared definitions, not records) |
-| `app.logdate.journal` | `entry`, `transcript`, `journal`, `membership`, `draft` |
-| `app.logdate.place` | `place`, `visit`, `journey`, `correction`, `sample` |
+| `app.logdate.journal` | `entry`, `transcript`, `journal`, `membership`, `draft`, `markedMoment` |
+| `app.logdate.place` | `place`, `visit`, `correction`, `entryLink`, `sample`, and `journey` (reserved: nothing writes it yet) |
 | `app.logdate.people` | `person`, `mention`, `decision`, `inference` |
 | `app.logdate.event` | `annotation` |
 | `app.logdate.rewind` | `rewind`, `promptResponse` |
@@ -299,11 +424,13 @@ yet.
 | `journal.journal` | `OrderedCollection` with `name` and `summary`; its entries are the `orderedItems` |
 | `journal.membership` | An item in the journal's collection (`Add` with the journal as `target` when expressed as an activity) |
 | `journal.draft` | None; drafts are unfinished and never leave the owner's devices in any other form |
-| `place.place` | `Place`, with `name`, `latitude`, `longitude`, `radius` and `units` |
+| `journal.markedMoment` | None; a reminder to write something later, not content |
+| `place.place` | `Place`, with `name`, `latitude`, `longitude`, and `radius` and `units` when it has a radius |
 | `place.visit` | `Arrive`, with the `Place` as `location` and the visit's start as `published`; the end time uses a LogDate term |
 | `place.journey` | `Travel`, with `origin` and `target` places |
-| `place.correction` | `Update` of the visit or journey it corrects |
-| `place.sample` | None; daily location records use the lexicon form (and GeoJSON in exports) |
+| `place.correction` | `Update` of the visit, journey or place it corrects |
+| `place.entryLink` | None; it connects two private records and has no meaning on its own |
+| `place.sample` | None; hourly location records use the lexicon form (and GeoJSON in exports) |
 | `people.person` | `Person` as an object, not an actor: `name`, `summary`, `icon`. It describes someone; it doesn't make them an account. |
 | `people.mention` | A `Mention` in the entry's `tag` |
 | `people.decision` | None; it records an answer to a question LogDate asked, not content |
@@ -342,7 +469,7 @@ Streams form.
 |---|---|
 | 2026-10-10 | **One entry type.** `entry` holds ordered blocks (text, photo, video, audio), following the planned multi-block journal entry. The sync migration converts today's separate note tables into entries. |
 | 2026-10-10 | **One sealed collection.** Every private record is stored inside a single `app.logdate.crypto.sealed` collection, so the server can't tell which kinds of records someone has. |
-| 2026-10-10 | **Daily location records.** Raw location samples are batched into one `place.sample` record per day instead of one record per sample. |
+| 2026-10-18 | **Hourly location records, one per device.** Raw location samples and activity changes are batched into one `place.sample` record per device per UTC hour, keyed `<UTC hour>:<device>`, instead of one record per sample. This replaces the 2026-10-10 decision to batch by day. A sealed record is replaced whole on every change, and a device uploads new samples every few minutes. A day can hold thousands of samples (the foreground stream takes about one a second), so a daily record would be encrypted and uploaded again at up to several megabytes, many times a day. An hourly record stays small, and an hour that has ended only changes again when the person deletes something. Each device writes only its own records, so two devices never conflict over new samples. Keying by UTC hour means a time zone change or a daylight saving change never puts two hours under one key. |
 | 2026-10-10 | **Inferred people sync as regular records.** Unconfirmed inferences are `people.inference` records in the personal space, synced like any other content, so every device shows the same suggestions and works from the same underlying data. They stay private and never become shareable until confirmed. |
 | 2026-10-10 | **Shared copies are ordinary records.** A shared entry, journal, Rewind, postcard or sticker is copied into the circle or group space under its usual type, and an `app.logdate.share.item` lists the copies. The AT Protocol reference implementation doesn't allow one record type to be embedded inside another, and keeping one type per kind of content means apps read shared and private entries the same way. |
 | 2026-10-10 | **References inside private spaces use `recordRef`.** Records in personal, circle and group spaces point at each other by type and key (`app.logdate.defs#recordRef`), because they have no public AT URI or CID. |
@@ -352,3 +479,12 @@ Streams form.
 | 2026-10-18 | **Sharing apps never get the journal or the keys.** `app.logdate.authShare` grants circle and group spaces only. The personal space, the profile, the sharing keys, deleting shares and running groups stay with `app.logdate.authFull`, LogDate's own apps. |
 | 2026-10-18 | **Managing spaces only under your own authority.** Both sets grant `manage` only for the person's own spaces, and `app.logdate.authFull` can only create the personal space, never change or delete it. Records in other people's spaces are reached through separate permissions without `manage`. |
 | 2026-10-18 | **Group profiles and members come from the group's authority.** Apps accept `groupProfile` and `member` records only from the repository of the person who started the group. |
+| 2026-10-18 | **The schemas carry everything LogDate syncs today.** Every field of today's synced notes, transcripts, journals, journal links, drafts, marked moments and location history has a place in an `app.logdate.*` record, so switching sync over loses nothing. The field-by-field map is in [How today's synced data becomes records](#how-todays-synced-data-becomes-records). |
+| 2026-10-18 | **One note becomes one single-block entry.** The entry's record key and its block's id are the note's id. Each note has its own time, location and capture details today, so merging notes into one entry would mix them up. Multi-block entries stay supported. |
+| 2026-10-18 | **Capture details belong to the entry.** `timeZone`, `capturedOn` and `capturedDuring` are entry fields, so the local time is known even without a location. `app.logdate.defs#location` holds only where: coordinates, a place, or both. |
+| 2026-10-18 | **Media is encrypted with the account's media key.** Blobs are encrypted on the device in 64 KiB chunks with the account-wide media key (`LDCE2`), not with the content key of the record that refers to them. The app records `mimeType` when it imports or uploads a file. |
+| 2026-10-18 | **Transcripts keep full detail.** Segment ids, words, speakers, the recognition pass of each segment and the engine are all stored, because a transcript is costly to produce again. Speaker colors aren't: they're a display choice nothing sets. The first recognition pass maps to `inProgress` and the second to `refining`. |
+| 2026-10-18 | **Merged journals leave a redirect.** The merged-away journal stays as a record with `mergedInto`, so every device can move what it still has in that journal. It's deleted with the surviving journal, and points at the newest survivor when merges chain. |
+| 2026-10-18 | **Marked moments are their own record.** `app.logdate.journal.markedMoment` is private only. A mark isn't an entry: it's left out of Rewinds and the library, and it can hold a heart rate. |
+| 2026-10-18 | **Stored location history is samples plus what the person did.** Samples and activity changes, places, corrections, entry links and visits the person added are records. Visits and journeys LogDate works out are recomputed on every device, so `app.logdate.place.journey` is reserved and nothing writes it yet. Corrections and entry links name their target with today's evidence ids, and each correction stores its new value in a field of the right type. |
+| 2026-10-18 | **Fractional measurements use smaller units.** Accuracy is in centimeters, speed in centimeters per second and bearing in hundredths of a degree, so the digits devices report as fractions survive as integers. |

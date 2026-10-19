@@ -1,0 +1,36 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.place.entryLink",
+  "description": "Connects an entry to a visit in the person's location history.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Connects an entry to a visit in the person's location history, so the entry appears with that visit even when its time or location alone wouldn't put it there. Only the owner sees it.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "entry",
+          "evidenceId"
+        ],
+        "properties": {
+          "entry": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The entry (app.logdate.journal.entry)."
+          },
+          "evidenceId": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "The visit, named the same way as an app.logdate.place.correction's evidenceId: by the id of one of its location samples, or by the record key of a visit the person added."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When the entry was connected, when known."
+          }
+        }
+      }
+    }
+  }
+}

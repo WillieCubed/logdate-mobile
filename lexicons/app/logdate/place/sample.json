@@ -1,28 +1,28 @@
 {
   "lexicon": 1,
   "id": "app.logdate.place.sample",
-  "description": "One day of raw location samples. The record key is the local date, such as 2026-10-10, so each day has exactly one record.",
+  "description": "One hour of raw location samples and activity changes recorded by one device.",
   "defs": {
     "main": {
       "type": "record",
-      "description": "One day of raw location samples. The record key is the local date, such as 2026-10-10, so each day has exactly one record.",
+      "description": "One hour of raw location samples and activity changes recorded by one device. The record key is the UTC hour and the device's identifier joined by a colon, such as 2026-10-19T14:6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b, so each device writes its own records and a new sample only rewrites the current hour. Visits and journeys aren't stored: every device works them out from these samples.",
       "key": "any",
       "record": {
         "type": "object",
         "required": [
-          "date",
-          "samples"
+          "device",
+          "startsAt"
         ],
         "properties": {
-          "date": {
+          "device": {
             "type": "string",
-            "maxLength": 10,
-            "description": "The local calendar date, as YYYY-MM-DD."
+            "maxLength": 128,
+            "description": "Identifier of the device that recorded the samples."
           },
-          "timeZone": {
+          "startsAt": {
             "type": "string",
-            "maxLength": 64,
-            "description": "IANA time zone the date is in."
+            "format": "datetime",
+            "description": "The start of the UTC hour the samples fall in, such as 2026-10-19T14:00:00.000Z."
           },
           "samples": {
             "type": "array",
@@ -30,7 +30,35 @@
               "type": "ref",
               "ref": "#point"
             },
-            "maxLength": 50000
+            "maxLength": 10000,
+            "description": "The location samples, in time order."
+          },
+          "transitions": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "#transition"
+            },
+            "maxLength": 2000,
+            "description": "Changes in what the person was doing that the device detected, such as starting to walk, in time order."
+          },
+          "deletedSampleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "maxLength": 10000,
+            "description": "Ids of samples from this hour that the person deleted. A device must not add a sample back once its id is listed here."
+          },
+          "deletedTransitionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "maxLength": 2000,
+            "description": "Ids of activity changes from this hour that were deleted. A device must not add one back once its id is listed here."
           }
         }
       }
@@ -39,11 +67,17 @@
       "type": "object",
       "description": "One location sample.",
       "required": [
+        "id",
         "at",
         "latitude",
         "longitude"
       ],
       "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Identifier of the sample, unique for the account. Corrections and deletions refer to the sample by this value."
+        },
         "at": {
           "type": "string",
           "format": "datetime"
@@ -63,38 +97,112 @@
           "maxLength": 32,
           "description": "Decimal meters above the WGS84 ellipsoid."
         },
-        "accuracyMeters": {
+        "accuracyCentimeters": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Horizontal accuracy, in centimeters."
         },
         "speedCentimetersPerSecond": {
           "type": "integer",
           "minimum": 0
         },
-        "bearingDegrees": {
+        "bearingCentidegrees": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 359
+          "maximum": 35999,
+          "description": "Direction of travel in hundredths of a degree, clockwise from true north."
         },
         "activity": {
           "type": "string",
+          "maxLength": 32,
           "knownValues": [
             "still",
             "walking",
             "running",
             "cycling",
-            "inVehicle",
+            "vehicle",
+            "driving",
+            "bus",
+            "train",
             "unknown"
-          ]
+          ],
+          "description": "How the person was moving when the sample was taken. vehicle means some vehicle whose kind isn't known; driving, bus and train are specific kinds. Defaults to unknown."
+        },
+        "timeZone": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "IANA time zone the device was in when it took the sample."
         },
         "source": {
           "type": "string",
           "maxLength": 64,
-          "description": "Which sensor pipeline produced the sample."
+          "knownValues": [
+            "backgroundPeriodic",
+            "passiveUpdate",
+            "activityTransition",
+            "geofenceTransition",
+            "serverNudge",
+            "foregroundStream",
+            "journalEntry",
+            "timelineReview",
+            "manual",
+            "retry",
+            "unknown"
+          ],
+          "description": "What made the device take the sample, such as a periodic background check or writing an entry. Defaults to unknown."
         },
         "mock": {
           "type": "boolean",
           "description": "True when the device reported a simulated location."
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "description": "The moment the device detected that the person started or stopped an activity, such as walking or riding in a vehicle. LogDate uses these to find where visits begin and end.",
+      "required": [
+        "id",
+        "at",
+        "activity",
+        "transition"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Identifier of the activity change, unique for the account."
+        },
+        "at": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "activity": {
+          "type": "string",
+          "maxLength": 32,
+          "knownValues": [
+            "still",
+            "walking",
+            "running",
+            "onFoot",
+            "onBicycle",
+            "inVehicle",
+            "unknown"
+          ],
+          "description": "The activity, as the device's activity recognition reported it. onFoot means walking or running without knowing which."
+        },
+        "transition": {
+          "type": "string",
+          "maxLength": 32,
+          "knownValues": [
+            "enter",
+            "exit"
+          ],
+          "description": "Whether the person started (enter) or stopped (exit) the activity."
+        },
+        "timeZone": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "IANA time zone the device was in at the time."
         }
       }
     }

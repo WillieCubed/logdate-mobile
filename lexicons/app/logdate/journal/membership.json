@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "Places an entry in a journal. An entry can belong to several journals.",
+      "description": "Places an entry in a journal. An entry can belong to several journals. The record key is the journal's key and the entry's key joined by a colon (<journal>:<entry>), so a pair has exactly one membership and every device that adds the same entry to the same journal writes the same record.",
       "key": "any",
       "record": {
         "type": "object",

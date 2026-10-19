@@ -1,0 +1,87 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.journal.markedMoment",
+  "description": "A moment the person marked to write about later, such as with one tap on their watch.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A moment the person marked to write about later, such as with one tap on their watch. It records when and where the mark was made, and later which entries filled it in. It isn't an entry: apps show it as a reminder until it's filled in or dismissed. Only the owner ever sees it.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "state",
+          "timeZone",
+          "originDevice",
+          "createdAt"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "maxLength": 32,
+            "knownValues": [
+              "open",
+              "dismissed",
+              "filled"
+            ],
+            "description": "Where the mark is in its life. It only moves forward: open, then dismissed or filled. When two devices disagree, the later state in that order wins, and filled wins over dismissed."
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 20000,
+            "maxGraphemes": 2000,
+            "description": "A few words the person wrote about the moment. Saved while the mark is open, too, so unfinished words aren't lost."
+          },
+          "resolvedEntries": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "app.logdate.defs#recordRef"
+            },
+            "maxLength": 200,
+            "description": "The entries that filled in this mark. The list only grows."
+          },
+          "location": {
+            "type": "ref",
+            "ref": "app.logdate.defs#location",
+            "description": "Where the mark was made, as precisely as the device knew it. Can be added later when the mark was made without one, but never replaced."
+          },
+          "timeZone": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "IANA time zone the device was in when the mark was made, such as America/Chicago."
+          },
+          "heartRateBpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 400,
+            "description": "The person's heart rate when the mark was made, in beats per minute, when the watch measured it."
+          },
+          "capturedDuring": {
+            "type": "string",
+            "maxLength": 32,
+            "knownValues": [
+              "moving",
+              "inVehicle"
+            ],
+            "description": "What the person was doing when they made the mark, while activity awareness was on. Absent when nothing was under way or it wasn't recorded."
+          },
+          "originDevice": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Identifier of the device that made the mark. It never changes, and devices use it to tell two marks apart when they merge copies."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When the person made the mark."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

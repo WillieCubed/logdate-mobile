@@ -56,7 +56,8 @@ class GeneratedModelRoundTripTest {
                     EntryBlocksItem.AudioBlock(EntryAudioBlock(id = "a1", media = media("voice"), durationMs = 12_000)),
                 ),
             createdAt = "2026-10-16T08:30:00.000Z",
-            location = DefsLocation(geo = Geo(latitude = "47.6062", longitude = "-122.3321"), timeZone = "America/Los_Angeles"),
+            location = DefsLocation(geo = Geo(latitude = "47.6062", longitude = "-122.3321"), accuracyCentimeters = 1_250),
+            timeZone = "America/Los_Angeles",
         )
 
     @Test
