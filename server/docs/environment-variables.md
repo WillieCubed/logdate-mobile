@@ -601,9 +601,11 @@ with the change that makes them required.
   advertises the `atprotoPlcPublishingV1` protocol feature, and clients may then offer identity
   changes such as signing-key rotation. When disabled, the server refuses those changes.
   Recovery keys do not need it; see `ATPROTO_RECOVERY_KEYS_ENABLED`. Production leaves it off.
-  DIDs created while it is off are never published later on their own, so turning it on needs a
-  backfill for existing accounts. The hosted operation log records each operation's CID, so that
-  backfill can submit the log as it is.
+  DIDs created while it is off are never published later on their own: turning it on means running
+  the identity publishing command for existing accounts, which submits the hosted operation log as
+  it is. Publishing can't be undone, so follow
+  [identity publishing runbook](../../docs/runbook/identity-publishing.md) to turn it on. Only a
+  production deployment contract may set it to `true`.
 
 ### `ATPROTO_RECOVERY_KEYS_ENABLED`
 - **Description**: Whether people can register their own recovery key on their hosted `did:plc`
@@ -626,8 +628,10 @@ with the change that makes them required.
 - **Default**: `https://plc.directory`
 - **Example**: `ATPROTO_PLC_DIRECTORY_URL=https://plc.directory`
 - **Required**: No
-- **Notes**: Must use `https`. Point it at a test directory when exercising publishing outside
-  production.
+- **Notes**: Must use `https`, except outside production, where plain `http` is accepted for a
+  loopback host such as `http://127.0.0.1:2582`. That is how `./run identity:rehearse` points a
+  local server at a PLC directory running on the same machine. Never point a development or
+  staging server at the public directory with publishing on.
 
 ### `ATPROTO_OAUTH_ISSUER`
 - **Description**: Issuer URL of the server's OAuth authorization server for third-party AT
