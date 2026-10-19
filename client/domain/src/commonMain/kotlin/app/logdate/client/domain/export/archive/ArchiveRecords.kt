@@ -82,7 +82,14 @@ private fun SerializableEntryBlock.mediaKind(): MediaKind =
     }
 
 internal fun Journal.toArchiveJournal() =
-    ArchiveJournal(id = id.toString(), title = title, description = description, createdAt = created, updatedAt = lastUpdated)
+    ArchiveJournal(
+        id = id.toString(),
+        title = title,
+        description = description,
+        createdAt = created,
+        updatedAt = lastUpdated,
+        favorite = isFavorited,
+    )
 
 internal fun JournalNote.toArchiveNote(
     journalIds: List<Uuid>,

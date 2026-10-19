@@ -26,6 +26,8 @@ data class ArchiveJournal(
     val description: String,
     val createdAt: Instant,
     val updatedAt: Instant,
+    /** Whether the person marked the journal as a favorite. Absent in archives from before the app kept it. */
+    val favorite: Boolean = false,
 )
 
 @Serializable

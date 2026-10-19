@@ -75,7 +75,16 @@ object ArchiveSamples {
 
     val journalFile =
         ArchiveJournalFile(
-            listOf(ArchiveJournal(id = JOURNAL_ID, title = "Daily", description = "Every day", createdAt = at, updatedAt = at)),
+            listOf(
+                ArchiveJournal(
+                    id = JOURNAL_ID,
+                    title = "Daily",
+                    description = "Every day",
+                    createdAt = at,
+                    updatedAt = at,
+                    favorite = true,
+                ),
+            ),
         )
 
     val draftFile =
