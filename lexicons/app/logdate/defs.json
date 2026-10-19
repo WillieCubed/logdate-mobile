@@ -93,12 +93,12 @@
         "place": {
           "type": "ref",
           "ref": "app.logdate.defs#recordRef",
-          "description": "The saved place (app.logdate.place.place) this location belongs to, when there is one."
+          "description": "The saved place (app.logdate.place.place) this location belongs to, when there is one. Places are private only, so a shared copy of a record leaves place and placeDetails out unless the person chooses to share the place."
         },
         "placeDetails": {
           "type": "ref",
           "ref": "#placeDetails",
-          "description": "The place's name and center, written alongside place so the location still reads correctly on a device that doesn't have the place record, or after the place is deleted."
+          "description": "The place's name and center, written alongside place so the location still reads correctly on a device that doesn't have the place record, or after the place is deleted. It's a copy and can be out of date: when the place record is available, its name (after label corrections) and center are shown instead. Left out of shared copies unless the person chooses to share the place."
         }
       }
     },
