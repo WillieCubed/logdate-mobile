@@ -88,7 +88,7 @@
         "accuracyCentimeters": {
           "type": "integer",
           "minimum": 0,
-          "description": "Horizontal accuracy of the coordinates, in centimeters: the device's value in meters times 100, rounded to the nearest whole number, and 0 if it was negative. Digits below a centimeter are dropped; they're finer than any location sensor measures."
+          "description": "Horizontal accuracy of the coordinates, in centimeters: the device's value in meters times 100, rounded to the nearest whole number with halves away from zero, and 0 if it was negative. Left out when the value is NaN or infinite. Digits below a centimeter are dropped; they're finer than any location sensor measures."
         },
         "place": {
           "type": "ref",

@@ -66,6 +66,20 @@ in the name (`accuracyCentimeters`, `durationMs`, `speedCentimetersPerSecond`), 
 thousandths (`942` means 94.2%), and decimal strings for coordinates, which is what the community
 location schema does.
 
+Every client converts a fractional value to one of these integers the same way, so the Kotlin and
+Swift apps write identical records:
+
+1. If the value is NaN or infinite, refuse it: leave the field out, because it measures nothing.
+2. Multiply by the field's scale: 100 for centimeters and hundredths of a degree, 1000 for
+   thousandths.
+3. Round to the nearest integer, with halves rounded away from zero (2.5 becomes 3, −2.5 becomes
+   −3). Kotlin's `roundToLong()` rounds halves up instead, so Kotlin code rounds the absolute value
+   and puts the sign back; Swift's `rounded()` already rounds this way.
+4. Bring the result into the field's range. A bearing in hundredths of a degree is reduced with a
+   true modulo into 0 to 35,999, whatever its sign or size (Kotlin `mod`, not `%`): −1 becomes
+   35,999, −36,050 (below −360°) becomes 35,950, and 36,000 becomes 0. A confidence is clamped to 0 to 1000. Accuracy, speed and radius
+   become 0 when negative.
+
 **Limits on every string and array.** Give strings a `maxLength` (bytes) and, for text people
 write, a `maxGraphemes` (visible characters). Give arrays a `maxLength`. Limits stop one bad record
 from breaking sync for everyone.
