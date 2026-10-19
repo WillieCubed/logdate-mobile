@@ -1,0 +1,92 @@
+{
+  "collection": "app.logdate.place.place",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a5646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6c7261646975734d657465727307",
+      "cid": "bafyreih2cmbieg7uj4wsvvbqvxvy2crrrdex27pr6tjzwze3upmj2b24di"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","description":"Pancakes at the lake","location":{"latitude":"44.9778","longitude":"-93.2650","altitude":"Pancakes at the lake","name":"Lake house"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a7646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea4646e616d656a4c616b6520686f75736568616c7469747564657450616e63616b657320617420746865206c616b65686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6b6465736372697074696f6e7450616e63616b657320617420746865206c616b656c7261646975734d657465727307",
+      "cid": "bafyreicmb7nfqrju2gqgfbjrxaomcpdwpiirsmcgkvq4lolt7eslqq2eay"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a6646e616d656a4c616b6520686f757365652474797065776170702e6c6f67646174652e706c6163652e706c616365686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6c7261646975734d65746572730772756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreidruqudwqvyynif4cmywfy5xyhtai7klccdl5xtuzkgkpkh5ytjze",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-name",
+      "record": {"$type":"app.logdate.place.place","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/name"}
+    },
+    {
+      "name": "wrong-type-name",
+      "record": {"$type":"app.logdate.place.place","name":42,"location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/name"}
+    },
+    {
+      "name": "too-long-name",
+      "record": {"$type":"app.logdate.place.place","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/name"}
+    },
+    {
+      "name": "missing-location",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/location"}
+    },
+    {
+      "name": "wrong-type-location",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":"not the right type","radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/location"}
+    },
+    {
+      "name": "missing-location-latitude",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"longitude":"-93.2650"},"radiusMeters":7,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/location/latitude"}
+    },
+    {
+      "name": "missing-radiusMeters",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/radiusMeters"}
+    },
+    {
+      "name": "wrong-type-radiusMeters",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":"seven","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/radiusMeters"}
+    },
+    {
+      "name": "below-minimum-radiusMeters",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":0,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"out-of-range","path":"/radiusMeters"}
+    },
+    {
+      "name": "above-maximum-radiusMeters",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":100001,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"out-of-range","path":"/radiusMeters"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.place.place","name":"Lake house","location":{"latitude":"44.9778","longitude":"-93.2650"},"radiusMeters":7,"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

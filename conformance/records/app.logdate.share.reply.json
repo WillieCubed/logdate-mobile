@@ -1,0 +1,62 @@
+{
+  "collection": "app.logdate.share.reply",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.share.reply","item":"Pancakes at the lake","text":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4646974656d7450616e63616b657320617420746865206c616b6564746578747450616e63616b657320617420746865206c616b65652474797065776170702e6c6f67646174652e73686172652e7265706c79696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreigkd2ws3twsf6sk7c2g4mgeaw3n3b5ivpn2hirfowpko35resctsq"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.share.reply","item":"Pancakes at the lake","text":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4646974656d7450616e63616b657320617420746865206c616b6564746578747450616e63616b657320617420746865206c616b65652474797065776170702e6c6f67646174652e73686172652e7265706c79696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreigkd2ws3twsf6sk7c2g4mgeaw3n3b5ivpn2hirfowpko35resctsq"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.share.reply","item":"Pancakes at the lake","text":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a5646974656d7450616e63616b657320617420746865206c616b6564746578747450616e63616b657320617420746865206c616b65652474797065776170702e6c6f67646174652e73686172652e7265706c79696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreidzciqowhnqa5qyoubfvjo72xdovme37yzlakwcma3fretthd6dpi",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","item":"Pancakes at the lake","text":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-item",
+      "record": {"$type":"app.logdate.share.reply","text":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/item"}
+    },
+    {
+      "name": "wrong-type-item",
+      "record": {"$type":"app.logdate.share.reply","item":42,"text":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/item"}
+    },
+    {
+      "name": "too-long-item",
+      "record": {"$type":"app.logdate.share.reply","item":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","text":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/item"}
+    },
+    {
+      "name": "missing-text",
+      "record": {"$type":"app.logdate.share.reply","item":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/text"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.share.reply","item":"Pancakes at the lake","text":"Pancakes at the lake"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.share.reply","item":"Pancakes at the lake","text":"Pancakes at the lake","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "collection": "app.logdate.crypto.wrappedKey",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a7646974656d7450616e63616b657320617420746865206c616b65652474797065781d6170702e6c6f67646174652e63727970746f2e777261707065644b657967777261707065644601020304050669616c676f726974686d7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a69726563697069656e7478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6c726563697069656e744b65797450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreidltr2gmfwmm6wmjt5rvcd5vbr4lzw2i5ttexko6kxwwsglc6ebaa"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a7646974656d7450616e63616b657320617420746865206c616b65652474797065781d6170702e6c6f67646174652e63727970746f2e777261707065644b657967777261707065644601020304050669616c676f726974686d7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a69726563697069656e7478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6c726563697069656e744b65797450616e63616b657320617420746865206c616b65",
+      "cid": "bafyreidltr2gmfwmm6wmjt5rvcd5vbr4lzw2i5ttexko6kxwwsglc6ebaa"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a8646974656d7450616e63616b657320617420746865206c616b65652474797065781d6170702e6c6f67646174652e63727970746f2e777261707065644b657967777261707065644601020304050669616c676f726974686d7450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a69726563697069656e7478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a6c726563697069656e744b65797450616e63616b657320617420746865206c616b6572756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreibddpctuw3hyjiiu2acvc5p67pj7uwoe5mutr5vgbbwk6yk74vvie",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-item",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/item"}
+    },
+    {
+      "name": "wrong-type-item",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":42,"recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/item"}
+    },
+    {
+      "name": "too-long-item",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/item"}
+    },
+    {
+      "name": "missing-recipient",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/recipient"}
+    },
+    {
+      "name": "invalid-format-recipient",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"not-a-did","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/recipient"}
+    },
+    {
+      "name": "missing-recipientKey",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/recipientKey"}
+    },
+    {
+      "name": "missing-algorithm",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/algorithm"}
+    },
+    {
+      "name": "missing-wrapped",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/wrapped"}
+    },
+    {
+      "name": "wrong-type-wrapped",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":"not the right type","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/wrapped"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"}},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.crypto.wrappedKey","item":"Pancakes at the lake","recipient":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","recipientKey":"Pancakes at the lake","algorithm":"Pancakes at the lake","wrapped":{"$bytes":"AQIDBAUG"},"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "collection": "app.logdate.place.sample",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650"}]},
+      "dagCbor": "a364646174656a50616e63616b6573206165247479706578186170702e6c6f67646174652e706c6163652e73616d706c656773616d706c657381a36261747818323032362d31302d31365431383a33303a30302e3030305a686c617469747564656734342e39373738696c6f6e676974756465682d39332e32363530",
+      "cid": "bafyreias5dabx3tl2vgi4drylojmeq3lfvkx4srfhubskztai7nr6cb22a"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","timeZone":"America/Chicago","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650","altitudeMeters":"Pancakes at the lake","accuracyMeters":7,"speedCentimetersPerSecond":7,"bearingDegrees":7,"activity":"still","source":"Pancakes at the lake","mock":true}]},
+      "dagCbor": "a464646174656a50616e63616b6573206165247479706578186170702e6c6f67646174652e706c6163652e73616d706c656773616d706c657381aa6261747818323032362d31302d31365431383a33303a30302e3030305a646d6f636bf566736f757263657450616e63616b657320617420746865206c616b65686163746976697479657374696c6c686c617469747564656734342e39373738696c6f6e676974756465682d39332e323635306e61636375726163794d6574657273076e616c7469747564654d65746572737450616e63616b657320617420746865206c616b656e62656172696e6744656772656573077819737065656443656e74696d65746572735065725365636f6e64076874696d655a6f6e656f416d65726963612f4368696361676f",
+      "cid": "bafyreidxkk2flsq5sxmwzs5hl4wxt4g2rvgmr7n6z44yowbksjxqj6kcj4"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650"}],"unknownFutureField":"ignored"},
+      "dagCbor": "a464646174656a50616e63616b6573206165247479706578186170702e6c6f67646174652e706c6163652e73616d706c656773616d706c657381a36261747818323032362d31302d31365431383a33303a30302e3030305a686c617469747564656734342e39373738696c6f6e676974756465682d39332e3236353072756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreih5322xaxfuqxignboyucayuszbd5tbdh24rlknabpyugpyad4rnu",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-place-sample",
+      "record": {"$type":"app.logdate.place.sample","date":"2026-10-10","timeZone":"America/Chicago","samples":[{"at":"2026-10-10T13:58:00.000Z","latitude":"44.97781","longitude":"-93.26502","accuracyMeters":9,"activity":"still","source":"fused","mock":false},{"at":"2026-10-10T14:06:30.000Z","latitude":"44.97802","longitude":"-93.26411","accuracyMeters":14,"speedCentimetersPerSecond":130,"bearingDegrees":72,"activity":"walking"}]},
+      "dagCbor": "a464646174656a323032362d31302d313065247479706578186170702e6c6f67646174652e706c6163652e73616d706c656773616d706c657382a76261747818323032362d31302d31305431333a35383a30302e3030305a646d6f636bf466736f75726365656675736564686163746976697479657374696c6c686c617469747564656834342e3937373831696c6f6e676974756465692d39332e32363530326e61636375726163794d657465727309a76261747818323032362d31302d31305431343a30363a33302e3030305a6861637469766974796777616c6b696e67686c617469747564656834342e3937383032696c6f6e676974756465692d39332e32363431316e61636375726163794d65746572730e6e62656172696e674465677265657318487819737065656443656e74696d65746572735065725365636f6e6418826874696d655a6f6e656f416d65726963612f4368696361676f",
+      "cid": "bafyreibavkdkhklo6lx3vdusxn7tabibbdo36qro6dowbagketmbnhpvau"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","date":"Pancakes a","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650"}]},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-date",
+      "record": {"$type":"app.logdate.place.sample","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650"}]},
+      "failure": {"kind":"missing-required","path":"/date"}
+    },
+    {
+      "name": "wrong-type-date",
+      "record": {"$type":"app.logdate.place.sample","date":42,"samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650"}]},
+      "failure": {"kind":"wrong-type","path":"/date"}
+    },
+    {
+      "name": "too-long-date",
+      "record": {"$type":"app.logdate.place.sample","date":"aaaaaaaaaaa","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650"}]},
+      "failure": {"kind":"too-long","path":"/date"}
+    },
+    {
+      "name": "missing-samples",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a"},
+      "failure": {"kind":"missing-required","path":"/samples"}
+    },
+    {
+      "name": "wrong-type-samples",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/samples"}
+    },
+    {
+      "name": "missing-samples-0-at",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"latitude":"44.9778","longitude":"-93.2650"}]},
+      "failure": {"kind":"missing-required","path":"/samples/0/at"}
+    },
+    {
+      "name": "invalid-format-samples-0-at",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"at":"yesterday afternoon","latitude":"44.9778","longitude":"-93.2650"}]},
+      "failure": {"kind":"invalid-format","path":"/samples/0/at"}
+    },
+    {
+      "name": "wrong-type-samples-0-accuracyMeters",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650","accuracyMeters":"seven"}]},
+      "failure": {"kind":"wrong-type","path":"/samples/0/accuracyMeters"}
+    },
+    {
+      "name": "below-minimum-samples-0-accuracyMeters",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650","accuracyMeters":-1}]},
+      "failure": {"kind":"out-of-range","path":"/samples/0/accuracyMeters"}
+    },
+    {
+      "name": "above-maximum-samples-0-bearingDegrees",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650","bearingDegrees":360}]},
+      "failure": {"kind":"out-of-range","path":"/samples/0/bearingDegrees"}
+    },
+    {
+      "name": "wrong-type-samples-0-mock",
+      "record": {"$type":"app.logdate.place.sample","date":"Pancakes a","samples":[{"at":"2026-10-16T18:30:00.000Z","latitude":"44.9778","longitude":"-93.2650","mock":"yes"}]},
+      "failure": {"kind":"wrong-type","path":"/samples/0/mock"}
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "collection": "app.logdate.rewind.rewind",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "dagCbor": "a665247479706578196170702e6c6f67646174652e726577696e642e726577696e64657469746c6571412064617920617420746865206c616b6566656e647341747818323032362d31302d31365431383a33303a30302e3030305a6670616e656c7381a264746578747450616e63616b657320617420746865206c616b6565247479706578236170702e6c6f67646174652e726577696e642e726577696e64237465787450616e656c6873746172747341747818323032362d31302d31365431383a33303a30302e3030305a6b67656e65726174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreie6z7m35ef4s6jmhy4lsktywfgqo6o5mwawfx6fr2z44ziy5tukty"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","label":"Pancakes at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#imagePanel","media":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"caption":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#videoPanel","media":{"blob":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"application/octet-stream","size":1024},"mimeType":"image/jpeg","size":7,"alt":"Four people around a table on a porch","aspectRatio":{"width":7,"height":7}},"caption":"Pancakes at the lake","durationMs":7}],"firstViewedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a865247479706578196170702e6c6f67646174652e726577696e642e726577696e64656c6162656c7450616e63616b657320617420746865206c616b65657469746c6571412064617920617420746865206c616b6566656e647341747818323032362d31302d31365431383a33303a30302e3030305a6670616e656c7383a264746578747450616e63616b657320617420746865206c616b6565247479706578236170702e6c6f67646174652e726577696e642e726577696e64237465787450616e656ca365247479706578246170702e6c6f67646174652e726577696e642e726577696e6423696d61676550616e656c656d65646961a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa26577696474680766686569676874076763617074696f6e7450616e63616b657320617420746865206c616b65a465247479706578246170702e6c6f67646174652e726577696e642e726577696e6423766964656f50616e656c656d65646961a563616c747825466f75722070656f706c652061726f756e642061207461626c65206f6e206120706f72636864626c6f62a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706578186170706c69636174696f6e2f6f637465742d73747265616d6473697a6507686d696d65547970656a696d6167652f6a7065676b617370656374526174696fa26577696474680766686569676874076763617074696f6e7450616e63616b657320617420746865206c616b656a6475726174696f6e4d73076873746172747341747818323032362d31302d31365431383a33303a30302e3030305a6b67656e65726174656441747818323032362d31302d31365431383a33303a30302e3030305a6d666972737456696577656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreihwqdjdmhy65xsevsg2oob7lcehzz6sibuoa6w7znie3q7uugyvga"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}],"unknownFutureField":"ignored"},
+      "dagCbor": "a765247479706578196170702e6c6f67646174652e726577696e642e726577696e64657469746c6571412064617920617420746865206c616b6566656e647341747818323032362d31302d31365431383a33303a30302e3030305a6670616e656c7381a264746578747450616e63616b657320617420746865206c616b6565247479706578236170702e6c6f67646174652e726577696e642e726577696e64237465787450616e656c6873746172747341747818323032362d31302d31365431383a33303a30302e3030305a6b67656e65726174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreidxlelnnyxzg6gm4nhtbyadwmqpqga3cczoiwwikczkj2z4ruuzny",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-title",
+      "record": {"$type":"app.logdate.rewind.rewind","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"missing-required","path":"/title"}
+    },
+    {
+      "name": "wrong-type-title",
+      "record": {"$type":"app.logdate.rewind.rewind","title":42,"startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"wrong-type","path":"/title"}
+    },
+    {
+      "name": "too-long-title",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"too-long","path":"/title"}
+    },
+    {
+      "name": "missing-startsAt",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"missing-required","path":"/startsAt"}
+    },
+    {
+      "name": "invalid-format-startsAt",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"yesterday afternoon","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"invalid-format","path":"/startsAt"}
+    },
+    {
+      "name": "missing-endsAt",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"missing-required","path":"/endsAt"}
+    },
+    {
+      "name": "missing-generatedAt",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"missing-required","path":"/generatedAt"}
+    },
+    {
+      "name": "missing-panels",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/panels"}
+    },
+    {
+      "name": "wrong-type-panels",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/panels"}
+    },
+    {
+      "name": "too-long-panels",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"},{"$type":"app.logdate.rewind.rewind#textPanel","text":"Pancakes at the lake"}]},
+      "failure": {"kind":"too-long","path":"/panels"}
+    },
+    {
+      "name": "union-member-missing-type-panels-0",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{}]},
+      "failure": {"kind":"union-member-missing-type","path":"/panels/0"}
+    },
+    {
+      "name": "missing-panels-0-text",
+      "record": {"$type":"app.logdate.rewind.rewind","title":"A day at the lake","startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","generatedAt":"2026-10-16T18:30:00.000Z","panels":[{"$type":"app.logdate.rewind.rewind#textPanel"}]},
+      "failure": {"kind":"missing-required","path":"/panels/0/text"}
+    }
+  ]
+}

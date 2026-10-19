@@ -1,0 +1,58 @@
+{
+  "collection": "app.logdate.actor.profile",
+  "recordKey": "literal:self",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.actor.profile"},
+      "dagCbor": "a165247479706578196170702e6c6f67646174652e6163746f722e70726f66696c65",
+      "cid": "bafyreidqvdb2gv6wrwtuxgu6ozmkhtagfaqsqlu4os3z26mowffg7loku4"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.actor.profile","displayName":"Alice","description":"Pancakes at the lake","avatar":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"image/png","size":1024},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a565247479706578196170702e6c6f67646174652e6163746f722e70726f66696c6566617661746172a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519040065247479706564626c6f62686d696d655479706569696d6167652f706e67696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a6b6465736372697074696f6e7450616e63616b657320617420746865206c616b656b646973706c61794e616d6565416c696365",
+      "cid": "bafyreibbclflthqaxjqfuoiheo62rjb7jdjiksbofawakqidw3kfxj5zi4"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.actor.profile","unknownFutureField":"ignored"},
+      "dagCbor": "a265247479706578196170702e6c6f67646174652e6163746f722e70726f66696c6572756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreidx2wjbj2xs6naalmrh3snuglp3uktsjoyvjeshdsben3z5ythc4y",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-actor-profile",
+      "record": {"$type":"app.logdate.actor.profile","displayName":"Alice","description":"Keeping track of the good days.","avatar":{"$type":"blob","ref":{"$link":"bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy"},"mimeType":"image/jpeg","size":48211},"createdAt":"2026-08-01T12:00:00.000Z"},
+      "dagCbor": "a565247479706578196170702e6c6f67646174652e6163746f722e70726f66696c6566617661746172a463726566d82a582500015512202c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae6473697a6519bc5365247479706564626c6f62686d696d65547970656a696d6167652f6a706567696372656174656441747818323032362d30382d30315431323a30303a30302e3030305a6b6465736372697074696f6e781f4b656570696e6720747261636b206f662074686520676f6f6420646179732e6b646973706c61794e616d6565416c696365",
+      "cid": "bafyreidajcmkhhg2dixkqhsramjf3ghgbgok7pbgu3hnl74ovlkrvdnrb4"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "wrong-type-displayName",
+      "record": {"$type":"app.logdate.actor.profile","displayName":42},
+      "failure": {"kind":"wrong-type","path":"/displayName"}
+    },
+    {
+      "name": "too-long-displayName",
+      "record": {"$type":"app.logdate.actor.profile","displayName":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "failure": {"kind":"too-long","path":"/displayName"}
+    },
+    {
+      "name": "wrong-type-avatar",
+      "record": {"$type":"app.logdate.actor.profile","avatar":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/avatar"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.actor.profile","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

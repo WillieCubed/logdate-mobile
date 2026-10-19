@@ -1,0 +1,77 @@
+{
+  "collection": "app.logdate.journal.membership",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreiewpob27cm7imh4e6y6o4qubu42iq4xqiiyxnjmz4izdqiatudqfi"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreiewpob27cm7imh4e6y6o4qubu42iq4xqiiyxnjmz4izdqiatudqfi"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a5652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e6d656d6265727368697065656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279676a6f75726e616ca264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreihdfrzwzniyvbtkzxsmdq7sflpcanzky7i6eec4cbwyv7vdrypcye",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-journal",
+      "record": {"$type":"app.logdate.journal.membership","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/journal"}
+    },
+    {
+      "name": "wrong-type-journal",
+      "record": {"$type":"app.logdate.journal.membership","journal":"not the right type","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/journal"}
+    },
+    {
+      "name": "missing-journal-collection",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/journal/collection"}
+    },
+    {
+      "name": "wrong-type-journal-collection",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":42,"rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/journal/collection"}
+    },
+    {
+      "name": "invalid-format-journal-collection",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/journal/collection"}
+    },
+    {
+      "name": "invalid-format-journal-rkey",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/journal/rkey"}
+    },
+    {
+      "name": "missing-entry",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/entry"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.journal.membership","journal":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

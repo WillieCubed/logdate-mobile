@@ -1,0 +1,123 @@
+{
+  "collection": "app.logdate.journal.transcript",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a5652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e7472616e73637269707465656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279667374617475736770656e64696e6767626c6f636b49647450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreigmhg3wng5axosf7o6z2wkaxawrdl7whsqvdja5uqbbysddio5kyy"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","language":"en","text":"Pancakes at the lake","segments":[{"startMs":7,"endMs":7,"text":"Pancakes at the lake","speaker":"Pancakes at the lake","confidence":7,"final":true}],"soundTags":[{"name":"Lake house","startMs":7,"durationMs":7,"confidence":7}],"source":"onDevice","model":"Pancakes at the lake","revision":7,"status":"pending","speakerCount":7,"createdAt":"2026-10-16T18:30:00.000Z","updatedAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "ae64746578747450616e63616b657320617420746865206c616b65652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e7472616e73637269707465656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279656d6f64656c7450616e63616b657320617420746865206c616b6566736f75726365686f6e446576696365667374617475736770656e64696e6767626c6f636b49647450616e63616b657320617420746865206c616b65686c616e677561676562656e687265766973696f6e07687365676d656e747381a664746578747450616e63616b657320617420746865206c616b6565656e644d73076566696e616cf567737065616b65727450616e63616b657320617420746865206c616b656773746172744d73076a636f6e666964656e636507696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a69736f756e645461677381a4646e616d656a4c616b6520686f7573656773746172744d73076a636f6e666964656e6365076a6475726174696f6e4d7307697570646174656441747818323032362d31302d31365431383a33303a30302e3030305a6c737065616b6572436f756e7407",
+      "cid": "bafyreiewacqtavzgpmq5cd7jjz7o5hitctzt5wppsv4nzelrvpp5of2e4m"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a6652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e7472616e73637269707465656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279667374617475736770656e64696e6767626c6f636b49647450616e63616b657320617420746865206c616b65696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreicxipz2zcsqxv2dfhbevqziycwt4clvf3v4uiykkokvzw6gfx26pu",
+      "modelRoundTrip": false
+    },
+    {
+      "name": "example-journal-transcript",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"},"blockId":"b3","language":"en-US","text":"Okay, everyone say hi to future us.","segments":[{"startMs":0,"endMs":2400,"text":"Okay, everyone say hi to future us.","speaker":"1","confidence":942,"final":true}],"soundTags":[{"name":"laughter","startMs":2500,"durationMs":1800,"confidence":811}],"source":"onDevice","revision":1,"status":"complete","speakerCount":1,"createdAt":"2026-10-10T14:04:02.000Z"},
+      "dagCbor": "ac647465787478234f6b61792c2065766572796f6e652073617920686920746f206675747572652075732e652474797065781e6170702e6c6f67646174652e6a6f75726e616c2e7472616e73637269707465656e747279a264726b6579782433613163326234642d356536662d346137622d386339642d3065316632613362346335646a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727966736f75726365686f6e4465766963656673746174757368636f6d706c65746567626c6f636b4964626233686c616e677561676565656e2d5553687265766973696f6e01687365676d656e747381a6647465787478234f6b61792c2065766572796f6e652073617920686920746f206675747572652075732e65656e644d731909606566696e616cf567737065616b657261316773746172744d73006a636f6e666964656e63651903ae696372656174656441747818323032362d31302d31305431343a30343a30322e3030305a69736f756e645461677381a4646e616d65686c617567687465726773746172744d731909c46a636f6e666964656e636519032b6a6475726174696f6e4d731907086c737065616b6572436f756e7401",
+      "cid": "bafyreifvhdar5l3e6pwdierji4imdyhqxzrot5y3jxtc2eb6wmjqgopieq"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-entry",
+      "record": {"$type":"app.logdate.journal.transcript","blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/entry"}
+    },
+    {
+      "name": "wrong-type-entry",
+      "record": {"$type":"app.logdate.journal.transcript","entry":"not the right type","blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/entry"}
+    },
+    {
+      "name": "missing-entry-collection",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/entry/collection"}
+    },
+    {
+      "name": "wrong-type-entry-collection",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":42,"rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/entry/collection"}
+    },
+    {
+      "name": "invalid-format-entry-collection",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/entry/collection"}
+    },
+    {
+      "name": "invalid-format-entry-rkey",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"a/b"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/entry/rkey"}
+    },
+    {
+      "name": "missing-blockId",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/blockId"}
+    },
+    {
+      "name": "too-long-blockId",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"pending","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"too-long","path":"/blockId"}
+    },
+    {
+      "name": "invalid-format-language",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","language":"!!"},
+      "failure": {"kind":"invalid-format","path":"/language"}
+    },
+    {
+      "name": "wrong-type-segments",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","segments":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/segments"}
+    },
+    {
+      "name": "wrong-type-segments-0-startMs",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","segments":[{"startMs":"seven","endMs":7,"text":"Pancakes at the lake"}]},
+      "failure": {"kind":"wrong-type","path":"/segments/0/startMs"}
+    },
+    {
+      "name": "below-minimum-segments-0-startMs",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","segments":[{"startMs":-1,"endMs":7,"text":"Pancakes at the lake"}]},
+      "failure": {"kind":"out-of-range","path":"/segments/0/startMs"}
+    },
+    {
+      "name": "above-maximum-segments-0-confidence",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","segments":[{"startMs":7,"endMs":7,"text":"Pancakes at the lake","confidence":1001}]},
+      "failure": {"kind":"out-of-range","path":"/segments/0/confidence"}
+    },
+    {
+      "name": "wrong-type-segments-0-final",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"2026-10-16T18:30:00.000Z","segments":[{"startMs":7,"endMs":7,"text":"Pancakes at the lake","final":"yes"}]},
+      "failure": {"kind":"wrong-type","path":"/segments/0/final"}
+    },
+    {
+      "name": "missing-status",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/status"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.journal.transcript","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"blockId":"Pancakes at the lake","status":"pending","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

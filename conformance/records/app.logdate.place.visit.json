@@ -1,0 +1,77 @@
+{
+  "collection": "app.logdate.place.visit",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a4652474797065776170702e6c6f67646174652e706c6163652e7669736974686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e323635306873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreia6k7hsffqpopshukld74biyttusft6fqyic7zppyn3tw6q3wuoiq"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.place.visit","place":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"location":{"latitude":"44.9778","longitude":"-93.2650","altitude":"Pancakes at the lake","name":"Lake house"},"startsAt":"2026-10-16T18:30:00.000Z","endsAt":"2026-10-16T18:30:00.000Z","source":"inferred","status":"suggested","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a8652474797065776170702e6c6f67646174652e706c6163652e766973697465706c616365a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727966656e647341747818323032362d31302d31365431383a33303a30302e3030305a66736f7572636568696e6665727265646673746174757369737567676573746564686c6f636174696f6ea4646e616d656a4c616b6520686f75736568616c7469747564657450616e63616b657320617420746865206c616b65686c617469747564656734342e39373738696c6f6e676974756465682d39332e323635306873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreihqqhjhsnfvason2m7ugusjubtb23olhfne23fiypb4pqvqwibr3q"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a5652474797065776170702e6c6f67646174652e706c6163652e7669736974686c6f636174696f6ea2686c617469747564656734342e39373738696c6f6e676974756465682d39332e323635306873746172747341747818323032362d31302d31365431383a33303a30302e3030305a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreibhoj4zukqdinkhvqix5725i5cuismuohpjmg3hqrndesgynzwanq",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "wrong-type-place",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z","place":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/place"}
+    },
+    {
+      "name": "missing-place-collection",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z","place":{"rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"missing-required","path":"/place/collection"}
+    },
+    {
+      "name": "wrong-type-place-collection",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z","place":{"collection":42,"rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"wrong-type","path":"/place/collection"}
+    },
+    {
+      "name": "invalid-format-place-collection",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z","place":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/place/collection"}
+    },
+    {
+      "name": "invalid-format-place-rkey",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z","place":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/place/rkey"}
+    },
+    {
+      "name": "missing-location",
+      "record": {"$type":"app.logdate.place.visit","startsAt":"2026-10-16T18:30:00.000Z","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/location"}
+    },
+    {
+      "name": "missing-startsAt",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/startsAt"}
+    },
+    {
+      "name": "invalid-format-startsAt",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"yesterday afternoon","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/startsAt"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.place.visit","location":{"latitude":"44.9778","longitude":"-93.2650"},"startsAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "description": "How a payload is padded before encryption: a 4-byte big-endian length, the payload, then zeros up to a bucket. Buckets are powers of two from 512 bytes to 64 KiB, then whole multiples of 64 KiB.",
+  "sizes": [
+    {
+      "payloadLength": 0,
+      "paddedLength": 512
+    },
+    {
+      "payloadLength": 1,
+      "paddedLength": 512
+    },
+    {
+      "payloadLength": 507,
+      "paddedLength": 512
+    },
+    {
+      "payloadLength": 508,
+      "paddedLength": 512
+    },
+    {
+      "payloadLength": 509,
+      "paddedLength": 1024
+    },
+    {
+      "payloadLength": 1020,
+      "paddedLength": 1024
+    },
+    {
+      "payloadLength": 1021,
+      "paddedLength": 2048
+    },
+    {
+      "payloadLength": 2044,
+      "paddedLength": 2048
+    },
+    {
+      "payloadLength": 2045,
+      "paddedLength": 4096
+    },
+    {
+      "payloadLength": 4092,
+      "paddedLength": 4096
+    },
+    {
+      "payloadLength": 4093,
+      "paddedLength": 8192
+    },
+    {
+      "payloadLength": 8188,
+      "paddedLength": 8192
+    },
+    {
+      "payloadLength": 8189,
+      "paddedLength": 16384
+    },
+    {
+      "payloadLength": 16380,
+      "paddedLength": 16384
+    },
+    {
+      "payloadLength": 16381,
+      "paddedLength": 32768
+    },
+    {
+      "payloadLength": 32764,
+      "paddedLength": 32768
+    },
+    {
+      "payloadLength": 32765,
+      "paddedLength": 65536
+    },
+    {
+      "payloadLength": 65531,
+      "paddedLength": 65536
+    },
+    {
+      "payloadLength": 65532,
+      "paddedLength": 65536
+    },
+    {
+      "payloadLength": 65533,
+      "paddedLength": 131072
+    },
+    {
+      "payloadLength": 131068,
+      "paddedLength": 131072
+    },
+    {
+      "payloadLength": 131069,
+      "paddedLength": 196608
+    },
+    {
+      "payloadLength": 3997692,
+      "paddedLength": 3997696
+    }
+  ],
+  "largestSealablePayload": 3997692,
+  "smallestRefusedPayload": 3997693
+}

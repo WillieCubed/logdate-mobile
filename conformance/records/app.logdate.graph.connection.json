@@ -1,0 +1,77 @@
+{
+  "collection": "app.logdate.graph.connection",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a3652474797065781c6170702e6c6f67646174652e67726170682e636f6e6e656374696f6e677375626a65637478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreieyyoqg7etejc77txswzjlcnzawgf7lezzg6bqevkkknja37krrsy"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","via":"invite","person":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"createdAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a56376696166696e76697465652474797065781c6170702e6c6f67646174652e67726170682e636f6e6e656374696f6e66706572736f6ea264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e747279677375626a65637478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreigdcrqzxvwl7thypfosck5u3ahxle2m6uw2vrzwnftzllppu3qiuu"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a4652474797065781c6170702e6c6f67646174652e67726170682e636f6e6e656374696f6e677375626a65637478206469643a706c633a65777669376e787a796f756e367a687872687336346f697a696372656174656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreifvb2ejhszjuh2ol5wgfnfz5skfzpihhz7ej3qxrjpbseiclp4tdm",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-subject",
+      "record": {"$type":"app.logdate.graph.connection","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"missing-required","path":"/subject"}
+    },
+    {
+      "name": "wrong-type-subject",
+      "record": {"$type":"app.logdate.graph.connection","subject":42,"createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-type","path":"/subject"}
+    },
+    {
+      "name": "invalid-format-subject",
+      "record": {"$type":"app.logdate.graph.connection","subject":"not-a-did","createdAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"invalid-format","path":"/subject"}
+    },
+    {
+      "name": "wrong-type-person",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z","person":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/person"}
+    },
+    {
+      "name": "missing-person-collection",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z","person":{"rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"missing-required","path":"/person/collection"}
+    },
+    {
+      "name": "invalid-format-person-collection",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z","person":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/person/collection"}
+    },
+    {
+      "name": "invalid-format-person-rkey",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"2026-10-16T18:30:00.000Z","person":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/person/rkey"}
+    },
+    {
+      "name": "missing-createdAt",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz"},
+      "failure": {"kind":"missing-required","path":"/createdAt"}
+    },
+    {
+      "name": "invalid-format-createdAt",
+      "record": {"$type":"app.logdate.graph.connection","subject":"did:plc:ewvi7nxzyoun6zhxrhs64oiz","createdAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/createdAt"}
+    }
+  ]
+}

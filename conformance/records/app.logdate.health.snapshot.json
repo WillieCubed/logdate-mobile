@@ -1,0 +1,87 @@
+{
+  "collection": "app.logdate.health.snapshot",
+  "recordKey": "any",
+  "valid": [
+    {
+      "name": "minimal",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z"},
+      "dagCbor": "a2652474797065781b6170702e6c6f67646174652e6865616c74682e736e617073686f746a6d6561737572656441747818323032362d31302d31365431383a33303a30302e3030305a",
+      "cid": "bafyreie5k6nqqlxb3yjxtw3n5gttg5g7t3hgst33xzalalqzij3gvuspxa"
+    },
+    {
+      "name": "every-field",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","entry":{"collection":"app.logdate.journal.entry","rkey":"3jzfcijpj2z2a"},"heartRateBpm":7,"heartRateVariabilityMs":7,"stepCount":7,"stressPercent":7,"activeCalories":7,"source":"Pancakes at the lake"},
+      "dagCbor": "a9652474797065781b6170702e6c6f67646174652e6865616c74682e736e617073686f7465656e747279a264726b65796d336a7a6663696a706a327a32616a636f6c6c656374696f6e78196170702e6c6f67646174652e6a6f75726e616c2e656e74727966736f757263657450616e63616b657320617420746865206c616b656973746570436f756e74076a6d6561737572656441747818323032362d31302d31365431383a33303a30302e3030305a6c68656172745261746542706d076d73747265737350657263656e74076e61637469766543616c6f726965730776686561727452617465566172696162696c6974794d7307",
+      "cid": "bafyreifgdbzd65swwk2zugirtdjltfq75sxocipwenowcyhfh4uah2ukhq"
+    },
+    {
+      "name": "unknown-field-from-a-newer-version",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","unknownFutureField":"ignored"},
+      "dagCbor": "a3652474797065781b6170702e6c6f67646174652e6865616c74682e736e617073686f746a6d6561737572656441747818323032362d31302d31365431383a33303a30302e3030305a72756e6b6e6f776e4675747572654669656c646769676e6f726564",
+      "cid": "bafyreifl5jyn6rw2erubwpkpggpsqxuxhnwpnvzg4smwmojx3dstfwep3u",
+      "modelRoundTrip": false
+    }
+  ],
+  "invalid": [
+    {
+      "name": "wrong-record-type",
+      "record": {"$type":"app.logdate.not.this","measuredAt":"2026-10-16T18:30:00.000Z"},
+      "failure": {"kind":"wrong-record-type","path":"/$type"}
+    },
+    {
+      "name": "missing-measuredAt",
+      "record": {"$type":"app.logdate.health.snapshot"},
+      "failure": {"kind":"missing-required","path":"/measuredAt"}
+    },
+    {
+      "name": "wrong-type-measuredAt",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":42},
+      "failure": {"kind":"wrong-type","path":"/measuredAt"}
+    },
+    {
+      "name": "invalid-format-measuredAt",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"yesterday afternoon"},
+      "failure": {"kind":"invalid-format","path":"/measuredAt"}
+    },
+    {
+      "name": "wrong-type-entry",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","entry":"not the right type"},
+      "failure": {"kind":"wrong-type","path":"/entry"}
+    },
+    {
+      "name": "missing-entry-collection",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","entry":{"rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"missing-required","path":"/entry/collection"}
+    },
+    {
+      "name": "invalid-format-entry-collection",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","entry":{"collection":"not an nsid","rkey":"3jzfcijpj2z2a"}},
+      "failure": {"kind":"invalid-format","path":"/entry/collection"}
+    },
+    {
+      "name": "invalid-format-entry-rkey",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","entry":{"collection":"app.logdate.journal.entry","rkey":"a/b"}},
+      "failure": {"kind":"invalid-format","path":"/entry/rkey"}
+    },
+    {
+      "name": "wrong-type-heartRateBpm",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","heartRateBpm":"seven"},
+      "failure": {"kind":"wrong-type","path":"/heartRateBpm"}
+    },
+    {
+      "name": "below-minimum-heartRateBpm",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","heartRateBpm":-1},
+      "failure": {"kind":"out-of-range","path":"/heartRateBpm"}
+    },
+    {
+      "name": "above-maximum-heartRateBpm",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","heartRateBpm":401},
+      "failure": {"kind":"out-of-range","path":"/heartRateBpm"}
+    },
+    {
+      "name": "too-long-source",
+      "record": {"$type":"app.logdate.health.snapshot","measuredAt":"2026-10-16T18:30:00.000Z","source":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "failure": {"kind":"too-long","path":"/source"}
+    }
+  ]
+}

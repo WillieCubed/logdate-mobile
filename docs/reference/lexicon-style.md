@@ -242,3 +242,15 @@ It validates each file with the AT Protocol reference implementation, checks tha
 resolves and every record type has an Activity Streams mapping, checks space declarations and
 permission sets against their own rules and that everything they name is defined in `lexicons/`,
 and validates the example records against their schemas.
+
+Then regenerate the client conformance fixtures, which hold valid and invalid example records for
+every record type, and commit what changed:
+
+```bash
+./run conformance:update
+./run lint:conformance
+```
+
+The Mac and Linux apps run these fixtures against their own code, so a schema change shows up in
+their tests too. The files and how a client runs them are described in
+[`conformance/README.md`](../../conformance/README.md).
