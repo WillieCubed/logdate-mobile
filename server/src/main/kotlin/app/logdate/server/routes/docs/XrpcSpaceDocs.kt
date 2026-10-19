@@ -59,9 +59,10 @@ internal object XrpcSpaceDocs {
     private val logDateTokenRequired =
         ErrorCase(
             "AuthRequired",
-            "No LogDate access token was sent, or it is invalid or expired. OAuth DPoP tokens, AT Protocol session " +
-                "tokens and linked device tokens are refused the same way: personal spaces are only for the owner's " +
-                "own LogDate devices. Refresh the access token and retry once; if that also fails, sign in again.",
+            "No LogDate access token was sent, it is invalid or expired, or its account is deactivated. OAuth DPoP " +
+                "tokens, AT Protocol session tokens and linked device tokens are refused the same way: personal spaces " +
+                "are only for the owner's own LogDate devices. Refresh the access token and retry once; if that also " +
+                "fails, sign in again. A deactivated account is refused until it is reactivated.",
             "A LogDate access token is required",
         )
     private val invalidSpace = ErrorCase("InvalidRequest", "`space` is missing or isn't a space URI.", "space must be a space URI")
@@ -162,6 +163,10 @@ internal object XrpcSpaceDocs {
             )
             pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(HttpStatusCode.Conflict, swapConflict)
+            pdsError(
+                HttpStatusCode.PayloadTooLarge,
+                ErrorCase("RecordTooLarge", "The request is larger than 16 KiB, far more than a delete needs.", "The request is too large"),
+            )
             pdsError(HttpStatusCode.NotImplemented, notEnabled)
         }
     }
@@ -320,7 +325,7 @@ internal object XrpcSpaceDocs {
         }
         response {
             code(HttpStatusCode.OK) {
-                description = "The encrypted bytes."
+                description = "The encrypted bytes, sent with `Cache-Control: private, no-store` so no cache keeps a copy."
                 body(binarySchema()) { mediaTypes(ContentType.Application.OctetStream) }
             }
             pdsError(
