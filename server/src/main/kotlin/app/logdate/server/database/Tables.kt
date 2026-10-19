@@ -1,5 +1,6 @@
 package app.logdate.server.database
 
+import app.logdate.shared.model.AccountStorageMode
 import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.java.javaUUID
@@ -29,6 +30,9 @@ object AccountsTable : Table("accounts") {
     val lastSignInAt = timestamp("last_sign_in_at").nullable()
     val isActive = bool("is_active").default(true)
     val preferences = text("preferences").default("{}")
+
+    /** The [app.logdate.shared.model.AccountStorageMode.wireValue] of how the account's data is kept. */
+    val storageMode = varchar("storage_mode", 32).default(AccountStorageMode.LEGACY.wireValue)
 
     override val primaryKey = PrimaryKey(id)
 }

@@ -1,13 +1,15 @@
 package app.logdate.shared.model
 
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 @Serializable
 data class LogDateAccount(
     val id: @Contextual Uuid = Uuid.random(),
@@ -23,6 +25,9 @@ data class LogDateAccount(
     val email: String? = null,
     val emailVerified: Boolean = false,
     val emailVerifiedAt: Instant? = null,
+    /** How the server keeps this account's data; a server that predates storage modes sends nothing. */
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val storageMode: AccountStorageMode = AccountStorageMode.LEGACY,
 )
 
 @Serializable

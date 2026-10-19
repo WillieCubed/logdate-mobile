@@ -5,18 +5,26 @@ import app.logdate.server.auth.AccountIdentity
 import app.logdate.server.auth.AccountLinkEvent
 import app.logdate.server.auth.DeviceInfo
 import app.logdate.server.auth.IdentityProvider
+import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.entitlements.AccountEntitlementsTable
+import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.EncryptedPrivateKey
+import app.logdate.server.identity.InMemorySigningKeyRepository
+import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.identity.StoredSigningKey
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.runBlocking
+import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -181,6 +189,81 @@ class PostgreSqlRepositoriesTest {
             }
         }
     }
+
+    @Test
+    fun `both account stores set the storage mode only when an account is created or moved`() {
+        withAccountTables {
+            listOf(PostgreSQLAccountRepository(), InMemoryAccountRepository()).forEach { repository ->
+                val created = sampleAccount(Uuid.random(), username = "space-owner")
+                val existing = sampleAccount(Uuid.random(), username = "legacy-owner")
+                val inserted = sampleAccount(Uuid.random(), username = "inserted-owner")
+                assertEquals(AccountStorageMode.LEGACY, existing.storageMode, "an account starts in legacy unless told otherwise")
+
+                assertTrue(repository.createOnly(created.copy(storageMode = AccountStorageMode.PERSONAL_SPACE_V1)))
+                repository.save(existing)
+                assertTrue(repository.create(inserted.copy(storageMode = AccountStorageMode.PERSONAL_SPACE_V1)))
+                assertEquals(AccountStorageMode.PERSONAL_SPACE_V1, repository.findById(created.id)?.storageMode)
+                assertEquals(AccountStorageMode.LEGACY, repository.findById(existing.id)?.storageMode)
+                assertEquals(AccountStorageMode.PERSONAL_SPACE_V1, repository.findById(inserted.id)?.storageMode)
+
+                val read = requireNotNull(repository.findById(existing.id))
+                repository.save(read.copy(displayName = "Renamed", storageMode = AccountStorageMode.PERSONAL_SPACE_V1))
+                assertEquals(AccountStorageMode.LEGACY, repository.findById(existing.id)?.storageMode, "a save never moves an account")
+                assertEquals("Renamed", repository.findById(existing.id)?.displayName)
+
+                assertFalse(
+                    repository.updateStorageModeIfUnchanged(existing.id, AccountStorageMode.PERSONAL_SPACE_V1, AccountStorageMode.LEGACY),
+                )
+                assertTrue(
+                    repository.updateStorageModeIfUnchanged(existing.id, AccountStorageMode.LEGACY, AccountStorageMode.PERSONAL_SPACE_V1),
+                )
+                assertEquals(AccountStorageMode.PERSONAL_SPACE_V1, repository.findById(existing.id)?.storageMode)
+                assertFalse(
+                    repository.updateStorageModeIfUnchanged(Uuid.random(), AccountStorageMode.LEGACY, AccountStorageMode.PERSONAL_SPACE_V1),
+                )
+
+                repository.save(read.copy(displayName = "Saved from a stale copy"))
+                assertEquals(
+                    AccountStorageMode.PERSONAL_SPACE_V1,
+                    repository.findById(existing.id)?.storageMode,
+                    "a save of a copy read before the move doesn't undo it",
+                )
+                listOf(created.id, existing.id, inserted.id).forEach { repository.deleteAccount(it) }
+            }
+        }
+    }
+
+    @Test
+    fun `a storage mode a newer server wrote survives sign-ins, saves and identity setup`() {
+        withAccountTables {
+            val repository = PostgreSQLAccountRepository()
+            val account = sampleAccount(Uuid.random(), username = "future-owner")
+            repository.save(account)
+            transaction {
+                AccountsTable.update({ AccountsTable.id eq account.id.toJavaUuid() }) { it[storageMode] = "personalSpaceV9" }
+            }
+
+            val read = requireNotNull(repository.findById(account.id))
+            assertEquals(AccountStorageMode.UNRECOGNIZED, read.storageMode)
+            repository.updateLastSignIn(account.id)
+            repository.save(read.copy(displayName = "Profile save"))
+            identityService(repository).ensureIdentity(read)
+            assertFalse(repository.updateStorageModeIfUnchanged(account.id, AccountStorageMode.UNRECOGNIZED, AccountStorageMode.LEGACY))
+            assertFalse(
+                repository.updateStorageModeIfUnchanged(account.id, AccountStorageMode.LEGACY, AccountStorageMode.PERSONAL_SPACE_V1),
+            )
+
+            val stored = transaction { AccountsTable.selectAll().where { AccountsTable.id eq account.id.toJavaUuid() }.single() }
+            assertEquals("personalSpaceV9", stored[AccountsTable.storageMode])
+        }
+    }
+
+    private fun identityService(repository: PostgreSQLAccountRepository) =
+        AtprotoIdentityService(
+            accountRepository = repository,
+            signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "storage-mode-test-kek"),
+            config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
+        )
 
     @Test
     fun `account repository create only leaves a colliding account unchanged`() {

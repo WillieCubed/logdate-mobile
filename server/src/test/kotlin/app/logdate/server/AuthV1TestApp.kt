@@ -126,6 +126,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     oauthPasskeySignInEnabled: Boolean = false,
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
+    val newAccountStorageMode = ServerDescriptorConfig(personalSpaceEnabled = personalSpaceEnabled).newAccountStorageMode
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
     val atprotoPasswordService = AtprotoPasswordService(InMemoryAtprotoPasswordCredentialRepository())
     val atprotoSessionTokenService = AtprotoSessionTokenService(InMemoryAtprotoSessionRepository(), secret = "test")
@@ -181,6 +182,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             identityService = atprotoIdentityService,
             passwordService = atprotoPasswordService,
             sessionTokenService = atprotoSessionTokenService,
+            newAccountStorageMode = newAccountStorageMode,
         )
     val pdsDiscoveryService =
         StaticPdsDiscoveryService(
@@ -290,6 +292,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                             blobStorage = blobStorage,
                             oauthGrantRevoker = oauthAuthorizationService,
                         ),
+                    newAccountStorageMode = newAccountStorageMode,
                 )
                 identityApiRoutes(
                     accountRepository = accountRepository,

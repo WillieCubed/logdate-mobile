@@ -30,6 +30,11 @@ data class CloudAccount(
     val originalBio: String? = null,
     val isVerified: Boolean = false,
     val lastLoginAt: Instant? = null,
+    /**
+     * How the server keeps this account's data, as the server last reported it. Unknown until the
+     * server has reported it: a device never assumes legacy.
+     */
+    val storageMode: AccountStorageMode = AccountStorageMode.UNRECOGNIZED,
 )
 
 /**

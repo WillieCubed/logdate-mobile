@@ -40,6 +40,7 @@ import app.logdate.server.routes.docs.AccountDocs
 import app.logdate.server.routes.docs.AuthDocs
 import app.logdate.server.routes.docs.AuthSessionDocs
 import app.logdate.shared.model.AccountInfoResponse
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiError
 import app.logdate.shared.model.ApiErrorResponse
@@ -205,6 +206,8 @@ data class AuthAccountView(
     val passkeyCredentialIds: List<String>,
     val createdAt: String,
     val updatedAt: String,
+    /** How the server keeps this account's data; apps choose how to sync from it. */
+    val storageMode: AccountStorageMode,
 )
 
 @Serializable
@@ -319,6 +322,7 @@ fun Route.authV1Routes(
     deviceLinkService: DeviceLinkService? = null,
     accessTokenVerifier: AccessTokenVerifier = AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
     oauthGrantRevoker: OAuthGrantRevoker? = null,
+    newAccountStorageMode: AccountStorageMode = AccountStorageMode.LEGACY,
 ) {
     val rateLimiter = InMemoryAuthRateLimiter()
 
@@ -515,6 +519,7 @@ fun Route.authV1Routes(
                                 isActive = true,
                                 email = bindingClaims?.email?.lowercase(),
                                 emailVerified = bindingClaims?.emailVerified ?: false,
+                                storageMode = newAccountStorageMode,
                             )
 
                         // Account row first so the passkey FK to accounts(id) holds. Passkey
@@ -661,6 +666,7 @@ fun Route.authV1Routes(
                             requestedUsername = request.username,
                             requestedDisplayName = request.displayName,
                             requestedOwnerId = requestedOwnerId,
+                            newAccountStorageMode = newAccountStorageMode,
                             call = call,
                         )
                     if (resolution == null) {
@@ -872,6 +878,7 @@ fun Route.authV1Routes(
                             requestedUsername = request.username,
                             requestedDisplayName = request.displayName,
                             requestedOwnerId = null,
+                            newAccountStorageMode = newAccountStorageMode,
                             call = call,
                         )
                             ?: return@post call.respondApiError(
@@ -1217,6 +1224,7 @@ fun Route.authV1Routes(
                                 email = ensuredAccount.email,
                                 emailVerified = ensuredAccount.emailVerified,
                                 emailVerifiedAt = ensuredAccount.emailVerifiedAt,
+                                storageMode = ensuredAccount.storageMode,
                             ),
                     ),
                 )
@@ -1564,6 +1572,7 @@ private suspend fun resolveGoogleAccount(
     requestedUsername: String?,
     requestedDisplayName: String?,
     requestedOwnerId: Uuid?,
+    newAccountStorageMode: AccountStorageMode,
     call: ApplicationCall,
 ): GoogleResolution? {
     val normalizedEmail = claims.email.lowercase()
@@ -1661,6 +1670,7 @@ private suspend fun resolveGoogleAccount(
             createdAt = now,
             lastSignInAt = now,
             isActive = true,
+            storageMode = newAccountStorageMode,
         )
     if (!accountRepository.createOnly(account)) return null
 
@@ -1772,6 +1782,7 @@ private suspend fun issueAuthResponse(
                         passkeyCredentialIds = passkeyCredentialIds,
                         createdAt = fresh.createdAt.toString(),
                         updatedAt = (fresh.lastSignInAt ?: fresh.createdAt).toString(),
+                        storageMode = fresh.storageMode,
                     ),
                 tokens = tokens,
             ),

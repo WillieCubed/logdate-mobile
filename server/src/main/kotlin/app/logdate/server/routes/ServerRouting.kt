@@ -195,6 +195,7 @@ internal fun Application.accountApiRoutes() {
                 deviceLinkService = deviceLinkService,
                 accessTokenVerifier = accessTokenVerifier,
                 oauthGrantRevoker = oauthGrantRevoker,
+                newAccountStorageMode = descriptorConfig.newAccountStorageMode,
             )
             identityApiRoutes(
                 accountRepository = accountRepository,

@@ -310,6 +310,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 identityService = get(),
                 passwordService = get(),
                 sessionTokenService = get(),
+                newAccountStorageMode = get<ServerDescriptorConfig>().newAccountStorageMode,
             )
         }
 

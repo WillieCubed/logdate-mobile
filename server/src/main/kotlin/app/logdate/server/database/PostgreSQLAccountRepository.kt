@@ -3,6 +3,7 @@ package app.logdate.server.database
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.entitlements.AccountEntitlementsTable
+import app.logdate.shared.model.AccountStorageMode
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -45,6 +46,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
+                    it[storageMode] = account.newAccountStorageMode()
                 }.insertedCount > 0
         }
 
@@ -94,6 +96,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
+                    it[storageMode] = account.newAccountStorageMode()
                 }
                 account
             }
@@ -119,8 +122,23 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
+                    it[storageMode] = account.newAccountStorageMode()
                 }.insertedCount == 1
         }
+
+    override suspend fun updateStorageModeIfUnchanged(
+        accountId: Uuid,
+        expected: AccountStorageMode,
+        new: AccountStorageMode,
+    ): Boolean {
+        require(new != AccountStorageMode.UNRECOGNIZED) { "An account can't be moved to a storage mode this server doesn't know" }
+        if (expected == AccountStorageMode.UNRECOGNIZED) return false
+        return transaction {
+            AccountsTable.update({ (AccountsTable.id eq accountId.toJavaUUID()) and (AccountsTable.storageMode eq expected.wireValue) }) {
+                it[storageMode] = new.wireValue
+            } == 1
+        }
+    }
 
     override suspend fun findById(id: Uuid): Account? =
         transaction {
@@ -297,6 +315,11 @@ class PostgreSQLAccountRepository : AccountRepository {
 
     private fun Column<String?>.matches(value: String?): Op<Boolean> = if (value == null) isNull() else (this eq value)
 
+    private fun Account.newAccountStorageMode(): String {
+        require(storageMode != AccountStorageMode.UNRECOGNIZED) { "A new account needs a storage mode this server knows" }
+        return storageMode.wireValue
+    }
+
     private fun ResultRow.toAccount(): Account =
         Account(
             id = this[AccountsTable.id].toKotlinUuid(),
@@ -315,5 +338,6 @@ class PostgreSQLAccountRepository : AccountRepository {
             lastSignInAt = this[AccountsTable.lastSignInAt],
             isActive = this[AccountsTable.isActive],
             preferences = this[AccountsTable.preferences],
+            storageMode = AccountStorageMode.fromWireValue(this[AccountsTable.storageMode]),
         )
 }

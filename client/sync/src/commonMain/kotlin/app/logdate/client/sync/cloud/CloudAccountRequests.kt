@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.BeginAccountCreationData
 import app.logdate.shared.model.BeginAccountCreationRequest
@@ -322,6 +323,8 @@ private data class AuthAccountDto(
     val email: String? = null,
     val emailVerified: Boolean = false,
     val emailVerifiedAt: String? = null,
+    /** Absent from servers that predate storage modes, which keep every account in legacy. */
+    val storageMode: AccountStorageMode = AccountStorageMode.LEGACY,
 )
 
 @Serializable
@@ -352,4 +355,5 @@ private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
         email = email,
         emailVerified = emailVerified,
         emailVerifiedAt = emailVerifiedAt?.let { Instant.parse(it) },
+        storageMode = storageMode,
     )

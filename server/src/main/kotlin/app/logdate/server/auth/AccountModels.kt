@@ -1,5 +1,6 @@
 package app.logdate.server.auth
 
+import app.logdate.shared.model.AccountStorageMode
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
@@ -27,6 +28,11 @@ data class Account(
     val locale: String? = null,
     val preferences: String? = null,
     val isActive: Boolean = true,
+    /**
+     * How this account's journal data is kept. Set when the account is created and changed only by
+     * [AccountRepository.updateStorageModeIfUnchanged]; [AccountRepository.save] ignores it on updates.
+     */
+    val storageMode: AccountStorageMode = AccountStorageMode.LEGACY,
 )
 
 @OptIn(ExperimentalUuidApi::class)

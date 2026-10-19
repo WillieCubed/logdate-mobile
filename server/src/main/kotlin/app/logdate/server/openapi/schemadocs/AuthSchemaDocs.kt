@@ -63,6 +63,11 @@ internal object AuthSchemaDocs {
                         "passkeyCredentialIds" to "The `credentialId` of every active passkey.",
                         "createdAt" to "When the account was created. $ISO_TIME",
                         "updatedAt" to "When the account last signed in, or when it was created if it never has. $ISO_TIME",
+                        "storageMode" to
+                            "How the server keeps this account's journal data: `legacy` (one sync endpoint for each kind of " +
+                            "data) or `personalSpaceV1` (sealed records in the account's personal space). Every device of the " +
+                            "account syncs the way this says. A server that predates storage modes leaves it out, which " +
+                            "means `legacy`; an app that does not recognize the value must not sync the account.",
                     ),
                 ),
             "LogDateAccount" to
@@ -82,6 +87,11 @@ internal object AuthSchemaDocs {
                         "email" to "Email attached to the account, or `null` if none.",
                         "emailVerified" to "`true` once the email has been verified.",
                         "emailVerifiedAt" to "When the email was verified, or `null`. $ISO_TIME",
+                        "storageMode" to
+                            "How the server keeps this account's journal data: `legacy` (one sync endpoint for each kind of " +
+                            "data) or `personalSpaceV1` (sealed records in the account's personal space). Every device of the " +
+                            "account syncs the way this says. A server that predates storage modes leaves it out, which " +
+                            "means `legacy`; an app that does not recognize the value must not sync the account.",
                     ),
                 ),
             "AccountInfoResponse" to

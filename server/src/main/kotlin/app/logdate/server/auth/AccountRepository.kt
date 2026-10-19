@@ -1,5 +1,6 @@
 package app.logdate.server.auth
 
+import app.logdate.shared.model.AccountStorageMode
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
@@ -10,7 +11,24 @@ interface AccountRepository {
     /** Atomically creates an account without ever replacing an existing owner. */
     suspend fun create(account: Account): Boolean
 
+    /**
+     * Inserts [account], or updates an existing one. An update never changes the stored storage mode,
+     * whatever [Account.storageMode] the caller holds: only [updateStorageModeIfUnchanged] does, so a
+     * save of an account read before its mode changed can't undo the change, and a mode a newer
+     * server wrote is never overwritten.
+     */
     suspend fun save(account: Account): Account
+
+    /**
+     * Moves an account from [expected] to [new] only if its stored mode is still [expected], and
+     * returns whether it did. A stored mode this server doesn't recognize never matches, and [new]
+     * must be a mode this server knows.
+     */
+    suspend fun updateStorageModeIfUnchanged(
+        accountId: Uuid,
+        expected: AccountStorageMode,
+        new: AccountStorageMode,
+    ): Boolean
 
     /**
      * Persists a new account only when its ID has not already been claimed.
@@ -116,6 +134,7 @@ class InMemoryAccountRepository : AccountRepository {
 
     override suspend fun save(account: Account): Account {
         val existingAccount = accounts[account.id]
+        val stored = existingAccount?.let { account.copy(storageMode = it.storageMode) } ?: account
         if (existingAccount != null && existingAccount.username != account.username) {
             usernameIndex.remove(existingAccount.username)
         }
@@ -129,12 +148,26 @@ class InMemoryAccountRepository : AccountRepository {
             existingAccount.handle?.let { handleIndex.remove(it) }
         }
 
-        accounts[account.id] = account
+        accounts[account.id] = stored
         usernameIndex[account.username] = account.id
         account.email?.let { emailIndex[it] = account.id }
         account.did?.let { didIndex[it] = account.id }
         account.handle?.let { handleIndex[it] = account.id }
-        return account
+        return stored
+    }
+
+    override suspend fun updateStorageModeIfUnchanged(
+        accountId: Uuid,
+        expected: AccountStorageMode,
+        new: AccountStorageMode,
+    ): Boolean {
+        require(new != AccountStorageMode.UNRECOGNIZED) { "An account can't be moved to a storage mode this server doesn't know" }
+        if (expected == AccountStorageMode.UNRECOGNIZED) return false
+        return synchronized(accounts) {
+            val account = accounts[accountId]?.takeIf { it.storageMode == expected } ?: return@synchronized false
+            accounts[accountId] = account.copy(storageMode = new)
+            true
+        }
     }
 
     override suspend fun createOnly(account: Account): Boolean =

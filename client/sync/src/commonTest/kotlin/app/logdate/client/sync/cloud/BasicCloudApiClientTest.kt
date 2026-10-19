@@ -2,6 +2,7 @@ package app.logdate.client.sync.cloud
 
 import app.logdate.client.sync.test.uploadMedia
 import app.logdate.shared.config.LogDateConfigRepository
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.PasskeyAuthenticatorResponse
@@ -463,6 +464,40 @@ class BasicCloudApiClientTest {
             assertEquals("tester", result.getOrThrow().username)
             assertEquals("did:web:tester.logdate.app", result.getOrThrow().did)
             assertEquals("tester.logdate.app", result.getOrThrow().handle)
+            assertEquals(AccountStorageMode.LEGACY, result.getOrThrow().storageMode, "a server without storage modes means legacy")
+        }
+
+    @Test
+    fun `get account info reads the account's storage mode`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine {
+                        respond(
+                            content =
+                                """
+                                {
+                                  "success": true,
+                                  "data": {
+                                    "account": {
+                                      "id": "550e8400-e29b-41d4-a716-446655440001",
+                                      "username": "tester",
+                                      "displayName": "Tester",
+                                      "createdAt": "2026-03-05T00:00:00Z",
+                                      "updatedAt": "2026-03-05T00:00:00Z",
+                                      "storageMode": "personalSpaceV1"
+                                    },
+                                    "tokens": {"accessToken":"access","refreshToken":"refresh"}
+                                  }
+                                }
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+
+            assertEquals(AccountStorageMode.PERSONAL_SPACE_V1, client.getAccountInfo("jwt-abc").getOrThrow().storageMode)
         }
 
     @Test
