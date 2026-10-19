@@ -90,8 +90,44 @@ public object LexiconParser {
             maximum = source.long("maximum"),
             closedValues = source["enum"]?.let { source.strings("enum") },
             constValue = source["const"] as? JsonPrimitive,
+            permissionSet = source.takeIf { type == LexiconType.PERMISSION_SET }?.let(::parsePermissionSet),
+            space = source.takeIf { type == LexiconType.SPACE }?.let(::parseSpace),
         )
     }
+
+    private fun parsePermissionSet(source: JsonObject): LexiconPermissionSet =
+        LexiconPermissionSet(
+            title = source.string("title"),
+            titleLang = source.languageMap("title:lang"),
+            detail = source.string("detail"),
+            detailLang = source.languageMap("detail:lang"),
+            permissions =
+                (source["permissions"] as? JsonArray)?.map { entry ->
+                    val permission = entry as? JsonObject ?: JsonObject(emptyMap())
+                    LexiconPermission(
+                        type = permission.string("type"),
+                        resource = permission.string("resource"),
+                        parameters = permission.filterKeys { it != "type" && it != "resource" },
+                    )
+                },
+        )
+
+    private fun parseSpace(source: JsonObject): LexiconSpace =
+        LexiconSpace(
+            name = source.string("name"),
+            nameLang = source.languageMap("name:lang"),
+            keyRule = source.string("key"),
+            collections = (source["collections"] as? JsonArray)?.let { source.strings("collections") },
+        )
+
+    private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+    // Keeps every key, so the checker can report a key that isn't a language tag.
+    private fun JsonObject.languageMap(key: String): Map<String, String> =
+        (this[key] as? JsonObject)
+            ?.mapNotNull { (language, text) -> (text as? JsonPrimitive)?.contentOrNull?.let { language to it } }
+            ?.toMap()
+            .orEmpty()
 
     private fun parseField(
         owner: Nsid,
@@ -194,6 +230,7 @@ public object LexiconParser {
             "subscription" to LexiconType.SUBSCRIPTION,
             "permission-set" to LexiconType.PERMISSION_SET,
             "permission" to LexiconType.PERMISSION,
+            "space" to LexiconType.SPACE,
         )
 
     private fun JsonObject.stringSet(key: String): Set<String> =

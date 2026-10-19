@@ -1,6 +1,10 @@
 package studio.hypertext.atproto.lexicon
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import studio.hypertext.atproto.syntax.Nsid
 
 /**
@@ -45,6 +49,10 @@ public data class LexiconDefinition(
     val maximum: Long? = null,
     val closedValues: List<String>? = null,
     val constValue: JsonPrimitive? = null,
+    /** The contents of a `permission-set` definition, and null for every other type. */
+    val permissionSet: LexiconPermissionSet? = null,
+    /** The contents of a `space` definition, and null for every other type. */
+    val space: LexiconSpace? = null,
 ) {
     /** The record-key rule of a `record` definition, or null when it's missing or malformed. */
     val recordKey: LexiconRecordKey?
@@ -145,17 +153,99 @@ public enum class LexiconType {
     PERMISSION_SET,
     PERMISSION,
 
+    /** A space type declaration, from the AT Protocol Spaces proposal. */
+    SPACE,
+
     /** A type name the Lexicon specification doesn't define. */
     UNSUPPORTED,
     ;
 
     /** Whether this is a primary type, which may only be the `main` definition of a document. */
     public val isPrimary: Boolean
-        get() = this == RECORD || this == QUERY || this == PROCEDURE || this == SUBSCRIPTION || this == PERMISSION_SET
+        get() = this in primaryTypes
+
+    private companion object {
+        private val primaryTypes = setOf(RECORD, QUERY, PROCEDURE, SUBSCRIPTION, PERMISSION_SET, SPACE)
+    }
 }
 
 /**
- * The rule a `record` definition sets for the keys of records in its collection.
+ * A permission set: access an app asks for as one OAuth scope, `include:<set NSID>`, described in
+ * words people see when they approve it. See https://atproto.com/specs/permission.
+ */
+public data class LexiconPermissionSet(
+    /** The short name people see when an app asks for this set. */
+    val title: String? = null,
+    /** [title] translated, keyed by language tag. */
+    val titleLang: Map<String, String> = emptyMap(),
+    /** A summary of what the set allows, shown with [title]. */
+    val detail: String? = null,
+    /** [detail] translated, keyed by language tag. */
+    val detailLang: Map<String, String> = emptyMap(),
+    /** The permissions the set grants, or null when the schema doesn't list them. */
+    val permissions: List<LexiconPermission>? = null,
+)
+
+/**
+ * One permission in a permission set, such as write access to a record collection.
+ *
+ * The [resource] decides which [parameters] apply: `collection` and `action` for `repo`, `lxm`,
+ * `aud` and `inheritAud` for `rpc`, and `spaceType`, `authority`, `skey`, `collection`, `action`
+ * and `manage` for `space`. Parameters are kept as written so that resources and parameters
+ * added to the specification later survive parsing.
+ */
+public data class LexiconPermission(
+    /** The entry's `type`, which must be `permission`. */
+    val type: String? = null,
+    /** What the permission grants access to: `repo`, `rpc`, `space` and so on. */
+    val resource: String? = null,
+    /** Every other field of the entry, by name. */
+    val parameters: Map<String, JsonElement> = emptyMap(),
+) {
+    /** The string values of parameter [name], which may be written as one value or a list; empty when it's absent. */
+    public fun values(name: String): List<String> =
+        when (val value = parameters[name]) {
+            null -> emptyList()
+            is JsonArray -> value.map { (it as? JsonPrimitive)?.contentOrNull ?: it.toString() }
+            is JsonPrimitive -> listOf(value.contentOrNull ?: value.toString())
+            else -> listOf(value.toString())
+        }
+
+    /** The value of parameter [name] when it's a single string. */
+    public fun string(name: String): String? = (parameters[name] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+    /** The value of parameter [name] when it's a boolean. */
+    public fun boolean(name: String): Boolean? = (parameters[name] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull
+
+    /** Whether the entry sets parameter [name] at all. */
+    public fun has(name: String): Boolean = name in parameters
+}
+
+/**
+ * A space type declaration: what a kind of AT Protocol space is called, how its spaces are keyed,
+ * and which record collections apps should expect in it. Its NSID is the `{spaceType}` part of a
+ * space's URI, `at://{authority}/space/{spaceType}/{skey}`.
+ *
+ * Spaces is still an alpha in the AT Protocol, so this follows the proposal as it stands.
+ */
+public data class LexiconSpace(
+    /** The short name people see when an app asks for access to spaces of this type. */
+    val name: String? = null,
+    /** [name] translated, keyed by language tag. */
+    val nameLang: Map<String, String> = emptyMap(),
+    /** The schema's `key` value, the rule for space keys, as written. */
+    val keyRule: String? = null,
+    /** The record collections apps should expect, or null when the schema doesn't list them. */
+    val collections: List<String>? = null,
+) {
+    /** The rule for this type's space keys, which uses the record-key rules, or null when it's missing or malformed. */
+    val key: LexiconRecordKey?
+        get() = keyRule?.let(LexiconRecordKey::parse)
+}
+
+/**
+ * The rule a `record` definition sets for the keys of records in its collection. A `space`
+ * declaration uses the same rules for the keys of its spaces.
  */
 public sealed interface LexiconRecordKey {
     /** A timestamp identifier, the usual key for records someone creates over time. */

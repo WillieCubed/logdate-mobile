@@ -1,5 +1,10 @@
 package studio.hypertext.atproto.lexicon
 
+import studio.hypertext.atproto.syntax.Did
+import studio.hypertext.atproto.syntax.LanguageTag
+import studio.hypertext.atproto.syntax.Nsid
+import studio.hypertext.atproto.syntax.RecordKey
+
 /**
  * Validation result for a parsed lexicon document.
  */
@@ -56,6 +61,8 @@ public object LexiconValidator {
                 report(path, "${definition.type.lexiconName()} definitions must be named main")
             }
             if (definition.type == LexiconType.RECORD) checkRecord(path, definition)
+            definition.space?.let { checkSpace(path, it) }
+            definition.permissionSet?.let { checkPermissionSet(path, it) }
             checkField(path, definition.asField, requiredNames = definition.required)
             definition.parameters?.let { checkField("$path.parameters", it) }
             definition.input?.schema?.let { checkField("$path.input", it) }
@@ -77,6 +84,153 @@ public object LexiconValidator {
                 return
             }
             checkField(path, record, requiredNames = record.properties.filterValues { it.required }.keys)
+        }
+
+        // Follows the space type declaration in the AT Protocol Spaces proposal.
+        private fun checkSpace(
+            path: String,
+            space: LexiconSpace,
+        ) {
+            val name = space.name
+            when {
+                name.isNullOrEmpty() -> report(path, "A space declaration needs a name")
+                name.length > MAX_SPACE_NAME_LENGTH -> report(path, "The name is longer than $MAX_SPACE_NAME_LENGTH characters")
+            }
+            checkLanguages(path, "name:lang", space.nameLang)
+            val keyRule = space.keyRule
+            when {
+                keyRule == null -> report(path, "A space declaration needs a key rule")
+                !isKeyRule(keyRule) -> report(path, "'$keyRule' isn't a key rule")
+            }
+            val collections = space.collections ?: return report(path, "A space declaration needs a collections list")
+            collections.forEach { collection ->
+                when {
+                    collection == WILDCARD -> report(path, "Collections can't include the * wildcard")
+                    !Nsid.isValid(collection) -> report(path, "Collection '$collection' isn't a valid NSID")
+                }
+            }
+            collections.duplicates().forEach { report(path, "Collection $it is listed twice") }
+        }
+
+        // Follows https://atproto.com/specs/permission, plus the space resource from the Spaces proposal.
+        private fun checkPermissionSet(
+            path: String,
+            set: LexiconPermissionSet,
+        ) {
+            checkLanguages(path, "title:lang", set.titleLang)
+            checkLanguages(path, "detail:lang", set.detailLang)
+            val permissions = set.permissions ?: return report(path, "A permission set needs a permissions list")
+            val group = owner.id.toString().substringBeforeLast('.')
+            permissions.forEachIndexed { index, permission ->
+                val at = "$path.permissions[$index]"
+                if (permission.type != PERMISSION) return@forEachIndexed report(at, "Every entry needs \"type\": \"permission\"")
+                when (val resource = permission.resource) {
+                    "repo" -> checkRepoPermission(at, permission, group)
+                    "rpc" -> checkRpcPermission(at, permission, group)
+                    "space" -> checkSpacePermission(at, permission, group)
+                    "blob", "account", "identity" ->
+                        report(at, "$resource permissions can't be in a permission set; apps ask for them directly")
+                    else -> report(at, "'$resource' isn't a resource a permission set can grant")
+                }
+            }
+        }
+
+        private fun checkRepoPermission(
+            path: String,
+            permission: LexiconPermission,
+            group: String,
+        ) {
+            val collections = permission.values("collection")
+            if (collections.isEmpty()) report(path, "A repo permission needs at least one collection")
+            collections.forEach { checkOwnNsid(path, it, "collection", group) }
+            checkAllowedValues(path, permission, "action", RECORD_ACTIONS)
+        }
+
+        private fun checkRpcPermission(
+            path: String,
+            permission: LexiconPermission,
+            group: String,
+        ) {
+            val methods = permission.values("lxm")
+            if (methods.isEmpty()) report(path, "An rpc permission needs at least one lxm")
+            methods.forEach { checkOwnNsid(path, it, "lxm", group) }
+            val inheritAud = permission.boolean("inheritAud")
+            if (permission.has("inheritAud") && inheritAud == null) report(path, "inheritAud must be true or false")
+            val inherits = inheritAud == true
+            val hasAudience = permission.has("aud")
+            when {
+                inherits && hasAudience -> report(path, "An rpc permission can't set aud and inheritAud together")
+                !inherits && !hasAudience -> report(path, "An rpc permission needs aud: *, or inheritAud: true")
+            }
+            // A set can't name a service: the audience comes from the app's include scope instead.
+            val audience = permission.values("aud").joinToString()
+            if (hasAudience && audience != WILDCARD) {
+                report(path, "aud '$audience' can't name a service in a permission set; use inheritAud: true")
+            }
+        }
+
+        private fun checkSpacePermission(
+            path: String,
+            permission: LexiconPermission,
+            group: String,
+        ) {
+            when (val spaceType = permission.string("spaceType")) {
+                null -> report(path, "A space permission needs a spaceType")
+                WILDCARD -> report(path, "A permission set must name a space type, not *")
+                else -> checkOwnNsid(path, spaceType, "spaceType", group)
+            }
+            if (permission.has("authority")) {
+                val authority = permission.values("authority").joinToString()
+                if (authority != "self" && authority != WILDCARD && !Did.isValid(authority)) {
+                    report(path, "authority '$authority' isn't self, * or a DID")
+                }
+            }
+            if (permission.has("skey")) {
+                val skey = permission.values("skey").joinToString()
+                if (skey != WILDCARD && !RecordKey.isValid(skey)) report(path, "skey '$skey' isn't * or a valid space key")
+            }
+            permission.values("collection").forEach { collection ->
+                if (collection != WILDCARD && !Nsid.isValid(collection)) report(path, "collection '$collection' isn't * or a valid NSID")
+            }
+            checkAllowedValues(path, permission, "action", SPACE_ACTIONS)
+            checkAllowedValues(path, permission, "manage", RECORD_ACTIONS)
+        }
+
+        // A set may only grant within its own NSID group, or the groups below it.
+        private fun checkOwnNsid(
+            path: String,
+            nsid: String,
+            parameter: String,
+            group: String,
+        ) {
+            when {
+                nsid == WILDCARD -> report(path, "$parameter can't be * in a permission set")
+                !Nsid.isValid(nsid) -> report(path, "$parameter '$nsid' isn't a valid NSID")
+                !nsid.startsWith("$group.") -> report(path, "$parameter $nsid is outside this set's namespace, $group.*")
+            }
+        }
+
+        private fun checkAllowedValues(
+            path: String,
+            permission: LexiconPermission,
+            parameter: String,
+            allowed: List<String>,
+        ) {
+            val values = permission.values(parameter)
+            values.filterNot(allowed::contains).forEach { value ->
+                report(path, "$parameter '$value' isn't one of ${allowed.joinToString()}")
+            }
+            values.duplicates().forEach { report(path, "$parameter $it is listed twice") }
+        }
+
+        private fun checkLanguages(
+            path: String,
+            field: String,
+            translations: Map<String, String>,
+        ) {
+            translations.keys.filterNot(LanguageTag::isValid).forEach { language ->
+                report(path, "$field key '$language' isn't a language tag")
+            }
         }
 
         private fun checkField(
@@ -167,6 +321,26 @@ public object LexiconValidator {
     }
 
     private fun LexiconType.lexiconName(): String = name.lowercase().replace('_', '-')
+
+    private fun isKeyRule(rule: String): Boolean =
+        when (val key = LexiconRecordKey.parse(rule)) {
+            null -> false
+            is LexiconRecordKey.Literal -> RecordKey.isValid(key.value)
+            else -> true
+        }
+
+    private fun List<String>.duplicates(): List<String> =
+        groupingBy { it }
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+            .toList()
+
+    private const val WILDCARD = "*"
+    private const val PERMISSION = "permission"
+    private const val MAX_SPACE_NAME_LENGTH = 64
+    private val RECORD_ACTIONS = listOf("create", "update", "delete")
+    private val SPACE_ACTIONS = listOf("read_self", "read", "create", "update", "delete")
 
     // A blob's accept list holds MIME types, globs over a whole subtype, or the any-type glob.
     private fun isAcceptableMimePattern(entry: String): Boolean = entry == "*/*" || mimePattern.matches(entry)
