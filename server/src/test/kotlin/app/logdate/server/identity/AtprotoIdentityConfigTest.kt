@@ -71,6 +71,17 @@ class AtprotoIdentityConfigTest {
     }
 
     @Test
+    fun `environment factory reads the recovery keys flag and leaves it off by default`() {
+        val enabled = AtprotoIdentityConfig.fromEnvironment(recoveryKeysEnabled = " TRUE ")
+        val unset = AtprotoIdentityConfig.fromEnvironment(recoveryKeysEnabled = null, publishHostedPlcOperations = null)
+
+        assertTrue(enabled.recoveryKeysEnabled)
+        assertTrue(enabled.supportsRecoveryKeys)
+        assertEquals(false, unset.recoveryKeysEnabled)
+        assertEquals(false, unset.supportsRecoveryKeys)
+    }
+
+    @Test
     fun `environment factory rejects unsupported hosted did methods`() {
         assertFailsWith<IllegalArgumentException> {
             AtprotoIdentityConfig.fromEnvironment(hostedAccountDidMethod = "unsupported")

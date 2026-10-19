@@ -365,14 +365,28 @@ class AtprotoIdentityService(
             ensured.did
                 ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before registering a PLC recovery key")
         if (!did.startsWith("did:plc:")) {
-            throw IdentityLifecycleConflictException("PLC recovery keys are only supported for hosted did:plc identities")
+            throw IdentityLifecycleConflictException(
+                "PLC recovery keys are only supported for hosted did:plc identities",
+                code = PlcIdentityService.RECOVERY_KEYS_UNAVAILABLE,
+            )
         }
-        if (!config.publishHostedPlcOperations) {
-            throw IdentityLifecycleConflictException("Hosted PLC recovery keys require published PLC operations")
+        if (!config.supportsRecoveryKeys) {
+            throw IdentityLifecycleConflictException(
+                "Recovery keys are not enabled on this server",
+                code = PlcIdentityService.RECOVERY_KEYS_UNAVAILABLE,
+            )
+        }
+        val existingRecoveryDidKey = ensured.plcRecoveryDidKey
+        if (existingRecoveryDidKey != null && existingRecoveryDidKey != normalizedRecoveryDidKey) {
+            // Replacing the person's key with only a session would let a stolen session take the identity.
+            throw IdentityLifecycleConflictException(
+                "A different recovery key is already registered for this identity",
+                code = RECOVERY_KEY_ALREADY_SET,
+            )
         }
 
         val plcOperation =
-            if (ensured.plcRecoveryDidKey == normalizedRecoveryDidKey) {
+            if (existingRecoveryDidKey == normalizedRecoveryDidKey) {
                 null
             } else {
                 val updatedRecoveryKey =
@@ -391,6 +405,101 @@ class AtprotoIdentityService(
             plcOperation = plcOperation,
         )
     }
+
+    /**
+     * Step one of replacing the server's key with the person's recovery key: prepares a fresh server
+     * key and the operation that installs it, for the recovery key to sign on the device. The fresh
+     * key comes back sealed in [PreparedIdentityRecovery.preparedKey], so nothing is stored until
+     * [completeRecovery].
+     */
+    suspend fun prepareRecovery(account: Account): PreparedIdentityRecovery {
+        val target = recoveryTarget(account)
+        val nextKey = signingKeyService.prepareKey(target.account.id)
+        val prepared =
+            plcIdentityService.prepareHostedRecoveryImport(
+                accountId = target.account.id,
+                did = target.did,
+                handle = target.handle,
+                recoveryDidKey = target.recoveryDidKey,
+                nextSigningKeyDidKey = didKeyFor(nextKey.publicKeyMultibase),
+            )
+        return PreparedIdentityRecovery(
+            did = target.did.toString(),
+            handle = target.handle,
+            recoveryDidKey = target.recoveryDidKey,
+            nextSigningKeyDidKey = prepared.nextSigningKeyDidKey,
+            unsignedOperation = prepared.unsignedOperation,
+            signingPayloadBase64Url = Base64.UrlSafe.encode(prepared.signingPayload).trimEnd('='),
+            preparedKey = signingKeyService.sealPreparedKey(nextKey, prevCid = requireNotNull(prepared.unsignedOperation.prev)),
+        )
+    }
+
+    /**
+     * Step two: checks the recovery key's [signature] over the operation from [prepareRecovery],
+     * appends it, and makes the prepared key the server's key. The old key no longer has any
+     * authority over the identity.
+     */
+    suspend fun completeRecovery(
+        account: Account,
+        preparedKey: String,
+        signature: String,
+    ): ImportedIdentitySigningKey {
+        val target = recoveryTarget(account)
+        val opened = signingKeyService.openPreparedKey(target.account.id, preparedKey)
+        val prepared =
+            plcIdentityService.prepareHostedRecoveryImport(
+                accountId = target.account.id,
+                did = target.did,
+                handle = target.handle,
+                recoveryDidKey = target.recoveryDidKey,
+                nextSigningKeyDidKey = didKeyFor(opened.key.publicKeyMultibase),
+            )
+        if (prepared.unsignedOperation.prev != opened.prevCid) {
+            throw IdentityLifecycleConflictException(
+                "The identity changed after this recovery was prepared",
+                code = PlcIdentityService.IDENTITY_CHANGED,
+            )
+        }
+        plcIdentityService.publishClientSignedRecoveryImport(
+            accountId = target.account.id,
+            did = target.did,
+            recoveryDidKey = target.recoveryDidKey,
+            preparedOperation = prepared,
+            signature = signature,
+        )
+        val activeKey = signingKeyService.activatePreparedKey(target.account.id, opened.key)
+        val updatedAccount = accountRepository.save(target.account.copy(signingKeyPublic = activeKey.publicKeyMultibase))
+        return ImportedIdentitySigningKey(account = updatedAccount, activeKey = activeKey)
+    }
+
+    private suspend fun recoveryTarget(account: Account): RecoveryTarget {
+        val ensured = ensureIdentity(account)
+        val did =
+            ensured.did
+                ?: throw IdentityLifecycleConflictException("Account identity must be provisioned before recovery")
+        if (!did.startsWith("did:plc:") || !config.supportsRecoveryKeys) {
+            throw IdentityLifecycleConflictException(
+                "Recovery keys are not enabled for this identity",
+                code = PlcIdentityService.RECOVERY_KEYS_UNAVAILABLE,
+            )
+        }
+        val recoveryDidKey =
+            ensured.plcRecoveryDidKey
+                ?: throw IdentityLifecycleConflictException("No recovery key is registered for this identity", code = RECOVERY_KEY_NOT_SET)
+        return RecoveryTarget(
+            account = ensured,
+            did = AtprotoDid.require(did),
+            handle = requireNotNull(ensured.handle),
+            recoveryDidKey = recoveryDidKey,
+        )
+    }
+
+    private data class RecoveryTarget(
+        val account: Account,
+        val did: AtprotoDid,
+        val handle: String,
+        val recoveryDidKey: String,
+    )
 
     override suspend fun resolveHandle(handle: String): Result<ResolveHandleResponse?> =
         runCatching {
@@ -594,7 +703,13 @@ class AtprotoIdentityService(
         }.getOrNull()
     }
 
-    private companion object {
+    companion object {
+        /** A different recovery key is already registered; replacing it needs the current one. */
+        const val RECOVERY_KEY_ALREADY_SET: String = "RECOVERY_KEY_ALREADY_SET"
+
+        /** Recovery was asked for, but no recovery key is registered. */
+        const val RECOVERY_KEY_NOT_SET: String = "RECOVERY_KEY_NOT_SET"
+
         private const val DEFAULT_HANDLE_LABEL = "user"
         private const val DID_KEY_PREFIX = "did:key:"
         private const val MAX_HANDLE_LABEL_LENGTH = 63
@@ -629,6 +744,20 @@ data class PreparedRecoverySigningKeyImport(
     val nextSigningKeyDidKey: String,
     val unsignedOperation: PlcUnsignedOperation,
     val signingPayloadBase64Url: String,
+)
+
+/**
+ * A prepared recovery: the operation the recovery key must sign, and the sealed server key that
+ * completing it will install.
+ */
+data class PreparedIdentityRecovery(
+    val did: String,
+    val handle: String,
+    val recoveryDidKey: String,
+    val nextSigningKeyDidKey: String,
+    val unsignedOperation: PlcUnsignedOperation,
+    val signingPayloadBase64Url: String,
+    val preparedKey: String,
 )
 
 data class RegisteredPlcRecoveryKey(

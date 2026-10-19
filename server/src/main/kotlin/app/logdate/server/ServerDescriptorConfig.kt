@@ -74,6 +74,9 @@ data class ServerDescriptorConfig(
                     if (identityConfig.publishesPlcOperations) {
                         add(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1)
                     }
+                    if (identityConfig.supportsRecoveryKeys) {
+                        add(ServerProtocolFeature.ATPROTO_RECOVERY_KEYS_V1)
+                    }
                 },
             privacyPolicyUrl = privacyPolicyUrl,
             termsOfServiceUrl = termsOfServiceUrl,

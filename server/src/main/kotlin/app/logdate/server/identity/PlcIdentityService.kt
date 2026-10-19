@@ -57,7 +57,7 @@ class PlcIdentityService(
                 handle = handle,
                 pdsServiceEndpoint = config.pdsServiceEndpoint,
                 signingKeyDidKey = publicKeyDidKey,
-                rotationKeys = listOfNotNull(publicKeyDidKey, recoveryDidKey).distinct(),
+                rotationKeys = listOfNotNull(recoveryDidKey, publicKeyDidKey).distinct(),
             )
         val signature =
             signOperation(
@@ -189,7 +189,10 @@ class PlcIdentityService(
         hostedPlcOperationRepository?.listByDid(did.toString()).orEmpty()
 
     /**
-     * Publishes a hosted PLC update operation that adds or replaces the user-controlled recovery key.
+     * Appends an update operation that lists the person's [recoveryDidKey] ahead of the server's key,
+     * so it can overrule the server. The server signs it with its current key, which the previous
+     * operation lists as a rotation key. The operation reaches the PLC directory only when publishing
+     * is on; otherwise the hosted operation log is the identity's history.
      */
     suspend fun updateHostedRecoveryKey(
         accountId: Uuid,
@@ -197,25 +200,14 @@ class PlcIdentityService(
         handle: String,
         recoveryDidKey: String,
     ): UpdatedPlcRecoveryKey {
-        if (!config.publishHostedPlcOperations) {
-            throw IdentityLifecycleConflictException("Hosted PLC recovery keys require published PLC operations")
-        }
-        val plcClient = plcDirectoryClient ?: throw IdentityLifecycleConflictException("PLC publishing requires a PLC directory client")
-        require(did.method == "plc") { "Hosted PLC recovery keys require a did:plc identity" }
+        requireRecoveryKeys(did)
 
         val activeKey = signingKeyService.ensureActiveKey(accountId)
-        val activePublicKeyDidKey = didKeyFor(activeKey.publicKeyMultibase)
-        val latestIndexedOperation =
-            plcClient
-                .getAuditLog(did)
-                .getOrThrow()
-                .lastOrNull { !it.nullified }
-                ?: throw IdentityLifecycleConflictException("No PLC audit log entry exists for $did")
         val unsignedOperation =
             buildHostedAtprotoUpdate(
-                prevCid = latestIndexedOperation.cid,
+                prevCid = latestOperation(did).cid,
                 handle = handle,
-                signingKeyDidKey = activePublicKeyDidKey,
+                signingKeyDidKey = didKeyFor(activeKey.publicKeyMultibase),
                 recoveryDidKey = recoveryDidKey,
             )
         val signedOperation =
@@ -230,14 +222,7 @@ class PlcIdentityService(
                 ),
             )
 
-        plcClient.submit(did, signedOperation).getOrThrow()
-        val resolvedCid = resolvePublishedCid(did, signedOperation)
-        persistHostedOperation(
-            accountId = accountId,
-            did = did,
-            operation = signedOperation,
-            resolvedCid = resolvedCid,
-        )
+        appendOperation(accountId = accountId, did = did, operation = signedOperation)
         return UpdatedPlcRecoveryKey(
             did = did.toString(),
             recoveryDidKey = recoveryDidKey,
@@ -245,6 +230,11 @@ class PlcIdentityService(
         )
     }
 
+    /**
+     * Builds the unsigned operation that installs [nextSigningKeyDidKey] as the server's key, for the
+     * person's [recoveryDidKey] to sign. The recovery key stays first. The operation builds on the
+     * identity's latest operation, which must list the recovery key as a rotation key.
+     */
     suspend fun prepareHostedRecoveryImport(
         accountId: Uuid,
         did: AtprotoDid,
@@ -252,21 +242,18 @@ class PlcIdentityService(
         recoveryDidKey: String,
         nextSigningKeyDidKey: String,
     ): PreparedPlcRecoveryOperation {
-        if (!config.publishHostedPlcOperations) {
-            throw IdentityLifecycleConflictException("Hosted PLC recovery import requires published PLC operations")
-        }
-        val plcClient = plcDirectoryClient ?: throw IdentityLifecycleConflictException("PLC publishing requires a PLC directory client")
-        require(did.method == "plc") { "Hosted PLC recovery import requires a did:plc identity" }
+        requireRecoveryKeys(did)
 
-        val latestIndexedOperation =
-            plcClient
-                .getAuditLog(did)
-                .getOrThrow()
-                .lastOrNull { !it.nullified }
-                ?: throw IdentityLifecycleConflictException("No PLC audit log entry exists for $did")
+        val latest = latestOperation(did)
+        if (recoveryDidKey !in latest.operation.rotationKeys) {
+            throw IdentityLifecycleConflictException(
+                "The identity's latest operation does not list the registered recovery key",
+                code = RECOVERY_KEY_NOT_ON_IDENTITY,
+            )
+        }
         val unsignedOperation =
             buildHostedAtprotoUpdate(
-                prevCid = latestIndexedOperation.cid,
+                prevCid = latest.cid,
                 handle = handle,
                 signingKeyDidKey = nextSigningKeyDidKey,
                 recoveryDidKey = recoveryDidKey,
@@ -281,6 +268,11 @@ class PlcIdentityService(
         )
     }
 
+    /**
+     * Attaches the client's recovery-key [signature] to [preparedOperation] and appends it, after
+     * checking that the operation still builds on the identity's latest operation and that the
+     * signature is the registered recovery key's.
+     */
     suspend fun publishClientSignedRecoveryImport(
         accountId: Uuid,
         did: AtprotoDid,
@@ -288,13 +280,12 @@ class PlcIdentityService(
         preparedOperation: PreparedPlcRecoveryOperation,
         signature: String,
     ): PlcOperation {
-        if (!config.publishHostedPlcOperations) {
-            throw IdentityLifecycleConflictException("Hosted PLC recovery import requires published PLC operations")
-        }
-        val plcClient = plcDirectoryClient ?: throw IdentityLifecycleConflictException("PLC publishing requires a PLC directory client")
-        require(did.method == "plc") { "Hosted PLC recovery import requires a did:plc identity" }
+        requireRecoveryKeys(did)
         require(preparedOperation.did == did.toString()) { "Prepared PLC recovery import belongs to a different DID" }
         require(preparedOperation.recoveryDidKey == recoveryDidKey) { "Prepared PLC recovery import belongs to a different recovery key" }
+        if (preparedOperation.unsignedOperation.prev != latestOperation(did).cid) {
+            throw IdentityLifecycleConflictException("The identity changed after this recovery was prepared", code = IDENTITY_CHANGED)
+        }
         verifyRecoverySignature(
             recoveryDidKey = recoveryDidKey,
             payload = preparedOperation.signingPayload,
@@ -302,22 +293,69 @@ class PlcIdentityService(
         )
 
         val signedOperation = preparedOperation.unsignedOperation.signed(signature)
-        plcClient.submit(did, signedOperation).getOrThrow()
-        val resolvedCid = resolvePublishedCid(did, signedOperation)
-        persistHostedOperation(
-            accountId = accountId,
-            did = did,
-            operation = signedOperation,
-            resolvedCid = resolvedCid,
-        )
+        appendOperation(accountId = accountId, did = did, operation = signedOperation)
         return signedOperation
     }
 
+    private fun requireRecoveryKeys(did: AtprotoDid) {
+        if (!config.supportsRecoveryKeys) {
+            throw IdentityLifecycleConflictException("Recovery keys are not enabled on this server", code = RECOVERY_KEYS_UNAVAILABLE)
+        }
+        if (did.method != "plc") {
+            throw IdentityLifecycleConflictException("Recovery keys need a did:plc identity", code = RECOVERY_KEYS_UNAVAILABLE)
+        }
+    }
+
+    /**
+     * The identity's newest operation and its CID: from the PLC directory's audit log when this server
+     * publishes, otherwise from the hosted operation log, which is then the identity's only history.
+     */
+    private suspend fun latestOperation(did: AtprotoDid): LatestPlcOperation {
+        val plcClient = plcDirectoryClient
+        if (config.publishHostedPlcOperations && plcClient != null) {
+            val indexed =
+                plcClient
+                    .getAuditLog(did)
+                    .getOrThrow()
+                    .lastOrNull { !it.nullified }
+                    ?: throw IdentityLifecycleConflictException("No PLC audit log entry exists for $did")
+            val operation =
+                indexed.operation as? PlcOperation
+                    ?: throw IdentityLifecycleConflictException("The identity $did has been deactivated")
+            return LatestPlcOperation(cid = indexed.cid, operation = operation)
+        }
+        val stored =
+            listStoredOperations(did).lastOrNull()
+                ?: throw IdentityLifecycleConflictException("No hosted PLC operation exists for $did")
+        val operation = json.decodeFromString(PlcOperation.serializer(), stored.operationJson)
+        return LatestPlcOperation(cid = stored.cid ?: PlcEncoding.operationCid(operation), operation = operation)
+    }
+
+    /** Submits [operation] to the PLC directory when this server publishes, then records it in the hosted log. */
+    private suspend fun appendOperation(
+        accountId: Uuid,
+        did: AtprotoDid,
+        operation: PlcOperation,
+    ) {
+        val plcClient = plcDirectoryClient
+        if (config.publishHostedPlcOperations && plcClient != null) {
+            plcClient.submit(did, operation).getOrThrow()
+        }
+        persistHostedOperation(
+            accountId = accountId,
+            did = did,
+            operation = operation,
+            resolvedCid = resolvePublishedCid(did, operation),
+        )
+    }
+
+    /** The CID the directory reports for [operation] when this server publishes, otherwise the one computed locally. */
     private suspend fun resolvePublishedCid(
         did: AtprotoDid,
         operation: PlcOperation,
-    ): String? =
+    ): String =
         plcDirectoryClient
+            ?.takeIf { config.publishHostedPlcOperations }
             ?.getAuditLog(did)
             ?.getOrNull()
             ?.lastOrNull { indexedOperation ->
@@ -325,12 +363,13 @@ class PlcIdentityService(
                     indexedOperation.operation is PlcOperation &&
                     indexedOperation.operation.sig == operation.sig
             }?.cid
+            ?: PlcEncoding.operationCid(operation)
 
     private suspend fun persistHostedOperation(
         accountId: Uuid,
         did: AtprotoDid,
         operation: PlcOperation,
-        resolvedCid: String?,
+        resolvedCid: String,
     ) {
         hostedPlcOperationRepository?.save(
             StoredHostedPlcOperation(
@@ -357,7 +396,7 @@ class PlcIdentityService(
             handle = Handle.require(handle.trim().trim('.').lowercase()).toString(),
             pdsServiceEndpoint = config.pdsServiceEndpoint,
             signingKeyDidKey = signingKeyDidKey,
-            rotationKeys = listOfNotNull(signingKeyDidKey, recoveryDidKey).distinct(),
+            rotationKeys = listOfNotNull(recoveryDidKey, signingKeyDidKey).distinct(),
         )
 
     private fun signOperation(
@@ -376,14 +415,18 @@ class PlcIdentityService(
     ) {
         val multikey = recoveryDidKey.removePrefix(DID_KEY_PREFIX)
         val decoded = EcKeySupport.decodePublicKey(multikey)
-        require(
-            EcKeySupport.verifySha256(
-                publicKey = decoded.publicKey,
-                curve = decoded.curve,
-                payload = payload,
-                signature = decodeBase64Url(signature),
-            ),
-        ) { "Client PLC recovery signature is invalid" }
+        val verified =
+            runCatching {
+                EcKeySupport.verifySha256(
+                    publicKey = decoded.publicKey,
+                    curve = decoded.curve,
+                    payload = payload,
+                    signature = decodeBase64Url(signature),
+                )
+            }.getOrDefault(false)
+        if (!verified) {
+            throw IdentityLifecycleValidationException("Client PLC recovery signature is invalid", code = RECOVERY_SIGNATURE_INVALID)
+        }
     }
 
     private fun decodeBase64Url(value: String): ByteArray {
@@ -397,10 +440,28 @@ class PlcIdentityService(
         return Base64.UrlSafe.decode(normalized)
     }
 
-    private companion object {
+    companion object {
         private const val DID_KEY_PREFIX: String = "did:key:"
+
+        /** The server does not support recovery keys, or the identity is not a `did:plc`. */
+        const val RECOVERY_KEYS_UNAVAILABLE: String = "RECOVERY_KEYS_UNAVAILABLE"
+
+        /** The identity's latest operation does not list the registered recovery key. */
+        const val RECOVERY_KEY_NOT_ON_IDENTITY: String = "RECOVERY_KEY_NOT_ON_IDENTITY"
+
+        /** Another operation was appended between preparing and completing a recovery. */
+        const val IDENTITY_CHANGED: String = "IDENTITY_CHANGED"
+
+        /** The recovery signature is not the registered recovery key's signature over the operation. */
+        const val RECOVERY_SIGNATURE_INVALID: String = "RECOVERY_SIGNATURE_INVALID"
     }
 }
+
+/** The newest operation in an identity's history and the CID the next operation names as `prev`. */
+private data class LatestPlcOperation(
+    val cid: String,
+    val operation: PlcOperation,
+)
 
 /**
  * Signed hosted PLC identity material.

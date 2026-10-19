@@ -599,9 +599,25 @@ with the change that makes them required.
 - **Required**: No
 - **Notes**: Only applies when `ATPROTO_HOSTED_DID_METHOD` is `plc`. When enabled, the server
   advertises the `atprotoPlcPublishingV1` protocol feature, and clients may then offer identity
-  changes such as signing-key rotation and recovery-key registration. When disabled, the server
-  refuses those changes. Production leaves it off. DIDs created while it is off are never
-  published later on their own, so turning it on needs a backfill for existing accounts.
+  changes such as signing-key rotation. When disabled, the server refuses those changes.
+  Recovery keys do not need it; see `ATPROTO_RECOVERY_KEYS_ENABLED`. Production leaves it off.
+  DIDs created while it is off are never published later on their own, so turning it on needs a
+  backfill for existing accounts. The hosted operation log records each operation's CID, so that
+  backfill can submit the log as it is.
+
+### `ATPROTO_RECOVERY_KEYS_ENABLED`
+- **Description**: Whether people can register their own recovery key on their hosted `did:plc`
+  identity and use it to replace the server's key. The recovery key is listed ahead of the
+  server's key, so it can overrule it.
+- **Type**: Boolean (`true` to enable)
+- **Default**: `false`
+- **Example**: `ATPROTO_RECOVERY_KEYS_ENABLED=true`
+- **Required**: No
+- **Notes**: Only applies when `ATPROTO_HOSTED_DID_METHOD` is `plc`. It works without
+  `ATPROTO_PLC_PUBLISH_ENABLED`: the server's hosted operation log is then the identity's history,
+  and nothing is sent to the PLC directory. When enabled, or when publishing is on, the server
+  advertises the `atprotoRecoveryKeysV1` protocol feature. When neither is set, the recovery-key
+  endpoints answer `409 RECOVERY_KEYS_UNAVAILABLE`.
 
 ### `ATPROTO_PLC_DIRECTORY_URL`
 - **Description**: The PLC directory to publish to and resolve `did:plc` identities from.
