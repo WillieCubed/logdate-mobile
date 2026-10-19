@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 /**
  * Validates the base32-sortable `Tid` (Timestamp Identifier) class.
@@ -53,5 +54,32 @@ class TidTest {
 
         assertEquals("222222222223e", tid.value)
         assertEquals(42L, tid.toLong())
+    }
+
+    @Test
+    fun `builds a tid from a timestamp and clock identifier`() {
+        val instant = Instant.parse("2026-10-18T12:00:00.123456Z")
+
+        val tid = Tid.fromInstant(instant, clockId = 7)
+
+        assertEquals(instant.epochSeconds * 1_000_000 + 123_456, tid.timestampMicros)
+        assertEquals(7, tid.clockId)
+        assertEquals(tid, Tid.require(tid.value))
+    }
+
+    @Test
+    fun `later timestamps sort after earlier ones as strings and numbers`() {
+        val earlier = Tid.fromInstant(Instant.parse("2023-01-01T00:00:00Z"), clockId = 1023)
+        val later = Tid.fromInstant(Instant.parse("2023-01-01T00:00:00.000001Z"), clockId = 0)
+
+        assertTrue(earlier.value < later.value)
+        assertTrue(earlier.toLong() < later.toLong())
+    }
+
+    @Test
+    fun `rejects clock identifiers outside ten bits and times before the epoch`() {
+        assertFailsWith<IllegalArgumentException> { Tid.fromInstant(Instant.parse("2026-01-01T00:00:00Z"), clockId = 1024) }
+        assertFailsWith<IllegalArgumentException> { Tid.fromInstant(Instant.parse("2026-01-01T00:00:00Z"), clockId = -1) }
+        assertFailsWith<IllegalArgumentException> { Tid.fromInstant(Instant.parse("1969-12-31T23:59:59Z")) }
     }
 }
