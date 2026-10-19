@@ -6,12 +6,17 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class HandleLabelsTest {
-    /** `RESERVED_SUBDOMAINS` in logdate-web's `apps/web/src/lib/site.ts`; the server must refuse each one. */
+    /**
+     * A hand-kept copy of `RESERVED_SUBDOMAINS` in logdate-web's `apps/web/src/lib/site.ts`. The
+     * server must refuse each one. This repository cannot read the website's source, so the copy is
+     * updated by hand whenever the website's list changes.
+     */
     private val websiteReservedSubdomains =
         listOf(
             "www",
             "app",
             "cloud",
+            "cloud-staging",
             "api",
             "studio",
             "admin",
