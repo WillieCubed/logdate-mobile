@@ -68,7 +68,7 @@ class SpaceMediaDataSource(
                 homes.open(target.origin, accessToken).uploadBlob(target.space, storedSize) { encryptor.encrypt(SizeCheckedSource(media)) }
             }
         val cid = uploaded.getOrElse { return Result.failure(uploadFailure(it, contentId, storedSize)) }
-        val reference = SpaceMediaReference(cid, contentId, media.mimeType, storedSize)
+        val reference = SpaceMediaReference(cid, contentId, media.mimeType, storedSize, media.sizeBytes.takeUnless { alreadyEncrypted })
         return Result.success(MediaUploadResult(mediaId = cid, downloadUrl = reference.format(), uploadedAt = Clock.System.now()))
     }
 

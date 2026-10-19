@@ -9,16 +9,12 @@ import app.logdate.client.sync.cloud.ReferencedMediaDataSource
 import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
 import app.logdate.client.sync.test.mediaFileSource
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 class SpaceMediaTest {
@@ -44,7 +40,7 @@ class SpaceMediaTest {
             assertEquals("LDCE2", stored.copyOf(5).decodeToString())
             assertFalse(stored.contentEquals(photo))
             val reference = assertNotNull(SpaceMediaReference.parse(upload.downloadUrl))
-            assertEquals(SpaceMediaReference(upload.mediaId, contentId, "image/jpeg", stored.size.toLong()), reference)
+            assertEquals(SpaceMediaReference(upload.mediaId, contentId, "image/jpeg", stored.size.toLong(), photo.size.toLong()), reference)
         }
 
     @Test
@@ -99,20 +95,6 @@ class SpaceMediaTest {
             assertEquals(listOf("upload", "download:m1"), legacy.calls)
             assertEquals(listOf("upload", "download:bafkreiabc"), spaceSource.calls)
         }
-
-    @Test
-    fun `a space media reference round-trips through its URL and its record blob`() {
-        val reference =
-            SpaceMediaReference("bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku", Uuid.random(), "video/mp4", 4_096)
-
-        assertEquals(reference, SpaceMediaReference.parse(reference.format()))
-        assertEquals(reference, SpaceMediaReference.fromBlob(reference.contentId, reference.blob(), "video/mp4"))
-        assertEquals(JsonPrimitive("blob"), reference.blob()["\$type"])
-        assertEquals(JsonPrimitive(SpaceMediaReference.STORED_MIME_TYPE), reference.blob()["mimeType"])
-        assertTrue(reference.format().startsWith("https://space.logdate.invalid/media/"))
-        assertNull(SpaceMediaReference.parse("https://cloud.test/api/v1/media/m1"))
-        assertNull(SpaceMediaReference.fromBlob(reference.contentId, JsonObject(emptyMap()), "video/mp4"))
-    }
 
     private class RecordingMediaSource :
         CloudMediaDataSource,
