@@ -17,6 +17,7 @@ import {
   spaceDeclarationProblems,
   values,
 } from "./declarations.mjs";
+import { optionalCreatedAtProblems } from "./conventions.mjs";
 import { recordKeyProblems } from "./keys.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +93,7 @@ for (const path of (await jsonFiles(lexiconRoot)).filter((p) => p !== mappingFil
   if (main?.type === "record") {
     ownRecords.add(doc.id);
     if (!allowedKeys.has(main.key)) report(where, `record key "${main.key}" isn't one LogDate uses`);
+    optionalCreatedAtProblems(doc).forEach((problem) => report(where, problem));
   }
 }
 

@@ -56,10 +56,11 @@ has `createdAt`, and records that can change have `updatedAt`. Name other times 
 `startsAt`, `endsAt`, `measuredAt`, `sharedAt`.
 
 Make `createdAt` required unless a record's existing data has no time to put there. Never make one
-up, and say in the field's description when it can be absent. Today these records have an optional
-`createdAt`: `actor.profile` (a profile edited over time, as on other AT Protocol apps),
-transcripts, places that only came from location history, corrections, entry links, visits the
-person added, and journal memberships. A membership is written create-only, so its `createdAt` is
+up, and say in the field's description when it can be absent; the lexicon check refuses an optional
+`createdAt` without a description. Today these records have an optional `createdAt`:
+`actor.profile` (a profile edited over time, as on other AT Protocol apps), transcripts, places
+that only came from location history, corrections, entry links, visits the person added, and
+journal memberships. A membership is written create-only, so its `createdAt` is
 the first one written and two devices writing the same membership agree.
 
 **No floating-point numbers.** The AT Protocol data model has no floats. Use integers with the unit
