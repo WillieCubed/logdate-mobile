@@ -82,6 +82,9 @@ public data class RepoBlock(
 
 /**
  * Canonical repo head metadata.
+ *
+ * @property revision the head commit's `rev`: a TID stored as its 64-bit number, so
+ * `Tid.fromLong(revision)` gives the string form. Later commits always have larger revisions.
  */
 public data class RepoHead(
     val repo: AtprotoDid,
@@ -92,6 +95,9 @@ public data class RepoHead(
 
 /**
  * Unsigned repo commit payload.
+ *
+ * @property revision the commit's `rev`: a TID stored as its 64-bit number. Repositories written
+ * before revisions were TIDs have small counter values here; every later commit is larger.
  */
 @Serializable
 public data class RepoCommit(
@@ -105,6 +111,8 @@ public data class RepoCommit(
 
 /**
  * Signed repo commit entry.
+ *
+ * @property signature the raw signature bytes as unpadded base64url text.
  */
 public data class SignedRepoCommit(
     val cid: Cid,

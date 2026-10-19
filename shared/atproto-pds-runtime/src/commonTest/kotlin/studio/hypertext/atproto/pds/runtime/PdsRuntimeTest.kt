@@ -249,6 +249,8 @@ class PdsRuntimeTest {
                         },
                 ).getOrThrow()
 
+            val secondHead = requireNotNull(repoStore.loadHead(repo).getOrThrow())
+
             val export = syncService.getRepo(GetRepoRequest(did = repo, since = Tid.fromLong(firstHead.revision))).getOrThrow()
             val latestCommit = syncService.getLatestCommit(GetLatestCommitRequest(did = repo)).getOrThrow()
             val repoStatus = syncService.getRepoStatus(GetRepoStatusRequest(did = repo)).getOrThrow()
@@ -256,13 +258,14 @@ class PdsRuntimeTest {
 
             assertEquals(DefaultPdsSyncService.CAR_CONTENT_TYPE, export.contentType)
             assertEquals(repo, exportRepo.repo)
-            assertEquals(listOf(2L), exportRepo.commits.map { it.commit.revision })
+            assertEquals(listOf(secondHead.revision), exportRepo.commits.map { it.commit.revision })
             assertTrue(exportRepo.blocks.none { block -> block.cid.toString() == firstWrite.cid })
             assertNotNull(latestCommit)
-            assertEquals(2L, latestCommit.rev.toLong())
+            assertEquals(Tid.fromLong(secondHead.revision), latestCommit.rev)
+            assertTrue(latestCommit.rev.value > Tid.fromLong(firstHead.revision).value)
             assertNotNull(repoStatus)
             assertTrue(repoStatus.active)
             assertEquals(repo, repoStatus.did)
-            assertEquals(2L, repoStatus.rev?.toLong())
+            assertEquals(Tid.fromLong(secondHead.revision), repoStatus.rev)
         }
 }

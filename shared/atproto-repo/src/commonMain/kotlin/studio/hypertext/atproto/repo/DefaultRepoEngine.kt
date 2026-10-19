@@ -301,16 +301,36 @@ public class DefaultRepoEngine(
                         reachableBlocks(repo, previousTree, commit).mapTo(linkedSetOf(), RepoBlock::cid)
                     } ?: emptySet()
                 }
+            val blocks = linkedMapOf<Cid, RepoBlock>()
+            currentBlocks
+                .filterNot { block -> block.cid in previousBlockIds }
+                .forEach { block -> blocks[block.cid] = block }
+            // Commit blocks travel as stored. Rebuilding them from the commit rows would only give
+            // the same bytes -- and so the same CIDs -- if the encoding had never changed.
+            blockStore
+                .readBlocks(exportCommits.map(SignedRepoCommit::cid))
+                .getOrThrow()
+                .filterNotNull()
+                .forEach { block -> blocks.getOrPut(block.cid) { block } }
             RepoExport(
                 repo = repo,
                 head = head,
                 commits = exportCommits,
-                blocks = currentBlocks.filterNot { block -> block.cid in previousBlockIds },
+                blocks = blocks.values.toList(),
             )
         }
 
     override suspend fun import(export: RepoExport): Result<RepoHead> =
         runCatching {
+            // The specification requires readers to check the tree of untrusted input: keys sorted,
+            // each at the depth its hash gives it. Rebuilding the tree from its entries and comparing
+            // roots checks both, since only the canonical shape produces the same root.
+            val providedBlocks = export.blocks.associateBy(RepoBlock::cid)
+            val importedTree =
+                MerkleSearchTree.fromBlocks(export.head.root) { cid -> providedBlocks[cid] ?: blockStore.readBlock(cid).getOrThrow() }
+            require(importedTree.rootCid() == export.head.root) {
+                "Record tree ${export.head.root} is not in the canonical shape for its entries"
+            }
             export.blocks.forEach { block ->
                 blockStore.writeBlock(export.repo, block).getOrThrow()
             }
@@ -361,7 +381,7 @@ public class DefaultRepoEngine(
                 repo = repo,
                 root = rootCid,
                 prev = previousHead?.commitCid,
-                revision = (previousHead?.revision ?: 0L) + 1L,
+                revision = nextRevision(previousHead?.revision),
                 createdAtEpochMillis = clock.now().toEpochMilliseconds(),
                 recordCount = tree.entries().size,
             )
@@ -391,6 +411,19 @@ public class DefaultRepoEngine(
             throw RepoHeadConflictException(repo = repo, expectedRevision = previousHead?.revision)
         }
         return head
+    }
+
+    /**
+     * The revision for a new commit: the TID for the current time, or one past [previous] when the
+     * clock has not moved past it. The specification requires every commit's `rev` to be greater
+     * than the one before, and that has to hold even when two commits land in the same
+     * microsecond, the clock steps backwards, or the repository still carries the small counter
+     * revisions it was written with before revisions were TIDs.
+     */
+    private fun nextRevision(previous: Long?): Long {
+        val clockRevision = Tid.fromInstant(clock.now()).toLong()
+        if (previous == null) return clockRevision
+        return maxOf(clockRevision, previous + 1)
     }
 
     private data class RepoSnapshot(

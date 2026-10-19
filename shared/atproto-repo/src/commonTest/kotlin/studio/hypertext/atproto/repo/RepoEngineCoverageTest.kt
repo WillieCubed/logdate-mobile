@@ -94,8 +94,6 @@ class RepoEngineCoverageTest {
     fun `car codec round trips exports with commits and blocks`() {
         val root = Cid.sha256(codec = DAG_CBOR_CODEC, bytes = "root".encodeToByteArray())
         val prev = Cid.sha256(codec = DAG_CBOR_CODEC, bytes = "prev".encodeToByteArray())
-        val commitCid = Cid.sha256(codec = DAG_CBOR_CODEC, bytes = "commit".encodeToByteArray())
-        val head = RepoHead(repo = repo, root = root, commitCid = commitCid, revision = 2L)
         val commit =
             RepoCommit(
                 repo = repo,
@@ -105,16 +103,14 @@ class RepoEngineCoverageTest {
                 createdAtEpochMillis = 1_741_391_200_000L,
                 recordCount = 3,
             )
+        val commitCid = Cid.sha256(codec = DAG_CBOR_CODEC, bytes = encodeSignedCommitPayload(commit, "c2lnLTE"))
+        val head = RepoHead(repo = repo, root = root, commitCid = commitCid, revision = 2L)
         val export =
             RepoExport(
                 repo = repo,
                 head = head,
                 commits = listOf(SignedRepoCommit(cid = commitCid, commit = commit, signature = "c2lnLTE")),
-                blocks =
-                    listOf(
-                        RepoBlock(cid = root, bytes = "root".encodeToByteArray()),
-                        RepoBlock(cid = commitCid, bytes = "commit".encodeToByteArray()),
-                    ),
+                blocks = listOf(RepoBlock(cid = root, bytes = "root".encodeToByteArray())),
             )
 
         val restored = CarCodec.read(CarCodec.write(export))
@@ -127,7 +123,7 @@ class RepoEngineCoverageTest {
         assertEquals(export.commits.map { it.commit.prev }, restored.commits.map { it.commit.prev })
         assertEquals(export.commits.map { it.commit.revision }, restored.commits.map { it.commit.revision })
         assertEquals(export.commits.map { it.signature }, restored.commits.map { it.signature })
-        assertEquals(export.blocks.map { it.cid }, restored.blocks.map { it.cid })
+        assertEquals(export.blocks.map { it.cid } + commitCid, restored.blocks.map { it.cid })
         assertContentEquals(export.blocks.first().bytes, restored.blocks.first().bytes)
         val encodedCommit =
             DagCborCodec.decode(
@@ -427,7 +423,9 @@ class RepoEngineCoverageTest {
         val fullExport = runSuspend { engine.export(repo).getOrThrow() }
         val diffExport = runSuspend { engine.export(repo, since = Tid.fromLong(firstHead.revision)).getOrThrow() }
 
-        assertEquals(listOf(2L), diffExport.commits.map { it.commit.revision })
+        val secondHead = runSuspend { requireNotNull(engine.loadHead(repo).getOrThrow()) }
+        assertEquals(listOf(secondHead.revision), diffExport.commits.map { it.commit.revision })
+        assertTrue(secondHead.revision > firstHead.revision)
         assertTrue(fullExport.blocks.any { it.cid.toString() == firstWrite.cid })
         assertTrue(diffExport.blocks.none { it.cid.toString() == firstWrite.cid })
         assertEquals(fullExport.head, diffExport.head)

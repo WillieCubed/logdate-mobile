@@ -27,11 +27,13 @@ public object CarCodec {
             blockMap[block.cid] = block
         }
         export.commits.forEach { commit ->
-            blockMap[commit.cid] =
-                RepoBlock(
-                    cid = commit.cid,
-                    bytes = encodeSignedCommitPayload(commit.commit, commit.signature),
-                )
+            if (commit.cid in blockMap) return@forEach
+            val bytes = encodeSignedCommitPayload(commit.commit, commit.signature)
+            require(Cid.sha256(DAG_CBOR_CODEC, bytes) == commit.cid) {
+                "Commit ${commit.cid} has no block in the export, and encoding it again gives bytes with a different CID. " +
+                    "Include the stored commit block in the export."
+            }
+            blockMap[commit.cid] = RepoBlock(cid = commit.cid, bytes = bytes)
         }
         return writeCar(roots = listOf(export.head.commitCid), blocks = blockMap.values.toList())
     }
