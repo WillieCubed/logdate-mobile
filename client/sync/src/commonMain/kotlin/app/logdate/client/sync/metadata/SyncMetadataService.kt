@@ -217,7 +217,12 @@ interface Syncable {
 /**
  * Types of entities that can be synced.
  *
- * [MOMENT] is a moment marked on the watch, stored apart from notes; nothing uploads it yet.
+ * [MOMENT] is a moment marked on the watch, stored apart from notes.
+ *
+ * The `PLACE_*` and [LOCATION_SAMPLES] types are location history in the personal space: its places,
+ * the visits, corrections and journeys the person recorded, the entries linked to visits, and each
+ * device's location samples, one item per device and hour. They exist only for the personal space,
+ * where each is one kind of record; location history syncs through its own endpoints otherwise.
  */
 enum class EntityType {
     JOURNAL,
@@ -228,4 +233,10 @@ enum class EntityType {
     HEALTH,
     DRAFT,
     MOMENT,
+    PLACE,
+    PLACE_VISIT,
+    PLACE_CORRECTION,
+    PLACE_ENTRY_LINK,
+    PLACE_JOURNEY,
+    LOCATION_SAMPLES,
 }

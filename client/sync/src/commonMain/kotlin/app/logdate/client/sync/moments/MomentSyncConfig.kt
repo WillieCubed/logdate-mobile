@@ -21,6 +21,7 @@ internal fun DefaultSyncManager.createMomentDownloader(config: MomentSyncConfig)
         unreadableCloudRecordStore,
         statusPublisher::handleCloudApiError,
         statusPublisher::handleSyncException,
+        space,
     )
 
 internal fun DefaultSyncManager.createMomentUploader(config: MomentSyncConfig): MomentUploader =
@@ -39,4 +40,5 @@ internal fun DefaultSyncManager.createMomentUploader(config: MomentSyncConfig): 
             )
         },
         requireNotNull(downloadInbox) { "Moment uploads require a durable download inbox" },
+        space,
     )

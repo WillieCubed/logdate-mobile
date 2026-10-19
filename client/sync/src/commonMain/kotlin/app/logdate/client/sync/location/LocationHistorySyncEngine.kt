@@ -8,7 +8,11 @@ import app.logdate.client.repository.location.HistoryRecordStore
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncResult
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.crypto.SyncPayloadCipher
+import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.recovery.DownloadInbox
+import app.logdate.client.sync.space.SpaceSync
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.config.PinnedLogDateConfigRepository
 import app.logdate.shared.model.sync.LocationHistoryUpload
@@ -23,7 +27,37 @@ class LocationHistorySyncEngine(
     private val config: LogDateConfigRepository,
     private val enabled: suspend () -> Boolean,
     private val prepare: suspend (ownerId: String, origin: String) -> Boolean = { _, _ -> false },
+    private val savedPlaceIds: suspend () -> List<String> = { emptyList() },
 ) {
+    /** The part of this engine that syncs through the personal space, for the manager that owns [space]. */
+    internal fun forSpace(
+        space: SpaceSync,
+        metadata: SyncMetadataService,
+        transactions: SyncTransactionManager,
+        inbox: DownloadInbox?,
+        uploadsUpdates: Boolean,
+    ): LocationHistorySpaceSync = LocationHistorySpaceSync(space, store, metadata, transactions, inbox, uploadsUpdates, savedPlaceIds)
+
+    /** Stages the samples captured here, then uploads what changed to the personal space instead of the location history endpoints. */
+    internal suspend fun uploadToSpace(
+        accessToken: String,
+        spaceSync: LocationHistorySpaceSync,
+    ): SyncResult =
+        runPhase(accessToken) { namespace, _ ->
+            val moreToStage = prepare(namespace.owner, namespace.origin)
+            ensureCurrent(namespace)
+            spaceSync.upload(namespace.owner, namespace.origin, moreToStage).also { ensureCurrent(namespace) }
+        }
+
+    internal suspend fun downloadFromSpace(
+        accessToken: String,
+        spaceSync: LocationHistorySpaceSync,
+    ): SyncResult =
+        runPhase(accessToken) { namespace, _ ->
+            ensureCurrent(namespace)
+            spaceSync.download().also { ensureCurrent(namespace) }
+        }
+
     suspend fun upload(accessToken: String): SyncResult =
         runPhase(accessToken) { namespace, api ->
             val moreToStage = prepare(namespace.owner, namespace.origin)

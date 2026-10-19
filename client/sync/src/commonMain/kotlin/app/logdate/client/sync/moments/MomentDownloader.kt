@@ -1,5 +1,8 @@
 package app.logdate.client.sync.moments
 
+import app.logdate.client.repository.moments.MarkedMoment
+import app.logdate.client.repository.moments.atMillisecondPrecision
+import app.logdate.client.sync.RemoteOutcome
 import app.logdate.client.sync.SyncDownloader
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
@@ -9,11 +12,16 @@ import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.MomentSyncResult
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceStagedRecords
+import app.logdate.client.sync.space.SpaceSync
+import app.logdate.client.sync.space.spaceFetchError
 import app.logdate.shared.model.diagnostics.DiagnosticReason
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Instant
@@ -28,6 +36,7 @@ internal class MomentDownloader(
     private val unreadable: UnreadableCloudRecordStore,
     private val mapCloudError: (CloudApiException) -> SyncResult,
     private val mapException: (Exception, String) -> SyncResult,
+    private val space: SpaceSync? = null,
 ) {
     private val applier = MomentRemoteApplier(config.repository, metadata, transactions, inbox)
 
@@ -36,7 +45,99 @@ internal class MomentDownloader(
         val errors = mutableListOf<SyncError>()
     }
 
-    suspend fun download(): SyncResult =
+    suspend fun download(): SyncResult {
+        val kind = space?.activeKind(EntityType.MOMENT)
+        if (space != null && kind != null) {
+            @Suppress("UNCHECKED_CAST")
+            return downloadFromSpace(space, kind as SpaceKind<MarkedMoment>)
+        }
+        return downloadFromServer()
+    }
+
+    /**
+     * Applies the marks the personal space changed, one at a time so one failure leaves the rest
+     * applied. A mark changed here since it was uploaded keeps what it holds, and uploads again.
+     */
+    private suspend fun downloadFromSpace(
+        sync: SpaceSync,
+        kind: SpaceKind<MarkedMoment>,
+    ): SyncResult =
+        try {
+            val tally = Tally()
+            val staged = sync.read(kind).getOrElse { failure -> throw failure }
+            inbox.spaceFetchError()?.let { tally.errors += it }
+            do {
+                val page = staged.page()
+                page.changes.forEach { applyMark(staged, it, tally) }
+                page.deletions.forEach { deleteMark(staged, it, page.readAt, tally) }
+            } while (page.hasMore)
+            SyncResult(success = tally.errors.isEmpty(), downloadedItems = tally.downloaded, errors = tally.errors)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: CloudApiException) {
+            mapCloudError(error)
+        } catch (error: Exception) {
+            mapException(error, "Download marked moments")
+        }
+
+    private suspend fun applyMark(
+        staged: SpaceStagedRecords<MarkedMoment>,
+        mark: MarkedMoment,
+        tally: Tally,
+    ) {
+        val id = mark.id.toString()
+        try {
+            transactions.withTransaction {
+                val incoming = mark.atMillisecondPrecision()
+                val merged = config.repository.applyFromSync(incoming)
+                when {
+                    merged == null && config.repository.getMark(mark.id) == null -> staged.settle(id, RemoteOutcome.DECLINED)
+                    merged == null -> {
+                        staged.settleFailed(id)
+                        tally.errors += SyncError(SyncErrorType.CONFLICT_ERROR, "A marked moment could not be merged")
+                    }
+                    else -> {
+                        // The version is transport metadata; only content that survived here needs to upload again.
+                        val kept = merged.copy(syncVersion = incoming.syncVersion) != incoming
+                        if (kept && !metadata.hasPending(EntityType.MOMENT, id)) {
+                            metadata.enqueuePending(id, EntityType.MOMENT, PendingOperation.UPDATE)
+                        }
+                        staged.settle(id, if (kept) RemoteOutcome.MERGED else RemoteOutcome.STORED)
+                        tally.downloaded++
+                    }
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            staged.settleFailed(id)
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be saved")
+        }
+    }
+
+    private suspend fun deleteMark(
+        staged: SpaceStagedRecords<MarkedMoment>,
+        id: String,
+        deletedAt: Instant,
+        tally: Tally,
+    ) {
+        try {
+            transactions.withTransaction {
+                val uuid = Uuid.parse(id)
+                val version = maxOf(1L, config.repository.getMark(uuid)?.syncVersion ?: 0L)
+                config.repository.applyDeletionFromSync(uuid, deletedAt, version)
+                staged.settle(id, RemoteOutcome.DELETED)
+                tally.downloaded++
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            staged.settleFailed(id)
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "A marked moment could not be deleted")
+        }
+    }
+
+    private suspend fun downloadFromServer(): SyncResult =
         try {
             if (!config.enabled()) {
                 SyncResult(success = true)

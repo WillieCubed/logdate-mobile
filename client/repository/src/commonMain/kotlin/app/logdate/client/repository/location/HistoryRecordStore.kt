@@ -2,7 +2,13 @@ package app.logdate.client.repository.location
 
 import kotlinx.coroutines.flow.Flow
 
-/** Local outbox and downloaded records. Sensitive payloads are encrypted before transport. */
+/**
+ * Local outbox and downloaded records. Sensitive payloads are encrypted before transport.
+ *
+ * @property observedAtMillis when a sample or activity change happened, kept after its payload is
+ *   removed by a deletion so the record can still be found by the hour it belongs to. Null for
+ *   other records, and for a deleted record this device never knew the time of.
+ */
 data class HistoryRecord(
     val id: String,
     val recordType: String,
@@ -12,6 +18,7 @@ data class HistoryRecord(
     val serverVersion: Long = 0,
     val deleted: Boolean = false,
     val dirty: Boolean = true,
+    val observedAtMillis: Long? = null,
 )
 
 interface HistoryRecordStore {
@@ -37,6 +44,32 @@ interface HistoryRecordStore {
         origin: String,
         id: String,
     ): HistoryRecord? = records(ownerId, origin).firstOrNull { it.id == id }
+
+    /** Every record of [recordType], deleted ones included. */
+    suspend fun recordsOfType(
+        ownerId: String,
+        origin: String,
+        recordType: String,
+    ): List<HistoryRecord> = records(ownerId, origin).filter { it.recordType == recordType }
+
+    /**
+     * Every [recordType] record [deviceId] observed from [startMillis] up to but not including
+     * [endMillis], deleted ones included. A deleted record is found by the time it kept.
+     */
+    suspend fun recordsBetween(
+        ownerId: String,
+        origin: String,
+        recordType: String,
+        deviceId: String,
+        startMillis: Long,
+        endMillis: Long,
+    ): List<HistoryRecord> =
+        records(ownerId, origin).filter {
+            it.recordType == recordType &&
+                it.deviceId == deviceId &&
+                it.observedAtMillis != null &&
+                it.observedAtMillis in startMillis until endMillis
+        }
 
     suspend fun put(
         ownerId: String,

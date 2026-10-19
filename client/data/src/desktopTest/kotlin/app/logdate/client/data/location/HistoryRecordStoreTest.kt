@@ -283,6 +283,77 @@ class HistoryRecordStoreTest {
             }
         }
 
+    @Test
+    fun deletedSamplesStayFindableByTheHourTheyWereTakenIn() =
+        runTest {
+            withStore { _, store ->
+                val at = Instant.parse("2026-10-19T14:12:03Z")
+                val observation = LocationObservation("a", owner, "phone", at, 36.0, -115.0)
+                val payload = Json.encodeToString(HistoryPayload.serializer(), HistoryPayload.Observation(observation))
+                store.put(owner, origin, HistoryRecord("observation:a", "observation", payload, "phone"))
+                store.put(owner, origin, HistoryRecord("observation:b", "observation", payload, "other"))
+                val start = Instant.parse("2026-10-19T14:00:00Z").toEpochMilliseconds()
+                val end = start + 3_600_000
+
+                store.put(owner, origin, HistoryRecord("observation:a", "observation", null, "phone", deviceVersion = 2, deleted = true))
+
+                val found = store.recordsBetween(owner, origin, "observation", "phone", start, end)
+                assertEquals(listOf("observation:a"), found.map { it.id })
+                assertTrue(found.single().deleted)
+                assertEquals(at.toEpochMilliseconds(), found.single().observedAtMillis)
+                assertEquals(emptyList(), store.recordsBetween(owner, origin, "observation", "phone", end, end + 3_600_000))
+                assertEquals(listOf("observation:b"), store.recordsBetween(owner, origin, "observation", "other", start, end).map { it.id })
+            }
+        }
+
+    @Test
+    fun aDeletionThatArrivesFromAnotherDeviceKeepsTheTimeTheRecordHad() =
+        runTest {
+            withStore { _, store ->
+                val at = Instant.parse("2026-10-19T14:12:03Z")
+                val observation = LocationObservation("a", owner, "phone", at, 36.0, -115.0)
+                val payload = Json.encodeToString(HistoryPayload.serializer(), HistoryPayload.Observation(observation))
+                store.put(owner, origin, HistoryRecord("observation:a", "observation", payload, "phone", dirty = false))
+
+                store.applyPage(
+                    owner,
+                    origin,
+                    listOf(HistoryRecord("observation:a", "observation", null, "phone", 2, 5, deleted = true)),
+                    5,
+                )
+
+                assertEquals(at.toEpochMilliseconds(), store.record(owner, origin, "observation:a")!!.observedAtMillis)
+            }
+        }
+
+    @Test
+    fun aTombstoneWrittenWithATimeKeepsThatTime() =
+        runTest {
+            withStore { _, store ->
+                val at = Instant.parse("2026-10-19T14:12:03Z").toEpochMilliseconds()
+
+                store.put(
+                    owner,
+                    origin,
+                    HistoryRecord("observation:z", "observation", null, "phone", deleted = true, observedAtMillis = at),
+                )
+
+                assertEquals(at, store.record(owner, origin, "observation:z")!!.observedAtMillis)
+            }
+        }
+
+    @Test
+    fun recordsOfATypeIncludeDeletedOnesAndNoOtherType() =
+        runTest {
+            withStore { _, store ->
+                store.put(owner, origin, HistoryRecord("one", "correction", "p", "phone"))
+                store.put(owner, origin, HistoryRecord("two", "correction", null, "phone", deleted = true))
+                store.put(owner, origin, HistoryRecord("three", "place", "p", "phone"))
+
+                assertEquals(setOf("one", "two"), store.recordsOfType(owner, origin, "correction").map { it.id }.toSet())
+            }
+        }
+
     private fun record(
         version: Long,
         server: Long,
