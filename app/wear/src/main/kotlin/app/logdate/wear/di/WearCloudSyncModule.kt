@@ -33,6 +33,8 @@ import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMomentDataSource
 import app.logdate.client.sync.cloud.DeviceSessionRevocationListener
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
+import app.logdate.client.sync.cloud.account.ServerAccountStorageMode
+import app.logdate.client.sync.cloud.account.ServerAccountStore
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.crypto.MarkedMomentPayloadCodec
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
@@ -111,8 +113,10 @@ val wearCloudSyncModule =
                     config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.MOMENTS_V1) == true
             }
         }
+        single { ServerAccountStore(get()) }
+        single { ServerAccountStorageMode(get(), get()) }
         single<CloudAccountRepository>(WatchCloud) {
-            WatchCloudAccountRepository(api = get(WatchCloud), config = get())
+            WatchCloudAccountRepository(api = get(WatchCloud), config = get(), sessions = get(), accounts = get())
         }
         single { ReleasedToCloud(ledger = get(), peers = get(), outbox = get()) }
         single<CloudEligibility>(WatchCloud) { get<ReleasedToCloud>() }
@@ -160,6 +164,7 @@ private fun Scope.watchCloudEngine(): DefaultSyncManager {
         lastErrorStore = KeyValueLastSyncErrorStore(storage),
         firstSyncEnqueueStore = KeyValueFirstSyncEnqueueStore(storage),
         cloudApiClient = get(WatchCloud),
+        serverAccounts = get(),
         identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(storage),
         unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(storage),
         downloadInbox = get(WatchCloud),

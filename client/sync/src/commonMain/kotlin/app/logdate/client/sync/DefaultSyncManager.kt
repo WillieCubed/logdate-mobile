@@ -17,6 +17,9 @@ import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.cloud.DeviceSessionRevocationListener
+import app.logdate.client.sync.cloud.account.ServerAccountRefresher
+import app.logdate.client.sync.cloud.account.ServerAccountStore
+import app.logdate.client.sync.cloud.account.ServerReportedAccount
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
@@ -122,6 +125,11 @@ class DefaultSyncManager(
     private val createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
     private val momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
     internal val deviceEnrollment: suspend () -> Unit = {},
+    /**
+     * Where the account `/auth/me` describes is saved when sync starts. Wired on every platform;
+     * optional so tests that never read the account can omit it.
+     */
+    serverAccounts: ServerAccountStore? = null,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -379,6 +387,16 @@ class DefaultSyncManager(
         )
 
     internal val tokenRefresher = SyncTokenRefresher(sessionStorage, cloudAccountRepository, deviceSessionRevocationListener)
+
+    private val accountRefresher =
+        serverAccounts?.let { store -> cloudApiClient?.let { api -> ServerAccountRefresher(api, tokenRefresher, sessionStorage, store) } }
+
+    /**
+     * Reads the signed-in account from `/auth/me` and saves its DID and storage mode, or null when this
+     * manager doesn't keep the account. A full sync does this first; a linked watch also does it as
+     * soon as its phone links it.
+     */
+    suspend fun refreshServerAccount(): Result<ServerReportedAccount>? = accountRefresher?.refresh()
 
     internal suspend fun cursorFor(entityType: EntityType): Instant =
         syncMetadataService.getLastSyncTime(entityType)

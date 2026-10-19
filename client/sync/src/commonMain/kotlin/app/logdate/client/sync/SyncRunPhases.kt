@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.diagnostics.SyncRunDiagnostics
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
@@ -253,6 +254,7 @@ internal suspend fun DefaultSyncManager.syncEntityType(
 internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
     val run = SyncRunDiagnostics(diagnostics, diagnosticSource())
     return run.phase(DiagnosticPhase.RECOVERY) {
+        val accountErrors = refreshAccountForSync()
         if (profile.sweepsOnFirstSync) uploader.enqueueEverythingOnFirstSync()
         val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
         val uploadResult = run.phase(DiagnosticPhase.UPLOAD) { uploadPendingChanges() }
@@ -266,14 +268,15 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
             Napier.w("Couldn't enroll this account device", failure)
         }
 
-        val errors = downloadResult.errors + uploadResult.errors + draftResult.errors
+        val errors = accountErrors + downloadResult.errors + uploadResult.errors + draftResult.errors
         // Each phase updates the shared last error. A successful upload must not erase a failed
         // download from the same full run, or the worker retries with no visible reason.
         lastErrorFlow.value = errors.mostSevere()
 
         SyncResult(
             success =
-                uploadResult.success &&
+                accountErrors.isEmpty() &&
+                    uploadResult.success &&
                     downloadResult.success &&
                     draftResult.success &&
                     (downloadInbox?.count() ?: 0) == 0,
@@ -289,4 +292,23 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
                     (downloadInbox?.count() ?: 0) > 0,
         )
     }
+}
+
+/**
+ * Reads the account from the server before anything else syncs, so its storage mode is the server's
+ * current answer rather than a saved one. A failure is reported with the run's other errors; it never
+ * stops the legacy phases, which the server refuses itself when the account isn't in legacy storage.
+ */
+internal suspend fun DefaultSyncManager.refreshAccountForSync(): List<SyncError> {
+    if (!isEnabled || !tokenRefresher.isAuthenticated()) return emptyList()
+    val failure = refreshServerAccount()?.exceptionOrNull() ?: return emptyList()
+    Napier.e("The account could not be read from the server at the start of sync", failure)
+    val unauthorized = (failure.cause as? CloudApiException)?.statusCode == 401
+    return listOf(
+        SyncError(
+            type = if (unauthorized) SyncErrorType.AUTHENTICATION_ERROR else SyncErrorType.SERVER_ERROR,
+            message = "The account could not be read from the server: ${failure.message}",
+            cause = failure,
+        ),
+    )
 }

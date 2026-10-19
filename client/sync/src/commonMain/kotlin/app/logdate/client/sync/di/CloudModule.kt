@@ -27,6 +27,8 @@ import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMomentDataSource
 import app.logdate.client.sync.cloud.LogDateCloudApiClient
+import app.logdate.client.sync.cloud.account.ServerAccountStorageMode
+import app.logdate.client.sync.cloud.account.ServerAccountStore
 import app.logdate.client.sync.crypto.MarkedMomentPayloadCodec
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
@@ -81,6 +83,8 @@ val cloudModule =
             )
         }
         single { DurableCloudApiClient(get<CloudApiClient>(), get()) }
+        single { ServerAccountStore(get()) }
+        single { ServerAccountStorageMode(get(), get()) }
 
         // Raw API remains available for identity emptiness checks; incremental inbox reads cannot prove emptiness.
         // Cloud Data Sources

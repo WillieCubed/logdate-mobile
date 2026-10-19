@@ -1,10 +1,12 @@
 package app.logdate.wear.di
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudRequestLocationProvider
 import app.logdate.client.sync.cloud.RefreshedSession
 import app.logdate.client.sync.cloud.SessionRefreshingAccountRepository
+import app.logdate.client.sync.cloud.account.ServerAccountStore
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
@@ -26,7 +28,8 @@ class WearCloudCredentialsTest {
     fun `request location captures the selected server and invalidates after switching`() =
         runTest {
             val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://watch.test", initialApiVersion = "v2")
-            val accounts: CloudRequestLocationProvider = WatchCloudAccountRepository(mockk(), config)
+            val accounts: CloudRequestLocationProvider =
+                WatchCloudAccountRepository(mockk(), config, mockk(), ServerAccountStore(MemoryKeyValueStorage()))
             val location = accounts.captureLocation()
             assertEquals("https://watch.test", location.origin)
             assertEquals("https://watch.test/api/v2", location.apiBaseUrl)
@@ -48,6 +51,7 @@ class WearCloudCredentialsTest {
                         wearCloudSyncModule,
                         module {
                             single<KeyValueStorage> { storage }
+                            single<SessionStorage> { mockk(relaxed = true) }
                             single<LogDateConfigRepository> { DefaultLogDateConfigRepository(initialBackendUrl = "https://watch.test") }
                             single<CloudApiClient>(WatchCloud) { api }
                         },

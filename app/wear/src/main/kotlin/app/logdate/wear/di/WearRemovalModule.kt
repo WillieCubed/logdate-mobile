@@ -16,7 +16,7 @@ val wearRemovalModule =
         single { WatchRemovalLock(get()) }
         single {
             app.logdate.wear.sync.v2.removal
-                .WatchRemovalCaches(get(), get(), get(), get(), get(), get(), get())
+                .WatchRemovalCaches(get(), get(), get(), get(), get(), get(), get(), get())
         }
         single {
             app.logdate.wear.sync.v2.removal

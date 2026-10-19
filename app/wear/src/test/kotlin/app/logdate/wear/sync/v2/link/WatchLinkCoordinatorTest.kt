@@ -45,6 +45,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class WatchLinkCoordinatorTest {
     private val installer = FakeInstaller()
+    private var accountReads = 0
 
     private fun accountCoordinator(scope: CoroutineScope) =
         WatchLinkCoordinator(
@@ -54,6 +55,7 @@ class WatchLinkCoordinatorTest {
             localNodeId = { WATCH },
             installer = installer,
             installScope = scope,
+            afterInstall = { accountReads++ },
         )
 
     @Test
@@ -68,6 +70,7 @@ class WatchLinkCoordinatorTest {
             assertEquals("https://linked.test", store.current()?.serverOrigin)
             assertEquals(32, LinkWire.decodeKey(assertNotNull(store.current()?.linkId))?.size)
             assertEquals(1, installer.installs)
+            assertEquals(1, accountReads, "the watch reads its account from the server once it is linked")
         }
 
     @Test
@@ -93,6 +96,7 @@ class WatchLinkCoordinatorTest {
 
             assertEquals(PeerLinkState.NEEDS_RELINK, store.current().peerLinkState())
             assertEquals("DEVICE_LIMIT_REACHED", store.current()?.problem)
+            assertEquals(0, accountReads)
         }
 
     @Test
