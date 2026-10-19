@@ -99,9 +99,12 @@ public interface DataHome {
     ): StoredRecord
 
     /**
-     * Deletes the record at [rkey] and returns the sequence number of the deletion.
+     * Deletes the record at [rkey] and returns the sequence number of the deletion. Deleting a key
+     * with no live record changes nothing and returns the latest sequence number.
      *
+     * @param swap the condition the delete must meet: [RecordSwap.Unconditional] or [RecordSwap.Matching].
      * @throws DataHomeConflictException if [swap] isn't met.
+     * @throws IllegalArgumentException if [swap] is [RecordSwap.Absent], which no delete can meet.
      */
     public suspend fun deleteRecord(
         space: SpaceRef,

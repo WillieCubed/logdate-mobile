@@ -3,18 +3,25 @@ package app.logdate.space
 import app.logdate.lexicon.app.logdate.crypto.Sealed
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.HttpRequestData
+import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
 import studio.hypertext.atproto.lexicon.data.Bytes
 import studio.hypertext.atproto.xrpc.BearerToken
 import studio.hypertext.atproto.xrpc.KtorXrpcClient
+import studio.hypertext.atproto.xrpc.NoAuth
+import studio.hypertext.atproto.xrpc.XrpcAuth
 import studio.hypertext.atproto.xrpc.XrpcProtocolException
+import studio.hypertext.atproto.xrpc.XrpcSerializationException
+import studio.hypertext.atproto.xrpc.XrpcTransportException
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -45,6 +52,20 @@ class XrpcDataHomeTest {
             }
         val http = HttpClient(engine)
         return XrpcDataHome(KtorXrpcClient(http, "https://cloud.test"), http, "https://cloud.test") { BearerToken("token") }
+    }
+
+    private fun failingHome(
+        auth: XrpcAuth = BearerToken("token"),
+        respond: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
+    ): XrpcDataHome {
+        val http =
+            HttpClient(
+                MockEngine { request ->
+                    requests += request
+                    respond(request)
+                },
+            )
+        return XrpcDataHome(KtorXrpcClient(http, "https://cloud.test"), http, "https://cloud.test") { auth }
     }
 
     private fun HttpRequestData.bodyBytes(): ByteArray = (body as OutgoingContent.ByteArrayContent).bytes()
@@ -118,6 +139,15 @@ class XrpcDataHomeTest {
                 home(HttpStatusCode.Conflict, """{"error":"InvalidSwap","message":"changed"}""")
                     .deleteRecord(space, "abc", RecordSwap.Matching("bafyold"))
             }
+        }
+
+    @Test
+    fun `deleting with an absent swap is refused before anything is sent`() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> {
+                home(HttpStatusCode.OK, """{"seq":9}""").deleteRecord(space, "abc", RecordSwap.Absent)
+            }
+            assertTrue(requests.isEmpty())
         }
 
     @Test
@@ -237,5 +267,33 @@ class XrpcDataHomeTest {
             assertFailsWith<XrpcProtocolException> {
                 home(HttpStatusCode.Forbidden, """{"error":"Forbidden","message":"no"}""").getBlob(space, "bafyblob")
             }
+        }
+
+    @Test
+    fun `a blob request that fails in transit is a transport error`() =
+        runTest {
+            val home = failingHome { throw IOException("connection reset") }
+            assertFailsWith<XrpcTransportException> { home.uploadBlob(space, byteArrayOf(1)) }
+            assertFailsWith<XrpcTransportException> { home.getBlob(space, "bafyblob") }
+        }
+
+    @Test
+    fun `an upload response that isn't a blob reference is a serialization error`() =
+        runTest {
+            assertFailsWith<XrpcSerializationException> {
+                home(HttpStatusCode.OK, """{"blob":"nope"}""").uploadBlob(space, byteArrayOf(1))
+            }
+            assertFailsWith<XrpcSerializationException> {
+                home(HttpStatusCode.OK, "not json").uploadBlob(space, byteArrayOf(1))
+            }
+        }
+
+    @Test
+    fun `blob methods without a bearer token are refused before anything is sent`() =
+        runTest {
+            val home = failingHome(auth = NoAuth) { respond("", HttpStatusCode.OK) }
+            assertFailsWith<IllegalStateException> { home.uploadBlob(space, byteArrayOf(1)) }
+            assertFailsWith<IllegalStateException> { home.getBlob(space, "bafyblob") }
+            assertTrue(requests.isEmpty())
         }
 }
