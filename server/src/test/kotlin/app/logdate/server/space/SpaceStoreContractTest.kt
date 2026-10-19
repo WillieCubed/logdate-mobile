@@ -27,19 +27,24 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
 abstract class SpaceStoreContractTest {
-    abstract fun withStore(block: suspend (SpaceStore, UUID) -> Unit)
+    abstract fun withStore(
+        changesByteBudget: Long = MAX_SPACE_CHANGES_BYTES,
+        block: suspend (SpaceStore, UUID) -> Unit,
+    )
 
     private val space = "at://did:plc:owner/space/app.logdate.space.personal/self"
     private val author = "did:plc:owner"
 
-    private fun sealed(fill: Int) =
-        buildJsonObject {
-            put("\$type", "app.logdate.crypto.sealed")
-            put("version", 1)
-            put("keyId", "abcdefghijklm")
-            putJsonObject("nonce") { put("\$bytes", Base64.encode(ByteArray(12))) }
-            putJsonObject("ciphertext") { put("\$bytes", Base64.encode(ByteArray(528) { fill.toByte() })) }
-        }
+    private fun sealed(
+        fill: Int,
+        ciphertextBytes: Int = 528,
+    ) = buildJsonObject {
+        put("\$type", "app.logdate.crypto.sealed")
+        put("version", 1)
+        put("keyId", "abcdefghijklm")
+        putJsonObject("nonce") { put("\$bytes", Base64.encode(ByteArray(12))) }
+        putJsonObject("ciphertext") { put("\$bytes", Base64.encode(ByteArray(ciphertextBytes) { fill.toByte() })) }
+    }
 
     private fun write(
         account: UUID,
@@ -48,7 +53,8 @@ abstract class SpaceStoreContractTest {
         swapCid: String? = null,
         createOnly: Boolean = false,
         blobs: List<String> = emptyList(),
-    ) = SpaceRecordWrite(account, space, author, rkey, sealed(fill), blobs, swapCid, createOnly)
+        ciphertextBytes: Int = 528,
+    ) = SpaceRecordWrite(account, space, author, rkey, sealed(fill, ciphertextBytes), blobs, swapCid, createOnly)
 
     @Test
     fun `writes get increasing sequence numbers and read back`() =
@@ -114,6 +120,33 @@ abstract class SpaceStoreContractTest {
             assertFalse(rest.hasMore)
             val empty = store.changes(space, author, rest.cursor, 2)
             assertEquals(SpaceChangePage(emptyList(), rest.cursor, false), empty)
+        }
+
+    @Test
+    fun `a page stops before its stored records pass the byte budget`() =
+        withStore { store, account ->
+            listOf("a", "b", "c").forEach { store.put(write(account, it, ciphertextBytes = LARGEST_CIPHERTEXT)) }
+            store.put(write(account, "d"))
+            val first = store.changes(space, author, 0, 10)
+            assertEquals(listOf("a", "b"), first.changes.map { it.rkey })
+            assertTrue(first.hasMore)
+            assertEquals(first.changes.last().seq, first.cursor)
+            val rest = store.changes(space, author, first.cursor, 10)
+            assertEquals(listOf("c", "d"), rest.changes.map { it.rkey })
+            assertFalse(rest.hasMore)
+        }
+
+    @Test
+    fun `a record larger than the byte budget still comes back on its own page`() =
+        withStore(changesByteBudget = 100) { store, account ->
+            store.put(write(account, "a"))
+            store.put(write(account, "b"))
+            val first = store.changes(space, author, 0, 10)
+            assertEquals(listOf("a"), first.changes.map { it.rkey })
+            assertTrue(first.hasMore)
+            val rest = store.changes(space, author, first.cursor, 10)
+            assertEquals(listOf("b"), rest.changes.map { it.rkey })
+            assertFalse(rest.hasMore)
         }
 
     @Test
@@ -204,22 +237,30 @@ abstract class SpaceStoreContractTest {
         }
 }
 
+/** The largest ciphertext a sealed record can carry: 61 padding buckets of 64 KiB, plus the AES-GCM tag. */
+private const val LARGEST_CIPHERTEXT = 61 * 65_536 + 16
+
 class InMemorySpaceStoreTest : SpaceStoreContractTest() {
-    override fun withStore(block: suspend (SpaceStore, UUID) -> Unit) = runBlocking { block(InMemorySpaceStore(), UUID.randomUUID()) }
+    override fun withStore(
+        changesByteBudget: Long,
+        block: suspend (SpaceStore, UUID) -> Unit,
+    ) = runBlocking { block(InMemorySpaceStore(changesByteBudget), UUID.randomUUID()) }
 }
 
 class PostgreSQLSpaceStoreH2Test : SpaceStoreContractTest() {
-    override fun withStore(block: suspend (SpaceStore, UUID) -> Unit) =
-        withH2Database(AccountsTable, SpaceStatesTable, SpaceRecordsTable, SpaceRecordBlobsTable, SpaceBlobsTable) {
-            val account = UUID.randomUUID()
-            transaction {
-                AccountsTable.insert {
-                    it[id] = account
-                    it[username] = "owner"
-                    it[displayName] = "Owner"
-                    it[createdAt] = Clock.System.now()
-                }
+    override fun withStore(
+        changesByteBudget: Long,
+        block: suspend (SpaceStore, UUID) -> Unit,
+    ) = withH2Database(AccountsTable, SpaceStatesTable, SpaceRecordsTable, SpaceRecordBlobsTable, SpaceBlobsTable) {
+        val account = UUID.randomUUID()
+        transaction {
+            AccountsTable.insert {
+                it[id] = account
+                it[username] = "owner"
+                it[displayName] = "Owner"
+                it[createdAt] = Clock.System.now()
             }
-            runBlocking { block(PostgreSQLSpaceStore(), account) }
         }
+        runBlocking { block(PostgreSQLSpaceStore(changesByteBudget), account) }
+    }
 }

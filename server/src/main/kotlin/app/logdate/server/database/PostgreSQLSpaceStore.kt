@@ -1,5 +1,6 @@
 package app.logdate.server.database
 
+import app.logdate.server.space.MAX_SPACE_CHANGES_BYTES
 import app.logdate.server.space.SpaceBlob
 import app.logdate.server.space.SpaceChange
 import app.logdate.server.space.SpaceChangePage
@@ -8,6 +9,7 @@ import app.logdate.server.space.SpaceRecordWrite
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.space.SpaceSwapException
 import app.logdate.server.space.StoredSpaceRecord
+import app.logdate.server.space.countWithinBudget
 import app.logdate.server.space.decodeRecord
 import app.logdate.server.space.recordCid
 import app.logdate.server.space.requireChangesLimit
@@ -22,6 +24,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.lessEq
 import org.jetbrains.exposed.v1.core.notExists
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -40,9 +43,12 @@ private const val PUT_BLOB_ATTEMPTS = 3
 
 /**
  * Stores sealed space records in PostgreSQL. Every write locks its (space, author) state row before
- * taking the next sequence number, so concurrent writes never share one.
+ * taking the next sequence number, so concurrent writes never share one. A page of changes carries
+ * at most [changesByteBudget] stored record bytes.
  */
-class PostgreSQLSpaceStore : SpaceStore {
+class PostgreSQLSpaceStore(
+    private val changesByteBudget: Long = MAX_SPACE_CHANGES_BYTES,
+) : SpaceStore {
     override suspend fun put(write: SpaceRecordWrite): StoredSpaceRecord {
         requireSealedRecord(write.record)
         return withContext(Dispatchers.IO) {
@@ -138,18 +144,28 @@ class PostgreSQLSpaceStore : SpaceStore {
     ): SpaceChangePage {
         requireChangesLimit(limit)
         return withContext(Dispatchers.IO) {
-            transaction {
-                val rows =
+            // Sizes first, so only the records that fit the byte budget are loaded. Repeatable read
+            // makes the second query see exactly the rows the first one measured.
+            transaction(transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ) {
+                val after =
+                    (SpaceRecordsTable.spaceUri eq space) and (SpaceRecordsTable.authorDid eq author) and
+                        (SpaceRecordsTable.seq greater since)
+                val sizes =
+                    SpaceRecordsTable
+                        .select(SpaceRecordsTable.seq, SpaceRecordsTable.sizeBytes)
+                        .where { after }
+                        .orderBy(SpaceRecordsTable.seq to SortOrder.ASC)
+                        .limit(limit + 1)
+                        .map { it[SpaceRecordsTable.seq] to it[SpaceRecordsTable.sizeBytes].toLong() }
+                val fitting = countWithinBudget(sizes.take(limit).map { it.second }, changesByteBudget)
+                if (fitting == 0) return@transaction SpaceChangePage(emptyList(), since, false)
+                val page =
                     SpaceRecordsTable
                         .selectAll()
-                        .where {
-                            (SpaceRecordsTable.spaceUri eq space) and (SpaceRecordsTable.authorDid eq author) and
-                                (SpaceRecordsTable.seq greater since)
-                        }.orderBy(SpaceRecordsTable.seq to SortOrder.ASC)
-                        .limit(limit + 1)
-                        .toList()
-                val page = rows.take(limit).map { it.toChange() }
-                SpaceChangePage(page, page.lastOrNull()?.seq ?: since, rows.size > limit)
+                        .where { after and (SpaceRecordsTable.seq lessEq sizes[fitting - 1].first) }
+                        .orderBy(SpaceRecordsTable.seq to SortOrder.ASC)
+                        .map { it.toChange() }
+                SpaceChangePage(page, page.lastOrNull()?.seq ?: since, sizes.size > fitting)
             }
         }
     }
