@@ -101,8 +101,7 @@
       "type": "object",
       "description": "A photo.",
       "required": [
-        "id",
-        "media"
+        "id"
       ],
       "properties": {
         "id": {
@@ -112,12 +111,13 @@
         },
         "media": {
           "type": "ref",
-          "ref": "app.logdate.defs#media"
+          "ref": "app.logdate.defs#media",
+          "description": "The photo. Absent when the file is unavailable: no device has its bytes, such as after restoring an archive that didn't include them. The rest of the block is kept, and apps show that the photo is missing."
         },
         "caption": {
           "type": "string",
-          "maxLength": 20000,
-          "maxGraphemes": 2000,
+          "maxLength": 1000000,
+          "maxGraphemes": 100000,
           "description": "What the person wrote about the photo, in markdown."
         },
         "presentation": {
@@ -135,8 +135,7 @@
       "type": "object",
       "description": "A video.",
       "required": [
-        "id",
-        "media"
+        "id"
       ],
       "properties": {
         "id": {
@@ -146,12 +145,13 @@
         },
         "media": {
           "type": "ref",
-          "ref": "app.logdate.defs#media"
+          "ref": "app.logdate.defs#media",
+          "description": "The video. Absent when the file is unavailable: no device has its bytes, such as after restoring an archive that didn't include them. The rest of the block is kept, and apps show that the video is missing."
         },
         "caption": {
           "type": "string",
-          "maxLength": 20000,
-          "maxGraphemes": 2000,
+          "maxLength": 1000000,
+          "maxGraphemes": 100000,
           "description": "What the person wrote about the video, in markdown."
         },
         "durationMs": {
@@ -165,7 +165,6 @@
       "description": "An audio recording.",
       "required": [
         "id",
-        "media",
         "durationMs"
       ],
       "properties": {
@@ -176,7 +175,8 @@
         },
         "media": {
           "type": "ref",
-          "ref": "app.logdate.defs#media"
+          "ref": "app.logdate.defs#media",
+          "description": "The recording. Absent when the file is unavailable: no device has its bytes, such as after restoring an archive that didn't include them. The length, caption and transcript are kept, and apps show that the recording is missing."
         },
         "durationMs": {
           "type": "integer",
@@ -184,14 +184,14 @@
         },
         "caption": {
           "type": "string",
-          "maxLength": 20000,
-          "maxGraphemes": 2000,
+          "maxLength": 1000000,
+          "maxGraphemes": 100000,
           "description": "What the person wrote about the recording, in markdown."
         },
         "transcript": {
           "type": "ref",
           "ref": "app.logdate.defs#recordRef",
-          "description": "The transcript of this recording (app.logdate.journal.transcript), when one exists."
+          "description": "The transcript of this recording (app.logdate.journal.transcript), when one exists. Its record key is this entry's key and this block's id joined by a colon."
         }
       }
     }

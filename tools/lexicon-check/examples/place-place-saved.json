@@ -5,7 +5,7 @@
     "name": "Grandma's house",
     "description": "The blue one at the end of the road.",
     "location": { "latitude": "46.7867", "longitude": "-92.1005" },
-    "radiusMeters": 75,
+    "radiusCentimeters": 7500,
     "userConfirmed": true,
     "createdAt": "2026-03-02T17:45:00.000Z",
     "updatedAt": "2026-09-30T11:12:00.000Z"

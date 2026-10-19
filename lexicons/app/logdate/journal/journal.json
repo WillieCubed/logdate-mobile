@@ -16,13 +16,14 @@
         "properties": {
           "title": {
             "type": "string",
-            "maxLength": 2000,
-            "maxGraphemes": 200
+            "maxLength": 1000000,
+            "maxGraphemes": 100000,
+            "description": "The journal's name. The app doesn't limit its length, so the limit matches an entry's text block."
           },
           "description": {
             "type": "string",
-            "maxLength": 30000,
-            "maxGraphemes": 3000
+            "maxLength": 1000000,
+            "maxGraphemes": 100000
           },
           "cover": {
             "type": "ref",
@@ -35,7 +36,7 @@
           "mergedInto": {
             "type": "ref",
             "ref": "app.logdate.defs#recordRef",
-            "description": "The journal this one was merged into. A device that finds a membership, draft or other reference to this journal points it at that journal instead. Always the final surviving journal: when that journal is merged again, every record that names it here is updated to the new survivor."
+            "description": "The journal this one was merged into. A device that finds a membership, draft or other reference to this journal points it at that journal instead. Always the final surviving journal: when that journal is merged again, every record that names it here is updated to the new survivor. If two devices merged journals into each other while offline, following mergedInto leads in a circle; then the journal in the circle with the smallest record key (compared byte by byte) survives, its mergedInto is removed, and the others point at it. A journal with mergedInto is deleted when the journal it points at is deleted, and is never brought back."
           },
           "createdAt": {
             "type": "string",

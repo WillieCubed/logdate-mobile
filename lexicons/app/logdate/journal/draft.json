@@ -110,8 +110,8 @@
         },
         "caption": {
           "type": "string",
-          "maxLength": 20000,
-          "maxGraphemes": 2000,
+          "maxLength": 1000000,
+          "maxGraphemes": 100000,
           "description": "What the person wrote about the photo, in markdown."
         },
         "presentation": {
@@ -160,8 +160,8 @@
         },
         "caption": {
           "type": "string",
-          "maxLength": 20000,
-          "maxGraphemes": 2000,
+          "maxLength": 1000000,
+          "maxGraphemes": 100000,
           "description": "What the person wrote about the video, in markdown."
         }
       }

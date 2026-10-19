@@ -88,12 +88,36 @@
         "accuracyCentimeters": {
           "type": "integer",
           "minimum": 0,
-          "description": "Horizontal accuracy of the coordinates, in centimeters. Devices report accuracy in fractional meters, and centimeters keep those digits."
+          "description": "Horizontal accuracy of the coordinates, in centimeters: the device's value in meters times 100, rounded to the nearest whole number, and 0 if it was negative. Digits below a centimeter are dropped; they're finer than any location sensor measures."
         },
         "place": {
           "type": "ref",
           "ref": "app.logdate.defs#recordRef",
           "description": "The saved place (app.logdate.place.place) this location belongs to, when there is one."
+        },
+        "placeDetails": {
+          "type": "ref",
+          "ref": "#placeDetails",
+          "description": "The place's name and center, written alongside place so the location still reads correctly on a device that doesn't have the place record, or after the place is deleted."
+        }
+      }
+    },
+    "placeDetails": {
+      "type": "object",
+      "description": "A copy of a place's name and center, as they were when the record referring to the place was last written.",
+      "required": [
+        "name",
+        "geo"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 1000000,
+          "maxGraphemes": 100000
+        },
+        "geo": {
+          "type": "ref",
+          "ref": "community.lexicon.location.geo"
         }
       }
     }

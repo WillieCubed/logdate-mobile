@@ -34,9 +34,9 @@
           },
           "label": {
             "type": "string",
-            "maxLength": 1000,
-            "maxGraphemes": 100,
-            "description": "The new name, when field is label."
+            "maxLength": 1000000,
+            "maxGraphemes": 100000,
+            "description": "The new name, when field is label. The app doesn't limit its length, so the limit matches an entry's text block."
           },
           "place": {
             "type": "ref",
@@ -76,7 +76,7 @@
               "ref": "app.logdate.defs#recordRef"
             },
             "maxLength": 100,
-            "description": "Earlier corrections to the same field of the same thing that this one replaces."
+            "description": "Earlier corrections to the same field of the same thing that this one replaces. Only the ones not already replaced by another correction need listing: an older correction stays replaced through the one that replaced it, and corrections are never deleted, so this loses nothing and keeps the list short. Today's corrections list every earlier correction; a device moving them over keeps only the ones no other correction lists."
           },
           "createdAt": {
             "type": "string",

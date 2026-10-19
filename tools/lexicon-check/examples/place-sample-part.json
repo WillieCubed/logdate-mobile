@@ -1,0 +1,21 @@
+{
+  "collection": "app.logdate.place.sample",
+  "record": {
+    "$type": "app.logdate.place.sample",
+    "device": "6f1c2b0e-8a4d-4f3e-9b21-5c7d8e9f0a1b",
+    "startsAt": "2026-10-10T13:00:00.000Z",
+    "part": 2,
+    "samples": [
+      {
+        "id": "d1f4c5b6-7a8e-4f9d-a0b2-becd3f405162",
+        "at": "2026-10-10T13:59:59.000Z",
+        "latitude": "44.98013",
+        "longitude": "-93.26011",
+        "accuracyCentimeters": 488,
+        "bearingCentidegrees": 0,
+        "activity": "train",
+        "source": "foregroundStream"
+      }
+    ]
+  }
+}

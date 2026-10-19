@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "A place in the person's life, such as Home or Grandma's house: one they saved and named, or one LogDate suggested from where they spend time. A suggestion becomes the person's own once they confirm it. Renaming a place the person confirmed is recorded as an app.logdate.place.correction, so the name here stays the one first given.",
+      "description": "A place in the person's life, such as Home or Grandma's house: one they saved and named, or one LogDate suggested from where they spend time. A suggestion becomes the person's own once they confirm it.\n\nToday the apps keep a place in two tables that share its id: the places the person saved (with a radius, a description and timestamps) and the places in their location history (with an address, a map directory id and whether it's confirmed). This record is both: one record per id, with every field from either. When both have a value, the saved place's name, coordinates and radius win, because renaming or moving a saved place changes it in place and so holds the person's latest choice. The name shown is name, unless an app.logdate.place.correction with field label targets place:<this record's key>; then the latest such correction's label is shown, as today. Deleting this record deletes the place from both: there is no way to delete one without the other.",
       "key": "any",
       "record": {
         "type": "object",
@@ -16,30 +16,30 @@
         "properties": {
           "name": {
             "type": "string",
-            "maxLength": 1000,
-            "maxGraphemes": 100
+            "maxLength": 1000000,
+            "maxGraphemes": 100000,
+            "description": "The place's name. The app doesn't limit its length, so the limit matches an entry's text block."
           },
           "description": {
             "type": "string",
-            "maxLength": 10000,
-            "maxGraphemes": 1000
+            "maxLength": 1000000,
+            "maxGraphemes": 100000
           },
           "location": {
             "type": "ref",
             "ref": "community.lexicon.location.geo",
             "description": "The center of the place."
           },
-          "radiusMeters": {
+          "radiusCentimeters": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 100000,
-            "description": "How far from the center still counts as being at the place. When absent, apps use their usual distance for telling whether someone stayed somewhere."
+            "minimum": 0,
+            "description": "How far from the center still counts as being at the place, in centimeters: the saved radius in meters times 100, rounded to the nearest whole number, and 0 if it was negative. There's no upper limit, because the app sets none. When absent, apps use their usual distance for telling whether someone stayed somewhere."
           },
           "locality": {
             "type": "string",
-            "maxLength": 2000,
-            "maxGraphemes": 200,
-            "description": "A readable description of where the place is, such as its street address or neighborhood."
+            "maxLength": 10000,
+            "maxGraphemes": 1000,
+            "description": "A readable description of where the place is, such as its street address or neighborhood, as the map directory gave it."
           },
           "externalId": {
             "type": "string",
@@ -48,12 +48,12 @@
           },
           "userConfirmed": {
             "type": "boolean",
-            "description": "True when the person saved or confirmed the place, false while it's only a suggestion. Defaults to false."
+            "description": "True when the person saved or confirmed the place, false while it's only a suggestion. Defaults to false. A place the person saved is always confirmed."
           },
           "createdAt": {
             "type": "string",
             "format": "datetime",
-            "description": "When the place was saved or first suggested, when known."
+            "description": "When the person saved the place. Absent for places that only ever came from location history, which doesn't record it."
           },
           "updatedAt": {
             "type": "string",
