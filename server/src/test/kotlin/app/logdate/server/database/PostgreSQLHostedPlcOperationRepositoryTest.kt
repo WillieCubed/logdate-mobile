@@ -8,6 +8,8 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -75,6 +77,14 @@ class PostgreSQLHostedPlcOperationRepositoryTest {
                     assertEquals(listOf(first, second).map(StoredHostedPlcOperation::id), byAccount.map(StoredHostedPlcOperation::id))
                     assertEquals(listOf("cid-1", "cid-2"), byDid.map(StoredHostedPlcOperation::cid))
                     assertEquals(listOf(null, "cid-1"), byDid.map(StoredHostedPlcOperation::prevCid))
+
+                    val unpublished =
+                        repository.save(
+                            first.copy(id = Uuid.random(), did = "did:plc:unpublishedaccountxyz234", cid = null),
+                        )
+                    assertTrue(repository.recordPublishedCid(unpublished.id, "cid-published"))
+                    assertFalse(repository.recordPublishedCid(Uuid.random(), "cid-missing"))
+                    assertEquals("cid-published", repository.listByDid(unpublished.did).single().cid)
                 }
             }
         }

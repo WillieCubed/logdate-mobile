@@ -3,6 +3,7 @@ package app.logdate.server.identity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -87,6 +88,18 @@ class AtprotoIdentityConfigTest {
 
         assertTrue(publishing.publishesPlcOperations)
         assertEquals(false, publishing.supportsRecoveryKeys)
+    }
+
+    @Test
+    fun `a local plc directory may use plain http on a loopback host outside production`() {
+        val config = AtprotoIdentityConfig.fromEnvironment(plcDirectoryUrl = "http://127.0.0.1:2582/")
+
+        assertEquals("http://127.0.0.1:2582", config.normalizedPlcDirectoryUrl)
+        assertFalse(config.targetsPublicPlcDirectory)
+        assertTrue(AtprotoIdentityConfig().targetsPublicPlcDirectory)
+        assertFailsWith<IllegalArgumentException> {
+            AtprotoIdentityConfig.fromEnvironment(plcDirectoryUrl = "http://plc.example.com")
+        }
     }
 
     @Test

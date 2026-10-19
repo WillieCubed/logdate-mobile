@@ -2,6 +2,8 @@ package app.logdate.server.identity
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -47,5 +49,25 @@ class InMemoryHostedPlcOperationRepositoryTest {
 
             assertEquals(listOf(first, second), repository.listByAccountId(accountId))
             assertEquals(listOf(first, second), repository.listByDid(did))
+        }
+
+    @Test
+    fun `recording the directory cid fills in an operation saved before it was published`() =
+        kotlinx.coroutines.test.runTest {
+            val repository = InMemoryHostedPlcOperationRepository()
+            val unpublished =
+                StoredHostedPlcOperation(
+                    id = Uuid.random(),
+                    accountId = Uuid.random(),
+                    did = "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+                    operationType = "plc_operation",
+                    operationJson = """{"sig":"one"}""",
+                )
+            repository.save(unpublished)
+
+            assertTrue(repository.recordPublishedCid(unpublished.id, "bafy-genesis"))
+            assertFalse(repository.recordPublishedCid(Uuid.random(), "bafy-other"))
+
+            assertEquals("bafy-genesis", repository.listByDid(unpublished.did).single().cid)
         }
 }

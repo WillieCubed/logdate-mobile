@@ -1,5 +1,7 @@
 package app.logdate.server.identity
 
+import app.logdate.server.logging.IdentityPublishingNotices
+import io.github.aakira.napier.Napier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import studio.hypertext.atproto.crypto.EcCurve
@@ -72,15 +74,13 @@ class PlcIdentityService(
         val did = PlcEncoding.deriveDid(signedOperation)
 
         if (config.publishHostedPlcOperations) {
-            plcDirectoryClient
-                ?.submit(did = did, entry = signedOperation)
-                ?.getOrThrow()
+            submitToDirectory(requireNotNull(plcDirectoryClient), did, signedOperation)
         }
         persistHostedOperation(
             accountId = accountId,
             did = did,
             operation = signedOperation,
-            resolvedCid = resolvePublishedCid(did, signedOperation),
+            resolvedCid = confirmPublishedCid(did, signedOperation),
         )
 
         return ProvisionedPlcIdentity(
@@ -164,13 +164,12 @@ class PlcIdentityService(
                 ),
             )
 
-        plcClient.submit(did, signedOperation).getOrThrow()
-        val resolvedCid = resolvePublishedCid(did, signedOperation)
+        submitToDirectory(plcClient, did, signedOperation)
         persistHostedOperation(
             accountId = accountId,
             did = did,
             operation = signedOperation,
-            resolvedCid = resolvedCid,
+            resolvedCid = confirmPublishedCid(did, signedOperation),
         )
         val activatedKey = signingKeyService.activatePreparedKey(accountId, nextKey)
         return RotatedPlcIdentity(
@@ -201,7 +200,74 @@ class PlcIdentityService(
         recoveryDidKey: String,
     ): UpdatedPlcRecoveryKey {
         requireRecoveryKeys(did)
+        return UpdatedPlcRecoveryKey(
+            did = did.toString(),
+            recoveryDidKey = recoveryDidKey,
+            operation = publishHostedUpdate(accountId, did, handle, recoveryDidKey),
+        )
+    }
 
+    /**
+     * Publishes an update operation that makes the directory's copy of [did] match what LogDate
+     * serves for the account: its handle, active signing key, PDS endpoint and registered recovery
+     * key. The account's active signing key signs it, so the directory accepts it only while that
+     * key is still one of the identity's rotation keys.
+     */
+    suspend fun reconcileHostedDid(
+        accountId: Uuid,
+        did: AtprotoDid,
+        handle: String,
+        recoveryDidKey: String?,
+    ): PlcOperation {
+        if (!config.publishHostedPlcOperations) {
+            throw IdentityLifecycleConflictException("Reconciling a hosted PLC identity requires published PLC operations")
+        }
+        require(did.method == "plc") { "Reconciling requires a did:plc identity" }
+        return publishHostedUpdate(accountId, did, handle, recoveryDidKey)
+    }
+
+    /**
+     * Sends a genesis operation that was signed and stored while publishing was off, and records the
+     * CID the directory assigned to it.
+     *
+     * @return the CID the directory assigned to the genesis operation.
+     */
+    suspend fun publishStoredGenesis(stored: StoredHostedPlcOperation): String {
+        if (!config.publishHostedPlcOperations) {
+            throw IdentityLifecycleConflictException("Publishing a stored PLC genesis operation requires published PLC operations")
+        }
+        val plcClient = plcDirectoryClient ?: throw IdentityLifecycleConflictException("PLC publishing requires a PLC directory client")
+        val did = AtprotoDid.require(stored.did)
+        val operation = storedGenesisOperation(stored)
+        submitToDirectory(plcClient, did, operation)
+        val cid =
+            directoryCid(did, operation)
+                ?: throw PlcPublicationUnconfirmedException(
+                    "The PLC directory accepted the genesis operation for $did but its audit log does not show it",
+                )
+        hostedPlcOperationRepository?.recordPublishedCid(stored.id, cid)
+        return cid
+    }
+
+    /**
+     * Decodes a stored genesis operation and checks that it still derives the DID it was stored
+     * under, so a damaged row can never be sent in place of the real identity.
+     */
+    fun storedGenesisOperation(stored: StoredHostedPlcOperation): PlcOperation {
+        val operation = json.decodeFromString(PlcOperation.serializer(), stored.operationJson)
+        require(operation.isGenesis && operation.isSigned) { "Stored operation ${stored.id} is not a signed genesis operation" }
+        require(PlcEncoding.deriveDid(operation).toString() == stored.did) {
+            "Stored genesis operation ${stored.id} does not derive ${stored.did}"
+        }
+        return operation
+    }
+
+    private suspend fun publishHostedUpdate(
+        accountId: Uuid,
+        did: AtprotoDid,
+        handle: String,
+        recoveryDidKey: String?,
+    ): PlcOperation {
         val activeKey = signingKeyService.ensureActiveKey(accountId)
         val activeDidKey = didKeyFor(activeKey.publicKeyMultibase)
         val head = head(did)
@@ -231,11 +297,7 @@ class PlcIdentityService(
             )
 
         appendOperation(accountId = accountId, did = did, operation = signedOperation)
-        return UpdatedPlcRecoveryKey(
-            did = did.toString(),
-            recoveryDidKey = recoveryDidKey,
-            operation = signedOperation,
-        )
+        return signedOperation
     }
 
     /**
@@ -371,14 +433,14 @@ class PlcIdentityService(
     ) {
         val plcClient = plcDirectoryClient
         if (config.publishHostedPlcOperations && plcClient != null) {
-            plcClient.submit(did, operation).getOrThrow()
+            submitToDirectory(plcClient, did, operation)
         }
         try {
             persistHostedOperation(
                 accountId = accountId,
                 did = did,
                 operation = operation,
-                resolvedCid = resolvePublishedCid(did, operation),
+                resolvedCid = confirmPublishedCid(did, operation),
             )
         } catch (conflict: HostedPlcOperationConflictException) {
             throw IdentityLifecycleConflictException(
@@ -389,13 +451,42 @@ class PlcIdentityService(
         }
     }
 
-    /** The CID the directory reports for [operation] when this server publishes, otherwise the one computed locally. */
-    private suspend fun resolvePublishedCid(
+    /**
+     * Sends [operation] and logs the outcome as one of the [IdentityPublishingNotices], so publish
+     * successes and failures stay countable in production logs.
+     */
+    private suspend fun submitToDirectory(
+        plcClient: PlcDirectoryClient,
         did: AtprotoDid,
         operation: PlcOperation,
-    ): String =
+    ) {
+        plcClient
+            .submit(did, operation)
+            .onFailure { failure -> Napier.e(IdentityPublishingNotices.forSubmitFailure(failure), failure) }
+            .getOrThrow()
+        Napier.i(IdentityPublishingNotices.PLC_OPERATION_PUBLISHED)
+    }
+
+    /**
+     * The CID to store for [operation]: the one the directory reports when this server publishes,
+     * otherwise the one computed locally. A published operation the directory's audit log does not
+     * yet show is logged as unconfirmed and stored under its computed CID, which is the same value.
+     */
+    private suspend fun confirmPublishedCid(
+        did: AtprotoDid,
+        operation: PlcOperation,
+    ): String {
+        if (!config.publishHostedPlcOperations) return PlcEncoding.operationCid(operation)
+        val cid = directoryCid(did, operation)
+        if (cid == null) Napier.w(IdentityPublishingNotices.PLC_OPERATION_UNCONFIRMED)
+        return cid ?: PlcEncoding.operationCid(operation)
+    }
+
+    private suspend fun directoryCid(
+        did: AtprotoDid,
+        operation: PlcOperation,
+    ): String? =
         plcDirectoryClient
-            ?.takeIf { config.publishHostedPlcOperations }
             ?.getAuditLog(did)
             ?.getOrNull()
             ?.lastOrNull { indexedOperation ->
@@ -403,7 +494,6 @@ class PlcIdentityService(
                     indexedOperation.operation is PlcOperation &&
                     indexedOperation.operation.sig == operation.sig
             }?.cid
-            ?: PlcEncoding.operationCid(operation)
 
     private suspend fun persistHostedOperation(
         accountId: Uuid,
@@ -502,50 +592,3 @@ class PlcIdentityService(
         const val SERVER_KEY_NOT_ON_IDENTITY: String = "SERVER_KEY_NOT_ON_IDENTITY"
     }
 }
-
-/** The newest operation in an identity's history and the CID the next operation names as `prev`. */
-data class PlcOperationHead(
-    val cid: String,
-    val operation: PlcOperation,
-)
-
-/**
- * Signed hosted PLC identity material.
- */
-data class ProvisionedPlcIdentity(
-    val did: String,
-    val publicKeyMultibase: String,
-    val publicKeyDidKey: String,
-    val operation: PlcOperation,
-)
-
-/**
- * Signed hosted PLC rotation material after a successful update operation.
- */
-data class RotatedPlcIdentity(
-    val did: String,
-    val previousPublicKeyMultibase: String,
-    val publicKeyMultibase: String,
-    val publicKeyDidKey: String,
-    val operation: PlcOperation,
-)
-
-/**
- * Hosted PLC recovery-key update result.
- */
-data class UpdatedPlcRecoveryKey(
-    val did: String,
-    val recoveryDidKey: String,
-    val operation: PlcOperation,
-)
-
-/**
- * Unsigned hosted PLC recovery import payload that a first-party client can sign locally.
- */
-data class PreparedPlcRecoveryOperation(
-    val did: String,
-    val recoveryDidKey: String,
-    val nextSigningKeyDidKey: String,
-    val unsignedOperation: PlcUnsignedOperation,
-    val signingPayload: ByteArray,
-)

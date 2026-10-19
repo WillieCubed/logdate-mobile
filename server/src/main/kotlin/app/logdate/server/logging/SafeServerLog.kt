@@ -12,6 +12,7 @@ import io.github.aakira.napier.LogLevel
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import studio.hypertext.atproto.plc.PlcDirectoryException
 
 internal const val SAFE_SERVER_EVENT_TAG = "ServerDiagnostics"
 
@@ -60,6 +61,20 @@ private val approvedNotices =
         IdentityNotices.BACKFILL_REFUSED_PUBLISHING to "SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING",
         IdentityNotices.BACKFILL_FAILED to "SERVER_IDENTITY_BACKFILL_FAILED",
         IdentityNotices.BACKFILL_ACCOUNT_FAILED to "SERVER_IDENTITY_BACKFILL_ACCOUNT_FAILED",
+        IdentityPublishingNotices.PLC_OPERATION_PUBLISHED to "SERVER_PLC_OPERATION_PUBLISHED",
+        IdentityPublishingNotices.PLC_OPERATION_REJECTED to "SERVER_PLC_OPERATION_REJECTED",
+        IdentityPublishingNotices.PLC_DIRECTORY_RATE_LIMITED to "SERVER_PLC_DIRECTORY_RATE_LIMITED",
+        IdentityPublishingNotices.PLC_DIRECTORY_UNREACHABLE to "SERVER_PLC_DIRECTORY_UNREACHABLE",
+        IdentityPublishingNotices.PLC_OPERATION_UNCONFIRMED to "SERVER_PLC_OPERATION_UNCONFIRMED",
+        IdentityPublishingNotices.RUN_STARTED to "SERVER_IDENTITY_PUBLISHING_STARTED",
+        IdentityPublishingNotices.RUN_COMPLETE to "SERVER_IDENTITY_PUBLISHING_COMPLETE",
+        IdentityPublishingNotices.RUN_STOPPED to "SERVER_IDENTITY_PUBLISHING_STOPPED",
+        IdentityPublishingNotices.REFUSED_USAGE to "SERVER_IDENTITY_PUBLISHING_REFUSED_USAGE",
+        IdentityPublishingNotices.REFUSED_PUBLISHING_OFF to "SERVER_IDENTITY_PUBLISHING_REFUSED_PUBLISHING_OFF",
+        IdentityPublishingNotices.REFUSED_DIRECTORY_UNCONFIRMED to "SERVER_IDENTITY_PUBLISHING_REFUSED_DIRECTORY_UNCONFIRMED",
+        IdentityPublishingNotices.REFUSED_NOT_PLC to "SERVER_IDENTITY_PUBLISHING_REFUSED_NOT_PLC",
+        IdentityPublishingNotices.RUN_FAILED to "SERVER_IDENTITY_PUBLISHING_FAILED",
+        IdentityPublishingNotices.ACCOUNT_FAILED to "SERVER_IDENTITY_PUBLISH_FAILED",
     )
 
 /**
@@ -135,6 +150,57 @@ internal object SpacePurgeNotices {
     const val PURGE_FAILED = "Purging space tombstones and blobs failed; the next sweep retries"
 }
 
+/**
+ * Fixed log messages for sending `did:plc` operations to the PLC directory, from sign-up, key
+ * changes and the identity publishing command alike. Production logs keep only approved messages,
+ * so each outcome stays countable there as one SERVER_PLC_* or SERVER_IDENTITY_* code. The
+ * publishing command also writes one [summary] line of counts per batch and per run.
+ */
+internal object IdentityPublishingNotices {
+    const val PLC_OPERATION_PUBLISHED = "The PLC directory accepted a PLC operation"
+    const val PLC_OPERATION_REJECTED = "The PLC directory rejected a PLC operation"
+    const val PLC_DIRECTORY_RATE_LIMITED = "The PLC directory rate-limited a PLC operation"
+    const val PLC_DIRECTORY_UNREACHABLE = "Sending a PLC operation to the PLC directory failed before it answered"
+    const val PLC_OPERATION_UNCONFIRMED = "The PLC directory accepted a PLC operation that its audit log does not show"
+    const val RUN_STARTED = "Identity publishing started"
+    const val RUN_COMPLETE = "Identity publishing finished"
+    const val RUN_STOPPED = "Identity publishing stopped at its failure limit"
+    const val REFUSED_USAGE = "Identity publishing refused to start: the arguments are not valid"
+    const val REFUSED_PUBLISHING_OFF = "Identity publishing refused to start: ATPROTO_PLC_PUBLISH_ENABLED is not true"
+    const val REFUSED_DIRECTORY_UNCONFIRMED =
+        "Identity publishing refused to start: --confirm-directory does not name the configured PLC directory"
+    const val REFUSED_NOT_PLC = "Identity publishing refused to start: hosted accounts do not use did:plc"
+    const val RUN_FAILED = "Identity publishing failed"
+    const val ACCOUNT_FAILED = "Publishing an account's identity failed"
+
+    /** The first word of every summary line; the rest is `name=count` pairs. */
+    const val SUMMARY_CODE = "SERVER_IDENTITY_PUBLISHING_SUMMARY"
+
+    private val summaryPattern = Regex("^$SUMMARY_CODE( [a-z_]{1,40}=[0-9]{1,9}){1,32}$")
+
+    /** Picks the notice for a failed submission from what the directory answered, if anything. */
+    fun forSubmitFailure(failure: Throwable): String {
+        val status = (failure as? PlcDirectoryException)?.statusCode
+        return when {
+            status == HTTP_TOO_MANY_REQUESTS -> PLC_DIRECTORY_RATE_LIMITED
+            status != null && status in HTTP_CLIENT_ERRORS -> PLC_OPERATION_REJECTED
+            else -> PLC_DIRECTORY_UNREACHABLE
+        }
+    }
+
+    /** A line of counts that carries no identifiers, so production logs can keep it as written. */
+    fun summary(counts: Map<String, Int>): String =
+        buildString {
+            append(SUMMARY_CODE)
+            counts.forEach { (name, count) -> append(' ').append(name).append('=').append(count) }
+        }.also { require(isSummary(it)) { "Summary names must be lowercase words and counts must be non-negative" } }
+
+    fun isSummary(message: String?): Boolean = message != null && summaryPattern.matches(message)
+
+    private const val HTTP_TOO_MANY_REQUESTS = 429
+    private val HTTP_CLIENT_ERRORS = 400..499
+}
+
 internal fun safeServerMessage(
     priority: LogLevel,
     tag: String?,
@@ -143,6 +209,7 @@ internal fun safeServerMessage(
     if (tag == SAFE_SERVER_EVENT_TAG) validatedEvent(message)?.let { return it }
     approvedNotices[message]?.let { return it }
     if (isApprovedCountMessage(message)) return requireNotNull(message)
+    if (IdentityPublishingNotices.isSummary(message)) return requireNotNull(message)
     return when (priority) {
         LogLevel.ERROR, LogLevel.ASSERT -> "SERVER_ERROR"
         LogLevel.WARNING -> "SERVER_WARNING"
@@ -166,6 +233,7 @@ class SafeServerMessageConverter : ClassicConverter() {
             val text = event.formattedMessage
             if (text in approvedNotices.values || text in setOf("SERVER_ERROR", "SERVER_WARNING", "SERVER_NOTICE")) return text
             if (isApprovedCountMessage(text)) return text
+            if (IdentityPublishingNotices.isSummary(text)) return text
             validatedEvent(text)?.let { return it }
         }
         return "SERVER_LIBRARY_EVENT"

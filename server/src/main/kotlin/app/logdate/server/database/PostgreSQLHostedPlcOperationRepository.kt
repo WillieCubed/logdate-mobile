@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.exceptions.ExposedSQLException
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -54,6 +55,16 @@ class PostgreSQLHostedPlcOperationRepository : HostedPlcOperationRepository {
                 .where { HostedPlcOperationsTable.did eq did }
                 .orderBy(HostedPlcOperationsTable.createdAt, SortOrder.ASC)
                 .map { row -> row.toStoredHostedPlcOperation() }
+        }
+
+    override suspend fun recordPublishedCid(
+        operationId: Uuid,
+        cid: String,
+    ): Boolean =
+        transaction {
+            HostedPlcOperationsTable.update({ HostedPlcOperationsTable.id eq operationId.toJavaUUID() }) {
+                it[HostedPlcOperationsTable.cid] = cid
+            } > 0
         }
 
     private fun ResultRow.toStoredHostedPlcOperation(): StoredHostedPlcOperation =
