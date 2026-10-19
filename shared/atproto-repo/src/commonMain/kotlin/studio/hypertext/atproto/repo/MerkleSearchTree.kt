@@ -57,20 +57,21 @@ public class MerkleSearchTree private constructor(
     ): MerkleSearchTree = MerkleSearchTree(entriesByKey - MerkleSearchTreeKey(collection = collection, recordKey = recordKey))
 
     /**
-     * Returns the entries in deterministic collection and key order.
+     * Returns the entries in the order the tree stores them: by the full `collection/recordKey`
+     * key, compared byte by byte as the repository specification requires.
+     *
+     * This is not the same as sorting by collection and then by record key. "com.example.app.two/y"
+     * sorts before "com.example.app/x", because "." comes before "/", although the collection
+     * "com.example.app" sorts before "com.example.app.two".
      */
     public fun entries(collection: Nsid? = null): List<MerkleSearchTreeEntry> =
         entriesByKey.entries
             .asSequence()
             .filter { collection == null || it.key.collection == collection }
-            .sortedWith(
-                compareBy<Map.Entry<MerkleSearchTreeKey, Cid>>(
-                    { it.key.collection.toString() },
-                    { it.key.recordKey.toString() },
-                ),
-            ).map { (key, cid) ->
+            .map { (key, cid) ->
                 MerkleSearchTreeEntry(collection = key.collection, recordKey = key.recordKey, cid = cid)
-            }.toList()
+            }.sortedBy(MerkleSearchTreeEntry::storageKey)
+            .toList()
 
     /**
      * Returns the deterministic root CID for the current tree.

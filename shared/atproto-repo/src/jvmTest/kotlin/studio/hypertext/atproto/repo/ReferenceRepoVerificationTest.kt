@@ -70,6 +70,25 @@ class ReferenceRepoVerificationTest {
         }
 
     @Test
+    fun `reference implementation accepts collections where one name is a prefix of another`() =
+        runBlocking {
+            // "com.example.app.two/y" sorts before "com.example.app/x" because "." comes before "/",
+            // although the collection "com.example.app" sorts before "com.example.app.two".
+            val signer = KeyPairCommitSigner(EcCurve.P256)
+            val engine = DefaultRepoEngine(InMemoryRepoBlockStore(), signer = signer)
+            val app = Nsid.require("com.example.app")
+            val appTwo = Nsid.require("com.example.app.two")
+            val appDash = Nsid.require("com.example.app-three.records")
+            listOf(app to "x", appTwo to "y", appDash to "z", app to "a", appTwo to "b").forEach { (collection, key) ->
+                engine.putRecord(record(collection, key), value(collection, key)).getOrThrow()
+            }
+
+            val summary = verifyWithReference(engine, signer.didKey)
+
+            assertEquals(5, summary.getValue("records").jsonPrimitive.int)
+        }
+
+    @Test
     fun `reference implementation accepts an empty repository`() =
         runBlocking {
             val signer = KeyPairCommitSigner(EcCurve.P256)

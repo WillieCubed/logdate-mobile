@@ -235,6 +235,22 @@ class RepoCommitSpecTest {
     }
 
     @Test
+    fun `tree entries sort by the full key the way the specification compares them`() {
+        val cid = Cid.sha256(DAG_CBOR_CODEC, "value".encodeToByteArray())
+        val tree =
+            MerkleSearchTree
+                .empty()
+                .put(Nsid.require("com.example.app"), RecordKey.require("x"), cid)
+                .put(Nsid.require("com.example.app.two"), RecordKey.require("y"), cid)
+                .put(Nsid.require("com.example.app-three.records"), RecordKey.require("z"), cid)
+
+        assertEquals(
+            listOf("com.example.app-three.records/z", "com.example.app.two/y", "com.example.app/x"),
+            tree.entries().map { "${it.collection}/${it.recordKey}" },
+        )
+    }
+
+    @Test
     fun `import rejects a record tree that is not in canonical order`() =
         runSuspend {
             val recordBytes = DagCborCodec.encode(entry("one"))
