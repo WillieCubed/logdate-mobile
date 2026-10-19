@@ -208,7 +208,8 @@ internal object XrpcSpaceDocs {
             """
             `app.logdate.space.listRepoOps`. Lists every write and deletion after a sequence number, oldest
             first, with only the latest state of each key. Send `since=0` to export the whole space, then the
-            `cursor` of each page while `hasMore` is true. $OWNER_ONLY
+            `cursor` of each page while `hasMore` is true. A page ends before `limit` changes rather than carry
+            more than 8 MiB of stored records, but always holds at least one change. $OWNER_ONLY
             """,
         )
         request {

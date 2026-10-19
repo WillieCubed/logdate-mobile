@@ -70,6 +70,12 @@ class SpaceMissingBlobException(
 /** The most changes one [SpaceStore.changes] call returns. */
 const val MAX_SPACE_CHANGES_LIMIT = 500
 
+/**
+ * The most stored record bytes one [SpaceStore.changes] page carries, so a page of the largest
+ * records can't exhaust memory. A page always holds at least one change, even a larger one.
+ */
+const val MAX_SPACE_CHANGES_BYTES: Long = 8L * 1024 * 1024
+
 /** An encrypted blob uploaded to a space; its bytes are in object storage at [storagePath]. */
 data class SpaceBlob(
     val cid: String,
@@ -111,7 +117,11 @@ interface SpaceStore {
         rkey: String,
     ): StoredSpaceRecord?
 
-    /** Up to [limit] changes with a sequence number greater than [since]; [limit] is 1 to [MAX_SPACE_CHANGES_LIMIT]. */
+    /**
+     * Up to [limit] changes with a sequence number greater than [since]; [limit] is 1 to
+     * [MAX_SPACE_CHANGES_LIMIT]. The page ends early, with [SpaceChangePage.hasMore] set, rather than
+     * carry more than [MAX_SPACE_CHANGES_BYTES] of stored records, but always holds at least one change.
+     */
     suspend fun changes(
         space: String,
         author: String,
@@ -163,11 +173,32 @@ internal fun requireChangesLimit(limit: Int) {
     require(limit in 1..MAX_SPACE_CHANGES_LIMIT) { "limit must be 1 to $MAX_SPACE_CHANGES_LIMIT" }
 }
 
+/**
+ * How many of the leading records, stored in [sizes] bytes each, fit in [budget] together. The first
+ * record always counts, so a page never comes back empty while changes remain.
+ */
+internal fun countWithinBudget(
+    sizes: List<Long>,
+    budget: Long,
+): Int {
+    var total = 0L
+    sizes.forEachIndexed { index, size ->
+        total += size
+        if (index > 0 && total > budget) return index
+    }
+    return sizes.size
+}
+
 /** Decodes stored DAG-CBOR bytes, so every read returns the same form of a record. */
 internal fun decodeRecord(bytes: ByteArray): JsonObject = DagCborCodec.decode(bytes).jsonObject
 
-/** A [SpaceStore] for servers running without a database. */
-class InMemorySpaceStore : SpaceStore {
+/**
+ * A [SpaceStore] for servers running without a database. A page of changes carries at most
+ * [changesByteBudget] stored record bytes.
+ */
+class InMemorySpaceStore(
+    private val changesByteBudget: Long = MAX_SPACE_CHANGES_BYTES,
+) : SpaceStore {
     private class Row(
         val seq: Long,
         val cid: String?,
@@ -242,11 +273,12 @@ class InMemorySpaceStore : SpaceStore {
                     .entries
                     .sortedBy { it.value.seq }
                     .take(limit + 1)
+            val fitting = countWithinBudget(rows.take(limit).map { (it.value.bytes?.size ?: 0).toLong() }, changesByteBudget)
             val page =
-                rows.take(limit).map { (key, row) ->
+                rows.take(fitting).map { (key, row) ->
                     SpaceChange(key.third, row.seq, row.deletedAt != null, row.cid, row.bytes?.let(::decodeRecord))
                 }
-            SpaceChangePage(page, page.lastOrNull()?.seq ?: since, rows.size > limit)
+            SpaceChangePage(page, page.lastOrNull()?.seq ?: since, rows.size > fitting)
         }
     }
 

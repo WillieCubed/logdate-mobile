@@ -35,6 +35,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
@@ -223,6 +224,31 @@ class SpaceXrpcRoutesTest {
                 }
             assertEquals(HttpStatusCode.OK, put.status, put.bodyAsText())
             assertEquals(HttpStatusCode.OK, getRecord(token, space, "big").status)
+        }
+
+    @Test
+    fun `a page of changes stops before its records pass the byte budget`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            listOf("a", "b", "c").forEach { rkey ->
+                val put =
+                    client.post("/xrpc/app.logdate.space.putRecord") {
+                        bearer(token)
+                        json("""{"space":"$space","rkey":"$rkey","record":${sealedJson(ciphertextBytes = 61 * 65_536 + 16)}}""")
+                    }
+                assertEquals(HttpStatusCode.OK, put.status)
+            }
+            val page =
+                client.get("/xrpc/app.logdate.space.listRepoOps") {
+                    bearer(token)
+                    parameter("space", space)
+                }
+            val body = Json.parseToJsonElement(page.bodyAsText()).jsonObject
+            assertEquals(2, body.getValue("ops").jsonArray.size)
+            assertEquals(2L, body.getValue("cursor").jsonPrimitive.long)
+            assertEquals("true", body.getValue("hasMore").jsonPrimitive.content)
         }
 
     @Test
