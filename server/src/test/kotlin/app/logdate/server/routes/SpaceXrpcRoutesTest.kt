@@ -6,13 +6,18 @@ import app.logdate.lexicon.app.logdate.space.DeleteRecordInput
 import app.logdate.lexicon.app.logdate.space.PutRecordInput
 import app.logdate.server.AuthV1TestEnvironment
 import app.logdate.server.auth.Account
+import app.logdate.server.auth.InMemoryAccountRepository
+import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.configureAuthV1TestApp
+import app.logdate.server.database.toJavaUUID
 import app.logdate.server.oauth.createDpopProof
 import app.logdate.server.oauth.generateP256KeyPair
 import app.logdate.server.oauth.publicJwk
+import app.logdate.server.routes.support.DeviceLinkTestKit
 import app.logdate.server.space.InMemorySpaceStore
 import app.logdate.server.space.SpaceBlob
 import app.logdate.server.space.SpaceStore
+import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -515,7 +520,7 @@ class SpaceXrpcRoutesTest {
         }
 
     @Test
-    fun `OAuth, AT Protocol session and linked device tokens are refused on every method`() =
+    fun `OAuth and AT Protocol session tokens are refused on every method`() =
         testApplication {
             val env = configureAuthV1TestApp(personalSpaceEnabled = true)
             val (did, token) = env.signedInAccount("alice")
@@ -549,8 +554,6 @@ class SpaceXrpcRoutesTest {
             }
             val sessionToken = runBlocking { env.atprotoSessionTokenService.createSession(account).accessJwt }
             val session: HttpRequestBuilder.(String, String) -> Unit = { _, _ -> bearer(sessionToken) }
-            val deviceToken = env.tokenService.generateDeviceAccessToken(account.id.toString(), did, Uuid.random().toString())
-            val device: HttpRequestBuilder.(String, String) -> Unit = { _, _ -> bearer(deviceToken) }
 
             val listRecords = "/xrpc/com.atproto.repo.listRecords"
             val collection = "studio.hypertext.logdate.content"
@@ -571,7 +574,6 @@ class SpaceXrpcRoutesTest {
                 "OAuth DPoP" to dpop,
                 "OAuth sent as Bearer" to oauthAsBearer,
                 "AT Protocol session" to session,
-                "linked device" to device,
             ).forEach { (kind, authorize) ->
                 everySpaceMethod(space, authorize).forEach { (method, response) ->
                     assertEquals(HttpStatusCode.Unauthorized, response.status, "$kind token on $method")
@@ -583,6 +585,99 @@ class SpaceXrpcRoutesTest {
                 assertTrue(response.status.value in 200..299, "LogDate token on $method answered ${response.status}")
             }
         }
+
+    @Test
+    fun `a linked watch uses its account's personal space on every method`() =
+        testApplication {
+            val (env, kit) = configureWithDeviceSessions()
+            val (did, owner) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val watch = runBlocking { kit.linkWatch(env.accountId(did)) }.tokens.accessToken
+            assertEquals(HttpStatusCode.OK, uploadBlob(owner, space, ByteArray(600)).status)
+
+            everySpaceMethod(space) { _, _ -> bearer(watch) }.forEach { (method, response) ->
+                assertTrue(response.status.value in 200..299, "linked watch on $method answered ${response.status}")
+            }
+
+            client.post("/xrpc/app.logdate.space.putRecord") {
+                bearer(owner)
+                json("""{"space":"$space","rkey":"from-phone","record":${sealedJson()}}""")
+            }
+            assertEquals(HttpStatusCode.OK, getRecord(watch, space, "from-phone").status, "the watch reads what the phone wrote")
+        }
+
+    @Test
+    fun `a linked watch can't reach another account's space`() =
+        testApplication {
+            val (env, kit) = configureWithDeviceSessions()
+            val (aliceDid, _) = env.signedInAccount("alice")
+            val (bobDid, bob) = env.signedInAccount("bob")
+            val bobSpace = "at://$bobDid/space/app.logdate.space.personal/self"
+            client.post("/xrpc/app.logdate.space.putRecord") {
+                bearer(bob)
+                json("""{"space":"$bobSpace","rkey":"abc","record":${sealedJson()}}""")
+            }
+            val aliceWatch = runBlocking { kit.linkWatch(env.accountId(aliceDid)) }.tokens.accessToken
+
+            val read = getRecord(aliceWatch, bobSpace, "abc")
+
+            assertEquals(HttpStatusCode.BadRequest, read.status)
+            assertEquals("RecordNotFound", read.errorCode())
+        }
+
+    @Test
+    fun `a removed watch is told its session was revoked on every method`() =
+        testApplication {
+            val (env, kit) = configureWithDeviceSessions()
+            val (did, _) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val accountId = env.accountId(did)
+            val linked = runBlocking { kit.linkWatch(accountId) }
+            runBlocking { kit.linkService.revoke(accountId.toJavaUUID(), java.util.UUID.fromString(linked.sessionId)) }
+            val unknownSession =
+                env.tokenService.generateDeviceAccessToken(accountId.toString(), did, Uuid.random().toString())
+
+            listOf(linked.tokens.accessToken, unknownSession).forEach { token ->
+                everySpaceMethod(space) { _, _ -> bearer(token) }.forEach { (method, response) ->
+                    assertEquals(HttpStatusCode.Unauthorized, response.status, method)
+                    assertEquals(DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED, response.errorCode(), method)
+                }
+            }
+        }
+
+    @Test
+    fun `a linked watch of a deactivated account is refused`() =
+        testApplication {
+            val (env, kit) = configureWithDeviceSessions()
+            val (did, _) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val watch = runBlocking { kit.linkWatch(env.accountId(did)) }.tokens.accessToken
+            runBlocking {
+                val account = requireNotNull(env.accountRepository.findByDid(did))
+                env.accountRepository.save(account.copy(isActive = false))
+            }
+
+            val unauthenticated = everySpaceMethod(space) { _, _ -> }
+            everySpaceMethod(space) { _, _ -> bearer(watch) }.forEach { (method, response) ->
+                assertEquals(HttpStatusCode.Unauthorized, response.status, method)
+                assertContentEquals(unauthenticated.getValue(method).bodyAsBytes(), response.bodyAsBytes(), method)
+            }
+        }
+
+    /** The test app with device sessions that a linked watch's token is checked against. */
+    private fun ApplicationTestBuilder.configureWithDeviceSessions(): Pair<AuthV1TestEnvironment, DeviceLinkTestKit> {
+        val tokenService = JwtTokenService("space-device-session-secret")
+        val accounts = InMemoryAccountRepository()
+        val kit = DeviceLinkTestKit(tokenService, accounts)
+        val env =
+            configureAuthV1TestApp(
+                tokenService = tokenService,
+                accountRepository = accounts,
+                accessTokenVerifier = kit.verifier,
+                personalSpaceEnabled = true,
+            )
+        return env to kit
+    }
 
     @Test
     fun `the request bodies use the lexicon's field names`() {
@@ -847,6 +942,8 @@ private suspend fun HttpResponse.errorCode(): String? =
         .jsonObject["error"]
         ?.jsonPrimitive
         ?.content
+
+private fun AuthV1TestEnvironment.accountId(did: String): Uuid = runBlocking { requireNotNull(accountRepository.findByDid(did)).id }
 
 private fun AuthV1TestEnvironment.signedInAccount(username: String): Pair<String, String> =
     runBlocking {
