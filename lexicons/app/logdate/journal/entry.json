@@ -84,7 +84,8 @@
         "text": {
           "type": "string",
           "maxLength": 1000000,
-          "maxGraphemes": 100000
+          "maxGraphemes": 100000,
+          "description": "The text. The app doesn't limit its length; a device refuses to write a longer text and shows a sync error naming the field, rather than cutting it short. Captions, journal titles, place names and correction labels share these limits and this rule."
         },
         "format": {
           "type": "string",

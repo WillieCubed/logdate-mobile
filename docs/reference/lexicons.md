@@ -129,10 +129,13 @@ with an empty media reference. They still become entries. The block has no `medi
 caption, length, transcript and the entry's time and location. Apps show the block with a note
 that the file is missing.
 
-Captions have the same limits as an entry's text, because the app doesn't limit how long a caption
-is. The same goes for journal titles and descriptions, place names and descriptions, and the
-labels in corrections. A value longer than that limit can't be stored in the new format; the code
-that moves data over reports it instead of cutting it short.
+The app doesn't limit how long an entry's text or a caption is, so captions share the text block's
+limits: 1,000,000 bytes and 100,000 characters. The same goes for journal titles and descriptions,
+place names and descriptions, and the labels in corrections. A value longer than that can't be
+stored, at any time: while data is first moved over, and on every sync write after that, because
+every write goes through the same conversion. The device never cuts the text short. It refuses
+that one record and shows a sync error naming the field that's too long, so the person can shorten
+it; the rest of their data keeps syncing.
 
 ### Transcripts
 
@@ -561,7 +564,7 @@ Streams form.
 | 2026-10-18 | **A place stays private in shared entries by default.** An entry's location can name a saved place and copy its name and center (`placeDetails`), so the location reads correctly without the place record. Places are private only, so a shared copy of an entry leaves out `place` and `placeDetails` unless the person chooses to share the place. Where the place record is available, its current name and center are shown rather than the copy. |
 | 2026-10-18 | **Media is encrypted with the account's media key.** Blobs are encrypted on the device in 64 KiB chunks with the account-wide media key (`LDCE2`), not with the content key of the record that refers to them. `mimeType` comes from the file when it's uploaded. |
 | 2026-10-18 | **A missing file doesn't lose the block.** `media` is optional on an entry's photo, video and audio blocks. Its absence means no device has the file, such as a note restored from an archive without its media, and the block keeps its caption, length and transcript. |
-| 2026-10-18 | **Text fields are at least as long as the app allows.** The app doesn't limit captions, journal titles and descriptions, place names and descriptions, or correction labels, so they share the limits of an entry's text (1,000,000 bytes, 100,000 characters). |
+| 2026-10-18 | **Long text is refused, never cut short.** The app doesn't limit an entry's text, captions, journal titles and descriptions, place names and descriptions, or correction labels, so they all share the text block's limits (1,000,000 bytes, 100,000 characters). On any sync write, during the first move or later, a record with a longer value isn't written: the device shows a sync error naming the field, and keeps syncing everything else. Cutting text short would lose the person's words without telling them. |
 | 2026-10-18 | **Transcripts keep full detail.** Segment ids, words, speakers, the recognition pass of each segment and the engine are all stored, because a transcript is costly to produce again. Speaker colors aren't: they're a display choice nothing sets. The first recognition pass maps to `inProgress` and the second to `refining`. A transcript is keyed `<entry>:<block>`, so an entry can hold a transcript for each recording. |
 | 2026-10-18 | **Merged journals leave a redirect.** The merged-away journal stays as a record with `mergedInto`, so every device can move what it still has in that journal, however long it was offline. It's deleted with the surviving journal, and points at the newest survivor when merges chain. In a circle of merges, the journal with the smallest record key survives. |
 | 2026-10-18 | **Records that two devices may both create have keys built from what they connect.** Memberships are keyed `<journal>:<entry>`, entry links `<entry>:<SHA-256 of the evidence id>` and transcripts `<entry>:<block>`, so the same fact is always one record. They are written create-only (`createOnly`), and an existing record is left as it is, so a membership's optional `createdAt` is the first one written and both devices settle on the same bytes. |

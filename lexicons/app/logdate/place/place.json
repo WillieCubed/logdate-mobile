@@ -18,7 +18,7 @@
             "type": "string",
             "maxLength": 1000000,
             "maxGraphemes": 100000,
-            "description": "The place's name. The app doesn't limit its length, so the limit matches an entry's text block."
+            "description": "The place's name. The app doesn't limit its length, so the limit matches an entry's text block, and a longer value is refused with a sync error rather than cut short."
           },
           "description": {
             "type": "string",
