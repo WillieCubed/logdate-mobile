@@ -1,5 +1,9 @@
 package studio.hypertext.atproto.lexicon
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import studio.hypertext.atproto.syntax.Did
 import studio.hypertext.atproto.syntax.LanguageTag
 import studio.hypertext.atproto.syntax.Nsid
@@ -124,10 +128,13 @@ public object LexiconValidator {
             permissions.forEachIndexed { index, permission ->
                 val at = "$path.permissions[$index]"
                 if (permission.type != PERMISSION) return@forEachIndexed report(at, "Every entry needs \"type\": \"permission\"")
-                when (val resource = permission.resource) {
-                    "repo" -> checkRepoPermission(at, permission, group)
-                    "rpc" -> checkRpcPermission(at, permission, group)
-                    "space" -> checkSpacePermission(at, permission, group)
+                val resource = permission.resource
+                val shapes = PARAMETER_SHAPES[resource]
+                val wellFormed = shapes?.let { checkShapes(at, resource, permission, it) }.orEmpty()
+                when (resource) {
+                    "repo" -> checkRepoPermission(at, permission, group, wellFormed)
+                    "rpc" -> checkRpcPermission(at, permission, group, wellFormed)
+                    "space" -> checkSpacePermission(at, permission, group, wellFormed)
                     "blob", "account", "identity" ->
                         report(at, "$resource permissions can't be in a permission set; apps ask for them directly")
                     else -> report(at, "'$resource' isn't a resource a permission set can grant")
@@ -135,36 +142,80 @@ public object LexiconValidator {
             }
         }
 
+        // An authorization server silently ignores an entry it can't read, such as one with a
+        // misspelled parameter or a single value where a list belongs, so each is reported here.
+        // Returns the parameters that are present and well formed.
+        private fun checkShapes(
+            path: String,
+            resource: String?,
+            permission: LexiconPermission,
+            shapes: Map<String, ParameterShape>,
+        ): Set<String> =
+            permission.parameters
+                .filter { (name, value) ->
+                    val shape = shapes[name]
+                    val problem =
+                        if (shape == null) {
+                            "'$name' isn't a parameter of $resource permissions"
+                        } else {
+                            shapeProblem(name, shape, value)
+                        }
+                    problem?.let { report(path, it) }
+                    problem == null
+                }.keys
+
+        private fun shapeProblem(
+            name: String,
+            shape: ParameterShape,
+            value: JsonElement,
+        ): String? =
+            when (shape) {
+                ParameterShape.LIST ->
+                    when {
+                        value !is JsonArray -> "$name must be a list, even for one value"
+                        value.isEmpty() -> "$name can't be an empty list"
+                        value.any { (it as? JsonPrimitive)?.isString != true } -> "$name must list only strings"
+                        else -> null
+                    }
+                ParameterShape.STRING ->
+                    when {
+                        value is JsonArray -> "$name must be a single value, not a list"
+                        (value as? JsonPrimitive)?.isString != true -> "$name must be a string"
+                        else -> null
+                    }
+                ParameterShape.BOOLEAN -> if (value.asBoolean() == null) "$name must be true or false" else null
+            }
+
+        private fun JsonElement.asBoolean(): Boolean? = (this as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull
+
         private fun checkRepoPermission(
             path: String,
             permission: LexiconPermission,
             group: String,
+            wellFormed: Set<String>,
         ) {
-            val collections = permission.values("collection")
-            if (collections.isEmpty()) report(path, "A repo permission needs at least one collection")
-            collections.forEach { checkOwnNsid(path, it, "collection", group) }
-            checkAllowedValues(path, permission, "action", RECORD_ACTIONS)
+            if (!permission.has("collection")) report(path, "A repo permission needs at least one collection")
+            if ("collection" in wellFormed) permission.values("collection").forEach { checkOwnNsid(path, it, "collection", group) }
+            if ("action" in wellFormed) checkAllowedValues(path, permission, "action", RECORD_ACTIONS)
         }
 
         private fun checkRpcPermission(
             path: String,
             permission: LexiconPermission,
             group: String,
+            wellFormed: Set<String>,
         ) {
-            val methods = permission.values("lxm")
-            if (methods.isEmpty()) report(path, "An rpc permission needs at least one lxm")
-            methods.forEach { checkOwnNsid(path, it, "lxm", group) }
-            val inheritAud = permission.boolean("inheritAud")
-            if (permission.has("inheritAud") && inheritAud == null) report(path, "inheritAud must be true or false")
-            val inherits = inheritAud == true
+            if (!permission.has("lxm")) report(path, "An rpc permission needs at least one lxm")
+            if ("lxm" in wellFormed) permission.values("lxm").forEach { checkOwnNsid(path, it, "lxm", group) }
+            val inherits = permission.boolean("inheritAud") == true
             val hasAudience = permission.has("aud")
             when {
                 inherits && hasAudience -> report(path, "An rpc permission can't set aud and inheritAud together")
                 !inherits && !hasAudience -> report(path, "An rpc permission needs aud: *, or inheritAud: true")
             }
             // A set can't name a service: the audience comes from the app's include scope instead.
-            val audience = permission.values("aud").joinToString()
-            if (hasAudience && audience != WILDCARD) {
+            val audience = permission.string("aud")
+            if ("aud" in wellFormed && audience != WILDCARD) {
                 report(path, "aud '$audience' can't name a service in a permission set; use inheritAud: true")
             }
         }
@@ -173,27 +224,29 @@ public object LexiconValidator {
             path: String,
             permission: LexiconPermission,
             group: String,
+            wellFormed: Set<String>,
         ) {
-            when (val spaceType = permission.string("spaceType")) {
-                null -> report(path, "A space permission needs a spaceType")
-                WILDCARD -> report(path, "A permission set must name a space type, not *")
-                else -> checkOwnNsid(path, spaceType, "spaceType", group)
+            val spaceType = permission.string("spaceType")
+            when {
+                !permission.has("spaceType") -> report(path, "A space permission needs a spaceType")
+                spaceType == WILDCARD -> report(path, "A permission set must name a space type, not *")
+                spaceType != null && "spaceType" in wellFormed -> checkOwnNsid(path, spaceType, "spaceType", group)
             }
-            if (permission.has("authority")) {
-                val authority = permission.values("authority").joinToString()
-                if (authority != "self" && authority != WILDCARD && !Did.isValid(authority)) {
-                    report(path, "authority '$authority' isn't self, * or a DID")
-                }
+            val authority = permission.string("authority")
+            val validAuthority = authority == "self" || authority == WILDCARD || Did.isValid(authority.orEmpty())
+            if ("authority" in wellFormed && !validAuthority) report(path, "authority '$authority' isn't self, * or a DID")
+            val skey = permission.string("skey")
+            if ("skey" in wellFormed && skey != WILDCARD && !RecordKey.isValid(skey.orEmpty())) {
+                report(path, "skey '$skey' isn't * or a valid space key")
             }
-            if (permission.has("skey")) {
-                val skey = permission.values("skey").joinToString()
-                if (skey != WILDCARD && !RecordKey.isValid(skey)) report(path, "skey '$skey' isn't * or a valid space key")
+            if ("collection" in wellFormed) {
+                permission
+                    .values("collection")
+                    .filterNot { it == WILDCARD || Nsid.isValid(it) }
+                    .forEach { report(path, "collection '$it' isn't * or a valid NSID") }
             }
-            permission.values("collection").forEach { collection ->
-                if (collection != WILDCARD && !Nsid.isValid(collection)) report(path, "collection '$collection' isn't * or a valid NSID")
-            }
-            checkAllowedValues(path, permission, "action", SPACE_ACTIONS)
-            checkAllowedValues(path, permission, "manage", RECORD_ACTIONS)
+            if ("action" in wellFormed) checkAllowedValues(path, permission, "action", SPACE_ACTIONS)
+            if ("manage" in wellFormed) checkAllowedValues(path, permission, "manage", RECORD_ACTIONS)
         }
 
         // A set may only grant within its own NSID group, or the groups below it.
@@ -341,6 +394,24 @@ public object LexiconValidator {
     private const val MAX_SPACE_NAME_LENGTH = 64
     private val RECORD_ACTIONS = listOf("create", "update", "delete")
     private val SPACE_ACTIONS = listOf("read_self", "read", "create", "update", "delete")
+
+    private enum class ParameterShape { LIST, STRING, BOOLEAN }
+
+    // The parameters each resource takes in a permission set, and their shapes.
+    private val PARAMETER_SHAPES =
+        mapOf(
+            "repo" to mapOf("collection" to ParameterShape.LIST, "action" to ParameterShape.LIST),
+            "rpc" to mapOf("lxm" to ParameterShape.LIST, "aud" to ParameterShape.STRING, "inheritAud" to ParameterShape.BOOLEAN),
+            "space" to
+                mapOf(
+                    "spaceType" to ParameterShape.STRING,
+                    "authority" to ParameterShape.STRING,
+                    "skey" to ParameterShape.STRING,
+                    "collection" to ParameterShape.LIST,
+                    "action" to ParameterShape.LIST,
+                    "manage" to ParameterShape.LIST,
+                ),
+        )
 
     // A blob's accept list holds MIME types, globs over a whole subtype, or the any-type glob.
     private fun isAcceptableMimePattern(entry: String): Boolean = entry == "*/*" || mimePattern.matches(entry)
