@@ -5,6 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
@@ -13,7 +14,9 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.Buffer
 import kotlinx.io.IOException
+import kotlinx.io.readByteArray
 import studio.hypertext.atproto.lexicon.data.Bytes
 import studio.hypertext.atproto.xrpc.BearerToken
 import studio.hypertext.atproto.xrpc.KtorXrpcClient
@@ -294,6 +297,80 @@ class XrpcDataHomeTest {
             val home = failingHome(auth = NoAuth) { respond("", HttpStatusCode.OK) }
             assertFailsWith<IllegalStateException> { home.uploadBlob(space, byteArrayOf(1)) }
             assertFailsWith<IllegalStateException> { home.getBlob(space, "bafyblob") }
+            assertFailsWith<IllegalStateException> { home.uploadBlob(space, 1) { Buffer().apply { writeByte(1) } } }
+            assertFailsWith<IllegalStateException> { home.downloadBlob(space, "bafyblob", Buffer()) }
             assertTrue(requests.isEmpty())
+        }
+
+    @Test
+    fun `a streamed upload reads its source while sending and declares its length`() =
+        runTest {
+            var opened = 0
+            val payload = ByteArray(200_000) { it.toByte() }
+            val cid =
+                home(
+                    HttpStatusCode.OK,
+                    """{"blob":{"${'$'}type":"blob","ref":{"${'$'}link":"bafyblob"},"mimeType":"application/octet-stream","size":3}}""",
+                ).uploadBlob(space, payload.size.toLong()) {
+                    opened++
+                    Buffer().apply { write(payload) }
+                }
+
+            assertEquals("bafyblob", cid)
+            val request = requests.single()
+            assertEquals("/xrpc/app.logdate.space.uploadBlob", request.url.encodedPath)
+            assertEquals(space.uri, request.url.parameters["space"])
+            assertEquals("Bearer token", request.headers[HttpHeaders.Authorization])
+            val body = request.body as OutgoingContent.WriteChannelContent
+            assertEquals(payload.size.toLong(), body.contentLength)
+            assertContentEquals(payload, body.toByteArray())
+            assertTrue(opened >= 1)
+        }
+
+    @Test
+    fun `a streamed download writes the blob into the sink`() =
+        runTest {
+            val payload = ByteArray(150_000) { (it * 7).toByte() }
+            val sink = Buffer()
+
+            val found = home(HttpStatusCode.OK, payload, "application/octet-stream").downloadBlob(space, "bafyblob", sink)
+
+            assertTrue(found)
+            assertContentEquals(payload, sink.readByteArray())
+            val request = requests.single()
+            assertEquals("/xrpc/app.logdate.space.getBlob", request.url.encodedPath)
+            assertEquals("bafyblob", request.url.parameters["cid"])
+        }
+
+    @Test
+    fun `a streamed download of a missing blob writes nothing`() =
+        runTest {
+            val sink = Buffer()
+
+            val found =
+                home(HttpStatusCode.BadRequest, """{"error":"BlobNotFound","message":"none"}""").downloadBlob(space, "bafyblob", sink)
+
+            assertEquals(false, found)
+            assertEquals(0L, sink.size)
+        }
+
+    @Test
+    fun `a rate-limited blob request carries the server's Retry-After`() =
+        runTest {
+            val home =
+                failingHome {
+                    respond(
+                        """{"error":"RateLimitExceeded","message":"slow down"}""",
+                        HttpStatusCode.TooManyRequests,
+                        headersOf(HttpHeaders.RetryAfter, "30"),
+                    )
+                }
+
+            val upload = assertFailsWith<XrpcProtocolException> { home.uploadBlob(space, 1) { Buffer().apply { writeByte(1) } } }
+            val download = assertFailsWith<XrpcProtocolException> { home.downloadBlob(space, "bafyblob", Buffer()) }
+
+            assertEquals(30L, upload.retryAfterSeconds)
+            assertEquals(429, download.statusCode)
+            assertEquals(30L, download.retryAfterSeconds)
         }
 }
