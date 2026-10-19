@@ -79,6 +79,20 @@ class OfflineFirstEntryDraftRepository(
             )
         }
 
+    override suspend fun saveDraftSnapshot(draft: EntryDraft): Uuid =
+        mutationMutex.withLock {
+            val existing = draftsFlow.value[draft.id] ?: draftStore.getDraft(draft.id)
+            val saved =
+                draft.copy(
+                    createdAt = existing?.createdAt ?: draft.createdAt,
+                    updatedAt = Clock.System.now(),
+                    selectedJournalIds = resolveSelection(draft.selectedJournalIds),
+                )
+            draftStore.saveDraft(saved)
+            draftsFlow.value = draftsFlow.value + (saved.id to saved)
+            saved.id
+        }
+
     override suspend fun createDraft(notes: List<JournalNote>): Uuid {
         val id = Uuid.random()
         return createDraft(

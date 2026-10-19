@@ -2,6 +2,7 @@ package app.logdate.client.domain.editor
 
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.location.VisitMemoryContext
 import kotlin.uuid.Uuid
@@ -36,10 +37,16 @@ class SaveEntryUseCase(
         activeDraftId: Uuid?,
         visitContext: VisitMemoryContext? = null,
         markId: String? = null,
+        editBase: EntryEditBase? = null,
     ) {
         val contextualNotes = if (visitContext == null) notes else notes.map { it.withVisitContext(visitContext) }
         val savedNotes = if (markId == null) contextualNotes else prepareMarkedNotes(Uuid.parse(markId), contextualNotes)
-        addNoteUseCase(notes = savedNotes, journalIds = journalIds, captureCurrentLocation = visitContext == null && markId == null)
+        addNoteUseCase(
+            notes = savedNotes,
+            journalIds = journalIds,
+            captureCurrentLocation = visitContext == null && markId == null,
+            editBase = editBase,
+        )
         if (visitContext != null) {
             savedNotes.forEach { note -> linkVisitMemory(visitContext.evidenceId, note.uid.toString()) }
         }

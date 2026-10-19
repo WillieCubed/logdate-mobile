@@ -431,6 +431,71 @@ from authorizing transferred content when the source preferences never arrive.
 Completed native-delivery fingerprints keep validation active after restore work is acknowledged,
 so a second launch cannot bypass the check.
 
+### Editing retained entries
+
+Stored entries use an explicit edit path. Opening an entry captures `EntryEditBase` with its
+original note and account scope. Complete draft snapshots preserve that base alongside the edited
+content, so reopening a draft retains its editing intent. Ordinary note creation continues to reject
+an existing ID with different content; import and recovery callers must not turn that guard into an
+unconditional update.
+
+Keep the base captured at opening until the edit is published. Fetching a new expected note at
+Save time would let an old editor silently replace another editor's work. Publication compares the
+loaded content with the current record and uses the repository's scoped transaction. Capture
+provenance, location, and current sync history come from retained storage rather than the editor's
+partial presentation model.
+
+```kotlin
+// Capture once when opening, and carry this same value through the draft.
+val editBase = fetchEntry.forEditing(noteId) ?: return
+// After editing:
+saveEntry(notes, selectedJournalIds, activeDraftId, editBase = editBase)
+```
+
+A concurrent edit or deletion preserves the edited version in Drafts. The editor's existing snackbar
+offers Save separately; it never replaces the newer version or recreates the deleted ID. A separate
+version receives its own ID, which every publication attempt commits to the draft before writing any
+note. A failed draft write therefore remains retryable without producing another copy after process
+death. Even a retry finding an identical copy must confirm its record and account inside the scoped
+transaction before acknowledging the draft.
+
+`NativeRestoredEntryEditingTest` exercises production storage and editor state, including oversized
+text, current-day entries, reopened drafts, concurrent edits, deletion, and failed copy persistence.
+For a rendered walkthrough, retain an entry beyond the AI input budget through Backup Manager,
+open and edit it, then compare its full stored text and ID. Android accessibility text is capped,
+so an accessibility snapshot alone cannot establish preservation of an oversized entry.
+
+### Retained-key failure acceptance
+
+`NativeRetainedKeyFailureTest` requires a verified emulator, an unprivileged synthetic debug app,
+and `retainedKeyFailures=true`. Its database, portable material, and original media live in an
+isolated fixture. Missing, malformed, truncated, mismatched, and file-permission-denied recovery
+material must leave the encrypted journal and originals intact. A valid portable key must recover
+an invalid or unreadable primary, and a failed primary commit must remain recoverable when the
+provider is recreated. Capture diagnostics without disclosing the key or private storage errors.
+The fixture restores file permissions before cleanup and never changes the application's keys.
+`NativeKeyPersistenceRestartProbeTest` uses the same isolated storage with a unique `keyRestartId`
+and `keyRestartStage=seed`, followed by stopping the synthetic app process and a `verify` invocation.
+Verification requires a different process ID and opens the unchanged encrypted journal using the
+only valid key retained in an interrupted write, before committing that key. Acceptance rejects
+both ignored tests and assumption failures; JUnit's `OK` summary alone does not prove execution.
+
+### Recovery accessibility on an emulator
+
+Verify recovery with TalkBack touch exploration enabled, using forward/backward navigation and
+double-tap activation of the retry action. At 200% text, allow TalkBack to scroll the guidance
+before expecting focus to reach the action. Wait for the recovery state to appear before sending
+gestures. Android shell `input` injection bypasses the input-reader gesture path; native emulator
+multitouch events exercise TalkBack's recognizer. Capture accessibility focus/click events and verify
+the retained journal before and after retry. After a database has opened, compare journal content
+and integrity because SQLite index maintenance can change its encrypted file bytes.
+
+The modern callback fixture constructs a real framework `FullRestoreDataInput` from a private
+file descriptor. Its constructor is hidden from the SDK, so the API 36.1 instrumentation command
+uses `--no-hidden-api-checks` on its verified emulator. This keeps the callback test independent
+of MockK's JVMTI agent and the runtime temporary directory, which may be unavailable on a fresh
+emulator. Production callback handling uses the public callback and accessors.
+
 `RestoreCredentialCleanupRuntimeTest` checks encrypted-storage recreation, worker retry, and
 production dependency injection and scheduling. Its `cleanupSurvivesAppProcessRestart` test accepts
 a unique `cleanupProcessNamespace` and `cleanupProcessStage=seed` for the first instrumentation

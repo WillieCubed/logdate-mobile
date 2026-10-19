@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor.delegate
 
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.notes.FetchEntryUseCase
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.isCapturedOnWatch
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
@@ -12,6 +13,7 @@ import kotlin.uuid.Uuid
 data class LoadedEntry(
     val block: EntryBlockUiState,
     val capturedOnWatch: Boolean,
+    val editBase: EntryEditBase? = null,
 )
 
 /**
@@ -26,9 +28,10 @@ class ContentLoader(
      */
     suspend fun loadEntry(entryId: Uuid): Result<LoadedEntry> =
         try {
-            val entry = fetchEntryUseCase(entryId)
+            val edit = fetchEntryUseCase.forEditing(entryId)
+            val entry = edit?.original
             if (entry != null) {
-                Result.success(LoadedEntry(block = entry.toDomainBlock(), capturedOnWatch = entry.isCapturedOnWatch))
+                Result.success(LoadedEntry(block = entry.toDomainBlock(), capturedOnWatch = entry.isCapturedOnWatch, editBase = edit))
             } else {
                 Result.failure(NoSuchElementException("Entry not found: $entryId"))
             }

@@ -15,8 +15,10 @@ on:
       - 'app/android-main/src/androidTest/**/RestoredJournalLockRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredAppLockEnrollmentRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/InterruptedDatabaseKeyRecoveryTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeRetainedKeyFailureTest.kt'
       - 'app/android-main/src/androidTest/**/LegacyPlaintextMigrationTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRecoveryWorkStateTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeRestoredEntryEditingTest.kt'
       - 'app/android-main/src/androidTest/**/TransferredInstallationTrustTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredNotificationDeliveryTest.kt'
       - 'app/android-main/src/androidTest/**/CompletedRecordingRestartTest.kt'
@@ -211,8 +213,60 @@ jobs:
             studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
             > "$RUNNER_TEMP/native-key-recovery/runtime.log"
           grep -Eq '^OK \(12 tests\)$' "$RUNNER_TEMP/native-key-recovery/runtime.log"
-          if grep -Fq 'INSTRUMENTATION_STATUS_CODE: -3' "$RUNNER_TEMP/native-key-recovery/runtime.log"; then
+          if grep -Eq '^INSTRUMENTATION_STATUS_CODE: -(3|4)[[:space:]]*$' "$RUNNER_TEMP/native-key-recovery/runtime.log"; then
             echo 'Native key and restart recovery must run without skipped cases' >&2
+            exit 1
+          fi
+
+      - name: Verify retained keys under Android storage failures
+        shell: bash
+        run: |
+          test "$(adb -s emulator-5558 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          adb -s emulator-5558 shell am instrument -w -r \
+            -e retainedKeyFailures true \
+            -e class app.logdate.client.e2e.NativeRetainedKeyFailureTest \
+            studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
+            > "$RUNNER_TEMP/native-key-recovery/retained-failures.log"
+          grep -Eq '^OK \(7 tests\)$' "$RUNNER_TEMP/native-key-recovery/retained-failures.log"
+          if grep -Eq '^INSTRUMENTATION_STATUS_CODE: -(3|4)[[:space:]]*$' "$RUNNER_TEMP/native-key-recovery/retained-failures.log"; then
+            echo 'Retained-key failures must run without skipped cases' >&2
+            exit 1
+          fi
+
+      - name: Verify pending key recovery after app process death
+        shell: bash
+        run: |
+          namespace="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+          for stage in seed verify; do
+            test "$(adb -s emulator-5558 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+            adb -s emulator-5558 shell am instrument -w -r \
+              -e retainedKeyFailures true -e keyRestartStage "$stage" -e keyRestartId "$namespace" \
+              -e class app.logdate.client.e2e.NativeKeyPersistenceRestartProbeTest \
+              studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
+              > "$RUNNER_TEMP/native-key-recovery/process-$stage.log"
+            grep -Eq '^OK \(1 test\)$' "$RUNNER_TEMP/native-key-recovery/process-$stage.log"
+            if grep -Eq '^INSTRUMENTATION_STATUS_CODE: -(3|4)[[:space:]]*$' "$RUNNER_TEMP/native-key-recovery/process-$stage.log"; then
+              echo 'Pending-key process acceptance must run without skipped cases' >&2
+              exit 1
+            fi
+            if [[ "$stage" == seed ]]; then
+              adb -s emulator-5558 shell am force-stop studio.hypertext.logdate.debug
+            fi
+          done
+
+      - name: Verify editing recovered entries and conflict recovery
+        shell: bash
+        run: |
+          test "$(adb -s emulator-5558 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          mkdir -p "$RUNNER_TEMP/native-entry-editing"
+          adb -s emulator-5558 shell am instrument -w -r \
+            -e restoredEntryEditing true \
+            -e class app.logdate.client.e2e.NativeRestoredEntryEditingTest \
+            studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
+            > "$RUNNER_TEMP/native-entry-editing/runtime.log"
+          grep -Eq '^OK \(7 tests\)$' "$RUNNER_TEMP/native-entry-editing/runtime.log"
+          if grep -Eq '^INSTRUMENTATION_STATUS_CODE: -(3|4)[[:space:]]*$' "$RUNNER_TEMP/native-entry-editing/runtime.log"; then
+            echo 'Recovered entry editing must run without skipped cases' >&2
             exit 1
           fi
 
@@ -226,7 +280,7 @@ jobs:
             studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
             > "$RUNNER_TEMP/native-lock-recovery/runtime.log"
           grep -Eq '^OK \(8 tests\)$' "$RUNNER_TEMP/native-lock-recovery/runtime.log"
-          if grep -Fq 'INSTRUMENTATION_STATUS_CODE: -3' "$RUNNER_TEMP/native-lock-recovery/runtime.log"; then
+          if grep -Eq '^INSTRUMENTATION_STATUS_CODE: -(3|4)[[:space:]]*$' "$RUNNER_TEMP/native-lock-recovery/runtime.log"; then
             echo 'Native device-security acceptance must run without skipped cases' >&2
             exit 1
           fi
@@ -609,7 +663,7 @@ jobs:
           }
           install_api36_apk app app/android-main/build/outputs/apk/debug/android-main-debug.apk studio.hypertext.logdate.debug
           install_api36_apk android-test app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk studio.hypertext.logdate.debug.test
-          adb -s emulator-5562 shell am instrument --user 0 -w -r \
+          adb -s emulator-5562 shell am instrument --user 0 --no-hidden-api-checks -w -r \
             -e class app.logdate.client.e2e.NativeBackgroundCredentialCallbackTest \
             studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
             > "$RUNNER_TEMP/native-restore-api36-1-callback.log"

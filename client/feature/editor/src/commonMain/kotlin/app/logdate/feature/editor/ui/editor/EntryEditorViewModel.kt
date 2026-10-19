@@ -163,7 +163,7 @@ class EntryEditorViewModel(
                     .toSet()
 
             val blocks = currentState.blocks
-            val readOnlyMap = blocks.associate { it.id to (it.id in todayBlockIds) }
+            val readOnlyMap = blocks.associate { it.id to (it.id in todayBlockIds && it.id != currentState.entryEditBase?.targetId) }
 
             val selectedJournalIds =
                 if (
@@ -234,6 +234,12 @@ class EntryEditorViewModel(
     suspend fun discardAndExit(): Boolean = discardAndExitImpl()
 
     fun saveEntry(state: EditorState) = saveEntryImpl(state)
+
+    fun saveConflictingVersionSeparately() = saveConflictingVersionSeparatelyImpl()
+
+    fun dismissEntryEditConflict() {
+        mutableEditorState.update { it.copy(entryEditConflict = false) }
+    }
 
     fun setExpandedBlockId(blockId: Uuid?) = setExpandedBlockIdImpl(blockId)
 

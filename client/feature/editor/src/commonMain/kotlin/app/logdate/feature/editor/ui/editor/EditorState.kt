@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.editor
 
 import androidx.compose.runtime.Stable
 import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.text.UiText
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.location.VisitMemoryContext
@@ -40,6 +41,8 @@ class EditorState(
     val blocks: List<EntryBlockUiState> = emptyList(),
     val expandedBlockId: Uuid? = null,
     val readOnlyBlocks: Map<Uuid, Boolean> = emptyMap(),
+    val entryEditBase: EntryEditBase? = null,
+    val entryEditConflict: Boolean = false,
     val availableJournals: List<Journal> = emptyList(),
     val selectedJournalIds: List<Uuid> = emptyList(),
     val hasJournalSelectionChanges: Boolean = false,
@@ -119,6 +122,8 @@ class EditorState(
         blocks: List<EntryBlockUiState> = this.blocks,
         expandedBlockId: Uuid? = this.expandedBlockId,
         readOnlyBlocks: Map<Uuid, Boolean> = this.readOnlyBlocks,
+        entryEditBase: EntryEditBase? = this.entryEditBase,
+        entryEditConflict: Boolean = this.entryEditConflict,
         availableJournals: List<Journal> = this.availableJournals,
         selectedJournalIds: List<Uuid> = this.selectedJournalIds,
         hasJournalSelectionChanges: Boolean = this.hasJournalSelectionChanges,
@@ -142,6 +147,8 @@ class EditorState(
             blocks = blocks,
             expandedBlockId = expandedBlockId,
             readOnlyBlocks = readOnlyBlocks,
+            entryEditBase = entryEditBase,
+            entryEditConflict = entryEditConflict,
             availableJournals = availableJournals,
             selectedJournalIds = selectedJournalIds,
             hasJournalSelectionChanges = hasJournalSelectionChanges,
@@ -169,6 +176,8 @@ class EditorState(
         if (blocks != other.blocks) return false
         if (expandedBlockId != other.expandedBlockId) return false
         if (readOnlyBlocks != other.readOnlyBlocks) return false
+        if (entryEditBase != other.entryEditBase) return false
+        if (entryEditConflict != other.entryEditConflict) return false
         if (availableJournals != other.availableJournals) return false
         if (selectedJournalIds != other.selectedJournalIds) return false
         if (hasJournalSelectionChanges != other.hasJournalSelectionChanges) return false
@@ -197,6 +206,8 @@ class EditorState(
         result = 31 * result + (visitContext?.hashCode() ?: 0)
         result = 31 * result + (expandedBlockId?.hashCode() ?: 0)
         result = 31 * result + readOnlyBlocks.hashCode()
+        result = 31 * result + (entryEditBase?.hashCode() ?: 0)
+        result = 31 * result + entryEditConflict.hashCode()
         result = 31 * result + availableJournals.hashCode()
         result = 31 * result + selectedJournalIds.hashCode()
         result = 31 * result + hasJournalSelectionChanges.hashCode()

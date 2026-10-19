@@ -1,8 +1,10 @@
 package app.logdate.client.domain.notes
 
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlin.uuid.Uuid
 
 /**
@@ -17,6 +19,13 @@ import kotlin.uuid.Uuid
 class FetchEntryUseCase(
     private val journalNotesRepository: JournalNotesRepository,
 ) {
+    suspend fun forEditing(entryId: Uuid): EntryEditBase? {
+        val scope = journalNotesRepository.getNoteRecoveryScope()
+        val note = invoke(entryId) ?: return null
+        check(scope == journalNotesRepository.getNoteRecoveryScope()) { "The entry account changed while loading" }
+        return EntryEditBase(note, scope)
+    }
+
     suspend operator fun invoke(entryId: Uuid): JournalNote? =
         try {
             val entry = journalNotesRepository.getNoteById(entryId)
@@ -26,6 +35,8 @@ class FetchEntryUseCase(
                 Napier.w("FetchEntryUseCase: Entry not found: $entryId")
             }
             entry
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Napier.e("FetchEntryUseCase: Failed to fetch entry: $entryId", e)
             null

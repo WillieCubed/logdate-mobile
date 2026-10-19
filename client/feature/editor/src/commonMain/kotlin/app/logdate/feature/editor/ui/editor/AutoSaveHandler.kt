@@ -327,6 +327,7 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
     buildString {
         appendFingerprintField("mark")
         appendFingerprintField(state.markId)
+        appendFingerprintField(state.entryEditBase)
         appendFingerprintField("visit")
         appendFingerprintField(state.visitContext)
         appendFingerprintField("journals")

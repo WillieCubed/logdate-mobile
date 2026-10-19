@@ -1,9 +1,12 @@
 package app.logdate.client.domain.notes.drafts
 
+import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
+import app.logdate.client.repository.journals.EntryEditBase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.shared.model.location.VisitMemoryContext
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -26,8 +29,14 @@ class CreateEntryDraftUseCase(
         selectedJournalIds: List<Uuid> = emptyList(),
         visitContext: VisitMemoryContext? = null,
         markId: String? = null,
+        editBase: EntryEditBase? = null,
     ): Uuid =
-        if (markId == null) {
+        if (editBase != null) {
+            val now = Clock.System.now()
+            entryDraftRepository.saveDraftSnapshot(
+                EntryDraft(draftId, notes, now, now, pendingMedia, selectedJournalIds, visitContext, markId, editBase),
+            )
+        } else if (markId == null) {
             entryDraftRepository.createDraft(
                 uid = draftId,
                 notes = notes,

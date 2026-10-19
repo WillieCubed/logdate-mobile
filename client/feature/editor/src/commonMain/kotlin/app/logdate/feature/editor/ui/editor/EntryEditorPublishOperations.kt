@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.editor
 
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.notes.EntryEditConflictException
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.text.toUiText
 import app.logdate.feature.editor.ui.mapper.toJournalNote
@@ -36,6 +37,21 @@ internal fun EntryEditorViewModel.saveEntryImpl(state: EditorState) {
             saveEntryAfterAdmission(admittedContentRevision)
         } catch (cancellation: CancellationException) {
             throw cancellation
+        } catch (conflict: EntryEditConflictException) {
+            try {
+                val draftId = persistDraft(currentDraftPersistenceState(mutableEditorState.value), allowWhileExplicitlySaving = true)
+                checkNotNull(draftId) { "The conflicting edit could not be saved as a draft" }
+                mutableEditorState.update { it.copy(entryEditConflict = true, errorMessage = null) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Napier.e("Could not preserve conflicting entry edits", failure)
+                mutableEditorState.update {
+                    it.copy(
+                        errorMessage = Res.string.editor_error_save_failed.toUiText(failure.message.toString()),
+                    )
+                }
+            }
         } catch (error: Exception) {
             Napier.e("Failed to save entry: ${error.message}", error)
             mutableEditorState.update {
@@ -65,7 +81,13 @@ internal suspend fun EntryEditorViewModel.saveEntryAfterAdmission(admittedConten
     draftPersistenceMutex.withLock {
         val latestEditableState = mutableEditorState.value
         if (latestEditableState.shouldExit) return@withLock
-        val publishSnapshot = currentDraftPersistenceState(latestEditableState)
+        var publishSnapshot = currentDraftPersistenceState(latestEditableState)
+        if (publishSnapshot.entryEditBase?.copyNoteId != null) {
+            checkNotNull(
+                persistLatestDraftUntilStable(publishSnapshot),
+            ) { "The separate version must be saved as a draft before publishing" }
+            publishSnapshot = currentDraftPersistenceState(mutableEditorState.value)
+        }
         if (publishSnapshot.contentRevision != admittedContentRevision) {
             failPublishInvariant()
             return@withLock
@@ -309,6 +331,7 @@ private suspend fun EntryEditorViewModel.persistPublishedNotes(
             cleanupDraftId,
             publishSnapshot.visitContext,
             publishSnapshot.markId,
+            publishSnapshot.entryEditBase,
         )
         draftManager.acknowledgeDraftDeletion(cleanupDraftId)
     } catch (cancellation: CancellationException) {
