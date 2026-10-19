@@ -8,11 +8,11 @@ root="$(git rev-parse --show-toplevel)"
 work="$(mktemp -d)"
 trap 'rm -r "$work"' EXIT
 
-# A copy of the working tree's schemas and checker, sharing the installed packages.
+# A copy of the working tree's schemas and checker, sharing the installed packages. Every module
+# the checker might import is copied, so a new one doesn't need adding here.
 mkdir -p "$work/tools/lexicon-check"
 cp -R "$root/lexicons" "$work/lexicons"
-cp -R "$root/tools/lexicon-check/check.mjs" "$root/tools/lexicon-check/compat.mjs" "$root/tools/lexicon-check/declarations.mjs" \
-    "$root/tools/lexicon-check/examples" \
+cp -R "$root"/tools/lexicon-check/*.mjs "$root"/tools/lexicon-check/*.json "$root/tools/lexicon-check/examples" \
     "$work/tools/lexicon-check/"
 ln -s "$root/tools/lexicon-check/node_modules" "$work/tools/lexicon-check/node_modules"
 
