@@ -62,6 +62,15 @@ class SpaceSwapException(
     message: String,
 ) : RuntimeException(message)
 
+/**
+ * A [SpaceStore.changes] cursor older than tombstones that purging has deleted, so paging on from it
+ * would miss those deletions. The client lists again from zero; [purgedThroughSeq] is the highest
+ * purged sequence number.
+ */
+class SpaceCursorTooOldException(
+    val purgedThroughSeq: Long,
+) : RuntimeException("Changes up to $purgedThroughSeq were purged")
+
 /** A write whose record isn't a valid sealed envelope; [reason] says why. */
 class SpaceInvalidRecordException(
     val reason: String,
@@ -135,6 +144,8 @@ interface SpaceStore {
      * Up to [limit] changes with a sequence number greater than [since]; [limit] is 1 to
      * [MAX_SPACE_CHANGES_LIMIT]. The page ends early, with [SpaceChangePage.hasMore] set, rather than
      * carry more than [MAX_SPACE_CHANGES_BYTES] of stored records, but always holds at least one change.
+     * Throws [SpaceCursorTooOldException] when [since] is above zero but below the highest sequence
+     * number of a purged tombstone; listing from zero always works.
      */
     suspend fun changes(
         space: String,
@@ -161,7 +172,8 @@ interface SpaceStore {
     ): SpaceBlob?
 
     /**
-     * Deletes tombstones made before [tombstonesBefore], and blobs created before
+     * Deletes tombstones made before [tombstonesBefore], remembering the highest purged sequence number
+     * of each repository for [changes], and blobs created before
      * [unreferencedBlobsBefore] that no record refers to. Each blob's object is deleted with
      * [deleteObject] while its row is locked, and the row goes only after that succeeds, so an object
      * is never left without a row pointing at it. When [deleteObject] throws, the failure is logged as
@@ -184,6 +196,14 @@ internal fun recordCid(record: JsonObject): Pair<String, ByteArray> {
 /** Throws [SpaceInvalidRecordException] unless [record] is a valid sealed envelope. */
 internal fun requireSealedRecord(record: JsonObject) {
     checkSealedRecord(record)?.let { throw SpaceInvalidRecordException(it) }
+}
+
+/** Throws [SpaceCursorTooOldException] when [since] predates tombstones purged through [purgedThroughSeq]. */
+internal fun requireFreshCursor(
+    since: Long,
+    purgedThroughSeq: Long,
+) {
+    if (since in 1 until purgedThroughSeq) throw SpaceCursorTooOldException(purgedThroughSeq)
 }
 
 /** Throws unless [limit] is a page size [SpaceStore.changes] accepts. */
@@ -250,6 +270,7 @@ class InMemorySpaceStore(
 
     private val mutex = Mutex()
     private val states = mutableMapOf<Pair<String, String>, Long>()
+    private val purgedThrough = mutableMapOf<Pair<String, String>, Long>()
     private val records = mutableMapOf<Triple<String, String, String>, Row>()
     private val recordBlobs = mutableMapOf<Triple<String, String, String>, Set<String>>()
     private val blobs = mutableMapOf<Pair<String, String>, Pair<SpaceBlob, Instant>>()
@@ -309,6 +330,7 @@ class InMemorySpaceStore(
     ): SpaceChangePage {
         requireChangesLimit(limit)
         return mutex.withLock {
+            requireFreshCursor(since, purgedThrough[space to author] ?: 0L)
             val rows =
                 records
                     .filter { (key, row) -> key.first == space && key.second == author && row.seq > since }
@@ -348,7 +370,12 @@ class InMemorySpaceStore(
     ): SpacePurgeResult {
         val candidates =
             mutex.withLock {
-                records.entries.removeAll { (_, row) -> row.deletedAt != null && row.deletedAt < tombstonesBefore }
+                val old = records.filterValues { it.deletedAt != null && it.deletedAt < tombstonesBefore }
+                old.forEach { (key, row) ->
+                    val repository = key.first to key.second
+                    purgedThrough[repository] = maxOf(purgedThrough[repository] ?: 0L, row.seq)
+                    records.remove(key)
+                }
                 blobs.keys.filter { purgeable(it, unreferencedBlobsBefore) }.sortedWith(compareBy({ it.first }, { it.second }))
             }
         var deleted = 0

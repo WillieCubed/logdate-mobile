@@ -164,6 +164,25 @@ class XrpcDataHomeTest {
         }
 
     @Test
+    fun `a cursor from before purged deletions is too old`() =
+        runTest {
+            assertFailsWith<DataHomeCursorTooOldException> {
+                home(HttpStatusCode.BadRequest, """{"error":"CursorTooOld","message":"list again from 0"}""")
+                    .listChanges(space, since = 2)
+            }
+        }
+
+    @Test
+    fun `listChanges propagates other errors`() =
+        runTest {
+            val failure =
+                assertFailsWith<XrpcProtocolException> {
+                    home(HttpStatusCode.BadRequest, """{"error":"InvalidRequest","message":"bad"}""").listChanges(space, since = 2)
+                }
+            assertEquals("InvalidRequest", failure.error)
+        }
+
+    @Test
     fun `uploadBlob sends the bytes signed in and returns the cid`() =
         runTest {
             val cid =

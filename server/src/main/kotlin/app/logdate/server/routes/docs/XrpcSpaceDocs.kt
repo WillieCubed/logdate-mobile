@@ -246,6 +246,12 @@ internal object XrpcSpaceDocs {
                     "limit must be a whole number",
                 ),
                 recordNotFound,
+                ErrorCase(
+                    "CursorTooOld",
+                    "Deletions after `since` were purged, so paging on from it would miss them. List again from `since=0` " +
+                        "and replace what the device holds with the result.",
+                    "Deletions after this cursor were purged; list again from 0",
+                ),
             )
             pdsError(HttpStatusCode.Unauthorized, logDateTokenRequired)
             pdsError(HttpStatusCode.NotImplemented, notEnabled)

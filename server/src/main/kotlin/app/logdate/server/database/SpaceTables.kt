@@ -5,12 +5,16 @@ import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.java.javaUUID
 import org.jetbrains.exposed.v1.datetime.timestamp
 
-/** The last sequence number issued for one author's repository in one space; its row is the write lock. */
+/**
+ * The last sequence number issued for one author's repository in one space; its row is the write lock.
+ * [purgedThroughSeq] is the highest sequence number of a tombstone that purging deleted.
+ */
 object SpaceStatesTable : Table("space_states") {
     val spaceUri = text("space_uri")
     val authorDid = text("author_did")
     val accountId = javaUUID("account_id").references(AccountsTable.id, onDelete = ReferenceOption.CASCADE)
     val lastSeq = long("last_seq").default(0L)
+    val purgedThroughSeq = long("purged_through_seq").default(0L)
     override val primaryKey = PrimaryKey(spaceUri, authorDid)
 
     init {

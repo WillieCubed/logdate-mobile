@@ -47,6 +47,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -249,6 +250,41 @@ class SpaceXrpcRoutesTest {
             assertEquals(2, body.getValue("ops").jsonArray.size)
             assertEquals(2L, body.getValue("cursor").jsonPrimitive.long)
             assertEquals("true", body.getValue("hasMore").jsonPrimitive.content)
+        }
+
+    @Test
+    fun `a cursor from before purged tombstones answers CursorTooOld`() =
+        testApplication {
+            val store = InMemorySpaceStore()
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceStore = store)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            listOf("a", "b").forEach { rkey ->
+                client.post("/xrpc/app.logdate.space.putRecord") {
+                    bearer(token)
+                    json("""{"space":"$space","rkey":"$rkey","record":${sealedJson()}}""")
+                }
+            }
+            client.post("/xrpc/app.logdate.space.deleteRecord") {
+                bearer(token)
+                json("""{"space":"$space","rkey":"a"}""")
+            }
+            val later = Clock.System.now() + 1.hours
+            runBlocking { store.purge(tombstonesBefore = later, unreferencedBlobsBefore = later) {} }
+
+            fun list(since: Long) =
+                runBlocking {
+                    client.get("/xrpc/app.logdate.space.listRepoOps") {
+                        bearer(token)
+                        parameter("space", space)
+                        parameter("since", since.toString())
+                    }
+                }
+            val stale = list(since = 1)
+            assertEquals(HttpStatusCode.BadRequest, stale.status)
+            assertEquals("CursorTooOld", stale.errorCode())
+            assertEquals(HttpStatusCode.OK, list(since = 0).status)
+            assertEquals(HttpStatusCode.OK, list(since = 3).status)
         }
 
     @Test

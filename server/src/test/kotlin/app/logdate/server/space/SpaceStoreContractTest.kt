@@ -169,6 +169,29 @@ abstract class SpaceStoreContractTest {
         }
 
     @Test
+    fun `a cursor from before purged tombstones is too old and a full listing still works`() =
+        withStore { store, account ->
+            store.put(write(account, "a"))
+            store.put(write(account, "b"))
+            val deleted = store.delete(account, space, author, "a", swapCid = null)
+            store.put(write(account, "c"))
+            val later = Clock.System.now() + 1.hours
+            store.purgeRecording(tombstonesBefore = later, unreferencedBlobsBefore = later)
+
+            listOf(1L, deleted - 1).forEach { since ->
+                val stale = assertFailsWith<SpaceCursorTooOldException> { store.changes(space, author, since, 10) }
+                assertEquals(deleted, stale.purgedThroughSeq)
+            }
+            assertEquals(listOf("c"), store.changes(space, author, deleted, 10).changes.map { it.rkey })
+            assertEquals(listOf("b", "c"), store.changes(space, author, 0, 10).changes.map { it.rkey })
+
+            store.purgeRecording(tombstonesBefore = later, unreferencedBlobsBefore = later)
+            assertFailsWith<SpaceCursorTooOldException> { store.changes(space, author, 1, 10) }
+            val otherAuthor = "did:plc:other"
+            assertEquals(emptyList(), store.changes(space, otherAuthor, 1, 10).changes)
+        }
+
+    @Test
     fun `a blob whose object can't be deleted keeps its row until a later purge deletes both`() =
         withStore { store, account ->
             store.putBlob(account, space, SpaceBlob("bafyfirst", "application/octet-stream", 10, "path/first"))
