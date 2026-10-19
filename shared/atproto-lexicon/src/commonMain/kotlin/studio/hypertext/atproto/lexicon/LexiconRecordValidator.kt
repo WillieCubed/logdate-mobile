@@ -42,7 +42,7 @@ public class LexiconRecordValidator(
         val definition = registry.resolve(LexiconReference(collection, MAIN_DEFINITION_NAME))
         val schema =
             definition?.record?.takeIf { definition.type == LexiconType.RECORD }
-                ?: return LexiconValidationResult(listOf(LexiconValidationIssue("", "$collection isn't a known record type")))
+                ?: return LexiconValidationResult(listOf(LexiconValidationIssue("", notARecordType(collection, definition?.type))))
         val issues = mutableListOf<LexiconValidationIssue>()
         record[TYPE_KEY]?.let { type ->
             val name = type.stringOrNull()
@@ -234,6 +234,16 @@ public class LexiconRecordValidator(
     }
 }
 
+private fun notARecordType(
+    collection: Nsid,
+    type: LexiconType?,
+): String =
+    when (type) {
+        LexiconType.SPACE -> "$collection is a space type, not a record type"
+        LexiconType.PERMISSION_SET -> "$collection is a permission set, not a record type"
+        else -> "$collection isn't a known record type"
+    }
+
 private fun JsonElement.stringOrNull(): String? = (this as? JsonPrimitive)?.takeIf { it.isString }?.contentOrNull
 
 private fun JsonElement.display(): String = if (this is JsonPrimitive && isString) "\"$content\"" else toString()
@@ -262,9 +272,24 @@ private fun matchesFormat(
         "language" -> LanguageTag.isValid(value)
         "tid" -> Tid.isValid(value)
         "record-key" -> RecordKey.isValid(value)
+        "space-ref" -> isSpaceRef(value)
         // A format this version doesn't know, from a newer schema, isn't held against the record.
         else -> true
     }
+
+// A space, not a record in one: at://{authority DID}/space/{space type NSID}/{skey}, from the AT
+// Protocol Spaces proposal. Unlike a public AT URI, the authority can't be a handle.
+private fun isSpaceRef(value: String): Boolean {
+    if (!value.startsWith(AT_SCHEME)) return false
+    val parts = value.removePrefix(AT_SCHEME).split('/')
+    if (parts.size != SPACE_REF_PARTS) return false
+    val (authority, marker, spaceType, skey) = parts
+    return marker == SPACE_MARKER && Did.isValid(authority) && Nsid.isValid(spaceType) && RecordKey.isValid(skey)
+}
+
+private const val AT_SCHEME = "at://"
+private const val SPACE_MARKER = "space"
+private const val SPACE_REF_PARTS = 4
 
 /**
  * Counts user-perceived characters, close to Unicode extended grapheme clusters: combining marks,

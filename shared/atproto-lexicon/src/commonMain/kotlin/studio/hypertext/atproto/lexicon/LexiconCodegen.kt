@@ -111,6 +111,10 @@ public object LexiconCodegen {
 
                 LexiconType.RECORD -> definition.record?.let { record -> writeRecord(definition, record) }
 
+                LexiconType.SPACE -> definition.space?.let { space -> writeSpace(definition, space) }
+
+                LexiconType.PERMISSION_SET -> writePermissionSet(definition)
+
                 in aliasedTypes -> writeAlias(definition)
 
                 LexiconType.QUERY, LexiconType.PROCEDURE -> {
@@ -183,6 +187,51 @@ public object LexiconCodegen {
                     appendLine("        public const val TYPE: String = \"${document.id}\"")
                     appendLine("        public val KEY: LexiconRecordKey = ${recordKey.kotlin()}")
                     appendLine("    }")
+                    appendLine("}")
+                }
+        }
+
+        // A space type has no data of its own: apps need its NSID to address spaces, and its key
+        // rule and collections to know what to expect in one.
+        private fun writeSpace(
+            definition: LexiconDefinition,
+            space: LexiconSpace,
+        ) {
+            imports += RECORD_KEY
+            val name = className(document.id, definition.name)
+            val key = requireNotNull(space.key) { "Space ${document.id} has no valid key rule" }
+            val collections = space.collections.orEmpty()
+            val collectionList =
+                if (collections.isEmpty()) "emptyList()" else "listOf(${collections.joinToString { it.asKotlinString() }})"
+            declarations +=
+                buildString {
+                    appendKdoc(definition.description, indent = "")
+                    appendLine("public object $name {")
+                    appendLine("    /** The space type, the `{spaceType}` part of a space URI. */")
+                    appendLine("    public const val TYPE: String = \"${document.id}\"")
+                    space.name?.let { spaceName ->
+                        appendLine()
+                        appendLine("    /** What people see this kind of space called when an app asks for access to it. */")
+                        appendLine("    public const val NAME: String = ${spaceName.asKotlinString()}")
+                    }
+                    appendLine()
+                    appendLine("    /** The rule for the keys of spaces of this type. */")
+                    appendLine("    public val KEY: LexiconRecordKey = ${key.kotlin()}")
+                    appendLine()
+                    appendLine("    /** The record collections apps should expect in a space of this type. */")
+                    appendLine("    public val COLLECTIONS: List<String> = $collectionList")
+                    appendLine("}")
+                }
+        }
+
+        private fun writePermissionSet(definition: LexiconDefinition) {
+            val name = className(document.id, definition.name)
+            declarations +=
+                buildString {
+                    appendKdoc(definition.permissionSet?.detail ?: definition.description, indent = "")
+                    appendLine("public object $name {")
+                    appendLine("    /** The OAuth scope an app asks for to be granted this permission set. */")
+                    appendLine("    public const val SCOPE: String = \"include:${document.id}\"")
                     appendLine("}")
                 }
         }
@@ -416,6 +465,23 @@ public object LexiconCodegen {
             }
 
     private fun String.asIdentifier(): String = if (this in kotlinKeywords) "`$this`" else this
+
+    private fun String.asKotlinString(): String =
+        buildString {
+            append('"')
+            this@asKotlinString.forEach { char ->
+                when (char) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '$' -> append("\\$")
+                    '\n' -> append("\\n")
+                    '\r' -> append("\\r")
+                    '\t' -> append("\\t")
+                    else -> append(char)
+                }
+            }
+            append('"')
+        }
 
     private val aliasedTypes =
         setOf(
