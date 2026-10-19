@@ -88,8 +88,8 @@ records once the repository accepts public collections.
 - Removing a passkey or deleting the account revokes every refresh token the account has issued, so
   every app loses access within the access token's lifetime. The server has no sign-out-everywhere
   action today; when it gets one, it should revoke them too.
-- A list of connected apps, with a way to revoke one, is a follow-up: it needs a settings screen in
-  the apps.
+- A list of connected apps, with a way to revoke one, is a separate feature and is not part of
+  this design.
 
 ## How it works
 
@@ -159,7 +159,19 @@ passkey sign-in, and answer `429` with `Retry-After` beyond that.
   its `iat` stays acceptable.
 - Each PKCE `code_challenge` starts one pushed request; a reused one is refused for an hour.
 
-Both memories live in the server process and are bounded in size.
+Production runs more than one server instance, so a replay can reach a different instance from the
+first use. Both kinds of value are recorded in one PostgreSQL table that every instance shares
+(`oauth_used_values`):
+
+- each row is the SHA-256 of the namespaced value and when it expires, so the values themselves are
+  never stored;
+- recording a value is a single insert that does nothing when the value is already there, so two
+  instances racing on the same value cannot both accept it;
+- each insert also deletes up to 100 expired rows, which keeps the table small without a separate
+  job.
+
+Authorization codes were already single use: taking one deletes its row. A server running without
+a database keeps the same records in memory instead.
 
 ### Where passkeys work
 
@@ -225,6 +237,10 @@ its issuer is `cloud-staging.logdate.app` and its relying party is `staging.logd
   - token lifetimes;
   - revocation;
   - DPoP proof replay.
+- Replay store tests check that a value recorded through one store is refused through another
+  sharing the database, that only hashes are stored and that expired rows are removed. On the
+  PostgreSQL that CI provides, they also check that 16 instances racing on one value accept it exactly
+  once.
 - End-to-end tests in `integration/server-client-e2e` start the real server, with strict passkey
   verification, and a separate third-party app that publishes its own client metadata document.
   - They create a passkey-only account with a synthetic authenticator and confirm it has no password.

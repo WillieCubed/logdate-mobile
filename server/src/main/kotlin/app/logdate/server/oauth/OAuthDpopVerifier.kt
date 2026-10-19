@@ -20,7 +20,7 @@ class OAuthDpopVerifier(
     private val clock: Clock = Clock.System,
     private val acceptedClockSkew: Duration = 5.minutes,
     private val json: Json = Json { ignoreUnknownKeys = true },
-    private val usedProofs: OAuthReplayCache = OAuthReplayCache(clock),
+    private val usedProofs: OAuthReplayStore = InMemoryOAuthReplayStore(clock),
 ) {
     /**
      * Validates [proof] against the request described by [method] and [htu].
@@ -86,7 +86,7 @@ class OAuthDpopVerifier(
             }
             val thumbprint = jwkThumbprint(header.jwk)
             // A proof stays acceptable for the clock-skew window on either side of its iat.
-            if (!usedProofs.firstUse("$thumbprint:${claims.jti}", acceptedClockSkew * 2)) {
+            if (!usedProofs.firstUse("dpop:$thumbprint:${claims.jti}", acceptedClockSkew * 2)) {
                 throw OAuthInvalidDpopProofException("DPoP proof has already been used")
             }
 

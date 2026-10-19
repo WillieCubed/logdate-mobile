@@ -50,6 +50,7 @@ import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
 import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
+import app.logdate.server.database.PostgreSQLOAuthReplayStore
 import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
 import app.logdate.server.database.PostgreSQLOAuthSigningKeyRepository
 import app.logdate.server.database.PostgreSQLPendingEmailVerificationRepository
@@ -98,6 +99,7 @@ import app.logdate.server.logdate.MergeAwareLogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateMomentsRepository
 import app.logdate.server.logdate.ResourceRouteRepository
+import app.logdate.server.oauth.InMemoryOAuthReplayStore
 import app.logdate.server.oauth.InMemoryOAuthRuntimeStateRepository
 import app.logdate.server.oauth.InMemoryOAuthSigningKeyRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
@@ -108,6 +110,7 @@ import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyRotationPolicy
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.oauth.OAuthReplayStore
 import app.logdate.server.oauth.OAuthRuntimeStateRepository
 import app.logdate.server.oauth.OAuthSigningKeyRepository
 import app.logdate.server.space.InMemorySpaceStore
@@ -242,7 +245,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             )
         }
         single { OAuthNonceService() }
-        single { OAuthDpopVerifier() }
+        single<OAuthReplayStore> {
+            if (isDatabaseAvailable) PostgreSQLOAuthReplayStore() else InMemoryOAuthReplayStore()
+        }
+        single { OAuthDpopVerifier(usedProofs = get()) }
         single<OAuthRuntimeStateRepository> {
             if (isDatabaseAvailable) {
                 PostgreSQLOAuthRuntimeStateRepository()
@@ -262,6 +268,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 authorizationServerIssuer = config.normalizedIssuer,
                 runtimeStateRepository = get(),
                 trustedClientIds = config.trustedClientIds,
+                usedCodeChallenges = get(),
             )
         }
         single {
