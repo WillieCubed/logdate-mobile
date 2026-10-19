@@ -33,8 +33,7 @@ data class GlobalAppUiLoadedState(
 data object GlobalAppUiLoadingState : GlobalAppUiState
 
 val GlobalAppUiLoadedState.requiresUnlock: Boolean
-    get() = authState == AppAuthState.REQUIRE_PROMPT
+    get() = !isAppUnlocked
 
 val GlobalAppUiLoadedState.isAppUnlocked: Boolean
-    // TODO: Test that other app states don't break the app
     get() = authState == AppAuthState.NO_PROMPT_NEEDED || authState == AppAuthState.AUTHENTICATED

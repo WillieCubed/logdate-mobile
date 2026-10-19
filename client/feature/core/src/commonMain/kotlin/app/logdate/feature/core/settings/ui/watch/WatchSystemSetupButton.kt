@@ -3,7 +3,6 @@
 package app.logdate.feature.core.settings.ui.watch
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import app.logdate.ui.common.AlertDialog
 import app.logdate.ui.common.SimpleSettingsItem
 import app.logdate.ui.watch.WatchSetupProvider
 import app.logdate.ui.watch.rememberWatchSetupLauncher

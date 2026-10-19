@@ -24,8 +24,8 @@ interface BiometricGatekeeper {
     /**
      * Performs biometric authentication.
      *
-     * If the user has not enabled biometric authentication, the [authState] will be set to
-     * [AppAuthState.NO_PROMPT_NEEDED] to indicate that no prompt is needed.
+     * A successful challenge emits [AppAuthState.AUTHENTICATED]. Missing enrollment or an
+     * unavailable authenticator must keep the app locked; they never disable its security setting.
      *
      * The prompt is shown by the system, outside composition, so implementations resolve [title],
      * [subtitle], [cancelLabel] and [description] to words where they build the prompt.

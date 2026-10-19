@@ -3,7 +3,6 @@ package app.logdate.feature.editor.ui.audio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionStatus
 import app.logdate.client.permissions.PermissionType
+import app.logdate.ui.common.AlertDialog
 import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.allow_access

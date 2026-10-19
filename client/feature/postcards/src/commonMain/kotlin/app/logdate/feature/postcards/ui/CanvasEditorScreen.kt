@@ -38,7 +38,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -70,6 +69,7 @@ import app.logdate.feature.postcards.model.ShapeKind
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.common.CursorType
+import app.logdate.ui.common.TooltipBox
 import app.logdate.ui.common.cursorIcon
 import logdate.client.feature.postcards.generated.resources.Res
 import logdate.client.feature.postcards.generated.resources.postcards_delete_shortcut

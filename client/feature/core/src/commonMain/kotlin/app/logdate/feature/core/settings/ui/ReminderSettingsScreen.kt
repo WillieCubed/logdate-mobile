@@ -3,7 +3,6 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,6 +18,7 @@ import app.logdate.client.domain.reminders.ReminderPreferencesState
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.streak.StreakSettingsRepository
+import app.logdate.ui.common.AlertDialog
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch

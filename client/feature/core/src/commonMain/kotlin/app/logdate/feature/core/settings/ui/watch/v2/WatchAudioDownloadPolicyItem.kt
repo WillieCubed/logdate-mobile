@@ -5,7 +5,6 @@ package app.logdate.feature.core.settings.ui.watch.v2
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -15,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import app.logdate.client.domain.watch.WatchAudioDownloadPolicy
+import app.logdate.ui.common.AlertDialog
 import app.logdate.ui.common.SettingsChoiceItem
 import app.logdate.ui.common.SimpleSettingsItem
 import logdate.client.feature.core.generated.resources.Res

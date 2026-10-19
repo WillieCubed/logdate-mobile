@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,6 +41,7 @@ import app.logdate.client.domain.moments.MarkPhotoSuggestions
 import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
+import app.logdate.ui.common.DropdownMenu
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineMediaItemUiState
 import app.logdate.ui.timeline.newstuff.TimelineMediaTile

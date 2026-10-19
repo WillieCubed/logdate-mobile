@@ -213,6 +213,152 @@ class AppViewModelTest {
         }
 
     @Test
+    fun `restored app lock protects the journal when destination authentication is unavailable`() =
+        runTest {
+            listOf(
+                AppAuthState.REQUEST_ENROLLMENT,
+                AppAuthState.UNSUPPORTED,
+                AppAuthState.UPDATE_REQUIRED,
+                AppAuthState.UNKNOWN,
+            ).forEach { authState ->
+                val viewModel = lockedViewModel(FakeBiometricGatekeeper(authState))
+                advanceUntilIdle()
+                val state = assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value)
+                assertEquals(authState, state.authState)
+                assertEquals(true, state.requiresUnlock, authState.name)
+            }
+        }
+
+    @Test
+    fun `returning from enrollment rechecks authentication without reopening canceled setup`() =
+        runTest {
+            val gatekeeper = FakeBiometricGatekeeper(AppAuthState.REQUEST_ENROLLMENT)
+            val viewModel = lockedViewModel(gatekeeper)
+            advanceUntilIdle()
+
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+
+            assertEquals(listOf(false), gatekeeper.enrollmentRequests)
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+            gatekeeper.complete(AppAuthState.AUTHENTICATED)
+            advanceUntilIdle()
+            assertEquals(false, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    @Test
+    fun `backgrounding requires a new challenge after previously successful authentication`() =
+        runTest {
+            val gatekeeper = FakeBiometricGatekeeper()
+            val viewModel = lockedViewModel(gatekeeper)
+            advanceUntilIdle()
+            viewModel.showNativeUnlockPrompt()
+            gatekeeper.complete(AppAuthState.AUTHENTICATED)
+            advanceUntilIdle()
+            assertEquals(false, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+
+            viewModel.onAppBackgrounded()
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+
+            gatekeeper.setState(AppAuthState.REQUIRE_PROMPT)
+            advanceUntilIdle()
+            viewModel.showNativeUnlockPrompt()
+            gatekeeper.complete(AppAuthState.AUTHENTICATED)
+            advanceUntilIdle()
+            assertEquals(false, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    @Test
+    fun `a new app session never reuses the prior session biometric success`() =
+        runTest {
+            val viewModel = lockedViewModel(FakeBiometricGatekeeper(AppAuthState.AUTHENTICATED))
+            advanceUntilIdle()
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    @Test
+    fun `a success delivered after backgrounding cannot unlock the next foreground session`() =
+        runTest {
+            val gatekeeper = FakeBiometricGatekeeper()
+            val viewModel = lockedViewModel(gatekeeper)
+            advanceUntilIdle()
+            viewModel.onAppBackgrounded()
+            gatekeeper.setState(AppAuthState.AUTHENTICATED)
+            advanceUntilIdle()
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    @Test
+    fun `a queued background auth state cannot unlock after the foreground callback`() =
+        runTest {
+            val gatekeeper = FakeBiometricGatekeeper()
+            val viewModel = lockedViewModel(gatekeeper)
+            advanceUntilIdle()
+            viewModel.onAppBackgrounded()
+            gatekeeper.setState(AppAuthState.AUTHENTICATED)
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    @Test
+    fun `an unrelated security check cannot unlock the journal challenge`() =
+        runTest {
+            val gatekeeper = FakeBiometricGatekeeper()
+            val viewModel = lockedViewModel(gatekeeper)
+            advanceUntilIdle()
+            gatekeeper.setState(AppAuthState.AUTHENTICATED)
+            advanceUntilIdle()
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    @Test
+    fun `a successful callback queued before backgrounding cannot unlock after return`() =
+        runTest {
+            val gatekeeper = FakeBiometricGatekeeper()
+            val viewModel = lockedViewModel(gatekeeper)
+            advanceUntilIdle()
+            viewModel.showNativeUnlockPrompt()
+            gatekeeper.complete(AppAuthState.AUTHENTICATED)
+            viewModel.onAppBackgrounded()
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    @Test
+    fun `a superseded journal challenge cannot complete the current unlock request`() =
+        runTest {
+            val gatekeeper = FakeBiometricGatekeeper()
+            val viewModel = lockedViewModel(gatekeeper)
+            advanceUntilIdle()
+            viewModel.showNativeUnlockPrompt()
+            viewModel.showNativeUnlockPrompt()
+            gatekeeper.completeRequest(0, AppAuthState.AUTHENTICATED)
+            advanceUntilIdle()
+            assertEquals(true, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+            gatekeeper.completeRequest(1, AppAuthState.AUTHENTICATED)
+            advanceUntilIdle()
+            assertEquals(false, assertIs<GlobalAppUiLoadedState>(viewModel.uiState.value).requiresUnlock)
+        }
+
+    private fun lockedViewModel(gatekeeper: BiometricGatekeeper): AppViewModel =
+        AppViewModel(
+            userStateRepository =
+                FakeUserStateRepository(
+                    UserData(isOnboarded = true, securityLevel = AppSecurityLevel.BIOMETRIC),
+                ),
+            biometricGatekeeper = gatekeeper,
+            networkMonitor = FakeNetworkAvailabilityMonitor(isAvailable = true),
+            sessionStorage = FakeSessionStorage(),
+            tryRestoreSignInUseCase = TryRestoreSignInUseCase(FakePasskeyAccountRepository()),
+        )
+
+    @Test
     fun `enabling biometric mid-session does not lock the app`() =
         runTest {
             val userRepo =
@@ -374,8 +520,27 @@ class AppViewModelTest {
         override suspend fun addFavoriteNote(vararg noteId: String) {}
     }
 
-    private class FakeBiometricGatekeeper : BiometricGatekeeper {
-        override val authState: StateFlow<AppAuthState> = MutableStateFlow(AppAuthState.NO_PROMPT_NEEDED)
+    private class FakeBiometricGatekeeper(
+        initialState: AppAuthState = AppAuthState.NO_PROMPT_NEEDED,
+    ) : BiometricGatekeeper {
+        private val state = MutableStateFlow(initialState)
+        override val authState: StateFlow<AppAuthState> = state
+        val enrollmentRequests = mutableListOf<Boolean>()
+        private val resultCallbacks = mutableListOf<(AppAuthState) -> Unit>()
+
+        fun complete(value: AppAuthState) = completeRequest(resultCallbacks.lastIndex, value)
+
+        fun completeRequest(
+            index: Int,
+            value: AppAuthState,
+        ) {
+            state.value = value
+            resultCallbacks[index](value)
+        }
+
+        fun setState(value: AppAuthState) {
+            state.value = value
+        }
 
         override fun authenticate(
             title: UiText,
@@ -386,6 +551,8 @@ class AppViewModelTest {
             description: UiText?,
             onResult: (AppAuthState) -> Unit,
         ) {
+            enrollmentRequests += requestEnrollmentIfNecessary
+            resultCallbacks += onResult
         }
 
         override fun requestEnrollment() {

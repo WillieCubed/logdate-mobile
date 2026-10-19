@@ -6,6 +6,8 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import app.logdate.client.text.UiText
 import app.logdate.client.text.resolve
 import io.github.aakira.napier.Napier
@@ -23,6 +25,24 @@ import java.lang.ref.WeakReference
  */
 class AndroidBiometricGatekeeper : BiometricGatekeeper {
     private var activityRef = WeakReference<FragmentActivity>(null)
+    private val challenge = AuthenticationChallenge()
+    private var pendingSuccess: (() -> Unit)? = null
+    private val lifecycleObserver =
+        LifecycleEventObserver { owner, event ->
+            val host = owner as? FragmentActivity ?: return@LifecycleEventObserver
+            if (activityRef.get() !== host) return@LifecycleEventObserver
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> challenge.markHostPaused()
+                Lifecycle.Event.ON_RESUME -> deliverPendingSuccess(host)
+                Lifecycle.Event.ON_DESTROY -> {
+                    challenge.invalidate()
+                    pendingSuccess = null
+                    activityRef.clear()
+                    _authState.value = AppAuthState.REQUIRE_PROMPT
+                }
+                else -> Unit
+            }
+        }
 
     private val activity: FragmentActivity
         get() =
@@ -41,6 +61,7 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
         subtitle: UiText,
         description: UiText?,
         requireConfirmation: Boolean,
+        authenticators: Int,
     ): BiometricPrompt.PromptInfo =
         BiometricPrompt.PromptInfo
             .Builder()
@@ -50,18 +71,15 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
                 if (description != null) {
                     setDescription(description.resolve())
                 }
-            }.setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-            ).setConfirmationRequired(requireConfirmation)
-            // TODO: Only apply negative button text if device credential authentication is allowed
-            // .setNegativeButtonText(cancelLabel.resolve())
+            }.setAllowedAuthenticators(authenticators)
+            .setConfirmationRequired(requireConfirmation)
             .build()
 
     /**
      * Authenticates the user using biometric authentication.
      *
-     * If the user has not enabled biometric authentication, the [authState] will be set to
-     * [AppAuthState.NO_PROMPT_NEEDED] to indicate that no prompt is needed.
+     * Enrollment and unavailable authentication keep the journal locked. An enrolled device
+     * credential remains usable when the biometric sensor cannot authenticate.
      */
     override fun authenticate(
         title: UiText,
@@ -72,8 +90,11 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
         description: UiText?,
         onResult: (AppAuthState) -> Unit,
     ) {
-        val biometricManager = BiometricManager.from(activity)
-        val executor = ContextCompat.getMainExecutor(activity)
+        val host = activity
+        val attempt = challenge.begin()
+        pendingSuccess = null
+        val biometricManager = BiometricManager.from(host)
+        val executor = ContextCompat.getMainExecutor(host)
         val callback =
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(
@@ -81,6 +102,9 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
                     errString: CharSequence,
                 ) {
                     super.onAuthenticationError(errorCode, errString)
+                    if (!isCurrentAttempt(attempt, host)) return
+                    challenge.invalidate()
+                    pendingSuccess = null
                     Napier.e("Biometric authentication error: $errorCode, $errString", tag = TAG)
                     _authState.value = AppAuthState.REQUIRE_PROMPT
                     onResult(AppAuthState.REQUIRE_PROMPT)
@@ -88,58 +112,60 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
 
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
-                    _authState.value = AppAuthState.AUTHENTICATED
-                    onResult(AppAuthState.AUTHENTICATED)
+                    if (!isCurrentAttempt(attempt, host)) return
+                    val accepted =
+                        challenge.recordSuccess(
+                            attempt,
+                            hostResumed = host.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED),
+                            deviceCredential = result.authenticationType == BiometricPrompt.AUTHENTICATION_RESULT_TYPE_DEVICE_CREDENTIAL,
+                        )
+                    if (!accepted) return
+                    pendingSuccess = {
+                        _authState.value = AppAuthState.AUTHENTICATED
+                        onResult(AppAuthState.AUTHENTICATED)
+                    }
+                    deliverPendingSuccess(host)
                 }
             }
-        when (
-            biometricManager.canAuthenticate(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
-            )
-        ) {
-            BiometricManager.BIOMETRIC_SUCCESS -> {
-                Napier.d("App can authenticate using biometrics.", tag = TAG)
-                val host = activity
+        // Reset a previous success so another successful challenge produces a fresh state event.
+        _authState.value = AppAuthState.REQUIRE_PROMPT
+        when (val availability = resolveAndroidAuthenticationAvailability(biometricManager::canAuthenticate)) {
+            is AndroidAuthenticationAvailability.Ready -> {
                 promptScope.launch {
-                    val promptInfo = promptInfo(title, subtitle, description, requireConfirmation)
-                    BiometricPrompt(host, executor, callback).authenticate(promptInfo)
+                    val info = promptInfo(title, subtitle, description, requireConfirmation, availability.authenticators)
+                    if (!isCurrentAttempt(attempt, host) || !host.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                        return@launch
+                    }
+                    BiometricPrompt(host, executor, callback).authenticate(info)
                 }
             }
-
-            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
-                Napier.e(
-                    "Biometric features are currently unavailable.",
-                    tag = TAG,
-                )
-                _authState.value = AppAuthState.UNSUPPORTED
-                onResult(AppAuthState.UNSUPPORTED)
-            }
-
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                _authState.value = AppAuthState.REQUEST_ENROLLMENT
-                onResult(AppAuthState.REQUEST_ENROLLMENT)
-                if (requestEnrollmentIfNecessary) {
+            is AndroidAuthenticationAvailability.Unavailable -> {
+                _authState.value = availability.state
+                onResult(availability.state)
+                if (availability.state == AppAuthState.REQUEST_ENROLLMENT && requestEnrollmentIfNecessary) {
                     requestEnrollment()
                 }
             }
-
-            BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED,
-            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
-            BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED,
-            -> {
-                Napier.d(
-                    "Biometric authentication is not supported on this device.",
-                    tag = TAG,
-                )
-                _authState.value = AppAuthState.UNSUPPORTED
-                onResult(AppAuthState.UNSUPPORTED)
-            }
-
-            BiometricManager.BIOMETRIC_STATUS_UNKNOWN -> {
-                _authState.value = AppAuthState.UNKNOWN
-                onResult(AppAuthState.UNKNOWN)
-            }
         }
+    }
+
+    private fun isCurrentAttempt(
+        attempt: Long,
+        host: FragmentActivity,
+    ): Boolean = challenge.isCurrent(attempt) && activityRef.get() === host && !host.isDestroyed && !host.isFinishing
+
+    private fun deliverPendingSuccess(host: FragmentActivity) {
+        if (activityRef.get() !== host ||
+            host.isDestroyed ||
+            host.isFinishing ||
+            !host.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        ) {
+            return
+        }
+        if (!challenge.consumeSuccess()) return
+        val publish = pendingSuccess
+        pendingSuccess = null
+        publish?.invoke()
     }
 
     /**
@@ -170,8 +196,14 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
      * This must be called before calling [authenticate] or [requestEnrollment].
      */
     fun setActivity(fragmentActivity: FragmentActivity) {
+        if (activityRef.get() === fragmentActivity) return
+        activityRef.get()?.lifecycle?.removeObserver(lifecycleObserver)
+        challenge.invalidate()
+        pendingSuccess = null
         activityRef.clear()
         activityRef = WeakReference(fragmentActivity)
+        _authState.value = AppAuthState.REQUIRE_PROMPT
+        fragmentActivity.lifecycle.addObserver(lifecycleObserver)
     }
 
     private companion object {

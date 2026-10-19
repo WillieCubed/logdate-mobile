@@ -26,9 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.UIKitView
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.ui.common.Dialog
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi

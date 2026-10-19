@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +28,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.recommendation.AmbientPromptTime
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.AlertDialog
 import app.logdate.ui.common.LocalSettingsEnabled
 import app.logdate.ui.common.MasterFeatureToggle
 import app.logdate.ui.common.MaterialContainer

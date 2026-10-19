@@ -6,6 +6,10 @@
 
 Provides a comprehensive set of reusable UI components, layouts, and utilities for consistent design across all platforms. This module serves as the foundation for the application's user interface, implementing the design system and offering common UI patterns.
 
+Private dialogs, menus, and sheets use the shared components described in
+[App lock and private windows](../../docs/reference/standards/app-lock.md). These components hide
+independent windows while the journal is locked and preserve caller-owned editing state.
+
 ## Architecture
 
 ```
