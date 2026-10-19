@@ -8,8 +8,10 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.LocationHistoryApiClient
+import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.repository.location.ActivityHistoryRepository
@@ -57,7 +59,9 @@ import app.logdate.client.sync.space.SpaceSwapStore
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.mappers.draftSpaceKind
 import app.logdate.client.sync.space.mappers.journalSpaceKind
+import app.logdate.client.sync.space.mappers.membershipSpaceKind
 import app.logdate.client.sync.space.mappers.noteSpaceKind
 import app.logdate.client.sync.space.spaceLocation
 import app.logdate.shared.config.LogDateConfigRepository
@@ -80,6 +84,12 @@ val spaceSyncModule =
                 journals = get<JournalRepository>() as SyncableJournalRepository,
                 resolver = get(named(SyncQualifiers.JOURNAL_CONFLICT_RESOLVER)),
             )
+        }
+        single<SpaceKind<*>>(named("membershipSpaceKind")) {
+            membershipSpaceKind(get<JournalContentRepository>() as SyncableJournalContentRepository)
+        }
+        single<SpaceKind<*>>(named("draftSpaceKind")) {
+            draftSpaceKind(get<JournalRepository>())
         }
         single<SpaceKind<*>>(named("noteSpaceKind")) {
             noteSpaceKind(

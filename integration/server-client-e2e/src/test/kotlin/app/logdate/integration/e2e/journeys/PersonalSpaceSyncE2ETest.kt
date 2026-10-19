@@ -7,17 +7,33 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.space.mappers.JournalRecordMapper
+import app.logdate.client.sync.space.mappers.SpaceJournal
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
 import app.logdate.integration.e2e.harness.withServerClientHarness
+import app.logdate.lexicon.app.logdate.crypto.SealedPayload
 import app.logdate.server.space.SpaceStore
+import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.PhotoPresentation
+import app.logdate.shared.model.SerializableImageBlock
+import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.space.RecordSwap
+import app.logdate.space.SealedRecordCodec
+import app.logdate.space.SealingKeys
+import app.logdate.space.SpaceRef
+import app.logdate.space.XrpcDataHome
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import org.koin.core.context.GlobalContext
+import studio.hypertext.atproto.xrpc.BearerToken
+import studio.hypertext.atproto.xrpc.KtorXrpcClient
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -29,6 +45,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Devices of one account sync through its sealed personal space on a real server, with real Room
@@ -89,7 +106,7 @@ class PersonalSpaceSyncE2ETest {
         }
 
     @Test
-    fun `a journal with a description and a unicode title reaches another device and its edits come back`() =
+    fun `a favorite journal with a description and a unicode title reaches another device and its edits come back`() =
         spaceTest { account ->
             val phone = device(account)
             val tablet = device(account)
@@ -97,6 +114,7 @@ class PersonalSpaceSyncE2ETest {
                 Journal(
                     title = "Lac d'Annecy 🏊 日本語",
                     description = "Every swim\nthis summer",
+                    isFavorited = true,
                     created = later(0),
                     lastUpdated = later(0),
                 )
@@ -108,15 +126,236 @@ class PersonalSpaceSyncE2ETest {
             val arrived = assertNotNull(tablet.journals.getJournalById(journal.id))
             assertEquals(journal.title, arrived.title)
             assertEquals(journal.description, arrived.description)
+            assertTrue(arrived.isFavorited)
             assertEquals(journal.created.toEpochMilliseconds(), arrived.created.toEpochMilliseconds())
 
-            tablet.journals.update(arrived.copy(title = "Lac d'Annecy et Léman", description = "", lastUpdated = later(1)))
+            tablet.journals.update(
+                arrived.copy(title = "Lac d'Annecy et Léman", description = "", isFavorited = false, lastUpdated = later(1)),
+            )
             assertSynced(tablet.manager.uploadPendingChanges())
             assertSynced(phone.manager.downloadRemoteChanges())
             val edited = assertNotNull(phone.journals.getJournalById(journal.id))
             assertEquals("Lac d'Annecy et Léman", edited.title)
             assertEquals("", edited.description)
+            assertFalse(edited.isFavorited)
             assertEquals(0, phone.inbox.count())
+        }
+
+    @Test
+    fun `an entry link and a draft reach another device and their removal comes back`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val journal = Journal(title = "Lake trips", created = later(0), lastUpdated = later(0))
+            val note = JournalNote.Text(creationTimestamp = later(0), lastUpdated = later(0), content = "First swim")
+            phone.journals.create(journal)
+            phone.notes.create(note)
+            phone.content.addContentToJournal(note.uid, journal.id)
+            val photo = ByteArray(300_000) { (it % 199).toByte() }
+            val local = phone.media.saveMedia(MediaPayload("view.jpg", "image/jpeg", photo.size.toLong(), photo))
+            val draft =
+                EditorDraft(
+                    blocks =
+                        listOf(
+                            SerializableTextBlock(
+                                Uuid.random(),
+                                later(0),
+                                48.8566,
+                                2.3522,
+                                35.5,
+                                content = "Dear diary, the lake was calm",
+                            ),
+                            SerializableImageBlock(
+                                Uuid.random(),
+                                later(1),
+                                uri = local,
+                                caption = "The view",
+                                presentation = PhotoPresentation.Framed,
+                            ),
+                        ),
+                    selectedJournalIds = listOf(journal.id),
+                    createdAt = later(0),
+                    lastModifiedAt = later(2),
+                )
+            phone.journals.saveDraft(draft)
+
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(phone.manager.syncDrafts())
+            assertFalse("calm" in rawChanges(account), "The server received the draft's text")
+
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertEquals(
+                listOf(journal.id),
+                tablet.content
+                    .observeJournalsForContent(note.uid)
+                    .first()
+                    .map { it.id },
+            )
+            assertSynced(tablet.manager.syncDrafts())
+            val arrived = assertNotNull(tablet.journals.getDraft(draft.id))
+            assertEquals(draft.selectedJournalIds, arrived.selectedJournalIds)
+            assertEquals(draft.blocks[0], arrived.blocks[0])
+            val image = arrived.blocks[1] as SerializableImageBlock
+            assertEquals("The view", image.caption)
+            assertEquals(PhotoPresentation.Framed, image.presentation)
+            assertContentEquals(photo, tablet.media.readMedia(assertNotNull(image.uri)).data)
+
+            tablet.content.removeContentFromJournal(note.uid, journal.id)
+            assertSynced(tablet.manager.uploadPendingChanges())
+            tablet.journals.deleteDraft(draft.id)
+            assertSynced(tablet.manager.uploadPendingChanges())
+            assertSynced(phone.manager.downloadRemoteChanges())
+            assertSynced(phone.manager.syncDrafts())
+
+            assertEquals(emptyList(), phone.content.observeJournalsForContent(note.uid).first())
+            assertNull(phone.journals.getDraft(draft.id))
+            assertEquals(0, phone.inbox.count())
+        }
+
+    @Test
+    fun `a journal merged on another device moves its entries into the survivor once`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val lake = Journal(title = "Lake", created = later(0), lastUpdated = later(0))
+            val river = Journal(title = "River", created = later(0), lastUpdated = later(0))
+            val swim = JournalNote.Text(creationTimestamp = later(0), lastUpdated = later(0), content = "Swim")
+            val both = JournalNote.Text(creationTimestamp = later(0), lastUpdated = later(0), content = "Both")
+            listOf(lake, river).forEach { phone.journals.create(it) }
+            listOf(swim, both).forEach { phone.notes.create(it) }
+            phone.content.addContentToJournal(swim.uid, lake.id)
+            phone.content.addContentToJournal(both.uid, lake.id)
+            phone.content.addContentToJournal(both.uid, river.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertEquals(
+                2,
+                tablet.content
+                    .observeContentForJournal(lake.id)
+                    .first()
+                    .size,
+            )
+
+            writeFromAnotherDevice(account, JOURNAL, lake.id.toString(), mergedJournalRecord(lake, river))
+            assertSynced(tablet.manager.downloadRemoteChanges())
+
+            assertEquals(
+                listOf(river.id),
+                tablet.journals.allJournalsObserved
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(
+                setOf(swim.uid, both.uid),
+                tablet.content
+                    .observeContentForJournal(river.id)
+                    .first()
+                    .map { it.uid }
+                    .toSet(),
+            )
+            assertEquals(
+                listOf(river.id),
+                tablet.content
+                    .observeJournalsForContent(both.uid)
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(0, tablet.inbox.count())
+
+            assertSynced(tablet.manager.uploadPendingChanges())
+            assertSynced(phone.manager.downloadRemoteChanges())
+            assertEquals(
+                listOf(river.id),
+                phone.journals.allJournalsObserved
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(
+                setOf(swim.uid, both.uid),
+                phone.content
+                    .observeContentForJournal(river.id)
+                    .first()
+                    .map { it.uid }
+                    .toSet(),
+            )
+        }
+
+    @Test
+    fun `a journal merge that arrives before the surviving journal waits for it`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val tablet = device(account)
+            val lake = Journal(title = "Lake", created = later(0), lastUpdated = later(0))
+            val river = Journal(title = "River", created = later(0), lastUpdated = later(0))
+            val swim = JournalNote.Text(creationTimestamp = later(0), lastUpdated = later(0), content = "Swim")
+            phone.journals.create(lake)
+            phone.notes.create(swim)
+            phone.content.addContentToJournal(swim.uid, lake.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+
+            writeFromAnotherDevice(account, JOURNAL, lake.id.toString(), mergedJournalRecord(lake, river))
+            assertSynced(tablet.manager.downloadRemoteChanges())
+            assertEquals(emptyList(), tablet.journals.allJournalsObserved.first(), "The merged journal is still listed")
+            assertEquals(
+                listOf(swim.uid),
+                tablet.content
+                    .observeContentForJournal(lake.id)
+                    .first()
+                    .map { it.uid },
+                "Entries moved nowhere",
+            )
+
+            phone.journals.create(river)
+            assertSynced(phone.manager.uploadPendingChanges())
+            assertSynced(tablet.manager.downloadRemoteChanges())
+
+            assertEquals(
+                listOf(river.id),
+                tablet.journals.allJournalsObserved
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(
+                listOf(swim.uid),
+                tablet.content
+                    .observeContentForJournal(river.id)
+                    .first()
+                    .map { it.uid },
+            )
+            assertEquals(0, tablet.inbox.count())
+        }
+
+    @Test
+    fun `a journal merged before this device has any of it is never listed and its entries land in the survivor`() =
+        spaceTest { account ->
+            val phone = device(account)
+            val laptop = device(account)
+            val lake = Journal(title = "Lake", created = later(0), lastUpdated = later(0))
+            val river = Journal(title = "River", created = later(0), lastUpdated = later(0))
+            val swim = JournalNote.Text(creationTimestamp = later(0), lastUpdated = later(0), content = "Swim")
+            listOf(lake, river).forEach { phone.journals.create(it) }
+            phone.notes.create(swim)
+            phone.content.addContentToJournal(swim.uid, lake.id)
+            assertSynced(phone.manager.uploadPendingChanges())
+            writeFromAnotherDevice(account, JOURNAL, lake.id.toString(), mergedJournalRecord(lake, river))
+
+            assertSynced(laptop.manager.downloadRemoteChanges())
+
+            assertEquals(
+                listOf(river.id),
+                laptop.journals.allJournalsObserved
+                    .first()
+                    .map { it.id },
+            )
+            assertEquals(
+                listOf(swim.uid),
+                laptop.content
+                    .observeContentForJournal(river.id)
+                    .first()
+                    .map { it.uid },
+            )
+            assertEquals(0, laptop.inbox.count())
         }
 
     @Test
@@ -285,6 +524,32 @@ class PersonalSpaceSyncE2ETest {
                     parameter("since", "0")
                     header(HttpHeaders.Authorization, "Bearer ${account.token}")
                 }.bodyAsText()
+
+        /** Writes [record] into the account's personal space as a second device of the account would. */
+        suspend fun writeFromAnotherDevice(
+            account: SpaceAccount,
+            collection: String,
+            rkey: String,
+            record: JsonObject,
+        ) {
+            val client = KtorXrpcClient(harness.httpClient, account.origin)
+            val home = XrpcDataHome(client, harness.httpClient, account.origin) { BearerToken(account.token) }
+            val space = SpaceRef.personal(account.did)
+            val sealed =
+                SealedRecordCodec.seal(
+                    SealingKeys.personal(IDENTITY_KEY),
+                    space,
+                    account.did,
+                    SealedPayload(collection, record, rkey),
+                )
+            home.putRecord(space, sealed.rkey, sealed.record, swap = RecordSwap.Unconditional)
+        }
+
+        /** The record another device writes when it merges [source] into [survivor]. */
+        fun mergedJournalRecord(
+            source: Journal,
+            survivor: Journal,
+        ): JsonObject = JournalRecordMapper().toRecord(SpaceJournal(source, mergedInto = survivor.id))
 
         /** Runs the server's cleanup as if every deletion so far were old enough to purge. */
         suspend fun purgeDeletions() {

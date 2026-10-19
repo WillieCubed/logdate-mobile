@@ -11,9 +11,16 @@ import app.logdate.client.sync.cloud.RemoteRecordFailure
 import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceStagedRecords
+import app.logdate.client.sync.space.SpaceSync
+import app.logdate.client.sync.space.mappers.JournalMembership
+import app.logdate.client.sync.space.spaceFetchError
 import app.logdate.shared.model.diagnostics.DiagnosticAction
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
@@ -39,6 +46,8 @@ internal class AssociationDownloader(
     private val mapCloudApiError: (CloudApiException) -> SyncResult,
     private val mapException: (Exception, String) -> SyncResult,
     private val downloadInbox: DownloadInbox?,
+    private val space: SpaceSync? = null,
+    private val resolveJournal: suspend (Uuid) -> Uuid = { it },
 ) {
     private val syncable = journalContentRepository as? SyncableJournalContentRepository
 
@@ -54,7 +63,17 @@ internal class AssociationDownloader(
         val tally: Tally,
     )
 
-    suspend fun download(since: Instant): SyncResult =
+    suspend fun download(since: Instant): SyncResult {
+        val sync = space
+        val kind = sync?.activeKind(EntityType.ASSOCIATION)
+        if (sync != null && kind != null) {
+            @Suppress("UNCHECKED_CAST")
+            return downloadFromSpace(sync, kind as SpaceKind<JournalMembership>)
+        }
+        return downloadFromServer(since)
+    }
+
+    private suspend fun downloadFromServer(since: Instant): SyncResult =
         try {
             val selected = downloadInbox?.currentScope()
             syncMetadataService.getPendingUploads(EntityType.ASSOCIATION)
@@ -88,6 +107,144 @@ internal class AssociationDownloader(
         } catch (error: Exception) {
             mapException(error, "Download associations")
         }
+
+    /** Applies the memberships the personal space changed, one at a time, so one failure leaves the rest applied. */
+    private suspend fun downloadFromSpace(
+        sync: SpaceSync,
+        kind: SpaceKind<JournalMembership>,
+    ): SyncResult =
+        try {
+            val selected = downloadInbox?.currentScope()
+            val tally = Tally()
+            val staged = sync.read(kind).getOrElse { failure -> throw failure }
+            downloadInbox.spaceFetchError()?.let { tally.errors += it }
+            do {
+                val page = staged.page()
+                val pending = syncMetadataService.getPendingUploads(EntityType.ASSOCIATION).associateBy { it.entityId }
+                page.changes.forEach { applyFromSpace(staged, it, pending, selected, tally) }
+                page.deletions.forEach { removeFromSpace(staged, it, pending, selected, tally) }
+            } while (page.hasMore)
+            SyncResult(
+                success = tally.errors.isEmpty(),
+                downloadedItems = tally.downloaded,
+                conflictsResolved = tally.conflicts,
+                errors = tally.errors,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: CloudApiException) {
+            mapCloudApiError(error)
+        } catch (error: Exception) {
+            mapException(error, "Download associations")
+        }
+
+    private suspend fun applyFromSpace(
+        staged: SpaceStagedRecords<JournalMembership>,
+        membership: JournalMembership,
+        pending: Map<String, PendingUpload>,
+        selected: DownloadScope?,
+        tally: Tally,
+    ) {
+        val key = AssociationPendingKey(membership.journalId, membership.entryId).toPendingId()
+        try {
+            transactionManager.withTransaction {
+                ensureScope(selected)
+                val local = pending[key]
+                val outcome =
+                    when {
+                        local == null -> {
+                            addMembership(membership)
+                            RemoteOutcome.STORED
+                        }
+                        local.operation == PendingOperation.DELETE -> {
+                            recordConflict(key, membership.syncVersion)
+                            tally.conflicts++
+                            RemoteOutcome.DECLINED
+                        }
+                        else -> RemoteOutcome.KEPT_LOCAL
+                    }
+                if (outcome == RemoteOutcome.STORED) tally.downloaded++
+                staged.settle(key, outcome)
+                ensureScope(selected)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            staged.settleFailed(key)
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote relationship")
+            Napier.e("Failed to apply remote relationship")
+        }
+    }
+
+    private suspend fun removeFromSpace(
+        staged: SpaceStagedRecords<JournalMembership>,
+        key: String,
+        pending: Map<String, PendingUpload>,
+        selected: DownloadScope?,
+        tally: Tally,
+    ) {
+        val ids = AssociationPendingKey.fromPendingId(key)
+        try {
+            transactionManager.withTransaction {
+                ensureScope(selected)
+                val local = pending[key]
+                val outcome =
+                    when {
+                        ids == null -> RemoteOutcome.DECLINED
+                        local?.operation == PendingOperation.DELETE -> RemoteOutcome.DELETED
+                        local != null -> {
+                            recordConflict(key, null)
+                            tally.conflicts++
+                            RemoteOutcome.DECLINED
+                        }
+                        else -> {
+                            removeMembership(ids)
+                            tally.downloaded++
+                            RemoteOutcome.DELETED
+                        }
+                    }
+                staged.settle(key, outcome)
+                ensureScope(selected)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            staged.settleFailed(key)
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to remove remote relationship")
+            Napier.e("Failed to remove remote relationship")
+        }
+    }
+
+    /** Adds the entry to the journal, or to the journal it was merged into on this device. */
+    private suspend fun addMembership(membership: JournalMembership) {
+        val journalId = resolveJournal(membership.journalId)
+        if (syncable != null) {
+            syncable.addContentToJournalFromSync(membership.entryId, journalId)
+        } else {
+            journalContentRepository.addContentToJournal(membership.entryId, journalId)
+        }
+    }
+
+    private suspend fun removeMembership(key: AssociationPendingKey) {
+        if (syncable != null) {
+            syncable.removeContentFromJournalFromSync(key.contentId, key.journalId)
+        } else {
+            journalContentRepository.removeContentFromJournal(key.contentId, key.journalId)
+        }
+    }
+
+    private suspend fun recordConflict(
+        key: String,
+        remoteVersion: Long?,
+    ) = downloadEngine.recordConflict(
+        EntityType.ASSOCIATION,
+        key,
+        "Local pending changes vs remote relationship",
+        null,
+        remoteVersion,
+        null,
+        null,
+    )
 
     private suspend fun applyPage(
         page: AssociationSyncResult,

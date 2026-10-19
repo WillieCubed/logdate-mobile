@@ -21,6 +21,7 @@ import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceMediaReference
 import app.logdate.client.sync.space.SpaceSync
+import app.logdate.client.sync.space.mappers.SpaceDraft
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
@@ -378,9 +379,30 @@ internal class SyncUploader(
     }
 
     suspend fun uploadAssociations(accessToken: String): SyncResult =
-        uploadPass("Upload associations") { associationUploader.uploadPending() }
+        uploadPass("Upload associations") {
+            val spaceKind = space?.activeKind(EntityType.ASSOCIATION)
+            if (spaceKind != null) space.uploadKind(spaceKind, profile.uploadsUpdates) else associationUploader.uploadPending()
+        }
 
-    suspend fun uploadDrafts(accessToken: String): SyncResult = uploadPass("Upload drafts") { draftUploader.uploadPending() }
+    /** Drafts in the personal space: their media is uploaded first, as space blobs, before the draft is written. */
+    private suspend fun uploadDraftsToSpace(
+        space: SpaceSync,
+        kind: SpaceKind<*>,
+    ): SyncResult {
+        @Suppress("UNCHECKED_CAST")
+        val drafts = kind as SpaceKind<SpaceDraft>
+        return space.upload(
+            drafts,
+            profile.uploadsUpdates,
+            begin = { pending, draft, errors -> draftUploader.prepareForSpace(pending, draft, errors) },
+        )
+    }
+
+    suspend fun uploadDrafts(accessToken: String): SyncResult =
+        uploadPass("Upload drafts") {
+            val spaceKind = space?.activeKind(EntityType.DRAFT)
+            if (spaceKind != null) uploadDraftsToSpace(space, spaceKind) else draftUploader.uploadPending()
+        }
 
     suspend fun enqueueEverythingOnFirstSync() =
         FirstSyncEnqueuer(
@@ -388,9 +410,10 @@ internal class SyncUploader(
             journalNotesRepository,
             syncMetadataService,
             firstSyncEnqueueStore,
-            draftUploader::enqueueForRichSync,
+            ::enqueueDraftsForRichSync,
         ).enqueue()
 
     /** Queues pre-existing drafts once per signed-in owner/server, preserving pending deletions. */
-    suspend fun enqueueDraftsForRichSync() = draftUploader.enqueueForRichSync()
+    suspend fun enqueueDraftsForRichSync() =
+        draftUploader.enqueueForRichSync(serverSupportRequired = space?.activeKind(EntityType.DRAFT) == null)
 }

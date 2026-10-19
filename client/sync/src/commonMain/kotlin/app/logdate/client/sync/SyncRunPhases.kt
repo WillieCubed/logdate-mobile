@@ -147,13 +147,16 @@ internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
         // Sequential for the same reason as the upload side: these share one server
         // instance whose per-request cost is proportional to repo size, and fanning out
         // was enough on its own to starve every request thread it had.
-        val (journalResult, contentResult) =
+        val (journalResult, contentResult, associationResult) =
             downloader.downloadPass {
-                downloader.downloadJournals(accessToken, journalSince) to downloader.downloadContent(accessToken, contentSince)
+                Triple(
+                    downloader.downloadJournals(accessToken, journalSince),
+                    downloader.downloadContent(accessToken, contentSince),
+                    downloader.downloadAssociations(accessToken, associationSince),
+                )
             }
         if (journalResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.JOURNAL)
         if (contentResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.NOTE)
-        val associationResult = downloader.downloadAssociations(accessToken, associationSince)
         if (associationResult.success) legacyBackfill?.enqueueMembershipsIfNeeded()
         val historyResult = historyEngine?.download(accessToken) ?: SyncResult(success = true)
         val momentResult = momentDownloader?.download() ?: SyncResult(success = true)

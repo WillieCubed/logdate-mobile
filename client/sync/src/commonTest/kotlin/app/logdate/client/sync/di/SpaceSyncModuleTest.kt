@@ -1,16 +1,23 @@
 package app.logdate.client.sync.di
 
+import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableDraftRepository
+import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.conflict.JournalNoteConflictResolver
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.space.SpaceRecordRegistry
+import app.logdate.client.sync.space.mappers.SpaceDraft
 import app.logdate.client.sync.space.mappers.SpaceJournal
+import app.logdate.client.sync.test.FakeJournalContentRepository
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.FakeJournalRepository
+import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.SerializableTextBlock
 import kotlinx.coroutines.test.runTest
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
@@ -25,6 +32,7 @@ import kotlin.uuid.Uuid
 class SpaceSyncModuleTest {
     private val notes = FakeJournalNotesRepository()
     private val journals = SyncedJournalRepository(FakeJournalRepository())
+    private val content = SyncedContentRepository(FakeJournalContentRepository())
 
     private fun startKoin() =
         koinApplication {
@@ -32,6 +40,7 @@ class SpaceSyncModuleTest {
                 module {
                     single<JournalNotesRepository> { notes }
                     single<JournalRepository> { journals }
+                    single<JournalContentRepository> { content }
                 },
                 conflictResolverModule,
                 spaceSyncModule,
@@ -46,7 +55,13 @@ class SpaceSyncModuleTest {
 
             val kind = assertNotNull(registry.forEntityType(EntityType.NOTE))
             assertEquals(
-                setOf("app.logdate.journal.entry", "app.logdate.journal.transcript", "app.logdate.journal.journal"),
+                setOf(
+                    "app.logdate.journal.entry",
+                    "app.logdate.journal.transcript",
+                    "app.logdate.journal.journal",
+                    "app.logdate.journal.membership",
+                    "app.logdate.journal.draft",
+                ),
                 registry.collections,
             )
             assertEquals(listOf("app.logdate.journal.entry", "app.logdate.journal.transcript"), kind.parts.map { it.collection })
@@ -68,6 +83,38 @@ class SpaceSyncModuleTest {
                 val kind = app.koin.get<SpaceRecordRegistry>().forEntityType(EntityType.NOTE)!!
 
                 assertEquals(note, kind.local.load(note.uid.toString()))
+            } finally {
+                app.close()
+            }
+        }
+
+    @Test
+    fun `the registry resolved from the space sync module has the membership and draft kinds`() {
+        val app = startKoin()
+        try {
+            val registry = app.koin.get<SpaceRecordRegistry>()
+
+            val membership = assertNotNull(registry.forEntityType(EntityType.ASSOCIATION))
+            val draft = assertNotNull(registry.forEntityType(EntityType.DRAFT))
+            assertEquals(listOf("app.logdate.journal.membership"), membership.parts.map { it.collection })
+            assertEquals(listOf("app.logdate.journal.draft"), draft.parts.map { it.collection })
+        } finally {
+            app.close()
+        }
+    }
+
+    @Test
+    fun `the draft kind reads the repository the app uses`() =
+        runTest {
+            val app = startKoin()
+            try {
+                val draft =
+                    EditorDraft(blocks = listOf(SerializableTextBlock(Uuid.random(), created, content = "Dear diary")), createdAt = created)
+                journals.saveDraft(draft)
+
+                val kind = app.koin.get<SpaceRecordRegistry>().forEntityType(EntityType.DRAFT)!!
+
+                assertEquals(SpaceDraft(draft), kind.local.load(draft.id.toString()))
             } finally {
                 app.close()
             }
@@ -104,9 +151,25 @@ class SpaceSyncModuleTest {
 
     private val created = Instant.parse("2026-10-01T09:00:00Z")
 
+    private class SyncedContentRepository(
+        private val base: FakeJournalContentRepository,
+    ) : JournalContentRepository by base,
+        SyncableJournalContentRepository {
+        override suspend fun addContentToJournalFromSync(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) = base.addContentToJournal(contentId, journalId)
+
+        override suspend fun removeContentFromJournalFromSync(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) = base.removeContentFromJournal(contentId, journalId)
+    }
+
     private class SyncedJournalRepository(
         private val base: FakeJournalRepository,
     ) : JournalRepository by base,
+        SyncableDraftRepository by base,
         SyncableJournalRepository {
         override suspend fun createFromSync(journal: Journal) {
             base.create(journal)

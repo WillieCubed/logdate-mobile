@@ -76,6 +76,7 @@ internal class SyncDownloader(
             mapCloudApiError = mapCloudApiError,
             mapException = mapException,
             downloadInbox = downloadInbox,
+            space = space,
         )
 
     private val associationDownloader =
@@ -89,6 +90,8 @@ internal class SyncDownloader(
             mapCloudApiError = mapCloudApiError,
             mapException = mapException,
             downloadInbox = downloadInbox,
+            space = space,
+            resolveJournal = journalRepository::resolveJournalId,
         )
 
     suspend fun downloadJournals(

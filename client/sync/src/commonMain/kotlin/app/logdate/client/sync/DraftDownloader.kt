@@ -14,8 +14,18 @@ import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.SpaceKind
+import app.logdate.client.sync.space.SpaceMediaReference
+import app.logdate.client.sync.space.SpaceStagedRecords
+import app.logdate.client.sync.space.SpaceSync
+import app.logdate.client.sync.space.mappers.SpaceDraft
+import app.logdate.client.sync.space.spaceFetchError
 import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.SerializableAudioBlock
+import app.logdate.shared.model.SerializableCameraBlock
+import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.diagnostics.DiagnosticAction
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
@@ -41,6 +51,7 @@ internal class DraftDownloader(
     private val mapCloudApiError: (CloudApiException) -> SyncResult,
     private val mapException: (Exception, String) -> SyncResult,
     private val downloadInbox: DownloadInbox?,
+    private val space: SpaceSync? = null,
 ) {
     private val syncableDraftRepository = journalRepository as? SyncableDraftRepository
 
@@ -62,7 +73,17 @@ internal class DraftDownloader(
         val errors = mutableListOf<SyncError>()
     }
 
-    suspend fun download(since: Instant): SyncResult =
+    suspend fun download(since: Instant): SyncResult {
+        val sync = space
+        val kind = sync?.activeKind(EntityType.DRAFT)
+        if (sync != null && kind != null) {
+            @Suppress("UNCHECKED_CAST")
+            return downloadFromSpace(sync, kind as SpaceKind<SpaceDraft>)
+        }
+        return downloadFromServer(since)
+    }
+
+    private suspend fun downloadFromServer(since: Instant): SyncResult =
         try {
             val downloadScope = downloadInbox?.currentScope()
 
@@ -90,6 +111,150 @@ internal class DraftDownloader(
             if (e is CancellationException) throw e
             mapException(e, "Download drafts")
         }
+
+    /**
+     * Applies the drafts the personal space changed, one at a time so one failure leaves the rest
+     * applied. A draft edited here since it was last uploaded keeps the edit and uploads it again;
+     * otherwise the newer of the two wins, as for drafts from the server.
+     */
+    private suspend fun downloadFromSpace(
+        sync: SpaceSync,
+        kind: SpaceKind<SpaceDraft>,
+    ): SyncResult =
+        try {
+            val selected = downloadInbox?.currentScope()
+            val tally = BatchTally()
+            val staged = sync.read(kind).getOrElse { failure -> throw failure }
+            downloadInbox.spaceFetchError()?.let { tally.errors += it }
+            do {
+                val page = staged.page()
+                page.changes.forEach { applySpaceDraft(staged, it, selected, tally) }
+                page.deletions.forEach { deleteSpaceDraft(staged, it, selected, tally) }
+            } while (page.hasMore)
+            SyncResult(
+                success = tally.errors.isEmpty(),
+                downloadedItems = tally.downloadedCount,
+                conflictsResolved = tally.conflictsResolved,
+                errors = tally.errors,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: CloudApiException) {
+            mapCloudApiError(error)
+        } catch (error: Exception) {
+            mapException(error, "Download drafts")
+        }
+
+    private suspend fun applySpaceDraft(
+        staged: SpaceStagedRecords<SpaceDraft>,
+        remote: SpaceDraft,
+        selected: DownloadScope?,
+        tally: BatchTally,
+    ) {
+        val draft = remote.draft
+        val id = draft.id.toString()
+        try {
+            transactionManager.withTransaction {
+                checkScope(selected)
+                val existing = journalRepository.getDraft(draft.id)
+                val outcome =
+                    when {
+                        hasPendingLocal(draft.id) -> {
+                            recordPendingConflict(draft.id, existing, remote.syncVersion, draft.lastModifiedAt)
+                            tally.conflictsResolved++
+                            RemoteOutcome.DECLINED
+                        }
+                        existing != null && existing.lastModifiedAt > draft.lastModifiedAt -> {
+                            syncMetadataService.enqueuePending(id, EntityType.DRAFT, PendingOperation.UPDATE)
+                            tally.conflictsResolved++
+                            RemoteOutcome.KEPT_LOCAL
+                        }
+                        else -> {
+                            if (existing != draft) saveDraft(draft)
+                            downloadInbox?.takeIf { draft.hasSpaceMedia() }?.enqueueSpaceDraftMedia(id, remote.syncVersion)
+                            tally.downloadedCount++
+                            RemoteOutcome.STORED
+                        }
+                    }
+                staged.settle(id, outcome)
+                checkScope(selected)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            staged.settleFailed(id)
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to apply remote draft")
+            Napier.e("Failed to apply draft change")
+        }
+    }
+
+    private suspend fun deleteSpaceDraft(
+        staged: SpaceStagedRecords<SpaceDraft>,
+        id: String,
+        selected: DownloadScope?,
+        tally: BatchTally,
+    ) {
+        val draftId = Uuid.parse(id)
+        try {
+            transactionManager.withTransaction {
+                checkScope(selected)
+                val outcome =
+                    if (hasPendingLocal(draftId)) {
+                        recordPendingConflict(draftId, journalRepository.getDraft(draftId), null, null)
+                        tally.conflictsResolved++
+                        RemoteOutcome.DECLINED
+                    } else {
+                        if (syncableDraftRepository != null) {
+                            syncableDraftRepository.deleteDraftFromSync(draftId)
+                        } else {
+                            journalRepository.deleteDraft(draftId)
+                        }
+                        tally.downloadedCount++
+                        RemoteOutcome.DELETED
+                    }
+                staged.settle(id, outcome)
+                checkScope(selected)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            staged.settleFailed(id)
+            tally.errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Failed to delete remote draft")
+            Napier.e("Failed to delete draft")
+        }
+    }
+
+    private suspend fun saveDraft(draft: EditorDraft) {
+        if (syncableDraftRepository != null) syncableDraftRepository.saveDraftFromSync(draft) else journalRepository.saveDraft(draft)
+    }
+
+    private suspend fun recordPendingConflict(
+        draftId: Uuid,
+        existing: EditorDraft?,
+        remoteVersion: Long?,
+        remoteUpdatedAt: Instant?,
+    ) = downloadEngine.recordConflict(
+        entityType = EntityType.DRAFT,
+        entityId = draftId.toString(),
+        reason = "Local pending draft changes vs remote update",
+        localVersion = null,
+        remoteVersion = remoteVersion,
+        localUpdatedAt = existing?.lastModifiedAt,
+        remoteUpdatedAt = remoteUpdatedAt,
+    )
+
+    private fun EditorDraft.hasSpaceMedia(): Boolean =
+        blocks.any { block ->
+            when (block) {
+                is SerializableTextBlock -> false
+                is SerializableImageBlock -> block.uri.isSpaceFile()
+                is SerializableVideoBlock -> block.uri.isSpaceFile() || block.thumbnailUri.isSpaceFile()
+                is SerializableAudioBlock -> block.uri.isSpaceFile()
+                is SerializableCameraBlock -> block.uri.isSpaceFile()
+            }
+        }
+
+    private fun String?.isSpaceFile(): Boolean = this != null && SpaceMediaReference.parse(this) != null
 
     private suspend fun downloadPage(
         cursor: Instant,

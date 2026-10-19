@@ -10,6 +10,8 @@ import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.space.SpaceMediaReference
+import app.logdate.client.sync.space.mappers.SpaceDraft
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.sync.DeviceId
 import io.github.aakira.napier.Napier
@@ -68,9 +70,13 @@ internal class DraftUploader(
     }
 
     /** Queues pre-existing drafts once per signed-in owner/server, preserving pending deletions. */
-    suspend fun enqueueForRichSync() {
+    suspend fun enqueueForRichSync(serverSupportRequired: Boolean = true) {
         val selected = draftRepairScope()?.takeIf { it.owner.isNotBlank() && it.origin.isNotBlank() } ?: return
-        if (!supportsRichDrafts() || firstSyncEnqueueStore.hasEnqueuedDraftScope(selected.owner, selected.origin)) return
+        if ((serverSupportRequired && !supportsRichDrafts()) ||
+            firstSyncEnqueueStore.hasEnqueuedDraftScope(selected.owner, selected.origin)
+        ) {
+            return
+        }
         journalRepository.getAllDraftsForSync().forEach { draft ->
             check(draftRepairScope() == selected) { "Draft sync scope changed" }
             syncMetadataService.enqueueRepairIfAbsent(draft.id.toString(), EntityType.DRAFT, serverOrigin = selected.origin)
@@ -78,6 +84,29 @@ internal class DraftUploader(
         check(draftRepairScope() == selected) { "Draft sync scope changed" }
         firstSyncEnqueueStore.markEnqueuedDraftScope(selected.owner, selected.origin)
         Napier.i("First sync: queued drafts already on this device")
+    }
+
+    /**
+     * Starts an upload of [draft] to the personal space: records the attempt and uploads its media
+     * as space blobs, so the draft record can refer to them. Returns the draft to write, or null
+     * when it has to wait or failed.
+     */
+    suspend fun prepareForSpace(
+        pending: PendingUpload,
+        draft: SpaceDraft,
+        errors: MutableList<SyncError>,
+    ): SpaceDraft? {
+        if (!retryCoordinator.beginAttempt(EntityType.DRAFT, pending, errors)) return null
+        val prepared =
+            tokenRefresher.withFreshToken(
+                { token -> mediaTransfer.uploadDraftMediaIfNeeded(token, draft.draft) { SpaceMediaReference.parse(it) != null } },
+                "uploadDraftMedia(${draft.draft.id})",
+                expectedScope = pending.scope,
+            )
+        if (prepared.isSuccess) return draft.copy(draft = prepared.getOrThrow())
+        val error = prepared.exceptionOrNull() ?: Exception("Unknown draft media upload error")
+        recordFailure(pending, error, "Failed to upload media for draft ${draft.draft.id}", errors)
+        return null
     }
 
     /** Returns true when the server accepted the deletion. */

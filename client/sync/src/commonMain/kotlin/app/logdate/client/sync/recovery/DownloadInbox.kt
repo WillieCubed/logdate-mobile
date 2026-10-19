@@ -26,6 +26,9 @@ data class DownloadScope(
 /** Starts a media-recovery row for a note applied from the personal space; the file's reference follows. */
 internal const val SPACE_MEDIA_PREFIX = "SPACE1-MEDIA:"
 
+/** Marks a draft media row as one for a draft applied from the personal space, whose files it refers to. */
+internal const val SPACE_DRAFT_MEDIA_PREFIX = "SPACE1-DRAFT-MEDIA"
+
 data class WireDownload(
     val id: String,
     val version: Long,
@@ -313,6 +316,23 @@ class DownloadInbox(
             val prior = dao.get(selected.owner, selected.origin, "MEDIA_NOTE", id)
             if (prior != null && prior.version >= version) return@withTransaction
             dao.put(waitingRow(selected, "MEDIA_NOTE", WireDownload(id, version, false, SPACE_MEDIA_PREFIX + reference)))
+        }
+    }
+
+    /**
+     * Queues the files of a draft applied from the personal space for media recovery. The draft
+     * holds no inbox row of its own, so the row only says which draft, and recovery reads its blocks.
+     */
+    internal suspend fun enqueueSpaceDraftMedia(
+        id: String,
+        version: Long,
+        selected: DownloadScope = scope(),
+    ) {
+        transactions.withTransaction {
+            check(selected == scope()) { "Download scope changed" }
+            val prior = dao.get(selected.owner, selected.origin, "MEDIA_DRAFT", id)
+            if (prior != null && prior.version >= version) return@withTransaction
+            dao.put(waitingRow(selected, "MEDIA_DRAFT", WireDownload(id, version, false, SPACE_DRAFT_MEDIA_PREFIX)))
         }
     }
 
