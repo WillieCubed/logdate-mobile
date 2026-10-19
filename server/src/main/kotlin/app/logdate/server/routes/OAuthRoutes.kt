@@ -9,6 +9,11 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthException
 import app.logdate.server.oauth.OAuthInvalidRequestException
 import app.logdate.server.oauth.OAuthKeyService
+import app.logdate.server.oauth.OAuthPasskeyApprovalRequest
+import app.logdate.server.oauth.OAuthPasskeyApprovalResponse
+import app.logdate.server.oauth.OAuthPasskeyOptionsRequest
+import app.logdate.server.oauth.OAuthPasskeyPage
+import app.logdate.server.oauth.OAuthPasskeySignInService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
 import app.logdate.server.routes.docs.OAuthDocs
 import io.github.smiley4.ktoropenapi.get
@@ -20,6 +25,7 @@ import io.ktor.server.application.call
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.header
 import io.ktor.server.request.path
+import io.ktor.server.request.receive
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
@@ -53,6 +59,7 @@ fun Route.oauthRoutes(
     accountRepository: AccountRepository? = null,
     tokenService: TokenService? = null,
     identityService: AtprotoIdentityService? = null,
+    passkeySignIn: OAuthPasskeySignInService? = null,
 ) {
     get("/.well-known/oauth-authorization-server", OAuthDocs.getAuthorizationServerMetadata) {
         call.respond(HttpStatusCode.OK, discoveryService?.authorizationServerMetadata() ?: config.authorizationServerMetadata())
@@ -119,6 +126,16 @@ fun Route.oauthRoutes(
             call.request.queryParameters["request_uri"]
                 ?.trim()
                 .orEmpty()
+        if (passkeySignIn != null && call.isBrowserWithoutLogDateSession()) {
+            val page =
+                if (requestUri.isBlank()) {
+                    OAuthPasskeyPage.RequestExpired
+                } else {
+                    passkeySignIn.page(requestUri, clientId = call.request.queryParameters["client_id"]?.trim())
+                }
+            call.respondAuthorizationPage(page)
+            return@get
+        }
         if (requestUri.isBlank()) {
             call.respondOAuthError(OAuthInvalidRequestException("request_uri is required"))
             return@get
@@ -147,6 +164,10 @@ fun Route.oauthRoutes(
                 HttpStatusCode.NotImplemented,
                 OAuthErrorResponse("server_error", "OAuth authorization is not configured"),
             )
+        if (passkeySignIn != null && call.isBrowserWithoutLogDateSession()) {
+            call.respondBrowserDecision(passkeySignIn, call.receiveParameters())
+            return@post
+        }
         val account =
             resolveOAuthAccount(
                 call = call,
@@ -181,6 +202,32 @@ fun Route.oauthRoutes(
         }.onFailure { error ->
             call.respondOAuthError(error)
         }
+    }
+
+    post("/oauth/authorize/passkey/options", OAuthDocs.getPasskeyOptions) {
+        val signIn = passkeySignIn ?: return@post call.respondPasskeySignInDisabled()
+        val request =
+            runCatching { call.receive<OAuthPasskeyOptionsRequest>() }
+                .getOrElse { return@post call.respondOAuthError(OAuthInvalidRequestException("request_uri is required")) }
+        runCatching { signIn.options(request.requestUri.trim()) }
+            .onSuccess { options ->
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                call.respond(HttpStatusCode.OK, options)
+            }.onFailure { error -> call.respondOAuthError(error) }
+    }
+
+    post("/oauth/authorize/passkey", OAuthDocs.approveWithPasskey) {
+        val signIn = passkeySignIn ?: return@post call.respondPasskeySignInDisabled()
+        val request =
+            runCatching { call.receive<OAuthPasskeyApprovalRequest>() }
+                .getOrElse {
+                    return@post call.respondOAuthError(OAuthInvalidRequestException("request_uri, challenge and credential are required"))
+                }
+        runCatching { signIn.approve(request.requestUri.trim(), request.challenge, request.credential) }
+            .onSuccess { redirectUri ->
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                call.respond(HttpStatusCode.OK, OAuthPasskeyApprovalResponse(redirectUri))
+            }.onFailure { error -> call.respondOAuthError(error) }
     }
 
     post("/oauth/token", OAuthDocs.exchangeToken) {
@@ -343,6 +390,43 @@ private suspend fun ApplicationCall.respondOAuthError(error: Throwable) {
 
     respond(HttpStatusCode.InternalServerError, OAuthErrorResponse("server_error", error.message ?: "OAuth request failed"))
 }
+
+/** A browser arriving from another app has no LogDate bearer token; the LogDate apps always send one. */
+private fun ApplicationCall.isBrowserWithoutLogDateSession(): Boolean = request.header(HttpHeaders.Authorization) == null
+
+/**
+ * Handles the authorization page's own form post. Only cancelling is possible without a bearer
+ * token; approving goes through a passkey sign-in.
+ */
+private suspend fun ApplicationCall.respondBrowserDecision(
+    passkeySignIn: OAuthPasskeySignInService,
+    parameters: io.ktor.http.Parameters,
+) {
+    val requestUri = parameters["request_uri"]?.trim().orEmpty()
+    if (parameters["decision"]?.trim() != "deny") {
+        respond(HttpStatusCode.Unauthorized, OAuthErrorResponse("login_required", "Sign in with a passkey to approve this request"))
+        return
+    }
+    if (requestUri.isBlank()) {
+        respondAuthorizationPage(OAuthPasskeyPage.RequestExpired)
+        return
+    }
+    runCatching { passkeySignIn.deny(requestUri) }
+        .onSuccess { redirectUri -> respondRedirect(redirectUri, permanent = false) }
+        .onFailure { error ->
+            if (error is OAuthInvalidRequestException) {
+                respondAuthorizationPage(OAuthPasskeyPage.RequestExpired)
+            } else {
+                respondOAuthError(error)
+            }
+        }
+}
+
+private suspend fun ApplicationCall.respondPasskeySignInDisabled() =
+    respond(
+        HttpStatusCode.NotImplemented,
+        OAuthErrorResponse("server_error", "Passkey sign-in on the authorization page is not enabled on this server"),
+    )
 
 private fun AuthorizationPrompt.toResponse(account: Account): AuthorizationPromptResponse =
     AuthorizationPromptResponse(

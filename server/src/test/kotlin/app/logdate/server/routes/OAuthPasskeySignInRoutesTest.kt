@@ -1,0 +1,500 @@
+package app.logdate.server.routes
+
+import app.logdate.server.AuthV1TestEnvironment
+import app.logdate.server.auth.Account
+import app.logdate.server.configureAuthV1TestApp
+import app.logdate.server.oauth.OAuthClientMetadataResolver
+import app.logdate.server.oauth.PasskeyTestAuthenticator
+import app.logdate.server.oauth.clientMetadataJson
+import app.logdate.server.oauth.createDpopProof
+import app.logdate.server.oauth.generateP256KeyPair
+import app.logdate.server.passkeys.InMemoryPasskeyRepository
+import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.shared.model.PasskeyAssertionResponse
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.request.forms.FormDataContent
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
+import io.ktor.http.Url
+import io.ktor.http.contentType
+import io.ktor.http.headersOf
+import io.ktor.http.isSuccess
+import io.ktor.server.testing.ApplicationTestBuilder
+import io.ktor.server.testing.TestApplicationBuilder
+import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+/**
+ * The browser side of AT Protocol OAuth: a person who only has a passkey opens the authorization
+ * page another app sent them to, signs in with the passkey, and the app receives a code.
+ */
+@OptIn(ExperimentalUuidApi::class)
+class OAuthPasskeySignInRoutesTest {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun `browser sign-in stays closed while the flag is off`() =
+        testApplication {
+            configureApp(passkeySignInEnabled = false)
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val page = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }
+            val options = postJson("/oauth/authorize/passkey/options", buildJsonObject { put("request_uri", requestUri) })
+
+            assertFalse(page.status.isSuccess(), page.status.toString())
+            assertFalse(page.contentType()?.match(ContentType.Text.Html) == true)
+            assertEquals(HttpStatusCode.NotImplemented, options.status)
+        }
+
+    @Test
+    fun `a browser without a LogDate session gets the passkey page`() =
+        testApplication {
+            val env = configureApp()
+            createAccount(env, "alice")
+            val requestUri = pushAuthorizationRequest(loginHint = "alice.logdate.app").requestUri
+
+            val page = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }
+
+            assertEquals(HttpStatusCode.OK, page.status)
+            assertEquals(ContentType.Text.Html, page.contentType()?.withoutParameters())
+            val body = page.bodyAsText()
+            assertTrue("Journal Viewer" in body, body)
+            assertTrue("viewer.example.com" in body, body)
+            assertTrue("@alice.logdate.app" in body, body)
+            assertTrue("Continue with passkey" in body, body)
+            val csp = assertNotNull(page.headers["Content-Security-Policy"])
+            assertTrue("frame-ancestors 'none'" in csp, csp)
+            assertTrue("script-src 'nonce-" in csp, csp)
+            assertFalse("unsafe-inline" in csp, csp)
+            assertEquals("DENY", page.headers["X-Frame-Options"])
+            assertEquals("no-store", page.headers[HttpHeaders.CacheControl])
+            assertEquals("no-referrer", page.headers["Referrer-Policy"])
+        }
+
+    @Test
+    fun `the page escapes a client name it does not control`() =
+        testApplication {
+            configureApp(clientName = "<script>alert(1)</script>")
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val body = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }.bodyAsText()
+
+            assertFalse("<script>alert(1)</script>" in body, body)
+            assertTrue("&lt;script&gt;alert(1)&lt;/script&gt;" in body, body)
+        }
+
+    @Test
+    fun `the page refuses a client_id that does not match the pushed request`() =
+        testApplication {
+            configureApp()
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val page =
+                client.get("/oauth/authorize?client_id=https://other.example.com/client.json&request_uri=$requestUri") { acceptHtml() }
+
+            assertEquals(HttpStatusCode.BadRequest, page.status)
+            assertEquals(ContentType.Text.Html, page.contentType()?.withoutParameters())
+            assertTrue("start signing in again" in page.bodyAsText(), page.bodyAsText())
+        }
+
+    @Test
+    fun `the page explains an unknown or expired request`() =
+        testApplication {
+            configureApp()
+
+            val page = client.get("/oauth/authorize?request_uri=urn:ietf:params:oauth:request_uri:missing") { acceptHtml() }
+
+            assertEquals(HttpStatusCode.BadRequest, page.status)
+            assertTrue("expired" in page.bodyAsText(), page.bodyAsText())
+        }
+
+    @Test
+    fun `the page says when the app asked for an account that is not here`() =
+        testApplication {
+            configureApp()
+            val requestUri = pushAuthorizationRequest(loginHint = "bob.example.com").requestUri
+
+            val page = client.get("/oauth/authorize?client_id=$CLIENT_ID&request_uri=$requestUri") { acceptHtml() }
+
+            assertEquals(HttpStatusCode.BadRequest, page.status)
+            assertTrue("@bob.example.com" in page.bodyAsText(), page.bodyAsText())
+            assertFalse("Continue with passkey" in page.bodyAsText())
+        }
+
+    @Test
+    fun `signing in with a passkey hands the app a code for that account`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val authenticator = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val pushed = pushAuthorizationRequest(loginHint = "alice.logdate.app")
+
+            val options = passkeyOptions(pushed.requestUri)
+            assertEquals("logdate.app", options["rp_id"]?.jsonPrimitive?.content)
+            assertEquals("required", options["user_verification"]?.jsonPrimitive?.content)
+            assertEquals(
+                listOf(authenticator.credentialIdB64),
+                options["allow_credentials"]?.jsonArray?.map { it.jsonPrimitive.content },
+            )
+            val challenge = options.getValue("challenge").jsonPrimitive.content
+
+            val approval = approveWithPasskey(pushed.requestUri, challenge, authenticator.assert(challenge))
+
+            assertEquals(HttpStatusCode.OK, approval.status, approval.bodyAsText())
+            val redirect =
+                Url(
+                    json
+                        .parseToJsonElement(approval.bodyAsText())
+                        .jsonObject
+                        .getValue("redirect_uri")
+                        .jsonPrimitive.content,
+                )
+            assertEquals(REDIRECT_URI, "${redirect.protocol.name}://${redirect.host}${redirect.encodedPath}")
+            assertEquals("state-123", redirect.parameters["state"])
+            assertEquals("https://logdate.app", redirect.parameters["iss"])
+            val code = assertNotNull(redirect.parameters["code"])
+
+            val token =
+                client.post("/oauth/token") {
+                    header("DPoP", createDpopProof(pushed.dpopKey, "POST", "http://localhost/oauth/token", nonce = pushed.nonce))
+                    setBody(
+                        FormDataContent(
+                            Parameters.build {
+                                append("grant_type", "authorization_code")
+                                append("code", code)
+                                append("redirect_uri", REDIRECT_URI)
+                                append("client_id", CLIENT_ID)
+                                append("code_verifier", CODE_VERIFIER)
+                            },
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, token.status, token.bodyAsText())
+            assertEquals(
+                alice.did,
+                json
+                    .parseToJsonElement(token.bodyAsText())
+                    .jsonObject["sub"]
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+        }
+
+    @Test
+    fun `a passkey for a different account leaves the request usable`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val bob = createAccount(env, "bob")
+            val alicePasskey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val bobPasskey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, bob.id, "bob") }
+            val requestUri = pushAuthorizationRequest(loginHint = "bob.logdate.app").requestUri
+
+            val firstChallenge = passkeyOptions(requestUri).getValue("challenge").jsonPrimitive.content
+            val mismatch = approveWithPasskey(requestUri, firstChallenge, alicePasskey.assert(firstChallenge))
+
+            assertEquals(HttpStatusCode.Forbidden, mismatch.status)
+            val error = json.parseToJsonElement(mismatch.bodyAsText()).jsonObject
+            assertEquals("access_denied", error["error"]?.jsonPrimitive?.content)
+            val description = error.getValue("error_description").jsonPrimitive.content
+            assertTrue("@alice.logdate.app" in description && "@bob.logdate.app" in description, description)
+
+            val secondChallenge = passkeyOptions(requestUri).getValue("challenge").jsonPrimitive.content
+            val approval = approveWithPasskey(requestUri, secondChallenge, bobPasskey.assert(secondChallenge))
+            assertEquals(HttpStatusCode.OK, approval.status, approval.bodyAsText())
+        }
+
+    @Test
+    fun `an assertion that does not verify is rejected and the request stays usable`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            val passkey = PasskeyTestAuthenticator().also { it.registerWith(env.webAuthn, alice.id, "alice") }
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val firstChallenge = passkeyOptions(requestUri).getValue("challenge").jsonPrimitive.content
+            val rejected = approveWithPasskey(requestUri, firstChallenge, passkey.assert(firstChallenge, tamperSignature = true))
+            assertEquals(HttpStatusCode.Unauthorized, rejected.status)
+            assertEquals(
+                "access_denied",
+                json
+                    .parseToJsonElement(rejected.bodyAsText())
+                    .jsonObject["error"]
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+
+            val secondChallenge = passkeyOptions(requestUri).getValue("challenge").jsonPrimitive.content
+            val approval = approveWithPasskey(requestUri, secondChallenge, passkey.assert(secondChallenge))
+            assertEquals(HttpStatusCode.OK, approval.status, approval.bodyAsText())
+        }
+
+    @Test
+    fun `a passkey from another origin is rejected`() =
+        testApplication {
+            val env = configureApp()
+            val alice = createAccount(env, "alice")
+            PasskeyTestAuthenticator().registerWith(env.webAuthn, alice.id, "alice")
+            val phishing = PasskeyTestAuthenticator(origin = "https://logdate-login.example.com")
+            phishing.registerWithoutOriginCheck(env, alice)
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val challenge = passkeyOptions(requestUri).getValue("challenge").jsonPrimitive.content
+            val rejected = approveWithPasskey(requestUri, challenge, phishing.assert(challenge))
+
+            assertEquals(HttpStatusCode.Unauthorized, rejected.status)
+        }
+
+    @Test
+    fun `cancelling sends the browser back to the app with access_denied`() =
+        testApplication {
+            configureApp()
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val cancel =
+                createClient { followRedirects = false }.post("/oauth/authorize") {
+                    setBody(
+                        FormDataContent(
+                            Parameters.build {
+                                append("request_uri", requestUri)
+                                append("decision", "deny")
+                            },
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Found, cancel.status)
+            val location = Url(assertNotNull(cancel.headers[HttpHeaders.Location]))
+            assertEquals("access_denied", location.parameters["error"])
+            assertEquals("state-123", location.parameters["state"])
+            assertEquals("https://logdate.app", location.parameters["iss"])
+            assertEquals(null, location.parameters["code"])
+        }
+
+    @Test
+    fun `approving without a session still needs a passkey`() =
+        testApplication {
+            configureApp()
+            val requestUri = pushAuthorizationRequest(loginHint = null).requestUri
+
+            val approve =
+                createClient { followRedirects = false }.post("/oauth/authorize") {
+                    setBody(
+                        FormDataContent(
+                            Parameters.build {
+                                append("request_uri", requestUri)
+                                append("decision", "approve")
+                            },
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Unauthorized, approve.status)
+        }
+
+    @Test
+    fun `turning the page on for an issuer outside the relying party fails at startup`() {
+        val failure =
+            assertFailsWith<IllegalStateException> {
+                createPasskeySignInService(issuer = "https://cloud-staging.logdate.app", relyingPartyId = "staging.logdate.app")
+            }
+
+        val message = assertNotNull(failure.message)
+        assertTrue("cloud-staging.logdate.app" in message && "staging.logdate.app" in message, message)
+    }
+
+    private fun createPasskeySignInService(
+        issuer: String,
+        relyingPartyId: String,
+    ) {
+        val accounts =
+            app.logdate.server.auth
+                .InMemoryAccountRepository()
+        val config =
+            app.logdate.server.oauth
+                .OAuthConfig(issuer = issuer, passkeySignInEnabled = true)
+        app.logdate.server.oauth.OAuthPasskeySignInService(
+            config = config,
+            authorizationService = io.mockk.mockk(),
+            webAuthnService = WebAuthnPasskeyService(relyingPartyId = relyingPartyId, origins = setOf("https://app.$relyingPartyId")),
+            accountRepository = accounts,
+            identityService = io.mockk.mockk(),
+        )
+    }
+
+    private class PushedRequest(
+        val requestUri: String,
+        val nonce: String,
+        val dpopKey: java.security.KeyPair,
+    )
+
+    private class PasskeyEnv(
+        val base: AuthV1TestEnvironment,
+        val webAuthn: WebAuthnPasskeyService,
+        val passkeys: InMemoryPasskeyRepository,
+    )
+
+    private fun TestApplicationBuilder.configureApp(
+        passkeySignInEnabled: Boolean = true,
+        clientName: String = "Journal Viewer",
+    ): PasskeyEnv {
+        val passkeys = InMemoryPasskeyRepository()
+        val webAuthn =
+            WebAuthnPasskeyService(
+                passkeyRepository = passkeys,
+                relyingPartyId = "logdate.app",
+                origins = setOf("https://logdate.app"),
+                strictVerificationEnabled = true,
+            )
+        val metadataResolver =
+            OAuthClientMetadataResolver(
+                httpClient =
+                    HttpClient(
+                        MockEngine { request ->
+                            respond(
+                                content =
+                                    clientMetadataJson(clientId = request.url.toString(), redirectUri = REDIRECT_URI)
+                                        .replace("\"Journal Viewer\"", Json.encodeToJsonElement(clientName).toString()),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf("Content-Type", ContentType.Application.Json.toString()),
+                            )
+                        },
+                    ),
+            )
+        val base =
+            configureAuthV1TestApp(
+                webAuthnPasskeyService = webAuthn,
+                oauthClientMetadataResolver = metadataResolver,
+                oauthPasskeySignInEnabled = passkeySignInEnabled,
+            )
+        return PasskeyEnv(base, webAuthn, passkeys)
+    }
+
+    private fun createAccount(
+        env: PasskeyEnv,
+        username: String,
+    ): Account =
+        runBlocking {
+            val saved =
+                env.base.accountRepository.save(
+                    Account(id = Uuid.random(), username = username, displayName = username, createdAt = Clock.System.now()),
+                )
+            env.base.atprotoIdentityService.ensureIdentity(saved)
+        }
+
+    private fun PasskeyTestAuthenticator.registerWithoutOriginCheck(
+        env: PasskeyEnv,
+        account: Account,
+    ) {
+        // Registration goes through a relying party that accepts this origin, so only the
+        // authorization page's verification is left to reject it.
+        val lenient =
+            WebAuthnPasskeyService(
+                passkeyRepository = env.passkeys,
+                relyingPartyId = "logdate.app",
+                origins = setOf("https://logdate-login.example.com"),
+                strictVerificationEnabled = true,
+            )
+        registerWith(lenient, account.id, account.username)
+    }
+
+    private suspend fun ApplicationTestBuilder.pushAuthorizationRequest(loginHint: String?): PushedRequest {
+        val dpopKey = generateP256KeyPair()
+        val response =
+            client.post("/oauth/par") {
+                header("DPoP", createDpopProof(dpopKey, "POST", "http://localhost/oauth/par"))
+                setBody(
+                    FormDataContent(
+                        Parameters.build {
+                            append("client_id", CLIENT_ID)
+                            append("response_type", "code")
+                            append("scope", "atproto")
+                            append("redirect_uri", REDIRECT_URI)
+                            append("code_challenge", CODE_CHALLENGE)
+                            append("code_challenge_method", "S256")
+                            append("state", "state-123")
+                            loginHint?.let { append("login_hint", it) }
+                        },
+                    ),
+                )
+            }
+        check(response.status == HttpStatusCode.Created) { "PAR failed: ${response.bodyAsText()}" }
+        return PushedRequest(
+            requestUri =
+                json
+                    .parseToJsonElement(response.bodyAsText())
+                    .jsonObject
+                    .getValue("request_uri")
+                    .jsonPrimitive.content,
+            nonce = assertNotNull(response.headers["DPoP-Nonce"]),
+            dpopKey = dpopKey,
+        )
+    }
+
+    private suspend fun ApplicationTestBuilder.passkeyOptions(requestUri: String): JsonObject {
+        val response = postJson("/oauth/authorize/passkey/options", buildJsonObject { put("request_uri", requestUri) })
+        check(response.status == HttpStatusCode.OK) { "Passkey options failed: ${response.bodyAsText()}" }
+        return json.parseToJsonElement(response.bodyAsText()).jsonObject
+    }
+
+    private suspend fun ApplicationTestBuilder.approveWithPasskey(
+        requestUri: String,
+        challenge: String,
+        credential: PasskeyAssertionResponse,
+    ): HttpResponse =
+        postJson(
+            "/oauth/authorize/passkey",
+            buildJsonObject {
+                put("request_uri", requestUri)
+                put("challenge", challenge)
+                put("credential", json.encodeToJsonElement(credential))
+            },
+        )
+
+    private suspend fun ApplicationTestBuilder.postJson(
+        path: String,
+        body: JsonObject,
+    ): HttpResponse =
+        client.post(path) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(body.toString())
+        }
+
+    private fun io.ktor.client.request.HttpRequestBuilder.acceptHtml() {
+        header(HttpHeaders.Accept, "text/html,application/xhtml+xml")
+    }
+
+    private companion object {
+        const val CLIENT_ID = "https://viewer.example.com/client.json"
+        const val REDIRECT_URI = "https://viewer.example.com/callback"
+        const val CODE_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        const val CODE_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    }
+}

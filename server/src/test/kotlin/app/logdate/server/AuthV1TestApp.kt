@@ -43,6 +43,7 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.oauth.OAuthPasskeySignInService
 import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
@@ -120,6 +121,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     personalSpaceEnabled: Boolean = false,
     spaceStore: SpaceStore = InMemorySpaceStore(),
     spaceMaxBlobBytes: Long = MAX_SPACE_BLOB_BYTES,
+    oauthPasskeySignInEnabled: Boolean = false,
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
@@ -199,6 +201,18 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
             nonceService = oauthNonceService,
             authorizationServerIssuer = oauthConfig.normalizedIssuer,
         )
+    val oauthPasskeySignIn =
+        if (oauthPasskeySignInEnabled) {
+            OAuthPasskeySignInService(
+                config = oauthConfig.copy(passkeySignInEnabled = true),
+                authorizationService = oauthAuthorizationService,
+                webAuthnService = webAuthnPasskeyService,
+                accountRepository = accountRepository,
+                identityService = atprotoIdentityService,
+            )
+        } else {
+            null
+        }
 
     val json =
         Json {
@@ -225,6 +239,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 accountRepository = accountRepository,
                 tokenService = tokenService,
                 identityService = atprotoIdentityService,
+                passkeySignIn = oauthPasskeySignIn,
             )
             xrpcRoutes(
                 identityService = atprotoIdentityService,

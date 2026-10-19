@@ -137,43 +137,59 @@ class OAuthAuthorizationService(
         val stored = runtimeStateRepository.requireValidRequest(requestUri, clock)
         runtimeStateRepository.deleteAuthorizationRequest(requestUri)
 
-        if (stored.loginHint != null &&
-            stored.loginHint.lowercase() != subjectHandle.lowercase() &&
-            stored.loginHint.lowercase() != subjectDid.lowercase()
-        ) {
+        if (!loginHintMatches(stored.loginHint, subjectDid = subjectDid, subjectHandle = subjectHandle)) {
             throw OAuthInvalidRequestException("login_hint does not match the authenticated account")
         }
+        if (!approved) return deniedRedirect(stored)
 
-        val queryParameters =
-            if (approved) {
-                val code = randomToken()
-                runtimeStateRepository.saveAuthorizationCode(
-                    StoredAuthorizationCode(
-                        code = code,
-                        clientId = stored.clientId,
-                        redirectUri = stored.redirectUri,
-                        subjectDid = subjectDid,
-                        subjectHandle = subjectHandle,
-                        scope = stored.scope,
-                        codeChallenge = stored.codeChallenge,
-                        dpopKeyThumbprint = stored.dpopKeyThumbprint,
-                        clientAuthKeyId = stored.clientAuthKeyId,
-                        clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
-                        expiresAt = clock.now() + AUTHORIZATION_CODE_TTL,
-                    ),
-                )
-                buildMap {
-                    put("code", code)
-                    stored.state?.let { put("state", it) }
-                }
-            } else {
-                buildMap {
-                    put("error", "access_denied")
-                    stored.state?.let { put("state", it) }
-                }
-            }
-        return appendQuery(stored.redirectUri, queryParameters)
+        val code = randomToken()
+        runtimeStateRepository.saveAuthorizationCode(
+            StoredAuthorizationCode(
+                code = code,
+                clientId = stored.clientId,
+                redirectUri = stored.redirectUri,
+                subjectDid = subjectDid,
+                subjectHandle = subjectHandle,
+                scope = stored.scope,
+                codeChallenge = stored.codeChallenge,
+                dpopKeyThumbprint = stored.dpopKeyThumbprint,
+                clientAuthKeyId = stored.clientAuthKeyId,
+                clientAuthKeyThumbprint = stored.clientAuthKeyThumbprint,
+                expiresAt = clock.now() + AUTHORIZATION_CODE_TTL,
+            ),
+        )
+        return appendQuery(
+            stored.redirectUri,
+            buildMap {
+                put("code", code)
+                stored.state?.let { put("state", it) }
+                put("iss", authorizationServerIssuer)
+            },
+        )
     }
+
+    /**
+     * Denies the stored authorization request without a signed-in account and returns the
+     * client's redirect carrying `error=access_denied`.
+     *
+     * Only the browser that started the request knows its `request_uri`, and denying it affects
+     * nothing else, so cancelling does not need a sign-in.
+     */
+    suspend fun denyAuthorization(requestUri: String): String {
+        val stored = runtimeStateRepository.requireValidRequest(requestUri, clock)
+        runtimeStateRepository.deleteAuthorizationRequest(requestUri)
+        return deniedRedirect(stored)
+    }
+
+    private fun deniedRedirect(stored: StoredAuthorizationRequest): String =
+        appendQuery(
+            stored.redirectUri,
+            buildMap {
+                put("error", "access_denied")
+                stored.state?.let { put("state", it) }
+                put("iss", authorizationServerIssuer)
+            },
+        )
 
     /**
      * Exchanges an authorization code for a DPoP-bound token pair.
@@ -487,6 +503,19 @@ private suspend fun OAuthRuntimeStateRepository.requireValidRequest(
         throw OAuthInvalidRequestException("request_uri is invalid or expired")
     }
     return stored
+}
+
+/**
+ * Returns `true` when an authorization request's [loginHint] names the account with
+ * [subjectDid] and [subjectHandle], or when there is no hint.
+ */
+internal fun loginHintMatches(
+    loginHint: String?,
+    subjectDid: String,
+    subjectHandle: String,
+): Boolean {
+    val hint = loginHint?.trim()?.removePrefix("@")?.lowercase() ?: return true
+    return hint == subjectHandle.lowercase() || hint == subjectDid.lowercase()
 }
 
 private fun appendQuery(

@@ -24,7 +24,19 @@ fun syntheticPasskeyCredential(credentialId: String): PasskeyCredentialResponse 
 suspend fun LogDateCloudApiClient.createAccountWithSyntheticPasskey(
     username: String,
     displayName: String = username,
-): CompleteAccountCreationResponse {
+): CompleteAccountCreationResponse = createPasskeyOnlyAccount(username, displayName).response
+
+/** A passkey-only account and the authenticator holding its passkey, for later sign-ins. */
+internal class SyntheticPasskeyAccount(
+    val response: CompleteAccountCreationResponse,
+    val authenticator: TestAuthenticator,
+)
+
+/** Creates an account whose only credential is a passkey, as every LogDate app sign-up does. */
+internal suspend fun LogDateCloudApiClient.createPasskeyOnlyAccount(
+    username: String,
+    displayName: String = username,
+): SyntheticPasskeyAccount {
     val begin =
         beginAccountCreation(
             BeginAccountCreationRequest(
@@ -58,5 +70,5 @@ suspend fun LogDateCloudApiClient.createAccountWithSyntheticPasskey(
             ),
         ).getOrElse { throw AssertionError("completeAccountCreation failed: ${it.message}", it) }
 
-    return complete
+    return SyntheticPasskeyAccount(complete, authenticator)
 }

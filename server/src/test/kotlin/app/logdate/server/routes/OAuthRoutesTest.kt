@@ -269,6 +269,14 @@ class OAuthRoutesTest {
             assertEquals(HttpStatusCode.Found, approve.status)
             val redirectLocation = approve.headers[HttpHeaders.Location]
             val authorizationCode = redirectLocation?.substringAfter("code=")?.substringBefore('&')
+            assertEquals(
+                "https://logdate.app",
+                redirectLocation?.let {
+                    io.ktor.http
+                        .Url(it)
+                        .parameters["iss"]
+                },
+            )
             assertNotNull(authorizationCode)
 
             val missingDpop =

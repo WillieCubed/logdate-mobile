@@ -35,6 +35,7 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.oauth.OAuthPasskeySignInService
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
@@ -78,6 +79,19 @@ internal fun Application.atprotoRoutes() {
     val oauthAccessTokenService by inject<OAuthAccessTokenService>()
     val oauthDpopVerifier by inject<OAuthDpopVerifier>()
     val oauthNonceService by inject<OAuthNonceService>()
+    val webAuthnService by inject<WebAuthnPasskeyService>()
+    // Built eagerly so a misconfigured issuer stops the server at startup instead of serving a
+    // page whose passkey button can never work.
+    val oauthPasskeySignIn =
+        oauthConfig.takeIf(OAuthConfig::passkeySignInEnabled)?.let { config ->
+            OAuthPasskeySignInService(
+                config = config,
+                authorizationService = oauthAuthorizationService,
+                webAuthnService = webAuthnService,
+                accountRepository = accountRepository,
+                identityService = atprotoIdentityService,
+            )
+        }
 
     routing {
         identityRoutes(atprotoIdentityService)
@@ -90,6 +104,7 @@ internal fun Application.atprotoRoutes() {
             accountRepository = accountRepository,
             tokenService = tokenService,
             identityService = atprotoIdentityService,
+            passkeySignIn = oauthPasskeySignIn,
         )
         xrpcRoutes(
             identityService = atprotoIdentityService,
