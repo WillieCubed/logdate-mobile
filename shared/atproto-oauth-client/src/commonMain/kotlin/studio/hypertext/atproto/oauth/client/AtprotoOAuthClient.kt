@@ -3,6 +3,8 @@ package studio.hypertext.atproto.oauth.client
 import io.ktor.client.HttpClient
 import io.ktor.http.URLBuilder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.identity.IdentityResolver
@@ -83,10 +85,14 @@ public data class OAuthCallbackResult(
  * @param crypto Platform cryptography; `JvmOAuthCrypto` on the JVM.
  * @param stateStore Storage for pending authorization requests.
  * @param sessionStore Storage for sessions. Share it between server instances.
- * @param sessionLock Serializes token refreshes per account. See [OAuthSessionLock].
+ * @param sessionLock Serializes token refreshes per account. The default covers one process; when
+ *   several instances share [sessionStore], they must share a lock too. See [OAuthSessionLock].
  * @param clock Time source, replaceable in tests.
  * @param allowHttp Accept `http://` data and authorization servers. Only for local development.
  * @param stateLifetime How long a pending authorization request stays valid.
+ * @param strictDpopNonces Refuse an authorization server whose pushed authorization response has
+ *   no `DPoP-Nonce` header. The AT Protocol requires servers to issue nonces, but development
+ *   servers often run without them, so this is off by default, as in the reference client.
  */
 public class AtprotoOAuthClient(
     public val config: OAuthClientConfig,
@@ -99,6 +105,7 @@ public class AtprotoOAuthClient(
     private val clock: Clock = Clock.System,
     allowHttp: Boolean = false,
     private val stateLifetime: Duration = 1.hours,
+    strictDpopNonces: Boolean = false,
 ) {
     /**
      * The resolver this client uses to find authorization servers.
@@ -116,6 +123,7 @@ public class AtprotoOAuthClient(
             sessionStore = sessionStore,
             sessionLock = sessionLock,
             clock = clock,
+            strictDpopNonces = strictDpopNonces,
         )
 
     /**
@@ -137,6 +145,9 @@ public class AtprotoOAuthClient(
      * Starts a sign-in for [input]: a handle (`alice.example.com`), a DID, or the `https://` URL of
      * a data server or entryway.
      *
+     * @throws IllegalArgumentException if [OAuthAuthorizeOptions.redirectUri] is not one of the
+     *   configured redirect URIs, or [OAuthAuthorizeOptions.scope] lacks `atproto` or goes beyond
+     *   the configured scope.
      * @throws OAuthResolutionException if the account or its servers cannot be found or used.
      * @throws OAuthServerResponseException if the authorization server rejects the request.
      */
@@ -160,6 +171,7 @@ public class AtprotoOAuthClient(
         val dpopKey = crypto.generateEs256Key()
         val clientKey = config.signingKey
         val state = crypto.randomToken(32)
+        val createdAt = clock.now()
 
         stateStore.save(
             OAuthAuthorizationState(
@@ -171,8 +183,9 @@ public class AtprotoOAuthClient(
                 redirectUri = redirectUri,
                 expectedDid = resolved.identity?.did,
                 appState = options.appState,
-                createdAt = clock.now(),
+                createdAt = createdAt,
             ),
+            expiresAt = createdAt + stateLifetime,
         )
 
         val parameters =
@@ -189,8 +202,11 @@ public class AtprotoOAuthClient(
         val requestUri =
             try {
                 manager.agentFor(metadata, dpopKey, clientKey).pushAuthorizationRequest(parameters)
-            } catch (exception: Exception) {
-                stateStore.take(state)
+            } catch (exception: Throwable) {
+                // The request never reached the person, so its pending state is removed, even on cancellation.
+                withContext(NonCancellable) {
+                    runCatching { stateStore.take(state) }.exceptionOrNull()?.let(exception::addSuppressed)
+                }
                 throw exception
             }
 
@@ -216,14 +232,14 @@ public class AtprotoOAuthClient(
      * @throws OAuthCallbackException if the parameters do not match a pending request.
      * @throws OAuthVerificationException if an identity check fails.
      * @throws OAuthServerResponseException if the token request fails.
+     * @throws OAuthClientKeyRemovedException if the client key that started the sign-in has since
+     *   been removed from the configuration.
      */
     public suspend fun callback(parameters: Map<String, String>): OAuthCallbackResult {
         val (pending, code) = takePendingRequest(parameters)
 
         val metadata = resolver.authorizationServerMetadata(pending.issuer)
-        val clientKey =
-            config.key(pending.clientKeyId)
-                ?: throw IllegalStateException("Client key ${pending.clientKeyId} was removed while the sign-in was pending")
+        val clientKey = config.key(pending.clientKeyId) ?: throw OAuthClientKeyRemovedException(pending.clientKeyId)
         val agent = manager.agentFor(metadata, pending.dpopKey, clientKey)
         val tokens = agent.exchangeCode(code, pending.pkceVerifier, pending.redirectUri)
         val now = clock.now()
@@ -233,26 +249,30 @@ public class AtprotoOAuthClient(
                 verifySubject(tokens.sub, pending)
             } catch (exception: Exception) {
                 if (exception is CancellationException) throw exception
-                revokeQuietlyInto(exception, agent, tokens.accessToken)
+                // Revoking the refresh token also ends its access tokens (RFC 7009); the reverse is not guaranteed.
+                revokeQuietlyInto(exception, agent, tokens.refreshToken ?: tokens.accessToken)
                 throw exception
             }
 
-        val previousFailure = revokePrevious(did)
-        saveNewSession(
-            agent = agent,
-            session =
-                OAuthStoredSession(
-                    did = did,
-                    issuer = pending.issuer,
-                    pdsUrl = pdsUrl,
-                    scope = tokens.scope,
-                    accessToken = tokens.accessToken,
-                    refreshToken = tokens.refreshToken,
-                    expiresAt = tokens.expiresAt(now),
-                    dpopKey = pending.dpopKey,
-                    clientKeyId = pending.clientKeyId,
-                ),
-        )
+        val session =
+            OAuthStoredSession(
+                did = did,
+                issuer = pending.issuer,
+                pdsUrl = pdsUrl,
+                scope = tokens.scope,
+                accessToken = tokens.accessToken,
+                refreshToken = tokens.refreshToken,
+                expiresAt = tokens.expiresAt(now),
+                dpopKey = pending.dpopKey,
+                clientKeyId = pending.clientKeyId,
+            )
+        // Under the session lock, so a concurrent refresh of the old session cannot overwrite the new one.
+        val previousFailure =
+            manager.withLock(did) {
+                val failure = revokePreviousLocked(did)
+                saveNewSession(agent, session)
+                failure
+            }
         return OAuthCallbackResult(
             session = newSession(did),
             appState = pending.appState,
@@ -264,7 +284,8 @@ public class AtprotoOAuthClient(
      * Loads the stored session for [did], renewing its access token according to [refresh].
      *
      * @throws OAuthSessionNotFoundException if there is no session for [did].
-     * @throws OAuthSessionEndedException if the session expired or was revoked; it is removed.
+     * @throws OAuthSessionEndedException if the session expired, was revoked, or was rejected by
+     *   its authorization server; it is removed.
      */
     public suspend fun restore(
         did: AtprotoDid,
@@ -351,15 +372,13 @@ public class AtprotoOAuthClient(
         return did to pdsUrl
     }
 
-    private suspend fun revokePrevious(did: AtprotoDid): Throwable? {
-        if (sessionStore.get(did) == null) return null
-        return try {
-            manager.signOut(did)
+    private suspend fun revokePreviousLocked(did: AtprotoDid): Throwable? =
+        try {
+            manager.signOutLocked(did)
             null
         } catch (exception: OAuthRevocationException) {
             exception
         }
-    }
 
     private suspend fun revokeQuietlyInto(
         primary: Exception,

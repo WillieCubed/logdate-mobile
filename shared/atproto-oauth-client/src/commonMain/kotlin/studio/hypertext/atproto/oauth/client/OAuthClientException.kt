@@ -12,6 +12,11 @@ import studio.hypertext.atproto.identity.AtprotoDid
  * - [OAuthServerResponseException]: an authorization server rejected a request
  * - [OAuthVerificationException]: a server answered, but its answer failed a security check
  * - [OAuthSessionException]: a stored session is missing, expired, or revoked
+ * - [OAuthClientKeyRemovedException]: the client's own configuration no longer has a key in use
+ *
+ * Invalid arguments, such as a redirect URI that is not configured, throw
+ * [IllegalArgumentException] instead. Exceptions from the caller's own stores and locks pass
+ * through unchanged.
  */
 public sealed class OAuthClientException(
     message: String,
@@ -227,6 +232,39 @@ public class OAuthSessionRevokedException(
     detail: String,
     cause: Throwable? = null,
 ) : OAuthSessionEndedException(did, "The OAuth session for $did was revoked: $detail", cause)
+
+/**
+ * The authorization server refused the session's refresh token (`invalid_grant`). The session
+ * reached the end of its lifetime or was revoked; the server's answer does not say which.
+ */
+public class OAuthSessionRejectedException(
+    did: AtprotoDid,
+    cause: OAuthServerResponseException,
+) : OAuthSessionEndedException(did, "The authorization server no longer accepts the OAuth session for $did", cause)
+
+/**
+ * A request through [OAuthSession.httpClient] was addressed to a server other than the account's
+ * data server, so it was not sent. This also happens when a renewal finds that the account moved
+ * to another data server while the request was being made.
+ *
+ * @property targetOrigin Where the request was addressed.
+ * @property pdsOrigin The account's data server.
+ */
+public class OAuthForeignOriginException(
+    did: AtprotoDid,
+    public val targetOrigin: String,
+    public val pdsOrigin: String,
+) : OAuthSessionException(did, "This session only authenticates requests to $pdsOrigin, not $targetOrigin")
+
+/**
+ * The client key that a pending sign-in or a stored session is bound to is no longer in
+ * [OAuthClientConfig.keys]. Keep retired keys configured until nothing uses them.
+ *
+ * @property keyId The missing key's `kid`.
+ */
+public class OAuthClientKeyRemovedException(
+    public val keyId: String,
+) : OAuthClientException("The client key $keyId is no longer configured")
 
 /**
  * Signing out removed the local session, but the authorization server did not confirm that it

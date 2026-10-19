@@ -73,7 +73,8 @@ convert an existing PKCS#8 key with `JvmOAuthCrypto.privateJwkFromPkcs8(bytes, k
 
 **Rotating keys:** put the new key first in `keys` (it signs new sessions) and keep the old key
 after it. Each session stays bound to the key that started it, so remove the old key only when no
-stored session uses it. Sessions whose key was removed end with `OAuthSessionRevokedException`.
+stored session uses it. Sessions whose key was removed end with `OAuthSessionRevokedException`
+when they next renew, and pending sign-ins that used it fail with `OAuthClientKeyRemovedException`.
 
 ### 2. Configure and build the client
 
@@ -100,7 +101,7 @@ val oauth =
         crypto = JvmOAuthCrypto,
         stateStore = myStateStore,           // your database
         sessionStore = mySessionStore,       // your database
-        sessionLock = myDistributedLock,     // optional, see below
+        sessionLock = mySharedLock,          // required with more than one instance, see below
     )
 ```
 
@@ -136,6 +137,9 @@ val session = oauth.restore(did)
 val xrpc = session.xrpcClient()
 val profile = xrpc.queryRaw(Nsid.require("com.atproto.server.getSession"))
 ```
+
+Before each XRPC call the session renews its access token if needed and looks up the account's
+current data server, so it keeps working after the account moves.
 
 `session.httpClient` is a plain Ktor client for anything XRPC does not cover. It only sends
 requests to the account's own data server and does not follow redirects, so the token cannot leak
@@ -183,7 +187,10 @@ The OAuth client also protects itself:
 The library never decides where data lives. You provide two stores:
 
 - `OAuthStateStore` holds a pending sign-in between `authorize` and `callback`. `take` must return
-  and delete in one step so a callback cannot be replayed.
+  and delete in one step so a callback cannot be replayed. `save` receives an `expiresAt` time
+  (one hour after the sign-in started, by default): most sign-ins that start are never finished,
+  so give entries a time to live, such as a Redis `EXPIREAT` or a column a cleanup job checks. The
+  client refuses an expired entry either way.
 - `OAuthSessionStore` holds the session for each DID: tokens, the private DPoP key, and the client
   key ID. Both stored types are `@Serializable`, so saving them as JSON is one line.
 
@@ -193,17 +200,31 @@ Because the session object holds no state of its own, any instance that shares t
 `restore` and use a session, including after a restart. `InMemoryOAuthStateStore` and
 `InMemoryOAuthSessionStore` exist for tests and single-process development only.
 
-Refresh tokens are single-use. If two instances refresh the same session at the same time, one of
-them fails. The default `InProcessOAuthSessionLock` prevents this within one process. Across
-instances, either pass an `OAuthSessionLock` backed by something shared (a database advisory lock,
-for example), or rely on the built-in recovery: when a refresh is rejected, the client re-reads the
-store and uses the tokens another instance just saved. The lock is the more reliable option,
-because some authorization servers end the whole session when they see a refresh token reused.
+Refresh tokens are single-use. If two instances refresh the same session at the same time, the
+second one presents a refresh token that has already been spent, and authorization servers that
+detect this (the reference one included) end the whole session. The person is signed out. The
+client reads sessions without any lock, and takes the `OAuthSessionLock` only to renew one. Inside
+the lock it reads the session again, so a request that waited behind another renewal uses that
+renewal's tokens instead of spending the refresh token a second time. Replacing an account's
+session after a new sign-in, and signing out, also happen under the lock.
+
+The default `InProcessOAuthSessionLock` covers one process. **If more than one instance shares the
+session store, they must share an `OAuthSessionLock` too**: one backed by a database advisory lock
+or a Redis lease, for example. When a refresh is rejected, the client waits a second and re-reads
+the store in case another instance has just saved newer tokens, but that does not replace the
+lock. On a server that detects refresh token reuse, those newer tokens have already been revoked,
+so the next request ends the session. The re-read only helps against servers without reuse
+detection, or when a lock's lease ran out in the middle of a refresh.
+
+When a renewal finds that the account's authorization server changed, or the new tokens belong to
+another account, the client revokes the tokens it can and ends the session.
 
 ## Errors
 
 Every failure is a subclass of `OAuthClientException`, so you can tell the person what actually
-happened:
+happened. The exceptions are invalid arguments (a redirect URI or scope outside the configuration),
+which throw `IllegalArgumentException`, and errors from your own stores and lock, which pass
+through unchanged.
 
 | Exception | Meaning | What to tell the person |
 | --- | --- | --- |
@@ -217,12 +238,18 @@ happened:
 | `OAuthIssuerMismatchException`, `OAuthSubjectMismatchException`, `OAuthInvalidTokenResponseException` | A security check failed; any tokens were revoked | Sign-in failed |
 | `OAuthServerResponseException` | An authorization server request failed (`error` holds the OAuth code) | Try again later |
 | `OAuthSessionNotFoundException` | No stored session for this DID | Sign in |
-| `OAuthSessionExpiredException` | The session reached the end of its lifetime | Sign in again |
-| `OAuthSessionRevokedException` | The session was revoked or failed a security check | Sign in again |
+| `OAuthSessionExpiredException` | The access token expired and the server issued no refresh token | Sign in again |
+| `OAuthSessionRejectedException` | The server refused the refresh token (`invalid_grant`): the session expired or was revoked, and the server does not say which | Sign in again |
+| `OAuthSessionRevokedException` | The session failed a security check, or its client key was removed | Sign in again |
+| `OAuthForeignOriginException` | A `session.httpClient` request was addressed to a server other than the account's data server, or the account moved while it was being made | Nothing; retry through `xrpcClient()` |
 | `OAuthRevocationException` | Sign-out removed the local session but the server did not confirm | Nothing; the tokens expire on their own |
+| `OAuthClientKeyRemovedException` | A pending sign-in or session uses a client key you removed from the configuration | Start the sign-in again; keep retired keys configured longer |
 
 Sessions that end (`OAuthSessionEndedException`) are removed from the store automatically. Through
-`xrpcClient()`, these session errors arrive as the `cause` of an `XrpcTransportException`.
+`xrpcClient()`, session errors arrive as the `cause` of an `XrpcTransportException`.
+
+If signing out fails both to revoke the tokens and to delete the stored session, the store's
+exception is thrown with the revocation failure attached as a suppressed exception.
 
 ## Platforms
 
@@ -238,9 +265,11 @@ crypto library.
   or some people will not be able to sign in.
 - **Only ES256** is used for DPoP proofs and client assertions. It is the algorithm every AT
   Protocol server must support.
-- **Missing DPoP nonces are tolerated.** The specification asks clients to reject responses without
-  a `DPoP-Nonce` header. Like the reference TypeScript client, this client does not, because
-  development servers can run with nonces turned off.
+- **Missing DPoP nonces are tolerated by default.** The AT Protocol requires servers to issue
+  nonces, but development servers can run with them turned off, so like the reference TypeScript
+  client this one does not insist. Pass `strictDpopNonces = true` to refuse an authorization server
+  whose pushed authorization response has no `DPoP-Nonce` header. Every sign-in starts with that
+  request, so such a server is refused before it issues any tokens.
 - **Request bodies must be re-sendable.** A data server request may be sent up to three times (new
   nonce, renewed token), so streaming bodies are not supported through `session.httpClient`.
 

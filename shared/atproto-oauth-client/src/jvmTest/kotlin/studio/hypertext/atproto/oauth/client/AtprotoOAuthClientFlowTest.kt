@@ -20,6 +20,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 class AtprotoOAuthClientFlowTest {
     private val getSession = Nsid.require("com.atproto.server.getSession")
@@ -112,7 +113,7 @@ class AtprotoOAuthClientFlowTest {
         }
 
     @Test
-    fun rejectsAnExpiredPendingSignIn() =
+    fun anExpiredPendingSignInIsGoneFromTheStore() =
         runTest {
             val harness = OAuthTestHarness()
             val redirect = harness.client.authorize("alice.example.com")
@@ -121,8 +122,36 @@ class AtprotoOAuthClientFlowTest {
 
             val error = assertFailsWith<OAuthCallbackException> { harness.client.callback(parameters) }
 
+            assertEquals(OAuthCallbackException.Reason.UNKNOWN_STATE, error.reason)
+        }
+
+    @Test
+    fun rejectsAnExpiredPendingSignInFromAStoreWithoutExpiry() =
+        runTest {
+            val harness = OAuthTestHarness()
+            val client = harness.newClientInstance(pendingStore = KeepForeverStateStore())
+            val redirect = client.authorize("alice.example.com")
+            val parameters = harness.atmosphere.approve(redirect.url)
+            harness.atmosphere.clock.advance(61.minutes)
+
+            val error = assertFailsWith<OAuthCallbackException> { client.callback(parameters) }
+
             assertEquals(OAuthCallbackException.Reason.EXPIRED_STATE, error.reason)
         }
+
+    /** A state store that ignores expiry, as a store without TTL support would. */
+    private class KeepForeverStateStore : OAuthStateStore {
+        private val entries = mutableMapOf<String, OAuthAuthorizationState>()
+
+        override suspend fun save(
+            value: OAuthAuthorizationState,
+            expiresAt: Instant,
+        ) {
+            entries[value.state] = value
+        }
+
+        override suspend fun take(state: String): OAuthAuthorizationState? = entries.remove(state)
+    }
 
     @Test
     fun rejectsACallbackFromAnotherIssuer() =
@@ -180,7 +209,9 @@ class AtprotoOAuthClientFlowTest {
 
             assertFailsWith<OAuthSubjectMismatchException> { harness.signIn() }
 
-            assertEquals(1, atmosphere.revokedTokens.size, "the unusable access token is revoked")
+            val grant = atmosphere.grantsFor(atmosphere.alice.did).single()
+            assertEquals(listOf(grant.refreshToken), atmosphere.revokedTokens, "the refresh token is revoked, which ends its access token")
+            assertTrue(grant.revoked)
             assertNull(harness.sessionStore.get(AtprotoDid.require(atmosphere.bob.did)))
             assertNull(harness.sessionStore.get(AtprotoDid.require(atmosphere.alice.did)))
         }
@@ -322,13 +353,13 @@ class AtprotoOAuthClientFlowTest {
 
             val error = assertFailsWith<XrpcTransportException> { session.xrpcClient().queryRaw(getSession) }
 
-            assertIs<OAuthSessionRevokedException>(error.cause)
+            assertIs<OAuthSessionRejectedException>(error.cause)
             assertNull(harness.sessionStore.get(session.did))
             assertFailsWith<OAuthSessionNotFoundException> { harness.client.restore(session.did) }
         }
 
     @Test
-    fun reportsAnExpiredSessionAndRemovesIt() =
+    fun reportsASessionTheServerNoLongerAcceptsAndRemovesIt() =
         runTest {
             val harness = OAuthTestHarness()
             val atmosphere = harness.atmosphere
@@ -336,7 +367,7 @@ class AtprotoOAuthClientFlowTest {
             atmosphere.expireAllSessions(atmosphere.alice.did)
             atmosphere.clock.advance(6.minutes)
 
-            assertFailsWith<OAuthSessionExpiredException> { harness.client.restore(did) }
+            assertFailsWith<OAuthSessionRejectedException> { harness.client.restore(did) }
             assertNull(harness.sessionStore.get(did))
         }
 
@@ -417,7 +448,7 @@ class AtprotoOAuthClientFlowTest {
             val harness = OAuthTestHarness()
             val session = harness.signIn().session
 
-            assertFailsWith<IllegalStateException> {
+            assertFailsWith<OAuthForeignOriginException> {
                 session.httpClient.get("https://pds.example.net/xrpc/com.atproto.server.getSession")
             }
         }

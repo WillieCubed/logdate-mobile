@@ -2,6 +2,9 @@ package studio.hypertext.atproto.oauth.client
 
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import studio.hypertext.atproto.identity.AtprotoDid
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -25,6 +28,10 @@ public enum class OAuthRefreshMode {
 
 /**
  * Loads, renews, and ends stored sessions. Shared by [AtprotoOAuthClient] and [OAuthSession].
+ *
+ * Reading a session takes no lock. The [OAuthSessionLock] is taken only to renew one, and the
+ * session is read again inside it, so callers that queued behind another renewal use its result
+ * instead of spending the single-use refresh token a second time.
  */
 internal class OAuthSessionManager(
     private val config: OAuthClientConfig,
@@ -35,19 +42,33 @@ internal class OAuthSessionManager(
     private val sessionStore: OAuthSessionStore,
     private val sessionLock: OAuthSessionLock,
     private val clock: Clock,
+    private val strictDpopNonces: Boolean = false,
 ) {
     suspend fun session(
         did: AtprotoDid,
         mode: OAuthRefreshMode,
-    ): OAuthStoredSession =
-        sessionLock.withLock(did) {
-            val stored = sessionStore.get(did) ?: throw OAuthSessionNotFoundException(did)
-            when (mode) {
-                OAuthRefreshMode.NEVER -> stored
-                OAuthRefreshMode.AUTO -> if (isStale(stored)) refresh(stored) else stored
-                OAuthRefreshMode.FORCE -> refresh(stored)
-            }
+    ): OAuthStoredSession {
+        val current = load(did)
+        return when (mode) {
+            OAuthRefreshMode.NEVER -> current
+            OAuthRefreshMode.AUTO -> if (isStale(current)) renewUnlessReplaced(current) else current
+            OAuthRefreshMode.FORCE -> renewUnlessReplaced(current)
         }
+    }
+
+    /**
+     * Renews the session after a data server rejected [rejected]'s access token, unless another
+     * caller has already replaced that token.
+     */
+    suspend fun renewAfterRejection(rejected: OAuthStoredSession): OAuthStoredSession = renewUnlessReplaced(rejected)
+
+    /**
+     * Runs [block] while holding the session lock for [did].
+     */
+    suspend fun <T> withLock(
+        did: AtprotoDid,
+        block: suspend () -> T,
+    ): T = sessionLock.withLock(did, block)
 
     /**
      * Removes the session for [did] and throws [exception].
@@ -65,21 +86,42 @@ internal class OAuthSessionManager(
      * session is removed even when revocation fails.
      */
     suspend fun signOut(did: AtprotoDid) {
-        sessionLock.withLock(did) {
-            val stored = sessionStore.get(did) ?: return@withLock
-            val failure =
-                try {
-                    agentFor(stored, resolver.authorizationServerMetadata(stored.issuer))
-                        .revoke(stored.refreshToken ?: stored.accessToken)
-                    null
-                } catch (exception: CancellationException) {
-                    throw exception
-                } catch (exception: Exception) {
-                    exception
-                } finally {
-                    sessionStore.delete(did)
-                }
-            if (failure != null) throw OAuthRevocationException(did, failure)
+        sessionLock.withLock(did) { signOutLocked(did) }
+    }
+
+    /**
+     * [signOut] for a caller that already holds the session lock for [did].
+     */
+    suspend fun signOutLocked(did: AtprotoDid) {
+        val stored = sessionStore.get(did) ?: return
+        val failure =
+            try {
+                agentFor(stored, resolver.authorizationServerMetadata(stored.issuer))
+                    .revoke(stored.refreshToken ?: stored.accessToken)
+                null
+            } catch (exception: CancellationException) {
+                withContext(NonCancellable) { deleteKeeping(did, exception) }
+                throw exception
+            } catch (exception: Exception) {
+                exception
+            }
+        deleteKeeping(did, failure)
+        if (failure != null) throw OAuthRevocationException(did, failure)
+    }
+
+    /**
+     * Removes the session for [did]. If that fails, [earlier] is attached to the delete failure as
+     * suppressed, so neither is lost.
+     */
+    private suspend fun deleteKeeping(
+        did: AtprotoDid,
+        earlier: Throwable?,
+    ) {
+        try {
+            sessionStore.delete(did)
+        } catch (exception: Exception) {
+            earlier?.let(exception::addSuppressed)
+            throw exception
         }
     }
 
@@ -97,17 +139,24 @@ internal class OAuthSessionManager(
             crypto = crypto,
             nonces = nonces,
             clock = clock,
+            strictDpopNonces = strictDpopNonces,
         )
 
     private fun agentFor(
         stored: OAuthStoredSession,
         metadata: OAuthAuthorizationServerMetadata,
     ): OAuthServerAgent {
-        val clientKey =
-            config.key(stored.clientKeyId)
-                ?: throw IllegalStateException("Client key ${stored.clientKeyId} that started this session is no longer configured")
+        val clientKey = config.key(stored.clientKeyId) ?: throw OAuthClientKeyRemovedException(stored.clientKeyId)
         return agentFor(metadata, stored.dpopKey, clientKey)
     }
+
+    private suspend fun load(did: AtprotoDid): OAuthStoredSession = sessionStore.get(did) ?: throw OAuthSessionNotFoundException(did)
+
+    private suspend fun renewUnlessReplaced(seen: OAuthStoredSession): OAuthStoredSession =
+        sessionLock.withLock(seen.did) {
+            val latest = load(seen.did)
+            if (latest.accessToken != seen.accessToken) latest else refresh(latest)
+        }
 
     private fun isStale(stored: OAuthStoredSession): Boolean {
         val expiresAt = stored.expiresAt ?: return false
@@ -128,12 +177,17 @@ internal class OAuthSessionManager(
         val (pdsUrl, metadata) = resolver.resolveForDid(did)
         if (metadata.issuer != stored.issuer) {
             val mismatch = OAuthIssuerMismatchException(stored.issuer, metadata.issuer)
-            end(did, OAuthSessionRevokedException(did, "the account's authorization server changed", mismatch))
+            val ended = OAuthSessionRevokedException(did, "the account's authorization server changed", mismatch)
+            revokeQuietly(ended) {
+                agentFor(resolver.authorizationServerMetadata(stored.issuer), stored.dpopKey, clientKey).revoke(refreshToken)
+            }
+            end(did, ended)
         }
 
+        val agent = agentFor(metadata, stored.dpopKey, clientKey)
         val tokens =
             try {
-                agentFor(metadata, stored.dpopKey, clientKey).refresh(refreshToken)
+                agent.refresh(refreshToken)
             } catch (exception: OAuthServerResponseException) {
                 if (exception.error != "invalid_grant") throw exception
                 return recoverFromRejectedRefresh(stored, exception)
@@ -141,7 +195,9 @@ internal class OAuthSessionManager(
 
         if (tokens.sub != did.toString()) {
             val mismatch = OAuthSubjectMismatchException(did, tokens.sub)
-            end(did, OAuthSessionRevokedException(did, "the refreshed tokens belong to ${tokens.sub}", mismatch))
+            val ended = OAuthSessionRevokedException(did, "the refreshed tokens belong to ${tokens.sub}", mismatch)
+            revokeQuietly(ended) { agent.revoke(tokens.refreshToken ?: tokens.accessToken) }
+            end(did, ended)
         }
 
         val renewed =
@@ -162,26 +218,52 @@ internal class OAuthSessionManager(
     }
 
     /**
-     * Handles `invalid_grant` from a refresh. If another instance refreshed the session in the
-     * meantime, its newer tokens are in the store and are returned. Otherwise the session has ended.
+     * Handles `invalid_grant` from a refresh. Another instance may have refreshed the session just
+     * before, and may still be saving its result, so the store is read again after a short wait. If
+     * it holds newer tokens, they are returned. Otherwise the session has ended.
+     *
+     * This is a mitigation, not a substitute for a shared [OAuthSessionLock]: a server with refresh
+     * token reuse detection, the reference one included, has already ended the whole session by
+     * then, so the newer tokens fail on their next use. It helps only with servers without reuse
+     * detection, or when a shared lock's lease expired mid-refresh.
+     *
+     * `invalid_grant` does not say whether the session expired or was revoked, so it is reported
+     * as [OAuthSessionRejectedException] rather than guessed from the description.
      */
     private suspend fun recoverFromRejectedRefresh(
         stored: OAuthStoredSession,
         exception: OAuthServerResponseException,
     ): OAuthStoredSession {
         val did = stored.did
+        delay(REJECTED_REFRESH_GRACE)
         val latest = sessionStore.get(did)
         if (latest != null && (latest.accessToken != stored.accessToken || latest.refreshToken != stored.refreshToken)) {
             return latest
         }
-        val detail = exception.errorDescription ?: "the authorization server rejected the refresh token"
-        if (detail.contains("expired", ignoreCase = true)) end(did, OAuthSessionExpiredException(did, detail, exception))
-        end(did, OAuthSessionRevokedException(did, detail, exception))
+        end(did, OAuthSessionRejectedException(did, exception))
+    }
+
+    /**
+     * Runs [revoke], recording a failure on [primary] instead of throwing it: the session is
+     * ending anyway, and the tokens expire on their own.
+     */
+    private suspend fun revokeQuietly(
+        primary: Exception,
+        revoke: suspend () -> Unit,
+    ) {
+        try {
+            revoke()
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            primary.addSuppressed(exception)
+        }
     }
 
     private companion object {
         val REFRESH_MARGIN = 10.seconds
         val REFRESH_JITTER = 30.seconds
+        val REJECTED_REFRESH_GRACE = 1.seconds
     }
 }
 
