@@ -35,6 +35,7 @@ dependencies {
         api("studio.hypertext.atproto:atproto-repo:${project.version}")
         api("studio.hypertext.atproto:atproto-pds:${project.version}")
         api("studio.hypertext.atproto:atproto-pds-runtime:${project.version}")
+        api("studio.hypertext.atproto:atproto-oauth-client:${project.version}")
     }
 }
 
