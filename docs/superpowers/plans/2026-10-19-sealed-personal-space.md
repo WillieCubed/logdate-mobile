@@ -1276,7 +1276,7 @@ single<SpaceStore> { if (isDatabaseAvailable) PostgreSQLSpaceStore() else InMemo
 
 Run:
 - `./gradlew :server:test --tests 'app.logdate.server.space.*' --tests 'app.logdate.server.database.MigrationVersionsTest' -q`
-- The opt-in Postgres test against a disposable local PostgreSQL. Start one with `initdb` and `pg_ctl` in the scratchpad (`LC_ALL=en_US.UTF-8`), and set `LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL='postgresql://postgres@localhost:55432/logdate_disposable'` with `DATABASE_PASSWORD` set to any value (the local cluster trusts every connection) and `LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE=true`.
+- The Postgres tests against the local test database: start it with `./run dev` and run `./run test:server`, which points `DATABASE_URL`, `DATABASE_USER` and `DATABASE_PASSWORD` at it. Without that database they're skipped and say why.
 
 Expected: PASS for both.
 

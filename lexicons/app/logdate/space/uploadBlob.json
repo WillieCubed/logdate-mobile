@@ -28,7 +28,12 @@
       },
       "errors": [
         { "name": "BlobNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing blob." },
-        { "name": "BlobTooLarge", "description": "The file is larger than the server accepts: 100 MiB on LogDate Cloud." }
+        { "name": "LengthRequired", "description": "The request had no Content-Length header. The server holds the file's room against the quota before receiving anything, so it needs the length first." },
+        { "name": "UploadStalled", "description": "The client sent nothing for too long, so the server ended the upload and freed its place. Send the file again." },
+        { "name": "BlobTooLarge", "description": "The file is larger than the server accepts: 100 MiB on LogDate Cloud." },
+        { "name": "QuotaExceeded", "description": "The upload's Content-Length doesn't fit in what's left of the account's storage quota, counting other uploads in progress, or the file didn't fit once received. A file the space already holds adds nothing once stored." },
+        { "name": "RateLimitExceeded", "description": "The account sent too many requests of this kind recently. Wait the seconds in the Retry-After header, then retry. Record writes, reads and blob uploads are counted separately." },
+        { "name": "ServerBusy", "description": "The server is already moving as many files as it can hold. Wait the seconds in the Retry-After header, then retry. It isn't counted against the account." }
       ]
     }
   }

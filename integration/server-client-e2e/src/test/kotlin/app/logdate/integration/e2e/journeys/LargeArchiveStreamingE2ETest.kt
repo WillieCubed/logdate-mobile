@@ -32,7 +32,6 @@ class LargeArchiveStreamingE2ETest {
     fun `100 MiB and 1 GiB archives round trip over HTTP below archive-sized heap`() =
         runBlocking {
             assumeTrue(System.getenv("LOGDATE_LARGE_BACKUP_TEST") == "1")
-            check(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true")
             check(System.getenv("DATABASE_URL").orEmpty().startsWith("jdbc:postgresql://127.0.0.1:"))
             check(!System.getenv("SERVER_ENCRYPTION_KEY").isNullOrBlank())
             assertTrue(Runtime.getRuntime().maxMemory() <= 512L * 1024 * 1024, "proof requires a bounded test-worker heap")

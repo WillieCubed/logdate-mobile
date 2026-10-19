@@ -117,7 +117,7 @@ public class XrpcDataHome(
                 }
             } catch (e: XrpcProtocolException) {
                 if (e.error == RECORD_NOT_FOUND) return null
-                throw e
+                throw e.refusal() ?: e
             }
         return StoredRecord(rkey, output.cid, output.seq, output.value)
     }
@@ -138,7 +138,7 @@ public class XrpcDataHome(
                 }
             } catch (e: XrpcProtocolException) {
                 if (e.error == CURSOR_TOO_OLD) throw DataHomeCursorTooOldException(e.errorMessage ?: "List again from 0")
-                throw e
+                throw e.refusal() ?: e
             }
         val changes = output.ops.map { RecordChange(it.rkey, it.seq, it.deleted, it.cid, it.value) }
         return ChangePage(changes, output.cursor, output.hasMore)
@@ -155,16 +155,18 @@ public class XrpcDataHome(
     ): String {
         val token = bearerToken(auth())
         val body =
-            transport {
-                val response =
-                    httpClient.post(url(UPLOAD_BLOB)) {
-                        parameter("space", space.uri)
-                        bearer(token)
-                        contentType(ContentType.Application.OctetStream)
-                        setBody(bytes)
-                    }
-                if (!response.status.isSuccess()) throw response.failure()
-                response.bodyAsText()
+            refusals {
+                transport {
+                    val response =
+                        httpClient.post(url(UPLOAD_BLOB)) {
+                            parameter("space", space.uri)
+                            bearer(token)
+                            contentType(ContentType.Application.OctetStream)
+                            setBody(bytes)
+                        }
+                    if (!response.status.isSuccess()) throw response.failure()
+                    response.bodyAsText()
+                }
             }
         return blobCid(body)
     }
@@ -178,17 +180,19 @@ public class XrpcDataHome(
         cid: String,
     ): ByteArray? {
         val token = bearerToken(auth())
-        return transport {
-            val response =
-                httpClient.get(url(GET_BLOB)) {
-                    parameter("space", space.uri)
-                    parameter("cid", cid)
-                    bearer(token)
-                }
-            if (response.status.isSuccess()) return@transport response.readRawBytes()
-            val failure = response.failure()
-            if (failure.error == BLOB_NOT_FOUND) return@transport null
-            throw failure
+        return refusals {
+            transport {
+                val response =
+                    httpClient.get(url(GET_BLOB)) {
+                        parameter("space", space.uri)
+                        parameter("cid", cid)
+                        bearer(token)
+                    }
+                if (response.status.isSuccess()) return@transport response.readRawBytes()
+                val failure = response.failure()
+                if (failure.error == BLOB_NOT_FOUND) return@transport null
+                throw failure
+            }
         }
     }
 
@@ -322,7 +326,23 @@ public class XrpcDataHome(
             block()
         } catch (e: XrpcProtocolException) {
             if (e.error == INVALID_SWAP) throw DataHomeConflictException(e.errorMessage ?: "The record changed")
-            throw e
+            throw e.refusal() ?: e
+        }
+
+    /** Runs a request, reporting a rate limit, a busy server or a full quota as the [DataHome] exception for it. */
+    private inline fun <T> refusals(block: () -> T): T =
+        try {
+            block()
+        } catch (e: XrpcProtocolException) {
+            throw e.refusal() ?: e
+        }
+
+    private fun XrpcProtocolException.refusal(): Exception? =
+        when (error) {
+            RATE_LIMIT_EXCEEDED -> DataHomeRateLimitedException(errorMessage ?: "Too many requests", retryAfterSeconds, cause = this)
+            SERVER_BUSY -> DataHomeBusyException(errorMessage ?: "The data home is busy", retryAfterSeconds, cause = this)
+            QUOTA_EXCEEDED -> DataHomeQuotaExceededException(cause = this)
+            else -> null
         }
 
     private companion object {
@@ -331,6 +351,9 @@ public class XrpcDataHome(
         const val RECORD_NOT_FOUND = "RecordNotFound"
         const val BLOB_NOT_FOUND = "BlobNotFound"
         const val CURSOR_TOO_OLD = "CursorTooOld"
+        const val RATE_LIMIT_EXCEEDED = "RateLimitExceeded"
+        const val QUOTA_EXCEEDED = "QuotaExceeded"
+        const val SERVER_BUSY = "ServerBusy"
         val PUT = Nsid.require("app.logdate.space.putRecord")
         val DELETE = Nsid.require("app.logdate.space.deleteRecord")
         val GET = Nsid.require("app.logdate.space.getRecord")

@@ -1,13 +1,12 @@
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
 import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import org.junit.Assume.assumeTrue
-import java.net.URI
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,13 +16,13 @@ import kotlin.test.assertNotNull
 /**
  * Production reaches Postgres through a transaction-pooling proxy, which may run consecutive
  * autocommit statements from one client connection on different server backends. Point
- * LOGDATE_JOURNAL_MERGE_TEST_DATABASE_URL at such a proxy (for example PgBouncer with
+ * DATABASE_URL at such a proxy on this machine (for example PgBouncer with
  * `pool_mode = transaction`) to reproduce that routing; a direct connection also passes.
  */
 class JournalMergeAccountLockPostgresTest {
     @Test
     fun `account lock is released when other traffic takes the backend that acquired it`() =
-        withDisposableDataSource { dataSource ->
+        withTestDataSource { dataSource ->
             val store = PostgreSQLJournalMergeStore(dataSource)
             val otherInstance = PostgreSQLJournalMergeStore(dataSource)
             val user = UUID.randomUUID()
@@ -42,7 +41,7 @@ class JournalMergeAccountLockPostgresTest {
 
     @Test
     fun `account lock is released when its action fails`() =
-        withDisposableDataSource { dataSource ->
+        withTestDataSource { dataSource ->
             val store = PostgreSQLJournalMergeStore(dataSource)
             val user = UUID.randomUUID()
             assertFailsWith<IllegalStateException> {
@@ -80,13 +79,8 @@ class JournalMergeAccountLockPostgresTest {
                 }
         }
 
-    private fun withDisposableDataSource(test: suspend (HikariDataSource) -> Unit) {
-        val url = System.getenv("LOGDATE_JOURNAL_MERGE_TEST_DATABASE_URL")
-        assumeTrue(url != null && System.getenv("LOGDATE_JOURNAL_MERGE_TEST_DISPOSABLE") == "true")
-        val uri = URI(requireNotNull(url))
-        require(uri.host in setOf("localhost", "127.0.0.1") && uri.path.startsWith("/logdate_agent_journal_merge_"))
-        // Credentials come from the URL, for example postgresql://user:password@localhost:6432/...
-        val dataSource = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+    private fun withTestDataSource(test: suspend (HikariDataSource) -> Unit) {
+        val dataSource = localTestPostgresDataSource()
         // Closing the pool also ends any lock statement left blocked by a failed assertion.
         dataSource.use { runBlocking { test(it) } }
     }

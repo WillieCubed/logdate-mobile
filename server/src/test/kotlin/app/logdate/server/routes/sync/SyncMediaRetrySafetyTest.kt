@@ -6,7 +6,10 @@ import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.LogDateBlobFileWriteRequest
 import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
+import app.logdate.server.logdate.LogDateBlobStream
+import app.logdate.server.logdate.LogDateBlobStreamRequest
 import app.logdate.server.logdate.LogDateBlobWriteRequest
+import app.logdate.server.logdate.LogDateBlobWriter
 import app.logdate.server.logdate.LogDateMedia
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateBackupRepository
@@ -226,6 +229,10 @@ private class RetryBlobStorage : LogDateBlobStorage {
     override fun getBlob(storagePath: String): ByteArray? = blobs[storagePath]?.copyOf()
 
     override fun deleteBlob(storagePath: String): Boolean = blobs.remove(storagePath) != null
+
+    override fun openBlob(storagePath: String): LogDateBlobStream? = error("Streamed reads are not used by this route")
+
+    override fun openBlobWriter(request: LogDateBlobStreamRequest): LogDateBlobWriter = error("Streamed uploads are not used by this route")
 
     override fun getSignedDownloadUrl(
         storagePath: String,

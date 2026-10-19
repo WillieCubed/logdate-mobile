@@ -123,6 +123,7 @@ import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.LocationHistoryRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
+import app.logdate.server.transfer.TransferSlots
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import org.koin.dsl.bind
@@ -204,6 +205,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLAccountKeyEnvelopeRepository() else InMemoryAccountKeyEnvelopeRepository()
         }
         single<SpaceStore> { if (isDatabaseAvailable) PostgreSQLSpaceStore() else InMemorySpaceStore() }
+        single { TransferSlots() }
         single { GoogleVcJwksCache() }
         single {
             DigitalCredentialVerifier(

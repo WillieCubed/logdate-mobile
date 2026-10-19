@@ -1,9 +1,15 @@
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
+import app.logdate.server.database.support.localTestPostgresUrl
+import app.logdate.server.entitlements.DatabaseUsageCalculator
 import app.logdate.server.space.SpaceBlob
 import app.logdate.server.space.SpaceCursorTooOldException
 import app.logdate.server.space.SpacePurgeResult
+import app.logdate.server.space.SpaceQuota
+import app.logdate.server.space.SpaceQuotaExceededException
 import app.logdate.server.space.SpaceRecordWrite
+import app.logdate.server.space.recordCid
 import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +22,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
-import org.junit.Assume.assumeTrue
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.io.encoding.Base64
@@ -26,10 +32,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 
-/** Explicit disposable PostgreSQL only; forces competing transactions to wait on each other's locks. */
+/** Runs against the local test PostgreSQL only; forces competing transactions to wait on each other's locks. */
 class SpaceStorePostgresTest {
     private class Fixture(
         val source: HikariDataSource,
@@ -78,7 +85,7 @@ class SpaceStorePostgresTest {
                 store.delete(owner, space, author, "first", swapCid = null)
                 assertEquals(1, count(source, "SELECT count(*) FROM space_record_blobs WHERE space_uri = ?", space))
 
-                deleteTestAccountRow(owner)
+                transaction { exec("DELETE FROM accounts WHERE id = '$owner'") }
 
                 assertEquals(0, count(source, "SELECT count(*) FROM space_states WHERE account_id = ?", owner))
                 assertEquals(0, count(source, "SELECT count(*) FROM space_records WHERE account_id = ?", owner))
@@ -191,13 +198,80 @@ class SpaceStorePostgresTest {
             }
         }
 
+    @Test
+    fun `storage usage counts live space records and blobs but not tombstones`() =
+        withFixture { fixture ->
+            with(fixture) {
+                val usage = DatabaseUsageCalculator(requireNotNull(TransactionManager.defaultDatabase))
+                assertEquals(0L, usage.storageBytes(owner))
+                val kept = store.put(write("kept"))
+                store.put(write("deleted"))
+                store.delete(owner, space, author, "deleted", swapCid = null)
+                store.putBlob(owner, space, SpaceBlob("bafycounted", "application/octet-stream", 3_000_000_000L, "users/$owner/spaces/big"))
+                val recordBytes = recordCid(kept.record).second.size.toLong()
+                assertEquals(recordBytes + 3_000_000_000L, usage.storageBytes(owner))
+                assertEquals(0L, usage.storageBytesOutsideSpaces(owner))
+                assertEquals(
+                    number(source, "SELECT space_bytes - 3000000000 FROM account_storage_usage WHERE account_id = ?", owner),
+                    number(
+                        source,
+                        "SELECT COALESCE(SUM(size_bytes), 0) FROM space_records WHERE account_id = ? AND NOT deleted",
+                        owner,
+                    ),
+                    "The running total matches the rows it counts",
+                )
+            }
+        }
+
+    @Test
+    fun `requests that race for the last room wait on the account's usage lock and only those that fit are stored`() =
+        withFixture { fixture ->
+            with(fixture) {
+                store.put(write("first"))
+                val size = store.storedBytes(owner)
+                val quota = SpaceQuota(limitBytes = size * 3, otherBytes = 0)
+                source.connection.use { lock ->
+                    lock.autoCommit = false
+                    lock.prepareStatement("SELECT space_bytes FROM account_storage_usage WHERE account_id = ? FOR UPDATE").use {
+                        it.setObject(1, owner)
+                        it.executeQuery().close()
+                    }
+                    val racers =
+                        listOf(
+                            async(Dispatchers.IO) { runCatching { store.put(write("second").copy(quota = quota)) } },
+                            async(Dispatchers.IO) { runCatching { store.put(write("third").copy(quota = quota)) } },
+                            async(Dispatchers.IO) { runCatching { store.reserveUpload(owner, size, quota) } },
+                            async(Dispatchers.IO) { runCatching { store.reserveUpload(owner, size, quota) } },
+                        )
+                    try {
+                        withTimeout(15_000) {
+                            // The second write waits on the repository's state row, the rest on the usage row.
+                            while (waiting(
+                                    source,
+                                    "wait_event_type = 'Lock' AND (query LIKE '%account_storage_usage%' OR query LIKE '%space_states%')",
+                                ) <
+                                4
+                            ) {
+                                delay(25)
+                            }
+                        }
+                    } finally {
+                        lock.rollback()
+                    }
+                    val outcomes = racers.awaitAll()
+                    assertEquals(2, outcomes.count { it.isSuccess }, "Only two of four requests fit: $outcomes")
+                    assertTrue(outcomes.mapNotNull { it.exceptionOrNull() }.all { it is SpaceQuotaExceededException }, "$outcomes")
+                }
+                val held = number(source, "SELECT COALESCE(SUM(bytes), 0) FROM space_upload_reservations WHERE account_id = ?", owner)
+                assertEquals(size * 3, store.storedBytes(owner) + held, "Stored and held bytes fill the quota exactly")
+            }
+        }
+
     private fun withFixture(block: suspend CoroutineScope.(Fixture) -> Unit) =
         runBlocking {
-            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
-            require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+            val url = localTestPostgresUrl()
             val previous = TransactionManager.defaultDatabase
-            val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+            val source = localTestPostgresDataSource(url)
             val owner = UUID.randomUUID()
             try {
                 TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)
@@ -219,13 +293,19 @@ class SpaceStorePostgresTest {
         source: HikariDataSource,
         sql: String,
         vararg parameters: Any,
-    ): Int =
+    ): Int = number(source, sql, *parameters).toInt()
+
+    private fun number(
+        source: HikariDataSource,
+        sql: String,
+        vararg parameters: Any,
+    ): Long =
         source.connection.use { connection ->
             connection.prepareStatement(sql).use { statement ->
                 parameters.forEachIndexed { index, value -> statement.setObject(index + 1, value) }
                 statement.executeQuery().use { rows ->
                     rows.next()
-                    rows.getInt(1)
+                    rows.getLong(1)
                 }
             }
         }

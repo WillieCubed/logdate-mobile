@@ -1,12 +1,18 @@
 package app.logdate.server.space
 
+import app.logdate.server.database.AccountStorageUsageTable
 import app.logdate.server.database.AccountsTable
 import app.logdate.server.database.PostgreSQLSpaceStore
 import app.logdate.server.database.SpaceBlobsTable
 import app.logdate.server.database.SpaceRecordBlobsTable
 import app.logdate.server.database.SpaceRecordsTable
 import app.logdate.server.database.SpaceStatesTable
+import app.logdate.server.database.SpaceUploadReservationsTable
 import app.logdate.server.database.support.withH2Database
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
@@ -308,6 +314,89 @@ abstract class SpaceStoreContractTest {
         }
 
     @Test
+    fun `stored bytes follow writes, replacements, deletes, new blobs and purges`() =
+        withStore { store, account ->
+            val small = recordSize(sealed(1))
+            val large = recordSize(sealed(1, ciphertextBytes = 2_048 + 16))
+            store.put(write(account, "a"))
+            assertEquals(small, store.storedBytes(account))
+            store.put(write(account, "a", ciphertextBytes = 2_048 + 16))
+            assertEquals(large, store.storedBytes(account), "a replacement counts only its own size")
+            store.putBlob(account, space, SpaceBlob("bafycounted", OCTETS, 1_000, "path/first"))
+            store.putBlob(account, space, SpaceBlob("bafycounted", OCTETS, 1_000, "path/again"))
+            assertEquals(large + 1_000, store.storedBytes(account), "a blob the space holds counts once")
+            store.delete(account, space, author, "a", null)
+            assertEquals(1_000L, store.storedBytes(account))
+            val later = Clock.System.now() + 1.hours
+            store.purgeRecording(tombstonesBefore = later, unreferencedBlobsBefore = later)
+            assertEquals(0L, store.storedBytes(account))
+        }
+
+    @Test
+    fun `a write past the quota is refused after its conditions, and shrinking or deleting always works`() =
+        withStore { store, account ->
+            store.put(write(account, "a"))
+            val size = store.storedBytes(account)
+            val full = SpaceQuota(limitBytes = 10_000, otherBytes = 10_000 - size)
+            val refused = assertFailsWith<SpaceQuotaExceededException> { store.put(write(account, "b").copy(quota = full)) }
+            assertEquals(10_000L, refused.limitBytes)
+            assertEquals(10_000L, refused.usedBytes)
+            assertNull(store.get(space, author, "b"))
+            assertEquals(size, store.storedBytes(account))
+            assertFailsWith<SpaceSwapException> {
+                store.put(write(account, "a", createOnly = true, ciphertextBytes = 4_096 + 16).copy(quota = full))
+            }
+            store.put(write(account, "a", fill = 2).copy(quota = full))
+            store.delete(account, space, author, "a", null)
+            assertEquals(0L, store.storedBytes(account))
+        }
+
+    @Test
+    fun `an upload reservation holds room until its blob is stored or the room is released`() =
+        withStore { store, account ->
+            val quota = SpaceQuota(limitBytes = 1_000, otherBytes = 0)
+            val held = store.reserveUpload(account, 600, quota)
+            assertFailsWith<SpaceQuotaExceededException> { store.reserveUpload(account, 600, quota) }
+            store.putBlob(account, space, SpaceBlob("bafyheld", OCTETS, 600, "path/held"), quota, held)
+            assertEquals(600L, store.storedBytes(account))
+            store.releaseUpload(held)
+            assertFailsWith<SpaceQuotaExceededException> { store.reserveUpload(account, 600, quota) }
+            val other = store.reserveUpload(account, 400, quota)
+            store.releaseUpload(other)
+            store.releaseUpload(other)
+            store.releaseUpload(store.reserveUpload(account, 400, quota))
+            assertFailsWith<SpaceQuotaExceededException> {
+                store.putBlob(account, space, SpaceBlob("bafytoolarge", OCTETS, 401, "path/too-large"), quota)
+            }
+            assertNull(store.getBlob(space, "bafytoolarge"))
+            assertEquals(600L, store.storedBytes(account))
+        }
+
+    @Test
+    fun `concurrent writes and reservations can't together pass the quota`() =
+        withStore { store, account ->
+            val size = recordSize(sealed(1))
+            val records = SpaceQuota(limitBytes = size * 3, otherBytes = 0)
+            val writes =
+                coroutineScope {
+                    (0 until 8)
+                        .map { index ->
+                            async(Dispatchers.IO) { runCatching { store.put(write(account, "r$index").copy(quota = records)) } }
+                        }.awaitAll()
+                }
+            assertEquals(3, writes.count { it.isSuccess }, "$writes")
+            assertTrue(writes.mapNotNull { it.exceptionOrNull() }.all { it is SpaceQuotaExceededException }, "$writes")
+            assertEquals(size * 3, store.storedBytes(account))
+
+            val uploads = SpaceQuota(limitBytes = size * 3 + 1_000, otherBytes = 0)
+            val reservations =
+                coroutineScope {
+                    (0 until 8).map { async(Dispatchers.IO) { runCatching { store.reserveUpload(account, 400, uploads) } } }.awaitAll()
+                }
+            assertEquals(2, reservations.count { it.isSuccess }, "$reservations")
+        }
+
+    @Test
     fun `purge keeps recent tombstones and blobs`() =
         withStore { store, account ->
             val before = Clock.System.now() - 1.hours
@@ -330,6 +419,11 @@ private suspend fun SpaceStore.purgeRecording(
     return deleted
 }
 
+private const val OCTETS = "application/octet-stream"
+
+/** How many bytes [record] takes in storage. */
+private fun recordSize(record: kotlinx.serialization.json.JsonObject): Long = recordCid(record).second.size.toLong()
+
 /** The largest ciphertext a sealed record can carry: 61 padding buckets of 64 KiB, plus the AES-GCM tag. */
 private const val LARGEST_CIPHERTEXT = 61 * 65_536 + 16
 
@@ -346,7 +440,15 @@ class PostgreSQLSpaceStoreH2Test : SpaceStoreContractTest() {
         changesByteBudget: Long,
         objectDeleteTimeout: Duration,
         block: suspend (SpaceStore, UUID) -> Unit,
-    ) = withH2Database(AccountsTable, SpaceStatesTable, SpaceRecordsTable, SpaceRecordBlobsTable, SpaceBlobsTable) {
+    ) = withH2Database(
+        AccountsTable,
+        SpaceStatesTable,
+        SpaceRecordsTable,
+        SpaceRecordBlobsTable,
+        SpaceBlobsTable,
+        AccountStorageUsageTable,
+        SpaceUploadReservationsTable,
+    ) {
         val account = UUID.randomUUID()
         transaction {
             AccountsTable.insert {

@@ -1,8 +1,13 @@
 package app.logdate.server.sync
 
+import app.logdate.server.logdate.ChecksummingOutputStream
+import app.logdate.server.logdate.LogDateBlobIntegrityException
 import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
+import app.logdate.server.logdate.LogDateBlobStream
+import app.logdate.server.logdate.LogDateBlobStreamRequest
 import app.logdate.server.logdate.LogDateBlobWriteRequest
+import app.logdate.server.logdate.LogDateBlobWriter
 import app.logdate.server.logdate.copyBackupFile
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo
@@ -61,6 +66,45 @@ class GcsMediaStorage(
         } catch (error: Exception) {
             runCatching { storage.delete(BlobId.of(bucketName, storagePath)) }
             throw MediaStorageException("Failed to upload backup")
+        }
+    }
+
+    override fun openBlob(storagePath: String): LogDateBlobStream? {
+        val blob = storage.get(BlobId.of(bucketName, storagePath)) ?: return null
+        return LogDateBlobStream(blob.size, Channels.newInputStream(blob.reader()))
+    }
+
+    override fun openBlobWriter(request: LogDateBlobStreamRequest): LogDateBlobWriter {
+        val storagePath =
+            buildStoragePath(
+                LogDateBlobWriteRequest(request.ownerId, request.namespace, request.blobId, null, request.contentType, ByteArray(0)),
+            )
+        val blobId = BlobId.of(bucketName, storagePath)
+        val blobInfo = BlobInfo.newBuilder(blobId).setContentType(request.contentType).build()
+        val options = if (kmsKeyName != null) arrayOf(Storage.BlobWriteOption.kmsKeyName(kmsKeyName)) else emptyArray()
+        val channel = storage.writer(blobInfo, *options)
+        channel.setChunkSize(STREAMED_WRITE_CHUNK_BYTES)
+        val output = ChecksummingOutputStream(Channels.newOutputStream(channel))
+        return object : LogDateBlobWriter {
+            override val storagePath = storagePath
+            override val output = output
+
+            override fun commit() {
+                output.close()
+                val stored = storage.get(blobId)
+                if (stored == null || stored.size != output.size || stored.crc32cToHexString != output.crc32cHex) {
+                    runCatching { storage.delete(blobId) }
+                    throw LogDateBlobIntegrityException("Stored object differs from the bytes written")
+                }
+            }
+
+            override fun abort() {
+                try {
+                    storage.delete(blobId)
+                } catch (error: com.google.cloud.storage.StorageException) {
+                    if (error.code != 404) throw MediaStorageException("Blob cleanup failed")
+                }
+            }
         }
     }
 
@@ -238,6 +282,13 @@ class GcsMediaStorage(
         }
     }
 }
+
+/**
+ * How many bytes a streamed write gathers in memory before sending them to Cloud Storage. The client
+ * library's default is several times larger; this bounds each upload in progress to about 2 MiB of
+ * heap. It must be a multiple of 256 KiB.
+ */
+internal const val STREAMED_WRITE_CHUNK_BYTES = 2 * 1024 * 1024
 
 private fun LogDateBlobNamespace.errorLabel(): String =
     when (this) {

@@ -9,6 +9,9 @@ import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.DiagnosticReportUploadsTable
 import app.logdate.server.database.DiagnosticReportsTable
 import app.logdate.server.database.PostgreSQLDiagnosticReportStore
+import app.logdate.server.database.deleteTestAccountRow
+import app.logdate.server.database.support.localTestPostgresDataSource
+import app.logdate.server.database.support.localTestPostgresUrl
 import app.logdate.server.database.toJavaUUID
 import app.logdate.shared.model.diagnostics.DiagnosticReportCodec
 import app.logdate.shared.model.diagnostics.SyncDiagnosticReport
@@ -24,7 +27,6 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.junit.Assume.assumeTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -32,18 +34,16 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/** Runs only against an explicitly supplied disposable local PostgreSQL fixture. */
+/** Runs against the local test PostgreSQL only. */
 class DiagnosticReportPostgresTest {
     @Test
     fun `migrations persistence concurrent quotas and account deletion hold in PostgreSQL`() =
         runTest {
-            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
-            require(java.net.URI(requireNotNull(url)).host in setOf("127.0.0.1", "localhost")) { "A loopback test database is required" }
+            val url = localTestPostgresUrl()
             val previous = TransactionManager.defaultDatabase
 
             fun open(): HikariDataSource {
-                val dataSource = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+                val dataSource = localTestPostgresDataSource(url)
                 try {
                     TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(dataSource, autoMigrate = true)
                     return dataSource
@@ -161,7 +161,7 @@ class DiagnosticReportPostgresTest {
                     )
                 }
             } finally {
-                transaction { AccountsTable.deleteWhere { id eq owner.toJavaUUID() } }
+                deleteTestAccountRow(owner.toJavaUUID())
                 source.close()
                 TransactionManager.defaultDatabase = previous
             }

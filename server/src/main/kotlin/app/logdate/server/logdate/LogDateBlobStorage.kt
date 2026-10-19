@@ -1,5 +1,7 @@
 package app.logdate.server.logdate
 
+import java.io.Closeable
+import java.io.InputStream
 import java.nio.file.Path
 import java.util.UUID
 
@@ -30,6 +32,14 @@ data class LogDateBlobWriteRequest(
     val bytes: ByteArray,
 )
 
+/** An object's bytes as a stream, and how many there are. Closing it ends the read. */
+class LogDateBlobStream(
+    val size: Long,
+    val input: InputStream,
+) : Closeable {
+    override fun close() = input.close()
+}
+
 /**
  * LogDate-owned binary object storage boundary for media, encrypted backups, and future ATProto
  * blob semantics.
@@ -44,11 +54,20 @@ interface LogDateBlobStorage {
 
     fun putBlobFile(request: LogDateBlobFileWriteRequest): String
 
+    /** Starts an object whose bytes are written as they arrive; see [LogDateBlobWriter]. */
+    fun openBlobWriter(request: LogDateBlobStreamRequest): LogDateBlobWriter
+
     fun getBlobFile(
         storagePath: String,
         destination: Path,
         checkActive: () -> Unit = {},
     ): Boolean
+
+    /**
+     * Opens the object at [storagePath] to read as a stream, or returns null when there's none.
+     * Nothing is copied to memory or disk first; the caller closes the stream.
+     */
+    fun openBlob(storagePath: String): LogDateBlobStream?
 
     fun deleteBlob(storagePath: String): Boolean
 

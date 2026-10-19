@@ -1,8 +1,9 @@
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
+import app.logdate.server.database.support.localTestPostgresUrl
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
-import org.junit.Assume.assumeTrue
 import java.sql.Statement
 import java.util.UUID
 import kotlin.test.Test
@@ -16,11 +17,9 @@ import kotlin.test.assertEquals
 class DeletedAccountRepositoriesMigrationPostgresTest {
     @Test
     fun `cleanup removes deleted accounts' repositories and keeps every live one`() {
-        val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-        assumeTrue(url != null && System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true")
-        require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+        val url = localTestPostgresUrl()
         val schema = "cleanup_${UUID.randomUUID().toString().replace("-", "")}"
-        val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+        val source = localTestPostgresDataSource(url)
         try {
             migrate(source, schema, target = "40")
             val withDid = UUID.randomUUID()

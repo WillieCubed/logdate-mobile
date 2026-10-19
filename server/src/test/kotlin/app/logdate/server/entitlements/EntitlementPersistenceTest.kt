@@ -1,7 +1,8 @@
 package app.logdate.server.entitlements
 
+import app.logdate.server.database.AccountStorageUsageTable
+import app.logdate.server.database.AccountsTable
 import app.logdate.server.database.LogDateBackupsTable
-import app.logdate.server.database.LogDateMediaRecordsTable
 import kotlinx.coroutines.test.runTest
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.jdbc.Database
@@ -15,6 +16,10 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 
 class EntitlementPersistenceTest {
+    /** Every table [DatabaseUsageCalculator] reads; usage rows refer to accounts. */
+    private val usageTables =
+        arrayOf<Table>(LogDateBackupsTable, AccountsTable, AccountStorageUsageTable)
+
     @Test
     fun `stored service falls back to active free plan when account has no subscription row`() =
         runTest {
@@ -156,21 +161,23 @@ class EntitlementPersistenceTest {
         }
 
     @Test
-    fun `database usage calculator sums non-deleted media and backups for one account`() =
+    fun `database usage calculator reads one account's running totals and counts its backup rows`() =
         runTest {
-            withDatabase(LogDateMediaRecordsTable, LogDateBackupsTable) { database ->
+            withDatabase(*usageTables) { database ->
                 val accountId = UUID.randomUUID()
                 val otherAccountId = UUID.randomUUID()
-                insertMedia(database, accountId = accountId, mediaId = "media-1", bytes = 30L)
-                insertMedia(database, accountId = accountId, mediaId = "media-2", bytes = 40L, deleted = true)
-                insertMedia(database, accountId = otherAccountId, mediaId = "media-3", bytes = 70L)
+                insertAccount(database, accountId)
+                insertAccount(database, otherAccountId)
+                insertTotals(database, accountId, space = 3_000_000_000L, media = 30L, backup = 70L)
+                insertTotals(database, otherAccountId, space = 7_000L, media = 70L, backup = 90L)
                 insertBackup(database, accountId = accountId, bytes = 50L)
                 insertBackup(database, accountId = accountId, bytes = 20L)
                 insertBackup(database, accountId = otherAccountId, bytes = 90L)
 
                 val calculator = DatabaseUsageCalculator(database)
 
-                assertEquals(100L, calculator.storageBytes(accountId))
+                assertEquals(3_000_000_100L, calculator.storageBytes(accountId))
+                assertEquals(100L, calculator.storageBytesOutsideSpaces(accountId))
                 assertEquals(2, calculator.backupCount(accountId))
             }
         }
@@ -178,7 +185,7 @@ class EntitlementPersistenceTest {
     @Test
     fun `database usage calculator returns zeroes when account has no rows`() =
         runTest {
-            withDatabase(LogDateMediaRecordsTable, LogDateBackupsTable) { database ->
+            withDatabase(*usageTables) { database ->
                 val calculator = DatabaseUsageCalculator(database)
 
                 assertEquals(0L, calculator.storageBytes(UUID.randomUUID()))
@@ -258,31 +265,33 @@ class EntitlementPersistenceTest {
         }
     }
 
-    private fun insertMedia(
+    private fun insertAccount(
         database: Database,
         accountId: UUID,
-        mediaId: String,
-        bytes: Long,
-        deleted: Boolean = false,
     ) {
         transaction(database) {
-            LogDateMediaRecordsTable.insert {
-                it[userId] = accountId
-                it[LogDateMediaRecordsTable.mediaId] = mediaId
-                it[contentId] = "content-$mediaId"
-                it[fileName] = "$mediaId.jpg"
-                it[mimeType] = "image/jpeg"
-                it[sizeBytes] = bytes
-                it[data] = byteArrayOf(1, 2, 3)
-                it[storagePath] = null
-                it[createdAt] = 1L
-                it[version] = 1L
-                it[deviceId] = "device"
-                it[LogDateMediaRecordsTable.deleted] = deleted
-                it[deletedAt] = if (deleted) 2L else null
-                it[encryptionVersion] = null
-                it[encryptionKeyId] = null
-                it[encryptionMode] = null
+            AccountsTable.insert {
+                it[id] = accountId
+                it[username] = "u${accountId.toString().take(8)}"
+                it[displayName] = "Usage"
+                it[createdAt] = Clock.System.now()
+            }
+        }
+    }
+
+    private fun insertTotals(
+        database: Database,
+        accountId: UUID,
+        space: Long,
+        media: Long,
+        backup: Long,
+    ) {
+        transaction(database) {
+            AccountStorageUsageTable.insert {
+                it[AccountStorageUsageTable.accountId] = accountId
+                it[spaceBytes] = space
+                it[mediaBytes] = media
+                it[backupBytes] = backup
             }
         }
     }

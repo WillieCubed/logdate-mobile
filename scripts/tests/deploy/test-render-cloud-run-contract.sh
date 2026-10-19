@@ -1203,6 +1203,22 @@ jq '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED = "yes"' \
 expect_failure invalid-encrypted-unlock staging "$RELEASE_SHA" invalid-encrypted-unlock.json \
     "LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED must be true or false"
 
+# Personal spaces stay off until a deployment opts in; the flag is a boolean like encrypted unlock.
+for enabled in true false; do
+    jq --arg enabled "$enabled" '.env_vars.LOGDATE_PERSONAL_SPACE_ENABLED = $enabled' \
+        "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/personal-space-$enabled.json"
+    output="$TMP_DIR/personal-space-$enabled.out.json"
+    if ! run_renderer staging "$RELEASE_SHA" "personal-space-$enabled.json" "$output" "$LOG_DIR/personal-space-$enabled.err"; then
+        cat "$LOG_DIR/personal-space-$enabled.err" >&2
+        fail "personal space opt-in could not be rendered"
+    fi
+    assert_equals "$enabled" "$(jq -r '.env_vars.LOGDATE_PERSONAL_SPACE_ENABLED' "$output")"
+done
+jq '.env_vars.LOGDATE_PERSONAL_SPACE_ENABLED = "1"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-personal-space.json"
+expect_failure invalid-personal-space staging "$RELEASE_SHA" invalid-personal-space.json \
+    "LOGDATE_PERSONAL_SPACE_ENABLED must be true or false"
+
 jq '.env_vars.UNEXPECTED_ENV = "value"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-env.json"
 expect_failure unexpected-env staging "$RELEASE_SHA" unexpected-env.json "environment contract contains unexpected keys"
 

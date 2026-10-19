@@ -2,8 +2,9 @@
 
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
+import app.logdate.server.database.support.localTestPostgresUrl
 import app.logdate.server.logdate.LogDateCollectionKind
-import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -15,23 +16,20 @@ import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
-import org.junit.Assume.assumeTrue
 import studio.hypertext.atproto.identity.AtprotoDid
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
-/** Explicit disposable PostgreSQL only; forces competing writes past their initial state read. */
+/** Runs against the local test PostgreSQL only; forces competing writes past their initial state read. */
 class CollectionVersionPostgresTest {
     @Test
     fun `concurrent writes have unique versions and cannot vanish between single record pages`() =
         runBlocking {
-            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
-            require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+            val url = localTestPostgresUrl()
             val previous = TransactionManager.defaultDatabase
-            val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+            val source = localTestPostgresDataSource(url)
             val owner = Uuid.random().toJavaUUID()
             try {
                 TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)

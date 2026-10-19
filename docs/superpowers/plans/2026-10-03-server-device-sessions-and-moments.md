@@ -1223,16 +1223,14 @@ import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** Explicit disposable PostgreSQL only; races real transactions on one link code. */
+/** Runs against the local test PostgreSQL only; races real transactions on one link code. */
 class DeviceLinkCodePostgresTest {
     @Test
     fun `concurrent redemptions of one link code create exactly one session`() =
         runBlocking {
-            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
-            require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+            val url = localTestPostgresUrl()
             val previous = TransactionManager.defaultDatabase
-            val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+            val source = localTestPostgresDataSource(url)
             val owner = Uuid.random().toJavaUUID()
             try {
                 TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)
@@ -1766,7 +1764,7 @@ private fun ResultRow.toDeviceSession(): DeviceSession =
 - [ ] **Step 8: Run the tests and watch them pass**
 
 Run: `export ANDROID_HOME=$HOME/Library/Android/sdk && ./gradlew :server:test --tests 'app.logdate.server.database.PostgreSQLDeviceSessionRepositoryTest' --tests 'app.logdate.server.database.DeviceLinkCodePostgresTest' --console=plain`
-Expected: PASS; `DeviceLinkCodePostgresTest` is skipped (assumption failure) unless `LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL` and `LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE=true` point at a local disposable PostgreSQL. If one is available, run it once with those variables set and expect PASS.
+Expected: PASS; `DeviceLinkCodePostgresTest` runs against the local test database (`./run dev`, then `./run test:server`) and is skipped, saying why, without one.
 
 - [ ] **Step 9: Format, lint, and run the suite**
 
@@ -5437,16 +5435,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** Explicit disposable PostgreSQL only; races real repo-head swaps on one entry ID. */
+/** Runs against the local test PostgreSQL only; races real repo-head swaps on one entry ID. */
 class ConditionalCreatePostgresTest {
     @Test
     fun `concurrent strict creates of one entry produce exactly one record`() =
         runBlocking {
-            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
-            require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+            val url = localTestPostgresUrl()
             val previous = TransactionManager.defaultDatabase
-            val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+            val source = localTestPostgresDataSource(url)
             val owner = Uuid.random()
             val ownerId = owner.toJavaUUID()
             var did: String? = null
@@ -5850,7 +5846,7 @@ A batch writes one commit per new link (each through `putRecordIfAbsent`), unlik
 - [ ] **Step 8: Run the tests and watch them pass**
 
 Run: `export ANDROID_HOME=$HOME/Library/Android/sdk && ./gradlew :server:test --tests 'app.logdate.server.logdate.*' --tests 'app.logdate.server.database.*' --console=plain`
-Expected: PASS. `ConditionalCreatePostgresTest` is skipped unless the disposable PostgreSQL variables are set; if one is available, run it once with them and expect PASS.
+Expected: PASS. `ConditionalCreatePostgresTest` runs against the local test database (`./run dev`, then `./run test:server`) and is skipped, saying why, without one.
 
 - [ ] **Step 9: Format, lint, and run the suite**
 
@@ -8193,7 +8189,7 @@ Expected: hooks pass; sixteen files in the commit.
 **Risks to watch while executing.**
 - `SchemaDocumentationTest` keys schema prose by the generator's readable name. The plan assumes the class name (`DeviceLinkCodeResponse`, `MomentChange`, …), as for every existing DTO; if the test reports a different name, use the one it prints.
 - The plain Ktor `head("/{contentId}")` route appears in `/openapi.json` with generated text. `OpenApiContractTest` checks only GET, POST, PUT, PATCH and DELETE, so it passes; document it later if the reference should list it.
-- The two opt-in PostgreSQL tests (`DeviceLinkCodePostgresTest`, `ConditionalCreatePostgresTest`) skip without `LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL` and `LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE=true`. Run them once against a disposable local database before deploying Task 10.
+- The two PostgreSQL tests (`DeviceLinkCodePostgresTest`, `ConditionalCreatePostgresTest`) use the local test database named by `DATABASE_URL`; run them with `./run dev` and `./run test:server` before deploying Task 10.
 - The device-session guard caches per server instance. On a multi-instance deployment a removed device keeps sync access for up to 30 seconds on the other instances; refresh is checked against the database every time.
 - `ktlintFormat` may rewrap some of the code in this plan (chains, long string templates); that is expected and part of each task's lint step.
 

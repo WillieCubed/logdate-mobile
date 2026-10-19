@@ -40,6 +40,43 @@ class InMemoryLogDateBlobStorage : LogDateBlobStorage {
         }
     }
 
+    override fun openBlob(storagePath: String): LogDateBlobStream? {
+        fileBlobs[storagePath]?.let { file ->
+            return try {
+                LogDateBlobStream(Files.size(file), Files.newInputStream(file))
+            } catch (_: java.nio.file.NoSuchFileException) {
+                null
+            }
+        }
+        val bytes = blobs[storagePath]?.bytes ?: return null
+        return LogDateBlobStream(bytes.size.toLong(), bytes.inputStream())
+    }
+
+    override fun openBlobWriter(request: LogDateBlobStreamRequest): LogDateBlobWriter {
+        val storagePath =
+            storagePathFor(
+                LogDateBlobWriteRequest(request.ownerId, request.namespace, request.blobId, null, request.contentType, ByteArray(0)),
+            )
+        val buffer = java.io.ByteArrayOutputStream()
+        val output = ChecksummingOutputStream(buffer)
+        return object : LogDateBlobWriter {
+            override val storagePath = storagePath
+            override val output = output
+
+            override fun commit() {
+                output.close()
+                val bytes = buffer.toByteArray()
+                if (bytes.size.toLong() != output.size) throw LogDateBlobIntegrityException("Stored size differs from bytes written")
+                fileBlobs.remove(storagePath)?.let { Files.deleteIfExists(it) }
+                blobs[storagePath] = StoredBlob(bytes = bytes, contentType = request.contentType)
+            }
+
+            override fun abort() {
+                blobs.remove(storagePath)
+            }
+        }
+    }
+
     override fun getBlobFile(
         storagePath: String,
         destination: Path,

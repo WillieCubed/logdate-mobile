@@ -36,7 +36,9 @@
         { "name": "InvalidSwap" },
         { "name": "InvalidRecord" },
         { "name": "RecordNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing record." },
-        { "name": "RecordTooLarge", "description": "The request is larger than the largest sealed record can be." }
+        { "name": "RecordTooLarge", "description": "The request is larger than the largest sealed record can be." },
+        { "name": "QuotaExceeded", "description": "Storing the record would take the account past its storage quota. A write that stores no more than it replaces is never refused for this." },
+        { "name": "RateLimitExceeded", "description": "The account sent too many requests of this kind recently. Wait the seconds in the Retry-After header, then retry. Record writes, reads and blob uploads are counted separately." }
       ]
     }
   }

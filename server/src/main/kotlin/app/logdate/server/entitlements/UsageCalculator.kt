@@ -1,5 +1,6 @@
 package app.logdate.server.entitlements
 
+import app.logdate.server.space.SpaceQuota
 import java.util.UUID
 
 /**
@@ -7,11 +8,15 @@ import java.util.UUID
  * entitlement enforcement at the sync/backup endpoints to turn "is there room for this upload?"
  * into a boolean.
  *
- * Concrete implementation reads the existing media + backup tables. Keeping it behind an
+ * Concrete implementation reads the media, backup and personal space tables. Keeping it behind an
  * interface lets tests feed synthetic usage without spinning up a database.
  */
 interface UsageCalculator {
+    /** Every byte counted towards the account's storage quota: media, backups and spaces. */
     suspend fun storageBytes(accountId: UUID): Long
+
+    /** The bytes media and backups take. The space store counts its own, so it can check the quota as it writes. */
+    suspend fun storageBytesOutsideSpaces(accountId: UUID): Long
 
     suspend fun backupCount(accountId: UUID): Int
 }
@@ -68,6 +73,16 @@ class EntitlementEnforcer(
         } else {
             QuotaCheck.Allowed
         }
+    }
+
+    /**
+     * The account's storage quota as the space store enforces it, or null when the plan has no
+     * storage limit. Spaces share the plan's one storage limit with media and backups; the store
+     * adds its own bytes and checks each write against the limit in the same transaction.
+     */
+    suspend fun spaceQuota(accountId: UUID): SpaceQuota? {
+        val limit = entitlementService.resolve(accountId).limits.storageBytes ?: return null
+        return SpaceQuota(limitBytes = limit, otherBytes = usageCalculator.storageBytesOutsideSpaces(accountId))
     }
 
     suspend fun checkBackupUpload(

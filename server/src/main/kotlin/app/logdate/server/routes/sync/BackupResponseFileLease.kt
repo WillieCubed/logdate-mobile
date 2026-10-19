@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class BackupResponseFileLease(
     private val path: Path,
     maxLifetimeMillis: Long = MAX_RESPONSE_LEASE_MILLIS,
+    private val onClose: () -> Unit = {},
 ) : AutoCloseable {
     private val closed = AtomicBoolean(false)
     private val expiry = responseLeaseCleaner.schedule({ close() }, maxLifetimeMillis, TimeUnit.MILLISECONDS)
@@ -16,7 +17,11 @@ internal class BackupResponseFileLease(
     override fun close() {
         if (closed.compareAndSet(false, true)) {
             expiry.cancel(false)
-            runCatching { deletePrivateBackupTempFile(path) }
+            try {
+                runCatching { deletePrivateBackupTempFile(path) }
+            } finally {
+                onClose()
+            }
         }
     }
 }

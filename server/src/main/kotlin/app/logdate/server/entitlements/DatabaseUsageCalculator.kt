@@ -1,10 +1,9 @@
 package app.logdate.server.entitlements
 
+import app.logdate.server.database.AccountStorageUsageTable
 import app.logdate.server.database.LogDateBackupsTable
-import app.logdate.server.database.LogDateMediaRecordsTable
-import org.jetbrains.exposed.v1.core.and
+import app.logdate.server.database.StorageTotals
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.sum
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -12,8 +11,9 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
 
 /**
- * [UsageCalculator] backed by the media + backups tables. Counts non-deleted media bytes plus
- * backup bytes towards storage; counts backup rows for the backup-count dimension.
+ * [UsageCalculator] backed by the running storage totals in `account_storage_usage`, which every
+ * write of media, backups and personal-space data keeps current in its own transaction. Reading an
+ * account's storage is one row, however much it stores. Backup count comes from the backup rows.
  *
  * The [database] parameter is explicit rather than relying on Exposed's global default: the rest
  * of the server's Postgres repos use the thread-local default because they were scaffolded before
@@ -23,24 +23,9 @@ import java.util.UUID
 class DatabaseUsageCalculator(
     private val database: Database,
 ) : UsageCalculator {
-    override suspend fun storageBytes(accountId: UUID): Long =
-        transaction(database) {
-            val media =
-                LogDateMediaRecordsTable
-                    .select(LogDateMediaRecordsTable.sizeBytes.sum())
-                    .where {
-                        (LogDateMediaRecordsTable.userId eq accountId) and
-                            (LogDateMediaRecordsTable.deleted eq false)
-                    }.singleOrNull()
-                    ?.get(LogDateMediaRecordsTable.sizeBytes.sum()) ?: 0L
-            val backups =
-                LogDateBackupsTable
-                    .select(LogDateBackupsTable.sizeBytes.sum())
-                    .where { LogDateBackupsTable.userId eq accountId }
-                    .singleOrNull()
-                    ?.get(LogDateBackupsTable.sizeBytes.sum()) ?: 0L
-            media + backups
-        }
+    override suspend fun storageBytes(accountId: UUID): Long = totals(accountId).let { it.spaceBytes + it.mediaBytes + it.backupBytes }
+
+    override suspend fun storageBytesOutsideSpaces(accountId: UUID): Long = totals(accountId).let { it.mediaBytes + it.backupBytes }
 
     override suspend fun backupCount(accountId: UUID): Int =
         transaction(database) {
@@ -49,5 +34,20 @@ class DatabaseUsageCalculator(
                 .where { LogDateBackupsTable.userId eq accountId }
                 .count()
                 .toInt()
+        }
+
+    private fun totals(accountId: UUID): StorageTotals =
+        transaction(database) {
+            AccountStorageUsageTable
+                .select(AccountStorageUsageTable.spaceBytes, AccountStorageUsageTable.mediaBytes, AccountStorageUsageTable.backupBytes)
+                .where { AccountStorageUsageTable.accountId eq accountId }
+                .singleOrNull()
+                ?.let {
+                    StorageTotals(
+                        spaceBytes = it[AccountStorageUsageTable.spaceBytes],
+                        mediaBytes = it[AccountStorageUsageTable.mediaBytes],
+                        backupBytes = it[AccountStorageUsageTable.backupBytes],
+                    )
+                } ?: StorageTotals(0L, 0L, 0L)
         }
 }

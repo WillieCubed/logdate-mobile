@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ktor)
     jacoco
     application
+    id("app.logdate.test-database-environment")
 }
 
 group = "app.logdate.server"

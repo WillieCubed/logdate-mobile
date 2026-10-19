@@ -77,12 +77,45 @@ public class DataHomeCursorTooOldException(
 ) : Exception(message)
 
 /**
+ * Thrown when the data home refuses a request because the account sent too many recently. Send
+ * nothing more to it for [retryAfterSeconds], or back off on your own when that's null, then retry.
+ */
+public class DataHomeRateLimitedException(
+    message: String,
+    public val retryAfterSeconds: Long?,
+    cause: Throwable? = null,
+) : Exception(message, cause)
+
+/**
+ * Thrown by [DataHome.uploadBlob] and [DataHome.getBlob] when the data home is already moving as many
+ * files as it can. It says nothing about the account: wait [retryAfterSeconds], or back off on your
+ * own when that's null, then retry.
+ */
+public class DataHomeBusyException(
+    message: String,
+    public val retryAfterSeconds: Long?,
+    cause: Throwable? = null,
+) : Exception(message, cause)
+
+/**
+ * Thrown by [DataHome.putRecord] and [DataHome.uploadBlob] when storing what was sent would take the
+ * account past its storage quota. Deleting records still works; retry once space is freed or the
+ * plan changes. The message is for logs and never comes from the server: tell the person about a full
+ * quota in the app's own words.
+ */
+public class DataHomeQuotaExceededException(
+    cause: Throwable? = null,
+) : Exception("The data home's storage quota is full", cause)
+
+/**
  * Where a space's sealed records live: LogDate Cloud, or a self-hosted LogDate server. Every app
  * reaches a data home through this interface, and a data home only ever sees sealed envelopes and
  * encrypted blobs.
  *
  * To export a space, page [listChanges] from zero until [ChangePage.hasMore] is false, keeping the
  * latest change for each key, then read every blob the surviving records reference with [getBlob].
+ *
+ * Any method can throw [DataHomeRateLimitedException] when the account has sent too many requests.
  */
 public interface DataHome {
     /**
@@ -91,6 +124,7 @@ public interface DataHome {
      * @param blobs content identifiers of the uploaded blobs the record references.
      * @param swap the condition the write must meet.
      * @throws DataHomeConflictException if [swap] isn't met.
+     * @throws DataHomeQuotaExceededException if the record would take the account past its storage quota.
      */
     public suspend fun putRecord(
         space: SpaceRef,
@@ -131,13 +165,22 @@ public interface DataHome {
         limit: Int = 200,
     ): ChangePage
 
-    /** Stores encrypted [bytes] and returns their content identifier. */
+    /**
+     * Stores encrypted [bytes] and returns their content identifier.
+     *
+     * @throws DataHomeQuotaExceededException if the bytes would take the account past its storage quota.
+     * @throws DataHomeBusyException if the data home is moving as many files as it can.
+     */
     public suspend fun uploadBlob(
         space: SpaceRef,
         bytes: ByteArray,
     ): String
 
-    /** Reads the blob with content identifier [cid], or returns null if there isn't one. */
+    /**
+     * Reads the blob with content identifier [cid], or returns null if there isn't one.
+     *
+     * @throws DataHomeBusyException if the data home is moving as many files as it can.
+     */
     public suspend fun getBlob(
         space: SpaceRef,
         cid: String,

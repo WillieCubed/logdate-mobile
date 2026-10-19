@@ -98,6 +98,30 @@ See **[Audit Schema](docs/audit-schema.md)** for centralized audit categories an
 ./gradlew :server:compileTestKotlin
 ```
 
+### PostgreSQL Tests
+Most server tests use in-memory stores or H2. The tests whose names end in `PostgresTest` check
+behaviour that only a real PostgreSQL shows, such as row locks and concurrent transactions. They use
+the database named by `DATABASE_URL`, `DATABASE_USER` and `DATABASE_PASSWORD`, the same variables the
+server reads, and only one on this machine: a `DATABASE_URL` on any host other than `localhost` or
+`127.0.0.1` fails the test rather than write to it.
+
+Locally, start the development database and run the tests through `./run`, which sets those variables
+for it:
+
+```bash
+./run dev
+./run test:server
+```
+
+Without `DATABASE_URL`, or when nothing answers at its address, the PostgreSQL tests are skipped and
+say why. CI's unit-test job starts a throwaway PostgreSQL container and sets the same three variables,
+so they run on every change; there, a database that doesn't answer fails them instead.
+
+Many tests share that one database: each test deletes the rows it adds and never assumes the database
+is empty. A test that can't clean up after itself, or that changes the schema, wraps its body in
+`withOwnPostgresDatabase`, which creates a fresh database for the test and drops it afterwards. The
+helpers live in `src/test/kotlin/app/logdate/server/database/support/LocalTestPostgres.kt`.
+
 ### Available Test Suites
 - **Passkey Tests**: WebAuthn authentication, challenge validation, credential verification
 - **Route Tests**: HTTP endpoint integration tests, request/response validation

@@ -25,6 +25,7 @@ import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.devices.DeviceLinkService
 import app.logdate.server.devices.DeviceSessionGuard
+import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
@@ -51,6 +52,7 @@ import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.LogDateAccountAuth
 import app.logdate.server.routes.MAX_SPACE_BLOB_BYTES
+import app.logdate.server.routes.SpaceRateLimits
 import app.logdate.server.routes.authV1Routes
 import app.logdate.server.routes.identityApiRoutes
 import app.logdate.server.routes.identityRoutes
@@ -61,6 +63,8 @@ import app.logdate.server.space.InMemorySpaceStore
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncRepository
+import app.logdate.server.transfer.TransferLimits
+import app.logdate.server.transfer.TransferSlots
 import app.logdate.util.UuidSerializer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -124,6 +128,9 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     spaceStore: SpaceStore = InMemorySpaceStore(),
     spaceMaxBlobBytes: Long = MAX_SPACE_BLOB_BYTES,
     oauthPasskeySignInEnabled: Boolean = false,
+    spaceRateLimits: SpaceRateLimits = SpaceRateLimits(),
+    spaceTransferLimits: TransferLimits = TransferLimits(),
+    spaceEntitlementEnforcer: EntitlementEnforcer? = null,
 ): AuthV1TestEnvironment {
     val googleVerifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val verifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled)
@@ -266,6 +273,9 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 store = spaceStore,
                 blobStorage = blobStorage,
                 auth = LogDateAccountAuth(verifier, accountRepository, atprotoIdentityService),
+                entitlementEnforcer = spaceEntitlementEnforcer,
+                rateLimits = spaceRateLimits,
+                transfers = TransferSlots(spaceTransferLimits),
                 maxBlobBytes = spaceMaxBlobBytes,
             )
             route("/api/v1") {

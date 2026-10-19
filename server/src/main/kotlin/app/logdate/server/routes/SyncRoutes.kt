@@ -23,6 +23,7 @@ import app.logdate.server.routes.sync.syncMomentRoutes
 import app.logdate.server.routes.sync.syncStatusRoutes
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.SyncMetricsRegistry
+import app.logdate.server.transfer.TransferSlots
 import io.ktor.server.routing.Route
 
 /**
@@ -62,6 +63,7 @@ fun Route.syncRoutes(
     accessTokenVerifier: AccessTokenVerifier? = tokenService?.let { AccessTokenVerifier(it, DeviceSessionGuard.Disabled) },
     momentsRepository: LogDateMomentsRepository? = null,
     storageModes: AccountStorageModes? = null,
+    transfers: TransferSlots = TransferSlots(),
 ) {
     val config = SyncRouteConfig(mediaAccessPolicy = mediaAccessPolicy)
     syncStatusRoutes(tokenService, accessTokenVerifier, metrics, collectionsRepository)
@@ -87,6 +89,7 @@ fun Route.syncRoutes(
         entitlementEnforcer = entitlementEnforcer,
         rateLimiter = rateLimiter,
         config = config,
+        transfers = transfers,
     )
     syncMaintenanceRoutes(tokenService, mediaStorage, metrics, collectionsRepository, backupRepository)
     diagnosticReportRoutes(tokenService, diagnosticReportService)

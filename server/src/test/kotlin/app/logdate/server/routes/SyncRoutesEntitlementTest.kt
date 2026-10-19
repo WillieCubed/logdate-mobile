@@ -160,6 +160,8 @@ class SyncRoutesEntitlementTest {
                     object : UsageCalculator {
                         override suspend fun storageBytes(accountId: UUID): Long = currentBytes
 
+                        override suspend fun storageBytesOutsideSpaces(accountId: UUID): Long = currentBytes
+
                         override suspend fun backupCount(accountId: UUID): Int = currentBackups
                     },
             )

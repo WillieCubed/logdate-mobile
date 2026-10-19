@@ -2,36 +2,32 @@
 
 package app.logdate.server.database
 
+import app.logdate.server.database.support.localTestPostgresDataSource
+import app.logdate.server.database.support.localTestPostgresUrl
 import app.logdate.server.devices.DeviceLinkCode
 import app.logdate.server.devices.DeviceSessionLimits
 import app.logdate.server.devices.LinkCodeRedemption
 import app.logdate.server.devices.NewDeviceSession
-import com.zaxxer.hikari.HikariDataSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
-import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.junit.Assume.assumeTrue
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** Explicit disposable PostgreSQL only; races real transactions on one link code. */
+/** Runs against the local test PostgreSQL only; races real transactions on one link code. */
 class DeviceLinkCodePostgresTest {
     @Test
     fun `concurrent redemptions of one link code create exactly one session`() =
         runBlocking {
-            val url = System.getenv("LOGDATE_DIAGNOSTIC_TEST_DATABASE_URL")
-            assumeTrue(System.getenv("LOGDATE_DIAGNOSTIC_TEST_DISPOSABLE") == "true" && url != null)
-            require(java.net.URI(requireNotNull(url)).host in setOf("localhost", "127.0.0.1"))
+            val url = localTestPostgresUrl()
             val previous = TransactionManager.defaultDatabase
-            val source = DatabaseConfig.createDataSource(databaseUrl = url, username = null, password = null) as HikariDataSource
+            val source = localTestPostgresDataSource(url)
             val owner = Uuid.random().toJavaUUID()
             try {
                 TransactionManager.defaultDatabase = DatabaseConfig.initializeDatabase(source, autoMigrate = true)
@@ -64,7 +60,7 @@ class DeviceLinkCodePostgresTest {
                 assertEquals(1, outcomes.count { it is LinkCodeRedemption.Redeemed })
                 assertEquals(1, repository.listActive(owner, now + 100).size)
             } finally {
-                transaction { AccountsTable.deleteWhere { AccountsTable.id eq owner } }
+                deleteTestAccountRow(owner)
                 source.close()
                 TransactionManager.defaultDatabase = previous
             }

@@ -10,13 +10,25 @@ import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.configureAuthV1TestApp
 import app.logdate.server.database.toJavaUUID
+import app.logdate.server.entitlements.Entitlement
+import app.logdate.server.entitlements.EntitlementEnforcer
+import app.logdate.server.entitlements.EntitlementLimits
+import app.logdate.server.entitlements.EntitlementService
+import app.logdate.server.entitlements.EntitlementStatus
+import app.logdate.server.entitlements.EntitlementTier
+import app.logdate.server.entitlements.UsageCalculator
 import app.logdate.server.oauth.createDpopProof
 import app.logdate.server.oauth.generateP256KeyPair
 import app.logdate.server.oauth.publicJwk
+import app.logdate.server.ratelimit.FixedWindowRateLimiter
+import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.server.routes.support.DeviceLinkTestKit
 import app.logdate.server.space.InMemorySpaceStore
 import app.logdate.server.space.SpaceBlob
+import app.logdate.server.space.SpaceQuota
 import app.logdate.server.space.SpaceStore
+import app.logdate.server.space.SpaceUploadReservation
+import app.logdate.server.transfer.TransferLimits
 import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
@@ -37,6 +49,11 @@ import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteWriteChannel
 import io.ktor.utils.io.writeFully
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.Json
@@ -53,6 +70,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -712,6 +730,8 @@ class SpaceXrpcRoutesTest {
                         accountId: java.util.UUID,
                         space: String,
                         blob: SpaceBlob,
+                        quota: SpaceQuota?,
+                        reservation: SpaceUploadReservation?,
                     ): SpaceBlob = error("The metadata store is down")
                 }
             val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceStore = store)
@@ -741,8 +761,10 @@ class SpaceXrpcRoutesTest {
                         accountId: java.util.UUID,
                         space: String,
                         blob: SpaceBlob,
+                        quota: SpaceQuota?,
+                        reservation: SpaceUploadReservation?,
                     ): SpaceBlob {
-                        val stored = saving.putBlob(accountId, space, blob)
+                        val stored = saving.putBlob(accountId, space, blob, quota, reservation)
                         if (failNext) {
                             failNext = false
                             throw failure
@@ -789,7 +811,7 @@ class SpaceXrpcRoutesTest {
         }
 
     @Test
-    fun `a chunked upload over the limit is refused`() =
+    fun `an upload over the limit is refused by its declared length`() =
         testApplication {
             val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceMaxBlobBytes = 1024)
             val (did, token) = env.signedInAccount("alice")
@@ -835,6 +857,465 @@ class SpaceXrpcRoutesTest {
             assertEquals("RecordNotFound", deleteRecord(other).errorCode())
             assertEquals("RecordNotFound", putWithBadSwap(other).errorCode())
         }
+
+    @Test
+    fun `too many record writes answer RateLimitExceeded with when to retry`() =
+        testApplication {
+            val tight = RateLimitPolicy(maxRequests = 2, windowSeconds = 60)
+            val env =
+                configureAuthV1TestApp(
+                    personalSpaceEnabled = true,
+                    spaceRateLimits = SpaceRateLimits(recordWrites = tight, reads = tight, blobUploads = tight),
+                )
+            val (did, token) = env.signedInAccount("alice")
+            val (otherDid, other) = env.signedInAccount("bob")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            repeat(2) { assertEquals(HttpStatusCode.OK, putRecord(token, space, "r$it").status) }
+
+            val limited = putRecord(token, space, "r2")
+            assertEquals(HttpStatusCode.TooManyRequests, limited.status)
+            assertEquals("RateLimitExceeded", limited.errorCode())
+            val retryAfter = assertNotNull(limited.headers[HttpHeaders.RetryAfter]).toLong()
+            assertTrue(retryAfter in 1..60, "Retry-After: $retryAfter")
+            val delete =
+                client.post("/xrpc/app.logdate.space.deleteRecord") {
+                    bearer(token)
+                    json("""{"space":"$space","rkey":"r0"}""")
+                }
+            assertEquals("RateLimitExceeded", delete.errorCode(), "deletes share the record write budget")
+
+            assertEquals(HttpStatusCode.OK, getRecord(token, space, "r0").status, "reads have their own budget")
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, ByteArray(10)).status, "uploads have their own budget")
+            val otherSpace = "at://$otherDid/space/app.logdate.space.personal/self"
+            assertEquals(HttpStatusCode.OK, putRecord(other, otherSpace, "r0").status, "each account has its own budget")
+        }
+
+    @Test
+    fun `reads and blob downloads share one budget and blob uploads have another`() =
+        testApplication {
+            val tight = RateLimitPolicy(maxRequests = 3, windowSeconds = 60)
+            val env =
+                configureAuthV1TestApp(personalSpaceEnabled = true, spaceRateLimits = SpaceRateLimits(reads = tight, blobUploads = tight))
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val bytes = ByteArray(10) { 3 }
+            repeat(3) { assertEquals(HttpStatusCode.OK, uploadBlob(token, space, bytes).status) }
+            assertEquals("RateLimitExceeded", uploadBlob(token, space, bytes).errorCode())
+
+            val cid = Cid.rawSha256(bytes).value
+            assertEquals("RecordNotFound", getRecord(token, space, "missing").errorCode())
+            assertEquals(HttpStatusCode.OK, getBlob(token, space, cid).status)
+            assertEquals(HttpStatusCode.OK, client.get("/xrpc/app.logdate.space.listRepoOps?space=$space") { bearer(token) }.status)
+            val limited = getBlob(token, space, cid)
+            assertEquals(HttpStatusCode.TooManyRequests, limited.status)
+            assertEquals("RateLimitExceeded", limited.errorCode())
+        }
+
+    @Test
+    fun `with the feature off a rate limit never hides that the method isn't implemented`() =
+        testApplication {
+            val tight = RateLimitPolicy(maxRequests = 1, windowSeconds = 60)
+            val env =
+                configureAuthV1TestApp(
+                    personalSpaceEnabled = false,
+                    spaceRateLimits = SpaceRateLimits(recordWrites = tight, reads = tight, blobUploads = tight),
+                )
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            repeat(3) { assertEquals("MethodNotImplemented", putRecord(token, space, "r$it").errorCode()) }
+        }
+
+    @Test
+    fun `the default budgets let a device sync thousands of records as fast as it can send them`() {
+        val limits = SpaceRateLimits()
+        val limiter = FixedWindowRateLimiter()
+        val start = 1_000_000L
+        // One request every 15 ms is faster than a phone can send them one after another.
+        val writes = (0 until 10_000).count { limiter.allow("writes", limits.recordWrites, start + it * 15L) }
+        assertEquals(10_000, writes)
+        val reads = (0 until 10_000).count { limiter.allow("reads", limits.reads, start + it * 15L) }
+        assertEquals(10_000, reads)
+        val uploads = (0 until 2_000).count { limiter.allow("uploads", limits.blobUploads, start + it * 60L) }
+        assertEquals(2_000, uploads)
+    }
+
+    @Test
+    fun `parallel requests from two devices share one account budget`() =
+        testApplication {
+            val tight = RateLimitPolicy(maxRequests = 5, windowSeconds = 60)
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceRateLimits = SpaceRateLimits(recordWrites = tight))
+            val (did, phone) = env.signedInAccount("alice")
+            val ownerId = runBlocking { requireNotNull(env.accountRepository.findByDid(did)) }.id.toString()
+            val tablet = env.tokenService.generateAccessToken(ownerId)
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val statuses =
+                coroutineScope {
+                    (0 until 20)
+                        .map { index ->
+                            async { putRecord(if (index % 2 == 0) phone else tablet, space, "r$index").status }
+                        }.awaitAll()
+                }
+            assertEquals(5, statuses.count { it == HttpStatusCode.OK }, "$statuses")
+            assertEquals(15, statuses.count { it == HttpStatusCode.TooManyRequests }, "$statuses")
+        }
+
+    @Test
+    fun `a record write that would pass the storage quota answers QuotaExceeded`() =
+        testApplication {
+            val usage = MutableUsage()
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceEntitlementEnforcer = enforcer(limit = 10_000, usage))
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            assertEquals(HttpStatusCode.OK, putRecord(token, space, "kept").status)
+
+            usage.outsideSpaces = 10_000
+            val refused = putRecord(token, space, "new")
+            assertEquals(HttpStatusCode.PaymentRequired, refused.status)
+            assertEquals("QuotaExceeded", refused.errorCode())
+            assertEquals(HttpStatusCode.BadRequest, getRecord(token, space, "new").status, "nothing was stored")
+
+            assertEquals(HttpStatusCode.OK, putRecord(token, space, "kept", fill = 2).status, "a same-size replacement adds nothing")
+            val delete =
+                client.post("/xrpc/app.logdate.space.deleteRecord") {
+                    bearer(token)
+                    json("""{"space":"$space","rkey":"kept"}""")
+                }
+            assertEquals(HttpStatusCode.OK, delete.status, "a delete frees space even over the quota")
+        }
+
+    @Test
+    fun `a record that grows past the storage quota is refused but a smaller one is stored`() =
+        testApplication {
+            val usage = MutableUsage()
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceEntitlementEnforcer = enforcer(limit = 10_000, usage))
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            assertEquals(HttpStatusCode.OK, putRecord(token, space, "grow", ciphertextBytes = 2_048 + 16).status)
+
+            usage.outsideSpaces = 10_000
+            assertEquals("QuotaExceeded", putRecord(token, space, "grow", ciphertextBytes = 4_096 + 16).errorCode())
+            assertEquals(HttpStatusCode.OK, putRecord(token, space, "grow", ciphertextBytes = 528).status)
+        }
+
+    @Test
+    fun `a write that fails its swap condition is a swap conflict even past the quota`() =
+        testApplication {
+            val usage = MutableUsage()
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceEntitlementEnforcer = enforcer(limit = 10_000, usage))
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            assertEquals(HttpStatusCode.OK, putRecord(token, space, "taken").status)
+            usage.outsideSpaces = 10_000
+            val conflict =
+                client.post("/xrpc/app.logdate.space.putRecord") {
+                    bearer(token)
+                    json("""{"space":"$space","rkey":"taken","record":${sealedJson(ciphertextBytes = 4_096 + 16)},"createOnly":true}""")
+                }
+            assertEquals(HttpStatusCode.Conflict, conflict.status)
+            assertEquals("InvalidSwap", conflict.errorCode())
+        }
+
+    @Test
+    fun `a blob upload past the storage quota is refused before anything is stored`() =
+        testApplication {
+            val usage = MutableUsage()
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceEntitlementEnforcer = enforcer(limit = 10_000, usage))
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, ByteArray(600) { 1 }).status)
+            val ownerId = java.util.UUID.fromString(runBlocking { requireNotNull(env.accountRepository.findByDid(did)) }.id.toString())
+            val before = env.blobStorage.listOwnerBlobPaths(ownerId)
+
+            usage.outsideSpaces = 9_000
+            val refused = uploadBlob(token, space, ByteArray(600) { 2 })
+            assertEquals(HttpStatusCode.PaymentRequired, refused.status)
+            assertEquals("QuotaExceeded", refused.errorCode())
+            assertEquals(before, env.blobStorage.listOwnerBlobPaths(ownerId))
+            assertEquals(600L, runBlocking { env.spaceStore.storedBytes(ownerId) })
+        }
+
+    @Test
+    fun `uploading a file the space already holds adds nothing to the stored bytes`() =
+        testApplication {
+            val usage = MutableUsage()
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceEntitlementEnforcer = enforcer(limit = 10_000, usage))
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val stored = ByteArray(600) { 1 }
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, stored).status)
+            val ownerId = java.util.UUID.fromString(runBlocking { requireNotNull(env.accountRepository.findByDid(did)) }.id.toString())
+
+            usage.outsideSpaces = 10_000 - 600 - 600
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, stored).status)
+            assertEquals(600L, runBlocking { env.spaceStore.storedBytes(ownerId) })
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, ByteArray(600) { 3 }).status, "the repeat upload held no room")
+            assertEquals(1_200L, runBlocking { env.spaceStore.storedBytes(ownerId) })
+        }
+
+    @Test
+    fun `an upload past the instance's transfer slots answers ServerBusy with when to retry`() =
+        testApplication {
+            val entered = CompletableDeferred<Unit>()
+            val proceed = CompletableDeferred<Unit>()
+            val saving = InMemorySpaceStore()
+            val store =
+                object : SpaceStore by saving {
+                    override suspend fun reserveUpload(
+                        accountId: java.util.UUID,
+                        bytes: Long,
+                        quota: SpaceQuota,
+                    ): SpaceUploadReservation {
+                        if (!entered.isCompleted) {
+                            entered.complete(Unit)
+                            proceed.await()
+                        }
+                        return saving.reserveUpload(accountId, bytes, quota)
+                    }
+                }
+            val env =
+                configureAuthV1TestApp(
+                    personalSpaceEnabled = true,
+                    spaceStore = store,
+                    spaceTransferLimits = TransferLimits(streamedUploads = 1, downloads = 1, retryAfterSeconds = 7),
+                    spaceRateLimits = SpaceRateLimits(blobUploads = RateLimitPolicy(maxRequests = 2, windowSeconds = 60)),
+                    spaceEntitlementEnforcer = enforcer(limit = 1_000_000, MutableUsage()),
+                )
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            coroutineScope {
+                val first = async { uploadBlob(token, space, ByteArray(600) { 5 }) }
+                entered.await()
+                val busy = uploadBlob(token, space, ByteArray(600) { 6 })
+                assertEquals(HttpStatusCode.ServiceUnavailable, busy.status)
+                assertEquals("ServerBusy", busy.errorCode())
+                assertEquals("7", busy.headers[HttpHeaders.RetryAfter])
+                proceed.complete(Unit)
+                assertEquals(HttpStatusCode.OK, first.await().status)
+            }
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, ByteArray(600) { 6 }).status, "the slot is free again")
+            assertEquals(
+                HttpStatusCode.TooManyRequests,
+                uploadBlob(token, space, ByteArray(600) { 7 }).status,
+                "only the two uploads that got a slot spent the budget of two",
+            )
+        }
+
+    @Test
+    fun `an upload that fails after reserving its room frees the room`() =
+        testApplication {
+            val saving = InMemorySpaceStore()
+            var failNext = true
+            val store =
+                object : SpaceStore by saving {
+                    override suspend fun putBlob(
+                        accountId: java.util.UUID,
+                        space: String,
+                        blob: SpaceBlob,
+                        quota: SpaceQuota?,
+                        reservation: SpaceUploadReservation?,
+                    ): SpaceBlob {
+                        if (failNext) {
+                            failNext = false
+                            error("The metadata store is down")
+                        }
+                        return saving.putBlob(accountId, space, blob, quota, reservation)
+                    }
+                }
+            val env =
+                configureAuthV1TestApp(
+                    personalSpaceEnabled = true,
+                    spaceStore = store,
+                    spaceEntitlementEnforcer = enforcer(limit = 1_000, MutableUsage()),
+                )
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+
+            val failed = runCatching { uploadBlob(token, space, ByteArray(600) { 1 }) }
+            assertTrue(failed.isFailure || failed.getOrThrow().status == HttpStatusCode.InternalServerError, "$failed")
+
+            assertEquals(
+                HttpStatusCode.OK,
+                uploadBlob(token, space, ByteArray(600) { 2 }).status,
+                "the failed upload's 600 bytes would leave no room for this one if it were still held",
+            )
+        }
+
+    @Test
+    fun `a body that isn't as long as its Content-Length is refused and frees its room`() =
+        testApplication {
+            val env =
+                configureAuthV1TestApp(
+                    personalSpaceEnabled = true,
+                    spaceEntitlementEnforcer = enforcer(limit = 1_000, MutableUsage()),
+                )
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val ownerId = java.util.UUID.fromString(runBlocking { requireNotNull(env.accountRepository.findByDid(did)) }.id.toString())
+
+            val short = uploadSized(token, space, declared = 600, body = ByteArray(300))
+            assertEquals(HttpStatusCode.BadRequest, short.status)
+            assertEquals(emptyList(), env.blobStorage.listOwnerBlobPaths(ownerId), "the partial object is deleted")
+
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, ByteArray(600) { 3 }).status, "the room was freed")
+        }
+
+    @Test
+    fun `an upload without a Content-Length is refused before anything is received`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+
+            val refused = uploadUnsized(token, space, ByteArray(600))
+
+            assertEquals(HttpStatusCode.LengthRequired, refused.status)
+            assertEquals("LengthRequired", refused.errorCode())
+            assertEquals(HttpStatusCode.OK, uploadChunked(token, space, ByteArray(600)).status)
+        }
+
+    @Test
+    fun `an upload whose client stops sending is ended and frees its slot and room`() =
+        testApplication {
+            val env =
+                configureAuthV1TestApp(
+                    personalSpaceEnabled = true,
+                    spaceTransferLimits = TransferLimits(streamedUploads = 1, idleTimeout = 300.milliseconds),
+                    spaceEntitlementEnforcer = enforcer(limit = 1_000, MutableUsage()),
+                )
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+
+            val stalled = uploadStalled(token, space, declared = 600)
+
+            assertEquals(HttpStatusCode.RequestTimeout, stalled.status)
+            assertEquals("UploadStalled", stalled.errorCode())
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, ByteArray(600) { 4 }).status, "slot and room are free again")
+        }
+
+    @Test
+    fun `a download past the instance's transfer slots answers ServerBusy, and a finished download frees its slot`() =
+        testApplication {
+            val entered = CompletableDeferred<Unit>()
+            val proceed = CompletableDeferred<Unit>()
+            val saving = InMemorySpaceStore()
+            var hold = false
+            val store =
+                object : SpaceStore by saving {
+                    override suspend fun getBlob(
+                        space: String,
+                        cid: String,
+                    ): SpaceBlob? {
+                        if (hold) {
+                            hold = false
+                            entered.complete(Unit)
+                            proceed.await()
+                        }
+                        return saving.getBlob(space, cid)
+                    }
+                }
+            val env =
+                configureAuthV1TestApp(
+                    personalSpaceEnabled = true,
+                    spaceStore = store,
+                    spaceTransferLimits = TransferLimits(downloads = 1, retryAfterSeconds = 9),
+                    spaceRateLimits = SpaceRateLimits(reads = RateLimitPolicy(maxRequests = 3, windowSeconds = 60)),
+                )
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val bytes = ByteArray(600) { 8 }
+            val cid = Cid.rawSha256(bytes).value
+            assertEquals(HttpStatusCode.OK, uploadBlob(token, space, bytes).status)
+
+            hold = true
+            coroutineScope {
+                val first = async { getBlob(token, space, cid) }
+                entered.await()
+                val busy = getBlob(token, space, cid)
+                assertEquals(HttpStatusCode.ServiceUnavailable, busy.status)
+                assertEquals("ServerBusy", busy.errorCode())
+                assertEquals("9", busy.headers[HttpHeaders.RetryAfter])
+                proceed.complete(Unit)
+                assertContentEquals(bytes, first.await().bodyAsBytes())
+            }
+
+            assertContentEquals(bytes, getBlob(token, space, cid).bodyAsBytes(), "the slot is free after the body was sent")
+            assertContentEquals(bytes, getBlob(token, space, cid).bodyAsBytes(), "and again")
+            assertEquals(
+                HttpStatusCode.TooManyRequests,
+                getBlob(token, space, cid).status,
+                "only the three downloads that got a slot spent the budget of three",
+            )
+        }
+
+    @Test
+    fun `a large blob streams through without leaving temporary files behind`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true, spaceMaxBlobBytes = 8L * 1024 * 1024)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val before = spaceTempFiles()
+            val bytes = ByteArray(6 * 1024 * 1024) { (it * 31).toByte() }
+            val upload = uploadChunked(token, space, bytes)
+            assertEquals(HttpStatusCode.OK, upload.status, upload.bodyAsText())
+            val cid = Cid.rawSha256(bytes).value
+            assertTrue(cid in upload.bodyAsText())
+
+            val read = getBlob(token, space, cid)
+            assertEquals(HttpStatusCode.OK, read.status)
+            assertEquals("private, no-store", read.headers[HttpHeaders.CacheControl])
+            assertEquals(bytes.size.toString(), read.headers[HttpHeaders.ContentLength])
+            assertContentEquals(bytes, read.bodyAsBytes())
+
+            assertEquals(HttpStatusCode.PayloadTooLarge, uploadChunked(token, space, ByteArray(8 * 1024 * 1024 + 1)).status)
+            assertEquals(before, spaceTempFiles())
+        }
+
+    private fun spaceTempFiles(): Set<String> =
+        java.io
+            .File(System.getProperty("java.io.tmpdir"))
+            .list { _, name -> name.startsWith("logdate-space-blob-") }
+            .orEmpty()
+            .toSet()
+
+    private suspend fun ApplicationTestBuilder.putRecord(
+        token: String,
+        space: String,
+        rkey: String,
+        fill: Int = 1,
+        ciphertextBytes: Int = 528,
+    ): HttpResponse =
+        client.post("/xrpc/app.logdate.space.putRecord") {
+            bearer(token)
+            json("""{"space":"$space","rkey":"$rkey","record":${sealedJson(fill, ciphertextBytes)}}""")
+        }
+
+    private class MutableUsage : UsageCalculator {
+        @Volatile var outsideSpaces = 0L
+
+        override suspend fun storageBytes(accountId: java.util.UUID): Long = outsideSpaces
+
+        override suspend fun storageBytesOutsideSpaces(accountId: java.util.UUID): Long = outsideSpaces
+
+        override suspend fun backupCount(accountId: java.util.UUID): Int = 0
+    }
+
+    private fun enforcer(
+        limit: Long,
+        usage: UsageCalculator,
+    ): EntitlementEnforcer =
+        EntitlementEnforcer(
+            entitlementService =
+                object : EntitlementService {
+                    override suspend fun resolve(accountId: java.util.UUID): Entitlement =
+                        Entitlement(
+                            planId = "standard",
+                            tier = EntitlementTier.STANDARD,
+                            status = EntitlementStatus.ACTIVE,
+                            limits = EntitlementLimits(storageBytes = limit, backupCount = null),
+                        )
+                },
+            usageCalculator = usage,
+        )
 
     private suspend fun ApplicationTestBuilder.everySpaceMethod(
         space: String,
@@ -882,7 +1363,37 @@ class SpaceXrpcRoutesTest {
         )
     }
 
+    /** Sends [bytes] in small pieces with the Content-Length a client that knows the file's size sends. */
     private suspend fun ApplicationTestBuilder.uploadChunked(
+        token: String,
+        space: String,
+        bytes: ByteArray,
+    ): HttpResponse = uploadSized(token, space, declared = bytes.size.toLong(), body = bytes)
+
+    /** Sends [body] in small pieces while declaring a Content-Length of [declared]. */
+    private suspend fun ApplicationTestBuilder.uploadSized(
+        token: String,
+        space: String,
+        declared: Long,
+        body: ByteArray,
+    ): HttpResponse =
+        client.post("/xrpc/app.logdate.space.uploadBlob") {
+            bearer(token)
+            parameter("space", space)
+            setBody(
+                object : OutgoingContent.WriteChannelContent() {
+                    override val contentType = ContentType.Application.OctetStream
+                    override val contentLength = declared
+
+                    override suspend fun writeTo(channel: ByteWriteChannel) {
+                        body.asList().chunked(256).forEach { channel.writeFully(it.toByteArray()) }
+                    }
+                },
+            )
+        }
+
+    /** Sends [bytes] with no Content-Length, as a chunked request does. */
+    private suspend fun ApplicationTestBuilder.uploadUnsized(
         token: String,
         space: String,
         bytes: ByteArray,
@@ -896,6 +1407,29 @@ class SpaceXrpcRoutesTest {
 
                     override suspend fun writeTo(channel: ByteWriteChannel) {
                         bytes.asList().chunked(256).forEach { channel.writeFully(it.toByteArray()) }
+                    }
+                },
+            )
+        }
+
+    /** Declares [declared] bytes, sends some of them, then goes quiet without ending the request. */
+    private suspend fun ApplicationTestBuilder.uploadStalled(
+        token: String,
+        space: String,
+        declared: Long,
+    ): HttpResponse =
+        client.post("/xrpc/app.logdate.space.uploadBlob") {
+            bearer(token)
+            parameter("space", space)
+            setBody(
+                object : OutgoingContent.WriteChannelContent() {
+                    override val contentType = ContentType.Application.OctetStream
+                    override val contentLength = declared
+
+                    override suspend fun writeTo(channel: ByteWriteChannel) {
+                        channel.writeFully(ByteArray(100))
+                        channel.flush()
+                        delay(5_000)
                     }
                 },
             )

@@ -8,6 +8,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receiveChannel
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readAvailable
 import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.writeFully
 import kotlinx.coroutines.CancellationException
@@ -18,11 +19,14 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.readByteArray
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration
 
 /** [reason] is the client-facing message; it never echoes request content. */
 internal class InvalidBackupMultipart(
@@ -45,6 +49,9 @@ internal suspend fun withBackupFileHandoff(work: suspend () -> ParsedBackupMulti
     }
 }
 
+/** The client sent nothing for longer than the idle timeout, so the upload gave up its transfer slot. */
+internal class BackupUploadStalled : IOException("The backup upload sent nothing for too long")
+
 private class BackupStorageFailure : IllegalStateException("BACKUP_STORAGE_UNAVAILABLE")
 
 private inline fun <T> backupStorage(work: () -> T): T =
@@ -54,22 +61,33 @@ private inline fun <T> backupStorage(work: () -> T): T =
         throw BackupStorageFailure()
     }
 
-internal suspend fun ApplicationCall.streamBackupMultipart(): ParsedBackupMultipartFile =
+internal suspend fun ApplicationCall.streamBackupMultipart(idleTimeout: Duration): ParsedBackupMultipartFile =
     withBackupFileHandoff {
+        val stalled = AtomicBoolean(false)
         try {
-            parseBackupMultipartBody()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: IOException) {
-            throw InvalidBackupMultipart()
-        } catch (invalid: InvalidBackupMultipart) {
-            throw invalid
-        } catch (_: IllegalArgumentException) {
-            throw InvalidBackupMultipart()
+            try {
+                parseBackupMultipartBody(idleTimeout, stalled)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: IOException) {
+                throw InvalidBackupMultipart()
+            } catch (invalid: InvalidBackupMultipart) {
+                throw invalid
+            } catch (_: IllegalArgumentException) {
+                throw InvalidBackupMultipart()
+            }
+        } catch (failure: Exception) {
+            // A stalled pump closes the channel the multipart parser reads, and the parser's failure is what
+            // the scope rethrows, so the flag is the only record of why the upload ended.
+            if (stalled.get()) throw BackupUploadStalled()
+            throw failure
         }
     }
 
-private suspend fun ApplicationCall.parseBackupMultipartBody(): ParsedBackupMultipartFile =
+private suspend fun ApplicationCall.parseBackupMultipartBody(
+    idleTimeout: Duration,
+    stalled: AtomicBoolean,
+): ParsedBackupMultipartFile =
     coroutineScope {
         val contentType =
             request.headers[HttpHeaders.ContentType]
@@ -83,7 +101,7 @@ private suspend fun ApplicationCall.parseBackupMultipartBody(): ParsedBackupMult
         val input = receiveChannel()
         val guarded = ByteChannel(autoFlush = true)
         val credit = AtomicLong()
-        val pump = launchGuardedPump(input, guarded, credit)
+        val pump = launchGuardedPump(input, guarded, credit, idleTimeout, stalled)
         val events = parseMultipart(guarded, contentType, contentLength, MAX_BACKUP_BYTES)
         val reader = BackupMultipartReader(credit)
         var accepted = false
@@ -103,18 +121,30 @@ private suspend fun ApplicationCall.parseBackupMultipartBody(): ParsedBackupMult
         }
     }
 
-/** Forwards the request body while bounding how far non-file bytes may run ahead of the file [credit]. */
+/**
+ * Forwards the request body while bounding how far non-file bytes may run ahead of the file [credit].
+ * A client that sends nothing for [idleTimeout] ends the upload, and [stalled] says why.
+ */
 private fun CoroutineScope.launchGuardedPump(
     input: ByteReadChannel,
     guarded: ByteChannel,
     credit: AtomicLong,
+    idleTimeout: Duration,
+    stalled: AtomicBoolean,
 ): Job =
     launch {
         try {
             var forwarded = 0L
+            val buffer = ByteArray(CHUNK_BYTES.toInt())
             while (true) {
-                val chunk = input.readRemaining(CHUNK_BYTES).readByteArray()
-                if (chunk.isEmpty()) break
+                val count =
+                    withTimeoutOrNull(idleTimeout) { input.readAvailable(buffer, 0, buffer.size) }
+                        ?: run {
+                            stalled.set(true)
+                            throw BackupUploadStalled()
+                        }
+                if (count < 0) break
+                val chunk = buffer.copyOf(count)
                 forwarded += chunk.size
                 if (forwarded > MAX_BACKUP_BYTES + MAX_OVERHEAD_BYTES || forwarded - credit.get() > MAX_OVERHEAD_BYTES) {
                     throw InvalidBackupMultipart("Backup upload is larger than 2 GiB")
