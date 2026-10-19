@@ -40,6 +40,15 @@ interface HostedPlcOperationRepository {
     suspend fun listByAccountId(accountId: Uuid): List<StoredHostedPlcOperation>
 
     suspend fun listByDid(did: String): List<StoredHostedPlcOperation>
+
+    /**
+     * Records the CID the PLC directory assigned to a stored operation once the directory has it.
+     * Returns false when no operation has [operationId].
+     */
+    suspend fun recordPublishedCid(
+        operationId: Uuid,
+        cid: String,
+    ): Boolean
 }
 
 @OptIn(ExperimentalUuidApi::class)
@@ -68,5 +77,15 @@ class InMemoryHostedPlcOperationRepository : HostedPlcOperationRepository {
             operationsById.values
                 .filter { it.did == did }
                 .sortedBy(StoredHostedPlcOperation::createdAt)
+        }
+
+    override suspend fun recordPublishedCid(
+        operationId: Uuid,
+        cid: String,
+    ): Boolean =
+        synchronized(operationsById) {
+            val existing = operationsById[operationId] ?: return@synchronized false
+            operationsById[operationId] = existing.copy(cid = cid)
+            true
         }
 }

@@ -19,7 +19,7 @@ data class AtprotoIdentityConfig(
     val pdsServiceEndpoint: String = "https://logdate.app",
     val hostedAccountDidMethod: HostedAccountDidMethod = HostedAccountDidMethod.PLC,
     val publishHostedPlcOperations: Boolean = false,
-    val plcDirectoryUrl: String = "https://plc.directory",
+    val plcDirectoryUrl: String = PUBLIC_PLC_DIRECTORY_URL,
     val recoveryKeysEnabled: Boolean = false,
 ) {
     init {
@@ -29,12 +29,18 @@ data class AtprotoIdentityConfig(
                 "loopback hosts ($LOOPBACK_HOSTS), so an emulator can reach a server running on the " +
                 "developer's machine"
         }
-        require(plcDirectoryUrl.startsWith("https://")) { "plcDirectoryUrl must use https" }
+        require(isAcceptableServiceEndpoint(plcDirectoryUrl.trim())) {
+            "plcDirectoryUrl must use https; plain http is accepted outside production only for loopback " +
+                "hosts ($LOOPBACK_HOSTS), so a rehearsal can run against a PLC directory on the same machine"
+        }
     }
 
     val normalizedHandleDomain: String = handleDomain.trim().trim('.').lowercase()
     val serverDid: String = "did:web:$normalizedHandleDomain"
     val normalizedPlcDirectoryUrl: String = plcDirectoryUrl.trim().removeSuffix("/")
+
+    /** Whether operations go to the public PLC directory, where nothing published can be taken back. */
+    val targetsPublicPlcDirectory: Boolean = normalizedPlcDirectoryUrl.equals(PUBLIC_PLC_DIRECTORY_URL, ignoreCase = true)
 
     /** Whether hosted accounts get `did:plc` identities whose operations reach the PLC directory. */
     val publishesPlcOperations: Boolean =
@@ -81,13 +87,16 @@ data class AtprotoIdentityConfig(
                     plcDirectoryUrl
                         ?.trim()
                         .orEmpty()
-                        .ifBlank { "https://plc.directory" }
+                        .ifBlank { PUBLIC_PLC_DIRECTORY_URL }
                         .removeSuffix("/"),
                 recoveryKeysEnabled = recoveryKeysEnabled?.trim()?.equals("true", ignoreCase = true) == true,
             )
         }
     }
 }
+
+/** The public PLC directory that the wider AT Protocol network resolves `did:plc` identities from. */
+const val PUBLIC_PLC_DIRECTORY_URL: String = "https://plc.directory"
 
 /** Loopback hosts a device or emulator uses to reach the machine running the server. */
 internal val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "10.0.2.2", "::1", "[::1]")

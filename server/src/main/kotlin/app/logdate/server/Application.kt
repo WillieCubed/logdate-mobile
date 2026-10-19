@@ -8,6 +8,7 @@ import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.installServerKoin
 import app.logdate.server.diagnostics.installDiagnosticReportMaintenance
 import app.logdate.server.identity.handleIdentityBackfillCommand
+import app.logdate.server.identity.handleIdentityPublishingCommand
 import app.logdate.server.identity.installStoredKeyRewrap
 import app.logdate.server.logging.initializeSentry
 import app.logdate.server.logging.installRequestDiagnostics
@@ -33,6 +34,7 @@ fun main(args: Array<String> = emptyArray()) {
     installServerLogging()
 
     if (handleIdentityBackfillCommand(args)) return
+    if (handleIdentityPublishingCommand(args)) return
     if (handleAccountBlobCleanupCommand(args)) return
     val profile = RuntimeProfile.fromEnvironment()
     ProductionConfigValidator.validate(profile)
