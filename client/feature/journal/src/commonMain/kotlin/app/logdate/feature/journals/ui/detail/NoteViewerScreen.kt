@@ -680,14 +680,14 @@ private fun NoteLocationCard(
     modifier: Modifier = Modifier,
 ) {
     val coordinates = location.coordinates
-    val place = location.place
+    val placeCenter = location.place?.let { place -> place.latitude?.let { latitude -> place.longitude?.let { latitude to it } } }
     val title = location.displayName ?: stringResource(Res.string.pinned_location)
     val subtitle =
         when {
             coordinates != null ->
                 "${coordinates.latitude.formatCoordinate()}, ${coordinates.longitude.formatCoordinate()}"
-            place != null ->
-                "${place.latitude.formatCoordinate()}, ${place.longitude.formatCoordinate()}"
+            placeCenter != null ->
+                "${placeCenter.first.formatCoordinate()}, ${placeCenter.second.formatCoordinate()}"
             else -> ""
         }
 

@@ -231,15 +231,23 @@ data class NoteCoordinates(
 
 /**
  * A semantic place reference (e.g., "Home", "Work").
+ *
+ * A note stores only the place's [id]. The name and center are known when the place itself is on
+ * this device or when a record carries a copy, and absent otherwise; absent means unknown, never an
+ * empty name or a center of 0, 0. A center is either both coordinates or neither.
  */
 @Serializable
 data class NotePlace(
     @Serializable(with = UuidSerializer::class)
     val id: Uuid,
-    val name: String,
-    val latitude: Double,
-    val longitude: Double,
-)
+    val name: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+) {
+    init {
+        require((latitude == null) == (longitude == null)) { "A place's center needs both a latitude and a longitude" }
+    }
+}
 
 /**
  * Location data for a note, combining raw coordinates with optional semantic place.
