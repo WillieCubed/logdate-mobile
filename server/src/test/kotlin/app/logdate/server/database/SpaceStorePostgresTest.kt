@@ -16,6 +16,7 @@ import kotlinx.serialization.json.putJsonObject
 import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.junit.Assume.assumeTrue
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -120,13 +121,13 @@ class SpaceStorePostgresTest {
                         withTimeout(15_000) {
                             while (waiting(source, "wait_event = 'advisory' AND query LIKE '%space_record_blobs%'") < 1) delay(25)
                         }
+                        val purged = ConcurrentLinkedQueue<String>()
                         val purge =
                             async(Dispatchers.IO) {
                                 store.purge(
                                     tombstonesBefore = Clock.System.now() - 1.hours,
-                                    unreferencedBlobsBefore =
-                                        Clock.System.now() + 1.hours,
-                                )
+                                    unreferencedBlobsBefore = Clock.System.now() + 1.hours,
+                                ) { purged += it }
                             }
                         withTimeout(15_000) {
                             while (!purge.isCompleted &&
@@ -138,7 +139,7 @@ class SpaceStorePostgresTest {
                         control.createStatement().use { it.execute("SELECT pg_advisory_unlock($gate)") }
 
                         val stored = put.await()
-                        val purged = purge.await()
+                        purge.await()
                         assertFalse(blobPath in purged, "Purge must not delete a blob a committing write refers to")
                         assertNotNull(store.getBlob(space, "bafyracing"))
                         assertEquals(stored, store.get(space, author, "racing"))
