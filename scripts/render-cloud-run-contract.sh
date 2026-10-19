@@ -616,7 +616,11 @@ try:
         "AUTO_MIGRATE",
     }
     # Server feature flags a deployment may set; each one is off unless it says "true".
-    optional_flag_keys = {"LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED", "LOGDATE_PERSONAL_SPACE_ENABLED"}
+    optional_flag_keys = {
+        "LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED",
+        "LOGDATE_PERSONAL_SPACE_ENABLED",
+        "ATPROTO_PLC_PUBLISH_ENABLED",
+    }
     allowed_env_keys = required_env_keys | optional_flag_keys
     unexpected_env = set(env_vars) - allowed_env_keys
     if unexpected_env:
@@ -624,6 +628,11 @@ try:
     for key in sorted(optional_flag_keys & set(env_vars)):
         if env_vars[key] not in ("true", "false"):
             fail(f"{key} must be true or false")
+    # Publishing sends identities to the public PLC directory, where they can never be removed.
+    # Staging accounts are test accounts, so only production may switch it on
+    # (docs/runbook/identity-publishing.md).
+    if environment != "production" and env_vars.get("ATPROTO_PLC_PUBLISH_ENABLED") == "true":
+        fail("only production may publish identities to the PLC directory")
     for key in sorted(required_env_keys):
         if key not in env_vars:
             fail(f"required environment variable {key} is missing")
