@@ -580,3 +580,68 @@ resource "google_monitoring_alert_policy" "account_blob_cleanup_overdue" {
     mime_type = "text/markdown"
   }
 }
+
+# Other AT Protocol apps find an account by fetching https://<handle>/.well-known/atproto-did.
+# The logdate.app website answers that path for every handle host by asking this server, so the
+# check covers the whole route: DNS, the website Worker, and the server's account lookup.
+resource "google_monitoring_uptime_check_config" "handle_resolution" {
+  count        = var.handle_resolution_monitor != null ? 1 : 0
+  display_name = "${var.service_name} handle resolution"
+  timeout      = "10s"
+  period       = "300s"
+
+  http_check {
+    path           = "/.well-known/atproto-did"
+    port           = 443
+    use_ssl        = true
+    validate_ssl   = true
+    request_method = "GET"
+    accepted_response_status_codes {
+      status_value = 200
+    }
+  }
+
+  monitored_resource {
+    type = "uptime_url"
+    labels = {
+      project_id = var.project_id
+      host       = var.handle_resolution_monitor.handle
+    }
+  }
+
+  content_matchers {
+    content = "^${replace(var.handle_resolution_monitor.did, ".", "\\.")}\\s*$"
+    matcher = "MATCHES_REGEX"
+  }
+
+  depends_on = [google_project_service.required]
+}
+
+resource "google_monitoring_alert_policy" "handle_resolution_failing" {
+  count                 = var.handle_resolution_monitor != null ? 1 : 0
+  display_name          = "${var.service_name} handle resolution failing"
+  combiner              = "OR"
+  notification_channels = concat(var.handle_resolution_notification_channels, google_monitoring_notification_channel.cleanup_operator[*].name)
+  conditions {
+    display_name = "${var.handle_resolution_monitor.handle} does not resolve to its DID"
+    condition_threshold {
+      filter          = "metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\" AND resource.type = \"uptime_url\" AND metric.labels.check_id = \"${google_monitoring_uptime_check_config.handle_resolution[0].uptime_check_id}\""
+      comparison      = "COMPARISON_GT"
+      threshold_value = 1
+      duration        = "600s"
+      aggregations {
+        alignment_period     = "1200s"
+        per_series_aligner   = "ALIGN_NEXT_OLDER"
+        cross_series_reducer = "REDUCE_COUNT_FALSE"
+        group_by_fields      = ["resource.label.*"]
+      }
+      trigger {
+        count = 1
+      }
+    }
+  }
+  documentation {
+    content   = "P1: other AT Protocol apps cannot verify logdate.app handles while this fires. Run `./scripts/check-handle-resolution.sh --handle ${var.handle_resolution_monitor.handle} --service-url https://cloud.logdate.app` to see which step fails. See docs/reference/handle-resolution.md."
+    mime_type = "text/markdown"
+  }
+}

@@ -12,6 +12,8 @@ for emergency deploys.
 - Secret Manager secrets (optional, placeholder only)
 - GCS bucket for media (optional)
 - Cloud Run domain mapping (optional, requires verified domain)
+- Cloud Monitoring uptime check and alert for AT Protocol handle resolution (optional, set
+  `handle_resolution_monitor`; see `docs/reference/handle-resolution.md`)
 
 ## Required inputs
 - `project_id`
