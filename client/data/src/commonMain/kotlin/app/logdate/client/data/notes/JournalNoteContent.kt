@@ -36,6 +36,16 @@ internal fun JournalNote.hasSamePersistedContent(other: JournalNote): Boolean {
             other is JournalNote.Image && mediaRef == other.mediaRef && caption == other.caption && presentation == other.presentation
         is JournalNote.Audio ->
             other is JournalNote.Audio && mediaRef == other.mediaRef && durationMs == other.durationMs && caption == other.caption
-        is JournalNote.Video -> other is JournalNote.Video && mediaRef == other.mediaRef && caption == other.caption
+        is JournalNote.Video ->
+            other is JournalNote.Video &&
+                mediaRef == other.mediaRef &&
+                caption == other.caption &&
+                sameKnownDuration(durationMs, other.durationMs)
     }
 }
+
+// A length filled in when the note was first saved doesn't make a later save of the same note a different one.
+private fun sameKnownDuration(
+    first: Long?,
+    second: Long?,
+): Boolean = first == null || second == null || first == second

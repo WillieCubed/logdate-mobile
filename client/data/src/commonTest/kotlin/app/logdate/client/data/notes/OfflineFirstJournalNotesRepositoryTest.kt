@@ -275,6 +275,55 @@ class OfflineFirstJournalNotesRepositoryTest {
             assertTrue(indexedMediaRepository.isIndexed(videoNote.mediaRef))
         }
 
+    @Test
+    fun `create video note stores the length the media reports`() =
+        runTest {
+            val videoNote =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///video-length.mp4",
+                )
+            mediaManager.mediaByUri[videoNote.mediaRef] =
+                MediaObject.Video(
+                    name = "video-length.mp4",
+                    uri = videoNote.mediaRef,
+                    size = 1024,
+                    timestamp = videoNote.creationTimestamp,
+                    duration = 42.seconds,
+                )
+
+            repository.create(videoNote)
+
+            val stored = repository.getNoteById(videoNote.uid) as JournalNote.Video
+            assertEquals(42_000L, stored.durationMs)
+        }
+
+    @Test
+    fun `saving a video note again with a length the first save filled in is the same note`() =
+        runTest {
+            val videoNote =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = "file:///video-again.mp4",
+                )
+            mediaManager.mediaByUri[videoNote.mediaRef] =
+                MediaObject.Video(
+                    name = "video-again.mp4",
+                    uri = videoNote.mediaRef,
+                    size = 1024,
+                    timestamp = videoNote.creationTimestamp,
+                    duration = 9.seconds,
+                )
+
+            repository.create(videoNote)
+
+            assertEquals(videoNote.uid, repository.create(videoNote))
+        }
+
     /**
      * Tests creating a text note through the repository.
      *
