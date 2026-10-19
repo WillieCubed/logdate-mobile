@@ -58,6 +58,7 @@ import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLResourceRouteRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
+import app.logdate.server.database.PostgreSQLSpaceStore
 import app.logdate.server.devices.DeviceLinkService
 import app.logdate.server.devices.DeviceSessionGuard
 import app.logdate.server.devices.DeviceSessionRepository
@@ -109,6 +110,8 @@ import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthRuntimeStateRepository
 import app.logdate.server.oauth.OAuthSigningKeyRepository
+import app.logdate.server.space.InMemorySpaceStore
+import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.DbLocationHistoryRepository
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.GcsMediaStorage
@@ -197,6 +200,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single<AccountKeyEnvelopeRepository> {
             if (isDatabaseAvailable) PostgreSQLAccountKeyEnvelopeRepository() else InMemoryAccountKeyEnvelopeRepository()
         }
+        single<SpaceStore> { if (isDatabaseAvailable) PostgreSQLSpaceStore() else InMemorySpaceStore() }
         single { GoogleVcJwksCache() }
         single {
             DigitalCredentialVerifier(
