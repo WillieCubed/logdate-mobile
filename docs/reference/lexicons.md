@@ -277,7 +277,11 @@ a map directory id and whether the person confirmed it). Each id becomes one
 
 - When both have a name, coordinates or radius, the saved place's wins. Renaming or moving a saved
   place changes it in place, so it holds the person's latest choice.
-- Label corrections that target `place:<id>` still decide the name shown, as they do today.
+- Label corrections that target `place:<id>` decide the name shown, exactly as today. The current
+  ones are those no other correction lists in `supersedes`. If they all give the same label, it's
+  shown and the place counts as confirmed. If they disagree, the place's `name` is shown and the
+  person is offered the conflict to settle. Nothing depends on which correction is newest, because
+  moved-over corrections have no `createdAt`. The same rule applies to every corrected field.
 - A saved place is always `userConfirmed`. `createdAt` comes from the saved place; places that only
   came from history have none.
 - Deleting the record deletes both. Today, deleting the history place already hides the saved one.
