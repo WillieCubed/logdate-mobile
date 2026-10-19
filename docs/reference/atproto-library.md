@@ -136,6 +136,38 @@ engine.createRecord(
 )
 ```
 
+The quick start uses the default `DigestRepoCommitSigner`, which puts a hash where the signature
+belongs. That is fine for a repository that never leaves your process, but relays and other AT
+Protocol services reject those commits. A repository that anyone else will read needs a
+`RepoCommitSigner` backed by the account's signing key (the server's is
+`HostedRepoCommitSigner`), passed as `DefaultRepoEngine(blockStore, signer = ...)`.
+
+### How commits follow the repository specification
+
+Every write produces a commit that matches the
+[repository specification](https://atproto.com/specs/repository):
+
+- **Fields.** The commit object has exactly `version` (always 3), `did`, `data` (the root of the
+  record tree), `rev`, `prev` and `sig`. `prev` is always present, as `null` on the first commit.
+- **Signature.** The signer receives the DAG-CBOR bytes of the commit without `sig`, hashes them
+  with SHA-256 and signs the hash. A signer that cannot find the account's key must throw; the
+  write then fails rather than storing an unsigned commit.
+- **Revision.** `rev` is a TID (timestamp identifier) made from the current time, and every
+  commit's `rev` is greater than the one before it. If the clock stands still or steps back, the
+  engine uses one more than the previous revision instead. The engine stores revisions as the
+  TID's 64-bit number, so repositories written when revisions were a counter (1, 2, 3, ...) carry
+  on with TIDs, which are far larger.
+
+The JVM tests check this with the reference implementation itself. They export repositories as CAR
+files and run [`tools/atproto-repo-verify/verify.mjs`](../../tools/atproto-repo-verify/verify.mjs),
+which uses the pinned `@atproto/repo` package to check block hashes, the commit shape, the
+signature, the revision and the record tree's shape. The check needs Node.js and pnpm on your PATH;
+Gradle installs the pinned packages before the tests run:
+
+```bash
+./gradlew :shared:atproto-repo:jvmTest
+```
+
 ```kotlin
 val client = KtorXrpcClient(
     httpClient = HttpClient(),

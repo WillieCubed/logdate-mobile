@@ -1,0 +1,11 @@
+{
+  "name": "logdate-atproto-repo-verify",
+  "private": true,
+  "type": "module",
+  "description": "Verifies repository CAR exports with the AT Protocol reference implementation.",
+  "dependencies": {
+    "@atproto/repo": "0.11.0",
+    "@atproto/syntax": "0.7.7"
+  },
+  "packageManager": "pnpm@12.11.2"
+}
