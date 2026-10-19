@@ -146,7 +146,8 @@ entry made from a note, both parts are the note's id.
 A transcript keeps everything the apps store about it: every segment with its id, timing, text,
 words, speaker, confidence, recognition pass and whether it's final; the speakers; the engine's
 name, model and version; detected sounds; and the revision. A confidence from 0 to 1 becomes
-thousandths: times 1000, rounded to the nearest whole number, and kept between 0 and 1000.
+thousandths: times 1000, rounded to the nearest whole number with halves away from zero, and kept
+between 0 and 1000. A NaN or infinite confidence is left out.
 
 Speaker colors aren't stored. The apps can assign a color to each speaker without one, and nothing
 sets one today.
@@ -291,10 +292,12 @@ a map directory id and whether the person confirmed it). Each id becomes one
 - Deleting the record deletes both. Today, deleting the history place already hides the saved one.
 
 Fractional measurements become integers in smaller units: accuracy and radius in centimeters, speed
-in centimeters per second, and bearing in hundredths of a degree. Each is the device's value times
-100, rounded to the nearest whole number. A negative accuracy, speed or radius becomes 0, and a
-bearing is reduced modulo 36,000, so 359.996° becomes 0. Digits below a centimeter, which a float
-can carry, are dropped: they're finer than any location sensor measures.
+in centimeters per second, and bearing in hundredths of a degree. Each follows the conversion rule
+in [Writing LogDate lexicons](./lexicon-style.md#conventions): a NaN or infinite value is left out;
+otherwise the value times 100 is rounded to the nearest whole number, with halves away from zero.
+A negative accuracy, speed or radius becomes 0. A bearing is reduced with a true modulo into 0 to
+35,999, whatever its sign or size, so 359.996° becomes 0 and −360.5° becomes 35,950. Digits below a
+centimeter, which a float can carry, are dropped: they're finer than any location sensor measures.
 
 ### Records too large to seal
 
@@ -588,4 +591,4 @@ Streams form.
 | 2026-10-18 | **Marked moments are their own record.** `app.logdate.journal.markedMoment` is private only. A mark isn't an entry: it's left out of Rewinds and the library, and it can hold a heart rate. |
 | 2026-10-18 | **Stored location history is samples plus what the person did.** Samples and activity changes, places, corrections, entry links and visits the person added are records. Visits and journeys LogDate works out are recomputed on every device, so `app.logdate.place.journey` is reserved and nothing writes it yet. Corrections and entry links name their target with today's evidence ids, and each correction stores its new value in a field of the right type. |
 | 2026-10-18 | **Hourly location records, one per device.** Raw location samples and activity changes are batched into one `place.sample` record per device per UTC hour, keyed `<UTC hour>:<device>`, instead of one record per day. A sealed record is replaced whole on every change, and a device uploads new samples every few minutes. A day can hold tens of thousands of samples (the foreground stream takes about one a second), so a daily record would be encrypted and uploaded again at several megabytes, many times a day, and could outgrow a sealed record. An hourly record stays small, and an hour that has ended only changes again when the person deletes something. Only the recording device adds samples, so devices don't conflict over new ones. Another device may delete samples, so the first write of a record is create-only (`createOnly`), every later write uses `swapCid`, and a refused write is merged and retried: samples from either version minus deleted ids from either, with deletion lists that only grow. A deletion is listed in the part that held the sample. An hour's lists are capped so a record fits in a sealed record with every field at its longest; a new part, keyed `:2`, `:3`, starts once a part's samples plus deleted ids reach 5,000 (or its transitions plus deleted ids reach 500), so a deletion always fits. Keying by UTC hour means a time zone change or a daylight saving change never puts two hours under one key. |
-| 2026-10-18 | **Fractional measurements use smaller units.** Accuracy and radius are in centimeters, speed in centimeters per second and bearing in hundredths of a degree. Each is the device's value times 100, rounded to the nearest whole number; negative accuracy, speed and radius become 0, and bearing is reduced modulo 36,000. Confidences are rounded to the nearest thousandth and kept between 0 and 1000. Sub-centimeter digits are dropped, since they're finer than any location sensor measures. |
+| 2026-10-18 | **Fractional measurements use smaller units.** Accuracy and radius are in centimeters, speed in centimeters per second and bearing in hundredths of a degree. Every client converts the same way, so Kotlin and Swift write identical integers: a NaN or infinite value is left out; otherwise the value times 100 (1000 for confidences) is rounded to the nearest whole number with halves away from zero. Negative accuracy, speed and radius become 0, a bearing is reduced with a true modulo into 0 to 35,999 whatever its sign or size, and confidences are kept between 0 and 1000. Sub-centimeter digits are dropped, since they're finer than any location sensor measures. |

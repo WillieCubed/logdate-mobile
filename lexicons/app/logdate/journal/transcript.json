@@ -137,7 +137,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Recognition confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number and kept between 0 and 1000."
+          "description": "Recognition confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number with halves away from zero and kept between 0 and 1000. Left out when the value is NaN or infinite."
         },
         "source": {
           "type": "string",
@@ -188,7 +188,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Recognition confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number and kept between 0 and 1000."
+          "description": "Recognition confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number with halves away from zero and kept between 0 and 1000. Left out when the value is NaN or infinite."
         },
         "speaker": {
           "type": "string",
@@ -266,7 +266,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Detection confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number and kept between 0 and 1000."
+          "description": "Detection confidence, in thousandths: the 0 to 1 value times 1000, rounded to the nearest whole number with halves away from zero and kept between 0 and 1000. Left out when the value is NaN or infinite."
         }
       }
     }
