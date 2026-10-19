@@ -1,6 +1,6 @@
 package studio.hypertext.atproto.oauth.client
 
-import io.ktor.client.request.get
+import io.ktor.client.request.url
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -449,7 +449,7 @@ class AtprotoOAuthClientFlowTest {
             val session = harness.signIn().session
 
             assertFailsWith<OAuthForeignOriginException> {
-                session.httpClient.get("https://pds.example.net/xrpc/com.atproto.server.getSession")
+                session.request { url("https://pds.example.net/xrpc/com.atproto.server.getSession") }
             }
         }
 

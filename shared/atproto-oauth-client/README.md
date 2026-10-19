@@ -108,6 +108,11 @@ val oauth =
 `OAuthClientConfig` rejects settings the specification forbids, such as an `http://` client ID, a
 port in the client ID, or a scope without `atproto`.
 
+Create one `AtprotoOAuthClient` per process and keep it for the life of the process. It opens two
+HTTP clients on your engine (one for authorization servers, one for data servers) that every
+session shares; call `oauth.close()` on shutdown to release them. Closing it leaves your own client
+and its engine open.
+
 ### 3. Serve the client metadata
 
 Serve `oauth.clientMetadataJson()` at exactly the `clientId` URL, with HTTP 200 and
@@ -138,14 +143,16 @@ val xrpc = session.xrpcClient()
 val profile = xrpc.queryRaw(Nsid.require("com.atproto.server.getSession"))
 ```
 
-Before each XRPC call the session renews its access token if needed and looks up the account's
-current data server, so it keeps working after the account moves.
+Sessions are free to create: they hold no tokens and no HTTP client of their own, so restoring one
+on every request is fine. Before each XRPC call the session renews its access token if needed and
+looks up the account's current data server, so it keeps working after the account moves.
 
-`session.httpClient` is a plain Ktor client for anything XRPC does not cover. It only sends
-requests to the account's own data server and does not follow redirects, so the token cannot leak
-to another host. It shares your client's engine but **not its plugins**: if you installed request
-logging or default headers on the client you passed in, they do not apply here. That is deliberate,
-so that a logging plugin never records an access token.
+For anything XRPC does not cover, `session.request { url("$pdsUrl/…") }` sends an authenticated
+Ktor request. It only sends requests to the account's own data server and does not follow
+redirects (a 3xx comes back as it is), so the token cannot leak to another host. It uses your
+client's engine but **not its plugins**: if you installed request logging or default headers on the
+client you passed in, they do not apply here. That is deliberate, so that a logging plugin never
+records an access token.
 
 ## Network safety
 
@@ -241,7 +248,7 @@ through unchanged.
 | `OAuthSessionExpiredException` | The access token expired and the server issued no refresh token | Sign in again |
 | `OAuthSessionRejectedException` | The server refused the refresh token (`invalid_grant`): the session expired or was revoked, and the server does not say which | Sign in again |
 | `OAuthSessionRevokedException` | The session failed a security check, or its client key was removed | Sign in again |
-| `OAuthForeignOriginException` | A `session.httpClient` request was addressed to a server other than the account's data server, or the account moved while it was being made | Nothing; retry through `xrpcClient()` |
+| `OAuthForeignOriginException` | A `session.request` was addressed to a server other than the account's data server, or a renewal found the account had moved while the request was being made | Nothing; retry the call |
 | `OAuthRevocationException` | Sign-out removed the local session but the server did not confirm | Nothing; the tokens expire on their own |
 | `OAuthClientKeyRemovedException` | A pending sign-in or session uses a client key you removed from the configuration | Start the sign-in again; keep retired keys configured longer |
 
@@ -271,7 +278,7 @@ crypto library.
   whose pushed authorization response has no `DPoP-Nonce` header. Every sign-in starts with that
   request, so such a server is refused before it issues any tokens.
 - **Request bodies must be re-sendable.** A data server request may be sent up to three times (new
-  nonce, renewed token), so streaming bodies are not supported through `session.httpClient`.
+  nonce, renewed token), so streaming bodies are not supported through `session.request`.
 
 ## How this is tested
 

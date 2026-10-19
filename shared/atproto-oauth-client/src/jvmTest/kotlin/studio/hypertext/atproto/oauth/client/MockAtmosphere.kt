@@ -284,6 +284,7 @@ internal class MockAtmosphere(
                 },
             )
         }
+        if (path == "/xrpc/com.example.redirect") return redirect(REDIRECT_TARGET)
         if (path == "/xrpc/com.atproto.server.getSession") {
             val authorization = request.headers[HttpHeaders.Authorization] ?: return unauthorized("invalid_request")
             if (!authorization.startsWith("DPoP ")) return unauthorized("invalid_request")
@@ -677,6 +678,11 @@ internal class MockAtmosphere(
         Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256").digest(value.toByteArray()))
 
     private fun strings(vararg values: String) = buildJsonArray { values.forEach { add(JsonPrimitive(it)) } }
+
+    companion object {
+        /** Where the data server's `com.example.redirect` endpoint sends requests. */
+        const val REDIRECT_TARGET: String = "https://collector.example.org/steal"
+    }
 
     internal data class PendingRequest(
         val clientId: String,

@@ -1,5 +1,7 @@
 package studio.hypertext.atproto.oauth.client
 
+import io.ktor.client.HttpClient
+
 /**
  * Wires an [AtprotoOAuthClient] to a [MockAtmosphere] with shared, in-memory stores.
  */
@@ -32,12 +34,13 @@ internal class OAuthTestHarness(
         configuration: OAuthClientConfig = config,
         strictDpopNonces: Boolean = false,
         pendingStore: OAuthStateStore = stateStore,
+        httpClient: HttpClient = atmosphere.httpClient,
         sessions: OAuthSessionStore = sessionStore,
     ): AtprotoOAuthClient =
         AtprotoOAuthClient(
             config = configuration,
             identityResolver = atmosphere.identityResolver,
-            httpClient = atmosphere.httpClient,
+            httpClient = httpClient,
             crypto = JvmOAuthCrypto,
             stateStore = pendingStore,
             sessionStore = sessions,

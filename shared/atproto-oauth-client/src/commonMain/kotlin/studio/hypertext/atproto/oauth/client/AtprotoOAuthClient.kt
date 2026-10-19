@@ -68,7 +68,10 @@ public data class OAuthCallbackResult(
  *    to [callback], which exchanges the code for tokens, verifies that the server is really
  *    responsible for the account, and saves the session.
  * 3. Later, from any server instance that shares the stores, [restore] the session by DID and use
- *    [OAuthSession.xrpcClient] or [OAuthSession.httpClient].
+ *    [OAuthSession.xrpcClient] or [OAuthSession.request].
+ *
+ * Create one client per process and [close] it on shutdown. Sessions are cheap: they share the
+ * client's HTTP clients rather than creating their own.
  *
  * Serve [clientMetadata] at [OAuthClientConfig.clientId] so authorization servers can identify the
  * client.
@@ -106,18 +109,21 @@ public class AtprotoOAuthClient(
     allowHttp: Boolean = false,
     private val stateLifetime: Duration = 1.hours,
     strictDpopNonces: Boolean = false,
-) {
+) : AutoCloseable {
+    private val protocolClient = protocolHttpClient(httpClient)
+
     /**
      * The resolver this client uses to find authorization servers.
      */
-    public val resolver: OAuthServerResolver = OAuthServerResolver(identityResolver, httpClient, allowHttp)
+    public val resolver: OAuthServerResolver =
+        OAuthServerResolver(identityResolver, protocolClient, allowHttp, ownsProtocolClient = false)
 
     private val nonces = DpopNonceCache()
     private val manager =
         OAuthSessionManager(
             config = config,
             resolver = resolver,
-            httpClient = protocolHttpClient(httpClient),
+            httpClient = protocolClient,
             crypto = crypto,
             nonces = nonces,
             sessionStore = sessionStore,
@@ -125,6 +131,17 @@ public class AtprotoOAuthClient(
             clock = clock,
             strictDpopNonces = strictDpopNonces,
         )
+    private val dataServer = DataServerHttp(httpClient, manager, crypto, nonces, clock)
+
+    /**
+     * Closes the HTTP clients this client created on the engine of the `httpClient` it was given.
+     * The engine itself, and the client passed in, stay open. Sessions from this client stop
+     * working once it is closed.
+     */
+    override fun close() {
+        dataServer.close()
+        protocolClient.close()
+    }
 
     /**
      * The client metadata document to serve at [OAuthClientConfig.clientId].
@@ -394,15 +411,7 @@ public class AtprotoOAuthClient(
         }
     }
 
-    private fun newSession(did: AtprotoDid): OAuthSession =
-        OAuthSession(
-            did = did,
-            manager = manager,
-            baseHttpClient = httpClient,
-            crypto = crypto,
-            nonces = nonces,
-            clock = clock,
-        )
+    private fun newSession(did: AtprotoDid): OAuthSession = OAuthSession(did = did, manager = manager, dataServer = dataServer)
 
     private companion object {
         val metadataJson = Json { explicitNulls = false }
