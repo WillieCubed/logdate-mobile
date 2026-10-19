@@ -120,14 +120,15 @@ interface SpaceStore {
     ): SpaceChangePage
 
     /**
-     * Records a blob's metadata. For a blob already in the space, it keeps the original storage path
-     * and restarts the unreferenced grace period.
+     * Records a blob's metadata and returns what's stored. For a blob already in the space, it keeps
+     * the original storage path and restarts the unreferenced grace period, so the returned
+     * [SpaceBlob.storagePath] can differ from [blob]'s; the caller then deletes its own copy.
      */
     suspend fun putBlob(
         accountId: UUID,
         space: String,
         blob: SpaceBlob,
-    )
+    ): SpaceBlob
 
     /** The metadata of the blob [cid] in [space], or null. */
     suspend fun getBlob(
@@ -253,12 +254,13 @@ class InMemorySpaceStore : SpaceStore {
         accountId: UUID,
         space: String,
         blob: SpaceBlob,
-    ) {
+    ): SpaceBlob =
         mutex.withLock {
             val storagePath = blobs[space to blob.cid]?.first?.storagePath ?: blob.storagePath
-            blobs[space to blob.cid] = blob.copy(storagePath = storagePath) to Clock.System.now()
+            val stored = blob.copy(storagePath = storagePath)
+            blobs[space to blob.cid] = stored to Clock.System.now()
+            stored
         }
-    }
 
     override suspend fun getBlob(
         space: String,

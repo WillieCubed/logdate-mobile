@@ -168,14 +168,27 @@ abstract class SpaceStoreContractTest {
     @Test
     fun `putting an existing blob keeps its storage path and restarts its grace period`() =
         withStore { store, account ->
-            store.putBlob(account, space, SpaceBlob("bafyblob", "application/octet-stream", 10, "path/original"))
+            val original = SpaceBlob("bafyblob", "application/octet-stream", 10, "path/original")
+            assertEquals(original, store.putBlob(account, space, original))
             delay(5)
             val between = Clock.System.now()
             delay(5)
-            store.putBlob(account, space, SpaceBlob("bafyblob", "image/jpeg", 12, "path/second"))
-            assertEquals(SpaceBlob("bafyblob", "image/jpeg", 12, "path/original"), store.getBlob(space, "bafyblob"))
+            val stored = store.putBlob(account, space, SpaceBlob("bafyblob", "image/jpeg", 12, "path/second"))
+            assertEquals(SpaceBlob("bafyblob", "image/jpeg", 12, "path/original"), stored)
+            assertEquals(stored, store.getBlob(space, "bafyblob"))
             assertEquals(emptyList(), store.purge(tombstonesBefore = between, unreferencedBlobsBefore = between))
             assertNotNull(store.getBlob(space, "bafyblob"))
+        }
+
+    @Test
+    fun `a purged blob stored again gets a new row at its new path`() =
+        withStore { store, account ->
+            store.putBlob(account, space, SpaceBlob("bafyblob", "application/octet-stream", 10, "path/first"))
+            val later = Clock.System.now() + 1.hours
+            assertEquals(listOf("path/first"), store.purge(tombstonesBefore = later, unreferencedBlobsBefore = later))
+            val again = SpaceBlob("bafyblob", "application/octet-stream", 10, "path/again")
+            assertEquals(again, store.putBlob(account, space, again))
+            assertEquals(again, store.getBlob(space, "bafyblob"))
         }
 
     @Test
