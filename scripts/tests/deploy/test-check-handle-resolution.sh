@@ -28,7 +28,7 @@ cleanup() {
         kill "$STUB_PID" 2>/dev/null || true
         wait "$STUB_PID" 2>/dev/null || true
     fi
-    rm -rf "$TMP_DIR"
+    rm -r "$TMP_DIR"
 }
 trap cleanup EXIT
 
@@ -71,6 +71,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self.send(400, json.dumps({"error": "HandleNotFound", "message": "Handle not found"}), "application/json")
         if url.path == "/.well-known/atproto-did":
             host = self.headers.get("Host", "").split(":")[0]
+            if config.get("redirect"):
+                self.send_response(302)
+                self.send_header("Location", "https://sign-in.example/")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             did = config["wellKnown"].get(host) or config.get("wildcard")
             if did:
                 return self.send(200, did + "\n", "text/plain; charset=utf-8")
@@ -145,6 +151,14 @@ write_stub "$DID" "$DID" "\"$DID\""
 run_check
 assert_exit_code 1 "$STATUS"
 assert_contains "returned 200 instead of 404" "$OUTPUT"
+
+# A redirect (such as a sign-in wall in front of the handle host) is reported as LogDate's own rule.
+write_stub "$DID" "$DID"
+jq '.redirect = true' "$STUB_CONFIG" >"$STUB_CONFIG.next"
+mv "$STUB_CONFIG.next" "$STUB_CONFIG"
+run_check
+assert_exit_code 1 "$STATUS"
+assert_contains "[FAIL] https://$HANDLE/.well-known/atproto-did redirected (HTTP 302)" "$OUTPUT"
 
 # A DNS TXT record that disagrees with the HTTPS answer makes resolvers reject the handle.
 write_stub "$DID" "$DID"

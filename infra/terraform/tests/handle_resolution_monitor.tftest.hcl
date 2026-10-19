@@ -7,6 +7,10 @@ variables {
   enable_services          = false
   enable_artifact_registry = false
   enable_cloud_run_service = false
+  cloud_run_env = {
+    LOGDATE_PUBLIC_ORIGIN = "https://cloud.example.test"
+  }
+  handle_resolution_notification_channels = ["projects/logdate-contract-test/notificationChannels/123"]
 }
 
 run "no_monitor_without_a_canary_account" {
@@ -26,7 +30,6 @@ run "monitor_checks_the_handle_host_for_its_exact_did" {
       handle = "resolution-canary.logdate.app"
       did    = "did:plc:abcdefghijklmnopqrstuvwx"
     }
-    handle_resolution_notification_channels = ["projects/logdate-contract-test/notificationChannels/123"]
   }
 
   override_resource {
@@ -62,6 +65,25 @@ run "monitor_checks_the_handle_host_for_its_exact_did" {
     )
     error_message = "The alert must watch this uptime check and notify the configured channels."
   }
+
+  assert {
+    condition     = strcontains(google_monitoring_alert_policy.handle_resolution_failing[0].documentation[0].content, "--service-url https://cloud.example.test")
+    error_message = "The runbook must name this environment's own server origin."
+  }
+}
+
+run "refuses_an_alert_with_nowhere_to_send_it" {
+  command = plan
+
+  variables {
+    handle_resolution_monitor = {
+      handle = "resolution-canary.logdate.app"
+      did    = "did:plc:abcdefghijklmnopqrstuvwx"
+    }
+    handle_resolution_notification_channels = []
+  }
+
+  expect_failures = [google_monitoring_alert_policy.handle_resolution_failing]
 }
 
 run "did_web_dots_are_matched_literally" {
