@@ -17,6 +17,8 @@ import app.logdate.feature.core.settings.account.delete.DeleteAccountScreen
 import app.logdate.feature.core.settings.account.hosting.HostingScreen
 import app.logdate.feature.core.settings.account.move.MoveServerScreen
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseScreen
+import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyDestinations
+import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyScreen
 import app.logdate.feature.core.settings.account.signin.SignInMethodsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
@@ -140,6 +142,17 @@ fun EntryProviderScope<NavKey>.settingsEntries(
                     onDeleteAccount = { onNavigateTo(DeleteAccountRoute) },
                     onSignIn = onNavigateToSignIn,
                     onCreateAccount = onNavigateToCloudAccountCreation,
+                    onRecoveryKey = { onNavigateTo(RecoveryKeyRoute) },
+                ),
+        )
+    }
+    taggedEntry<RecoveryKeyRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories) + ViewModelsPerVisit) {
+        RecoveryKeyScreen(
+            destinations =
+                RecoveryKeyDestinations(
+                    onBack = onBack,
+                    onRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
+                    onEnterPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
                 ),
         )
     }

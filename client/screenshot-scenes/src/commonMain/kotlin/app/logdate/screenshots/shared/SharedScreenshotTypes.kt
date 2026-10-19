@@ -52,6 +52,8 @@ enum class SharedScreenshotSceneId(
     PrivacySettings("privacy-settings"),
     SignInMethods("sign-in-methods"),
     RecoveryPhrase("recovery-phrase"),
+    RecoveryKeySetup("recovery-key-setup"),
+    RecoveryKeyOn("recovery-key-on"),
     Hosting("hosting"),
     DeleteAccount("delete-account"),
     DataSettings("data-settings"),

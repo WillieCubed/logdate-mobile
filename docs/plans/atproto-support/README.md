@@ -148,16 +148,14 @@ These are not blockers for shipping the current hosted slice. They are the next 
 investments after the currently deployed library, identity, repo, blob, and first-party recovery
 surfaces.
 
-- Finish deterministic PLC recovery-key derivation from the recovery phrase. The derivation
-  exists in `client/device` as `PlcRecoveryKeyManager`: on Android and desktop,
-  `DeterministicPlcRecoveryKeyManager` derives a P-256 key from the phrase with HMAC-SHA256 and
-  signs with BouncyCastle. iOS binds `IosPlcRecoveryKeyManager`, which throws
-  `UnsupportedOperationException` for every call. Desktop's `AccountIdentityRepository` is the
-  `UnavailableAccountIdentityRepository` stub, so only Android has a complete client path, and no
-  screen uses it since the 2026-09-23 removal. The server also refuses recovery-key changes
-  wherever PLC publishing is off, which includes production.
-- Implement user-controlled PLC signing flows so hosted recovery does not depend only on a
-  server-published update path.
+- Roll out user-held recovery keys, described in
+  [User-held recovery keys](../../superpowers/specs/2026-10-19-user-held-recovery-keys-design.md).
+  The key is derived from the recovery phrase on Android, iOS and desktop, registered ahead of the
+  server's key, and can replace the server's key. It works from the server's hosted operation log
+  without PLC publishing. It is off until `ATPROTO_RECOVERY_KEYS_ENABLED` is set on the server and
+  the `IDENTITY_RECOVERY_KEY` client flag is turned on.
+- Let people use their recovery key directly with the PLC directory once identities are published,
+  so recovery does not depend on the server cooperating.
 - Define and lock the final LogDate lexicon family. The 2026-10-09 design replaces this item: new
   lexicons use the `app.logdate.*` namespace, and the existing `studio.hypertext.logdate.*`
   lexicons move there as part of the sync migration. The current LogDate lexicons (`profile`,

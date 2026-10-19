@@ -163,6 +163,37 @@ class AccountViewModelTest {
         }
 
     @Test
+    fun `the recovery key row is hidden unless it is offered`() =
+        runTest {
+            val state = signedIn(viewModel(recoveryKeyOffered = MutableStateFlow(false), hasRecoveryKey = { true }))
+
+            assertNull(state.recoveryKey)
+        }
+
+    @Test
+    fun `an offered recovery key row says whether the identity has one`() =
+        runTest {
+            val on = signedIn(viewModel(recoveryKeyOffered = MutableStateFlow(true), hasRecoveryKey = { true }))
+            val off = signedIn(viewModel(recoveryKeyOffered = MutableStateFlow(true), hasRecoveryKey = { false }))
+            val unknown = signedIn(viewModel(recoveryKeyOffered = MutableStateFlow(true), hasRecoveryKey = { error("offline") }))
+
+            assertEquals(RecoveryKeyRow.ON, on.recoveryKey)
+            assertEquals(RecoveryKeyRow.OFF, off.recoveryKey)
+            assertEquals(RecoveryKeyRow.UNKNOWN, unknown.recoveryKey)
+        }
+
+    @Test
+    fun `a server that starts supporting recovery keys after the screen opens shows the row`() =
+        runTest {
+            val offered = MutableStateFlow(false)
+            val viewModel = viewModel(recoveryKeyOffered = offered, hasRecoveryKey = { true })
+
+            offered.value = true
+
+            assertEquals(RecoveryKeyRow.ON, signedIn(viewModel).recoveryKey)
+        }
+
+    @Test
     fun `opening the screen asks the server for its current description`() =
         runTest {
             val server = FakeConnectedServer()
@@ -210,6 +241,8 @@ class AccountViewModelTest {
         checkRecoveryPhrase: suspend () -> Boolean = { hasRecoveryPhrase },
         isEmailVerificationAvailable: Boolean = false,
         verifyEmail: suspend () -> EmailVerificationOutcome = { EmailVerificationOutcome.Unsupported },
+        recoveryKeyOffered: Flow<Boolean> = MutableStateFlow(false),
+        hasRecoveryKey: suspend () -> Boolean = { false },
     ) = AccountViewModel(
         accountRepository = repository,
         userIdentity = MutableStateFlow(identity),
@@ -217,6 +250,8 @@ class AccountViewModelTest {
         hasRecoveryPhrase = checkRecoveryPhrase,
         isEmailVerificationAvailable = { isEmailVerificationAvailable },
         verifyEmail = verifyEmail,
+        isRecoveryKeyOffered = recoveryKeyOffered,
+        hasRecoveryKey = hasRecoveryKey,
     )
 
     private fun identity(

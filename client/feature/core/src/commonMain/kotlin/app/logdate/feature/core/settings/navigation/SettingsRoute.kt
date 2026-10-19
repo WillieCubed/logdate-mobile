@@ -24,6 +24,9 @@ data object SignInMethodsRoute : NavKey
 data object RecoveryPhraseRoute : NavKey
 
 @Serializable
+data object RecoveryKeyRoute : NavKey
+
+@Serializable
 data object HostingRoute : NavKey
 
 @Serializable
