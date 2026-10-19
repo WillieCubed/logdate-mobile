@@ -47,7 +47,7 @@ class SpaceRecordRegistry(
 
     companion object {
         /** The kinds whose downloaders apply staged space records. */
-        val WIRED_ENTITY_TYPES: Set<EntityType> = setOf(EntityType.JOURNAL, EntityType.NOTE)
+        val WIRED_ENTITY_TYPES: Set<EntityType> = setOf(EntityType.JOURNAL, EntityType.NOTE, EntityType.ASSOCIATION, EntityType.DRAFT)
 
         /** No kinds: everything keeps syncing through its own endpoints. */
         val EMPTY: SpaceRecordRegistry = SpaceRecordRegistry(emptyList())

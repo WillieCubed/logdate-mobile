@@ -85,6 +85,7 @@ internal class SyncMediaTransfer(
     suspend fun uploadDraftMediaIfNeeded(
         accessToken: String,
         draft: EditorDraft,
+        reusable: (String) -> Boolean = { true },
     ): Result<EditorDraft> =
         runCatching {
             draft.copy(
@@ -93,20 +94,28 @@ internal class SyncMediaTransfer(
                         when (block) {
                             is SerializableImageBlock ->
                                 block.copy(
-                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "image", block.uri),
+                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "image", block.uri, reusable),
                                 )
                             is SerializableVideoBlock ->
                                 block.copy(
-                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "video", block.uri),
-                                    thumbnailUri = uploadDraftAsset(accessToken, draft.id, block.id, "thumbnail", block.thumbnailUri),
+                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "video", block.uri, reusable),
+                                    thumbnailUri =
+                                        uploadDraftAsset(
+                                            accessToken,
+                                            draft.id,
+                                            block.id,
+                                            "thumbnail",
+                                            block.thumbnailUri,
+                                            reusable,
+                                        ),
                                 )
                             is SerializableAudioBlock ->
                                 block.copy(
-                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "audio", block.uri),
+                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "audio", block.uri, reusable),
                                 )
                             is SerializableCameraBlock ->
                                 block.copy(
-                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "camera", block.uri),
+                                    uri = uploadDraftAsset(accessToken, draft.id, block.id, "camera", block.uri, reusable),
                                 )
                             else -> block
                         }
@@ -120,6 +129,7 @@ internal class SyncMediaTransfer(
         blockId: Uuid,
         kind: String,
         uri: String?,
+        reusable: (String) -> Boolean,
     ): String? {
         if (uri == null) return null
         if (UnavailableMediaReferences.nativeSource(uri) != null) {
@@ -131,7 +141,13 @@ internal class SyncMediaTransfer(
         }
         if (!requiresUpload(uri)) return uri
         val cached = mediaSyncRefStore.getDraftAsset(draftId, blockId, kind)
-        if (cached != null && matchesLocalFile(cached, uri) && cached.remoteUrl.isNotBlank()) return cached.remoteUrl
+        if (cached != null &&
+            matchesLocalFile(cached, uri) &&
+            cached.remoteUrl.isNotBlank() &&
+            reusable(cached.remoteUrl)
+        ) {
+            return cached.remoteUrl
+        }
         val media = mediaManager.openMedia(uri)
         val named = MediaFileSource("draft-$kind-${media.fileName}", media.mimeType, media.sizeBytes) { media.open() }
         val uploaded = cloudMediaDataSource.uploadMedia(accessToken, blockId, named).getOrThrow()

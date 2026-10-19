@@ -3,6 +3,7 @@
 package app.logdate.integration.e2e.journeys
 
 import androidx.room.Room
+import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
@@ -17,6 +18,7 @@ import app.logdate.client.media.MediaPayload
 import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.SyncableJournalRepository
@@ -46,13 +48,16 @@ import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.mappers.draftSpaceKind
 import app.logdate.client.sync.space.mappers.journalSpaceKind
+import app.logdate.client.sync.space.mappers.membershipSpaceKind
 import app.logdate.client.sync.space.mappers.noteSpaceKind
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -62,7 +67,10 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -77,6 +85,8 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 internal const val JOURNAL = "app.logdate.journal.journal"
+internal const val MEMBERSHIP = "app.logdate.journal.membership"
+internal const val DRAFT = "app.logdate.journal.draft"
 internal const val ENTRY = "app.logdate.journal.entry"
 internal const val TRANSCRIPT = "app.logdate.journal.transcript"
 internal val IDENTITY_KEY = ByteArray(32) { (it * 5).toByte() }
@@ -124,11 +134,12 @@ internal class SpaceDevice(
             { DownloadScope(account.owner, account.origin) },
             { System.currentTimeMillis() },
         )
+    val drafts = InMemoryDrafts()
     private val realJournals =
         OfflineFirstJournalRepository(
             journalDao = database.journalDao(),
             remoteDataSource = mockk(relaxed = true),
-            draftRepository = mockk(relaxed = true),
+            draftRepository = drafts,
             syncMetadataService = metadata,
             database = database,
             currentScope = { JournalMergeScope(account.owner, account.origin) },
@@ -158,6 +169,14 @@ internal class SpaceDevice(
             syncMetadataService = metadata,
             transcriptionRepository = transcripts,
             syncScope = scope,
+        )
+    val content =
+        OfflineFirstJournalContentRepository(
+            database.journalContentDao(),
+            realJournals,
+            notes,
+            metadata,
+            transactions,
         )
     val media = FileReadingMediaManager()
     val mediaRefs = InMemoryMediaRefs()
@@ -239,8 +258,7 @@ internal class SpaceDevice(
             mediaSyncRefStore = mediaRefs,
             journalRepository = journals,
             journalNotesRepository = notes,
-            journalContentRepository =
-                mockk(relaxed = true) { every { observeJournalsForContents(any()) } returns flowOf(emptyMap()) },
+            journalContentRepository = content,
             journalConflictResolver = journalResolver,
             noteConflictResolver = noteResolver,
             conflictStore = conflicts,
@@ -253,7 +271,15 @@ internal class SpaceDevice(
             syncScope = scope,
             spaceSync =
                 SpaceSyncDependencies(
-                    registry = SpaceRecordRegistry(listOf(journalSpaceKind(journals, journalResolver), noteSpaceKind(notes, noteResolver))),
+                    registry =
+                        SpaceRecordRegistry(
+                            listOf(
+                                journalSpaceKind(journals, journalResolver),
+                                noteSpaceKind(notes, noteResolver),
+                                membershipSpaceKind(content),
+                                draftSpaceKind(realJournals),
+                            ),
+                        ),
                     gate = SpaceTransportGate({ true }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
                     homes = homes,
                     swapStore = RoomSpaceSwapStore(database.spaceRecordStateDao()),
@@ -356,5 +382,30 @@ internal class FileReadingMediaManager : InMemoryMediaManager() {
     ): String {
         val data = SystemFileSystem.source(Path(sourceFilePath)).buffered().use { it.readByteArray() }
         return saveMedia(MediaPayload(fileName, mimeType, data.size.toLong(), data))
+    }
+}
+
+/** Drafts kept in memory, standing in for the editor's draft storage. */
+internal class InMemoryDrafts : DraftRepository {
+    private val stored = MutableStateFlow<Map<Uuid, EditorDraft>>(emptyMap())
+
+    override suspend fun saveDraft(draft: EditorDraft) {
+        stored.value += draft.id to draft
+    }
+
+    override suspend fun getLatestDraft(): EditorDraft? = stored.value.values.maxByOrNull { it.lastModifiedAt }
+
+    override suspend fun getAllDrafts(): List<EditorDraft> = stored.value.values.toList()
+
+    override val allDrafts: Flow<List<EditorDraft>> = stored.map { it.values.toList() }
+
+    override suspend fun getDraft(id: Uuid): EditorDraft? = stored.value[id]
+
+    override suspend fun deleteDraft(id: Uuid) {
+        stored.value -= id
+    }
+
+    override suspend fun clearAllDrafts() {
+        stored.value = emptyMap()
     }
 }

@@ -31,6 +31,15 @@ internal class SyncDraftMediaRecovery(
         }
     }
 
+    /**
+     * Whether the draft version this row was queued for is still the newest. A draft from the
+     * personal space has no inbox row of its own; the draft itself is checked before it changes.
+     */
+    private suspend fun isCurrent(
+        scope: DownloadScope,
+        row: DownloadInboxEntity,
+    ): Boolean = row.payload.startsWith(SPACE_DRAFT_MEDIA_PREFIX) || inbox.isCurrentVersion("DRAFT", row.entityId, row.version, scope)
+
     /** Returns false when the download scope changed and the remaining rows must not be processed. */
     private suspend fun recoverRow(
         accessToken: String,
@@ -42,7 +51,7 @@ internal class SyncDraftMediaRecovery(
         var started = false
         try {
             val id = Uuid.parse(row.entityId)
-            if (!inbox.isCurrentVersion("DRAFT", row.entityId, row.version, scope)) {
+            if (!isCurrent(scope, row)) {
                 inbox.applied("MEDIA_DRAFT", row.entityId, row.version, scope)
                 return true
             }
@@ -81,7 +90,7 @@ internal class SyncDraftMediaRecovery(
                 is DraftMediaHydrationResult.Pending -> result.draft to result.mappings
                 is DraftMediaHydrationResult.Available -> result.draft to result.mappings
             }
-        if (!persistProgress(scope, draftScope, row.entityId, row.version, id, current, draft, mappings)) {
+        if (!persistProgress(scope, draftScope, row, id, current, draft, mappings)) {
             inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.INTERRUPTED, source)
             return true
         }
@@ -103,8 +112,7 @@ internal class SyncDraftMediaRecovery(
     private suspend fun persistProgress(
         scope: DownloadScope,
         draftScope: DraftRecoveryScope?,
-        entityId: String,
-        version: Long,
+        row: DownloadInboxEntity,
         draftId: Uuid,
         original: EditorDraft,
         updated: EditorDraft,
@@ -113,7 +121,7 @@ internal class SyncDraftMediaRecovery(
         var persisted = false
         transactions.withTransaction {
             if (scope != inbox.currentScope() ||
-                !inbox.isCurrentVersion("DRAFT", entityId, version, scope) ||
+                !isCurrent(scope, row) ||
                 drafts.getDraftForRestore(draftId) != original
             ) {
                 return@withTransaction
