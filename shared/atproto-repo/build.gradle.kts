@@ -50,5 +50,31 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+
+        jvmTest.dependencies {
+            implementation(projects.shared.atprotoCrypto)
+            implementation(libs.kotlinx.coroutines.core)
+        }
     }
+}
+
+// The JVM tests hand exported repositories to the AT Protocol reference implementation
+// (@atproto/repo, pinned in tools/atproto-repo-verify) so they are checked by the same code
+// relays run. Node.js and pnpm must be on the PATH.
+val referenceVerifierDir: Directory = rootProject.layout.projectDirectory.dir("tools/atproto-repo-verify")
+
+val installReferenceRepoVerifier by tasks.registering(Exec::class) {
+    description = "Installs the AT Protocol reference implementation that verifies exported repositories."
+    group = "verification"
+    workingDir(referenceVerifierDir)
+    commandLine("pnpm", "install", "--frozen-lockfile", "--silent")
+    inputs.file(referenceVerifierDir.file("package.json"))
+    inputs.file(referenceVerifierDir.file("pnpm-lock.yaml"))
+    outputs.dir(referenceVerifierDir.dir("node_modules"))
+}
+
+tasks.named<Test>("jvmTest") {
+    dependsOn(installReferenceRepoVerifier)
+    inputs.file(referenceVerifierDir.file("verify.mjs"))
+    systemProperty("atproto.referenceVerifier", referenceVerifierDir.file("verify.mjs").asFile.absolutePath)
 }
