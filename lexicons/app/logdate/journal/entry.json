@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "A journal entry: one moment, made of ordered blocks of text, photos, video and audio.",
+      "description": "A journal entry: one moment, made of ordered blocks of text, photos, video and audio. An entry too large for one sealed record isn't written: the device shows a RecordTooLarge sync error naming the entry, so the person can shorten or split it, and never trims it.",
       "key": "any",
       "record": {
         "type": "object",

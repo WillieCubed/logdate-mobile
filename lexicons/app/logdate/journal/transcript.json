@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "The transcript of an audio block: timed segments with word timings, the speakers, the engine that produced it, and detected sounds. The record key is the key of the entry that holds the audio and the audio block's id joined by a colon (<entry>:<block>), so each recording has at most one transcript and an entry with several recordings has one per recording. The full text is the segments' text joined in time order.",
+      "description": "The transcript of an audio block: timed segments with word timings, the speakers, the engine that produced it, and detected sounds. The record key is the key of the entry that holds the audio and the audio block's id joined by a colon (<entry>:<block>), so each recording has at most one transcript and an entry with several recordings has one per recording. The full text is the segments' text joined in time order. A transcript too large for one sealed record, such as one for a recording many hours long, isn't written: the device shows a RecordTooLarge sync error and keeps the transcript locally, rather than trimming or splitting it.",
       "key": "any",
       "record": {
         "type": "object",
