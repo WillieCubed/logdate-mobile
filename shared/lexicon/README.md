@@ -50,6 +50,9 @@ Encode and decode with `LexiconData`: its `json` configuration for JSON, and
 
 - Every example record in `tools/lexicon-check/examples/` decodes into its model and encodes back
   unchanged, through JSON and DAG-CBOR.
+- Every case in the shared client conformance suite, `conformance/records/`, passes: each valid
+  record validates, encodes to the known DAG-CBOR bytes and CID, and round-trips through its model,
+  and each invalid record fails with its labeled failure. The Mac and Linux apps run the same cases.
 - `LogDateRecords` lists every record schema.
 - A journal entry round-trips on every platform.
 
