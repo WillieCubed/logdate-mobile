@@ -44,9 +44,9 @@ are on that page with their passkey.** No password is created or needed.
 
 AT Protocol apps that support OAuth discover the account's authorization server from its DID
 document, push an authorization request, and send the person's browser to the authorization page.
-Making that page work with a passkey covers every such app at once. What an app can then do is
-limited to confirming the identity and, when granted, uploading files and writing its own public
-records. It never sees or changes the LogDate journal.
+Making that page work with a passkey covers every such app at once. Today what an app can then do is
+confirm the identity: no collection is open to apps yet. Later it may read and write collections
+that are opened to apps on purpose. It never sees or changes the LogDate journal.
 
 **App passwords are not part of this change.** An app password is a separate secret a person creates
 in a signed-in LogDate app and pastes into an older app that only knows `createSession`. It would need
@@ -61,35 +61,58 @@ lists exactly what is enforced:
 
 | Scope | Allows |
 | --- | --- |
-| `atproto` | Confirming which account signed in. No writes, no uploads. |
-| `atproto transition:generic` | Also writing records and uploading files to the account's repository. |
+| `atproto` | Confirming which account signed in. Nothing in the repository, read or write. |
+| `atproto transition:generic` | Also reading and writing collections that are open to apps. |
 
-Whatever the scope, an app signed in through OAuth:
+A collection is open to apps only when it is listed on purpose in the server's allowlist
+(`OAuthScopes.collectionsOpenToApps`), compared in canonical NSID form so a differently cased name
+cannot slip past. **No collection is open yet.** Everything the repository holds today is LogDate
+journal data, and the `studio.hypertext.logdate.*` and `app.logdate.*` lexicons can never be added:
+the server refuses to start with one on the list.
 
-- sees the journal collections (`studio.hypertext.logdate.*`) as empty, and journal records as not
-  found;
-- is refused, with `403`, when it writes to a journal collection;
+So, whatever the scope, an app signed in through OAuth today:
+
+- sees every collection as empty and every record as not found;
+- is refused, with `403`, when it writes a record or uploads a file;
 - cannot export the repository or read its latest commit or status, because those carry every
   journal record;
 - cannot download blobs, until blobs record which app uploaded them.
 
-`com.atproto.repo.describeRepo` answers anyone without a sign-in, so it never lists journal
-collections for anybody. The LogDate apps never use OAuth tokens, so none of this changes them.
+Uploads stay closed even with `transition:generic`. An app could only fill the account's storage with
+files nothing can refer to or remove, so uploads wait until a collection open to apps refers to
+files. At that point uploads also need a size limit, a streamed body and a place in the account's
+storage quota.
 
-Today the repository only accepts LogDate's own collections, so a write to any other collection is
-refused as unsupported. With `transition:generic` an app can upload files now, and can write public
-records once the repository accepts public collections.
+`com.atproto.repo.describeRepo` answers anyone without a sign-in, so it only lists collections that are
+open to apps. The LogDate apps never use OAuth tokens, so none of this changes them.
 
 ## How long access lasts
 
 - Access tokens last 15 minutes, because they cannot be revoked.
 - Refresh tokens last 14 days for apps that are not on the trusted list
   (`LOGDATE_OAUTH_TRUSTED_CLIENT_IDS`) and 30 days for trusted ones.
-- Removing a passkey or deleting the account revokes every refresh token the account has issued, so
-  every app loses access within the access token's lifetime. The server has no sign-out-everywhere
-  action today; when it gets one, it should revoke them too.
+- Removing a passkey or deleting the account revokes every grant the account has made. Account
+  deletion does this inside `AccountDeletionService`, so every way of deleting an account gets it.
+  Every app loses access within the access token's lifetime.
 - A list of connected apps, with a way to revoke one, is a separate feature and is not part of
   this design.
+
+Revocation has to hold even against a refresh that is already running. Every grant records when the
+person approved it, and revoking records the revocation time for the account
+(`oauth_subject_revocations`). Then:
+
+- refreshing replaces the old refresh token in one transaction. It locks the token's row, checks
+  that it is unrevoked, unexpired and approved after the account's last revocation, deletes it and
+  saves the replacement. The access token is only returned when this succeeds;
+- two refreshes of one token therefore cannot both succeed: the second waits for the row lock, then
+  finds the token gone;
+- if a refresh and a revocation interleave, the replacement token keeps its grant's approval time,
+  which is before the revocation, so it can never be used. The worst case is one access token that
+  expires within 15 minutes;
+- revoking also deletes the account's unredeemed authorization codes, and redeeming a code saves
+  its refresh token only if the grant was approved after the last revocation;
+- redeeming an authorization code locks and deletes its row in one transaction, so two exchanges of
+  one code cannot both succeed.
 
 ## How it works
 
@@ -106,9 +129,9 @@ The page:
   fake, because a self-reported name can claim to be anything;
 - names the account, `@alice.logdate.app`, when the app passed a `login_hint` that matches an
   account on this server;
-- says what continuing allows, following the requested scope: with `atproto` alone, that the app
-  learns which LogDate account this is and can't see or change anything; with `transition:generic`,
-  that it can upload files and can't see or change the journal;
+- says what continuing allows: that the app learns which LogDate account this is and can't see or
+  change anything in the account. That is true for both scopes today, because nothing is open to apps;
+  the sentence has to change when a collection opens;
 - offers **Continue with passkey** and **Cancel**.
 
 Continuing is the consent. The person picks a passkey in the browser's own passkey sheet, which also
@@ -131,9 +154,10 @@ The page:
 1. The page calls `POST /oauth/authorize/passkey/options` with the `request_uri`. The server checks
    the request is still valid and issues a WebAuthn challenge of its own type, bound to that
    `request_uri`. An app sign-in challenge cannot approve a request, and one request's challenge
-   cannot approve another. When the `login_hint` names a local account, the challenge lists that
-   account's credentials, so passkeys that are not discoverable still work. Nothing about the account
-   is created or changed before the passkey is verified.
+   cannot approve another. The options never list credential IDs, even when the `login_hint` names a
+   local account, so pushing a request for someone's handle reveals nothing about their passkeys. The
+   browser offers the person's discoverable passkeys, which is what LogDate creates. Nothing about the
+   account is created or changed before the passkey is verified.
 2. The browser runs `navigator.credentials.get` with user verification required.
 3. The page posts the assertion to `POST /oauth/authorize/passkey`. The server:
    - verifies the assertion cryptographically, against the bound challenge;
@@ -150,8 +174,25 @@ from the one the app asked for, the request expired and they need to start again
 server has the page turned off, or there were too many attempts. A mismatch or a failed assertion
 leaves the pushed request usable, so the person can try another passkey.
 
-Both passkey endpoints are limited to 10 attempts a minute per network, the same limit as the apps'
-passkey sign-in, and answer `429` with `Retry-After` beyond that.
+Both passkey endpoints are limited to 10 attempts a minute per client address, the same limit as the
+apps' passkey sign-in, and answer `429` with `Retry-After` beyond that.
+
+The client address comes from `X-Forwarded-For`, and only from the entry a trusted proxy added. Cloud
+Run's front end appends the address it received the request from, so the server reads the last entry;
+anything before it came from the client and may be invented. `TRUSTED_PROXY_HOPS` counts further
+trusted proxies, such as a load balancer in front of Cloud Run. The apps' sign-in and device-link
+limits use the same address; before this they were keyed on the proxy, so every visitor shared one
+limit.
+
+### Server errors
+
+A database failure is the server's problem, not the caller's. It is logged with the full error and
+answered as `503 temporarily_unavailable`, or `500 server_error` for anything else unexpected, with a
+fixed message and never SQL text. Specifically:
+
+- a DPoP check that cannot reach the replay store is a `503`, not a failed sign-in;
+- the authorization page shows "Sign-in isn't available right now" rather than "This sign-in link
+  has expired". "Expired" is only shown for a request that is unknown or past its time.
 
 ### Replays
 
@@ -168,10 +209,14 @@ first use. Both kinds of value are recorded in one PostgreSQL table that every i
 - recording a value is a single insert that does nothing when the value is already there, so two
   instances racing on the same value cannot both accept it;
 - each insert also deletes up to 100 expired rows, which keeps the table small without a separate
-  job.
+  job. The delete re-checks expiry, so a value another instance has just recorded again is left
+  alone.
 
-Authorization codes were already single use: taking one deletes its row. A server running without
-a database keeps the same records in memory instead.
+Used client assertions (`private_key_jwt` `jti` values) are recorded in the same table until the
+assertion expires.
+
+A server running without a database keeps the same records in memory instead, with each value
+expiring on its own lifetime.
 
 ### Where passkeys work
 
@@ -209,44 +254,55 @@ its issuer is `cloud-staging.logdate.app` and its relying party is `staging.logd
 
 - Route tests cover:
   - the HTML page, its security headers and HTML escaping;
-  - how trusted and untrusted apps are named, and the access sentence for each scope;
+  - how trusted and untrusted apps are named, and the access sentence;
   - the flag being off;
-  - a `client_id` mismatch and an expired request;
-  - the passkey options;
+  - a `client_id` mismatch, an expired request and a server failure;
+  - passkey options that never list credentials;
   - approval with a verified assertion;
   - a challenge used for another request or for an app sign-in;
   - a second approval of the same request;
   - a `login_hint` mismatch, which leaves the request usable;
   - a tampered assertion and a passkey from another origin;
   - cancelling;
-  - the rate limit;
-  - revocation when a passkey is removed;
+  - rate limits keyed on the forwarded client address, for the page and for app sign-in, including an
+    invented leading address;
+  - revocation when a passkey is removed and when the account is deleted;
   - startup refusals;
-  - the `iss` parameter on every redirect.
+  - the `iss` parameter on every redirect;
+  - database failures answered as server errors without internal details.
 - XRPC tests cover:
-  - empty journal lists and missing journal records for OAuth apps;
-  - refused journal deletes;
-  - writes and uploads with each scope;
-  - refused export, commit, status and blob reads;
+  - empty lists and missing records for collections not open to apps;
+  - `app.logdate.journal.entry` and `studio.hypertext.logdate.*`, in any case, staying closed even when
+    the repository accepts them;
+  - a collection opened in a test being readable and writable;
+  - reads and writes needing `transition:generic`;
+  - refused uploads, export, commit, status and blob reads;
   - deactivated accounts;
-  - `describeRepo`.
+  - `describeRepo`;
+  - refusing to open a journal collection.
 - Grant tests cover:
   - dropped scopes;
   - reused PKCE challenges;
   - a lost race to decide a request;
   - token lifetimes;
   - revocation;
-  - DPoP proof replay.
+  - DPoP proof replay;
+  - a client assertion replayed through another server instance;
+  - per-entry expiry in the in-memory replay store.
 - Replay store tests check that a value recorded through one store is refused through another
-  sharing the database, that only hashes are stored and that expired rows are removed. On the
-  PostgreSQL that CI provides, they also check that 16 instances racing on one value accept it exactly
-  once.
+  sharing the database, that only hashes are stored and that expired rows are removed.
+- On the PostgreSQL that CI provides, database tests check that:
+  - 16 instances racing on one value accept it exactly once;
+  - 12 parallel refreshes of one token let exactly one through;
+  - a refresh racing a revocation never leaves a usable token;
+  - 12 parallel exchanges of one authorization code redeem it once.
 - End-to-end tests in `integration/server-client-e2e` start the real server, with strict passkey
   verification, and a separate third-party app that publishes its own client metadata document.
   - They create a passkey-only account with a synthetic authenticator and confirm it has no password.
   - The test plays the browser through the page and the passkey ceremony. The app exchanges the code
-    with PKCE and DPoP and uploads a file with `transition:generic`.
-  - With `atproto` alone, the upload is refused.
+    with PKCE and DPoP and resolves the token's subject to the account's handle. Its upload is
+    refused.
+  - With `atproto` alone, repository reads are refused.
   - Against a journal seeded through the apps' sync API, the app sees an empty content list, a draft
-    that is not found, and a refused repository export. Its delete of an entry is refused, and the
-    entry is still in the journal afterwards.
+    that is not found, and a refused repository export. Its delete of an entry and its write to
+    `app.logdate.journal.entry` are refused, and the entry is still in the journal afterwards.

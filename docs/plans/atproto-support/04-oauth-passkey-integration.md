@@ -117,13 +117,17 @@ account's refresh tokens.
 
 ## What OAuth Tokens Can Reach
 
-- `atproto` alone confirms the identity: no writes and no uploads.
-- `transition:generic` also allows record writes and blob uploads.
-- Whatever the scope, the LogDate journal collections (`studio.hypertext.logdate.*`) look empty or
-  missing to an OAuth token, and writes to them are refused.
+- `atproto` alone confirms the identity: no repository reads, writes or uploads.
+- `transition:generic` also allows reading and writing collections listed in
+  `OAuthScopes.collectionsOpenToApps`. That list is empty, and `studio.hypertext.logdate.*` and
+  `app.logdate.*` collections can never be added to it.
+- Uploads are refused for OAuth tokens until a collection open to apps refers to files.
 - `com.atproto.sync.getRepo`, `getLatestCommit`, `getRepoStatus` and `getBlob` are refused for OAuth
   tokens.
-- `describeRepo` never lists the journal collections, for anyone.
+- `describeRepo` only lists collections open to apps, for anyone.
+- Refreshing rotates the token in one transaction and checks the account's last revocation time, so
+  a refresh racing a revocation never leaves a usable token. Redeeming a code is a single locked
+  delete.
 
 ## 5. Token Revocation
 
