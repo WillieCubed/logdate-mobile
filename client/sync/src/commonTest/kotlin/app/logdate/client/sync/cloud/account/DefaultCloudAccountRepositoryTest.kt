@@ -20,6 +20,7 @@ import app.logdate.client.sync.cloud.MediaUpload
 import app.logdate.client.sync.cloud.MediaUploadResponse
 import app.logdate.client.sync.cloud.RefreshedSession
 import app.logdate.shared.config.DefaultLogDateConfigRepository
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.CompleteAccountCreationRequest
@@ -140,6 +141,74 @@ class DefaultCloudAccountRepositoryTest {
             assertEquals("Polished bio", current?.bio)
             assertEquals("My own words", current?.originalBio)
         }
+
+    @Test
+    fun `the account's storage mode is stored for its server and loaded again`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            val repository = repository(storage, configRepository, createdAccount(AccountStorageMode.PERSONAL_SPACE_V1))
+
+            repository.completeAccountCreation("session", "cred-1", "client", "attestation")
+
+            assertEquals(AccountStorageMode.PERSONAL_SPACE_V1, repository.getCurrentAccount()?.storageMode)
+            assertEquals("personalSpaceV1", storage.getString(scopedKey("cloud_account_storage_mode", "https://test.logdate.app")))
+            assertNull(storage.getString(scopedKey("cloud_account_storage_mode", "https://other.logdate.app")))
+            val reloaded = repository(storage, configRepository)
+            testScheduler.advanceUntilIdle()
+            assertEquals(AccountStorageMode.PERSONAL_SPACE_V1, reloaded.getCurrentAccount()?.storageMode)
+
+            reloaded.signOut()
+            assertNull(storage.getString(scopedKey("cloud_account_storage_mode", "https://test.logdate.app")))
+        }
+
+    @Test
+    fun `an account stored before storage modes has an unknown mode and is never legacy`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            val configRepository = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            repository(storage, configRepository, createdAccount(AccountStorageMode.PERSONAL_SPACE_V1))
+                .completeAccountCreation("session", "cred-1", "client", "attestation")
+            storage.remove(scopedKey("cloud_account_storage_mode", "https://test.logdate.app"))
+
+            val reloaded = repository(storage, configRepository)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals("tester", reloaded.getCurrentAccount()?.username)
+            assertEquals(AccountStorageMode.UNRECOGNIZED, reloaded.getCurrentAccount()?.storageMode)
+        }
+
+    private fun kotlinx.coroutines.test.TestScope.repository(
+        storage: InMemoryKeyValueStorage,
+        configRepository: DefaultLogDateConfigRepository,
+        created: CompleteAccountCreationResponse? = null,
+    ) = DefaultCloudAccountRepository(
+        apiClient = FakeCloudApiClient(completeAccountCreationResult = created),
+        secureStorage = storage,
+        configRepository = configRepository,
+        coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
+    )
+
+    private fun createdAccount(storageMode: AccountStorageMode) =
+        CompleteAccountCreationResponse(
+            success = true,
+            data =
+                app.logdate.shared.model.CompleteAccountCreationData(
+                    account =
+                        app.logdate.shared.model.LogDateAccount(
+                            id = Uuid.parse("550e8400-e29b-41d4-a716-446655440000"),
+                            username = "tester",
+                            displayName = "Tester",
+                            did = "did:plc:tester",
+                            createdAt = Instant.parse("2026-03-05T00:00:00Z"),
+                            updatedAt = Instant.parse("2026-03-05T00:00:00Z"),
+                            storageMode = storageMode,
+                        ),
+                    tokens =
+                        app.logdate.shared.model
+                            .AccountTokens(accessToken = "access", refreshToken = "refresh"),
+                ),
+        )
 
     @Test
     fun `sign out clears persisted did and handle`() =

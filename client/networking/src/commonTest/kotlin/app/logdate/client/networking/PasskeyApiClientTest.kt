@@ -1,5 +1,6 @@
 package app.logdate.client.networking
 
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAuthenticationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
@@ -295,6 +296,49 @@ class PasskeyApiClientTest {
 
             assertTrue(result.isSuccess)
             assertEquals("testuser", result.getOrThrow().account.username)
+        }
+
+    @Test
+    fun `the current account carries the storage mode the server reports`() =
+        runTest {
+            val modes =
+                mapOf(
+                    """"storageMode": "personalSpaceV1",""" to AccountStorageMode.PERSONAL_SPACE_V1,
+                    """"storageMode": "legacy",""" to AccountStorageMode.LEGACY,
+                    "" to AccountStorageMode.LEGACY,
+                    """"storageMode": "personalSpaceV9",""" to AccountStorageMode.UNRECOGNIZED,
+                )
+            modes.forEach { (field, expected) ->
+                val apiClient =
+                    createMockApiClient(
+                        MockEngine { request ->
+                            assertEquals("/api/v1/auth/me", request.url.encodedPath)
+                            respond(
+                                content =
+                                    """
+                                    {
+                                      "success": true,
+                                      "data": {
+                                        "account": {
+                                          "id": "550e8400-e29b-41d4-a716-446655440001",
+                                          "username": "testuser",
+                                          "displayName": "Test User",
+                                          $field
+                                          "createdAt": "2026-03-05T00:00:00Z",
+                                          "updatedAt": "2026-03-05T00:00:00Z"
+                                        },
+                                        "tokens": {"accessToken": "a2", "refreshToken": "r2"}
+                                      }
+                                    }
+                                    """.trimIndent(),
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                            )
+                        },
+                    )
+
+                assertEquals(expected, apiClient.getAccountInfo("access").getOrThrow().storageMode, field)
+            }
         }
 
     @Test

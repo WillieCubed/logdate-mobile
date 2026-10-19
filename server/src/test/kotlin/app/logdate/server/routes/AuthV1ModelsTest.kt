@@ -6,6 +6,7 @@ import app.logdate.server.auth.AuthMetricsSnapshot
 import app.logdate.server.auth.AuthOperationMetricsSnapshot
 import app.logdate.server.auth.IdentityProvider
 import app.logdate.server.ratelimit.RateLimitPolicy
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
 import app.logdate.shared.model.PasskeyAssertionResponse
@@ -116,6 +117,7 @@ class AuthV1ModelsTest {
                 passkeyCredentialIds = listOf("cred"),
                 createdAt = "2026-01-01T00:00:00Z",
                 updatedAt = "2026-01-01T00:00:00Z",
+                storageMode = AccountStorageMode.LEGACY,
             )
         val copiedAccountView = accountView.copy(displayName = "Updated")
         assertEquals("Updated", copiedAccountView.displayName)
@@ -230,6 +232,7 @@ class AuthV1ModelsTest {
                 passkeyCredentialIds = emptyList(),
                 createdAt = "2026-01-01T00:00:00Z",
                 updatedAt = "2026-01-01T00:00:00Z",
+                storageMode = AccountStorageMode.LEGACY,
             )
         val authResponseData =
             AuthResponseData(
@@ -247,6 +250,7 @@ class AuthV1ModelsTest {
                         passkeyCredentialIds = listOf("cred-1"),
                         createdAt = "2026-01-01T00:00:00Z",
                         updatedAt = "2026-01-01T00:00:00Z",
+                        storageMode = AccountStorageMode.LEGACY,
                     ),
                 tokens = AccountTokens("access", "refresh"),
             )

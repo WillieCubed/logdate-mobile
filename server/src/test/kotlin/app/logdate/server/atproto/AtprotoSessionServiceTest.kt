@@ -5,6 +5,7 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.shared.model.AccountStorageMode
 import kotlinx.coroutines.test.runTest
 import studio.hypertext.atproto.pds.CreateAccountRequest
 import studio.hypertext.atproto.pds.CreateSessionRequest
@@ -51,6 +52,19 @@ class AtprotoSessionServiceTest {
             assertTrue(session.emailConfirmed == true)
             assertTrue(session.accessJwt.isNotBlank())
             assertTrue(session.refreshJwt.isNotBlank())
+        }
+
+    @Test
+    fun `a created account starts in the storage mode it is given`() =
+        runTest {
+            listOf(AccountStorageMode.LEGACY, AccountStorageMode.PERSONAL_SPACE_V1).forEach { mode ->
+                val context = sessionContext(newAccountStorageMode = mode)
+                context.service
+                    .createAccount(CreateAccountRequest(handle = "casey.logdate.app", password = "password-1"))
+                    .getOrThrow()
+
+                assertEquals(mode, context.accountRepository.findByHandle("casey.logdate.app")?.storageMode)
+            }
         }
 
     @Test
@@ -109,7 +123,7 @@ class AtprotoSessionServiceTest {
             }
         }
 
-    private fun sessionContext(): SessionContext {
+    private fun sessionContext(newAccountStorageMode: AccountStorageMode = AccountStorageMode.LEGACY): SessionContext {
         val accountRepository = InMemoryAccountRepository()
         val passwordRepository = InMemoryAtprotoPasswordCredentialRepository()
         val sessionRepository = InMemoryAtprotoSessionRepository()
@@ -130,6 +144,7 @@ class AtprotoSessionServiceTest {
                     identityService = identityService,
                     passwordService = passwordService,
                     sessionTokenService = AtprotoSessionTokenService(sessionRepository, secret = "test"),
+                    newAccountStorageMode = newAccountStorageMode,
                 ),
         )
     }

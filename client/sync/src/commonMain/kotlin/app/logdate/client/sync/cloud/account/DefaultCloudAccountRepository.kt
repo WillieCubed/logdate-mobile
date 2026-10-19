@@ -11,6 +11,7 @@ import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountCredentials
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.AuthenticationResult
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResult
@@ -79,6 +80,7 @@ class DefaultCloudAccountRepository(
         const val CREATED_AT = "cloud_created_at"
         const val UPDATED_AT = "cloud_updated_at"
         const val PASSKEY_IDS = "cloud_passkey_ids"
+        const val ACCOUNT_STORAGE_MODE = "cloud_account_storage_mode"
     }
 
     init {
@@ -119,6 +121,7 @@ class DefaultCloudAccountRepository(
             val createdAtString = secureStorage.getString(scopedKey(StorageKeys.CREATED_AT, backendUrl))
             val updatedAtString = secureStorage.getString(scopedKey(StorageKeys.UPDATED_AT, backendUrl))
             val passkeyIdsString = secureStorage.getString(scopedKey(StorageKeys.PASSKEY_IDS, backendUrl))
+            val storageMode = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_STORAGE_MODE, backendUrl))
 
             if (accessToken != null &&
                 accountId != null &&
@@ -151,6 +154,7 @@ class DefaultCloudAccountRepository(
                         createdAt = createdAt,
                         updatedAt = updatedAt,
                         passkeyCredentialIds = passkeyIds,
+                        storageMode = storageMode?.let(AccountStorageMode::fromWireValue) ?: AccountStorageMode.UNRECOGNIZED,
                     )
 
                 accountFlow.value = account
@@ -283,6 +287,7 @@ class DefaultCloudAccountRepository(
                                 accountDto.passkeyCredentialIds.mapNotNull {
                                     runCatching { Uuid.parse(it) }.getOrNull()
                                 },
+                            storageMode = accountDto.storageMode,
                         )
 
                     val credentials =
@@ -406,6 +411,7 @@ class DefaultCloudAccountRepository(
             secureStorage.remove(scopedKey(StorageKeys.CREATED_AT, backendUrl))
             secureStorage.remove(scopedKey(StorageKeys.UPDATED_AT, backendUrl))
             secureStorage.remove(scopedKey(StorageKeys.PASSKEY_IDS, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_STORAGE_MODE, backendUrl))
 
             // Clear the current account
             accountFlow.value = null
@@ -496,6 +502,7 @@ class DefaultCloudAccountRepository(
             scopedKey(StorageKeys.PASSKEY_IDS, backendUrl),
             account.passkeyCredentialIds.joinToString(",") { it.toString() },
         )
+        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_STORAGE_MODE, backendUrl), account.storageMode.wireValue)
     }
 
     private fun decodeWebAuthnUserId(encodedUserId: String): Uuid? =

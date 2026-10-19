@@ -6,6 +6,7 @@ import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.HandleLabels
+import app.logdate.shared.model.AccountStorageMode
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -344,6 +345,7 @@ public class AtprotoPdsSessionService(
     private val identityService: AtprotoIdentityService,
     private val passwordService: AtprotoPasswordService,
     private val sessionTokenService: AtprotoSessionTokenService,
+    private val newAccountStorageMode: AccountStorageMode = AccountStorageMode.LEGACY,
 ) : PdsSessionService {
     override suspend fun createAccount(request: CreateAccountRequest): Result<SessionResponse> =
         runCatching {
@@ -360,6 +362,7 @@ public class AtprotoPdsSessionService(
                         email = request.email?.trim()?.takeIf(String::isNotEmpty),
                         emailVerified = !request.email.isNullOrBlank(),
                         createdAt = Clock.System.now(),
+                        storageMode = newAccountStorageMode,
                     ),
                 )
             passwordService.setPassword(account.id, password)

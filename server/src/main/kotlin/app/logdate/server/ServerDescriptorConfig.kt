@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.server.identity.AtprotoIdentityConfig
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.ServerCapability
 import app.logdate.shared.model.ServerDescriptor
@@ -15,6 +16,14 @@ data class ServerDescriptorConfig(
     val privacyPolicyUrl: String? = null,
     val termsOfServiceUrl: String? = null,
 ) {
+    /**
+     * The storage mode an account created now starts in. With personal spaces on, new accounts keep
+     * their data there from the start, since they have nothing to migrate; accounts that already
+     * exist keep the mode they have.
+     */
+    val newAccountStorageMode: AccountStorageMode
+        get() = if (personalSpaceEnabled) AccountStorageMode.PERSONAL_SPACE_V1 else AccountStorageMode.LEGACY
+
     fun toDescriptor(
         identityConfig: AtprotoIdentityConfig,
         webAuthnRpId: String,

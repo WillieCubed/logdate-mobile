@@ -4,6 +4,7 @@ import app.logdate.server.routes.AuthAccountView
 import app.logdate.server.routes.AuthResponse
 import app.logdate.server.routes.AuthResponseData
 import app.logdate.server.routes.ErrorCase
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.PasskeyUser
@@ -60,6 +61,7 @@ internal object DocExamples {
             passkeyCredentialIds = listOf(CREDENTIAL_ID),
             createdAt = ISO_NOW,
             updatedAt = ISO_NOW,
+            storageMode = AccountStorageMode.LEGACY,
         )
 
     val authResponse = AuthResponse(success = true, data = AuthResponseData(account = accountView, tokens = tokens))
