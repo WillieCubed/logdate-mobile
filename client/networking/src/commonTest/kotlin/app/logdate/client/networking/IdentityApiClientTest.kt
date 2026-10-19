@@ -1,5 +1,7 @@
 package app.logdate.client.networking
 
+import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
+import app.logdate.shared.model.PasskeyAssertionResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -288,6 +290,7 @@ class IdentityApiClientTest {
                         val body = (request.body as io.ktor.http.content.TextContent).text
                         assertTrue(body.contains("\"preparedKey\":\"sealed\""))
                         assertTrue(body.contains("\"signature\":\"sig\""))
+                        assertTrue(body.contains("\"stepUp\":{\"challenge\":\"step-up-challenge\""))
                         respond(
                             content =
                                 """
@@ -299,9 +302,68 @@ class IdentityApiClientTest {
                     },
                 )
 
-            val completed = client.completeIdentityRecovery("token-123", preparedKey = "sealed", signature = "sig").getOrThrow()
+            val completed =
+                client
+                    .completeIdentityRecovery(
+                        "token-123",
+                        preparedKey = "sealed",
+                        signature = "sig",
+                        stepUp = STEP_UP,
+                    ).getOrThrow()
 
             assertEquals("did:key:zNext", completed.publicKeyDidKey)
+        }
+
+    @Test
+    fun `beginRecoveryKeyStepUp returns passkey options for the account`() =
+        runTest {
+            val client =
+                createClient(
+                    MockEngine { request ->
+                        assertEquals("/api/v1/identity/recovery-key/step-up", request.url.encodedPath)
+                        assertEquals("Bearer token-123", request.headers[HttpHeaders.Authorization])
+                        respond(
+                            content =
+                                """
+                                {"success":true,"data":{"challenge":"step-up-challenge","rpId":"logdate.app",
+                                "allowCredentials":[{"type":"public-key","id":"cred-1"}],"timeout":300000,"userVerification":"required"}}
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val options = client.beginRecoveryKeyStepUp("token-123").getOrThrow()
+
+            assertEquals("step-up-challenge", options.challenge)
+            assertEquals(listOf("cred-1"), options.allowCredentials)
+        }
+
+    @Test
+    fun `replacePlcRecoveryKey sends the new key and the step up to the replace path`() =
+        runTest {
+            val client =
+                createClient(
+                    MockEngine { request ->
+                        assertEquals("/api/v1/identity/plc/recovery-key/replace", request.url.encodedPath)
+                        val body = (request.body as io.ktor.http.content.TextContent).text
+                        assertTrue(body.contains("\"recoveryDidKey\":\"did:key:zNew\""))
+                        assertTrue(body.contains("\"challenge\":\"step-up-challenge\""))
+                        respond(
+                            content =
+                                """
+                                {"success":true,"data":{"did":"did:plc:alice123","handle":"alice.logdate.app","recoveryDidKey":"did:key:zNew"}}
+                                """.trimIndent(),
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val replaced = client.replacePlcRecoveryKey("token-123", "did:key:zNew", STEP_UP).getOrThrow()
+
+            assertEquals("did:key:zNew", replaced.recoveryDidKey)
         }
 
     @Test
@@ -318,8 +380,28 @@ class IdentityApiClientTest {
                     },
                 )
 
-            val error = client.completeIdentityRecovery("token-123", preparedKey = "sealed", signature = "sig").exceptionOrNull()
+            val error =
+                client
+                    .completeIdentityRecovery(
+                        "token-123",
+                        preparedKey = "sealed",
+                        signature = "sig",
+                        stepUp = STEP_UP,
+                    ).exceptionOrNull()
 
             assertEquals("IDENTITY_CHANGED", (error as IdentityApiException).errorCode)
         }
+
+    private companion object {
+        val STEP_UP =
+            PasskeyStepUpProofDto(
+                challenge = "step-up-challenge",
+                credential =
+                    PasskeyAssertionResponse(
+                        id = "cred-1",
+                        rawId = "cred-1",
+                        response = PasskeyAssertionAuthenticatorResponse("e30", "AA", "AA", "dXNlcg"),
+                    ),
+            )
+    }
 }

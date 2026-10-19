@@ -24,12 +24,15 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Default authenticated repository for first-party AT Protocol identity management.
+ *
+ * @param stepUp gets the fresh passkey confirmation that every recovery-key change needs
  */
 @OptIn(ExperimentalEncodingApi::class)
 class DefaultAccountIdentityRepository(
     private val apiClient: IdentityApiClientContract,
     private val sessionStorage: SessionStorage,
     private val plcRecoveryKeyManager: PlcRecoveryKeyManager,
+    private val stepUp: IdentityStepUp,
     private val json: Json =
         Json {
             ignoreUnknownKeys = true
@@ -138,11 +141,19 @@ class DefaultAccountIdentityRepository(
                     require(derivedDidKey == prepared.recoveryDidKey) {
                         "Recovery phrase does not match the registered PLC recovery key"
                     }
-                    val signature =
-                        plcRecoveryKeyManager.signPayload(
-                            recoveryPhrase = recoveryWords,
-                            payload = decodeBase64Url(prepared.signingPayloadBase64Url),
-                        )
+                    require(prepared.nextPublicKeyDidKey == exportedKey.publicKeyDidKey) {
+                        "The prepared operation installs a different key than the one being imported"
+                    }
+                    val payload = decodeBase64Url(prepared.signingPayloadBase64Url)
+                    RecoveryOperationCheck.requireExpected(
+                        unsignedOperationJson = prepared.unsignedOperationJson,
+                        nextKey = prepared.nextPublicKeyDidKey,
+                        payload = payload,
+                        history = apiClient.getHostedPlcOperations(token).getOrThrow(),
+                        recoveryDidKey = derivedDidKey,
+                        handle = apiClient.getIdentityStatus(token).getOrThrow().handle,
+                    )
+                    val signature = plcRecoveryKeyManager.signPayload(recoveryPhrase = recoveryWords, payload = payload)
                     apiClient
                         .completeRecoverySigningKeyImport(
                             accessToken = token,
@@ -165,21 +176,17 @@ class DefaultAccountIdentityRepository(
             AccountDerivedPlcRecoveryKey(recoveryDidKey = plcRecoveryKeyManager.deriveDidKey(recoveryWords))
         }
 
-    override suspend fun registerPlcRecoveryKey(recoveryDidKey: String): Result<AccountRegisteredPlcRecoveryKey> =
-        runWithAccessToken("register PLC recovery key") { token ->
-            apiClient.registerPlcRecoveryKey(token, recoveryDidKey).map { payload ->
-                AccountRegisteredPlcRecoveryKey(
-                    did = payload.did,
-                    handle = payload.handle,
-                    recoveryDidKey = payload.recoveryDidKey,
-                )
-            }
-        }
-
     override suspend fun registerRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey> =
         runRecoveryRequest("register the recovery key") { token ->
             val recoveryDidKey = deriveOnDevice { plcRecoveryKeyManager.deriveDidKey(recoveryPhrase) }
-            val payload = apiClient.registerPlcRecoveryKey(token, recoveryDidKey).getOrThrow()
+            val payload = apiClient.registerPlcRecoveryKey(token, recoveryDidKey, stepUp.confirm(token)).getOrThrow()
+            AccountRegisteredPlcRecoveryKey(did = payload.did, handle = payload.handle, recoveryDidKey = payload.recoveryDidKey)
+        }
+
+    override suspend fun replaceRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey> =
+        runRecoveryRequest("replace the recovery key") { token ->
+            val recoveryDidKey = deriveOnDevice { plcRecoveryKeyManager.deriveDidKey(recoveryPhrase) }
+            val payload = apiClient.replacePlcRecoveryKey(token, recoveryDidKey, stepUp.confirm(token)).getOrThrow()
             AccountRegisteredPlcRecoveryKey(did = payload.did, handle = payload.handle, recoveryDidKey = payload.recoveryDidKey)
         }
 
@@ -193,12 +200,21 @@ class DefaultAccountIdentityRepository(
                     "The recovery phrase on this device does not produce the registered recovery key",
                 )
             }
-            val signature =
-                deriveOnDevice {
-                    plcRecoveryKeyManager.signPayload(recoveryPhrase, decodeBase64Url(prepared.signingPayloadBase64Url))
+            val payload =
+                runCatching { decodeBase64Url(prepared.signingPayloadBase64Url) }.getOrElse {
+                    throw IdentityRecoveryException(IdentityRecoveryFailure.UNEXPECTED_CHANGE, "The bytes to sign could not be read", it)
                 }
-            val payload = apiClient.completeIdentityRecovery(token, prepared.preparedKey, signature).getOrThrow()
-            AccountImportedSigningKey(did = payload.did, handle = payload.handle, publicKeyDidKey = payload.publicKeyDidKey)
+            RecoveryOperationCheck.requireExpected(
+                unsignedOperationJson = prepared.unsignedOperationJson,
+                nextKey = prepared.nextPublicKeyDidKey,
+                payload = payload,
+                history = apiClient.getHostedPlcOperations(token).getOrThrow(),
+                recoveryDidKey = recoveryDidKey,
+                handle = apiClient.getIdentityStatus(token).getOrThrow().handle,
+            )
+            val signature = deriveOnDevice { plcRecoveryKeyManager.signPayload(recoveryPhrase, payload) }
+            val completed = apiClient.completeIdentityRecovery(token, prepared.preparedKey, signature, stepUp.confirm(token)).getOrThrow()
+            AccountImportedSigningKey(did = completed.did, handle = completed.handle, publicKeyDidKey = completed.publicKeyDidKey)
         }
 
     /**
@@ -274,9 +290,13 @@ internal fun recoveryFailureFor(code: String): IdentityRecoveryFailure =
         "RECOVERY_KEY_ALREADY_SET" -> IdentityRecoveryFailure.ALREADY_SET
         "RECOVERY_KEY_NOT_SET" -> IdentityRecoveryFailure.NOT_SET
         "RECOVERY_KEY_NOT_ON_IDENTITY" -> IdentityRecoveryFailure.KEY_REMOVED
-        "RECOVERY_SIGNATURE_INVALID" -> IdentityRecoveryFailure.PHRASE_MISMATCH
-        "IDENTITY_CHANGED", "PREPARED_KEY_EXPIRED" -> IdentityRecoveryFailure.IDENTITY_CHANGED
-        "INVALID_TOKEN" -> IdentityRecoveryFailure.SIGNED_OUT
+        "RECOVERY_SIGNATURE_INVALID" -> IdentityRecoveryFailure.SIGNATURE_REJECTED
+        "SERVER_KEY_NOT_ON_IDENTITY" -> IdentityRecoveryFailure.SERVER_KEY_MISSING
+        "IDENTITY_CHANGED", "PREPARED_KEY_EXPIRED", "PREPARED_KEY_INVALID" -> IdentityRecoveryFailure.IDENTITY_CHANGED
+        "STEP_UP_REQUIRED", "STEP_UP_FAILED" -> IdentityRecoveryFailure.STEP_UP_FAILED
+        "STEP_UP_UNAVAILABLE" -> IdentityRecoveryFailure.STEP_UP_UNAVAILABLE
+        "PASSKEY_REQUIRED" -> IdentityRecoveryFailure.PASSKEY_REQUIRED
+        "INVALID_TOKEN", "ACCOUNT_NOT_FOUND" -> IdentityRecoveryFailure.SIGNED_OUT
         "NETWORK_ERROR" -> IdentityRecoveryFailure.UNREACHABLE
         else -> IdentityRecoveryFailure.REFUSED
     }

@@ -152,7 +152,6 @@ fun EntryProviderScope<NavKey>.settingsEntries(
                 RecoveryKeyDestinations(
                     onBack = onBack,
                     onRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
-                    onEnterPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
                 ),
         )
     }

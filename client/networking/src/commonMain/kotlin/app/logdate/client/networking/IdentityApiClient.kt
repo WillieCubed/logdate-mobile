@@ -1,6 +1,8 @@
 package app.logdate.client.networking
 
 import app.logdate.shared.config.LogDateConfigRepository
+import app.logdate.shared.model.PasskeyAssertionResponse
+import app.logdate.shared.model.PasskeyAuthenticationOptions
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
@@ -52,19 +54,32 @@ interface IdentityApiClientContract {
         signature: String,
     ): Result<ImportSigningKeyDataDto>
 
+    /** Registers [recoveryDidKey] on the identity; the server refuses it without a passkey [stepUp]. */
     suspend fun registerPlcRecoveryKey(
         accessToken: String,
         recoveryDidKey: String,
+        stepUp: PasskeyStepUpProofDto? = null,
     ): Result<RegisterPlcRecoveryKeyDataDto>
+
+    /** Puts [recoveryDidKey] in place of the registered recovery key, confirmed by a passkey [stepUp]. */
+    suspend fun replacePlcRecoveryKey(
+        accessToken: String,
+        recoveryDidKey: String,
+        stepUp: PasskeyStepUpProofDto,
+    ): Result<RegisterPlcRecoveryKeyDataDto>
+
+    /** Asks the server for a challenge that only this account's passkeys can answer, to confirm a recovery-key change. */
+    suspend fun beginRecoveryKeyStepUp(accessToken: String): Result<PasskeyAuthenticationOptions>
 
     /** Asks the server for the operation that replaces its key, for the recovery key to sign. */
     suspend fun prepareIdentityRecovery(accessToken: String): Result<PrepareIdentityRecoveryDataDto>
 
-    /** Sends the recovery key's [signature] with the server's sealed [preparedKey] to finish a recovery. */
+    /** Sends the recovery key's [signature] with the server's sealed [preparedKey] and a passkey [stepUp] to finish a recovery. */
     suspend fun completeIdentityRecovery(
         accessToken: String,
         preparedKey: String,
         signature: String,
+        stepUp: PasskeyStepUpProofDto,
     ): Result<ImportSigningKeyDataDto>
 }
 
@@ -211,17 +226,56 @@ class IdentityApiClient(
     override suspend fun registerPlcRecoveryKey(
         accessToken: String,
         recoveryDidKey: String,
+        stepUp: PasskeyStepUpProofDto?,
     ): Result<RegisterPlcRecoveryKeyDataDto> =
         request(
             request = { token ->
                 post("${getBaseUrl()}/identity/plc/recovery-key") {
                     header("Authorization", "Bearer $token")
                     contentType(ContentType.Application.Json)
-                    setBody(RegisterPlcRecoveryKeyRequestDto(recoveryDidKey = recoveryDidKey))
+                    setBody(RegisterPlcRecoveryKeyRequestDto(recoveryDidKey = recoveryDidKey, stepUp = stepUp))
                 }
             },
             success = { payload -> json.decodeFromString<RegisterPlcRecoveryKeyResponseDto>(payload).data },
             failureMessage = "Failed to register PLC recovery key",
+            accessToken = accessToken,
+        )
+
+    override suspend fun replacePlcRecoveryKey(
+        accessToken: String,
+        recoveryDidKey: String,
+        stepUp: PasskeyStepUpProofDto,
+    ): Result<RegisterPlcRecoveryKeyDataDto> =
+        request(
+            request = { token ->
+                post("${getBaseUrl()}/identity/plc/recovery-key/replace") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(RegisterPlcRecoveryKeyRequestDto(recoveryDidKey = recoveryDidKey, stepUp = stepUp))
+                }
+            },
+            success = { payload -> json.decodeFromString<RegisterPlcRecoveryKeyResponseDto>(payload).data },
+            failureMessage = "Failed to replace the recovery key",
+            accessToken = accessToken,
+        )
+
+    override suspend fun beginRecoveryKeyStepUp(accessToken: String): Result<PasskeyAuthenticationOptions> =
+        request(
+            request = { token ->
+                post("${getBaseUrl()}/identity/recovery-key/step-up") {
+                    header("Authorization", "Bearer $token")
+                }
+            },
+            success = { payload ->
+                val data = json.decodeFromString<RecoveryKeyStepUpResponseDto>(payload).data
+                PasskeyAuthenticationOptions(
+                    challenge = data.challenge,
+                    rpId = data.rpId,
+                    allowCredentials = data.allowCredentials.map { it.id },
+                    timeout = data.timeout,
+                )
+            },
+            failureMessage = "Failed to begin the passkey confirmation",
             accessToken = accessToken,
         )
 
@@ -241,13 +295,14 @@ class IdentityApiClient(
         accessToken: String,
         preparedKey: String,
         signature: String,
+        stepUp: PasskeyStepUpProofDto,
     ): Result<ImportSigningKeyDataDto> =
         request(
             request = { token ->
                 post("${getBaseUrl()}/identity/recovery-key/recover/complete") {
                     header("Authorization", "Bearer $token")
                     contentType(ContentType.Application.Json)
-                    setBody(CompleteIdentityRecoveryRequestDto(preparedKey = preparedKey, signature = signature))
+                    setBody(CompleteIdentityRecoveryRequestDto(preparedKey = preparedKey, signature = signature, stepUp = stepUp))
                 }
             },
             success = { payload -> json.decodeFromString<ImportSigningKeyResponseDto>(payload).data },
@@ -346,6 +401,7 @@ data class CompleteRecoverySigningKeyImportRequestDto(
 @Serializable
 data class RegisterPlcRecoveryKeyRequestDto(
     val recoveryDidKey: String,
+    val stepUp: PasskeyStepUpProofDto? = null,
 )
 
 @Serializable
@@ -425,6 +481,33 @@ data class PrepareIdentityRecoveryDataDto(
 data class CompleteIdentityRecoveryRequestDto(
     val preparedKey: String,
     val signature: String,
+    val stepUp: PasskeyStepUpProofDto,
+)
+
+/** A passkey assertion over a step-up [challenge], sent with a recovery-key change. */
+@Serializable
+data class PasskeyStepUpProofDto(
+    val challenge: String,
+    val credential: PasskeyAssertionResponse,
+)
+
+@Serializable
+data class RecoveryKeyStepUpResponseDto(
+    val success: Boolean,
+    val data: RecoveryKeyStepUpDataDto,
+)
+
+@Serializable
+data class RecoveryKeyStepUpDataDto(
+    val challenge: String,
+    val rpId: String,
+    val allowCredentials: List<StepUpAllowedCredentialDto> = emptyList(),
+    val timeout: Long = 300_000,
+)
+
+@Serializable
+data class StepUpAllowedCredentialDto(
+    val id: String,
 )
 
 @Serializable

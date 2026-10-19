@@ -5,6 +5,8 @@ import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.account.DefaultServerScopedAccounts
 import app.logdate.client.data.account.HistoryOwnerAdoption
 import app.logdate.client.data.account.PasskeyBackedAccountRepository
+import app.logdate.client.data.account.PasskeyCredentialCodec
+import app.logdate.client.data.account.PasskeyIdentityStepUp
 import app.logdate.client.data.account.ServerScopedAccounts
 import app.logdate.client.data.account.historyOwnerAdoptionModule
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
@@ -341,6 +343,12 @@ actual val dataModule: Module =
                 apiClient = get(),
                 sessionStorage = get(),
                 plcRecoveryKeyManager = get(),
+                stepUp =
+                    PasskeyIdentityStepUp(
+                        beginStepUp = get<IdentityApiClientContract>()::beginRecoveryKeyStepUp,
+                        passkeyManager = get(),
+                        credentialCodec = PasskeyCredentialCodec(Json { ignoreUnknownKeys = true }),
+                    ),
             )
         }
         single<PasskeyAccountRepository> {

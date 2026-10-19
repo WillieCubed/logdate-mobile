@@ -29,6 +29,7 @@ import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseContent
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseUiState
 import app.logdate.feature.core.settings.account.recoverykey.KeyStatus
 import app.logdate.feature.core.settings.account.recoverykey.PhraseStatus
+import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyActions
 import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyContent
 import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyDestinations
 import app.logdate.feature.core.settings.account.recoverykey.RecoveryKeyUiState
@@ -152,11 +153,8 @@ internal val personalSettingsScenes: List<SharedScreenshotSceneSpec> =
                         phrase = PhraseStatus.CONFIRMED,
                         key = KeyStatus.OFF,
                     ),
-                destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}, onEnterPhrase = {}),
-                onTurnOn = {},
-                onReplaceServerKey = {},
-                onRetry = {},
-                onDismissError = {},
+                destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}),
+                actions = RecoveryKeyActions(),
             )
         },
         sharedScene(SharedScreenshotSceneId.RecoveryKeyOn, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
@@ -168,11 +166,8 @@ internal val personalSettingsScenes: List<SharedScreenshotSceneSpec> =
                         phrase = PhraseStatus.CONFIRMED,
                         key = KeyStatus.ON,
                     ),
-                destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}, onEnterPhrase = {}),
-                onTurnOn = {},
-                onReplaceServerKey = {},
-                onRetry = {},
-                onDismissError = {},
+                destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}),
+                actions = RecoveryKeyActions(),
             )
         },
         sharedScene(SharedScreenshotSceneId.Hosting, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

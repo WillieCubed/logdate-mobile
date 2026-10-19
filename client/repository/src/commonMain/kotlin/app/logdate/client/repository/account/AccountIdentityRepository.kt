@@ -27,23 +27,35 @@ interface AccountIdentityRepository {
 
     suspend fun derivePlcRecoveryDidKey(recoveryPhrase: String): Result<AccountDerivedPlcRecoveryKey>
 
-    suspend fun registerPlcRecoveryKey(recoveryDidKey: String): Result<AccountRegisteredPlcRecoveryKey>
-
     /**
      * Derives the recovery key from [recoveryPhrase] on this device and registers its public half on
-     * the identity, ahead of the server's key. Only the public half leaves the device.
+     * the identity, ahead of the server's key. Only the public half leaves the device. The person
+     * confirms the change with one of their passkeys first.
      *
-     * Fails with [IdentityRecoveryException] when the server refuses or cannot be reached.
+     * Fails with [IdentityRecoveryException] when the passkey confirmation does not finish, or the
+     * server refuses or cannot be reached.
      */
     suspend fun registerRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey>
 
     /**
+     * Puts the recovery key derived from [recoveryPhrase] in place of the one registered on the
+     * identity, for a person who no longer has the phrase the registered key came from. The person
+     * confirms the change with one of their passkeys first.
+     *
+     * Fails with [IdentityRecoveryException] like [registerRecoveryKey].
+     */
+    suspend fun replaceRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey>
+
+    /**
      * Replaces the server's key for the identity with a new one, approved by the recovery key
      * derived from [recoveryPhrase]. The phrase and the private key stay on this device; only the
-     * signature is sent.
+     * signature is sent. Before signing, the device decodes the operation it is asked to sign and
+     * refuses it unless it changes exactly the server's key, and the person confirms the change with
+     * one of their passkeys.
      *
      * Fails with [IdentityRecoveryException], including [IdentityRecoveryFailure.PHRASE_MISMATCH]
-     * when the phrase does not produce the recovery key registered on the identity.
+     * when the phrase does not produce the recovery key registered on the identity and
+     * [IdentityRecoveryFailure.UNEXPECTED_CHANGE] when the operation asks for more.
      */
     suspend fun recoverIdentity(recoveryPhrase: List<String>): Result<AccountImportedSigningKey>
 }
@@ -64,6 +76,27 @@ enum class IdentityRecoveryFailure {
 
     /** The recovery phrase on this device does not produce the registered recovery key. */
     PHRASE_MISMATCH,
+
+    /** The server did not accept this device's approval, although the phrase matches the registered key. */
+    SIGNATURE_REJECTED,
+
+    /** The server asked this device to approve more than replacing its key, so nothing was signed. */
+    UNEXPECTED_CHANGE,
+
+    /** The server cannot sign changes for the identity because its own key is no longer listed. */
+    SERVER_KEY_MISSING,
+
+    /** The person closed the passkey prompt, so nothing was sent. */
+    STEP_UP_CANCELLED,
+
+    /** The passkey confirmation was not accepted, or it expired. */
+    STEP_UP_FAILED,
+
+    /** This device or this server cannot confirm a change with a passkey. */
+    STEP_UP_UNAVAILABLE,
+
+    /** The account has no passkey to confirm the change with. */
+    PASSKEY_REQUIRED,
 
     /** The identity changed, or the request took too long, while the recovery was in progress. */
     IDENTITY_CHANGED,

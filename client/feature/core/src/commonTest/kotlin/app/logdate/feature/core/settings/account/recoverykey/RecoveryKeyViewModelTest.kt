@@ -159,12 +159,128 @@ class RecoveryKeyViewModelTest {
         }
 
     @Test
-    fun `a registered key with no phrase on this device asks for the phrase`() =
+    fun `a registered key with no phrase on this device cannot be used here`() =
         runTest {
             val state = ready(viewModel(FakeIdentity(registered = DERIVED), storedPhrase = null))
 
             assertEquals(KeyStatus.ON_WITHOUT_PHRASE, state.key)
             assertFalse(state.canReplaceServerKey)
+            assertFalse(state.canReplaceRecoveryKey)
+        }
+
+    @Test
+    fun `a key from another phrase can be replaced with this device's confirmed phrase`() =
+        runTest {
+            val identity = FakeIdentity(registered = "did:key:zSomeoneElse")
+            val viewModel = viewModel(identity)
+
+            assertTrue(ready(viewModel).canReplaceRecoveryKey)
+            viewModel.replaceRecoveryKey()
+
+            assertEquals(listOf(phrase), identity.replacements)
+            val state = ready(viewModel)
+            assertEquals(KeyStatus.ON, state.key)
+            assertTrue(state.replacedRecoveryKey)
+        }
+
+    @Test
+    fun `a key from another phrase is not replaced with an unconfirmed phrase`() =
+        runTest {
+            val identity = FakeIdentity(registered = "did:key:zSomeoneElse")
+            val viewModel = viewModel(identity, confirmed = false)
+
+            viewModel.replaceRecoveryKey()
+
+            assertFalse(ready(viewModel).canReplaceRecoveryKey)
+            assertTrue(identity.replacements.isEmpty())
+        }
+
+    @Test
+    fun `an earlier error is gone after a later request succeeds`() =
+        runTest {
+            val identity = FakeIdentity(registered = DERIVED, recoverFailure = IdentityRecoveryFailure.STEP_UP_CANCELLED)
+            val viewModel = viewModel(identity)
+            viewModel.replaceServerKey()
+            assertEquals(IdentityRecoveryFailure.STEP_UP_CANCELLED, ready(viewModel).error)
+
+            identity.recoverFailure = null
+            viewModel.replaceServerKey()
+
+            assertNull(ready(viewModel).error)
+            assertTrue(ready(viewModel).replacedServerKey)
+        }
+
+    @Test
+    fun `an earlier error is gone after the page is read again`() =
+        runTest {
+            val identity = FakeIdentity(registered = null, registerFailure = IdentityRecoveryFailure.REFUSED)
+            val viewModel = viewModel(identity)
+            viewModel.turnOn()
+
+            viewModel.refresh()
+
+            assertNull(ready(viewModel).error)
+        }
+
+    @Test
+    fun `a phrase that cannot be read offers only try again`() =
+        runTest {
+            val viewModel = viewModel(FakeIdentity(registered = DERIVED), phraseFailure = IllegalStateException("keystore locked"))
+
+            val state = assertIs<RecoveryKeyUiState.PhraseUnavailable>(viewModel.state.value)
+
+            assertEquals(PhraseProblem.UNREADABLE, state.problem)
+            assertEquals("alice.logdate.app", state.handle)
+        }
+
+    @Test
+    fun `a phrase read failure during a request stops it without sending anything`() =
+        runTest {
+            var failRead = false
+            val identity = FakeIdentity(registered = DERIVED)
+            val viewModel =
+                RecoveryKeyViewModel(
+                    identity = identity,
+                    connectedServer = FakeServer(supportsRecoveryKeys = true),
+                    offered = MutableStateFlow(true),
+                    loadPhrase = { if (failRead) error("keystore locked") else phrase },
+                    isPhraseConfirmed = { true },
+                )
+            failRead = true
+
+            viewModel.replaceServerKey()
+
+            assertEquals(PhraseProblem.UNREADABLE, assertIs<RecoveryKeyUiState.PhraseUnavailable>(viewModel.state.value).problem)
+            assertTrue(identity.recoveries.isEmpty())
+        }
+
+    @Test
+    fun `a failed confirmation check is reported instead of taken as unconfirmed`() =
+        runTest {
+            val viewModel =
+                RecoveryKeyViewModel(
+                    identity = FakeIdentity(registered = null),
+                    connectedServer = FakeServer(supportsRecoveryKeys = true),
+                    offered = MutableStateFlow(true),
+                    loadPhrase = { phrase },
+                    isPhraseConfirmed = { error("storage unavailable") },
+                )
+
+            val state = assertIs<RecoveryKeyUiState.PhraseUnavailable>(viewModel.state.value)
+
+            assertEquals(PhraseProblem.CONFIRMATION_UNREADABLE, state.problem)
+        }
+
+    @Test
+    fun `the page shows nothing it can change when the feature is not offered`() =
+        runTest {
+            val identity = FakeIdentity(registered = DERIVED)
+            val viewModel = viewModel(identity, offered = false)
+
+            viewModel.replaceServerKey()
+
+            assertEquals(RecoveryKeyUiState.NotOffered, viewModel.state.value)
+            assertTrue(identity.recoveries.isEmpty())
         }
 
     @Test
@@ -182,24 +298,28 @@ class RecoveryKeyViewModelTest {
         }
 
     @Test
-    fun `a phrase this device cannot use is reported`() =
+    fun `a phrase this device cannot derive a key from offers only try again`() =
         runTest {
-            val state = ready(viewModel(FakeIdentity(registered = null, deriveFailure = true)))
+            val off = viewModel(FakeIdentity(registered = null, deriveFailure = true)).state.value
+            val registered = viewModel(FakeIdentity(registered = DERIVED, deriveFailure = true)).state.value
 
-            assertEquals(IdentityRecoveryFailure.DEVICE_ERROR, state.error)
+            assertEquals(PhraseProblem.CANNOT_DERIVE, assertIs<RecoveryKeyUiState.PhraseUnavailable>(off).problem)
+            assertEquals(PhraseProblem.CANNOT_DERIVE, assertIs<RecoveryKeyUiState.PhraseUnavailable>(registered).problem)
         }
 
     @Test
-    fun `the row is offered only when the flag is on and the server supports recovery keys`() =
+    fun `the row is offered only with the flag on and server support and passkeys on this device`() =
         runTest {
             val flags = FakeFeatureFlagStore()
             val supporting = FakeServer(supportsRecoveryKeys = true)
             val notSupporting = FakeServer(supportsRecoveryKeys = false)
+            val passkeys = MutableStateFlow(true)
 
-            assertFalse(recoveryKeyOffered(flags, supporting).first(), "the flag is off by default")
+            assertFalse(recoveryKeyOffered(flags, supporting, passkeys).first(), "the flag is off by default")
             flags.setEnabled(FeatureFlag.IDENTITY_RECOVERY_KEY, true)
-            assertTrue(recoveryKeyOffered(flags, supporting).first())
-            assertFalse(recoveryKeyOffered(flags, notSupporting).first(), "a server without the capability never shows it")
+            assertTrue(recoveryKeyOffered(flags, supporting, passkeys).first())
+            assertFalse(recoveryKeyOffered(flags, notSupporting, passkeys).first(), "a server without the capability never shows it")
+            assertFalse(recoveryKeyOffered(flags, supporting, MutableStateFlow(false)).first(), "a device without passkeys never shows it")
         }
 
     private fun ready(viewModel: RecoveryKeyViewModel): RecoveryKeyUiState.Ready = assertIs(viewModel.state.value)
@@ -208,10 +328,16 @@ class RecoveryKeyViewModelTest {
         identity: FakeIdentity,
         storedPhrase: List<String>? = phrase,
         confirmed: Boolean = true,
+        offered: Boolean = true,
+        phraseFailure: Exception? = null,
     ) = RecoveryKeyViewModel(
         identity = identity,
         connectedServer = FakeServer(supportsRecoveryKeys = true),
-        loadPhrase = { storedPhrase },
+        offered = MutableStateFlow(offered),
+        loadPhrase = {
+            phraseFailure?.let { throw it }
+            storedPhrase
+        },
         isPhraseConfirmed = { confirmed },
     )
 
@@ -237,11 +363,12 @@ class RecoveryKeyViewModelTest {
         var statusFailure: Throwable? = null,
         private val deriveFailure: Boolean = false,
         private val registerFailure: IdentityRecoveryFailure? = null,
-        private val recoverFailure: IdentityRecoveryFailure? = null,
+        var recoverFailure: IdentityRecoveryFailure? = null,
         private val registerGate: CompletableDeferred<Unit>? = null,
     ) : AccountIdentityRepository {
         val registrations = mutableListOf<List<String>>()
         val recoveries = mutableListOf<List<String>>()
+        val replacements = mutableListOf<List<String>>()
 
         override suspend fun getIdentityStatus(): Result<AccountIdentityStatus> {
             statusFailure?.let { return Result.failure(it) }
@@ -294,7 +421,11 @@ class RecoveryKeyViewModelTest {
             recoveryPhrase: String,
         ): Result<AccountImportedSigningKey> = unused()
 
-        override suspend fun registerPlcRecoveryKey(recoveryDidKey: String): Result<AccountRegisteredPlcRecoveryKey> = unused()
+        override suspend fun replaceRecoveryKey(recoveryPhrase: List<String>): Result<AccountRegisteredPlcRecoveryKey> {
+            replacements += recoveryPhrase
+            registered = DERIVED
+            return Result.success(AccountRegisteredPlcRecoveryKey("did:plc:alice123", "alice.logdate.app", DERIVED))
+        }
 
         private fun <T> unused(): Result<T> = error("not used by the recovery key screen")
     }
