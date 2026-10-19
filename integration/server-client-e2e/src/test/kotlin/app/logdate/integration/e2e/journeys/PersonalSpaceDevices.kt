@@ -19,10 +19,7 @@ import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
-import app.logdate.client.repository.transcription.TranscriptDocument
-import app.logdate.client.repository.transcription.TranscriptDocumentStatus
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.cloud.AssociationSyncResult
@@ -44,31 +41,22 @@ import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.space.RoomSpaceSwapStore
-import app.logdate.client.sync.space.SpaceItemChanges
 import app.logdate.client.sync.space.SpaceKind
 import app.logdate.client.sync.space.SpaceLocalRecords
 import app.logdate.client.sync.space.SpaceLocation
 import app.logdate.client.sync.space.SpaceMediaDataSource
-import app.logdate.client.sync.space.SpaceMediaResolver
-import app.logdate.client.sync.space.SpacePart
-import app.logdate.client.sync.space.SpacePartChange
 import app.logdate.client.sync.space.SpaceRecordMapper
 import app.logdate.client.sync.space.SpaceRecordRegistry
 import app.logdate.client.sync.space.SpaceRoutingMediaDataSource
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
-import app.logdate.client.sync.space.blobCidFor
-import app.logdate.client.sync.space.encodeRecord
-import app.logdate.client.sync.space.mediaFor
+import app.logdate.client.sync.space.mappers.noteSpaceKind
 import app.logdate.client.sync.space.parseDatetime
 import app.logdate.client.sync.space.parseUuidKey
-import app.logdate.client.sync.space.recordRef
 import app.logdate.client.sync.space.toDatetime
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.ServerClientE2EHarness
-import app.logdate.lexicon.app.logdate.DefsMedia
-import app.logdate.lexicon.app.logdate.DefsRecordRef
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.AccountStorageMode
 import app.logdate.shared.model.CloudAccountRepository
@@ -86,20 +74,14 @@ import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readByteArray
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import okhttp3.Interceptor
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
-import studio.hypertext.atproto.lexicon.data.LexiconData
 import java.nio.file.Files
 import kotlin.random.Random
 import kotlin.time.Instant
@@ -282,7 +264,7 @@ internal class SpaceDevice(
             syncScope = scope,
             spaceSync =
                 SpaceSyncDependencies(
-                    registry = SpaceRecordRegistry(listOf(journalKind(journals, journalResolver), noteKind(notes, noteResolver))),
+                    registry = SpaceRecordRegistry(listOf(journalKind(journals, journalResolver), noteSpaceKind(notes, noteResolver))),
                     gate = SpaceTransportGate({ true }, { true }, { AccountStorageMode.PERSONAL_SPACE_V1 }),
                     homes = homes,
                     swapStore = RoomSpaceSwapStore(database.spaceRecordStateDao()),
@@ -439,187 +421,3 @@ private fun journalKind(
         }
     },
 ) { journal, version -> journal.copy(syncVersion = version) }
-
-/** A recording's transcript, with the note it belongs to. */
-private data class NoteTranscript(
-    val noteId: Uuid,
-    val document: TranscriptDocument,
-)
-
-/** Text and audio notes as single-block entries, written for these tests. */
-private object TestEntryMapper : SpaceRecordMapper<JournalNote> {
-    override val collection = ENTRY
-
-    override fun rkeyOf(value: JournalNote) = value.uid.toString()
-
-    override fun toRecord(value: JournalNote): JsonObject {
-        val owner = "$ENTRY/${value.uid}"
-        val block =
-            when (value) {
-                is JournalNote.Text ->
-                    buildJsonObject {
-                        put("\$type", "$ENTRY#textBlock")
-                        put("id", value.uid.toString())
-                        put("text", value.content)
-                    }
-                is JournalNote.Audio ->
-                    buildJsonObject {
-                        put("\$type", "$ENTRY#audioBlock")
-                        put("id", value.uid.toString())
-                        put("media", encodeRecord(DefsMedia.serializer(), SpaceMediaResolver.mediaFor(value.mediaRef, owner)))
-                        put("durationMs", value.durationMs)
-                        if (value.transcript != null) {
-                            put("transcript", encodeRecord(DefsRecordRef.serializer(), DefsRecordRef(TRANSCRIPT, transcriptKey(value.uid))))
-                        }
-                    }
-                else -> error("These tests map only text and audio notes")
-            }
-        return buildJsonObject {
-            put("\$type", ENTRY)
-            put("blocks", buildJsonArray { add(block) })
-            put("createdAt", value.creationTimestamp.toDatetime("$owner createdAt"))
-            put("updatedAt", value.lastUpdated.toDatetime("$owner updatedAt"))
-        }
-    }
-
-    override fun fromRecord(
-        rkey: String,
-        record: JsonObject,
-    ): JournalNote {
-        val uid = parseUuidKey(ENTRY, rkey)
-        val block = (record.getValue("blocks") as JsonArray).single() as JsonObject
-        val created = parseDatetime("created", record.getValue("createdAt").jsonPrimitive.content)
-        val updated = parseDatetime("updated", record.getValue("updatedAt").jsonPrimitive.content)
-        return when ((block["\$type"] as JsonPrimitive).contentOrNull) {
-            "$ENTRY#textBlock" ->
-                JournalNote.Text(
-                    uid = uid,
-                    creationTimestamp = created,
-                    lastUpdated = updated,
-                    content = block.getValue("text").jsonPrimitive.content,
-                )
-            else ->
-                JournalNote.Audio(
-                    uid = uid,
-                    creationTimestamp = created,
-                    lastUpdated = updated,
-                    mediaRef =
-                        SpaceMediaResolver.downloaded(
-                            uid,
-                            LexiconData.json.decodeFromJsonElement(DefsMedia.serializer(), block.getValue("media")),
-                        ),
-                    durationMs = block.getValue("durationMs").jsonPrimitive.longOrNull ?: 0,
-                )
-        }
-    }
-
-    override fun blobCidsOf(value: JournalNote): List<String> =
-        (value as? JournalNote.Audio)?.let { listOf(SpaceMediaResolver.blobCidFor(it.mediaRef, "$ENTRY/${value.uid}")) }.orEmpty()
-}
-
-internal fun transcriptKey(noteId: Uuid) = "$noteId:$noteId"
-
-/** Transcripts with their revision, language and whether they're final, written for these tests. */
-private object TestTranscriptMapper : SpaceRecordMapper<NoteTranscript> {
-    override val collection = TRANSCRIPT
-
-    override fun rkeyOf(value: NoteTranscript) = transcriptKey(value.noteId)
-
-    override fun toRecord(value: NoteTranscript): JsonObject =
-        buildJsonObject {
-            put("\$type", TRANSCRIPT)
-            put("entry", encodeRecord(DefsRecordRef.serializer(), recordRef(ENTRY, value.noteId)))
-            put("blockId", value.noteId.toString())
-            put("language", value.document.language)
-            put("text", value.document.plainText)
-            put("revision", value.document.revision.toLong())
-            put("status", if (value.document.status == TranscriptDocumentStatus.FINAL) "complete" else "inProgress")
-            put("createdAt", "2026-10-01T09:00:00Z")
-        }
-
-    override fun fromRecord(
-        rkey: String,
-        record: JsonObject,
-    ): NoteTranscript {
-        val noteId = parseUuidKey(TRANSCRIPT, rkey.substringBefore(':'))
-        val text = record["text"]?.jsonPrimitive?.content.orEmpty()
-        val document = TranscriptDocument.fromPlainText(text)
-        return NoteTranscript(
-            noteId,
-            document.copy(
-                revision =
-                    record
-                        .getValue("revision")
-                        .jsonPrimitive.longOrNull
-                        ?.toInt() ?: 0,
-                status =
-                    if (record.getValue("status").jsonPrimitive.content ==
-                        "complete"
-                    ) {
-                        TranscriptDocumentStatus.FINAL
-                    } else {
-                        TranscriptDocumentStatus.REFINING
-                    },
-                language = record["language"]?.jsonPrimitive?.content ?: "en-US",
-            ),
-        )
-    }
-}
-
-private fun noteKind(
-    notes: OfflineFirstJournalNotesRepository,
-    resolver: ConflictResolver<JournalNote>,
-): SpaceKind<JournalNote> {
-    val entry = SpacePart.main(TestEntryMapper)
-    val transcript =
-        SpacePart<JournalNote, NoteTranscript>(
-            mapper = TestTranscriptMapper,
-            recordsOf = { note -> (note as? JournalNote.Audio)?.transcript?.let { listOf(NoteTranscript(note.uid, it)) }.orEmpty() },
-            ownerOf = { rkey -> rkey.substringBefore(':') },
-            rkeysOf = { id -> listOf("$id:$id") },
-        )
-    val syncable: SyncableJournalNotesRepository = notes
-    val local =
-        object : SpaceLocalRecords<JournalNote> {
-            override suspend fun load(entityId: String) = notes.getNoteById(Uuid.parse(entityId))
-
-            override val conflictResolver = resolver
-
-            override fun lastUpdatedOf(item: JournalNote) = item.lastUpdated
-
-            override suspend fun acknowledgeUpload(
-                item: JournalNote,
-                seq: Long,
-                syncedAt: Instant,
-            ) = syncable.updateSyncMetadata(item, seq, syncedAt)
-
-            override suspend fun replaceLocal(item: JournalNote) {
-                syncable.deleteFromSync(item.uid)
-                syncable.createFromSync(item)
-            }
-        }
-    return SpaceKind(
-        entityType = EntityType.NOTE,
-        main = entry,
-        local = local,
-        withSyncVersion = { note, version -> note.withSyncVersion(version) },
-        others = listOf(transcript),
-    ) { changes: SpaceItemChanges<JournalNote>, current ->
-        val entryChange = changes.of(entry).lastOrNull() as? SpacePartChange.Written
-        val base = entryChange?.value ?: current ?: return@SpaceKind null
-        if (base !is JournalNote.Audio) return@SpaceKind base
-        when (val change = changes.of(transcript).lastOrNull()) {
-            is SpacePartChange.Written -> base.copy(transcript = change.value.document)
-            is SpacePartChange.Deleted -> base.copy(transcript = null)
-            null -> base.copy(transcript = (current as? JournalNote.Audio)?.transcript ?: base.transcript)
-        }
-    }
-}
-
-private fun JournalNote.withSyncVersion(version: Long): JournalNote =
-    when (this) {
-        is JournalNote.Text -> copy(syncVersion = version)
-        is JournalNote.Image -> copy(syncVersion = version)
-        is JournalNote.Video -> copy(syncVersion = version)
-        is JournalNote.Audio -> copy(syncVersion = version)
-    }

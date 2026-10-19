@@ -8,6 +8,8 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.LocationHistoryApiClient
+import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.location.ActivityHistoryRepository
 import app.logdate.client.repository.location.HistoryOwnerAdoptionRepair
 import app.logdate.client.repository.location.LocationHistoryRepository
@@ -53,10 +55,12 @@ import app.logdate.client.sync.space.SpaceSwapStore
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
+import app.logdate.client.sync.space.mappers.noteSpaceKind
 import app.logdate.client.sync.space.spaceLocation
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.ServerProtocolFeature
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import kotlin.time.Clock
 
@@ -67,6 +71,12 @@ import kotlin.time.Clock
  */
 val spaceSyncModule =
     module {
+        single<SpaceKind<*>> {
+            noteSpaceKind(
+                notes = get<JournalNotesRepository>() as SyncableJournalNotesRepository,
+                resolver = get(named(SyncQualifiers.NOTE_CONFLICT_RESOLVER)),
+            )
+        }
         single { SpaceRecordRegistry(getAll<SpaceKind<*>>()) }
         single<SpaceDataHomes> { XrpcSpaceDataHomes(get<io.ktor.client.HttpClient>()) }
         single<SpaceSwapStore> { RoomSpaceSwapStore(get<LogDateDatabase>().spaceRecordStateDao()) }
