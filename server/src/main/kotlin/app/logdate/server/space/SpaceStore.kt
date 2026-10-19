@@ -4,6 +4,7 @@ import app.logdate.server.logging.SpacePurgeNotices
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -13,7 +14,13 @@ import studio.hypertext.atproto.repo.Cid
 import studio.hypertext.atproto.repo.DAG_CBOR_CODEC
 import studio.hypertext.atproto.repo.DagCborCodec
 import java.util.UUID
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -176,7 +183,8 @@ interface SpaceStore {
      * of each repository for [changes], and blobs created before
      * [unreferencedBlobsBefore] that no record refers to. Each blob's object is deleted with
      * [deleteObject] while its row is locked, and the row goes only after that succeeds, so an object
-     * is never left without a row pointing at it. When [deleteObject] throws, the failure is logged as
+     * is never left without a row pointing at it. When [deleteObject] throws or doesn't finish within
+     * the store's object delete timeout, the failure is logged as
      * [SpacePurgeNotices.BLOB_DELETE_FAILED] and the row stays for the next purge; [deleteObject] must
      * therefore succeed for an object that's already gone. It blocks, and runs on [Dispatchers.IO].
      */
@@ -227,22 +235,41 @@ internal fun countWithinBudget(
     return sizes.size
 }
 
+/** How long a purge waits for one object delete before it gives up and keeps the blob's row. */
+internal val OBJECT_DELETE_TIMEOUT: Duration = 30.seconds
+
 /** Wraps a failed object delete inside a purge transaction, so the transaction rolls back and keeps the row. */
 internal class SpaceObjectDeleteException(
     cause: Throwable,
 ) : RuntimeException(cause)
 
-/** Deletes the object at [path], rethrowing a failure as [SpaceObjectDeleteException]. */
+/** An object delete that didn't finish within [timeout]. */
+internal class SpaceObjectDeleteTimeoutException(
+    timeout: Duration,
+) : RuntimeException("The object delete didn't finish within $timeout")
+
+/**
+ * Deletes the object at [path], rethrowing a failure as [SpaceObjectDeleteException]. The delete runs
+ * on [Dispatchers.IO] and is waited for at most [timeout]; past that it is interrupted and abandoned,
+ * and the failure's cause is a [SpaceObjectDeleteTimeoutException]. An abandoned delete that ignores
+ * the interrupt can still remove the object afterwards.
+ */
 internal fun deleteObjectOrThrow(
     deleteObject: (storagePath: String) -> Unit,
     path: String,
+    timeout: Duration,
 ) {
+    val deletion = FutureTask { deleteObject(path) }
+    Dispatchers.IO.asExecutor().execute(deletion)
     try {
-        deleteObject(path)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        throw SpaceObjectDeleteException(e)
+        deletion.get(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+    } catch (e: TimeoutException) {
+        deletion.cancel(true)
+        throw SpaceObjectDeleteException(SpaceObjectDeleteTimeoutException(timeout))
+    } catch (e: ExecutionException) {
+        val cause = e.cause
+        if (cause !is Exception || cause is CancellationException) throw cause ?: e
+        throw SpaceObjectDeleteException(cause)
     }
 }
 
@@ -256,10 +283,12 @@ internal fun decodeRecord(bytes: ByteArray): JsonObject = DagCborCodec.decode(by
 
 /**
  * A [SpaceStore] for servers running without a database. A page of changes carries at most
- * [changesByteBudget] stored record bytes.
+ * [changesByteBudget] stored record bytes, and a purge waits at most [objectDeleteTimeout] for each
+ * object delete.
  */
 class InMemorySpaceStore(
     private val changesByteBudget: Long = MAX_SPACE_CHANGES_BYTES,
+    private val objectDeleteTimeout: Duration = OBJECT_DELETE_TIMEOUT,
 ) : SpaceStore {
     private class Row(
         val seq: Long,
@@ -385,7 +414,7 @@ class InMemorySpaceStore(
                 if (!purgeable(key, unreferencedBlobsBefore)) return@withLock
                 val path = blobs.getValue(key).first.storagePath
                 try {
-                    withContext(Dispatchers.IO) { deleteObjectOrThrow(deleteObject, path) }
+                    withContext(Dispatchers.IO) { deleteObjectOrThrow(deleteObject, path, objectDeleteTimeout) }
                 } catch (e: SpaceObjectDeleteException) {
                     logObjectDeleteFailure(e)
                     failed++

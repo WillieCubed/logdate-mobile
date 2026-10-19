@@ -1,6 +1,7 @@
 package app.logdate.server.database
 
 import app.logdate.server.space.MAX_SPACE_CHANGES_BYTES
+import app.logdate.server.space.OBJECT_DELETE_TIMEOUT
 import app.logdate.server.space.SpaceBlob
 import app.logdate.server.space.SpaceChange
 import app.logdate.server.space.SpaceChangePage
@@ -44,6 +45,7 @@ import org.jetbrains.exposed.v1.jdbc.update
 import java.sql.Connection
 import java.util.UUID
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 private const val PUT_BLOB_ATTEMPTS = 3
@@ -54,10 +56,12 @@ private const val PURGE_BATCH_SIZE = 500
 /**
  * Stores sealed space records in PostgreSQL. Every write locks its (space, author) state row before
  * taking the next sequence number, so concurrent writes never share one. A page of changes carries
- * at most [changesByteBudget] stored record bytes.
+ * at most [changesByteBudget] stored record bytes, and a purge waits at most [objectDeleteTimeout]
+ * for each object delete.
  */
 class PostgreSQLSpaceStore(
     private val changesByteBudget: Long = MAX_SPACE_CHANGES_BYTES,
+    private val objectDeleteTimeout: Duration = OBJECT_DELETE_TIMEOUT,
 ) : SpaceStore {
     override suspend fun put(write: SpaceRecordWrite): StoredSpaceRecord {
         requireSealedRecord(write.record)
@@ -358,8 +362,13 @@ class PostgreSQLSpaceStore(
      * Deletes one unreferenced blob: its object first, then its row, inside one transaction that holds
      * the row lock throughout. A write that refers to the blob locks its row first, so taking the same
      * lock waits for that write to commit; the check after it is a separate statement, so under read
-     * committed it sees the committed reference and keeps the blob. When the object delete fails, the
-     * transaction rolls back and the row stays for the next purge.
+     * committed it sees the committed reference and keeps the blob. When the object delete fails, or
+     * doesn't finish within [objectDeleteTimeout], the transaction rolls back and the row stays for
+     * the next purge.
+     *
+     * The row can outlive its object: when the object delete succeeds but the commit fails, or a
+     * timed-out delete finishes after the rollback. Until the next purge deletes the row, a write may
+     * still refer to the blob, and reading it answers BlobNotFound because the object is gone.
      */
     private fun purgeBlob(
         space: String,
@@ -381,7 +390,7 @@ class PostgreSQLSpaceStore(
                         .where { key and (SpaceBlobsTable.createdAt less createdBefore) and unreferenced() }
                         .singleOrNull()
                         ?.get(SpaceBlobsTable.storagePath) ?: return@transaction BlobPurge.KEPT
-                deleteObjectOrThrow(deleteObject, path)
+                deleteObjectOrThrow(deleteObject, path, objectDeleteTimeout)
                 SpaceBlobsTable.deleteWhere { key }
                 BlobPurge.DELETED
             }

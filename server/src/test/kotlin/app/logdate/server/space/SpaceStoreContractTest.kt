@@ -15,6 +15,9 @@ import kotlinx.serialization.json.putJsonObject
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,12 +27,15 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 abstract class SpaceStoreContractTest {
     abstract fun withStore(
         changesByteBudget: Long = MAX_SPACE_CHANGES_BYTES,
+        objectDeleteTimeout: Duration = OBJECT_DELETE_TIMEOUT,
         block: suspend (SpaceStore, UUID) -> Unit,
     )
 
@@ -213,6 +219,36 @@ abstract class SpaceStoreContractTest {
         }
 
     @Test
+    fun `an object delete that hangs times out and keeps its row until a later purge deletes both`() =
+        withStore(objectDeleteTimeout = 200.milliseconds) { store, account ->
+            store.putBlob(account, space, SpaceBlob("bafystuck", "application/octet-stream", 10, "path/stuck"))
+            store.putBlob(account, space, SpaceBlob("bafyprompt", "application/octet-stream", 10, "path/prompt"))
+            val later = Clock.System.now() + 1.hours
+            val never = CountDownLatch(1)
+            val interrupted = CountDownLatch(1)
+            val deleted = ConcurrentLinkedQueue<String>()
+            val hanging =
+                store.purge(tombstonesBefore = later, unreferencedBlobsBefore = later) { path ->
+                    if (path == "path/stuck") {
+                        try {
+                            never.await(10, TimeUnit.SECONDS)
+                        } catch (e: InterruptedException) {
+                            interrupted.countDown()
+                            throw e
+                        }
+                    }
+                    deleted += path
+                }
+            assertEquals(SpacePurgeResult(blobsDeleted = 1, blobsFailed = 1), hanging)
+            assertEquals(listOf("path/prompt"), deleted.toList())
+            assertTrue(interrupted.await(5, TimeUnit.SECONDS), "The abandoned delete must be interrupted")
+            assertEquals(SpaceBlob("bafystuck", "application/octet-stream", 10, "path/stuck"), store.getBlob(space, "bafystuck"))
+
+            assertEquals(listOf("path/stuck"), store.purgeRecording(tombstonesBefore = later, unreferencedBlobsBefore = later))
+            assertNull(store.getBlob(space, "bafystuck"))
+        }
+
+    @Test
     fun `put referencing an unknown blob is refused`() =
         withStore { store, account ->
             store.putBlob(account, space, SpaceBlob("bafyknown", "application/octet-stream", 10, "path/known"))
@@ -300,13 +336,15 @@ private const val LARGEST_CIPHERTEXT = 61 * 65_536 + 16
 class InMemorySpaceStoreTest : SpaceStoreContractTest() {
     override fun withStore(
         changesByteBudget: Long,
+        objectDeleteTimeout: Duration,
         block: suspend (SpaceStore, UUID) -> Unit,
-    ) = runBlocking { block(InMemorySpaceStore(changesByteBudget), UUID.randomUUID()) }
+    ) = runBlocking { block(InMemorySpaceStore(changesByteBudget, objectDeleteTimeout), UUID.randomUUID()) }
 }
 
 class PostgreSQLSpaceStoreH2Test : SpaceStoreContractTest() {
     override fun withStore(
         changesByteBudget: Long,
+        objectDeleteTimeout: Duration,
         block: suspend (SpaceStore, UUID) -> Unit,
     ) = withH2Database(AccountsTable, SpaceStatesTable, SpaceRecordsTable, SpaceRecordBlobsTable, SpaceBlobsTable) {
         val account = UUID.randomUUID()
@@ -318,6 +356,6 @@ class PostgreSQLSpaceStoreH2Test : SpaceStoreContractTest() {
                 it[createdAt] = Clock.System.now()
             }
         }
-        runBlocking { block(PostgreSQLSpaceStore(changesByteBudget), account) }
+        runBlocking { block(PostgreSQLSpaceStore(changesByteBudget, objectDeleteTimeout), account) }
     }
 }
