@@ -3,6 +3,7 @@ package app.logdate.wear.di
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import app.logdate.client.sync.cloud.account.ServerAccountStore
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.wear.reminders.WatchReminderHours
@@ -56,6 +57,7 @@ class WearApplicationGraphTest {
                         single<WatchReminders> { mockk() }
                         single<PlaybackPreferencesStore> { mockk() }
                         single<HapticsPreferenceStore> { mockk() }
+                        single<ServerAccountStore> { mockk() }
                     },
                 )
             }

@@ -41,6 +41,8 @@ class WatchLinkCoordinator(
     private val installer: LinkInstaller? = null,
     private val installScope: CoroutineScope? = null,
     private val beforeInstall: suspend () -> Unit = {},
+    /** Runs once an account link is installed: the watch reads its account from the server. */
+    private val afterInstall: suspend () -> Unit = {},
 ) {
     /** Finishes an account link a stopped process left after the code was spent. */
     suspend fun resumeInstall() {
@@ -186,6 +188,7 @@ class WatchLinkCoordinator(
                 InstallOutcome.Failed(LinkProblem.INTERRUPTED)
             }
         mutex.withLock { record(phoneNode, outcome) }
+        if (outcome is InstallOutcome.Installed) afterInstall()
     }
 
     private suspend fun record(

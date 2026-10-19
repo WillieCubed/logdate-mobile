@@ -1,6 +1,7 @@
 package app.logdate.wear.sync.v2.removal
 
 import android.content.Context
+import app.logdate.client.sync.cloud.account.ServerAccountStore
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
 import app.logdate.wear.presentation.recording.SharedPreferencesRecordingHintStore
@@ -14,7 +15,10 @@ import app.logdate.wear.v2.playback.PlaybackPreferencesStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Clears both persistent per-watch state and the live objects that could otherwise reuse it. */
+/**
+ * Clears both persistent per-watch state and the live objects that could otherwise reuse it, including
+ * the account the server last described to this watch.
+ */
 class WatchRemovalCaches(
     private val context: Context,
     private val hours: WatchReminderHours,
@@ -23,8 +27,10 @@ class WatchRemovalCaches(
     private val continuity: WatchRecordingContinuity,
     private val playback: PlaybackPreferencesStore,
     private val haptics: HapticsPreferenceStore,
+    private val accounts: ServerAccountStore,
 ) {
     suspend fun clear() {
+        accounts.clear()
         reminders.clearForRemoval()
         hours.clearForRemoval()
         peers.clear()

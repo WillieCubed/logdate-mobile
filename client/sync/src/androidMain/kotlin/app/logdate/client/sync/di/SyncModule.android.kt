@@ -84,6 +84,7 @@ actual val syncModule: Module =
                 mediaPayloadKeyProvider = get(),
                 cloudQuotaManager = get(),
                 cloudApiClient = get(),
+                serverAccounts = get(),
                 downloadInbox = get(),
                 momentSyncConfig = get(),
                 diagnostics = get(),

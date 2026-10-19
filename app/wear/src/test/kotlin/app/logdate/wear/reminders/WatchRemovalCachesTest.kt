@@ -3,12 +3,15 @@ package app.logdate.wear.reminders
 import android.content.Context
 import android.content.SharedPreferences
 import app.logdate.client.domain.reminders.WakingHours
+import app.logdate.client.sync.cloud.account.ServerAccountStore
+import app.logdate.client.sync.cloud.account.ServerReportedAccount
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.PhoneState
 import app.logdate.client.sync.peer.state.ReminderHours
 import app.logdate.client.sync.peer.state.StateDocument
+import app.logdate.shared.model.AccountStorageMode
 import app.logdate.wear.sync.v2.MemoryKeyValueStorage
 import app.logdate.wear.sync.v2.removal.WatchRemovalCaches
 import app.logdate.wear.v2.continuity.WatchRecordingContinuity
@@ -29,6 +32,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WatchRemovalCachesTest {
@@ -89,6 +93,19 @@ class WatchRemovalCachesTest {
                 controller.restore()
                 val playback = SharedPreferencesPlaybackPreferencesStore(preferences)
                 val haptics = SharedPreferencesHapticsPreferenceStore(preferences)
+                val accounts = ServerAccountStore(MemoryKeyValueStorage())
+                accounts.write(
+                    ServerReportedAccount(
+                        origin = "https://logdate.test",
+                        accountId = "5f0c3a52-0000-4000-8000-000000000001",
+                        username = "owner",
+                        displayName = "Owner",
+                        did = "did:plc:owner",
+                        createdAt = Instant.fromEpochMilliseconds(1_000),
+                        updatedAt = Instant.fromEpochMilliseconds(1_000),
+                        storageMode = AccountStorageMode.PERSONAL_SPACE_V1,
+                    ),
+                )
                 val caches =
                     WatchRemovalCaches(
                         context,
@@ -98,8 +115,10 @@ class WatchRemovalCachesTest {
                         mockk<WatchRecordingContinuity>(relaxed = true),
                         playback,
                         haptics,
+                        accounts,
                     )
                 caches.clear()
+                assertNull(accounts.read(), "the account the server described is forgotten")
                 controller.restore()
                 assertFalse(local.enabled.value)
                 assertNull(local.lastReminderAt())

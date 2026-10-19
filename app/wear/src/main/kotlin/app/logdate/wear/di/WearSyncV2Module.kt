@@ -35,6 +35,7 @@ import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.sync.v2.localNodeIdOrNull
 import app.logdate.wear.sync.v2.media.GoogleMediaRangeSource
 import com.google.android.gms.wearable.Wearable
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import org.koin.core.parameter.parametersOf
@@ -69,6 +70,7 @@ val wearSyncV2Module =
                 installer = get<LinkInstaller>(),
                 installScope = get<CoroutineScope>(),
                 beforeInstall = { config.awaitConfigurationLoaded() },
+                afterInstall = { readLinkedAccount(get<DefaultSyncManager>(WatchCloud)) },
             )
         }
         single {
@@ -198,3 +200,12 @@ internal val watchSyncFeatures =
         WearFeatures.WINDOW,
         WearFeatures.MEDIA_RANGE,
     )
+
+/**
+ * Reads the account a newly linked watch belongs to with its own device token. A failure is logged here
+ * and reported by the next sync, which reads the account again before it does anything else.
+ */
+private suspend fun readLinkedAccount(engine: DefaultSyncManager) {
+    val result = engine.refreshServerAccount() ?: return
+    result.exceptionOrNull()?.let { Napier.e("The linked account could not be read from the server; the next sync reads it again", it) }
+}

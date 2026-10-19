@@ -177,6 +177,7 @@ fun testDefaultSyncManager(
     momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
     deviceIdProvider: app.logdate.client.device.identity.DeviceIdProvider? = null,
     deviceEnrollment: suspend () -> Unit = {},
+    serverAccounts: app.logdate.client.sync.cloud.account.ServerAccountStore? = null,
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -218,6 +219,7 @@ fun testDefaultSyncManager(
             momentSyncConfig = momentSyncConfig,
             deviceIdProvider = deviceIdProvider,
             deviceEnrollment = deviceEnrollment,
+            serverAccounts = serverAccounts,
         )
     } else {
         DefaultSyncManager(
@@ -260,6 +262,7 @@ fun testDefaultSyncManager(
             deviceIdProvider = deviceIdProvider,
             deviceEnrollment = deviceEnrollment,
             syncScope = syncScope,
+            serverAccounts = serverAccounts,
         )
     }
 
