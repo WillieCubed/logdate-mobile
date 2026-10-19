@@ -34,7 +34,8 @@
       },
       "errors": [
         { "name": "InvalidSwap" },
-        { "name": "RecordNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing record." }
+        { "name": "RecordNotFound", "description": "The space isn't the caller's own, answered exactly as for a missing record." },
+        { "name": "RecordTooLarge", "description": "The request is larger than 16 KiB, far more than a delete needs." }
       ]
     }
   }

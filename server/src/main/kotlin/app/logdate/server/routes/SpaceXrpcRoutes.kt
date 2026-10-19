@@ -31,6 +31,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.request.receiveChannel
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
@@ -58,6 +59,9 @@ internal const val MAX_SPACE_BLOB_BYTES: Long = 100L * 1024 * 1024
 
 /** Room for the largest sealed record, 4,000,000 bytes of ciphertext written as base64, and the rest of its JSON. */
 internal const val MAX_SPACE_RECORD_REQUEST_BYTES: Long = 6L * 1024 * 1024
+
+/** A delete carries only a space URI, a key and a CID; anything this large isn't one. */
+internal const val MAX_SPACE_DELETE_REQUEST_BYTES: Long = 16L * 1024
 
 private const val DEFAULT_CHANGES_LIMIT = 200
 private const val MAX_RECORD_BLOBS = 64
@@ -177,8 +181,8 @@ private fun Route.deleteRecord(
         val account = auth.requireLogDateAccount(call) ?: return@post
         val store = records ?: return@post call.respondNotImplemented()
         val bytes =
-            call.receiveBytesUpTo(MAX_SPACE_RECORD_REQUEST_BYTES)
-                ?: return@post call.respondInvalid("Invalid deleteRecord input")
+            call.receiveBytesUpTo(MAX_SPACE_DELETE_REQUEST_BYTES)
+                ?: return@post call.respond(HttpStatusCode.PayloadTooLarge, PdsErrorResponse("RecordTooLarge", "The request is too large"))
         val input = decodeOrNull<SpaceDeleteRecordInput>(bytes) ?: return@post call.respondInvalid("Invalid deleteRecord input")
         val space = call.ownSpace(input.space, account, RECORD_NOT_FOUND) ?: return@post
         if (!isRecordKey(input.rkey)) return@post call.respondInvalid("rkey must be a record key")
@@ -298,6 +302,8 @@ private fun Route.getBlob(
         val bytes =
             store.getBlob(space.uri, cid)?.let { withContext(Dispatchers.IO) { storage.getBlob(it.storagePath) } }
                 ?: return@get call.respondMissing(BLOB_NOT_FOUND)
+        // Decrypted on the device only; nothing between it and the server should keep a copy.
+        call.response.header(HttpHeaders.CacheControl, "private, no-store")
         call.respondBytes(bytes, ContentType.Application.OctetStream)
     }
 }

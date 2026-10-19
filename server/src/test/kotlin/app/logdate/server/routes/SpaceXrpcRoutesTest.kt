@@ -174,6 +174,7 @@ class SpaceXrpcRoutesTest {
             val read = getBlob(owner, space, cid)
             assertEquals(HttpStatusCode.OK, read.status)
             assertEquals(ContentType.Application.OctetStream, read.contentType()?.withoutParameters())
+            assertEquals("private, no-store", read.headers[HttpHeaders.CacheControl])
             assertContentEquals(bytes, read.bodyAsBytes())
 
             val stranger = getBlob(other, space, cid)
@@ -285,6 +286,28 @@ class SpaceXrpcRoutesTest {
             assertEquals("CursorTooOld", stale.errorCode())
             assertEquals(HttpStatusCode.OK, list(since = 0).status)
             assertEquals(HttpStatusCode.OK, list(since = 3).status)
+        }
+
+    @Test
+    fun `a delete request larger than 16 KiB is refused as too large`() =
+        testApplication {
+            val env = configureAuthV1TestApp(personalSpaceEnabled = true)
+            val (did, token) = env.signedInAccount("alice")
+            val space = "at://$did/space/app.logdate.space.personal/self"
+            val padded = " ".repeat(16 * 1024)
+            val tooLarge =
+                client.post("/xrpc/app.logdate.space.deleteRecord") {
+                    bearer(token)
+                    json("""{"space":"$space","rkey":"abc"}$padded""")
+                }
+            assertEquals(HttpStatusCode.PayloadTooLarge, tooLarge.status)
+            assertEquals("RecordTooLarge", tooLarge.errorCode())
+            val fits =
+                client.post("/xrpc/app.logdate.space.deleteRecord") {
+                    bearer(token)
+                    json("""{"space":"$space","rkey":"abc"}""")
+                }
+            assertEquals(HttpStatusCode.OK, fits.status)
         }
 
     @Test
