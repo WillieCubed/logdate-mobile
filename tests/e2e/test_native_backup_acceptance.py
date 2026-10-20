@@ -377,6 +377,16 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
         self.assertTrue(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_dialog_present(hierarchy))
         self.assertIsNone(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(hierarchy))
 
+    def test_digital_wellbeing_anr_waits_without_hiding_logdate_anr(self):
+        template = ('<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+                    'text="{} isn&#x27;t responding"/><node package="android" '
+                    'resource-id="android:id/aerr_wait" bounds="[80,1502][1200,1646]"/></hierarchy>')
+        hierarchy = template.format("Digital Wellbeing").encode()
+        self.assertEqual((640, 1574), NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(hierarchy))
+        app = template.format("LogDate").encode()
+        self.assertIsNone(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(app))
+        self.assertFalse(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_dialog_present(app))
+
     def test_ignores_other_anr_dialogs(self):
         hierarchy = (
             '<hierarchy><node package="android" resource-id="android:id/alertTitle" '

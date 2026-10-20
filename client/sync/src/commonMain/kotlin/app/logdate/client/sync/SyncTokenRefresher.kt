@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.datastore.OriginBoundSession
+import app.logdate.client.datastore.SessionAuthenticationSnapshot
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.networking.PasskeyApiErrorCodes
@@ -128,12 +129,21 @@ internal class SyncTokenRefresher(
     ): Result<T> {
         Napier.i("Token expired (401), attempting refresh")
         if (binding != null && !isStillBound(binding, locationProvider)) return Result.failure(scopeChanged())
+        val authorization = sessionStorage.captureAuthenticationSnapshot()
+        if (authorization != null &&
+            (
+                authorization.session?.session != currentSession ||
+                    (binding != null && authorization.session?.origin != binding.location.origin)
+            )
+        ) {
+            return Result.failure(scopeChanged())
+        }
         val refreshResult = runBound(binding) { refreshSession(currentSession.refreshToken) }
         refreshResult.rethrowCancellation()
         val refreshed =
             refreshResult.getOrElse { refreshError ->
                 Napier.e("Token refresh failed")
-                endSessionIfRefused(refreshError, currentSession)
+                endSessionIfRefused(refreshError, authorization)
                 return Result.failure(refreshError)
             }
 
@@ -174,12 +184,12 @@ internal class SyncTokenRefresher(
      */
     private suspend fun endSessionIfRefused(
         refreshError: Throwable,
-        currentSession: UserSession,
+        authorization: SessionAuthenticationSnapshot?,
     ) {
         if (refreshError !is CloudApiException || refreshError.statusCode != 401) return
         if (refreshError.errorCode !in SESSION_ENDED_CODES) return
-        if (sessionStorage.getSession() != currentSession) return
-        sessionStorage.clearSession()
+        val guard = authorization?.guard ?: return
+        if (!sessionStorage.clearSessionIfUnchanged(guard)) return
         if (refreshError.errorCode != DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED) return
         Napier.w("The server revoked this device's session")
         revocationListener.onDeviceSessionRevoked()

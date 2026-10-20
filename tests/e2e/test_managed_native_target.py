@@ -10,6 +10,13 @@ AVD = "dev34_google_apis_arm64-v8a_Pixel_9_Pro"
 
 
 class ManagedNativeCustodyTest(unittest.TestCase):
+    def test_binding_reads_cannot_consume_the_native_commands_stdin_payload(self):
+        function = TARGET["real_command"]
+        run = Mock(return_value=Mock(stdout=b"owned-driver"))
+        with patch.object(function.__globals__["subprocess"], "run", run):
+            self.assertEqual(b"owned-driver", function("/adb", "emulator-5556", "shell", "pidof", "driver"))
+        self.assertEqual(function.__globals__["subprocess"].DEVNULL, run.call_args.kwargs.get("stdin"))
+
     def test_selects_only_new_managed_qemu_processes_with_exact_avd(self):
         lines = [
             f"101 /sdk/emulator/qemu-system-aarch64 @{AVD} -id first_GradleManagedDevice -read-only",

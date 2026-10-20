@@ -211,6 +211,11 @@ archives must match the expected bytes by SHA-256; a repeated filename is insuff
 recovery refreshes expired credentials and stays bound to the captured owner and server. Temporary
 failures retain their checkpoints and retry without requiring another app launch.
 
+Refresh refusal clears a session only through the vault authorization captured before the refresh
+request. A later sign-in or server change invalidates that authority, including a sign-in that
+installs equal credential values. Missing authority never permits an unconditional clear. Device
+revocation is reported only after the conditional clear succeeds.
+
 Recovery observes server configuration, encryption-identity changes, authenticated-session
 readiness, and durable media-mapping changes. Scheduling awaits WorkManager's database commit and coalesces changes into one waiting
 successor, so a running job cannot discard a later wakeup. Missing or invalid source bytes retain
@@ -218,6 +223,10 @@ their checkpoints while awaiting a changed source, key, or session; empty sync p
 restart foreground recovery.
 
 Conditional reference patches preserve captions, timestamps, text, block order, and memberships.
+Current-editor notes and their original edit versions persist recovered references through the same
+`StoredMediaReferences` resolver as the journal. Keeping a device file path in an edit version while
+the journal stores a portable reference creates a false editing conflict even when both read the
+same bytes. Media-mapping comparisons also use that resolver before comparing reference spellings.
 Deleted entries, replaced attachments, and pending deletions take precedence. Notes, journals,
 memberships, places, location samples, drafts, and profile decisions have durable application
 receipts, including decisions to preserve newer content. Draft recovery admits its sync write
@@ -327,11 +336,25 @@ original. Outbound pending edits resolve the mapped remote URL; an unresolved ma
 A preview does not count as its original. Download validation checks the wire length before
 legacy plaintext acceptance or authenticated decryption.
 
+The Android photo-library manager must expose `ConditionalMediaSaver` as well as `MediaManager`.
+Kotlin interface delegation forwards only the declared interface, so wrapping a guarded store can
+otherwise make native recovery fail after downloading the original. Forward the original commit
+predicate to the store's atomic save boundary; an earlier identity check cannot guard a later write.
+Host regressions must exercise the manager returned by production DI, including an account change
+during persistence, rather than testing only the underlying file store.
+
 Local originals and retained archive files repair without media-library or notification permission.
 Availability requires an owned file whose bytes can be opened, rather than a successful provider
 metadata query. Network downloads obey the current data policy and account-scoped explicit
 mobile-data consent. A deferred download retains its recovery state; an allowed-network transition
 wakes recovery automatically. It does not require another sign-in or a manual retry.
+
+Android network policy follows the default network's callback capabilities. Synchronous connectivity
+getters can still describe an older network inside a callback. Data Saver broadcasts refresh their
+restriction state without replacing those capabilities, and callbacks from a superseded network
+cannot overwrite the new default's state. Recovery remains deferred while the current policy
+disallows its download; an allowed policy does not guarantee a reachable server, so failed
+connections must retain the operation for retry.
 
 Restored entries retain their complete text. Optional enrichment counts the combined input before
 concatenating it, and day previews allocate only their displayed range. Oversized entries must not
@@ -406,6 +429,12 @@ starting verification instrumentation. Verification checks exact bytes and offli
 removes only its uniquely named recording. Normal startup and the foreground fallback for a
 restore-retained Application run the same salvage step before database access.
 
+Current-editor drafts retain failed recording blocks as pending metadata. Missing staging bytes
+must not make autosave discard the block's caption, transcript, position, creation time, or recovery
+paths. Reload reconstructs a stopped recovery attempt, never an active recorder, and can accept a
+committed fallback if it becomes available. This preserves the draft without including temporary
+recording containers in Android backup.
+
 The location test waits for SDK acceptance using a temporary in-memory
 Napier sink; a non-null pending request is insufficient, and production log redaction stays intact.
 A private checkpoint retains the original tracking preferences
@@ -466,6 +495,10 @@ forbids uninstalling or clearing LogDate app data, so the harness restores expli
 using the guide's uninstall/reinstall step. Passing it proves the GMS test transport, callbacks, and
 restored content; it does not prove source-to-fresh-target setup-wizard transfer. That broader
 acceptance remains a separate device-transfer test and must use a new target.
+Transport failures retain bounded backup-service Logcat output in a private diagnostic file.
+A package-manager transport failure occurs before LogDate's agent and cannot establish an app
+backup failure or success. The diagnostic capture must preserve the failed acceptance result even
+when Logcat is unavailable.
 The in-place simulation retains the installation ID stored outside backup. The two-emulator
 scenario requires a distinct ID on the fresh destination and verifies recovery into a new Keystore.
 
@@ -491,16 +524,13 @@ WorkManager request. A generic request without a native delivery cannot satisfy 
 `tests/e2e/native-device-enrollment-acceptance.py` combines a populated two-emulator native
 transfer with the real account/device API and an isolated PostgreSQL server. Build
 `:app:android-main:assembleDebug`, `:app:android-main:assembleDebugAndroidTest`, and
-`:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath`, then provide two fresh,
-rootable emulator serials, both APKs, the generated classpath file, a private database environment
-file, and a new output directory:
+`:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath`, then use the managed controller
+with the generated classpath, a private database environment file, and a new output directory.
+The controller owns both fresh emulator instances and pins the APKs for the duration of the run:
 
 ```sh
 LOGDATE_NATIVE_ACCEPTANCE_PACKAGE=studio.hypertext.logdate.debug \
-python3 tests/e2e/native-device-enrollment-acceptance.py \
-  --source emulator-5554 --destination emulator-5556 \
-  --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
-  --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+python3 tests/e2e/managed-native-restore-acceptance.py --mode enrollment \
   --classpath integration/server-client-e2e/build/android-history-harness.classpath \
   --fixture-environment /private/temporary/enrollment-environment.json \
   --output /private/temporary/native-enrollment-result
@@ -527,6 +557,53 @@ The native transfer check waits for the retained text entry to appear on the Tim
 than accepting navigation over loading placeholders. Local entries publish independently of
 optional recommendations; a stalled or failed lookup cannot hide recovered entries or stop
 later local edits from appearing.
+
+The enrollment session also runs `NativeAutomaticMediaWorkerProbeTest` against the real server.
+It quarantines one synthetic note's mapping while preserving its original file, defers the resulting
+download under metered and Data Saver policies, and verifies automatic repair after each policy
+lifts. An incomplete running sync must receive a persisted successor before ordinary retry backoff
+can satisfy the test. A concurrent full sync can instead prove completion for the same account and
+server only after the retained operation is applied and exact original bytes are recovered.
+A separate process-death case retains the download operation and recovers on normal
+startup. Every case requires exact original bytes, unchanged timestamps, an applied inbox operation,
+and no pending download before accepting completion; the host never requests recovery a second time.
+
+`NativeRetainedDraftShortcutProbeTest` seeds the current editor's `EntryDraftRepository` before
+backup, separately from the legacy rich-draft fixture. On the replacement device it checks text,
+media bytes, memberships, and draft identity, publishes the real dynamic shortcut twice, then opens
+the platform-published intent and verifies the saved draft appears in the editor. This exercises
+retained draft storage and shortcut interaction; explicit publication in this probe does not prove
+automatic startup publication.
+
+The current editor and legacy archive editor use different draft stores. Native recovery must
+cover both: `NativeEntryDraftMediaQuarantine` fences current `EntryDraft` snapshots, and
+`NativeEntryDraftMediaRecovery` joins the ordinary draft sync phase. It retains an owner-scoped
+`MEDIA_NATIVE_ENTRY_DRAFT` inbox operation until every committed attachment is readable. Missing
+recording staging files keep their pending metadata; they are not downloadable originals.
+A draft's `editBase.original` is an independent recovery candidate: its current attachment may be
+readable while the original-version reference is stale. Repair only that reference and preserve the
+original fields, scope, and copy identity so legitimate edits do not become false conflicts.
+
+Use `EntryDraftRecoveryRepository` for media-only compare-and-set repairs. It preserves creation
+and update times, selected journals, captions, editing provenance, and pending recording metadata.
+The Android store checks the current snapshot and recovery authority inside its serialized write.
+Its JSON patch changes known fields while preserving unfamiliar restored metadata, including nested
+records. A cancelled write acknowledgement can follow a successful commit: reconcile the affected
+cached draft from storage before retrying, preserve the original failure, and never treat a failed
+reread as a deleted draft. A rejected disk comparison also refreshes the cache.
+
+`NativeCurrentDraftRecoveryProbeTest` adds a cold-delivery simulation after the enrolled native
+transfer. It places unrelated bytes behind an accessible provider URI, attaches that URI to the
+current draft with a matching real-server media mapping, and arms native quarantine. Offline
+startup must quarantine the reference while preserving the unrelated provider file. A subsequent
+online startup must recover the correct original through normal sync and apply the draft's inbox
+operation. Opening the actual shortcut and restarting again must retain the unfinished recording's
+caption, transcript, timestamp, position, and recovery reference without starting capture.
+A separate base-only stage retains a readable replacement attachment while recovering the original
+version reference. It publishes through `AddNoteUseCase` and verifies that a later genuine conflict
+is still refused. The provider-collision fixture is created on the destination; it does not prove
+setup-wizard delivery of the collision or Google credentials.
+
 Archive recovery must await `LogDateConfigDataSource.awaitConfigurationLoaded()` before
 capturing its owner/origin or creating a recovery record. The repository initially exposes the
 default Cloud origin; treating that initial value as a saved choice can bind accepted work to

@@ -6,8 +6,10 @@ import app.logdate.client.domain.notes.drafts.DeleteAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.FetchEntryDraftUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
+import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.feature.editor.ui.editor.delegate.DefaultPendingAudioRecoverer
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.fakes.FakeEntryDraftRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeJournalNotesRepository
@@ -17,6 +19,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -33,6 +36,60 @@ class PendingAudioDraftTest {
             cleanupExpiredDraftsUseCase = CleanupExpiredDraftsUseCase(repository),
         )
     private val recordedAt = Instant.parse("2026-01-02T03:04:05Z")
+
+    @Test
+    fun `missing transferred recording retains its metadata through autosave and later recovery`() =
+        runTest {
+            val text = TextBlockUiState(timestamp = recordedAt, content = "Before the recording")
+            val audio =
+                AudioBlockUiState(
+                    timestamp = recordedAt,
+                    captureState = AudioCaptureState.Stopping("/staging/excluded.m4a", "/audio/committed.m4a"),
+                    caption = "A retained caption",
+                    transcription = "Words already transcribed",
+                )
+            val id = assertNotNull(manager.autoSave(EditorState(blocks = listOf(text, audio))))
+            val pendingBefore =
+                repository
+                    .getDraft(id)
+                    .first()
+                    .getOrThrow()
+                    .pendingMedia
+                    .single()
+            var fallbackAvailable = false
+            val recoverer =
+                DefaultPendingAudioRecoverer(
+                    AudioDurationResolver { path -> if (fallbackAvailable && path == "/audio/committed.m4a") 2500L else null },
+                )
+            val loaded = manager.loadDraft(id).getOrThrow().blocks
+            val restored = loaded.last() as AudioBlockUiState
+            val failed = recoverer.recover(restored.captureState as AudioCaptureState.Stopping)
+            assertIs<AudioCaptureState.Failed>(failed)
+
+            manager.autoSave(
+                EditorState(blocks = listOf(loaded.first(), restored.copy(captureState = failed)), draftState = DraftState.Active(id)),
+            )
+
+            val pendingAfter =
+                repository
+                    .getDraft(id)
+                    .first()
+                    .getOrThrow()
+                    .pendingMedia
+            assertEquals(listOf(pendingBefore), pendingAfter)
+            repository.setPendingMedia(id, Json.decodeFromString(Json.encodeToString(pendingAfter)))
+            val reopened = manager.loadDraft(id).getOrThrow().blocks
+            assertEquals(listOf(text.id, audio.id), reopened.map { it.id })
+            val retained = reopened.last() as AudioBlockUiState
+            assertEquals(audio.caption, retained.caption)
+            assertEquals(audio.transcription, retained.transcription)
+            assertEquals(audio.timestamp, retained.timestamp)
+            fallbackAvailable = true
+            assertEquals(
+                AudioCaptureState.Ready("/audio/committed.m4a", 2500),
+                recoverer.recover(retained.captureState as AudioCaptureState.Stopping),
+            )
+        }
 
     @Test
     fun `pending recording stays between text blocks with identical timestamps`() =

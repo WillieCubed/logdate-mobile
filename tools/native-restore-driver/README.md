@@ -28,8 +28,14 @@ rejects reduced shard allocation before publishing readiness. The controller pin
 the reviewed UTP backend, requires both roles, and checks both final test methods.
 
 Before readiness, each driver verifies the installed app and probe APK hashes,
-matching signing certificates, and instrumentation target. Native harness reinstalls
-use private copies of those attested APKs. The host binds every ADB operation to its
+matching signing certificates, and instrumentation target. The controller copies both
+APKs into its private run directory before starting Gradle. It passes their absolute
+paths through `logdate.nativeAcceptanceAppApk` and `logdate.nativeAcceptanceProbeApk`,
+so Gradle installs that pair without rebuilding LogDate. Both properties are required
+together and must name existing files. A different version-code environment or a later
+build cannot change the selected bytes. Native harness reinstalls use the same copies.
+Direct Gradle runs without the properties retain the ordinary app assembly dependencies.
+The host binds every ADB operation to its
 live Gradle process, newly started managed QEMU processes, and nonce-bearing driver
 receipts with process birth identities. Protected transport access uses `su` without
 restarting ADB. Normal instrumentation retains its shell identity.

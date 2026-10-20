@@ -39,46 +39,54 @@ class RetainedDatabaseMigrationSafetyJvmTest {
             assertRefusedAndRetained(-1)
         }
 
+    @Test fun `released internal schema migrates with content deletion state and outbox intact`() = runTest { assertSupportedMigration(55) }
+
     @Test fun `supported previous schema migrates with content deletion state and outbox intact`() =
         runTest {
-            val helper =
-                MigrationTestHelper(
-                    Path.of("schemas"),
-                    file,
-                    BundledSQLiteDriver(),
-                    LogDateDatabase::class,
-                    { LogDateDatabaseConstructor.initialize() },
-                    emptyList(),
-                )
-            helper.createDatabase(56).use { connection ->
-                connection.execSQL(
-                    "INSERT INTO journals (id, title, description, created, lastUpdated, syncVersion) " +
-                        "VALUES ('$journalId', 'Retained journal', '', 1000, 1000, 7)",
-                )
-                connection.execSQL(
-                    "INSERT INTO text_notes (uid, content, created, lastUpdated, syncVersion, deletedAt) " +
-                        "VALUES ('$noteId', 'Retained deleted note', 1000, 1000, 8, 2000)",
-                )
-                connection.execSQL("INSERT INTO journal_notes (id, uid) VALUES ('$journalId', '$noteId')")
-            }
-            seedOutbox()
-            val before = snapshot()
-            val database = open()
-            try {
-                assertEquals(
-                    "Retained journal",
-                    database
-                        .journalDao()
-                        .getAll()
-                        .single()
-                        .title,
-                )
-            } finally {
-                database.close()
-            }
-            assertEquals(before, snapshot())
-            assertEquals(57L, version())
+            assertSupportedMigration(
+                56,
+            )
         }
+
+    private suspend fun assertSupportedMigration(fromVersion: Int) {
+        val helper =
+            MigrationTestHelper(
+                Path.of("schemas"),
+                file,
+                BundledSQLiteDriver(),
+                LogDateDatabase::class,
+                { LogDateDatabaseConstructor.initialize() },
+                emptyList(),
+            )
+        helper.createDatabase(fromVersion).use { connection ->
+            connection.execSQL(
+                "INSERT INTO journals (id, title, description, created, lastUpdated, syncVersion) " +
+                    "VALUES ('$journalId', 'Retained journal', '', 1000, 1000, 7)",
+            )
+            connection.execSQL(
+                "INSERT INTO text_notes (uid, content, created, lastUpdated, syncVersion, deletedAt) " +
+                    "VALUES ('$noteId', 'Retained deleted note', 1000, 1000, 8, 2000)",
+            )
+            connection.execSQL("INSERT INTO journal_notes (id, uid) VALUES ('$journalId', '$noteId')")
+        }
+        seedOutbox()
+        val before = snapshot()
+        val database = open()
+        try {
+            assertEquals(
+                "Retained journal",
+                database
+                    .journalDao()
+                    .getAll()
+                    .single()
+                    .title,
+            )
+        } finally {
+            database.close()
+        }
+        assertEquals(before, snapshot())
+        assertEquals(57L, version())
+    }
 
     @Test fun `only an explicitly disposable builder may recreate unsupported tables`() =
         runTest {

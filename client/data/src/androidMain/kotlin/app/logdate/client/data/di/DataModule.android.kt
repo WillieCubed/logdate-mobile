@@ -36,6 +36,7 @@ import app.logdate.client.data.notes.StoredMediaReferenceMigration
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
+import app.logdate.client.data.notes.drafts.NativeEntryDraftMediaQuarantine
 import app.logdate.client.data.notes.drafts.OfflineFirstEntryDraftRepository
 import app.logdate.client.data.people.AndroidDeviceContactsReader
 import app.logdate.client.data.people.OfflineFirstPeopleGraphRepository
@@ -81,6 +82,7 @@ import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.events.EventRepository
 import app.logdate.client.repository.journals.DraftRepository
+import app.logdate.client.repository.journals.EntryDraftRecoveryRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalMergeScope
@@ -225,7 +227,7 @@ actual val dataModule: Module =
             )
         }
         single {
-            NativeMediaQuarantine(get(), get(), get(), get(), get()) { reference -> get<MediaManager>().exists(reference) }
+            NativeMediaQuarantine(get(), get(), get(), get(), get(), get()) { reference -> get<MediaManager>().exists(reference) }
         }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
@@ -242,7 +244,10 @@ actual val dataModule: Module =
             )
         }
 
-        single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get(), get()) }
+        single { OfflineFirstEntryDraftRepository(get(), get(), get()) }
+        single<EntryDraftRepository> { get<OfflineFirstEntryDraftRepository>() }
+        single<EntryDraftRecoveryRepository> { get<OfflineFirstEntryDraftRepository>() }
+        single { NativeEntryDraftMediaQuarantine(get()) }
         factory<LocalEntryDraftStore> { AndroidLocalEntryDraftStore(get<Context>()) }
 
         // Rewind

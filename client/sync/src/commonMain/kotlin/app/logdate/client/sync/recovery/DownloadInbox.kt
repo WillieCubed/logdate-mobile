@@ -47,6 +47,9 @@ class DownloadInbox(
     private val diagnosticSource: () -> DiagnosticSource? = { null },
     private val diagnostics: (SyncDiagnosticEvent, DiagnosticSource?) -> Unit = { _, _ -> },
 ) {
+    private val nativeQueue = NativeMediaInboxQueue(dao, transactions, scope)
+    private val failures = DownloadInboxFailureRecorder(dao, transactions, now, ::recordDiagnostic)
+
     fun currentScope(): DownloadScope = scope()
 
     /** Missing native originals are local work, independent of the retained server-version watermark. */
@@ -56,31 +59,7 @@ class DownloadInbox(
         version: Long,
         reference: String,
         selected: DownloadScope,
-    ) {
-        require(type == "MEDIA_NATIVE_NOTE" || type == "MEDIA_NATIVE_DRAFT")
-        transactions.withTransaction {
-            check(selected == scope()) { "Native media recovery scope changed" }
-            val prior = dao.get(selected.owner, selected.origin, type, id)
-            if (prior != null && prior.state != "APPLIED" && prior.version == version && prior.payload == reference) return@withTransaction
-            dao.put(
-                DownloadInboxEntity(
-                    selected.owner,
-                    selected.origin,
-                    type,
-                    id,
-                    version,
-                    false,
-                    reference,
-                    Uuid.random().toString(),
-                    "WAITING",
-                    0,
-                    0,
-                    DiagnosticReason.NONE.name,
-                ),
-            )
-            check(selected == scope()) { "Native media recovery scope changed" }
-        }
-    }
+    ) = nativeQueue.enqueue(type, id, version, reference, selected)
 
     suspend fun hasRecord(
         type: String,
@@ -510,61 +489,7 @@ class DownloadInbox(
         selected: DownloadScope = scope(),
         attemptId: String? = null,
         source: DiagnosticSource? = captureDiagnosticSource(selected),
-    ) {
-        var retried: DownloadInboxEntity? = null
-        transactions.withTransaction {
-            val row = dao.get(selected.owner, selected.origin, type, id) ?: return@withTransaction
-            if (row.state == "APPLIED" || (version != null && row.version != version)) return@withTransaction
-            val policyDeferred = reason == DiagnosticReason.NETWORK_POLICY.name
-            val attempt = if (policyDeferred) row.attempts else (row.attempts + 1).coerceAtMost(30)
-            val delay = if (policyDeferred) 30_000L else (1000L shl attempt.coerceAtMost(12)).coerceAtMost(60 * 60 * 1000L)
-            val updated =
-                row.copy(
-                    state = if (policyDeferred) "WAITING" else "FAILED",
-                    attempts = attempt,
-                    nextAttemptAt = now() + delay,
-                    reason = DiagnosticReason.entries.firstOrNull { it.name == reason }?.name ?: DiagnosticReason.UNKNOWN.name,
-                )
-            dao.put(updated)
-            retried = updated
-        }
-        retried?.let { row ->
-            val classified = DiagnosticReason.entries.firstOrNull { it.name == row.reason } ?: DiagnosticReason.UNKNOWN
-            recordDiagnostic(
-                SyncDiagnosticEvent(
-                    phase = if (type.startsWith("MEDIA_")) DiagnosticPhase.MEDIA else DiagnosticPhase.APPLY,
-                    outcome =
-                        if (classified ==
-                            DiagnosticReason.NETWORK_POLICY
-                        ) {
-                            DiagnosticOutcome.PAUSED
-                        } else {
-                            DiagnosticOutcome.RETRY_SCHEDULED
-                        },
-                    reason = classified,
-                    action = actionFor(classified),
-                    operationId = row.operationId,
-                    attemptId = attemptId ?: Uuid.random().toString(),
-                    attemptCount = row.attempts,
-                    retryable = true,
-                ),
-                source,
-            )
-        }
-    }
-
-    private fun actionFor(reason: DiagnosticReason): DiagnosticAction =
-        when (reason) {
-            DiagnosticReason.NETWORK_POLICY -> DiagnosticAction.NONE
-            DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
-            DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
-            DiagnosticReason.LOCAL_STORAGE -> DiagnosticAction.RETRY
-            DiagnosticReason.KEY_RECOVERY_REQUIRED -> DiagnosticAction.RECOVER_KEY
-            DiagnosticReason.INCOMPATIBLE_SERVER -> DiagnosticAction.UPDATE_SERVER
-            DiagnosticReason.UNSUPPORTED_FORMAT -> DiagnosticAction.UPDATE_APP
-            DiagnosticReason.CONFLICT -> DiagnosticAction.REVIEW_CONFLICT
-            else -> DiagnosticAction.RETRY
-        }
+    ) = failures.record(type, id, reason, version, selected, attemptId, source)
 
     suspend fun release() {
         scope().let { dao.release(it.owner, it.origin) }

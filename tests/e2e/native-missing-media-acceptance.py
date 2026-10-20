@@ -57,8 +57,12 @@ def instrument(serial, selector, log, extras=(), release_network=None, status_ac
     released = False
     pending_actions = dict(status_actions or {})
     try:
+        log.write_bytes(b"")
+        log.chmod(0o600)
         for line in process.stdout:
             output.extend(line)
+            with log.open("ab") as transcript:
+                transcript.write(line)
             for marker in list(pending_actions):
                 if marker in line:
                     pending_actions.pop(marker)()

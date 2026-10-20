@@ -6,6 +6,20 @@
 
 Provides comprehensive media handling capabilities including image, video, and audio capture, processing, and management across all platforms. This module serves as the foundation for all media-related functionality in the application.
 
+## Guarded recovery writes
+
+Native recovery writes through `ConditionalMediaSaver` so an account or server change can reject
+an attachment before it becomes visible. Android exposes `AndroidPhotoLibraryMediaManager`, whose
+delegate implements that capability. Kotlin's `MediaManager by delegate` forwards only members of
+`MediaManager`; a decorator must explicitly implement and forward `ConditionalMediaSaver` too.
+Otherwise recovery can download a valid original and still fail before saving it.
+
+Forward the original `canCommit` predicate into the delegate's conditional save. Checking it once
+and then calling an unconditional save leaves a race with sign-out or account changes. Tests should
+exercise the manager exposed by dependency injection as well as the underlying store, including a
+scope change immediately before the delegate commits. `AndroidPhotoLibraryConditionalSaveTest` and
+`NativeMediaRecoveryProductionWrapperTest` cover both the capability and the recovery operation.
+
 ## Architecture
 
 ```

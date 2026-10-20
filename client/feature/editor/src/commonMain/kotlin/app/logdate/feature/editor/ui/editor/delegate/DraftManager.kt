@@ -229,9 +229,9 @@ private fun AudioBlockUiState.toPendingMediaRecord(position: Int): PendingMediaR
         when (val capture = captureState) {
             is AudioCaptureState.Recording -> capture.filePath
             is AudioCaptureState.Stopping -> capture.filePath
+            is AudioCaptureState.Failed -> capture.filePath
             AudioCaptureState.Empty,
             is AudioCaptureState.Ready,
-            is AudioCaptureState.Failed,
             -> return null
         }
     return PendingMediaRecord(
@@ -243,6 +243,7 @@ private fun AudioBlockUiState.toPendingMediaRecord(position: Int): PendingMediaR
             when (val capture = captureState) {
                 is AudioCaptureState.Recording -> capture.fallbackFilePath
                 is AudioCaptureState.Stopping -> capture.fallbackFilePath
+                is AudioCaptureState.Failed -> capture.fallbackFilePath
             },
         timeZoneId = timeZoneId,
         position = position,

@@ -15,6 +15,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 
@@ -118,6 +119,19 @@ def restore_device_settings(serial, previous_transport, previous_mode, backup_wa
         raise RuntimeError("Could not restore the emulator's original backup settings: " + "; ".join(errors))
 
 
+def retain_transport_failure(serial, output, phase):
+    # The package-manager backup can fail before the application's agent is called.
+    # Keep bounded transport evidence without replacing the failed acceptance result.
+    try:
+        evidence = HARNESS.adb(
+            serial, "shell", "logcat", "-d", "-t", "500", "-v", "threadtime",
+            "BackupManagerService:V", "Backup:V", "PFTBT:V", "*:S", timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        evidence = f"Transport diagnostics unavailable: {type(error).__name__}\n".encode()
+    HARNESS.private_file(output / f"d2d-{phase}-transport.log", evidence)
+
+
 def exercise_d2d(serial, app_apk, test_apk, output):
     verify_emulator(serial)
     if not app_apk.is_file() or not test_apk.is_file():
@@ -143,6 +157,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
         backup = HARNESS.adb(serial, "shell", "bmgr", "backupnow", HARNESS.PACKAGE, timeout=180)
         HARNESS.private_file(output / "d2d-backup.log", backup)
         if f"Package {HARNESS.PACKAGE} with result: Success".encode() not in backup:
+            retain_transport_failure(serial, output, "backup")
             raise RuntimeError("Google D2D test transport did not complete the native backup")
 
         HARNESS.probe(serial, "post-backup-mutation", output / "post-backup-mutation.log")
@@ -154,6 +169,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
         restore = HARNESS.adb(serial, "shell", "bmgr", "restore", token, HARNESS.PACKAGE, timeout=180)
         HARNESS.private_file(output / "d2d-restore.log", restore)
         if b"restoreFinished: 0" not in restore:
+            retain_transport_failure(serial, output, "restore")
             raise RuntimeError("Google D2D test transport did not complete native restore")
 
         HARNESS.adb(serial, "install", "-r", "-t", str(test_apk.resolve()))
