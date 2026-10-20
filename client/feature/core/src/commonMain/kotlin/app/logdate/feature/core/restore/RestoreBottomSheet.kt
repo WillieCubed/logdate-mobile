@@ -19,12 +19,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -34,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.ArchivePreview
+import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
@@ -60,6 +59,7 @@ import logdate.client.feature.core.generated.resources.restore_import_options_la
 import logdate.client.feature.core.generated.resources.restore_merge_info
 import logdate.client.feature.core.generated.resources.restore_preview_description
 import logdate.client.ui.generated.resources.common_cancel
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -214,7 +214,7 @@ private fun RestoreConfirmContent(
 }
 
 @Composable
-private fun RestorePreviewContent(
+internal fun RestorePreviewContent(
     preview: ArchivePreview,
     fileName: String,
     options: ImportOptions,
@@ -268,32 +268,35 @@ private fun RestorePreviewContent(
 
         Spacer(modifier = Modifier.height(Spacing.lg))
 
-        Text(
-            text = stringResource(Res.string.restore_import_options_label),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(Spacing.xs))
-
-        if (preview.hasDrafts) {
-            ImportCategoryToggle(
-                label = stringResource(Res.string.export_category_drafts),
-                count = preview.stats.draftCount,
-                checked = options.includeDrafts,
-                onCheckedChange = { onOptionsChanged(options.copy(includeDrafts = it)) },
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = Spacing.md),
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
-        }
-        if (preview.hasMedia) {
-            ImportCategoryToggle(
-                label = stringResource(Res.string.export_category_media),
-                count = preview.stats.mediaCount,
-                checked = options.includeMedia,
-                onCheckedChange = { onOptionsChanged(options.copy(includeMedia = it)) },
-            )
+        if (preview.hasDrafts || preview.hasMedia) {
+            SettingsSection(title = stringResource(Res.string.restore_import_options_label)) {
+                if (preview.hasDrafts) {
+                    ToggleSettingsItem(
+                        title = stringResource(Res.string.export_category_drafts),
+                        description =
+                            pluralStringResource(
+                                Res.plurals.export_category_item_count,
+                                preview.stats.draftCount,
+                                preview.stats.draftCount,
+                            ),
+                        checked = options.includeDrafts,
+                        onCheckedChange = { onOptionsChanged(options.copy(includeDrafts = it)) },
+                    )
+                }
+                if (preview.hasMedia) {
+                    ToggleSettingsItem(
+                        title = stringResource(Res.string.export_category_media),
+                        description =
+                            pluralStringResource(
+                                Res.plurals.export_category_item_count,
+                                preview.stats.mediaCount,
+                                preview.stats.mediaCount,
+                            ),
+                        checked = options.includeMedia,
+                        onCheckedChange = { onOptionsChanged(options.copy(includeMedia = it)) },
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(Spacing.md))
@@ -346,31 +349,6 @@ private fun PreviewStatsGrid(
         draftCount = stats.draftCount,
         mediaCount = stats.mediaCount,
         modifier = modifier,
-    )
-}
-
-@Composable
-private fun ImportCategoryToggle(
-    label: String,
-    count: Int,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    ListItem(
-        headlineContent = { Text(label) },
-        supportingContent = {
-            Text(
-                text = stringResource(Res.string.export_category_item_count, count),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-            )
-        },
     )
 }
 

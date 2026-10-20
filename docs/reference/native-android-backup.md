@@ -480,6 +480,14 @@ request must finish and restore the draft without another app launch. The harnes
 reads back Android's original storage state even when a stage fails. This validates platform
 deferral and interrupted-write custody, rather than physically filling the emulator's filesystem.
 
+`tests/e2e/native-recovery-ui-acceptance.py` checks production restore sheets at phone and tablet
+display sizes and with Android's system font scale at 200%. Each sheet's text-layout density must
+match the requested font scale: a `LocalDensity` override around the page does not establish the
+scale of a separate native modal window. The probe verifies partial-state copy, media counts,
+reachable accessibility actions, and one callback per tap, and captures each state's content and
+action placement for inspection. It restores and reads back the original display and font settings.
+Compose semantics and action checks do not establish a TalkBack navigation session.
+
 The independent server verifier checks that the uploaded draft carries the replacement device ID
 and its original creation time. The historical entry keeps its creation time and encrypted capture
 metadata; the destination decrypts that metadata through the production content API and checks

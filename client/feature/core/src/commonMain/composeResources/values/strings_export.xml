@@ -6,11 +6,15 @@
     <string name="export_and_import_description">Export archive, restore from backup, and integrity check</string>
     <string name="export_options_title">Export your data</string>
     <string name="export_options_description">Choose what to include in the export.</string>
+    <string name="export_categories_label">Include</string>
     <string name="export_category_journals">Journals</string>
     <string name="export_category_notes">Notes</string>
     <string name="export_category_drafts">Drafts</string>
     <string name="export_category_media">Media</string>
-    <string name="export_category_item_count">%1$d items</string>
+    <plurals name="export_category_item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
     <string name="export_date_range_label">Date range</string>
     <string name="export_date_range_all_time">All time</string>
     <string name="export_date_range_last_30_days">Last 30 days</string>

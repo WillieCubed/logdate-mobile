@@ -3,6 +3,7 @@ package app.logdate.feature.core.settings.ui
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -89,8 +90,8 @@ class AutomaticDataSettingsTest {
         onNodeWithText("Repair").assertDoesNotExist()
         onNodeWithText("Internal metadata failure").assertDoesNotExist()
         onAllNodesWithText("Sync couldn't finish").assertCountEquals(1)
-        onNodeWithText("Export").performClick()
-        onNodeWithText("Import").performClick()
+        onNodeWithText("Export data").assertHasClickAction().performClick()
+        onNodeWithText("Import backup").assertHasClickAction().performClick()
         assertEquals(1, exports)
         assertEquals(1, imports)
     }

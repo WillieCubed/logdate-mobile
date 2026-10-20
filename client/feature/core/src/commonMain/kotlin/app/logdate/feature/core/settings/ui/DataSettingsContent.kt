@@ -130,7 +130,7 @@ fun DataSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                NativeBackupSettingsSection(nativeBackupStatus, onShowExportOptions, Modifier.padding(horizontal = Spacing.lg))
+                NativeBackupSettingsSection(nativeBackupStatus, Modifier.padding(horizontal = Spacing.lg))
                 SyncSettingsSection(
                     syncStatus = syncStatus,
                     cloudArchiveStatus = cloudArchiveStatus,
@@ -169,7 +169,7 @@ fun DataSettingsContent(
 
                 if (nativeBackupStatus is NativeBackupStatus.Available) {
                     item {
-                        NativeBackupSettingsSection(nativeBackupStatus, onShowExportOptions, Modifier.padding(horizontal = Spacing.lg))
+                        NativeBackupSettingsSection(nativeBackupStatus, Modifier.padding(horizontal = Spacing.lg))
                     }
                 }
                 item {

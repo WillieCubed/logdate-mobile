@@ -15,14 +15,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
@@ -32,10 +31,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.text.asString
+import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.export
+import logdate.client.feature.core.generated.resources.export_categories_label
 import logdate.client.feature.core.generated.resources.export_category_drafts
 import logdate.client.feature.core.generated.resources.export_category_item_count
 import logdate.client.feature.core.generated.resources.export_category_journals
@@ -51,6 +53,7 @@ import logdate.client.feature.core.generated.resources.export_date_range_last_ye
 import logdate.client.feature.core.generated.resources.export_options_description
 import logdate.client.feature.core.generated.resources.export_options_title
 import logdate.client.ui.generated.resources.common_cancel
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -82,6 +85,7 @@ internal fun ExportBottomSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = Spacing.lg)
                     .navigationBarsPadding(),
         ) {
@@ -147,7 +151,7 @@ internal fun ExportBottomSheet(
 }
 
 @Composable
-private fun ExportConfigContent(
+internal fun ExportConfigContent(
     options: ExportOptions,
     counts: ExportCounts?,
     onOptionsChanged: (ExportOptions) -> Unit,
@@ -178,47 +182,36 @@ private fun ExportConfigContent(
 
         Spacer(modifier = Modifier.height(Spacing.lg))
 
-        // Category toggles
-        ExportCategoryToggle(
-            label = stringResource(Res.string.export_category_journals),
-            count = counts?.journalCount,
-            checked = options.includeJournals,
-            onCheckedChange = { onOptionsChanged(options.copy(includeJournals = it)) },
-            enabled = buttonsEnabled,
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = Spacing.md),
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-        )
-        ExportCategoryToggle(
-            label = stringResource(Res.string.export_category_notes),
-            count = counts?.noteCount,
-            checked = options.includeNotes,
-            onCheckedChange = { onOptionsChanged(options.copy(includeNotes = it)) },
-            enabled = buttonsEnabled,
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = Spacing.md),
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-        )
-        ExportCategoryToggle(
-            label = stringResource(Res.string.export_category_drafts),
-            count = counts?.draftCount,
-            checked = options.includeDrafts,
-            onCheckedChange = { onOptionsChanged(options.copy(includeDrafts = it)) },
-            enabled = buttonsEnabled,
-        )
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = Spacing.md),
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-        )
-        ExportCategoryToggle(
-            label = stringResource(Res.string.export_category_media),
-            count = counts?.mediaCount,
-            checked = options.includeMedia,
-            onCheckedChange = { onOptionsChanged(options.copy(includeMedia = it)) },
-            enabled = buttonsEnabled,
-        )
+        SettingsSection(title = stringResource(Res.string.export_categories_label)) {
+            ToggleSettingsItem(
+                title = stringResource(Res.string.export_category_journals),
+                description = counts?.journalCount?.let { pluralStringResource(Res.plurals.export_category_item_count, it, it) },
+                checked = options.includeJournals,
+                onCheckedChange = { onOptionsChanged(options.copy(includeJournals = it)) },
+                enabled = buttonsEnabled,
+            )
+            ToggleSettingsItem(
+                title = stringResource(Res.string.export_category_notes),
+                description = counts?.noteCount?.let { pluralStringResource(Res.plurals.export_category_item_count, it, it) },
+                checked = options.includeNotes,
+                onCheckedChange = { onOptionsChanged(options.copy(includeNotes = it)) },
+                enabled = buttonsEnabled,
+            )
+            ToggleSettingsItem(
+                title = stringResource(Res.string.export_category_drafts),
+                description = counts?.draftCount?.let { pluralStringResource(Res.plurals.export_category_item_count, it, it) },
+                checked = options.includeDrafts,
+                onCheckedChange = { onOptionsChanged(options.copy(includeDrafts = it)) },
+                enabled = buttonsEnabled,
+            )
+            ToggleSettingsItem(
+                title = stringResource(Res.string.export_category_media),
+                description = counts?.mediaCount?.let { pluralStringResource(Res.plurals.export_category_item_count, it, it) },
+                checked = options.includeMedia,
+                onCheckedChange = { onOptionsChanged(options.copy(includeMedia = it)) },
+                enabled = buttonsEnabled,
+            )
+        }
 
         Spacer(modifier = Modifier.height(Spacing.xl))
 
@@ -248,36 +241,6 @@ private fun ExportConfigContent(
             }
         }
     }
-}
-
-@Composable
-private fun ExportCategoryToggle(
-    label: String,
-    count: Int?,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true,
-) {
-    ListItem(
-        headlineContent = { Text(label) },
-        supportingContent =
-            count?.let {
-                {
-                    Text(
-                        text = stringResource(Res.string.export_category_item_count, it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                enabled = enabled,
-            )
-        },
-    )
 }
 
 @Composable
