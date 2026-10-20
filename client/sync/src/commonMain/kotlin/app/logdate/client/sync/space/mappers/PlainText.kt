@@ -63,7 +63,7 @@ private fun escapeLineStart(
         ruleOrUnderline.matches(line) || bulletMarker.containsMatchIn(line) -> "\\$body"
         else -> {
             val ordered = orderedListMarker.find(line) ?: return body
-            val delimiterAt = ordered.groups[2]!!.range.first
+            val delimiterAt = ordered.groupValues[1].length
             body.substring(0, delimiterAt) + "\\" + body.substring(delimiterAt)
         }
     }
