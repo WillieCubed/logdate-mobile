@@ -175,7 +175,7 @@ stylus-writing-on-controls|system|docs/screenshots/android-os-integration/keyboa
 stylus-writing-on-controls|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-search-typed--tablet-api37.png
 
 # Quiet Save: recording preference, saved draft, and return acknowledgement.
-quiet-save|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_QuietSaveScreenshots.kt#S01_QuietSaveSettings
+quiet-save|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_05_QuietSaveScreenshots.kt#S01_QuietSaveSettings
 quiet-save|desktop|quiet-save-settings
 quiet-save|system|docs/screenshots/android-os-integration/quiet-save/saved-notification--phone-api34.png
 quiet-save|system|docs/screenshots/android-os-integration/quiet-save/saved-draft--phone-api34.png
