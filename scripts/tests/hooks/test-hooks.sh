@@ -82,6 +82,18 @@ assert_equals "fix(editor): wrap commit body" "$(head -n 1 "$tmp_msg_file")"
 
 # hook-common module resolution
 source "$COMMON"
+
+# A real task list can exceed the pipe buffer; early matches must still pass under pipefail.
+large_task_listing=$'jvmTest - Runs JVM tests.\n'"$(printf '%200000s' '')"
+large_task_list_has_jvm_tests() {
+    module_has_task "$large_task_listing" "jvmTest"
+}
+large_task_list_has_no_partial_match() {
+    module_has_task "$large_task_listing" "jvmTestExtra"
+}
+assert_exit 0 large_task_list_has_jvm_tests
+assert_exit 1 large_task_list_has_no_partial_match
+
 resolved="$(modules_from_files $'client/feature/timeline/src/main/kotlin/Foo.kt\nclient/feature/timeline/src/main/kotlin/Bar.kt\nclient/repository/src/commonMain/kotlin/Baz.kt\nclient/datastore/src/commonMain/kotlin/Qux.kt')"
 assert_contains "^:client:feature:timeline$" "$resolved"
 assert_contains "^:client:repository$" "$resolved"

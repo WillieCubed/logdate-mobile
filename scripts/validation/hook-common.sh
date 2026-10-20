@@ -152,7 +152,7 @@ module_has_task() {
     local tasks_output="$1"
     local task_name="$2"
 
-    echo "$tasks_output" | grep -Eq "^[[:space:]]*${task_name}([[:space:]-]|$)"
+    grep -Eq "^[[:space:]]*${task_name}([[:space:]-]|$)" <<< "$tasks_output"
 }
 
 resolve_test_task_for_module() {
