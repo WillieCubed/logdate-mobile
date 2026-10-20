@@ -78,7 +78,8 @@ The ordinary build default remains disabled. Android builds may opt into the
 rollout with `-Plogdate.quietSaveDefault=true`; this sets the default for an unset
 rollout flag without changing the saved recording preference. An explicit rollout
 override still wins. The Play internal publishing workflow enables this default
-for the phone app. Wear OS and other platforms retain their existing behavior.
+for the phone app. Its `publish_wear` option can be disabled for a phone-only
+internal release. Quiet Save remains unavailable on Wear OS and other platforms.
 
 An internal upload begins release acceptance. Promotion to production requires the
 existing [Android release acceptance](../launch/android-public-release.md), including

@@ -16,6 +16,11 @@ on:
           - halt
           - resume-5
           - resume-25
+      publish_wear:
+        description: Also publish the Wear OS internal bundle
+        required: false
+        type: boolean
+        default: true
       candidate_tag:
         description: Tested android-v tag, required for production actions
         required: false
@@ -118,7 +123,7 @@ jobs:
         run: ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "$SHORT_SHA"
 
       - name: Publish Wear OS bundle to internal testing
-        if: ${{ vars.LOGDATE_PLAY_WEAR_PUBLISH_ENABLED == 'true' }}
+        if: ${{ vars.LOGDATE_PLAY_WEAR_PUBLISH_ENABLED == 'true' && inputs.publish_wear }}
         run: >
           ./gradlew :app:wear:publishReleaseBundle
           -Plogdate.backendUrl=https://cloud.logdate.app
