@@ -28,12 +28,22 @@ internal class ApplicationStartup(
     private val mutableState = MutableStateFlow<ApplicationStartupState>(ApplicationStartupState.Loading)
     val state: StateFlow<ApplicationStartupState> = mutableState.asStateFlow()
     private var job: Job? = null
+    private var retryAfter: Job? = null
 
     @Synchronized
     fun start() {
-        if (job?.isActive == true || state.value is ApplicationStartupState.Ready) return
+        if (state.value is ApplicationStartupState.Ready) return
+        val currentJob = job
+        if (currentJob?.isActive == true) {
+            if (state.value is ApplicationStartupState.Failed && retryAfter !== currentJob) {
+                retryAfter = currentJob
+                mutableState.value = ApplicationStartupState.Loading
+                currentJob.invokeOnCompletion { retryWhenFinished(currentJob) }
+            }
+            return
+        }
         mutableState.value = ApplicationStartupState.Loading
-        job =
+        val attempt =
             scope
                 .launch(start = CoroutineStart.LAZY) {
                     try {
@@ -44,7 +54,16 @@ internal class ApplicationStartup(
                     } catch (error: Exception) {
                         mutableState.value = ApplicationStartupState.Failed(error)
                     }
-                }.also { it.start() }
+                }
+        job = attempt
+        attempt.start()
+    }
+
+    @Synchronized
+    private fun retryWhenFinished(previous: Job) {
+        if (retryAfter !== previous) return
+        retryAfter = null
+        if (job === previous && state.value !is ApplicationStartupState.Ready) start()
     }
 
     suspend fun awaitReady(): Boolean = state.first { it !is ApplicationStartupState.Loading } is ApplicationStartupState.Ready

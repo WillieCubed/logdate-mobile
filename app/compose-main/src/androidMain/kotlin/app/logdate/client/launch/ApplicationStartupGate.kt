@@ -1,6 +1,7 @@
 package app.logdate.client.launch
 
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -35,8 +36,8 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
         val state by startup.state.collectAsState()
         val failure = state as? ApplicationStartupState.Failed
         LogDateTheme {
-            Surface {
-                GenericLoadingScreen()
+            Surface(modifier = Modifier.fillMaxSize()) {
+                if (state is ApplicationStartupState.Loading) GenericLoadingScreen()
                 if (failure != null) {
                     AlertDialog(
                         onDismissRequest = {},

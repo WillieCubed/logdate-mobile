@@ -599,6 +599,11 @@ assumption failures, test failures, runner errors, and crashes fail acceptance e
 summary is present. Harnesses preserve private logs before rejecting results. Network-release and
 permission-grant acknowledgements remain required for scenarios that depend on them.
 
+The missing-privacy runtime check observes a new startup failure after retry and activity
+recreation, verifies its privacy exception, and then checks the recovery guidance. Its bounded
+startup wait is separate from the rendered-text wait. The emulator-only `privacyRetryDelayMs`
+argument injects up to 25 seconds of retry latency without changing production behavior.
+
 Run `python3 -m unittest discover -s tests/e2e -p 'test_native*.py'` and
 `python3 scripts/tests/native-backup/test-native-acceptance-safety.py`, and
 `python3 scripts/tests/native-backup/test-native-instrumentation-results.py` when changing these harnesses.
