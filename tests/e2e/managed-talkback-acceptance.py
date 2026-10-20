@@ -180,11 +180,12 @@ def run(font, output, sdk):
             cases = list(ET.parse(result).getroot().iter("testcase"))
             if len(cases) != 1 or cases[0].get("classname") != CLASS or any(cases[0].find(tag) is not None for tag in ("failure", "error", "skipped")):
                 raise RuntimeError("Expected one passing TalkBack case without skips")
-            if seen != ["partial", "paused", "preview"]:
+            if seen != ["partial", "paused", "preview", "missing-key", "late-key", "app-lock", "app-lock-resumed"]:
                 raise RuntimeError(f"Incomplete gesture sequence: {seen}")
             (output / "acceptance.json").write_text(json.dumps({"fontScale": font, "scenes": seen,
                 "nativeTouchInput": True, "talkBackFocusForwardBackwardAndActivation": True,
-                "settingsRestoredByInstrumentation": True, "realImportExecuted": False}, indent=2) + "\n")
+                "settingsRestoredByInstrumentation": True, "realImportExecuted": False,
+                "actualStartupKeyRecovery": True, "syntheticLateKeyDelivery": True, "lockedJournalSemanticsHidden": True}, indent=2) + "\n")
         finally:
             if touch:
                 touch.close()

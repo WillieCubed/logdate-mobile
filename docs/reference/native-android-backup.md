@@ -345,6 +345,10 @@ use the variant's literal application ID, generated from one template. A string-
 in `android:targetPackage` is not resolved by Android's shortcut intent parser. The opt-in
 `RestoredShortcutTargetsRuntimeTest` reads the installed platform shortcut records and checks that
 every capture intent targets and resolves within the current application without launching capture.
+It also republishes a draft shortcut twice and checks the platform retains one target with the
+original draft ID. A refused dynamic-shortcut publication remains retryable work; rate limiting must
+not acknowledge a completed refresh. Cancellation propagates so a superseded refresh cannot finish
+as a successful publication.
 
 ## Emulator acceptance
 
@@ -675,6 +679,25 @@ gates moment signals. Cancellation waits for WorkManager persistence before anot
 enter the gate. Ordinary storage failures retry reconciliation and the pending signal without another
 preference change or input event; turning reminders off cancels those retries.
 
+Legacy immediate and periodic workers also share a delivery lock across eligibility, notification
+posting, and history persistence. A successful post finishes writing its suppression history even
+if the worker is canceled. Unreadable history prevents delivery; failed persistence remains retryable.
+Pending suppression is shared across reminder modes and retains the original delivery time, using
+the same timestamp precision as persisted history so a failed acknowledgement cannot count twice.
+The concurrent native fixture uses a private on-disk history store, reloads it after closing the
+original store, and checks one actual notification and one post call. It grants notification access
+only on its disposable managed installation. These checks cover concurrent workers and coroutine
+cancellation; killing the process between the OS post and history commit is a separate boundary.
+
+The managed startup job in `.github/workflows/native-restore-acceptance.yml` selects the notification,
+shortcut, and low-storage fixtures explicitly and rejects skipped or missing methods. The notification
+fixture's additional `notificationDedupeAcceptance` opt-in isolates its permission grant from the
+denied-permission probes. `managedAcceptedArchiveWaitsForStorageThenResumes` checks actual platform
+storage transitions, retained archive bytes and request identity, and automatic restoration in one
+process. The cold-process acceptance harness additionally tests process termination between stages.
+Storage-monitor commands queue their state update; wait for both forced and observed levels before
+continuing, and fail if the requested state never appears.
+
 Broadcast receivers release their pending result after asynchronous scheduling, including when the
 application scope was already cancelled. `RestoredReminderSchedulingRuntimeTest` runs on a Gradle
 Managed Device and checks actual AlarmManager registrations, unique periodic work, both reminder
@@ -713,12 +736,20 @@ multitouch events exercise TalkBack's recognizer. Capture accessibility focus/cl
 the retained journal before and after retry. After a database has opened, compare journal content
 and integrity because SQLite index maintenance can change its encrypted file bytes.
 
-The managed TalkBack harness runs the production archive recovery sheets with synthetic states and
-callback counters. It checks missing-original, resumable-import, and preview actions with actual
-TalkBack forward/backward navigation and double-tap activation. It requires a fresh evidence directory
-an installed Android NDK, and an ARM64 API 34 image with TalkBack and `su` support. Its input driver selects only a newly started, expected
-Gradle Managed Device, validates the per-run receipt before every gesture, and runs a small NDK-built input helper that writes native kernel
-touch events with bounded gesture timing. Shell `input` and direct recovery-node activation are not substitutes for this check.
+The managed TalkBack harness checks seven recovery scenes with forward/backward navigation and
+double-tap activation. Three archive scenes use production sheets with synthetic missing-original,
+resumable-import, and preview states and callback counters. Four startup scenes use an actual
+encrypted journal: retry with its key missing, retry after synthetic delivery of its original portable
+key, and app-lock security setup before and after leaving and returning to the app. Canceling Android
+security enrollment must keep the journal locked. Private journal text and titles must remain absent
+from every app-owned accessibility window, including content descriptions.
+
+The harness requires a fresh evidence directory, an installed Android NDK, and an ARM64 API 34 image
+with TalkBack and `su` support. Its input driver selects only a newly started, expected Gradle Managed
+Device, validates the per-run receipt before every gesture, and runs a small NDK-built input helper
+that writes native kernel touch events with bounded gesture timing. Shell `input` and direct
+recovery-node activation are not substitutes for this check. System Back/Home events use current
+uptime timestamps; zero-timestamp key events are stale and may be dropped by Android.
 
 ```bash
 python3 tests/e2e/managed-talkback-acceptance.py --font-scale 1.0 --output /tmp/recovery-talkback-normal
@@ -729,8 +760,11 @@ The fixture checks the Activity configuration and Compose density before accepti
 font scale. It preserves and restores the accessibility-service, font, Bluetooth, and notification
 permission settings it touches. Only the known initial Accessibility Suite notification prompt and
 Bluetooth crash dialog are handled during setup; unexpected covering windows fail with a diagnostic
-receipt. Successful navigation invokes a fixture callback, not a real import. Journal preservation,
-worker restart, app-lock privacy, and native delivery use the corresponding data/runtime fixtures.
+receipt. Archive navigation invokes fixture callbacks without executing an import. Startup recovery
+verifies journal contents and original-key retention through normal application initialization. The
+late key delivery is synthetic; Google-provider delivery and worker restart require separate fixtures.
+The managed device retains the accepted journal and keys; cleanup restores the original preferences
+and closes the Activity without deleting journal data or recovery material.
 If a host observer fails while Gradle is still running, inspect the saved child-process handle before
 starting another run; an observer failure does not mean the managed-device task has stopped.
 

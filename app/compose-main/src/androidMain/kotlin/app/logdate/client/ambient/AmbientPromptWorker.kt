@@ -11,6 +11,12 @@ import app.logdate.client.domain.recommendation.GenerateAmbientPromptCandidatesU
 import app.logdate.client.domain.reminders.PhoneReminderDelivery
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class AmbientPromptWorker(
     context: Context,
@@ -33,6 +39,17 @@ class AmbientPromptWorker(
             return Result.success()
         }
 
+        return try {
+            runLegacyReminder()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Napier.w("Ambient reminder recovery is pending", error)
+            Result.retry()
+        }
+    }
+
+    private suspend fun runLegacyReminder(): Result {
         val triggerContext =
             runCatching {
                 AmbientPromptTriggerContext.valueOf(
@@ -41,22 +58,27 @@ class AmbientPromptWorker(
             }.getOrDefault(AmbientPromptTriggerContext.PERIODIC)
 
         val candidates = generateAmbientPromptCandidates(triggerContext)
-        val candidate =
-            candidates.firstOrNull { ambientPromptHistoryRepository.canShow(it) }
-                ?: return Result.success()
-
-        if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) return Result.success()
-        val posted = notificationCoordinator.post(candidate)
-        if (!posted) {
-            Napier.w("Ambient prompt notification could not be posted")
-            return Result.success()
+        return deliveryMutex.withLock {
+            val candidate =
+                candidates.firstOrNull { ambientPromptHistoryRepository.canShow(it) }
+                    ?: return@withLock Result.success()
+            if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) return@withLock Result.success()
+            currentCoroutineContext().ensureActive()
+            // A replacement request cannot interrupt suppression persistence after a successful post.
+            withContext(NonCancellable) {
+                if (notificationCoordinator.post(candidate)) {
+                    ambientPromptHistoryRepository.recordShown(candidate)
+                } else {
+                    Napier.w("Ambient prompt notification could not be posted")
+                }
+                Result.success()
+            }
         }
-
-        ambientPromptHistoryRepository.recordShown(candidate)
-        return Result.success()
     }
 
     companion object {
         const val KEY_TRIGGER_CONTEXT = "ambient_trigger_context"
+
+        private val deliveryMutex = Mutex()
     }
 }

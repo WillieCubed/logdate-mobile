@@ -2,6 +2,7 @@ package app.logdate.client.e2e
 
 import android.os.Build
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.Data
@@ -60,6 +61,49 @@ class ArchiveLowStorageRecoveryTest {
         val label = requireNotNull(InstrumentationRegistry.getArguments().getString("storageRecoveryLabel"))
         require(label.matches(Regex("[a-z0-9-]+")))
         return context.noBackupFilesDir.resolve("archive-storage-$label.json")
+    }
+
+    @Test
+    fun managedAcceptedArchiveWaitsForStorageThenResumes(): Unit =
+        runBlocking {
+            assumeTrue(InstrumentationRegistry.getArguments().getString("managedStorageRecoveryAcceptance") == "true")
+            require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish")
+            require(context.packageName.endsWith(".debug"))
+            val original = platformStorageState()
+            assertEquals("UNKNOWN" to "NORMAL", original, "Use a fresh managed storage fixture")
+            try {
+                ensureLogDateApplicationStarted(context.applicationContext as android.app.Application)
+                seedAcceptedSource()
+                changeStorageState("force-low", "LOW" to "LOW")
+                enqueueWhileStorageLow()
+                verifyWaitingAfterRestart()
+                verifyResumed { changeStorageState("force-not-low", "NORMAL" to "NORMAL") }
+            } finally {
+                restoreFixtureState({ changeStorageState("reset", original) })
+            }
+        }
+
+    private fun storageShell(command: String): String =
+        ParcelFileDescriptor
+            .AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command))
+            .bufferedReader()
+            .use { it.readText() }
+
+    private fun platformStorageState(): Pair<String, String> {
+        val text = storageShell("dumpsys devicestoragemonitor")
+        val forced = requireNotNull(Regex("\\bmForceState=(\\w+)").find(text)).groupValues[1]
+        val level = requireNotNull(Regex("\\blevel=(\\w+)").find(text)).groupValues[1]
+        return forced to level
+    }
+
+    private suspend fun changeStorageState(
+        command: String,
+        expected: Pair<String, String>,
+    ) {
+        storageShell("cmd devicestoragemonitor $command -f")
+        withTimeout(10_000) {
+            while (platformStorageState() != expected) delay(100)
+        }
     }
 
     @Test
@@ -177,11 +221,15 @@ class ArchiveLowStorageRecoveryTest {
         assertNull(journals.getDraftForRestore(Uuid.parse(state.getString("draftId"))))
     }
 
-    private suspend fun verifyResumed() {
+    private suspend fun verifyResumed(
+        onStorageWaiting: suspend () -> Unit = {
+            instrumentation.sendStatus(0, Bundle().apply { putString("restoreStorage", "RESTORE_STORAGE_WAITING") })
+        },
+    ) {
         val state = JSONObject(fixture.readText())
         val id = UUID.fromString(state.getString("workId"))
         verifyWaiting(state, assertNotNull(manager.getWorkInfoById(id).get()))
-        instrumentation.sendStatus(0, Bundle().apply { putString("restoreStorage", "RESTORE_STORAGE_WAITING") })
+        onStorageWaiting()
         withTimeout(60_000) {
             while (manager
                     .getWorkInfoById(id)

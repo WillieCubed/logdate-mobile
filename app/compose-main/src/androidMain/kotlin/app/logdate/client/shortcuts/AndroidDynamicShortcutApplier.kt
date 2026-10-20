@@ -57,7 +57,7 @@ class AndroidDynamicShortcutApplier(
 ) {
     private val journalIcons = JournalShortcutIcons(context, imageLoader)
 
-    suspend fun apply(descriptors: List<DynamicShortcutDescriptor>) {
+    suspend fun apply(descriptors: List<DynamicShortcutDescriptor>): Boolean {
         val (sharingDescriptors, launcherDescriptors) =
             descriptors.partition { it is DynamicShortcutDescriptor.ShareToJournal }
 
@@ -96,6 +96,7 @@ class AndroidDynamicShortcutApplier(
         if (!publishSucceeded) {
             Napier.w("Dynamic shortcut publish was rate-limited by ShortcutManagerCompat")
         }
+        return publishSucceeded
     }
 
     private fun buildLauncherShortcut(

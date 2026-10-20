@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import runpy
+import time
 import uuid
 
 shared = runpy.run_path(str(Path(__file__).with_name("native-missing-media-acceptance.py")))
@@ -28,8 +29,13 @@ def storage_state(serial):
 def set_storage(serial, command, expected):
     safe_target(serial)
     adb(serial, "shell", "cmd", "devicestoragemonitor", command, "-f")
-    if storage_state(serial) != expected:
-        raise RuntimeError("Android storage state did not match the requested condition")
+    deadline = time.monotonic() + 10
+    observed = storage_state(serial)
+    while observed != expected:
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"Android storage command {command} did not settle: expected {expected}; observed {observed}")
+        time.sleep(.1)
+        observed = storage_state(serial)
 
 
 def run(args):

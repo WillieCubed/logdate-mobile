@@ -616,6 +616,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.uiautomator)
     androidTestImplementation(libs.mockk.android)
+    androidTestImplementation(libs.coil.compose)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestUtil(libs.androidx.test.orchestrator)
     // Emulator-only WebAuthn provider, installed alongside the app so instrumented tests can

@@ -155,6 +155,7 @@ kotlin {
             implementation(libs.robolectric)
             implementation(libs.androidx.work.testing)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.mockk)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
