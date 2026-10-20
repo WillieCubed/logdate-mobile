@@ -7,6 +7,7 @@ import app.logdate.shared.model.diagnostics.DiagnosticPhase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 
 /**
@@ -27,6 +28,7 @@ internal suspend fun DefaultSyncManager.runFullSyncPhase(
     body: suspend (accessToken: String) -> SyncResult,
 ): SyncResult =
     syncMutex.withLock {
+        if (!tokenRefresher.isFullSyncScopeCurrent()) return SyncResult(success = false, hasMorePending = true)
         if (!isEnabled) {
             return SyncResult(
                 success = false,
@@ -249,6 +251,7 @@ internal suspend fun DefaultSyncManager.syncEntityType(
     onException: (suspend (Exception) -> SyncResult)? = null,
 ): SyncResult =
     syncMutex.withLock {
+        if (!tokenRefresher.isFullSyncScopeCurrent()) return@withLock SyncResult(success = false, hasMorePending = true)
         disabledOrUnauthenticated()?.let { return@withLock it }
         accountStorageBlocked()?.let { return@withLock it }
 
@@ -296,44 +299,61 @@ internal suspend fun DefaultSyncManager.syncEntityType(
 
 internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
     val run = SyncRunDiagnostics(diagnostics, diagnosticSource())
-    return run.phase(DiagnosticPhase.RECOVERY) {
-        val accountErrors = refreshAccountForSync()
-        if (profile.sweepsOnFirstSync) uploader.enqueueEverythingOnFirstSync()
-        val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
-        val uploadResult = run.phase(DiagnosticPhase.UPLOAD) { uploadPendingChanges() }
-        val draftResult = run.phase(DiagnosticPhase.RECOVERY) { syncDrafts() }
+    val selected = tokenRefresher.currentUploadScope()
+    return withContext(FullSyncScope(selected)) {
+        run.phase(DiagnosticPhase.RECOVERY) recovery@{
+            if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            val accountErrors = refreshAccountForSync()
+            if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            if (profile.sweepsOnFirstSync) uploader.enqueueEverythingOnFirstSync()
+            val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
+            if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            val uploadResult = run.phase(DiagnosticPhase.UPLOAD) { uploadPendingChanges() }
+            if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            val draftResult = run.phase(DiagnosticPhase.RECOVERY) { syncDrafts() }
+            if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
 
-        try {
-            ensureDeviceEnrolled()
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (failure: Exception) {
-            Napier.w("Couldn't enroll this account device", failure)
+            try {
+                ensureDeviceEnrolled()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                Napier.w("Couldn't enroll this account device", failure)
+            }
+
+            val errors = accountErrors + downloadResult.errors + uploadResult.errors + draftResult.errors
+            // Each phase updates the shared last error. A successful upload must not erase a failed
+            // download from the same full run, or the worker retries with no visible reason.
+            lastErrorFlow.value = errors.mostSevere()
+
+            SyncResult(
+                success =
+                    accountErrors.isEmpty() &&
+                        uploadResult.success &&
+                        downloadResult.success &&
+                        draftResult.success &&
+                        (downloadInbox?.count() ?: 0) == 0,
+                uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
+                downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
+                conflictsResolved = downloadResult.conflictsResolved,
+                errors = errors,
+                lastSyncTime = latestSyncTime(),
+                hasMorePending =
+                    downloadResult.hasMorePending ||
+                        uploadResult.hasMorePending ||
+                        draftResult.hasMorePending ||
+                        (downloadInbox?.count() ?: 0) > 0,
+            ).let { result ->
+                result.copy(
+                    recoveredMediaScope =
+                        selected.takeIf {
+                            result.success &&
+                                !result.hasMorePending &&
+                                tokenRefresher.isFullSyncScopeCurrent()
+                        },
+                )
+            }
         }
-
-        val errors = accountErrors + downloadResult.errors + uploadResult.errors + draftResult.errors
-        // Each phase updates the shared last error. A successful upload must not erase a failed
-        // download from the same full run, or the worker retries with no visible reason.
-        lastErrorFlow.value = errors.mostSevere()
-
-        SyncResult(
-            success =
-                accountErrors.isEmpty() &&
-                    uploadResult.success &&
-                    downloadResult.success &&
-                    draftResult.success &&
-                    (downloadInbox?.count() ?: 0) == 0,
-            uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
-            downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
-            conflictsResolved = downloadResult.conflictsResolved,
-            errors = errors,
-            lastSyncTime = latestSyncTime(),
-            hasMorePending =
-                downloadResult.hasMorePending ||
-                    uploadResult.hasMorePending ||
-                    draftResult.hasMorePending ||
-                    (downloadInbox?.count() ?: 0) > 0,
-        )
     }
 }
 

@@ -128,6 +128,8 @@ data class SyncResult(
     val hasMorePending: Boolean = false,
     /** Every remote page was fetched and retained; applying individual records may still fail. */
     val remoteInventoryComplete: Boolean = false,
+    /** Set only by a successful full run whose entry and draft phases retained this scope. */
+    val recoveredMediaScope: app.logdate.client.sync.metadata.UploadScope? = null,
 )
 
 /**

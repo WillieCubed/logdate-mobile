@@ -184,6 +184,37 @@ Resolution Applied
 - **Foreground Service**: Long-running sync operations
 - **Network Callbacks**: Sync on connectivity changes
 
+#### Recovery when media becomes allowed
+
+`AndroidSyncManager` owns authenticated scheduling through `PeriodicSyncScheduleController`.
+An unrestricted-network transition stays unacknowledged until an existing writer finishes or a
+replacement full request reaches WorkManager storage. `KEEP` alone cannot satisfy this contract:
+if a worker deferred an original before the transition, discarding the new request leaves that
+original in the worker's previous retry delay.
+
+`resumeMediaReadiness` observes the unique immediate chain without holding the scheduling or sync
+phase mutex. A running writer that returns to `ENQUEUED` becomes replaceable. A queued request
+carrying mobile-data consent keeps its original inputs and grant; the generic tag cannot reconstruct
+which account and server received consent. After a writer yields, queue backoff is released outside
+the scheduling mutex. Inside that mutex, scheduling rechecks the owner, server, current policy and
+observed work snapshot, then awaits persisted enqueue. A changed snapshot is observed again; query
+and persistence failures remain retryable through the controller.
+
+Skipping a replacement requires this observation to have seen the relevant work active and then
+finish successfully with no unfinished successor. Historical success and partial sync success do
+not prove complete media recovery. `SyncResult.recoveredMediaScope` comes from the full run after
+entry and draft phases finish without pending work. `FullSyncScope` retains the selected owner and
+origin across phase-lock waits, and each phase checks it after acquiring its mutex. Actual request
+bindings must match it too. The worker publishes that proof only while the same scope is current.
+Token rotation for the same owner and origin preserves the scope.
+
+The regression example is a media-policy change while immediate work remains `RUNNING`: retain the
+wake, observe that work return to retry, persist one full replacement, then acknowledge readiness.
+Host tests cover snapshot races, cancellation, consent retention and completion proof. The managed
+restart suite exercises the real scheduler with running predecessors and verifies that unfinished
+cloud restore work retains its UUID across process death. Original-byte recovery through the server
+requires its own media acceptance scenario.
+
 ### Desktop
 - **Foreground Scheduler**: Periodic sync while app is running
 - **Application Lifecycle**: Sync on app focus

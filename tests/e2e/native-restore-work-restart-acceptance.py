@@ -63,7 +63,7 @@ def probe(serial, mode, output):
     )
     output.write_bytes(result)
     output.chmod(0o600)
-    if not instrumentation_passed(result, 7 if account_transitions else 1):
+    if not instrumentation_passed(result, 9 if account_transitions else 1):
         raise RuntimeError(f"Cloud restore work {mode} probe failed; inspect {output}")
 
 
