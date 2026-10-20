@@ -4,17 +4,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.media.AudioRouting
 import android.media.MediaRecorder
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import app.logdate.client.media.device.AndroidAudioRouteDevices
-import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.text.UiText
 import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
@@ -22,7 +19,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -93,12 +89,12 @@ class AudioRecordingService : Service() {
         const val EXTRA_HOLD_WAKE_LOCK = "app.logdate.extra.HOLD_WAKE_LOCK"
         const val EXTRA_CRASH_SAFE = "app.logdate.extra.CRASH_SAFE"
         const val EXTRA_EXCLUDE_INCOMPLETE_FROM_BACKUP = "app.logdate.extra.EXCLUDE_INCOMPLETE_FROM_BACKUP"
-        private const val WAKE_LOCK_TAG = "LogDate:AudioRecordingWakeLock"
-        private const val WAKE_LOCK_HEADROOM_MS = 60_000L
-        private const val DEFAULT_WAKE_LOCK_TIMEOUT_MS = 35 * 60_000L
-        private const val LEVEL_POLL_INTERVAL_MS = 100L
-        private const val DURATION_TICK_MS = 1000L
-        private const val MAX_AMPLITUDE = 32768f
+        internal const val WAKE_LOCK_TAG = "LogDate:AudioRecordingWakeLock"
+        internal const val WAKE_LOCK_HEADROOM_MS = 60_000L
+        internal const val DEFAULT_WAKE_LOCK_TIMEOUT_MS = 35 * 60_000L
+        internal const val LEVEL_POLL_INTERVAL_MS = 100L
+        internal const val DURATION_TICK_MS = 1000L
+        internal const val MAX_AMPLITUDE = 32768f
     }
 
     // Service binder for clients
@@ -106,35 +102,35 @@ class AudioRecordingService : Service() {
         fun getService(): AudioRecordingService = this@AudioRecordingService
     }
 
-    private val binder = AudioServiceBinder()
+    internal val binder = AudioServiceBinder()
 
     // Coroutine scope for service operations
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    internal val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Notification handler
     private lateinit var notificationHandler: AndroidAudioNotificationHandler
 
     // Recording state, guarded by recorderLock
-    private val recorderLock = Any()
-    private var mediaRecorder: MediaRecorder? = null
-    private var outputFile: File? = null
-    private var recordingStartTime: Long = 0
+    internal val recorderLock = Any()
+    internal var mediaRecorder: MediaRecorder? = null
+    internal var outputFile: File? = null
+    internal var recordingStartTime: Long = 0
 
     @Volatile
-    private var isPaused: Boolean = false
+    internal var isPaused: Boolean = false
 
     @Volatile
-    private var destroyed: Boolean = false
+    internal var destroyed: Boolean = false
 
     /** Counts start requests, so a stop that finishes late can tell a newer session now owns the service. */
     @Volatile
-    private var sessionGeneration: Int = 0
+    internal var sessionGeneration: Int = 0
 
-    private var wakeLock: PowerManager.WakeLock? = null
-    private var focusRequest: AudioFocusRequest? = null
-    private var options = RecordingSessionOptions()
+    internal var wakeLock: PowerManager.WakeLock? = null
+    internal var focusRequest: AudioFocusRequest? = null
+    internal var options = RecordingSessionOptions()
 
-    private val audioFocusListener =
+    internal val audioFocusListener =
         AudioManager.OnAudioFocusChangeListener { change ->
             if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
                 Napier.d("Audio focus lost ($change); pausing the recording")
@@ -143,8 +139,8 @@ class AudioRecordingService : Service() {
         }
 
     // State flow for UI updates
-    private val _recordingState = MutableStateFlow(RecordingServiceState())
-    val recordingState = _recordingState.asStateFlow()
+    internal val mutableRecordingState = MutableStateFlow(RecordingServiceState())
+    val recordingState = mutableRecordingState.asStateFlow()
 
     override fun onCreate() {
         super.onCreate()
@@ -205,7 +201,7 @@ class AudioRecordingService : Service() {
     override fun onDestroy() {
         Napier.d("Audio recording service destroyed")
         destroyed = true
-        if (options.crashSafe && _recordingState.value.isRecording) {
+        if (options.crashSafe && mutableRecordingState.value.isRecording) {
             // Wrapping a long recording must not block the main thread. The thread outlives the service
             // and drops the wake lock only once the file is finished.
             Thread({
@@ -245,7 +241,7 @@ class AudioRecordingService : Service() {
             }
         } catch (e: Exception) {
             Napier.e("Error starting foreground service", e)
-            _recordingState.update {
+            mutableRecordingState.update {
                 it.copy(isRecording = false, failureMessage = "Recording is not allowed right now: ${e.message}")
             }
             stopSelf()
@@ -259,7 +255,7 @@ class AudioRecordingService : Service() {
      * Pauses the current recording
      */
     internal fun pauseRecording(byInterruption: Boolean = false) {
-        if (!_recordingState.value.isRecording || isPaused) {
+        if (!mutableRecordingState.value.isRecording || isPaused) {
             return
         }
 
@@ -268,7 +264,7 @@ class AudioRecordingService : Service() {
                 synchronized(recorderLock) { mediaRecorder?.pause() }
                 isPaused = true
                 releaseWakeLock()
-                _recordingState.update { it.copy(isPaused = true, pausedByInterruption = byInterruption) }
+                mutableRecordingState.update { it.copy(isPaused = true, pausedByInterruption = byInterruption) }
             } else {
                 Napier.w("Pause recording not supported below Android N")
                 return
@@ -291,7 +287,7 @@ class AudioRecordingService : Service() {
      * Resumes a paused recording
      */
     internal fun resumeRecording() {
-        if (!_recordingState.value.isRecording || !isPaused) {
+        if (!mutableRecordingState.value.isRecording || !isPaused) {
             return
         }
 
@@ -300,7 +296,7 @@ class AudioRecordingService : Service() {
                 synchronized(recorderLock) { mediaRecorder?.resume() }
                 isPaused = false
                 acquireWakeLock()
-                _recordingState.update { it.copy(isPaused = false, pausedByInterruption = false) }
+                mutableRecordingState.update { it.copy(isPaused = false, pausedByInterruption = false) }
             } else {
                 Napier.w("Resume recording not supported below Android N")
                 return
@@ -333,14 +329,14 @@ class AudioRecordingService : Service() {
                 Napier.w("Ignoring a start that arrived after the service was destroyed")
                 return
             }
-            if (_recordingState.value.isRecording) {
+            if (mutableRecordingState.value.isRecording) {
                 Napier.w("A start arrived while recording; finalizing the previous recording first")
                 stopRecordingLocked()
             }
             var recorder: MediaRecorder? = null
             var recordingFile: File? = null
             try {
-                _recordingState.update { it.copy(routedInputDeviceId = null, inputRoutingError = null) }
+                mutableRecordingState.update { it.copy(routedInputDeviceId = null, inputRoutingError = null) }
                 val file = resolveOutputFile(outputPath)
                 outputFile = file
                 recordingFile = recordingFileFor(file)
@@ -351,7 +347,7 @@ class AudioRecordingService : Service() {
                 recordingStartTime = System.currentTimeMillis()
                 isPaused = false
                 acquireSessionResources()
-                _recordingState.update {
+                mutableRecordingState.update {
                     it.copy(
                         isRecording = true,
                         isPaused = false,
@@ -369,184 +365,9 @@ class AudioRecordingService : Service() {
                 releaseQuietly(recorder)
                 recordingFile?.delete()
                 mediaRecorder = null
-                _recordingState.update {
+                mutableRecordingState.update {
                     it.copy(isRecording = false, failureMessage = "Failed to start recording: ${e.message}")
                 }
-            }
-        }
-    }
-
-    private fun resolveOutputFile(outputPath: String?): File =
-        if (outputPath != null) {
-            File(outputPath).also { file ->
-                file.parentFile?.mkdirs()
-                if (file.exists()) file.delete()
-            }
-        } else {
-            File.createTempFile("audio_recording_", ".m4a", applicationContext.cacheDir)
-        }
-
-    /** The file the recorder writes: the m4a itself, or the raw AAC that is wrapped into it when it ends. */
-    private fun recordingFileFor(finalFile: File): File =
-        when {
-            options.crashSafe -> {
-                CrashSafeRecording.inFlightFile(finalFile, isolateForBackup = options.excludeIncompleteFromBackup).also { it.delete() }
-            }
-            options.excludeIncompleteFromBackup -> CrashSafeRecording.backupExcludedFile(finalFile).also { it.delete() }
-            else -> finalFile
-        }
-
-    private fun createRecorder(
-        file: File,
-        inputDeviceId: String?,
-    ): MediaRecorder {
-        val recorder =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                MediaRecorder(this)
-            } else {
-                @Suppress("DEPRECATION")
-                MediaRecorder()
-            }
-        return recorder.apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(if (options.crashSafe) MediaRecorder.OutputFormat.AAC_ADTS else MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setOutputFile(file.absolutePath)
-            setAudioEncodingBitRate(128000)
-            setAudioSamplingRate(44100)
-            if (options.maxDurationMs > 0) setMaxDuration(options.maxDurationMs.toInt())
-            setOnInfoListener { _, what, _ -> onRecorderInfo(what) }
-            setOnErrorListener { _, what, extra -> onRecorderError(what, extra) }
-            applyPreferredInputDevice(inputDeviceId)
-            addOnRoutingChangedListener(
-                AudioRouting.OnRoutingChangedListener { routing ->
-                    synchronized(recorderLock) {
-                        if (routing === mediaRecorder && _recordingState.value.isRecording) publishInputRoute(this)
-                    }
-                },
-                null,
-            )
-        }
-    }
-
-    /**
-     * The recorder ended the session itself at a configured limit. Finalizing here means the
-     * file is complete before the bound client learns the session is over.
-     */
-    private fun onRecorderInfo(what: Int) {
-        val limitReached =
-            what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED ||
-                what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED
-        if (!limitReached) return
-        Napier.d("Recorder reached its limit ($what); finalizing the recording")
-        serviceScope.launch {
-            stopRecording()
-            releaseSessionResources()
-        }
-    }
-
-    private fun onRecorderError(
-        what: Int,
-        extra: Int,
-    ) {
-        Napier.e("Recorder error what=$what extra=$extra")
-        serviceScope.launch {
-            stopRecording()
-            releaseSessionResources()
-            _recordingState.update { it.copy(failureMessage = "Recording stopped unexpectedly (error $what)") }
-        }
-    }
-
-    private fun acquireSessionResources() {
-        releaseSessionResources()
-        acquireWakeLock()
-        if (options.pauseOnInterruption) requestAudioFocus()
-    }
-
-    /**
-     * The lock's timeout is the longest the session can still record. The recorder counts recorded
-     * time only, so it is dropped while paused and taken again, with a fresh timeout, on resume.
-     */
-    private fun acquireWakeLock() {
-        if (!options.holdWakeLock) return
-        releaseWakeLock()
-        try {
-            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-            val timeoutMs =
-                if (options.maxDurationMs > 0) options.maxDurationMs + WAKE_LOCK_HEADROOM_MS else DEFAULT_WAKE_LOCK_TIMEOUT_MS
-            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply { acquire(timeoutMs) }
-        } catch (e: Exception) {
-            Napier.w("Could not acquire the recording wake lock", e)
-        }
-    }
-
-    private fun releaseWakeLock() {
-        try {
-            if (wakeLock?.isHeld == true) wakeLock?.release()
-        } catch (e: Exception) {
-            Napier.w("Error releasing the recording wake lock", e)
-        }
-        wakeLock = null
-    }
-
-    private fun requestAudioFocus() {
-        try {
-            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-            val request =
-                AudioFocusRequest
-                    .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                    .setAudioAttributes(
-                        AudioAttributes
-                            .Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build(),
-                    ).setOnAudioFocusChangeListener(audioFocusListener)
-                    .build()
-            focusRequest = request
-            audioManager.requestAudioFocus(request)
-        } catch (e: Exception) {
-            Napier.w("Could not request audio focus for the recording", e)
-        }
-    }
-
-    private fun releaseSessionResources() {
-        releaseWakeLock()
-        val request = focusRequest ?: return
-        focusRequest = null
-        try {
-            (getSystemService(Context.AUDIO_SERVICE) as AudioManager).abandonAudioFocusRequest(request)
-        } catch (e: Exception) {
-            Napier.w("Error abandoning audio focus", e)
-        }
-    }
-
-    /** Polls the input level and advances the elapsed time while the recorder runs. */
-    private fun monitorRecording() {
-        serviceScope.launch {
-            while (_recordingState.value.isRecording) {
-                if (!isPaused) {
-                    val amplitude =
-                        try {
-                            synchronized(recorderLock) { mediaRecorder?.maxAmplitude ?: 0 }
-                        } catch (e: Exception) {
-                            Napier.e("Error getting audio level", e)
-                            0
-                        }
-                    val level = (amplitude / MAX_AMPLITUDE).coerceIn(0f, 1f)
-                    _recordingState.update { it.copy(audioLevel = level) }
-                }
-                delay(LEVEL_POLL_INTERVAL_MS)
-            }
-        }
-        serviceScope.launch {
-            var elapsedTimeSeconds = 0
-            while (_recordingState.value.isRecording) {
-                delay(DURATION_TICK_MS)
-                if (!isPaused) {
-                    elapsedTimeSeconds++
-                }
-                _recordingState.update { it.copy(durationSeconds = elapsedTimeSeconds) }
             }
         }
     }
@@ -559,7 +380,7 @@ class AudioRecordingService : Service() {
     fun stopRecording(): String? = synchronized(recorderLock) { stopRecordingLocked() }
 
     private fun stopRecordingLocked(): String? {
-        if (!_recordingState.value.isRecording) {
+        if (!mutableRecordingState.value.isRecording) {
             return null
         }
         val recorder = mediaRecorder
@@ -579,14 +400,14 @@ class AudioRecordingService : Service() {
             }
             recorder?.release()
             val path = finalizeOutputFile()
-            _recordingState.update {
+            mutableRecordingState.update {
                 it.copy(isRecording = false, isPaused = false, pausedByInterruption = false, recordedFilePath = path)
             }
             path
         } catch (e: Exception) {
             Napier.e("Error stopping recording", e)
             releaseQuietly(recorder)
-            _recordingState.update {
+            mutableRecordingState.update {
                 it.copy(
                     isRecording = false,
                     isPaused = false,
@@ -600,50 +421,6 @@ class AudioRecordingService : Service() {
     }
 
     /**
-     * Wraps a crash-safe recording into its m4a. The raw AAC file stays beside it: its owner deletes it
-     * once the recording is saved, and until then it marks the recording as unsaved for startup recovery.
-     * A recording that cannot be wrapped is reported as a failed stop and recovered from the raw file at
-     * the next launch.
-     */
-    private fun finalizeOutputFile(): String? {
-        val finalFile = outputFile ?: return null
-        if (options.crashSafe) {
-            val inFlight = CrashSafeRecording.inFlightFile(finalFile, isolateForBackup = options.excludeIncompleteFromBackup)
-            if (AdtsToM4aRemuxer.remuxToM4a(inFlight, finalFile)) {
-                inFlight.delete()
-                CrashSafeRecording.clearCompletedRetryMarker(inFlight)
-                return finalFile.absolutePath
-            }
-            check(inFlight.isFile && inFlight.length() > 0L) {
-                "Could not preserve the recording for recovery"
-            }
-            Napier.w("Completed recording ${finalFile.name} is queued for startup recovery")
-            return finalFile.absolutePath
-        }
-        if (options.excludeIncompleteFromBackup) {
-            val publication = CrashSafeRecording.publishCompletedRecording(CrashSafeRecording.backupExcludedFile(finalFile), finalFile)
-            check(publication != CompletedRecordingPublication.FAILED) {
-                "Could not publish or preserve the completed recording"
-            }
-        }
-        return finalFile.absolutePath
-    }
-
-    private fun releaseQuietly(recorder: MediaRecorder?) {
-        if (recorder == null) return
-        try {
-            recorder.reset()
-        } catch (e: Exception) {
-            Napier.w("Error resetting recorder", e)
-        }
-        try {
-            recorder.release()
-        } catch (e: Exception) {
-            Napier.w("Error releasing recorder", e)
-        }
-    }
-
-    /**
      * Gets the recorded file path
      */
     fun getRecordedFilePath(): String? = outputFile?.absolutePath
@@ -651,10 +428,10 @@ class AudioRecordingService : Service() {
     /**
      * Checks if recording is currently paused
      */
-    fun isRecordingPaused(): Boolean = isPaused && _recordingState.value.isRecording
+    fun isRecordingPaused(): Boolean = isPaused && mutableRecordingState.value.isRecording
 
     /** How much has been recorded so far, without pauses, to the second the duration ticker counts. */
-    private fun recordedMillis(): Long = _recordingState.value.durationSeconds * 1_000L
+    private fun recordedMillis(): Long = mutableRecordingState.value.durationSeconds * 1_000L
 
     /**
      * Re-applies the preferred microphone route while recording is active.
@@ -663,33 +440,22 @@ class AudioRecordingService : Service() {
      * after the recording session has already started.
      */
     fun updatePreferredInputDevice(inputDeviceId: String?) {
-        if (!_recordingState.value.isRecording) return
+        if (!mutableRecordingState.value.isRecording) return
         synchronized(recorderLock) { mediaRecorder?.applyPreferredInputDevice(inputDeviceId) }
     }
 
-    private fun publishInputRoute(recorder: MediaRecorder) {
-        try {
-            val deviceId = recorder.routedDevice?.let { AndroidAudioRouteDevices.deviceKey(it, MediaDeviceKind.AUDIO_INPUT) }
-            _recordingState.update { state ->
-                state.copy(routedInputDeviceId = deviceId ?: state.routedInputDeviceId.takeIf { state.isPaused })
-            }
-        } catch (e: Exception) {
-            Napier.w("Could not verify the recording microphone route", e)
-        }
-    }
-
-    private fun MediaRecorder.applyPreferredInputDevice(inputDeviceId: String?) {
+    internal fun MediaRecorder.applyPreferredInputDevice(inputDeviceId: String?) {
         val preferredDevice = AndroidAudioRouteDevices.findPreferredInputDevice(this@AudioRecordingService, inputDeviceId)
         try {
             val applied = setPreferredDevice(preferredDevice)
-            _recordingState.update {
+            mutableRecordingState.update {
                 it.copy(inputRoutingError = if (applied) null else Res.string.media_device_microphone_switch_failed.toUiText())
             }
             if (this === mediaRecorder) publishInputRoute(this)
             Napier.d("Preferred recording microphone route applied=$applied")
         } catch (e: Exception) {
             Napier.e("Could not apply the recording microphone route", e)
-            _recordingState.update { it.copy(inputRoutingError = Res.string.media_device_microphone_switch_failed.toUiText()) }
+            mutableRecordingState.update { it.copy(inputRoutingError = Res.string.media_device_microphone_switch_failed.toUiText()) }
         }
     }
 }
