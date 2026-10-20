@@ -387,6 +387,9 @@ acceptance remains a separate device-transfer test and must use a new target.
 The in-place simulation retains the installation ID stored outside backup. The two-emulator
 scenario requires a distinct ID on the fresh destination and verifies recovery into a new Keystore.
 
+After process death, a read-only probe must find the saved offline edit before the content
+verifier runs. A verifier that creates a missing edit cannot establish persistence.
+
 The local transport exercises file selection, native callbacks, and application recovery using
 test encryption and direct-transfer flags. Google credential delivery and setup transfer require
 the corresponding providers and a dedicated test account. Cross-platform transfer requires a
@@ -565,6 +568,28 @@ link's counter and source key. Draft upload integration changes the installation
 initialization and verifies that the encrypted outbound request uses the replacement ID without
 rewriting the retained draft's creation time. These checks cover local protocol behavior; actual
 Google credential delivery and setup-wizard transfer retain their separate acceptance requirements.
+
+### Publication after a native transfer
+
+`tests/e2e/native-publication-acceptance.py` combines a populated native transfer with replacement
+peer trust and the first encrypted backup publication. Supply explicit source and destination
+emulator serials, both acceptance APKs, and a new private output directory. Both emulators must be
+fresh; `--resume-seeded-source` permits a retained two-journal native fixture as the source.
+The destination must still be empty. The harness never clears application data.
+
+The source negotiates a synthetic peer link and reserves its delivery counter. Android transfers
+the journal and peer preferences while excluding the source vault. On the replacement, the test
+requires a new installation ID, rejects the copied trust, negotiates a fresh link and counter,
+and invokes the production backup worker with a synthetic in-memory session and capture transport.
+It decrypts the outgoing archive, checks its replacement device ID, retained notes and offline edit,
+and verifies the exact size and SHA-256 of the image, audio and video originals. After a process
+restart, the same link, key and counter must remain stable, with no session installed in the app.
+Source cleanup verifies that the original pair key was unchanged before removing only its own fixture.
+
+The native CI data-only lane runs this combined check. Its captured upload proves the app's
+export, encryption and attribution behavior; hosted uploads and Google restore delivery require
+their own acceptance runs. The BackupManager transport and emulator setup follow
+[Android's backup testing guide](https://developer.android.com/identity/data/testingbackup).
 
 ### Instrumentation result validation
 
