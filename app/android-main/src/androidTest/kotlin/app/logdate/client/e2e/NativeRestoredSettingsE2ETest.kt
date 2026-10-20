@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import app.logdate.client.MainActivity
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
@@ -175,6 +176,7 @@ class NativeRestoredSettingsE2ETest {
                 status("RESTORE_ACTIVITY_RESUMING")
                 activity = launchResumedActivity(intent)
                 status("RESTORE_ACTIVITY_RESUMED_AFTER_MOTION_GRANT")
+                assertSame(service, ActivityAwareLocationService.instance, "Tracking service changed during the external grant")
                 val pendingIntentCreated =
                     withTimeoutOrNull(20_000) {
                         while (withContext(Dispatchers.Main) { transitions.get(service) } == null) delay(50)
@@ -219,20 +221,25 @@ class NativeRestoredSettingsE2ETest {
         val foregroundIntent =
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         instrumentation.runOnMainSync { context.startActivity(foregroundIntent) }
-        return withTimeout(20_000) {
-            var resumed: Activity? = null
-            while (resumed == null) {
-                resumed =
-                    withContext(Dispatchers.Main) {
-                        ActivityLifecycleMonitorRegistry
-                            .getInstance()
-                            .getActivitiesInStage(Stage.RESUMED)
-                            .firstOrNull { it.packageName == context.packageName && !it.isFinishing }
-                    }
-                if (resumed == null) delay(50)
+        val ready = MainActivity::class.java.getDeclaredField("bootstrapReady").apply { isAccessible = true }
+        val resumedActivity =
+            withTimeoutOrNull(20_000) {
+                var resumed: Activity? = null
+                while (resumed == null) {
+                    resumed =
+                        withContext(Dispatchers.Main) {
+                            ActivityLifecycleMonitorRegistry
+                                .getInstance()
+                                .getActivitiesInStage(Stage.RESUMED)
+                                .firstOrNull { it is MainActivity && !it.isFinishing && ready.getBoolean(it) }
+                        }
+                    if (resumed == null) delay(50)
+                }
+                resumed
             }
-            resumed
-        }
+        val readyActivity = assertNotNull(resumedActivity, "MainActivity did not finish application startup before permission recovery")
+        status("RESTORE_ACTIVITY_READY")
+        return readyActivity
     }
 
     private suspend fun awaitActivityStage(
