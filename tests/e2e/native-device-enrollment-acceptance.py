@@ -25,6 +25,13 @@ PROBE = "app.logdate.client.e2e.NativeDeviceEnrollmentProbeTest"
 AUTOMATIC_MEDIA = runpy.run_path(str(Path(__file__).with_name("native-automatic-media-worker-acceptance.py")))
 
 
+def server_timeout_seconds(environment):
+    seconds = int(environment.get("LOGDATE_NATIVE_ACCEPTANCE_TIMEOUT_SECONDS", "1800"))
+    if not 60 <= seconds <= 3600:
+        raise ValueError("Enrollment acceptance requires a bounded server lifetime")
+    return seconds
+
+
 def server_environment(environment, port):
     if not isinstance(port, int) or not 1 <= port <= 65535:
         raise ValueError("A valid owned loopback server port is required")
@@ -284,6 +291,7 @@ def main():
             parser.error("APKs, harness classpath, and private database fixture must exist")
     os.umask(0o077)
     environment = os.environ.copy()
+    server_lifetime = server_timeout_seconds(environment)
     environment.update(fixture_environment(options.fixture_environment))
     environment.update(LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED="true", WEBAUTHN_STRICT_VERIFICATION="true", JAVA_TOOL_OPTIONS="-Djava.awt.headless=true")
     with socket.socket() as reservation:
@@ -302,7 +310,7 @@ def main():
         with (options.output / "server.log").open("wb") as log:
             process = subprocess.Popen(
                 ["java", "-Xmx1g", "-Djava.awt.headless=true", "-cp", options.classpath.read_text().strip(),
-                 "app.logdate.integration.e2e.harness.NativeDeviceEnrollmentHarness", str(control), str(port)],
+                 "app.logdate.integration.e2e.harness.NativeDeviceEnrollmentHarness", str(control), str(port), str(server_lifetime)],
                 cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
             )
         result = run_acceptance(options, control, process)

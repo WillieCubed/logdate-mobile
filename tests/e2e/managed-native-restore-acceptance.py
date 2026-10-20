@@ -28,15 +28,24 @@ FOLLOWUPS = {"missing-media": "native-missing-media-acceptance.py",
 def acceptance_receipt(mode, native_arguments, followups):
     return {"managedDeviceLifecycleAccepted": True, "outerDrivers": 2, "mode": mode,
             "managedNativeTransport": mode != "work-restart",
-            "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment"},
+            "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment", "upgrade"},
             "nativeArguments": native_arguments, "followups": followups,
             "googleRestoreProviderAccepted": False}
 
 
-def acceptance_budget(followups):
-    budget = {"boot": 600, "native": 1200, "followup": 600, "teardown": 120}
+def acceptance_budget(followups, *, mode="transfer"):
+    budget = {"boot": 600, "native": 1800 if mode == "enrollment" else 1200, "followup": 600, "teardown": 120}
     budget["driverMillis"] = 1000 * (budget["boot"] + budget["native"] + followups * budget["followup"] + budget["teardown"])
+    if budget["driverMillis"] > 90 * 60_000:
+        raise ValueError("The combined profile exceeds the bounded managed lifetime; split its follow-ups")
     return budget
+
+
+def validate_followups(mode, followups):
+    if len(followups) != len(set(followups)):
+        raise ValueError("Each follow-up must run once per managed generation")
+    if mode == "upgrade" and followups:
+        raise ValueError("Released upgrades retain their candidate APK; run other profiles in a separate managed generation")
 
 
 def followup_command(name, destination, app, probe, output):
@@ -48,11 +57,11 @@ def followup_command(name, destination, app, probe, output):
 
 def scenario_command(mode, source, destination, app, probe, output, arguments, *, classpath=None, fixture_environment=None):
     validate_native_arguments(arguments)
-    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment"} or (mode != "transfer" and arguments):
+    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade"} or (mode != "transfer" and arguments):
         raise ValueError("Only transfer mode accepts native scenario arguments")
     filenames = {"transfer": "native-backup-acceptance.py", "publication": "native-publication-acceptance.py",
                  "work-restart": "native-restore-work-restart-acceptance.py", "d2d": "native-d2d-acceptance.py",
-                 "enrollment": "native-device-enrollment-acceptance.py"}
+                 "enrollment": "native-device-enrollment-acceptance.py", "upgrade": "native-released-upgrade-acceptance.py"}
     command = [sys.executable, str(ROOT / "tests/e2e" / filenames[mode])]
     if mode in {"work-restart", "d2d"}:
         command += ["--emulator", source]
@@ -65,6 +74,10 @@ def scenario_command(mode, source, destination, app, probe, output, arguments, *
         if classpath is None or fixture_environment is None:
             raise ValueError("Enrollment requires an existing private database fixture and server classpath")
         command += ["--classpath", str(classpath), "--fixture-environment", str(fixture_environment)]
+    if mode == "upgrade":
+        if fixture_environment is None:
+            raise ValueError("Released upgrade requires a private artifact fixture")
+        command += ["--fixture-environment", str(fixture_environment)]
     return command + arguments
 
 
@@ -165,9 +178,10 @@ def run(options):
         raise ValueError("Only transfer mode accepts native scenario arguments")
     if options.mode == "enrollment" and any(path is None or not path.is_file() for path in (options.classpath, options.fixture_environment)):
         raise ValueError("Enrollment requires an existing private database fixture and server classpath")
-    if len(options.after_transfer) != len(set(options.after_transfer)):
-        raise ValueError("Each follow-up must run once per managed generation")
-    budget = acceptance_budget(len(options.after_transfer))
+    if options.mode == "upgrade" and (options.fixture_environment is None or not options.fixture_environment.is_file()):
+        raise ValueError("Released upgrade requires an existing private artifact fixture")
+    validate_followups(options.mode, options.after_transfer)
+    budget = acceptance_budget(len(options.after_transfer), mode=options.mode)
     output = options.output.resolve()
     output.mkdir(mode=0o700)
     nonce = str(uuid.uuid4())
@@ -196,6 +210,7 @@ def run(options):
     device_name = "d2dPairApi34" if options.mode == "d2d" else "restorePairApi34"
     avd = f"dev34_{image}_{architecture}_Pixel_9_Pro"
     env = managed_environment(sdk, os.environ)
+    env["LOGDATE_NATIVE_ACCEPTANCE_TIMEOUT_SECONDS"] = str(budget["native"])
     args = ["./gradlew", f":tools:native-restore-driver:{group}GroupDebugAndroidTest",
             *pinned_install_arguments(app, probe),
             f"-Pandroid.testInstrumentationRunnerArguments.class={DRIVER_CASE}",
@@ -322,7 +337,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--sdk", type=Path, default=Path(os.environ.get("ANDROID_HOME", str(Path.home() / "Library/Android/sdk"))))
     parser.add_argument("--after-transfer", action="append", choices=sorted(FOLLOWUPS), default=[])
-    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment"), default="transfer")
+    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade"), default="transfer")
     parser.add_argument("--classpath", type=Path)
     parser.add_argument("--fixture-environment", type=Path)
     options, native_arguments = parser.parse_known_args()

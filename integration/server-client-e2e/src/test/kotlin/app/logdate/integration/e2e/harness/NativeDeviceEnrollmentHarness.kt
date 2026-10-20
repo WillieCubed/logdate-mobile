@@ -32,7 +32,9 @@ object NativeDeviceEnrollmentHarness {
     @JvmStatic
     fun main(args: Array<String>) =
         runBlocking {
-            require(args.size == 2) { "Supply a private control directory and owned loopback server port" }
+            require(args.size == 3) { "Supply a private control directory, owned loopback server port and bounded lifetime" }
+            val acceptanceSeconds = args[2].toLong()
+            require(acceptanceSeconds in 60..3600) { "Enrollment acceptance requires a bounded server lifetime" }
             val port = args[1].toInt()
             require(port in 1..65535) { "A valid owned server port is required" }
             val databaseUrl = System.getenv("DATABASE_URL").orEmpty()
@@ -68,7 +70,7 @@ object NativeDeviceEnrollmentHarness {
                 )
                 privateFile(control.resolve("ready"), "ready")
                 try {
-                    awaitRegistryChecks(control, AccountDeviceApi(httpClient), apiClient, session)
+                    awaitRegistryChecks(control, AccountDeviceApi(httpClient), apiClient, session, acceptanceSeconds)
                 } finally {
                     Files.deleteIfExists(control.resolve("ready"))
                 }
@@ -80,9 +82,10 @@ object NativeDeviceEnrollmentHarness {
         devices: AccountDeviceApi,
         api: CloudApiClient,
         session: OriginBoundSession,
+        acceptanceSeconds: Long,
     ) {
         val stages = listOf("source", "destination", "replay")
-        val deadline = System.nanoTime() + 15L * 60 * 1_000_000_000
+        val deadline = System.nanoTime() + acceptanceSeconds * 1_000_000_000
         while (!Files.exists(control.resolve("complete"))) {
             check(System.nanoTime() < deadline) { "Native device enrollment acceptance timed out" }
             for (stage in stages) verifyRegistryStage(control, stage, devices, api, session)
