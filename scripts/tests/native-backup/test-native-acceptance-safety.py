@@ -305,12 +305,14 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
 
     def test_native_restore_ci_checks_a_populated_signed_out_destination(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
-        scenario = workflow.split("- name: Exercise populated restore without an account", 1)[1]
-        scenario = scenario.split("- name: Upload native restore acceptance evidence", 1)[0]
+        scenario = workflow.split("- name: Exercise populated restore and replacement-device publication", 1)[1]
+        scenario = scenario.split("- name: Exercise missing-media and network recovery", 1)[0]
         self.assertIn("--source emulator-5554", scenario)
         self.assertIn("--destination emulator-5558", scenario)
-        self.assertIn("--snapshot-existing-source", scenario)
-        self.assertIn("--exercise-data-only", scenario)
+        self.assertIn("native-publication-acceptance.py", scenario)
+        self.assertIn("--resume-seeded-source", scenario)
+        publication = (ROOT / "tests/e2e/native-publication-acceptance.py").read_text()
+        self.assertIn("exercise_data_only=True", publication)
         self.assertIn('adb -s emulator-5558 emu kill || true', workflow)
         self.assertIn("native-restore-data-only/destination-ui.xml", workflow)
         self.assertIn("native-restore-data-only/destination-journal.png", workflow)

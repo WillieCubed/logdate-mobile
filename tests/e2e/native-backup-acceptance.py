@@ -786,6 +786,17 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
         raise RuntimeError(f"native {mode} probe failed; inspect {output}")
 
 
+def verify_restarted_content(serial, output, metadata, identity):
+    result = adb(serial, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+                 "app.logdate.client.e2e.NativeRetainedOfflineEditProbeTest",
+                 "-e", "nativeRetainedEdit", "true", RUNNER)
+    log = output / "destination-retained-offline-edit.log"
+    private_file(log, result)
+    if not instrumentation_passed(result):
+        raise RuntimeError(f"The retained offline edit did not pass read-only verification; inspect {log}")
+    probe(serial, "verify", output / "destination-restart.log", metadata, identity)
+
+
 def privacy_probe(serial, mode, output):
     result = adb(serial, "shell", "am", "instrument", "-w", "-r", "-e", "class",
                  "app.logdate.client.e2e.NativeRestorePrivacyRuntimeTest",
@@ -1083,7 +1094,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     try:
         adb(destination, "shell", "am", "force-stop", PACKAGE)
         set_offline(destination, True)
-        probe(destination, "verify", output / "destination-restart.log", metadata, identity)
+        verify_restarted_content(destination, output, metadata, identity)
         if archive_fixture:
             archive_probe(
                 destination,

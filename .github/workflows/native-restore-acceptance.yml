@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/native-restore-acceptance.yml'
       - 'app/android-main/src/androidTest/**/NativeBackupTransferProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeRetainedOfflineEditProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestorePrivacyRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeBackgroundCredentialCallbackTest.kt'
       - 'app/android-main/src/androidTest/**/NativeMissingMediaE2ETest.kt'
@@ -20,7 +21,9 @@ on:
       - 'app/android-main/src/androidTest/**/NativeRecoveryWorkStateTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestoredEntryEditingTest.kt'
       - 'app/android-main/src/androidTest/**/TransferredInstallationTrustTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeTransferredPublicationProbeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredNotificationDeliveryTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeRestoredSettingsE2ETest.kt'
       - 'app/android-main/src/androidTest/**/CompletedRecordingRestartTest.kt'
       - 'app/android-main/src/androidTest/assets/recovery/**'
       - 'app/android-main/src/main/**'
@@ -30,6 +33,7 @@ on:
       - 'scripts/tests/native-backup/**'
       - 'shared/model/**'
       - 'tests/e2e/native-backup-acceptance.py'
+      - 'tests/e2e/native-publication-acceptance.py'
       - 'tests/e2e/native-instrumentation-results.py'
       - 'tests/e2e/test_native*.py'
       - 'tests/e2e/native-d2d-acceptance.py'
@@ -196,16 +200,15 @@ jobs:
             --exercise-partial-media \
             --exercise-duplicate-restore
 
-      - name: Exercise populated restore without an account
+      - name: Exercise populated restore and replacement-device publication
         run: |
-          python3 tests/e2e/native-backup-acceptance.py \
+          python3 tests/e2e/native-publication-acceptance.py \
             --source emulator-5554 \
             --destination emulator-5558 \
             --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
             --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
             --output "$RUNNER_TEMP/native-restore-data-only" \
-            --snapshot-existing-source \
-            --exercise-data-only
+            --resume-seeded-source
 
       - name: Exercise missing-media and network recovery
         run: |
@@ -435,6 +438,9 @@ jobs:
           done
           test "$(adb -s emulator-5556 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
           test "$(adb -s emulator-5556 shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          adb -s emulator-5556 logcat -T 1 -v threadtime > "$RUNNER_TEMP/permission-recovery-logcat.log" 2>&1 &
+          permission_logcat_pid=$!
+          trap 'kill "$permission_logcat_pid" 2>/dev/null || true' EXIT
           python3 tests/e2e/native-permission-acceptance.py \
             --emulator emulator-5556 \
             --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
@@ -495,6 +501,9 @@ jobs:
             ${{ runner.temp }}/native-restore-data-only/*.log
             ${{ runner.temp }}/native-restore-data-only/*fixture.json
             ${{ runner.temp }}/native-restore-data-only/*files*.json
+            ${{ runner.temp }}/native-restore-data-only/source-publication.json
+            ${{ runner.temp }}/native-restore-data-only/publication-acceptance.json
+            ${{ runner.temp }}/native-restore-data-only/publication-fixture-id
             ${{ runner.temp }}/native-restore-data-only/destination-ui.xml
             ${{ runner.temp }}/native-restore-data-only/destination-journal.png
             ${{ runner.temp }}/native-missing-media-recovery/**/*.log
@@ -513,6 +522,8 @@ jobs:
             ${{ runner.temp }}/native-restore-privacy/*.log
             ${{ runner.temp }}/native-restore-privacy/*files*.json
             ${{ runner.temp }}/privacy-emulator.log
+            ${{ runner.temp }}/permissions-emulator.log
+            ${{ runner.temp }}/permission-recovery-logcat.log
             ${{ runner.temp }}/native-permission-recovery/**/*.log
             ${{ runner.temp }}/native-permission-recovery/**/environment-before.json
             ${{ runner.temp }}/native-permission-recovery/acceptance.json

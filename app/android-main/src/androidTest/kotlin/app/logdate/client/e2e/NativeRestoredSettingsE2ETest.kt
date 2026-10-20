@@ -31,6 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -237,9 +238,56 @@ class NativeRestoredSettingsE2ETest {
                 }
                 resumed
             }
-        val readyActivity = assertNotNull(resumedActivity, "MainActivity did not finish application startup before permission recovery")
+        val readyActivity =
+            assertNotNull(
+                resumedActivity,
+                "MainActivity did not finish application startup before permission recovery; " +
+                    if (resumedActivity == null) startupDiagnostics() else "ready",
+            )
         status("RESTORE_ACTIVITY_READY")
         return readyActivity
+    }
+
+    private suspend fun startupDiagnostics(): String {
+        val application = context.applicationContext
+        val startupState =
+            runCatching {
+                val field = application.javaClass.declaredFields.firstOrNull { it.name == "startup" }
+                val startup =
+                    if (field != null) {
+                        field.apply { isAccessible = true }.get(application)
+                    } else {
+                        val coordinator = Class.forName("app.logdate.client.ApplicationStartupCoordinator")
+                        val startups = coordinator.getDeclaredField("fallbackStartups").apply { isAccessible = true }.get(null) as Map<*, *>
+                        synchronized(startups) { startups[application] }
+                    }
+                val state =
+                    startup!!
+                        .javaClass
+                        .getDeclaredField("state")
+                        .apply { isAccessible = true }
+                        .get(startup) as StateFlow<*>
+                val value = state.value!!
+                val cause =
+                    value.javaClass.declaredFields.firstOrNull { it.name == "cause" }?.apply { isAccessible = true }?.get(
+                        value,
+                    ) as? Throwable
+                value.javaClass.simpleName + generateSequence(cause) { it.cause }.take(12).map { it.javaClass.simpleName }.toList()
+            }.getOrElse { "unavailable:${it.javaClass.simpleName}" }
+        val activities =
+            withContext(Dispatchers.Main) {
+                Stage.entries.flatMap { stage ->
+                    ActivityLifecycleMonitorRegistry
+                        .getInstance()
+                        .getActivitiesInStage(stage)
+                        .filterIsInstance<MainActivity>()
+                        .map { activity ->
+                            val ready = MainActivity::class.java.getDeclaredField("bootstrapReady").apply { isAccessible = true }
+                            "$stage(finishing=${activity.isFinishing},ready=${ready.getBoolean(activity)})"
+                        }
+                }
+            }
+        return "startup=$startupState, activities=$activities"
     }
 
     private suspend fun awaitActivityStage(
