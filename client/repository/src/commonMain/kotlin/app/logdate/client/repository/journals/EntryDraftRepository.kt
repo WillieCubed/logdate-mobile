@@ -22,6 +22,22 @@ interface EntryDraftRepository {
         return createDraft(draft.id, draft.notes, draft.pendingMedia, draft.selectedJournalIds, draft.visitContext, draft.markId)
     }
 
+    suspend fun checkpointRecording(
+        blockId: Uuid,
+        path: String,
+        ownerId: String,
+    ): Uuid? = null
+
+    suspend fun completeRecording(
+        blockId: Uuid,
+        path: String,
+        durationMs: Long,
+        ownerId: String,
+        quietSave: Boolean,
+    ): Uuid? = null
+
+    suspend fun acknowledgeQuietSave(draftId: Uuid) = Unit
+
     /**
      * Returns a flow containing all of the current user's entry drafts.
      */
@@ -194,6 +210,16 @@ data class EntryDraft(
     val visitContext: VisitMemoryContext? = null,
     val markId: String? = null,
     val editBase: EntryEditBase? = null,
+    val quietSave: QuietSaveOutcome? = null,
+    val recordingOwners: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class QuietSaveOutcome(
+    val savedAt: Instant,
+    val ownerId: String,
+    val acknowledged: Boolean = false,
+    val blockId: String? = null,
 )
 
 /** Type of pending media. Currently only audio is wired; camera/video will follow. */
@@ -230,4 +256,6 @@ data class PendingMediaRecord(
     val position: Int? = null,
     val caption: String = "",
     val transcription: String = "",
+    val recordingOwnerId: String? = null,
+    val checkpointAt: Instant? = null,
 )

@@ -74,6 +74,7 @@ fun WorkspaceScaffold(
     onSearch: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     status: @Composable () -> Unit = {},
+    snackbarHost: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val selected = destinations.firstOrNull { it.key == selectedKey } ?: destinations.firstOrNull() ?: return
@@ -96,6 +97,7 @@ fun WorkspaceScaffold(
             actions()
         }
         Scaffold(
+            snackbarHost = snackbarHost,
             containerColor = canvas,
             contentWindowInsets =
                 if (appBarInCaption != null) WindowInsets.safeDrawing.exclude(WindowInsets.captionBar) else WindowInsets.safeDrawing,

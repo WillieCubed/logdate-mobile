@@ -27,6 +27,7 @@ fun HomeWorkspaceComposition(
     onSearch: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     status: @Composable () -> Unit = {},
+    snackbarHost: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     WorkspaceScaffold(
@@ -40,6 +41,7 @@ fun HomeWorkspaceComposition(
         onSearch,
         actions,
         status,
+        snackbarHost = snackbarHost,
     ) {
         if (selectedKey == HomeRouteDestination.LocationHistory.name) {
             content()

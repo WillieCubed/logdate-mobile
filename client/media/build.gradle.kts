@@ -73,6 +73,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         androidMain.dependencies {
+            implementation(projects.client.logdateDatastore)
+            implementation(projects.shared.model)
             implementation(libs.koin.android)
             // Live Update builder methods (setRequestPromotedOngoing) need core 1.17 or later.
             implementation(libs.androidx.core.ktx)

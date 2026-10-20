@@ -19,13 +19,24 @@ import kotlin.time.Instant
 class WindDownTimeResolver(
     private val sleep: SleepRepository,
 ) {
+    suspend fun resolveKnown(
+        now: Instant,
+        zone: TimeZone,
+    ): WakingHours? = resolveHours(now, zone, requireKnown = true)
+
     suspend fun resolve(
         now: Instant,
         zone: TimeZone,
-    ): WakingHours =
+    ): WakingHours = resolveHours(now, zone, requireKnown = false) ?: WakingHours.Fallback
+
+    private suspend fun resolveHours(
+        now: Instant,
+        zone: TimeZone,
+        requireKnown: Boolean,
+    ): WakingHours? =
         try {
             if (!sleep.hasSleepPermissions()) {
-                WakingHours.Fallback
+                null
             } else {
                 val start = now - 30.days
                 val sessions =
@@ -34,19 +45,18 @@ class WindDownTimeResolver(
                         .filter { it.startTime >= start && it.endTime <= now && it.endTime > it.startTime }
                         .distinctBy { it.startTime to it.endTime }
                 if (!sleep.hasSleepPermissions()) {
-                    WakingHours.Fallback
+                    null
                 } else {
-                    WakingHours.from(
-                        averageWake = average(sessions.map { it.endTime.toLocalDateTime(zone).time }),
-                        averageSleep = average(sessions.map { it.startTime.toLocalDateTime(zone).time }),
-                    )
+                    val wake = average(sessions.map { it.endTime.toLocalDateTime(zone).time })
+                    val bedtime = average(sessions.map { it.startTime.toLocalDateTime(zone).time })
+                    if (requireKnown && (wake == null || bedtime == null || wake == bedtime)) null else WakingHours.from(wake, bedtime)
                 }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Napier.w("Could not resolve reminder waking hours from sleep", e)
-            WakingHours.Fallback
+            null
         }
 
     /** Circular means keep 23:30 and 00:30 near midnight; opposing times have no useful mean. */

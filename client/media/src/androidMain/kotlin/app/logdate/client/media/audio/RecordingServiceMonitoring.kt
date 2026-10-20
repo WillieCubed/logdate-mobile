@@ -1,4 +1,5 @@
 package app.logdate.client.media.audio
+
 import android.media.AudioRouting
 import android.media.MediaRecorder
 import android.os.Build
@@ -15,26 +16,56 @@ import java.io.File
 
 /** Polls the input level and advances the elapsed time while the recorder runs. */
 internal fun AudioRecordingService.monitorRecording() {
+    val generation = sessionGeneration
     serviceScope.launch {
-        while (mutableRecordingState.value.isRecording) {
+        while (mutableRecordingState.value.isRecording && sessionGeneration == generation) {
             if (!isPaused) {
+                if (options.holdWakeLock && android.os.SystemClock.elapsedRealtime() - wakeLockAcquiredAt >= 15 * 60_000L) {
+                    acquireWakeLock()
+                }
                 val amplitude =
                     try {
-                        synchronized(recorderLock) { mediaRecorder?.maxAmplitude ?: 0 }
+                        synchronized(recorderLock) {
+                            val recorder = mediaRecorder
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                                recorder?.activeRecordingConfiguration?.isClientSilenced == true
+                            ) {
+                                null
+                            } else {
+                                recorder?.maxAmplitude
+                            }
+                        }
                     } catch (e: Exception) {
                         Napier.e("Error getting audio level", e)
-                        0
+                        null
                     }
-                val level = (amplitude / MAX_AMPLITUDE).coerceIn(0f, 1f)
-                mutableRecordingState.update { it.copy(audioLevel = level) }
+                val level = amplitude?.let { (it / MAX_AMPLITUDE).coerceIn(0f, 1f) }
+                mutableRecordingState.update { it.copy(audioLevel = level ?: 0f) }
+                if (options.quietSave &&
+                    synchronized(recorderLock) {
+                        quietSaveDetector.observe(
+                            level,
+                            android.os.SystemClock.elapsedRealtime(),
+                            mutableRecordingState.value.routedInputDeviceId,
+                        )
+                    }
+                ) {
+                    synchronized(recorderLock) {
+                        if (sessionGeneration != generation || !mutableRecordingState.value.isRecording || isPaused) return@launch
+                        mutableRecordingState.update { it.copy(quietSaveTriggered = true) }
+                        stopRecordingLocked()
+                    }
+                    break
+                }
             }
             delay(LEVEL_POLL_INTERVAL_MS)
         }
     }
     serviceScope.launch {
         var elapsedTimeSeconds = 0
-        while (mutableRecordingState.value.isRecording) {
+        while (mutableRecordingState.value.isRecording && sessionGeneration == generation) {
             delay(DURATION_TICK_MS)
+            if (sessionGeneration != generation || !mutableRecordingState.value.isRecording) break
             if (!isPaused) {
                 elapsedTimeSeconds++
             }

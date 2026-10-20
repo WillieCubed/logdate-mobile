@@ -39,6 +39,16 @@ enum class CompletedRecordingPublication {
  * recording a dead process left behind.
  */
 object CrashSafeRecording {
+    fun recover(
+        finalFile: File,
+        remuxer: AudioRemuxer = AdtsToM4aRemuxer,
+    ): Boolean {
+        if (finalFile.isFile && finalFile.length() > 0) return true
+        val source = inFlightFile(finalFile, isolateForBackup = true).takeIf { it.isFile } ?: inFlightFile(finalFile)
+        if (!source.isFile || source.length() == 0L) return false
+        return remuxer.remuxToM4a(source, finalFile) && finalFile.isFile && finalFile.length() > 0
+    }
+
     const val IN_FLIGHT_EXTENSION = "aac"
     const val FINAL_EXTENSION = "m4a"
     const val BACKUP_EXCLUDED_STAGING_DIRECTORY = "staging"

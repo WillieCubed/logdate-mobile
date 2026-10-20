@@ -258,7 +258,7 @@ actual val coreFeatureModule: Module =
         viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get<MemoriesWidgetInstallController>()) }
-        viewModel { VoiceNotesSettingsViewModel(get(), get()) }
+        viewModel { VoiceNotesSettingsViewModel(get(), get(), get(), get()) }
         viewModel { StreakSettingsViewModel(get(), get(), get()) }
         viewModel { TimelineSettingsViewModel(get(), get(), get()) }
         viewModel { DayBoundarySettingsViewModel(get(), get(), get()) }

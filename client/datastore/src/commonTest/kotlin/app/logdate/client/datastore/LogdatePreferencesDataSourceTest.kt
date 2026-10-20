@@ -23,6 +23,16 @@ class LogdatePreferencesDataSourceTest {
     private val dataSource = LogdatePreferencesDataSource(TestPreferencesDataStore())
 
     @Test
+    fun `quiet save opt out survives reopening preferences`() =
+        runTest {
+            val store = TestPreferencesDataStore()
+            val first = LogdatePreferencesDataSource(store)
+            assertEquals(true, first.observeQuietSaveEnabled().first())
+            first.setQuietSaveEnabled(false)
+            assertEquals(false, LogdatePreferencesDataSource(store).observeQuietSaveEnabled().first())
+        }
+
+    @Test
     fun `system search visibility defaults to enabled`() =
         runTest {
             assertTrue(dataSource.getSystemSearchVisibilityEnabled())

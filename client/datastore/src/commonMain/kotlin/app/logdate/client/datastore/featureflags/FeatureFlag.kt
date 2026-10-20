@@ -28,6 +28,9 @@ enum class FeatureFlag(
      */
     LIBRARY(key = "library_enabled", defaultEnabled = true),
 
+    /** Stop quiet phone recordings and preserve them as drafts. */
+    QUIET_SAVE(key = "quiet_save_available", defaultEnabled = false),
+
     /**
      * Automatic event detection and the Events surface.
      *

@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.di
 
 import app.logdate.client.domain.di.domainModule
+import app.logdate.client.repository.account.AccountRepository
 import app.logdate.feature.editor.ui.audio.audioModule
 import app.logdate.feature.editor.ui.camera.CameraViewModel
 import app.logdate.feature.editor.ui.editor.CaptureUsageReporter
@@ -10,6 +11,7 @@ import app.logdate.feature.editor.ui.editor.delegate.DefaultPendingAudioRecovere
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.ui.audio.di.audioUiModule
+import kotlinx.coroutines.flow.first
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.factoryOf
 import org.koin.core.module.dsl.viewModel
@@ -28,7 +30,15 @@ val editorFeatureModule: Module =
         includes(audioModule)
         includes(audioUiModule)
 
-        factoryOf(::DraftManager)
+        factory {
+            DraftManager(get(), get(), get(), get(), get(), get(), recordingOwner = {
+                get<AccountRepository>()
+                    .currentAccount
+                    .first()
+                    ?.id
+                    ?.toString() ?: "anonymous"
+            })
+        }
         factoryOf(::ContentLoader)
 
         factory<PendingAudioRecoverer> { DefaultPendingAudioRecoverer(durationResolver = get(), recordingManager = get()) }

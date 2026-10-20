@@ -59,6 +59,7 @@ enum class SharedScreenshotSceneId(
     DataSettings("data-settings"),
     MemoriesSettings("memories-settings"),
     VoiceNotesSettings("voice-notes-settings"),
+    QuietSaveSettings("quiet-save-settings"),
     SyncSettings("sync-settings"),
     NativeBackupSignedOut("native-backup-signed-out"),
     NativeBackupReady("native-backup-ready"),

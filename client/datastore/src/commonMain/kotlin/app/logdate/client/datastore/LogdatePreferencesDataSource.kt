@@ -28,6 +28,12 @@ class LogdatePreferencesDataSource(
     private val userPreferences: DataStore<Preferences>,
     private val featureAvailable: (FeatureFlag) -> Boolean = { it.availableForLaunch },
 ) {
+    fun observeQuietSaveEnabled(): Flow<Boolean> = userPreferences.data.map { it[QUIET_SAVE_ENABLED] ?: true }
+
+    suspend fun setQuietSaveEnabled(enabled: Boolean) {
+        userPreferences.updateData { it.toMutablePreferences().apply { this[QUIET_SAVE_ENABLED] = enabled } }
+    }
+
     private val historyPreferences by lazy { HistoryPreferences(userPreferences) }
     private val profilePreferences by lazy { ProfilePreferences(userPreferences, userData, ::setBirthdate) }
 
@@ -35,6 +41,7 @@ class LogdatePreferencesDataSource(
 
     // TODO: Migrate to datastore-proto
     companion object {
+        val QUIET_SAVE_ENABLED = booleanPreferencesKey("quiet_save_preference_enabled")
         val BIRTHDAY = longPreferencesKey("birthday")
         val IS_ONBOARDED = booleanPreferencesKey("is_onboarded")
         val ONBOARDED_TIMESTAMP = longPreferencesKey("onboarded_timestamp")

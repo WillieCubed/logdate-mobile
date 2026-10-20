@@ -1,4 +1,5 @@
 package app.logdate.client.media.audio
+
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
@@ -78,29 +79,6 @@ internal fun AndroidAudioRecordingManager.updateTranscriptionInput(
     deviceId: String?,
     verifyActiveInput: Boolean = false,
 ) = transcriptionInputRouter.update(transcriptionService, deviceId, verifyActiveInput)
-
-internal fun AndroidAudioRecordingManager.onServiceState(state: RecordingServiceState?) {
-    audioRouteRepository.updateRecordingInputDevice(state?.routedInputDeviceId, state?.isRecording == true, state?.inputRoutingError)
-    if (state?.isRecording == true && state.routedInputDeviceId != null) updateTranscriptionInput(state.routedInputDeviceId)
-    if (state == null) {
-        recordingPausedFlow.value = false
-        if (recordingStateFlow.value) {
-            Napier.w("Recording service went away mid-session")
-            recordingStateFlow.value = false
-        }
-        return
-    }
-    recordingPausedFlow.value = state.isRecording && state.isPaused
-    audioLevelFlow.value = state.audioLevel
-    durationFlow.value = state.durationSeconds.toLong() * 1000
-    if (!state.isRecording && recordingStateFlow.value) {
-        // The service ended the session on its own (notification action or recorder
-        // failure). Keep the file it produced for the editor's stop call.
-        Napier.d("Recording service stopped on its own; file=${state.recordedFilePath} error=${state.failureMessage}")
-        externallyRecordedPath = state.recordedFilePath
-        recordingStateFlow.value = false
-    }
-}
 
 internal suspend fun AndroidAudioRecordingManager.startLiveTranscription() {
     val service = transcriptionService
@@ -245,3 +223,18 @@ internal fun AndroidAudioRecordingManager.scheduleTranscriptPersistence(
         job.start()
     }
 }
+
+internal suspend fun AndroidAudioRecordingManager.beginTranscriptSession(
+    noteId: Uuid?,
+    path: String,
+): RecordingTranscriptSession? =
+    noteId?.let {
+        try {
+            transcriptWriter.begin(it, path)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Could not capture recording transcript ownership; file recovery remains available", e)
+            null
+        }
+    }

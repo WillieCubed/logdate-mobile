@@ -45,6 +45,7 @@ class DraftManager(
     private val deleteEntryDraft: DeleteEntryDraftUseCase,
     private val deleteAllDraftsUseCase: DeleteAllDraftsUseCase,
     private val cleanupExpiredDraftsUseCase: CleanupExpiredDraftsUseCase,
+    private val recordingOwner: suspend () -> String? = { null },
 ) {
     private var pendingDraftId: Uuid? = null
 
@@ -129,7 +130,16 @@ class DraftManager(
     suspend fun loadDraft(draftId: Uuid): Result<LoadedDraft> =
         try {
             val result = fetchEntryDraft(draftId).first()
+            val owner = recordingOwner()
             result.map { draft ->
+                check(
+                    owner == null ||
+                        (
+                            draft.pendingMedia.none { it.recordingOwnerId != null && it.recordingOwnerId != owner } &&
+                                draft.recordingOwners.values.none { it != owner } &&
+                                (draft.quietSave?.let { it.ownerId == owner } != false)
+                        ),
+                ) { "Switch back to the account that started this recording to recover it." }
                 val blocks = draft.notes.map { it.toDomainBlock() }.toMutableList()
                 draft.pendingMedia.sortedBy { it.position ?: Int.MAX_VALUE }.forEach { record ->
                     record.toBlock()?.let { block ->

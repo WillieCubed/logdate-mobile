@@ -22,4 +22,13 @@ actual val datastoreModule: Module =
                     ?.getBoolean("app.logdate.watchExperienceDefault", false) ?: false
             }.getOrDefault(false)
         }
+        single(named("quietSaveDefault")) {
+            val context = androidContext()
+            runCatching {
+                context.packageManager
+                    .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+                    .metaData
+                    ?.getBoolean("app.logdate.quietSaveDefault", false) ?: false
+            }.getOrDefault(false)
+        }
     }

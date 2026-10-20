@@ -1,5 +1,8 @@
 package app.logdate.client.media.di
 
+import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.media.audio.AndroidAudioDurationResolver
 import app.logdate.client.media.audio.AndroidAudioPlaybackManager
 import app.logdate.client.media.audio.AndroidAudioRecordingManager
@@ -9,6 +12,8 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.audio.QuietSaveNotifier
+import app.logdate.client.media.audio.RecordingDraftSession
 import app.logdate.client.media.audio.RecordingSessionOptions
 import app.logdate.client.media.audio.SpeechFeatureProviderLoader
 import app.logdate.client.media.audio.tagging.AudioTaggingService
@@ -17,6 +22,8 @@ import app.logdate.client.media.audio.transcription.InstallTimeTranscriptionServ
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.device.AndroidAudioRouteRepository
 import app.logdate.client.media.device.AudioRouteRepository
+import app.logdate.client.repository.account.AccountRepository
+import kotlinx.coroutines.flow.first
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -29,6 +36,10 @@ actual val audioModule: Module =
         single<AudioStorage> { AndroidAudioStorage(androidContext()) }
         // Provide the Android implementation of AudioRecordingManager as a singleton
         single<AudioRecordingManager> {
+            val preferences = get<LogdatePreferencesDataSource>()
+            val flags = get<FeatureFlagStore>()
+            val accounts = get<AccountRepository>()
+            val notifier = QuietSaveNotifier(androidContext())
             AndroidAudioRecordingManager(
                 audioStorage = get(),
                 transcriptionRepository = get(),
@@ -38,8 +49,22 @@ actual val audioModule: Module =
                 serviceController =
                     AndroidRecordingServiceController(
                         androidContext(),
-                        RecordingSessionOptions(crashSafe = true, excludeIncompleteFromBackup = true),
+                        RecordingSessionOptions(
+                            crashSafe = true,
+                            holdWakeLock = true,
+                            pauseOnInterruption = true,
+                            excludeIncompleteFromBackup = true,
+                        ),
                     ),
+                draftSession =
+                    RecordingDraftSession(get()) {
+                        accounts.currentAccount
+                            .first()
+                            ?.id
+                            ?.toString() ?: "anonymous"
+                    },
+                quietSaveEnabled = { flags.isEnabled(FeatureFlag.QUIET_SAVE) && preferences.observeQuietSaveEnabled().first() },
+                onQuietSave = { notifier.saved(it) },
             )
         }
         single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get(), mediaFiles = get()) }

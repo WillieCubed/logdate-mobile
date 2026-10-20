@@ -23,6 +23,8 @@ import kotlinx.coroutines.launch
  * manager's session state machine can be exercised without a device.
  */
 interface RecordingServiceController {
+    fun configureQuietSave(enabled: Boolean) = Unit
+
     /**
      * Live state mirrored from the bound service. Null while no service is bound, which
      * includes the window between [start] and the service connecting.
@@ -75,6 +77,7 @@ data class RecordingSessionOptions(
     val holdWakeLock: Boolean = false,
     val crashSafe: Boolean = false,
     val excludeIncompleteFromBackup: Boolean = false,
+    val quietSave: Boolean = false,
 )
 
 /**
@@ -84,6 +87,12 @@ class AndroidRecordingServiceController(
     private val context: Context,
     private val options: RecordingSessionOptions = RecordingSessionOptions(),
 ) : RecordingServiceController {
+    private var quietSave = options.quietSave
+
+    override fun configureQuietSave(enabled: Boolean) {
+        quietSave = enabled
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutableServiceState = MutableStateFlow<RecordingServiceState?>(null)
     override val serviceState: StateFlow<RecordingServiceState?> = mutableServiceState.asStateFlow()
@@ -127,7 +136,11 @@ class AndroidRecordingServiceController(
         inputDeviceId: String?,
     ): Boolean =
         try {
-            context.startAudioRecordingService(outputFilePath = outputPath, inputDeviceId = inputDeviceId, options = options)
+            context.startAudioRecordingService(
+                outputFilePath = outputPath,
+                inputDeviceId = inputDeviceId,
+                options = options.copy(quietSave = quietSave),
+            )
             bindRequested = true
             val bound = context.bindService(Intent(context, AudioRecordingService::class.java), connection, Context.BIND_AUTO_CREATE)
             if (!bound) Napier.e("Recording service refused the bind request")

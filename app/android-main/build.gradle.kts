@@ -213,6 +213,12 @@ extensions.configure<ApplicationExtension> {
                 .map(String::toBooleanStrict)
                 .getOrElse(false)
                 .toString()
+        manifestPlaceholders["quietSaveDefault"] =
+            providers
+                .gradleProperty("logdate.quietSaveDefault")
+                .map(String::toBooleanStrict)
+                .getOrElse(false)
+                .toString()
         // Maps and Places use a dedicated Android-restricted credential. Never fall back to the
         // general Firebase API key generated from google-services.json.
         resValue("string", "google_maps_api_key", resolvedGoogleMapsApiKey)

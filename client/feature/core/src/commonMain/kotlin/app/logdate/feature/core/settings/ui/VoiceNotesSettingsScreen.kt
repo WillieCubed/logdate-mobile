@@ -60,6 +60,7 @@ fun VoiceNotesSettingsScreen(
         onDownloadTranscription = viewModel::downloadTranscriptionModel,
         onDownloadTagging = viewModel::downloadTaggingModel,
         onBack = onBack,
+        onQuietSaveChanged = viewModel::setQuietSaveEnabled,
         modifier = modifier,
     )
 }
@@ -71,6 +72,7 @@ fun VoiceNotesSettingsContent(
     onDownloadTagging: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onQuietSaveChanged: (Boolean) -> Unit = {},
 ) {
     FoldableBookLayout(
         modifier = modifier.fillMaxSize(),
@@ -84,6 +86,7 @@ fun VoiceNotesSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
+                QuietSaveSettingsSection(state, onQuietSaveChanged, Modifier.padding(horizontal = Spacing.lg))
                 Text(
                     text = stringResource(Res.string.voice_notes_settings_intro),
                     style = MaterialTheme.typography.bodyMedium,
@@ -126,6 +129,9 @@ fun VoiceNotesSettingsContent(
                 onBack = onBack,
                 modifier = modifier,
             ) {
+                item {
+                    QuietSaveSettingsSection(state, onQuietSaveChanged, Modifier.padding(horizontal = Spacing.lg))
+                }
                 item {
                     Text(
                         text = stringResource(Res.string.voice_notes_settings_intro),

@@ -73,6 +73,7 @@ kotlin {
             implementation(projects.client.sync)
             implementation(projects.client.sharing)
             implementation(projects.client.media)
+            implementation(projects.client.healthConnect)
             implementation(projects.client.location)
             implementation(projects.client.feature.timeline)
             implementation(projects.client.feature.rewind)

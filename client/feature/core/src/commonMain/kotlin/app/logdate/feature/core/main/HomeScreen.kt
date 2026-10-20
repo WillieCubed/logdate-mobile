@@ -132,6 +132,7 @@ fun HomeScreen(
             true
         }
     val snackbarHostState = remember { SnackbarHostState() }
+    QuietSaveReturnEffect(snackbarHostState, onOpenDraft)
     val onSyncAction: (SyncAction) -> Unit = { action ->
         when (action) {
             SyncAction.UseMobileData -> syncPresentationViewModel.useMobileData()
@@ -198,6 +199,7 @@ fun HomeScreen(
                     WatchReadyOnPhoneCard(onClick = onOpenWatch)
                 }
             },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             modifier = homeKeys,
         ) {
             val destinationContent: @Composable () -> Unit = {

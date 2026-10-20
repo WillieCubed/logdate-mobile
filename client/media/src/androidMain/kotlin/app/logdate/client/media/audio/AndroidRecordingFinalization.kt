@@ -1,4 +1,5 @@
 package app.logdate.client.media.audio
+
 import app.logdate.client.media.audio.tagging.AudioTaggingResult
 import app.logdate.client.repository.audio.AudioTag
 import io.github.aakira.napier.Napier
@@ -10,7 +11,7 @@ import kotlinx.coroutines.withContext
 import kotlin.uuid.Uuid
 
 internal suspend fun AndroidAudioRecordingManager.stopSessionLocked(): String? {
-    if (!recordingStateFlow.value && externallyRecordedPath == null) {
+    if (!recordingStateFlow.value && externallyRecordedPath == null && !serviceEnded) {
         Napier.w("Attempted to stop recording while not recording")
         return null
     }
@@ -31,12 +32,13 @@ internal suspend fun AndroidAudioRecordingManager.stopSessionLocked(): String? {
 
     val filePath =
         try {
-            finalizeServiceRecording()
+            finalizeServiceRecording()?.also { persistRecordingDraft(it) }
         } catch (e: Exception) {
             Napier.e("Error finalizing the recording", e)
             null
         } finally {
             serviceController.shutdown()
+            serviceEnded = false
             recordingStateFlow.value = false
             recordingPausedFlow.value = false
             audioRouteRepository.updateRecordingInputDevice(null, false)
@@ -56,6 +58,28 @@ internal suspend fun AndroidAudioRecordingManager.stopSessionLocked(): String? {
         runAmbientTagging(filePath, noteId)
     }
     return filePath
+}
+
+internal suspend fun AndroidAudioRecordingManager.persistRecordingDraft(path: String) {
+    if (sessionTargetNoteId == null || recordingDraftSaved) return
+    val session = draftSession ?: return
+    if (!finalizedFileAvailable(path)) {
+        Napier.w("Recording publication is pending; retaining its draft for recovery")
+        return
+    }
+    withContext(NonCancellable) {
+        try {
+            val savedDraft = session.complete(path, durationFlow.value, quietSaveTriggered)
+            if (savedDraft != null) {
+                recordingDraftSaved = true
+                val source = CrashSafeRecording.inFlightFile(java.io.File(path))
+                if (source.exists() && !source.delete()) Napier.w("Saved recording source could not be removed")
+                if (quietSaveTriggered) onQuietSave(savedDraft)
+            }
+        } catch (e: Exception) {
+            Napier.e("Recording draft could not be saved; source audio retained for recovery", e)
+        }
+    }
 }
 
 internal suspend fun AndroidAudioRecordingManager.preserveCancelledRecording() {
