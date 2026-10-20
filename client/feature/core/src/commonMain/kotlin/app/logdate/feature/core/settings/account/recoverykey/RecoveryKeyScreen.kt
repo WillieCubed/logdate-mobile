@@ -15,7 +15,6 @@ import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.PhonelinkLock
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -32,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.repository.account.IdentityRecoveryFailure
@@ -78,21 +76,10 @@ import logdate.client.feature.core.generated.resources.recovery_key_phrase_step_
 import logdate.client.feature.core.generated.resources.recovery_key_phrase_unreadable
 import logdate.client.feature.core.generated.resources.recovery_key_recover_action
 import logdate.client.feature.core.generated.resources.recovery_key_recover_body
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_action
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_intro
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_step_check
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_step_passkey
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_step_rank
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_step_replace
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_step_unchanged
-import logdate.client.feature.core.generated.resources.recovery_key_recover_confirm_title
 import logdate.client.feature.core.generated.resources.recovery_key_recover_section
 import logdate.client.feature.core.generated.resources.recovery_key_recovered
 import logdate.client.feature.core.generated.resources.recovery_key_replace_key_action
 import logdate.client.feature.core.generated.resources.recovery_key_replace_key_body
-import logdate.client.feature.core.generated.resources.recovery_key_replace_key_confirm_action
-import logdate.client.feature.core.generated.resources.recovery_key_replace_key_confirm_body
-import logdate.client.feature.core.generated.resources.recovery_key_replace_key_confirm_title
 import logdate.client.feature.core.generated.resources.recovery_key_replace_key_needs_phrase
 import logdate.client.feature.core.generated.resources.recovery_key_replace_key_section
 import logdate.client.feature.core.generated.resources.recovery_key_replaced_key
@@ -101,18 +88,13 @@ import logdate.client.feature.core.generated.resources.recovery_key_status_secti
 import logdate.client.feature.core.generated.resources.recovery_key_title
 import logdate.client.feature.core.generated.resources.recovery_key_try_again
 import logdate.client.feature.core.generated.resources.recovery_key_turn_on
-import logdate.client.feature.core.generated.resources.recovery_key_turn_on_confirm_action
-import logdate.client.feature.core.generated.resources.recovery_key_turn_on_confirm_body
-import logdate.client.feature.core.generated.resources.recovery_key_turn_on_confirm_title
 import logdate.client.feature.core.generated.resources.recovery_key_turn_on_needs_phrase
 import logdate.client.feature.core.generated.resources.recovery_key_warning
 import logdate.client.feature.core.generated.resources.recovery_key_what_it_does
 import logdate.client.feature.core.generated.resources.recovery_key_without_phrase_body
 import logdate.client.feature.core.generated.resources.recovery_key_without_phrase_title
-import logdate.client.ui.generated.resources.common_cancel
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Where the Recovery key screen leads. It never leads to phrase entry: entering a phrase replaces
@@ -244,71 +226,6 @@ fun RecoveryKeyContent(
             onDismiss = { confirmReplaceKey = false },
         )
     }
-}
-
-/** Says what turning on the recovery key changes before anything is sent. */
-@Composable
-fun TurnOnRecoveryKeyDialog(
-    state: RecoveryKeyUiState.Ready,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ConfirmDialog(
-        title = stringResource(Res.string.recovery_key_turn_on_confirm_title),
-        text = { Text(stringResource(Res.string.recovery_key_turn_on_confirm_body, state.serverName, state.handle)) },
-        confirmLabel = stringResource(Res.string.recovery_key_turn_on_confirm_action),
-        onConfirm = onConfirm,
-        onDismiss = onDismiss,
-    )
-}
-
-/** Lists what replacing the server's key will do before anything is sent. */
-@Composable
-fun ReplaceServerKeyDialog(
-    state: RecoveryKeyUiState.Ready,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ConfirmDialog(
-        title = stringResource(Res.string.recovery_key_recover_confirm_title),
-        text = { ReplaceSteps(state) },
-        confirmLabel = stringResource(Res.string.recovery_key_recover_confirm_action),
-        onConfirm = onConfirm,
-        onDismiss = onDismiss,
-    )
-}
-
-/** Says what replacing the registered recovery key changes before anything is sent. */
-@Composable
-fun ReplaceRecoveryKeyDialog(
-    state: RecoveryKeyUiState.Ready,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ConfirmDialog(
-        title = stringResource(Res.string.recovery_key_replace_key_confirm_title),
-        text = { Text(stringResource(Res.string.recovery_key_replace_key_confirm_body, state.serverName, state.handle)) },
-        confirmLabel = stringResource(Res.string.recovery_key_replace_key_confirm_action),
-        onConfirm = onConfirm,
-        onDismiss = onDismiss,
-    )
-}
-
-@Composable
-private fun ConfirmDialog(
-    title: String,
-    text: @Composable () -> Unit,
-    confirmLabel: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = text,
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(UiRes.string.common_cancel)) } },
-    )
 }
 
 @Composable
@@ -513,25 +430,6 @@ private fun ReplaceRecoveryKeySection(
 }
 
 @Composable
-private fun ReplaceSteps(state: RecoveryKeyUiState.Ready) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Text(stringResource(Res.string.recovery_key_recover_confirm_intro))
-        listOf(
-            stringResource(Res.string.recovery_key_recover_confirm_step_check),
-            stringResource(Res.string.recovery_key_recover_confirm_step_passkey),
-            stringResource(Res.string.recovery_key_recover_confirm_step_replace, state.serverName, state.handle),
-            stringResource(Res.string.recovery_key_recover_confirm_step_rank),
-            stringResource(Res.string.recovery_key_recover_confirm_step_unchanged),
-        ).forEach { step ->
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Text("•")
-                Text(step)
-            }
-        }
-    }
-}
-
-@Composable
 private fun Notice(text: String) {
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -599,36 +497,4 @@ private fun WorkingLabel(
         if (working) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
         Text(label)
     }
-}
-
-@Preview
-@Composable
-private fun RecoveryKeySetupPreview() {
-    RecoveryKeyContent(
-        state =
-            RecoveryKeyUiState.Ready(
-                handle = "alice.logdate.app",
-                serverName = "LogDate Cloud",
-                phrase = PhraseStatus.CONFIRMED,
-                key = KeyStatus.OFF,
-            ),
-        destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}),
-        actions = RecoveryKeyActions(),
-    )
-}
-
-@Preview
-@Composable
-private fun RecoveryKeyOnPreview() {
-    RecoveryKeyContent(
-        state =
-            RecoveryKeyUiState.Ready(
-                handle = "alice.logdate.app",
-                serverName = "LogDate Cloud",
-                phrase = PhraseStatus.CONFIRMED,
-                key = KeyStatus.ON,
-            ),
-        destinations = RecoveryKeyDestinations(onBack = {}, onRecoveryPhrase = {}),
-        actions = RecoveryKeyActions(),
-    )
 }
