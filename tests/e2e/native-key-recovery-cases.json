@@ -1,0 +1,30 @@
+{
+  "app.logdate.client.e2e.NativeRecoveryWorkStateTest": [
+    "the production dependency graph constructs the cloud restore worker",
+    "a newer delivery cannot be completed by an older queued worker",
+    "successful import acknowledges its native delivery and cannot replay at restart",
+    "changed account cannot apply or acknowledge queued native recovery",
+    "queued recovery waits for persisted session to load before checking its owner",
+    "queued recovery retries while its persisted owner is temporarily unavailable"
+  ],
+  "app.logdate.client.e2e.RestoreWorkerSessionRecoveryTest": [
+    "differentOwnerAfterArchiveReadSkipsWithoutImportAcknowledgmentOrSourceDeletion",
+    "unavailableSessionAtEntryRetriesAndSameOwnerResumesOnce",
+    "unavailableSessionAfterArchiveReadRetriesAndSameOwnerResumesOnce",
+    "differentOwnerAtEntrySkipsWithoutImportAcknowledgmentOrSourceDeletion"
+  ],
+  "app.logdate.client.e2e.LegacyPlaintextMigrationTest": [
+    "newerPlaintextJournalIsRefusedBeforeAnyMigrationFileIsChanged",
+    "newerLegacyCipherJournalIsRefusedBeforeCipherMigration",
+    "mismatchedCandidateDoesNotReplaceEncryptedJournalWithOlderPlaintextBackup",
+    "plaintextJournalUpgradesThroughTheProductionKeyProvider"
+  ],
+  "app.logdate.client.e2e.InterruptedDatabaseKeyRecoveryTest": [
+    "retainedJournalOpensWithItsOnlyKeyInAnInterruptedWrite",
+    "pendingKeyOpensTheJournalAfterBothOtherCandidatesAreRejected"
+  ],
+  "app.logdate.client.e2e.TransferredInstallationTrustTest": [
+    "copied_watch_record_requires_new_local_trust_and_preserves_forget_choice",
+    "backup_first_read_removes_legacy_credentials_for_every_server"
+  ]
+}

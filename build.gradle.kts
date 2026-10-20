@@ -4,14 +4,14 @@ import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.ManagedVirtualDevice
 import dev.detekt.gradle.DetektCreateBaselineTask
 import dev.detekt.gradle.extensions.DetektExtension
-import org.jlleitschuh.gradle.ktlint.KtlintExtension
-import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 import org.gradle.testing.jacoco.tasks.JacocoReport
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnPlugin
 import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootExtension
+import org.jlleitschuh.gradle.ktlint.KtlintExtension
+import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 
 plugins {
     id("app.logdate.home-workspace")
@@ -54,18 +54,21 @@ tasks.register("verifyKtlintCoversKotlinSources") {
     description = "Fails if a module has Kotlin sources that none of its ktlint tasks reads."
     notCompatibleWithConfigurationCache("Inspects the ktlint tasks of every project.")
     doLast {
-        val uncovered = subprojects.filter { module ->
-            val hasKotlinSources = module.fileTree("src") { include("**/*.kt") }.files.isNotEmpty()
-            if (!hasKotlinSources) return@filter false
-            val ktlintTasks = module.tasks.withType<BaseKtLintCheckTask>()
-            val sourceSetTasks = ktlintTasks.any {
-                it.name.startsWith("runKtlintCheckOver") && !it.name.endsWith("OverKotlinScripts")
+        val uncovered =
+            subprojects.filter { module ->
+                val hasKotlinSources = module.fileTree("src") { include("**/*.kt") }.files.isNotEmpty()
+                if (!hasKotlinSources) return@filter false
+                val ktlintTasks = module.tasks.withType<BaseKtLintCheckTask>()
+                val sourceSetTasks =
+                    ktlintTasks.any {
+                        it.name.startsWith("runKtlintCheckOver") && !it.name.endsWith("OverKotlinScripts")
+                    }
+                val scriptTaskReadsKotlin =
+                    ktlintTasks.any { task ->
+                        task.name.endsWith("OverKotlinScripts") && task.source.files.any { it.extension == "kt" }
+                    }
+                !sourceSetTasks && !scriptTaskReadsKotlin
             }
-            val scriptTaskReadsKotlin = ktlintTasks.any { task ->
-                task.name.endsWith("OverKotlinScripts") && task.source.files.any { it.extension == "kt" }
-            }
-            !sourceSetTasks && !scriptTaskReadsKotlin
-        }
         if (uncovered.isNotEmpty()) {
             throw GradleException(
                 "ktlintCheck does not lint the Kotlin sources of: " + uncovered.joinToString { it.path },
@@ -97,9 +100,10 @@ subprojects {
     // source sets and registers only the Kotlin-script tasks. Point those tasks at the module's
     // Kotlin sources too, so `ktlintCheck` and `ktlintFormat` cover them.
     afterEvaluate {
-        val coversKotlinSources = tasks.names.any {
-            it.startsWith("runKtlintCheckOver") && it != "runKtlintCheckOverKotlinScripts"
-        }
+        val coversKotlinSources =
+            tasks.names.any {
+                it.startsWith("runKtlintCheckOver") && it != "runKtlintCheckOverKotlinScripts"
+            }
         if (coversKotlinSources) return@afterEvaluate
         tasks.withType<BaseKtLintCheckTask>().configureEach {
             if (name.endsWith("OverKotlinScripts")) {
@@ -366,18 +370,18 @@ tasks.register("updateAndroidScreenshots") {
 
 val validateDesktopScreenshots =
     tasks.register("validateDesktopScreenshots") {
-    group = "verification"
-    description = "Validate committed Desktop screenshot baselines."
-    dependsOn(":app:compose-main:validateDesktopScreenshotTest")
-}
+        group = "verification"
+        description = "Validate committed Desktop screenshot baselines."
+        dependsOn(":app:compose-main:validateDesktopScreenshotTest")
+    }
 
 val validateIosScreenshots =
     tasks.register("validateIosScreenshots") {
-    group = "verification"
-    description =
-        "Run the iOS simulator host-test lane for screenshot-covered UI modules. " +
+        group = "verification"
+        description =
+            "Run the iOS simulator host-test lane for screenshot-covered UI modules. " +
             "This is the iOS half of the universal screenshot contract until an iOS baseline renderer lands."
-}
+    }
 
 tasks.register("updateDesktopScreenshots") {
     group = "verification"
@@ -389,7 +393,7 @@ tasks.register("updateIosScreenshots") {
     group = "verification"
     description =
         "Placeholder for future iOS screenshot baseline updates. " +
-            "iOS currently validates through simulator host tests only."
+        "iOS currently validates through simulator host tests only."
     doLast {
         logger.lifecycle(
             "iOS baseline updates are not implemented yet. " +
@@ -402,7 +406,7 @@ tasks.register("validateAllScreenshots") {
     group = "verification"
     description =
         "Run the universal screenshot lane across Android, Wear, Desktop, and iOS. " +
-            "Android/Wear/Desktop use baseline screenshots; iOS uses a simulator validation lane."
+        "Android/Wear/Desktop use baseline screenshots; iOS uses a simulator validation lane."
     dependsOn(
         "validateAndroidScreenshots",
         "validateDesktopScreenshots",
@@ -414,7 +418,7 @@ tasks.register("updateAllScreenshots") {
     group = "verification"
     description =
         "Update every supported screenshot baseline lane. " +
-            "Today this updates Android/Wear/Desktop baselines and leaves iOS as validate-only."
+        "Today this updates Android/Wear/Desktop baselines and leaves iOS as validate-only."
     dependsOn(
         "updateAndroidScreenshots",
         "updateDesktopScreenshots",
@@ -590,7 +594,9 @@ tasks.register<JacocoReport>("mediaAndroidTestCoverageReport") {
 
     reports {
         xml.required.set(true)
-        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/mediaAndroidTestCoverageReport/mediaAndroidTestCoverageReport.xml"))
+        xml.outputLocation.set(
+            layout.buildDirectory.file("reports/jacoco/mediaAndroidTestCoverageReport/mediaAndroidTestCoverageReport.xml"),
+        )
         html.required.set(true)
         html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/mediaAndroidTestCoverageReport/html"))
         csv.required.set(false)
@@ -637,16 +643,16 @@ kover {
                     "*.*_Factory*", // Koin generated factories
                     "*.di.*Module*", // DI modules
                     "*ComposableSingletons*", // Compose generated code
-                    "*.*\$WhenMappings*" // Kotlin when expression mappings
+                    "*.*\$WhenMappings*", // Kotlin when expression mappings
                 )
                 packages(
                     "*.di", // All DI packages
                     "*.test", // Test packages
-                    "*.generated" // Generated code packages
+                    "*.generated", // Generated code packages
                 )
                 annotatedBy(
                     "androidx.compose.runtime.Composable", // Exclude Composable functions
-                    "org.koin.core.annotation.Module" // Exclude Koin modules
+                    "org.koin.core.annotation.Module", // Exclude Koin modules
                 )
             }
         }
@@ -658,6 +664,7 @@ private data class ManagedVirtualDeviceConfig(
     val hardwareProfile: String,
     val apiLevel: Int,
     val systemImageSource: String,
+    val minorApiLevel: Int = 0,
     val pageAlignment: ManagedVirtualDevice.PageAlignment =
         ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES,
 )
@@ -844,6 +851,46 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                 )
             }
 
+        ":tools:native-restore-driver" ->
+            ManagedDeviceProjectConfig(
+                localDevices =
+                    listOf(
+                        ManagedVirtualDeviceConfig(
+                            deviceName = "restorePairApi34",
+                            hardwareProfile = "Pixel 9 Pro",
+                            apiLevel = 34,
+                            systemImageSource = "google",
+                            pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
+                        ),
+                        ManagedVirtualDeviceConfig(
+                            deviceName = "d2dPairApi34",
+                            hardwareProfile = "Pixel 9 Pro",
+                            apiLevel = 34,
+                            systemImageSource = "google_apis_playstore",
+                            pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
+                        ),
+                        ManagedVirtualDeviceConfig(
+                            deviceName = "restoreCallbackApi36_1",
+                            hardwareProfile = "Pixel 9 Pro",
+                            apiLevel = 36,
+                            minorApiLevel = 1,
+                            systemImageSource = "google_apis_playstore",
+                            pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
+                        ),
+                    ),
+                groups =
+                    listOf(
+                        ManagedDeviceGroupConfig(
+                            groupName = "nativeRestorePair",
+                            targetDeviceNames = listOf("restorePairApi34"),
+                        ),
+                        ManagedDeviceGroupConfig(
+                            groupName = "nativeD2dPair",
+                            targetDeviceNames = listOf("d2dPairApi34"),
+                        ),
+                    ),
+            )
+
         ":app:wear" ->
             ManagedDeviceProjectConfig(
                 localDevices =
@@ -881,6 +928,13 @@ private fun ApplicationExtension.configureManagedDevices(project: Project) {
                             ?: localDevices.maybeCreate(deviceConfig.deviceName).apply {
                                 device = deviceConfig.hardwareProfile
                                 apiLevel = deviceConfig.apiLevel
+                                if (deviceConfig.minorApiLevel != 0) {
+                                    // AGP 9.3.2 consumes this task input but does not expose it in
+                                    // the public device interface. Fail on incompatible upgrades
+                                    // rather than silently exercising Android 36 instead of 36.1.
+                                    (this as com.android.build.gradle.internal.dsl.ManagedVirtualDevice).sdkMinorVersion =
+                                        deviceConfig.minorApiLevel
+                                }
                                 systemImageSource = deviceConfig.systemImageSource
                                 pageAlignment = deviceConfig.pageAlignment
                             }

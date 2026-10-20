@@ -1,0 +1,6 @@
+{
+  "app.logdate.client.e2e.CompletedRecordingColdStartTest": [
+    "stage00RetainCompletedAndUnfinishedRecordingBeforeProcessDeath",
+    "stage01ColdForegroundPublishesOnlyCompletedAudioWithoutStartingCapture"
+  ]
+}

@@ -16,6 +16,35 @@ SPEC.loader.exec_module(PUBLICATION)
 
 
 class PublicationProbeTest(unittest.TestCase):
+    def test_owned_preinstalled_empty_source_is_allowed_but_retained_content_is_refused(self):
+        stopped = RuntimeError("source preparation reached")
+        def adb(serial, *arguments):
+            if arguments == ("shell", "getprop", "ro.kernel.qemu"):
+                return b"1"
+            if arguments == ("shell", "pm", "list", "packages", PUBLICATION.native.PACKAGE):
+                return ("package:" + PUBLICATION.native.PACKAGE).encode()
+            if arguments == ("shell", "id", "-u"):
+                return b"0"
+            return b""
+        options = SimpleNamespace(source="emulator-5580", destination="emulator-5582",
+                                  app_apk=Path("app.apk"), test_apk=Path("tests.apk"),
+                                  output=Path("unused"), resume_seeded_source=False, seed_empty_source=True)
+        with patch.object(PUBLICATION.native, "adb", side_effect=adb), patch.object(
+            PUBLICATION.native, "wait_for_package_manager"
+        ), patch.object(PUBLICATION.native, "ensure_emulator_setup_complete"), patch.object(
+            PUBLICATION.native, "select_local_transport"
+        ), patch.object(PUBLICATION.native, "package_user_files", return_value=[]), patch.object(
+            PUBLICATION.native, "prepare_source", side_effect=stopped
+        ):
+            with self.assertRaises(RuntimeError) as raised:
+                PUBLICATION.run(options)
+            self.assertIs(stopped, raised.exception)
+        with patch.object(PUBLICATION.native, "adb", side_effect=adb), patch.object(
+            PUBLICATION.native, "wait_for_package_manager"
+        ), patch.object(PUBLICATION.native, "package_user_files", return_value=["./databases/logdate"]):
+            with self.assertRaisesRegex(RuntimeError, "contains retained data"):
+                PUBLICATION.run(options)
+
     def test_partial_seed_failure_still_cleans_up_and_retains_primary_error(self):
         primary = RuntimeError("seed interrupted after pair key persisted")
         cleanup = RuntimeError("cleanup storage temporarily unavailable")
@@ -26,7 +55,7 @@ class PublicationProbeTest(unittest.TestCase):
         ) as probe:
             options = SimpleNamespace(source="emulator-5580", destination="emulator-5582",
                                       app_apk=Path("app.apk"), test_apk=Path("tests.apk"),
-                                      output=Path(temporary), resume_seeded_source=False)
+                                      output=Path(temporary), resume_seeded_source=False, seed_empty_source=False)
             with self.assertRaises(RuntimeError) as raised:
                 PUBLICATION.run(options)
         self.assertIs(primary, raised.exception)

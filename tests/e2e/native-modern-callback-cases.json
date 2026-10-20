@@ -1,0 +1,15 @@
+{
+  "app.logdate.client.e2e.NativeBackgroundCredentialCallbackTest": [
+    "manifest selects the account-capable native backup agent",
+    "modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable",
+    "callback resets installation identity before bounded account recovery",
+    "duplicate framework restore callbacks retain one delivery ticket",
+    "recreated backup agent retains tickets after a duplicate completion callback",
+    "duplicate completion after app launch preserves the new installation identity",
+    "duplicate completion retries an interrupted installation identity reset",
+    "corrupt restored server leaves local content and account recovery pending",
+    "transferred sign out preference prevents background account recovery without changing content",
+    "cachedUnlockedPolicyIsReplacedByTransferredBiometricPolicyInSameProcess",
+    "incompletePolicyCanBeRepairedWithoutReplacingLivePreferencesReaders"
+  ]
+}

@@ -147,9 +147,9 @@ def run_acceptance(options, control, process):
     fixture = json.loads((control / "fixture.json").read_text())
     for serial in (options.source, options.destination):
         checked_emulator(serial)
-        H["prepare"](serial)
+        H["prepare"](serial, allow_preinstalled_empty=getattr(options, "seed_empty_source", False))
     for apk in (options.app_apk, options.test_apk):
-        H["adb"](options.source, "install", "-t", str(apk))
+        H["adb"](options.source, "install", "-r", "-t", str(apk))
     private_fixture(options.source, fixture)
     probe(options.source, "source-prepare", options.output / "source-prepare.log")
     H["probe"](options.source, "seed", options.output / "source-seed.log", identity="account")
@@ -218,6 +218,7 @@ def main():
     parser.add_argument("--classpath", required=True, type=Path)
     parser.add_argument("--fixture-environment", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--seed-empty-source", action="store_true")
     options = parser.parse_args()
     if options.source == options.destination:
         parser.error("source and destination must be distinct emulators")

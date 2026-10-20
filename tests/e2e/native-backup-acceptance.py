@@ -6,6 +6,7 @@ cover phrase-derived and account-unlocked encryption identities.
 """
 
 import argparse
+from contextlib import contextmanager
 import base64
 import hashlib
 import io
@@ -150,6 +151,21 @@ def canonical_preferences(data, allowed_names=None, excluded_names=()):
         if "invalid DataStore preferences" in str(error):
             raise
         raise ValueError("invalid DataStore preferences: malformed preference map") from error
+
+
+def preference_changes(before, after):
+    """Identify unexpected preference writes without logging values or credentials."""
+    def entries(data):
+        result = {}
+        for _, _, _, entry in protobuf_fields(canonical_preferences(data)):
+            fields = list(protobuf_fields(entry))
+            name = next(payload.decode() for number, wire, _, payload in fields if number == 1 and wire == 2)
+            result[name] = entry
+        return result
+    original, prepared = entries(before), entries(after)
+    return {"added": sorted(prepared.keys() - original.keys()),
+            "removed": sorted(original.keys() - prepared.keys()),
+            "changed": sorted(name for name in original.keys() & prepared.keys() if original[name] != prepared[name])}
 
 
 def is_user_content_path(path):
@@ -333,6 +349,8 @@ def backup_source(serial, output, *, verify_after_backup=None):
     if before.get(preference_path) != after.get(preference_path):
         prepared_preferences = adb(serial, "exec-out", "run-as", PACKAGE, "cat", preference_path)
         if explicit_backup_privacy_defaults(original_preferences) != canonical_preferences(prepared_preferences):
+            private_file(output.with_name("source-preference-changes.json"),
+                         json.dumps(preference_changes(original_preferences, prepared_preferences), indent=2).encode())
             raise RuntimeError("native backup changed preferences beyond explicit missing privacy defaults")
         before = {**before, preference_path: after[preference_path]}
     if verify_after_backup is not None:
@@ -346,12 +364,12 @@ def backup_source(serial, output, *, verify_after_backup=None):
     return backup, before
 
 
-def package_user_files(serial):
+def package_user_files(serial, package=PACKAGE):
     """List installed-app files, treating an absent package data directory as empty."""
     try:
-        return adb(serial, "shell", "run-as", PACKAGE, "find", ".", "-type", "f").splitlines()
+        return adb(serial, "shell", "run-as", package, "find", ".", "-type", "f").splitlines()
     except subprocess.CalledProcessError as error:
-        missing_directory = f"couldn't stat /data/user/0/{PACKAGE}: No such file or directory".encode()
+        missing_directory = f"couldn't stat /data/user/0/{package}: No such file or directory".encode()
         if missing_directory in (error.stderr or b""):
             return []
         raise
@@ -776,7 +794,7 @@ def restore_radio_state(serial, original):
     raise RuntimeError(f"Could not restore emulator radio state: {detail}")
 
 
-def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False):
+def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False, source_session_id=None):
     arguments = ["shell", "am", "instrument", "-w", "-r", "-e", "class", PROBE,
                  "-e", "nativeBackupMode", mode, "-e", "nativeIdentityMode", identity]
     if metadata:
@@ -791,6 +809,8 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
             arguments.extend(("-e", "sourceRecordingTransferFixture", "true"))
     if mode == "source-backup-integrity":
         arguments.extend(("-e", "sourceHasSession", "true" if source_has_session else "false"))
+    if source_session_id is not None:
+        arguments.extend(("-e", "sourceSessionId", source_session_id))
     if missing_media_path:
         arguments.extend(("-e", "expectedMissingMediaPath", missing_media_path))
     arguments.append(RUNNER)
@@ -967,6 +987,41 @@ def prepare_source(serial, app_apk, test_apk, output, identity, seed_source=True
             probe(serial, "compact-transfer", output / "source-compact-transfer.log")
 
 
+@contextmanager
+def data_only_source_session(source, output, enabled):
+    if not enabled:
+        yield None
+        return
+    session_id = str(uuid.uuid4())
+    original_radio = radio_state(source)
+    primary_error = None
+    try:
+        # The synthetic session has no hosted account. Its draft adoption must finish
+        # before the source snapshot, while network work stays queued for real sign-in.
+        set_offline(source, True)
+        probe(source, "source-account-session", output / "source-account-session.log", source_session_id=session_id)
+        yield session_id
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        cleanup_errors = []
+        actions = (
+            lambda: probe(source, "source-account-session-cleanup", output / "source-account-session-cleanup.log", source_session_id=session_id),
+            lambda: adb(source, "shell", "am", "force-stop", PACKAGE),
+            lambda: restore_radio_state(source, original_radio),
+        )
+        for action in actions:
+            try:
+                action()
+            except Exception as error:
+                cleanup_errors.append(error)
+        if cleanup_errors:
+            if primary_error is None:
+                raise RuntimeError("Synthetic source session or network cleanup failed") from cleanup_errors[0]
+            primary_error.add_note("Synthetic source cleanup also failed: " + ", ".join(type(error).__name__ for error in cleanup_errors))
+
+
 def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False,
              exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False,
              exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False,
@@ -997,10 +1052,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
             f"/data/user/0/{PACKAGE}/no_backup/archive-media-recovery-{archive_fixture_label}.json",
         )
         private_file(output / "archive-source-fixture.json", archive_fixture)
-    try:
-        if exercise_data_only:
-            print("Seeding a synthetic source session for data-only restore acceptance", flush=True)
-            probe(source, "source-account-session", output / "source-account-session.log")
+    with data_only_source_session(source, output, exercise_data_only) as source_session_id:
         validate_source_integrity = lambda: probe(
             source,
             "source-backup-integrity",
@@ -1008,16 +1060,13 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
             metadata,
             identity,
             source_has_session=exercise_data_only,
+            source_session_id=source_session_id,
         )
         backup, source_files = backup_source(
             source,
             output / "native-backup.log",
             verify_after_backup=validate_source_integrity,
         )
-    finally:
-        if exercise_data_only:
-            probe(source, "source-account-session-cleanup", output / "source-account-session-cleanup.log")
-            adb(source, "shell", "am", "force-stop", PACKAGE)
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
     original_payload = payload
     missing_media_path = None
@@ -1061,7 +1110,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     print("Launching the restored app through its normal startup path", flush=True)
     launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
     private_file(output / "destination-first-launch.log", launch)
-    adb(destination, "install", "-t", str(test_apk))
+    adb(destination, "install", "-r", "-t", str(test_apk))
     if exercise_missing_privacy:
         print("Verifying missing privacy metadata blocks every database consumer", flush=True)
         privacy_probe(destination, "blocked", output / "destination-privacy-blocked.log")

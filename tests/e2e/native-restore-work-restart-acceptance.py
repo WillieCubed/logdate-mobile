@@ -16,6 +16,9 @@ instrumentation_passed = runpy.run_path(
 )["instrumentation_passed"]
 
 
+NATIVE = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
+
+
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.transfer.debug")
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 PROBE = "app.logdate.client.e2e.CloudRestoreWorkPersistenceProbeTest"
@@ -89,25 +92,33 @@ def restore_radio_state(serial, original):
     raise RuntimeError(f"Could not restore the emulator's original network state: expected {original!r}, observed {observed!r}")
 
 
+def require_empty_install(serial, allow_preinstalled_empty=False):
+    packages = adb(serial, "shell", "pm", "list", "packages", PACKAGE).decode().splitlines()
+    if "package:" + PACKAGE not in packages:
+        return
+    if not allow_preinstalled_empty:
+        raise RuntimeError("use a fresh isolated application install; the harness never clears app data")
+    if NATIVE["contains_user_content"](NATIVE["package_user_files"](serial, package=PACKAGE)):
+        raise RuntimeError("The installed managed source contains retained data")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emulator", required=True, type=emulator_serial)
     parser.add_argument("--app-apk", required=True, type=Path)
     parser.add_argument("--test-apk", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--seed-empty-source", action="store_true")
     options = parser.parse_args()
     if not options.app_apk.is_file() or not options.test_apk.is_file():
         parser.error("both APKs must exist")
     options.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     if adb(options.emulator, "shell", "getprop", "ro.kernel.qemu").strip() != b"1":
         raise RuntimeError("target did not identify itself as an emulator")
-    packages = adb(options.emulator, "shell", "pm", "list", "packages", PACKAGE).decode().splitlines()
-    installed = "package:" + PACKAGE in packages
-    if installed:
-        raise RuntimeError("use a fresh isolated application install; the harness never clears app data")
+    require_empty_install(options.emulator, options.seed_empty_source)
 
-    adb(options.emulator, "install", "-t", str(options.app_apk.resolve()))
-    adb(options.emulator, "install", "-t", str(options.test_apk.resolve()))
+    adb(options.emulator, "install", "-r", "-t", str(options.app_apk.resolve()))
+    adb(options.emulator, "install", "-r", "-t", str(options.test_apk.resolve()))
     original_radio = radio_state(options.emulator)
     try:
         set_offline(options.emulator)
