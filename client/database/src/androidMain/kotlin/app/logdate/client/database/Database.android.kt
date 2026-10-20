@@ -41,6 +41,11 @@ fun getDatabaseBuilder(
         if (hasExistingDb) {
             val opensWithCurrent = canOpenEncryptedDatabaseWithCurrentSettings(dbFile, passphrase)
             needsLegacyHook = !opensWithCurrent && canOpenEncryptedDatabaseWithLegacySettings(dbFile, passphrase)
+            if (opensWithCurrent || needsLegacyHook) {
+                requireSupportedDatabaseVersion(
+                    openAndPingEncryptedDatabase(dbFile, passphrase, if (needsLegacyHook) createLegacySqlCipherHook() else null),
+                )
+            }
             Napier.i(
                 "Existing encrypted DB probe: opensWithCurrent=$opensWithCurrent needsLegacyHook=$needsLegacyHook",
                 tag = DB_MIGRATION_TAG,
@@ -126,6 +131,12 @@ fun migratePlaintextDatabaseIfNeeded(
         )
         return
     }
+    android.database.sqlite.SQLiteDatabase
+        .openDatabase(
+            dbFile.absolutePath,
+            null,
+            android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
+        ).use { requireSupportedDatabaseVersion(it.version) }
     Napier.w("Detected plaintext SQLite DB. Starting one-time SQLCipher migration", tag = DB_MIGRATION_TAG)
 
     val tempEncryptedFile = File(dbFile.parentFile, "$DATABASE_NAME.sqlcipher-migrating")
@@ -262,7 +273,7 @@ private fun openAndPingEncryptedDatabase(
     encryptedFile: File,
     passphrase: ByteArray,
     hook: SQLiteDatabaseHook?,
-) {
+): Int {
     val encryptedDb =
         SQLCipherDatabase.openDatabase(
             encryptedFile.absolutePath,
@@ -276,9 +287,14 @@ private fun openAndPingEncryptedDatabase(
         encryptedDb.rawQuery("SELECT COUNT(*) FROM sqlite_schema", emptyArray<String>()).use { cursor ->
             cursor.moveToFirst()
         }
+        return encryptedDb.version
     } finally {
         encryptedDb.close()
     }
+}
+
+private fun requireSupportedDatabaseVersion(version: Int) {
+    if (version > DATABASE_VERSION) throw NewerDatabaseVersionException(version, DATABASE_VERSION)
 }
 
 private fun findLatestPlaintextBackup(dbFile: File): File? {

@@ -1,5 +1,6 @@
 package app.logdate.client.launch
 
+import app.logdate.client.database.NewerDatabaseVersionException
 import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
 import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
@@ -24,6 +25,73 @@ import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ApplicationStartupTest {
+    @Test
+    fun `optional device work cannot delay opening a validated journal`() =
+        runTest {
+            val content = CompletableDeferred<Unit>()
+            val deviceWork = CompletableDeferred<Unit>()
+            var starts = 0
+            val startup =
+                ApplicationStartup(backgroundScope, startDeviceWork = {
+                    starts++
+                    deviceWork.await()
+                }) { content.await() }
+            startup.start()
+            runCurrent()
+            assertIs<ApplicationStartupState.Loading>(startup.state.value)
+            assertEquals(0, starts, "Device observers cannot start before retained content is validated")
+            content.complete(Unit)
+            runCurrent()
+            assertTrue(startup.awaitReady())
+            assertEquals(1, starts)
+            assertFalse(deviceWork.isCompleted, "Slow optional initialization must remain independent of journal access")
+            repeat(3) { startup.start() }
+            runCurrent()
+            assertEquals(1, starts, "Repeated foreground startup cannot duplicate device initialization")
+            deviceWork.complete(Unit)
+        }
+
+    @Test
+    fun `optional startup failure cannot close a validated journal`() =
+        runTest {
+            var starts = 0
+            val startup =
+                ApplicationStartup(backgroundScope, startDeviceWork = {
+                    starts++
+                    error("Device service unavailable")
+                }) {}
+            startup.start()
+            runCurrent()
+            assertTrue(startup.awaitReady())
+            assertEquals(1, starts)
+        }
+
+    @Test
+    fun `failed content recovery cannot start device observers before a successful retry`() =
+        runTest {
+            var attempts = 0
+            var starts = 0
+            val startup =
+                ApplicationStartup(backgroundScope, startDeviceWork = { starts++ }) {
+                    attempts++
+                    check(attempts > 1) { "Retained journal unavailable" }
+                }
+            startup.start()
+            runCurrent()
+            assertFalse(startup.awaitReady())
+            assertEquals(0, starts)
+            startup.start()
+            runCurrent()
+            assertTrue(startup.awaitReady())
+            assertEquals(1, starts)
+        }
+
+    @Test
+    fun `a newer journal requests an app update through dependency wrappers`() {
+        val failure = IllegalStateException("Startup dependency failed", NewerDatabaseVersionException(58, 57))
+        assertEquals(ApplicationStartupFailureMessage.UPDATE_REQUIRED, applicationStartupFailureMessage(failure))
+    }
+
     @Test
     fun `retry waits for failed attempt cleanup and coalesces repeated requests`() =
         runTest {

@@ -21,6 +21,7 @@ on:
       - 'app/android-main/src/androidTest/**/InterruptedDatabaseKeyRecoveryTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRetainedKeyFailureTest.kt'
       - 'app/android-main/src/androidTest/**/LegacyPlaintextMigrationTest.kt'
+      - 'app/android-main/src/androidTest/**/NewerJournalRecoveryRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRecoveryWorkStateTest.kt'
       - 'app/android-main/src/androidTest/**/CloudRestoreWorkPersistenceProbeTest.kt'
       - 'app/android-main/src/androidTest/**/AndroidSyncAccountTransitionRuntimeTest.kt'
@@ -30,6 +31,8 @@ on:
       - 'app/android-main/src/androidTest/**/TransferredInstallationTrustTest.kt'
       - 'app/android-main/src/androidTest/**/NativeTransferredPublicationProbeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredReminderSchedulingRuntimeTest.kt'
+      - 'app/android-main/src/androidTest/**/RestoredReminderColdStartTest.kt'
+      - 'app/android-main/src/androidTest/**/RecoveryFixtureCleanup*.kt'
       - 'app/android-main/src/androidTest/**/RestoredNotificationDeliveryTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredShortcutTargetsRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestoredSettingsE2ETest.kt'
@@ -45,6 +48,11 @@ on:
       - 'scripts/ci/start-test-services.py'
       - 'server/**'
       - 'shared/model/**'
+      - 'tests/e2e/managed-talkback-acceptance.py'
+      - 'tests/e2e/test_managed_talkback_acceptance.py'
+      - 'tests/e2e/managed-permission-acceptance.py'
+      - 'tests/e2e/test_managed_permission_acceptance.py'
+      - 'tests/e2e/native-talkback-touch.c'
       - 'tests/e2e/native-backup-acceptance.py'
       - 'tests/e2e/native-publication-acceptance.py'
       - 'tests/e2e/native-instrumentation-results.py'
@@ -70,6 +78,148 @@ permissions:
   contents: read
 
 jobs:
+  managed-startup:
+    name: Verify restored startup and journal compatibility on managed devices
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Materialize Android Firebase config
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+
+      - name: Prepare the managed API 34 image
+        shell: bash
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          set +o pipefail
+          yes | sdkmanager --licenses >/dev/null
+          set -o pipefail
+          sdkmanager 'platform-tools' 'platforms;android-34' 'system-images;android-34;google_apis;x86_64'
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify restored reminder schedules on a managed device
+        run: |
+          ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+            -Plogdate.androidTestClass=app.logdate.client.e2e.RestoredReminderSchedulingRuntimeTest \
+            -Pandroid.testInstrumentationRunnerArguments.restoreAlarmAcceptance=true \
+            --no-daemon --console=plain
+          python3 - <<'PYVERIFY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          directory = Path("app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34")
+          cases = [case for report in directory.glob("TEST-*.xml")
+                   for case in ET.parse(report).getroot().iter("testcase")
+                   if case.get("classname") == "app.logdate.client.e2e.RestoredReminderSchedulingRuntimeTest"]
+          assert len(cases) == 1, "The native reminder case must execute exactly once"
+          assert cases[0].get("name") == "currentPreferencesRecreateOnlyValidSchedules"
+          assert not any(cases[0].find(tag) is not None for tag in ["skipped", "failure", "error"])
+          import os, shutil
+          destination = Path(os.environ["RUNNER_TEMP"]) / "native-gmd" / "reminder-schedules"
+          shutil.copytree(directory, destination / "results")
+          output = Path("app/android-main/build/intermediates/managed_device_android_test_additional_output/debugAndroidTest/phoneApi34DebugAndroidTest")
+          if output.exists():
+              shutil.copytree(output, destination / "output")
+          PYVERIFY
+
+      - name: Verify reminder reconstruction across cold processes
+        run: |
+          ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+            -Plogdate.androidTestClass=app.logdate.client.e2e.RestoredReminderColdStartTest,app.logdate.client.e2e.RecoveryFixtureCleanupRuntimeTest \
+            -Plogdate.androidTestOrchestrator=true \
+            -Pandroid.testInstrumentationRunnerArguments.restoreAlarmColdStartAcceptance=true \
+            -Pandroid.testInstrumentationRunnerArguments.clearPackageData=false \
+            --no-daemon --console=plain
+          python3 - <<'PYVERIFY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          directory = Path("app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34")
+          cases = [case for report in directory.glob("TEST-*.xml")
+                   for case in ET.parse(report).getroot().iter("testcase")
+                   if case.get("classname") == "app.logdate.client.e2e.RestoredReminderColdStartTest"]
+          expected = {
+              "stage00PreserveOriginalPreferencesAndJournal",
+              "stage01LegacyAlarmsReturnThroughColdForegroundStartup",
+              "stage02MomentEvaluationReturnsThroughColdForegroundStartup",
+              "stage03DisabledLegacyPreferencesCancelStaleDeviceWork",
+              "stage04DisabledMomentConsentCancelsStaleDeviceWork",
+              "stage05RestoreOriginalPreferencesAndVerifyEveryProcess",
+          }
+          assert len(cases) == len(expected) and {case.get("name") for case in cases} == expected
+          assert not any(case.find(tag) is not None for case in cases for tag in ["skipped", "failure", "error"])
+          cleanup = [case for report in directory.glob("TEST-*.xml")
+                     for case in ET.parse(report).getroot().iter("testcase")
+                     if case.get("classname") == "app.logdate.client.e2e.RecoveryFixtureCleanupRuntimeTest"]
+          assert len(cleanup) == 3
+          assert not any(case.find(tag) is not None for case in cleanup for tag in ["skipped", "failure", "error"])
+          import os, shutil
+          destination = Path(os.environ["RUNNER_TEMP"]) / "native-gmd" / "cold-reminders"
+          shutil.copytree(directory, destination / "results")
+          output = Path("app/android-main/build/intermediates/managed_device_android_test_additional_output/debugAndroidTest/phoneApi34DebugAndroidTest")
+          if output.exists():
+              shutil.copytree(output, destination / "output")
+          PYVERIFY
+
+      - name: Preserve journals that require a newer app
+        run: |
+          ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+            -Plogdate.androidTestClass=app.logdate.client.e2e.NewerJournalRecoveryRuntimeTest,app.logdate.client.e2e.LegacyPlaintextMigrationTest \
+            -Plogdate.androidTestOrchestrator=false \
+            -Pandroid.testInstrumentationRunnerArguments.newerJournalAcceptance=true \
+            --no-daemon --console=plain
+          python3 - <<'PYVERIFY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          directory = Path("app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34")
+          classes = {"app.logdate.client.e2e.NewerJournalRecoveryRuntimeTest", "app.logdate.client.e2e.LegacyPlaintextMigrationTest"}
+          cases = [case for report in directory.glob("TEST-*.xml")
+                   for case in ET.parse(report).getroot().iter("testcase")
+                   if case.get("classname") in classes]
+          expected = {
+              "newerJournalStaysEncryptedAndOffersAnUpdateWithoutReplacingItsKey",
+              "newerPlaintextJournalIsRefusedBeforeAnyMigrationFileIsChanged",
+              "newerLegacyCipherJournalIsRefusedBeforeCipherMigration",
+              "plaintextJournalUpgradesThroughTheProductionKeyProvider",
+              "mismatchedCandidateDoesNotReplaceEncryptedJournalWithOlderPlaintextBackup",
+          }
+          assert len(cases) == len(expected) and {case.get("name") for case in cases} == expected
+          assert not any(case.find(tag) is not None for case in cases for tag in ["skipped", "failure", "error"])
+          import os, shutil
+          destination = Path(os.environ["RUNNER_TEMP"]) / "native-gmd" / "newer-journal"
+          shutil.copytree(directory, destination / "results")
+          output = Path("app/android-main/build/intermediates/managed_device_android_test_additional_output/debugAndroidTest/phoneApi34DebugAndroidTest")
+          if output.exists():
+              shutil.copytree(output, destination / "output")
+          PYVERIFY
+
+      - name: Upload managed startup acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: native-managed-startup-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-gmd/**
+            app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34/**
+            app/android-main/build/intermediates/managed_device_android_test_additional_output/debugAndroidTest/phoneApi34DebugAndroidTest/**
+          if-no-files-found: warn
+          retention-days: 14
+
   native-transfer:
     name: Exercise Android native restore and quota on emulators
     runs-on: ubuntu-latest
@@ -85,6 +235,7 @@ jobs:
       - name: Validate native acceptance harnesses
         run: |
           python3 -m unittest discover -s tests/e2e -p 'test_native*.py'
+          python3 -m unittest discover -s tests/e2e -p 'test_managed*_acceptance.py'
           python3 scripts/tests/native-backup/test-native-acceptance-safety.py
           python3 scripts/tests/native-backup/test-native-instrumentation-results.py
           python3 scripts/tests/native-backup/test-native-device-enrollment-acceptance.py
@@ -195,24 +346,6 @@ jobs:
           :app:android-main:assembleDebugAndroidTest
           :integration:server-client-e2e:writeAndroidHistoryHarnessClasspath
           --no-daemon --console=plain
-
-      - name: Verify restored reminder schedules on a managed device
-        run: |
-          ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
-            -Plogdate.androidTestClass=app.logdate.client.e2e.RestoredReminderSchedulingRuntimeTest \
-            -Pandroid.testInstrumentationRunnerArguments.restoreAlarmAcceptance=true \
-            --no-daemon --console=plain
-          python3 - <<'PYVERIFY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          directory = Path("app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34")
-          cases = [case for report in directory.glob("TEST-*.xml")
-                   for case in ET.parse(report).getroot().iter("testcase")
-                   if case.get("classname") == "app.logdate.client.e2e.RestoredReminderSchedulingRuntimeTest"]
-          assert len(cases) == 1, "The native reminder case must execute exactly once"
-          assert cases[0].get("name") == "currentPreferencesRecreateOnlyValidSchedules"
-          assert not any(cases[0].find(tag) is not None for tag in ["skipped", "failure", "error"])
-          PYVERIFY
 
       - name: Boot source and destination emulators
         shell: bash

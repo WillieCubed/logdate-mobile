@@ -232,7 +232,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         // Moments marked on the watch
         MarkedMomentEntity::class,
     ],
-    version = 57,
+    version = DATABASE_VERSION,
     exportSchema = true,
 )
 @TypeConverters(
@@ -334,6 +334,7 @@ abstract class LogDateDatabase : RoomDatabase() {
  * The name of the [LogDateDatabase] file.
  */
 internal const val DATABASE_NAME = "logdate"
+internal const val DATABASE_VERSION = 57
 
 internal expect val roomDatabaseDispatcher: CoroutineDispatcher
 
@@ -351,8 +352,9 @@ internal expect val roomDatabaseDispatcher: CoroutineDispatcher
  * @param builder The [RoomDatabase.Builder] to use to create the database.
  * @param driver The SQLite driver to use for the database. Defaults to [BundledSQLiteDriver].
  * @param dispatcher The dispatcher to use for all database queries. Defaults to [roomDatabaseDispatcher].
- * @param destroyTablesOnDowngrade Whether to destructively recreate database tables if the
- * database version is downgraded. False by default — Room will throw instead of silently wiping data.
+ * Missing upgrade or downgrade migrations refuse to open the retained database. Persistent
+ * journals never enable Room's destructive fallback; its boolean parameter only controls which
+ * tables are deleted. Disposable tests may configure their own builder explicitly.
  *
  * @return A new [LogDateDatabase] instance.
  */
@@ -360,15 +362,11 @@ fun getRoomDatabase(
     builder: RoomDatabase.Builder<LogDateDatabase>,
     driver: SQLiteDriver? = BundledSQLiteDriver(),
     dispatcher: CoroutineDispatcher = roomDatabaseDispatcher,
-    destroyTablesOnUpgrade: Boolean = false,
-    destroyTablesOnDowngrade: Boolean = false,
 ): LogDateDatabase {
     val configured =
         builder
             .addMigrations(*databaseMigrations())
             .addCallback(FtsTableCallback)
-            .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
-            .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)
 
     driver?.let { configured.setDriver(it) }
@@ -380,9 +378,8 @@ fun getRoomDatabase(
  * Ensures the `entries_fts` FTS5 virtual table exists on every database open.
  *
  * The table is normally created by MIGRATION_19_20, but won't exist when:
- * - The database was created fresh via destructive migration
- * - The encrypted database failed to open and fell back to in-memory mode
- * - A new install skipped the migration path entirely
+ * - A new installation creates the current schema without running migrations
+ * - A test explicitly recreates its disposable database
  *
  * `CREATE VIRTUAL TABLE IF NOT EXISTS` is idempotent — it's a no-op when
  * the table already exists.

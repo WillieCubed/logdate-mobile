@@ -48,6 +48,24 @@ the app's content providers. Keep backup callbacks independent of Koin, Room, Wo
 location services, and same-app providers. Do not cast or depend on the `Application` object;
 persist a small durable marker and let ordinary startup reconcile it after restore completes.
 
+Journal readiness waits for completed-recording salvage, database/key/privacy validation, and required
+native media quarantine. Device observers and background scheduling start once in the application
+scope after that validation succeeds; constructing optional service dependencies must not hold the
+journal on its loading screen. A failed content-open attempt cannot start those observers. Location
+foreground services register their own notification channel before promotion, including service-only
+entry and launches racing with background initialization.
+
+On the ARM64 API 34 managed image, verify external location and motion grants with:
+
+```sh
+python3 tests/e2e/managed-permission-acceptance.py --output /absolute/path/to/new-permission-evidence
+```
+
+The driver starts Gradle, selects only its new managed emulator, and grants each permission after
+the matching fixture nonce requests it. It requires one passing native case and retains logs and
+results. Startup timeout diagnostics include thread frames without local values. If observation
+fails while Gradle remains alive, inspect the saved process handle before launching another run.
+
 The installation device ID also lives in non-backed-up storage. An ordinary upgrade retains its
 previous ID; a replacement installation creates a new one even if preference cleanup is interrupted.
 Archive workers carry the native delivery ID and authenticated account/origin. Only completion of
@@ -101,6 +119,38 @@ That surface runs before database-backed navigation and explains how to repeat t
 an updated original device or restore a complete backup, while retaining the encrypted journal.
 An identity recovery phrase does not recover the independent SQLCipher database key. Never invoke
 the storage-reset controller automatically or replace retained content with an empty database.
+
+### Database version compatibility
+
+Production database builders require an explicit migration path in both directions. Never call
+Room’s `fallbackToDestructiveMigration(false)` to disable destructive migration: the boolean
+controls whether unrelated tables are dropped, and the call enables destructive fallback.
+The same applies to `fallbackToDestructiveMigrationOnDowngrade(false)`. Persistent journal
+builders omit both APIs. Only a test with deliberately disposable storage may opt in.
+
+Android checks an existing journal’s schema read-only after its current or legacy SQLCipher key
+opens it. A newer schema stops startup before Room callbacks or cipher migration can run; a newer
+plaintext journal is refused before encryption export touches any migration files. The schema
+limit and Room annotation share `DATABASE_VERSION`. Update that constant with schema migrations.
+Unknown older versions remain protected by Room’s required migration path.
+
+When a received journal needs a newer app, startup keeps the journal and recovery key and offers
+**Update LogDate** before any content-backed navigation. The action opens this installation’s
+Play listing, falls back to a browser, and copies the update link if neither is available. Retrying
+startup or resetting storage cannot repair an unsupported schema.
+
+`RetainedDatabaseMigrationSafetyJvmTest` checks refusal, supported migration, tombstones,
+relationships, and pending work. `NewerJournalRecoveryRuntimeTest` exercises normal app startup
+against a synthetic encrypted restore on a fresh Gradle Managed Device, including the update
+action and retained key. `LegacyPlaintextMigrationTest` covers newer plaintext and legacy cipher
+refusal as well as supported plaintext conversion. Run the native cases together:
+
+```sh
+./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+  -Plogdate.androidTestClass=app.logdate.client.e2e.NewerJournalRecoveryRuntimeTest,app.logdate.client.e2e.LegacyPlaintextMigrationTest \
+  -Plogdate.androidTestOrchestrator=false \
+  -Pandroid.testInstrumentationRunnerArguments.newerJournalAcceptance=true
+```
 
 ## Provider credential cleanup
 
@@ -630,6 +680,29 @@ application scope was already cancelled. `RestoredReminderSchedulingRuntimeTest`
 Managed Device and checks actual AlarmManager registrations, unique periodic work, both reminder
 modes, and disabled callbacks. It restores the original preferences after checking those states.
 
+### Reminder recovery across app processes
+
+`RestoredReminderColdStartTest` adds six ordered stages on a fresh Gradle Managed Device.
+Android Test Orchestrator starts a distinct process for each stage while preserving application data.
+The fixture creates a journal with an explicit unlocked privacy policy, records synthetic native
+delivery state, and launches the real `MainActivity`. It does not call the reminder scheduler directly.
+Enabled legacy and moment modes must reconstruct their actual registrations; disabled modes must
+cancel the exact delayed work and future alarms seeded by the fixture. Every stage checks the retained
+journal and key. The final stage restores and reads back original reminder preferences. Missing stages,
+reused processes, skipped tests, and lost receipt state fail acceptance.
+
+```bash
+./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+  -Plogdate.androidTestClass=app.logdate.client.e2e.RestoredReminderColdStartTest \
+  -Plogdate.androidTestOrchestrator=true \
+  -Pandroid.testInstrumentationRunnerArguments.restoreAlarmColdStartAcceptance=true \
+  -Pandroid.testInstrumentationRunnerArguments.clearPackageData=false
+```
+
+This verifies foreground reconciliation across process death. It does not exercise Android's backup
+transport, reboot delivery, notification posting, or Google credentials; use their respective acceptance
+paths for those behaviors. Never enable Orchestrator's application-data clearing for retained-journal tests.
+
 ### Recovery accessibility on an emulator
 
 Verify recovery with TalkBack touch exploration enabled, using forward/backward navigation and
@@ -639,6 +712,27 @@ gestures. Android shell `input` injection bypasses the input-reader gesture path
 multitouch events exercise TalkBack's recognizer. Capture accessibility focus/click events and verify
 the retained journal before and after retry. After a database has opened, compare journal content
 and integrity because SQLite index maintenance can change its encrypted file bytes.
+
+The managed TalkBack harness runs the production archive recovery sheets with synthetic states and
+callback counters. It checks missing-original, resumable-import, and preview actions with actual
+TalkBack forward/backward navigation and double-tap activation. It requires a fresh evidence directory
+an installed Android NDK, and an ARM64 API 34 image with TalkBack and `su` support. Its input driver selects only a newly started, expected
+Gradle Managed Device, validates the per-run receipt before every gesture, and runs a small NDK-built input helper that writes native kernel
+touch events with bounded gesture timing. Shell `input` and direct recovery-node activation are not substitutes for this check.
+
+```bash
+python3 tests/e2e/managed-talkback-acceptance.py --font-scale 1.0 --output /tmp/recovery-talkback-normal
+python3 tests/e2e/managed-talkback-acceptance.py --font-scale 2.0 --output /tmp/recovery-talkback-large
+```
+
+The fixture checks the Activity configuration and Compose density before accepting the requested
+font scale. It preserves and restores the accessibility-service, font, Bluetooth, and notification
+permission settings it touches. Only the known initial Accessibility Suite notification prompt and
+Bluetooth crash dialog are handled during setup; unexpected covering windows fail with a diagnostic
+receipt. Successful navigation invokes a fixture callback, not a real import. Journal preservation,
+worker restart, app-lock privacy, and native delivery use the corresponding data/runtime fixtures.
+If a host observer fails while Gradle is still running, inspect the saved child-process handle before
+starting another run; an observer failure does not mean the managed-device task has stopped.
 
 The modern callback fixture constructs a real framework `FullRestoreDataInput` from a private
 file descriptor. Its constructor is hidden from the SDK, so the API 36.1 instrumentation command

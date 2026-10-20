@@ -80,7 +80,7 @@ class LogdateApplication :
     private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var dependenciesInitialized = false
     internal val startup =
-        ApplicationStartup(startupScope) {
+        ApplicationStartup(startupScope, startDeviceWork = ::startBackgroundWork) {
             try {
                 awaitAndroidUserUnlock()
                 withContext(Dispatchers.Main.immediate) { initializeUnlockedApplication() }
@@ -94,8 +94,7 @@ class LogdateApplication :
                     { NativeMediaQuarantineScheduler.enqueue(this@LogdateApplication, it) },
                 )
                 get<AndroidPlatformSearchIndexManager>()
-                startBackgroundWork()
-                Napier.i("Encrypted storage and startup observers ready", tag = APP_STARTUP_TAG)
+                Napier.i("Encrypted storage ready", tag = APP_STARTUP_TAG)
             } catch (error: Exception) {
                 Napier.e("Application storage initialization failed", error, tag = APP_STARTUP_TAG)
                 throw error
@@ -353,7 +352,10 @@ internal object ApplicationStartupCoordinator {
                 .getOrPut(application) {
                     setResourceReaderAndroidContext(application.applicationContext)
                     val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-                    ApplicationStartup(startupScope) {
+                    ApplicationStartup(
+                        startupScope,
+                        startDeviceWork = { AndroidApplicationRuntime(application, GlobalContext.get()).start() },
+                    ) {
                         try {
                             application.awaitAndroidUserUnlock()
                             withContext(Dispatchers.Main.immediate) {
@@ -375,8 +377,7 @@ internal object ApplicationStartupCoordinator {
                                 { NativeMediaQuarantineScheduler.enqueue(application, it) },
                             )
                             koin.get<AndroidPlatformSearchIndexManager>()
-                            AndroidApplicationRuntime(application, koin).start()
-                            Napier.i("Encrypted storage and startup observers ready", tag = APP_STARTUP_TAG)
+                            Napier.i("Encrypted storage ready", tag = APP_STARTUP_TAG)
                         } catch (error: Exception) {
                             Napier.e("Application storage initialization failed", error, tag = APP_STARTUP_TAG)
                             throw error
