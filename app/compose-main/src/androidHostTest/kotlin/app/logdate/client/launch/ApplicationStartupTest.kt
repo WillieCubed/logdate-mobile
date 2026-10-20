@@ -4,7 +4,12 @@ import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredExcepti
 import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.koin.dsl.koinApplication
@@ -19,6 +24,80 @@ import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ApplicationStartupTest {
+    @Test
+    fun `retry waits for failed attempt cleanup and coalesces repeated requests`() =
+        runTest {
+            val cleanup = CompletableDeferred<Unit>()
+            var attempts = 0
+            val startup =
+                ApplicationStartup(backgroundScope) {
+                    attempts++
+                    if (attempts == 1) {
+                        CoroutineScope(currentCoroutineContext()).launch { cleanup.await() }
+                        error("Storage temporarily unavailable")
+                    }
+                }
+            startup.start()
+            runCurrent()
+            assertIs<ApplicationStartupState.Failed>(startup.state.value)
+            startup.start()
+            startup.start()
+            runCurrent()
+            assertEquals(1, attempts, "A retry cannot overlap unfinished recovery cleanup")
+            cleanup.complete(Unit)
+            runCurrent()
+            assertEquals(2, attempts, "Repeated retry requests must schedule one successor")
+            assertIs<ApplicationStartupState.Ready>(startup.state.value)
+        }
+
+    @Test
+    fun `immediate failure retry keeps ownership of its unfinished attempt`() =
+        runTest {
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            val finish = CompletableDeferred<Unit>()
+            var attempts = 0
+            val startup =
+                ApplicationStartup(CoroutineScope(backgroundScope.coroutineContext + dispatcher)) {
+                    attempts++
+                    check(attempts > 1) { "Storage temporarily unavailable" }
+                    finish.await()
+                }
+            val retry =
+                launch(dispatcher) {
+                    startup.state.first { it is ApplicationStartupState.Failed }
+                    startup.start()
+                }
+            startup.start()
+            startup.start()
+            assertEquals(2, attempts, "A retry in progress must remain the current attempt")
+            assertIs<ApplicationStartupState.Loading>(startup.state.value)
+            finish.complete(Unit)
+            runCurrent()
+            retry.join()
+            assertIs<ApplicationStartupState.Ready>(startup.state.value)
+        }
+
+    @Test
+    fun `retry offered by a failure cannot be dropped while its job finishes`() =
+        runTest {
+            var attempts = 0
+            val startup =
+                ApplicationStartup(backgroundScope) {
+                    attempts++
+                    check(attempts > 1) { "Storage temporarily unavailable" }
+                }
+            val retry =
+                launch(UnconfinedTestDispatcher(testScheduler)) {
+                    startup.state.first { it is ApplicationStartupState.Failed }
+                    startup.start()
+                }
+            startup.start()
+            runCurrent()
+            retry.join()
+            assertEquals(2, attempts, "A retry must start as soon as failure is observable")
+            assertIs<ApplicationStartupState.Ready>(startup.state.value)
+        }
+
     @Test
     fun `missing restored privacy metadata reaches its recovery guidance through dependency wrappers`() {
         val failure = IllegalStateException("Startup dependency failed", NativeRestorePrivacyMetadataRequiredException())
