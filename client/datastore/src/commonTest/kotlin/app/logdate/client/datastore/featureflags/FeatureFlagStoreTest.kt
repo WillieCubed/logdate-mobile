@@ -53,6 +53,21 @@ class FeatureFlagStoreTest {
         }
 
     @Test
+    fun `connected assistants stays unavailable with unset stored and default enabled preferences`() =
+        runTest {
+            val flag = assertNotNull(FeatureFlag.forKey("connected_assistants_enabled"))
+            assertFalse(flag.defaultEnabled)
+            assertFalse(flag.availableForLaunch)
+            assertFalse(store.isEnabled(flag))
+
+            preferences.updateData { it.toMutablePreferences().apply { this[booleanPreferencesKey(flag.key)] = true } }
+            val internalStore = DataStoreFeatureFlagStore(preferences, defaultOverrides = mapOf(flag to true))
+
+            assertFalse(store.isEnabled(flag))
+            assertFalse(internalStore.isEnabled(flag))
+        }
+
+    @Test
     fun `an unset flag uses its declared default`() =
         runTest {
             assertTrue(store.isEnabled(FeatureFlag.LIBRARY))
