@@ -557,3 +557,18 @@ actions invalidate exchanges already in flight; confirmation must match the curr
 Storage read failures must propagate through trust guards instead of becoming an absent key or a
 false removal preference. The installation-trust emulator fixtures use their own preferences files
 and uniquely named secure keys, without opening or resetting the journal database.
+
+### Instrumentation result validation
+
+Native host harnesses share `tests/e2e/native-instrumentation-results.py` for AndroidJUnitRunner
+results. A successful summary must contain the expected completed test count; ignored tests,
+assumption failures, test failures, runner errors, and crashes fail acceptance even when a success
+summary is present. Harnesses preserve private logs before rejecting results. Network-release and
+permission-grant acknowledgements remain required for scenarios that depend on them.
+
+Run `python3 -m unittest discover -s tests/e2e -p 'test_native*.py'` and
+`python3 scripts/tests/native-backup/test-native-acceptance-safety.py`, and
+`python3 scripts/tests/native-backup/test-native-instrumentation-results.py` when changing these harnesses.
+The result regressions cover standalone entry points and the imported D2D and permission helpers,
+including Android's LF and CRLF output. Adding a helper requires updating native workflow path
+filters so a helper-only change still exercises emulator acceptance.

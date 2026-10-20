@@ -13,12 +13,19 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import subprocess
 import tarfile
 import time
 import uuid
 import xml.etree.ElementTree as ET
+
+
+# Use the adjacent helper for both standalone and importlib-loaded entry points.
+instrumentation_passed = runpy.run_path(
+    str(Path(__file__).with_name("native-instrumentation-results.py"))
+)["instrumentation_passed"]
 
 
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
@@ -775,7 +782,7 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
     arguments.append(RUNNER)
     result = adb(serial, *arguments)
     private_file(output, result)
-    if b"OK (1 test)" not in result or b"Process crashed" in result:
+    if not instrumentation_passed(result):
         raise RuntimeError(f"native {mode} probe failed; inspect {output}")
 
 
@@ -784,7 +791,7 @@ def privacy_probe(serial, mode, output):
                  "app.logdate.client.e2e.NativeRestorePrivacyRuntimeTest",
                  "-e", "restorePrivacyMode", mode, RUNNER)
     private_file(output, result)
-    if b"OK (1 test)" not in result or b"Process crashed" in result or b"INSTRUMENTATION_STATUS_CODE: -3" in result:
+    if not instrumentation_passed(result):
         raise RuntimeError(f"native privacy {mode} probe failed; inspect {output}")
 
 
@@ -873,7 +880,7 @@ def archive_probe(serial, mode, output, fixture=None, fixture_label="transfer"):
     arguments.append(RUNNER)
     result = adb(serial, "shell", shlex.join(arguments))
     private_file(output, result)
-    if b"OK (1 test)" not in result or b"Process crashed" in result:
+    if not instrumentation_passed(result):
         raise RuntimeError(f"archive {mode} probe failed; inspect {output}")
 
 

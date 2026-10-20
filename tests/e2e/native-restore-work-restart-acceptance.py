@@ -5,8 +5,15 @@ import argparse
 import os
 from pathlib import Path
 import re
+import runpy
 import subprocess
 import time
+
+
+# Use the adjacent helper for both standalone and importlib-loaded entry points.
+instrumentation_passed = runpy.run_path(
+    str(Path(__file__).with_name("native-instrumentation-results.py"))
+)["instrumentation_passed"]
 
 
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.transfer.debug")
@@ -49,7 +56,7 @@ def probe(serial, mode, output):
     )
     output.write_bytes(result)
     output.chmod(0o600)
-    if b"OK (1 test)" not in result or b"Process crashed" in result:
+    if not instrumentation_passed(result):
         raise RuntimeError(f"Cloud restore work {mode} probe failed; inspect {output}")
 
 

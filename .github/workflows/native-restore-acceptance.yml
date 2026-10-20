@@ -30,6 +30,8 @@ on:
       - 'scripts/tests/native-backup/**'
       - 'shared/model/**'
       - 'tests/e2e/native-backup-acceptance.py'
+      - 'tests/e2e/native-instrumentation-results.py'
+      - 'tests/e2e/test_native*.py'
       - 'tests/e2e/native-d2d-acceptance.py'
       - 'tests/e2e/native-missing-media-acceptance.py'
       - 'tests/e2e/native-permission-acceptance.py'
@@ -52,6 +54,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
+
+      - name: Validate native acceptance harnesses
+        run: |
+          python3 -m unittest discover -s tests/e2e -p 'test_native*.py'
+          python3 scripts/tests/native-backup/test-native-acceptance-safety.py
+          python3 scripts/tests/native-backup/test-native-instrumentation-results.py
 
       - name: Materialize Android Firebase config
         uses: ./.github/actions/setup-firebase-configs
