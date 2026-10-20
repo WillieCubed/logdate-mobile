@@ -13,8 +13,8 @@ import app.logdate.client.datastore.NativeRestorePolicy
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
-import app.logdate.client.device.storage.AndroidSecureStorage
 import app.logdate.client.device.storage.SecureSessionStorage
+import app.logdate.client.device.storage.createAndroidSecureStorage
 import app.logdate.client.networking.PasskeyApiClient
 import app.logdate.client.networking.createNativeRestoreHttpClient
 import app.logdate.client.permissions.AndroidRestoreCredentialManager
@@ -48,7 +48,7 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
             if (!policy.canAttempt) return@coroutineScope
             val restorePolicy = NativeRestorePolicy(DataStoreKeyValueStorage(preferences))
             if (!restorePolicy.canRestore(config.getCurrentBackendUrl())) return@coroutineScope
-            val secure = AndroidSecureStorage(this@NativeAccountBackupAgent)
+            val secure = createAndroidSecureStorage(this@NativeAccountBackupAgent)
             val observerJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
             try {
                 val vault =

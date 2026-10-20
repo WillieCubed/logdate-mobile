@@ -227,7 +227,7 @@ jobs:
             -e class app.logdate.client.e2e.NativeRetainedKeyFailureTest \
             studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
             > "$RUNNER_TEMP/native-key-recovery/retained-failures.log"
-          grep -Eq '^OK \(7 tests\)$' "$RUNNER_TEMP/native-key-recovery/retained-failures.log"
+          grep -Eq '^OK \(8 tests\)$' "$RUNNER_TEMP/native-key-recovery/retained-failures.log"
           if grep -Eq '^INSTRUMENTATION_STATUS_CODE: -(3|4)[[:space:]]*$' "$RUNNER_TEMP/native-key-recovery/retained-failures.log"; then
             echo 'Retained-key failures must run without skipped cases' >&2
             exit 1

@@ -1,6 +1,9 @@
 package app.logdate.client.device.storage
 
 import android.content.SharedPreferences
+import io.github.aakira.napier.Antilog
+import io.github.aakira.napier.LogLevel
+import io.github.aakira.napier.Napier
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -12,7 +15,8 @@ import java.security.KeyStoreException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 /**
  * Tests for [AndroidSecureStorage]'s handling of a broken encrypted preferences file.
@@ -23,6 +27,47 @@ import kotlin.test.assertSame
  * silently destroy the user's only copy of their key.
  */
 class AndroidSecureStorageTest {
+    @Test
+    fun `cache initialization also sanitizes unreadable retained values`() {
+        val privateDetail = "synthetic-private-retained-value"
+        val prefs =
+            mockk<SharedPreferences> {
+                every { all } throws IOException(privateDetail)
+            }
+        val failure = assertFailsWith<SecureStorageInitializationException> { AndroidSecureStorage { prefs } }
+        assertNull(failure.cause)
+        assertFalse(failure.stackTraceToString().contains(privateDetail))
+        verify(exactly = 0) { prefs.edit() }
+    }
+
+    @Test
+    fun `initialization failure cannot expose private keyset diagnostics`() {
+        val privateDetail = "synthetic-private-keyset-value"
+        val captured = mutableListOf<String>()
+        val sink =
+            object : Antilog() {
+                override fun performLog(
+                    priority: LogLevel,
+                    tag: String?,
+                    throwable: Throwable?,
+                    message: String?,
+                ) {
+                    captured += message.orEmpty() + throwable?.stackTraceToString().orEmpty()
+                }
+            }
+        Napier.base(sink)
+        try {
+            val failure =
+                assertFailsWith<SecureStorageInitializationException> {
+                    AndroidSecureStorage { throw GeneralSecurityException(privateDetail) }
+                }
+            assertFalse(failure.stackTraceToString().contains(privateDetail))
+            assertFalse(captured.joinToString().contains(privateDetail))
+        } finally {
+            Napier.takeLogarithm(sink)
+        }
+    }
+
     @Test
     fun `GeneralSecurityException during initialization is rethrown, not swallowed and retried`() {
         var attempts = 0
@@ -39,7 +84,7 @@ class AndroidSecureStorageTest {
             }
 
         assertEquals(1, attempts, "the broken creation step must not be retried automatically")
-        assertSame(exception, thrown.cause)
+        assertNull(thrown.cause)
     }
 
     @Test
@@ -58,7 +103,7 @@ class AndroidSecureStorageTest {
             }
 
         assertEquals(1, attempts, "the broken creation step must not be retried automatically")
-        assertSame(exception, thrown.cause)
+        assertNull(thrown.cause)
     }
 
     @Test
@@ -77,7 +122,7 @@ class AndroidSecureStorageTest {
             }
 
         assertEquals(1, attempts, "the broken creation step must not be retried automatically")
-        assertSame(exception, thrown.cause)
+        assertNull(thrown.cause)
     }
 
     @Test
@@ -97,19 +142,19 @@ class AndroidSecureStorageTest {
             }
 
         assertEquals(1, attempts, "the broken creation step must not be retried automatically")
-        assertSame(wrapper, thrown.cause)
+        assertNull(thrown.cause)
     }
 
     @Test
-    fun `an exception unrelated to keystore or protobuf corruption is propagated unchanged`() {
+    fun `an unclassified initialization failure is sanitized without discarding storage`() {
         val exception = IllegalStateException("unrelated failure")
 
         val thrown =
-            assertFailsWith<IllegalStateException> {
+            assertFailsWith<SecureStorageInitializationException> {
                 AndroidSecureStorage(encryptedPrefsFactory = { throw exception })
             }
 
-        assertSame(exception, thrown)
+        assertNull(thrown.cause)
     }
 
     @Test

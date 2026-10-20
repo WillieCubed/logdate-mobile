@@ -14,9 +14,9 @@ import app.logdate.client.device.restore.AndroidNativeRestoreDeliveryGate
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.device.restore.NativeRestorePrivacyGuard
 import app.logdate.client.device.restore.PostRestoreDetector
-import app.logdate.client.device.storage.AndroidSecureStorage
 import app.logdate.client.device.storage.SecureSessionStorage
 import app.logdate.client.device.storage.SecureStorage
+import app.logdate.client.device.storage.createAndroidSecureStorage
 import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +43,7 @@ actual val deviceInstanceModule: Module =
             CoroutineScope(get<Job>() + Dispatchers.Default)
         }
 
-        single<SecureStorage> { AndroidSecureStorage(androidContext()) }
+        single<SecureStorage> { createAndroidSecureStorage(androidContext()) }
 
         single { PostRestoreDetector(androidContext()) }
         single<NativeRestoreDeliveryGate> { AndroidNativeRestoreDeliveryGate }
