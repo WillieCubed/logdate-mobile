@@ -43,21 +43,37 @@ EOF
 
 resolve() {
     TRACK_FILE="$TMP_DIR/track.json" PLAY_ACCESS_TOKEN=fake PATH="$TMP_DIR/bin:$PATH" \
-        ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "$1" "$2" 2>&1
+        ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "$@" 2>&1
 }
 
 assert_contains "version_code=1921443" "$(resolve abc1234 1921443)"
 assert_contains "version_code=1921442" "$(resolve 3072ae3 1921442)"
 
+assert_contains "version_code=1921442" "$(resolve 3072ae3)"
+
 set +e
+ambiguous="$(resolve abc1234)"
+ambiguous_exit=$?
 missing="$(resolve deadbee 1921443)"
 missing_exit=$?
 wrong_code="$(resolve abc1234 1921442)"
 wrong_code_exit=$?
 set -e
+assert_exit_code 1 "$ambiguous_exit"
+assert_contains "No unique completed internal release" "$ambiguous"
 assert_exit_code 1 "$missing_exit"
 assert_contains "No internal release" "$missing"
 assert_exit_code 1 "$wrong_code_exit"
 assert_contains "No internal release" "$wrong_code"
+
+cat >"$TMP_DIR/track.json" <<'EOF'
+{"track":"internal","releases":[{"name":"internal 0.1.0 draft123","versionCodes":["1921445"],"status":"draft"}]}
+EOF
+set +e
+draft="$(resolve draft123)"
+draft_exit=$?
+set -e
+assert_exit_code 1 "$draft_exit"
+assert_contains "No unique completed internal release" "$draft"
 
 print_pass_summary "Play internal release lookup"
