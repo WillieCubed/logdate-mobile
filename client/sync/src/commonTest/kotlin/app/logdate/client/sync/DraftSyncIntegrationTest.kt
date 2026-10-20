@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.device.crypto.ContentEncryptionService
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.sync.cloud.CloudDraftDataSource
@@ -29,6 +30,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.sync.DeviceId
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -229,6 +231,15 @@ class DraftSyncIntegrationTest {
             val journalRepository = FakeJournalRepository()
             val syncMetadataService = fakeSyncMetadataService()
             val draft = testDraft(content = "continue this thought")
+            val sourceId = Uuid.random()
+            val replacementId = Uuid.random()
+            val installation = MutableStateFlow(sourceId)
+            val provider =
+                object : DeviceIdProvider {
+                    override fun getDeviceId() = installation
+
+                    override suspend fun refreshDeviceId() = Unit
+                }
             journalRepository.saveDraft(draft)
             syncMetadataService.enqueuePending(draft.id.toString(), EntityType.DRAFT, PendingOperation.CREATE)
             val syncManager =
@@ -236,15 +247,20 @@ class DraftSyncIntegrationTest {
                     cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient, cipher(), supportsRichDrafts = { true }),
                     journalRepository = journalRepository,
                     syncMetadataService = syncMetadataService,
+                    deviceIdProvider = provider,
                     supportsRichDrafts = { true },
                 )
 
+            installation.value = replacementId
             val result = syncManager.syncDrafts()
 
             assertTrue(result.success)
             assertEquals(1, result.uploadedItems)
             val uploaded = apiClient.uploadDraftCalls.single().second
             assertEquals(draft.id.toString(), uploaded.id)
+            assertEquals(DeviceId(replacementId.toString()), uploaded.deviceId)
+            assertEquals(draft.createdAt.toEpochMilliseconds(), uploaded.createdAt)
+            assertEquals(draft.createdAt, journalRepository.getDraft(draft.id)?.createdAt)
             assertTrue(uploaded.content.startsWith("LDSE2:"))
             assertTrue(uploaded.encryptedBlocks.orEmpty().startsWith("LDSE2:"))
             assertEquals(emptyList(), syncMetadataService.getPendingUploads(EntityType.DRAFT))

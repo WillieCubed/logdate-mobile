@@ -558,6 +558,14 @@ Storage read failures must propagate through trust guards instead of becoming an
 false removal preference. The installation-trust emulator fixtures use their own preferences files
 and uniquely named secure keys, without opening or resetting the journal database.
 
+The installation-trust runtime case also completes a fresh cryptographic peer handshake after
+rejecting the copied record. It checks the replacement pair key and link identity, secure-store
+recreation, idempotent confirmation, and a fresh publication revision while preserving the old
+link's counter and source key. Draft upload integration changes the installation ID after sync
+initialization and verifies that the encrypted outbound request uses the replacement ID without
+rewriting the retained draft's creation time. These checks cover local protocol behavior; actual
+Google credential delivery and setup-wizard transfer retain their separate acceptance requirements.
+
 ### Instrumentation result validation
 
 Native host harnesses share `tests/e2e/native-instrumentation-results.py` for AndroidJUnitRunner
