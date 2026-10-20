@@ -6,11 +6,18 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import subprocess
 import threading
 import time
 import uuid
+
+# Use the adjacent helper for both standalone and importlib-loaded entry points.
+instrumentation_passed = runpy.run_path(
+    str(Path(__file__).with_name("native-instrumentation-results.py"))
+)["instrumentation_passed"]
+
 
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
@@ -70,7 +77,7 @@ def instrument(serial, selector, log, extras=(), release_network=None, status_ac
             process.kill()
         log.write_bytes(output)
         log.chmod(0o600)
-    if code != 0 or b"OK (1 test)" not in output or b"FAILURES" in output or release_network and not released or pending_actions:
+    if code != 0 or not instrumentation_passed(output) or release_network and not released or pending_actions:
         safe_target(serial)
         adb(serial, "shell", "am", "force-stop", PACKAGE)
         adb(serial, "shell", "am", "force-stop", PACKAGE + ".test")

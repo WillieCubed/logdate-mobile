@@ -487,7 +487,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             HARNESS,
             "adb",
-            return_value=b"INSTRUMENTATION_STATUS: stream=OK (1 test)",
+            return_value=b"INSTRUMENTATION_STATUS_CODE: 0\n\nOK (1 test)\n",
         ) as adb:
             HARNESS.probe(
                 "emulator-5576",
@@ -860,7 +860,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             HARNESS,
             "adb",
-            return_value=b"INSTRUMENTATION_STATUS: stream=OK (1 test)",
+            return_value=b"INSTRUMENTATION_STATUS_CODE: 0\n\nOK (1 test)\n",
         ) as adb:
             HARNESS.probe(
                 "emulator-5576",
@@ -983,7 +983,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             HARNESS,
             "adb",
-            return_value=b"INSTRUMENTATION_STATUS: stream=OK (1 test)",
+            return_value=b"INSTRUMENTATION_STATUS_CODE: 0\n\nOK (1 test)\n",
         ) as adb:
             HARNESS.archive_probe(
                 "emulator-5582",
