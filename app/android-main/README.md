@@ -12,7 +12,7 @@ Android-only code) and the `:client:*` modules. This module supplies:
 - **`AndroidManifest.xml`**: activities, intent filters, deep links, share targets, services, and
   permissions.
 - **Resources**: the launcher icon (adaptive, with a monochrome layer for themed icons), static
-  shortcuts (`res/xml/shortcuts.xml`), backup rules, and strings.
+  shortcuts (generated from `src/main/shortcut-templates/shortcuts.xml`), backup rules, and strings.
 - **Build configuration**: application id, signing, and the `debug`, `dogfood`, and `release`
   variants.
 - **Tests**: JVM unit tests, Compose screenshot tests, and instrumented tests that run on Gradle
@@ -22,7 +22,7 @@ Android-only code) and the `:client:*` modules. This module supplies:
 
 ```
 src/main/AndroidManifest.xml     entry points and OS integration declarations
-src/main/res/xml/shortcuts.xml   static launcher shortcuts and the Direct Share target
+src/main/shortcut-templates/shortcuts.xml   static launcher shortcuts and Direct Share template
 src/main/res/xml/*_rules.xml     backup and device-transfer rules
 src/debug/                       debug-only manifest additions (network config, test host activities)
 src/test/                        JVM unit tests
@@ -44,11 +44,12 @@ src/androidTest/                 instrumented tests (managed devices only)
 The default id comes from `LogDateReleasePlugin` in `build-logic` and can be overridden with
 `-Plogdate.applicationId`. The namespace (`app.logdate.client`) is separate from the application id.
 
-XML cannot read the application id directly, so the build generates two string resources:
-
-- `@string/logdate_application_id`, used by `shortcuts.xml` so each variant's shortcuts target the
-  variant itself;
-- `@string/logdate_account_type`.
+Account authenticator XML uses the generated `@string/logdate_account_type` resource.
+Shortcut intent targets require literal package names: Android does not resolve string-resource
+references in `android:targetPackage`. `LogDateReleasePlugin` registers `GenerateAndroidShortcuts`
+for each application variant, substituting its final application ID into the single shortcut
+template and adding the generated `res/xml/shortcuts.xml` directory to that variant. The stable
+shortcut IDs remain identical across updates and native restoration.
 
 ### Manifest entry points
 

@@ -15,6 +15,13 @@ interface SyncMetadataService {
      */
     suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload>
 
+    /** Read a captured outbox without consulting the currently selected account or server. */
+    suspend fun getPendingUploadForScope(
+        entityType: EntityType,
+        entityId: String,
+        scope: UploadScope,
+    ): PendingUpload? = getPendingUploads(entityType).find { it.entityId == entityId && it.scope == scope }
+
     suspend fun hasPending(
         entityType: EntityType,
         entityId: String,

@@ -151,7 +151,11 @@ class CloudRestoreWorker(
                     inputData.getString(NativeRestoreWorkState.DELIVERY_KEY),
                     session,
                 ).build()
-        val requestBuilder = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(data).addTag(WORK_TAG)
+        val requestBuilder =
+            OneTimeWorkRequestBuilder<RestoreWorker>()
+                .setInputData(data)
+                .setConstraints(archiveRecoveryConstraints)
+                .addTag(WORK_TAG)
         inputData.getString(NativeRestoreWorkState.DELIVERY_KEY)?.let { deliveryId ->
             requestBuilder.addTag(CloudRestoreScheduler.deliveryWorkTag(deliveryId, session))
         }

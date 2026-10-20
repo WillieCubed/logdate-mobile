@@ -1,6 +1,7 @@
 package app.logdate.feature.core.restore
 
 import android.content.Context
+import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.CanonicalOwnerProvider
@@ -9,11 +10,13 @@ import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.flow.combine
 import org.koin.core.Koin
 
-internal suspend fun currentArchiveRecoveryScope(koin: Koin): ArchiveRecoveryScope =
-    ArchiveRecoveryScope(
+internal suspend fun currentArchiveRecoveryScope(koin: Koin): ArchiveRecoveryScope {
+    koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+    return ArchiveRecoveryScope(
         koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId(),
         koin.get<LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/'),
     )
+}
 
 internal fun Context.archiveRecoveryStore(): ArchiveRecoveryStore =
     ArchiveRecoveryStore(filesDir.resolve("archive_recovery"), cacheDir.resolve("archive_recovery_staging"))

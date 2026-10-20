@@ -52,6 +52,8 @@ def run(args, serial):
         if "mWakefulness=Awake" not in awake:
             raise RuntimeError("The emulator did not wake for the permission acceptance run")
         probe("restoreOriginalTrackingSettings", "initial-settings-cleanup.log")
+        h.instrument(serial, "app.logdate.client.e2e.RestoredShortcutTargetsRuntimeTest", directory / "shortcut-targets.log",
+                     extras=["-e", "nativeShortcutAcceptance", "true"])
         for permission in PERMISSIONS:
             result = h.adb(serial, "shell", "pm", "revoke", h.PACKAGE, "android.permission." + permission, check=False)
             if result.returncode and b"has not requested permission" not in result.stderr + result.stdout:

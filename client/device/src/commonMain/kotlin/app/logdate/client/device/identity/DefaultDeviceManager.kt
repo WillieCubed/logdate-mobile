@@ -6,6 +6,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -50,20 +52,16 @@ class DefaultDeviceManager(
      *
      * @return The current device's information
      */
-    suspend fun getCurrentDeviceInfo(): DeviceInfo {
-        // Update last active
-        val currentInfo = deviceInfo.value
-        val updatedInfo = currentInfo.copy(lastActive = Clock.System.now())
-        deviceInfo.value = updatedInfo
-        return updatedInfo
-    }
+    suspend fun getCurrentDeviceInfo(): DeviceInfo =
+        deviceInfo.updateAndGet {
+            it.copy(id = deviceIdProvider.getDeviceId().value, lastActive = Clock.System.now())
+        }
 
     /**
      * Updates the device's last active timestamp.
      */
     suspend fun updateLastActive() {
-        val currentInfo = deviceInfo.value
-        deviceInfo.value = currentInfo.copy(lastActive = Clock.System.now())
+        deviceInfo.update { it.copy(lastActive = Clock.System.now()) }
     }
 
     /**
@@ -98,10 +96,10 @@ class DefaultDeviceManager(
      * @param newName The new name for the device
      */
     suspend fun renameDevice(newName: String) {
-        // Update local device info
-        val currentInfo = deviceInfo.value
-        val updatedInfo = currentInfo.copy(name = newName)
-        deviceInfo.value = updatedInfo
+        val updatedInfo =
+            deviceInfo.updateAndGet {
+                it.copy(id = deviceIdProvider.getDeviceId().value, name = newName)
+            }
 
         // Update in repository
         try {
@@ -137,14 +135,10 @@ class DefaultDeviceManager(
         deviceIdProvider.refreshDeviceId()
         val newId = deviceIdProvider.getDeviceId().value
 
-        // Update device info
-        val currentInfo = deviceInfo.value
         val updatedInfo =
-            currentInfo.copy(
-                id = newId,
-                lastActive = Clock.System.now(),
-            )
-        deviceInfo.value = updatedInfo
+            deviceInfo.updateAndGet {
+                it.copy(id = newId, lastActive = Clock.System.now())
+            }
 
         // Re-register with cloud
         try {

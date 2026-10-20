@@ -57,7 +57,7 @@ A row reaches `[done]` only when its Evidence column lists:
   `app/compose-main/src/androidMain/kotlin/app/logdate/client/DeepLinkResolver.kt`,
   `MainActivity.kt`, and `MainActivity+MultiWindow.kt`
 - Editor route: `client/feature/editor/src/commonMain/kotlin/app/logdate/feature/editor/navigation/EditorNavRoute.kt`
-- Static shortcuts: `app/android-main/src/main/res/xml/shortcuts.xml`
+- Static shortcuts: `app/android-main/src/main/shortcut-templates/shortcuts.xml` (generated per variant)
 - Dynamic shortcuts: `client/feature/android-widgets/src/commonMain/kotlin/app/logdate/client/feature/widgets/shortcuts/`
   and `app/compose-main/src/androidMain/kotlin/app/logdate/client/shortcuts/`
 - Widgets: `client/feature/android-widgets/src/androidMain/kotlin/app/logdate/client/feature/widgets/`

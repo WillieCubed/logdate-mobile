@@ -16,6 +16,13 @@ interface DraftRepository {
      */
     suspend fun saveDraft(draft: EditorDraft)
 
+    /** Atomically retain a local mutation and its captured upload intent; false means unsupported. */
+    suspend fun persistDraftMutation(
+        id: Uuid,
+        replacement: EditorDraft?,
+        scope: DraftRecoveryScope,
+    ): Boolean = false
+
     /** Persist a downloaded draft without changing its remote modification time or hiding write failures. */
     suspend fun saveDraftFromSync(draft: EditorDraft) = saveDraft(draft)
 
@@ -41,6 +48,9 @@ interface DraftRepository {
      * Get a draft by ID
      */
     suspend fun getDraft(id: Uuid): EditorDraft?
+
+    /** Retained local data without selected-server provenance must not be treated as a deleted draft. */
+    suspend fun hasUnclaimedDraft(id: Uuid): Boolean = false
 
     /** Recovery reads must distinguish absent drafts from unavailable storage. */
     suspend fun getDraftForRestore(id: Uuid): EditorDraft? = getAllDraftsForSync().find { it.id == id }

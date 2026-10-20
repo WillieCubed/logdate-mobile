@@ -419,8 +419,9 @@ internal class SyncUploader(
 
     suspend fun uploadDrafts(accessToken: String): SyncResult =
         uploadPass("Upload drafts") {
+            val drafts = journalRepository.getAllDraftsForSync()
             val spaceKind = space?.activeKind(EntityType.DRAFT)
-            if (spaceKind != null) uploadDraftsToSpace(space, spaceKind) else draftUploader.uploadPending()
+            if (spaceKind != null) uploadDraftsToSpace(space, spaceKind) else draftUploader.uploadPending(drafts)
         }
 
     suspend fun enqueueEverythingOnFirstSync() =

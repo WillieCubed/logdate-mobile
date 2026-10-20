@@ -7,11 +7,13 @@ on:
     paths:
       - '.github/workflows/native-restore-acceptance.yml'
       - 'app/android-main/src/androidTest/**/NativeBackupTransferProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeDeviceEnrollment*.kt'
       - 'app/android-main/src/androidTest/**/NativeRetainedOfflineEditProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestorePrivacyRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeBackgroundCredentialCallbackTest.kt'
       - 'app/android-main/src/androidTest/**/NativeMissingMediaE2ETest.kt'
       - 'app/android-main/src/androidTest/**/ArchiveMediaRecoveryE2ETest.kt'
+      - 'app/android-main/src/androidTest/**/ArchiveLowStorageRecoveryTest.kt'
       - 'app/android-main/src/androidTest/**/CloudArchiveWorkerFixture.kt'
       - 'app/android-main/src/androidTest/**/RestoredJournalLockRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredAppLockEnrollmentRuntimeTest.kt'
@@ -19,10 +21,16 @@ on:
       - 'app/android-main/src/androidTest/**/NativeRetainedKeyFailureTest.kt'
       - 'app/android-main/src/androidTest/**/LegacyPlaintextMigrationTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRecoveryWorkStateTest.kt'
+      - 'app/android-main/src/androidTest/**/CloudRestoreWorkPersistenceProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/AndroidSyncAccountTransitionRuntimeTest.kt'
+      - 'app/android-main/src/androidTest/**/RestoreWorkerSessionRecoveryTest.kt'
+      - 'app/android-main/src/androidTest/**/RestoreWorkerTestBindings.kt'
       - 'app/android-main/src/androidTest/**/NativeRestoredEntryEditingTest.kt'
       - 'app/android-main/src/androidTest/**/TransferredInstallationTrustTest.kt'
       - 'app/android-main/src/androidTest/**/NativeTransferredPublicationProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/RestoredReminderSchedulingRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredNotificationDeliveryTest.kt'
+      - 'app/android-main/src/androidTest/**/RestoredShortcutTargetsRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestoredSettingsE2ETest.kt'
       - 'app/android-main/src/androidTest/**/CompletedRecordingRestartTest.kt'
       - 'app/android-main/src/androidTest/assets/recovery/**'
@@ -30,7 +38,11 @@ on:
       - 'app/compose-main/src/androidMain/**'
       - 'app/compose-main/src/commonMain/**'
       - 'client/**'
+      - 'build-logic/src/**/GenerateAndroidShortcuts*'
+      - 'build-logic/src/main/kotlin/app/logdate/LogDateReleasePlugin.kt'
       - 'scripts/tests/native-backup/**'
+      - 'scripts/ci/start-test-services.py'
+      - 'server/**'
       - 'shared/model/**'
       - 'tests/e2e/native-backup-acceptance.py'
       - 'tests/e2e/native-publication-acceptance.py'
@@ -38,8 +50,12 @@ on:
       - 'tests/e2e/test_native*.py'
       - 'tests/e2e/native-d2d-acceptance.py'
       - 'tests/e2e/native-missing-media-acceptance.py'
+      - 'tests/e2e/native-storage-recovery-acceptance.py'
       - 'tests/e2e/native-permission-acceptance.py'
       - 'tests/e2e/native-restore-work-restart-acceptance.py'
+      - 'tests/e2e/native-device-enrollment-acceptance.py'
+      - 'integration/server-client-e2e/src/test/kotlin/app/logdate/integration/e2e/harness/**'
+      - 'integration/server-client-e2e/build.gradle.kts'
       - 'build.gradle.kts'
   workflow_dispatch:
 
@@ -69,6 +85,7 @@ jobs:
           python3 -m unittest discover -s tests/e2e -p 'test_native*.py'
           python3 scripts/tests/native-backup/test-native-acceptance-safety.py
           python3 scripts/tests/native-backup/test-native-instrumentation-results.py
+          python3 scripts/tests/native-backup/test-native-device-enrollment-acceptance.py
 
       - name: Materialize Android Firebase config
         uses: ./.github/actions/setup-firebase-configs
@@ -155,6 +172,12 @@ jobs:
             --name logdate-restore-d2d \
             --package 'system-images;android-34;google_apis_playstore;x86_64' \
             --device pixel_2 --force <<< 'no'
+          for role in source destination; do
+            avdmanager create avd \
+              --name "logdate-enrollment-$role" \
+              --package 'system-images;android-34;google_apis;x86_64' \
+              --device pixel_2 --force <<< 'no'
+          done
           for config in "$ANDROID_AVD_HOME"/*.avd/config.ini; do
             sed -i -E 's/^disk\.dataPartition\.size[[:space:]]*=.*/disk.dataPartition.size=2147483648/' "$config"
           done
@@ -168,7 +191,26 @@ jobs:
         run: >-
           ./gradlew :app:android-main:assembleDebug
           :app:android-main:assembleDebugAndroidTest
+          :integration:server-client-e2e:writeAndroidHistoryHarnessClasspath
           --no-daemon --console=plain
+
+      - name: Verify restored reminder schedules on a managed device
+        run: |
+          ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+            -Plogdate.androidTestClass=app.logdate.client.e2e.RestoredReminderSchedulingRuntimeTest \
+            -Pandroid.testInstrumentationRunnerArguments.restoreAlarmAcceptance=true \
+            --no-daemon --console=plain
+          python3 - <<'PYVERIFY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          directory = Path("app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34")
+          cases = [case for report in directory.glob("TEST-*.xml")
+                   for case in ET.parse(report).getroot().iter("testcase")
+                   if case.get("classname") == "app.logdate.client.e2e.RestoredReminderSchedulingRuntimeTest"]
+          assert len(cases) == 1, "The native reminder case must execute exactly once"
+          assert cases[0].get("name") == "currentPreferencesRecreateOnlyValidSchedules"
+          assert not any(cases[0].find(tag) is not None for tag in ["skipped", "failure", "error"])
+          PYVERIFY
 
       - name: Boot source and destination emulators
         shell: bash
@@ -219,16 +261,25 @@ jobs:
             --output "$RUNNER_TEMP/native-missing-media-recovery" \
             --synthetic-data
 
+      - name: Exercise accepted archive recovery under low storage
+        run: |
+          python3 tests/e2e/native-storage-recovery-acceptance.py \
+            --emulator emulator-5558 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-storage-recovery" \
+            --synthetic-data
+
       - name: Verify database keys and restart-safe native recovery
         shell: bash
         run: |
           test "$(adb -s emulator-5558 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
           mkdir -p "$RUNNER_TEMP/native-key-recovery"
           adb -s emulator-5558 shell am instrument -w -r \
-            -e class app.logdate.client.e2e.NativeRecoveryWorkStateTest,app.logdate.client.e2e.LegacyPlaintextMigrationTest,app.logdate.client.e2e.InterruptedDatabaseKeyRecoveryTest,app.logdate.client.e2e.TransferredInstallationTrustTest \
+            -e class app.logdate.client.e2e.NativeRecoveryWorkStateTest,app.logdate.client.e2e.RestoreWorkerSessionRecoveryTest,app.logdate.client.e2e.LegacyPlaintextMigrationTest,app.logdate.client.e2e.InterruptedDatabaseKeyRecoveryTest,app.logdate.client.e2e.TransferredInstallationTrustTest \
             studio.hypertext.logdate.debug.test/androidx.test.runner.AndroidJUnitRunner \
             > "$RUNNER_TEMP/native-key-recovery/runtime.log"
-          grep -Eq '^OK \(12 tests\)$' "$RUNNER_TEMP/native-key-recovery/runtime.log"
+          grep -Eq '^OK \(16 tests\)$' "$RUNNER_TEMP/native-key-recovery/runtime.log"
           if grep -Eq '^INSTRUMENTATION_STATUS_CODE: -(3|4)[[:space:]]*$' "$RUNNER_TEMP/native-key-recovery/runtime.log"; then
             echo 'Native key and restart recovery must run without skipped cases' >&2
             exit 1
@@ -489,6 +540,60 @@ jobs:
             --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
             --output "$RUNNER_TEMP/native-d2d-acceptance"
 
+      - name: Start isolated enrollment database
+        run: python3 scripts/ci/start-test-services.py start e2e
+
+      - name: Verify populated transfer and distinct server enrollment
+        shell: bash
+        run: |
+          test "$(adb -s emulator-5554 shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+          adb -s emulator-5554 emu kill
+          for _ in $(seq 1 60); do
+            if ! adb devices | grep -q '^emulator-5554[[:space:]]'; then
+              break
+            fi
+            sleep 1
+          done
+          if adb devices | grep -q '^emulator-5554[[:space:]]'; then
+            echo 'D2D emulator did not stop' >&2
+            exit 1
+          fi
+          emulator -avd logdate-enrollment-source -port 5554 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/enrollment-source-emulator.log" 2>&1 &
+          emulator -avd logdate-enrollment-destination -port 5556 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/enrollment-destination-emulator.log" 2>&1 &
+          for serial in emulator-5554 emulator-5556; do
+            adb -s "$serial" wait-for-device
+            for _ in $(seq 1 120); do
+              if [[ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == '1' ]]; then
+                break
+              fi
+              sleep 2
+            done
+            test "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r')" = '1'
+            test "$(adb -s "$serial" shell getprop sys.boot_completed | tr -d '\r')" = '1'
+          done
+          python3 - <<'PY'
+          import base64, json, os, pathlib, secrets
+          os.umask(0o077)
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          (root / 'native-enrollment-environment.json').write_text(json.dumps({
+              'DATABASE_URL': 'jdbc:postgresql://127.0.0.1:5432/logdate',
+              'DATABASE_USER': 'logdate', 'DATABASE_PASSWORD': 'logdate',
+              'SERVER_ENCRYPTION_KEY': base64.b64encode(secrets.token_bytes(32)).decode(),
+              'LOGDATE_BLOB_STORAGE_DIR': str(root / 'native-enrollment-blobs'),
+          }))
+          PY
+          python3 tests/e2e/native-device-enrollment-acceptance.py \
+            --source emulator-5554 --destination emulator-5556 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --classpath integration/server-client-e2e/build/android-history-harness.classpath \
+            --fixture-environment "$RUNNER_TEMP/native-enrollment-environment.json" \
+            --output "$RUNNER_TEMP/native-device-enrollment"
+
+      - name: Stop enrollment database
+        if: always()
+        run: python3 scripts/ci/start-test-services.py stop e2e
+
       - name: Upload native restore acceptance evidence
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -509,6 +614,10 @@ jobs:
             ${{ runner.temp }}/native-missing-media-recovery/**/*.log
             ${{ runner.temp }}/native-missing-media-recovery/**/environment-before.json
             ${{ runner.temp }}/native-missing-media-recovery/acceptance.json
+            ${{ runner.temp }}/native-storage-recovery/*.log
+            ${{ runner.temp }}/native-storage-recovery/environment-before.json
+            ${{ runner.temp }}/native-storage-recovery/acceptance.json
+            app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34/**
             ${{ runner.temp }}/native-lock-recovery/*.log
             ${{ runner.temp }}/native-key-recovery/*.log
             ${{ runner.temp }}/native-restore-missing-keys/*.log
@@ -533,6 +642,16 @@ jobs:
             ${{ runner.temp }}/source-emulator.log
             ${{ runner.temp }}/destination-emulator.log
             ${{ runner.temp }}/data-only-emulator.log
+            ${{ runner.temp }}/native-device-enrollment/acceptance.json
+            ${{ runner.temp }}/native-device-enrollment/source-prepare.log
+            ${{ runner.temp }}/native-device-enrollment/source-enroll.log
+            ${{ runner.temp }}/native-device-enrollment/source-session-cleanup.log
+            ${{ runner.temp }}/native-device-enrollment/destination-enroll.log
+            ${{ runner.temp }}/native-device-enrollment/destination-offline-edit.log
+            ${{ runner.temp }}/native-device-enrollment/destination-process-restart.log
+            ${{ runner.temp }}/native-device-enrollment/destination-session-cleanup.log
+            ${{ runner.temp }}/enrollment-source-emulator.log
+            ${{ runner.temp }}/enrollment-destination-emulator.log
           if-no-files-found: warn
           retention-days: 14
 

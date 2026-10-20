@@ -52,11 +52,13 @@ label when it has one, and "Share to Summer in Lisbon" did not fit its two short
 
 ### Static shortcuts
 
-`app/android-main/src/main/res/xml/shortcuts.xml` is attached to `MainActivity` through
-`<meta-data android:name="android.app.shortcuts">`.
+`app/android-main/src/main/shortcut-templates/shortcuts.xml` is the single source template.
+`GenerateAndroidShortcuts` produces each variant's `res/xml/shortcuts.xml`, attached to
+`MainActivity` through `<meta-data android:name="android.app.shortcuts">`.
 
-- Each `<shortcut>` uses `@string/logdate_application_id` as its target package. That string is
-  generated per build variant, so debug (`.debug`) and release builds both point at themselves.
+- Each `<shortcut>` uses the final application ID as its literal target package, so debug
+  (`.debug`), release, and supported package overrides target themselves. Android's shortcut intent
+  parser does not resolve a string-resource reference in `android:targetPackage`.
 - Each static shortcut sends the [capture launch contract](capture-launch-contract.md) intent:
   `app.logdate.action.CAPTURE` with `mode` set to `text`, `voice`, or `camera`.
 - The icons (`ic_shortcut_new_entry`, `ic_shortcut_record_voice`, `ic_shortcut_take_photo`) are

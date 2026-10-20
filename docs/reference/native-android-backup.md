@@ -4,6 +4,9 @@ Android's backup service delivers application data independently of account sign
 preserves the journal owner and encryption identity while creating a distinct installation device
 ID. Content availability and account authentication have independent recovery state.
 
+The [credential custody model](native-android-recovery-custody.md) defines the owner, transport,
+recovery, and invalidation boundaries for each key and credential, including deliberate Block Store non-use.
+
 ## Backup coverage
 
 The manifest selects `backup_rules.xml` for older Android versions and `data_extraction_rules.xml`
@@ -49,6 +52,9 @@ The installation device ID also lives in non-backed-up storage. An ordinary upgr
 previous ID; a replacement installation creates a new one even if preference cleanup is interrupted.
 Archive workers carry the native delivery ID and authenticated account/origin. Only completion of
 that delivery can acknowledge missing content, and stale work cannot acknowledge a later delivery.
+A temporarily unavailable captured session leaves archive work and its source pending for retry,
+both before opening and after reading the archive. A different authenticated owner or an obsolete
+delivery remains stale and cannot import or acknowledge the pending journal.
 Pending sign-in recovery can retry when the app resumes or networking reconnects.
 
 Archive retries preserve drafts with newer or equal saved modification times. Recovery reads and
@@ -283,6 +289,13 @@ Placed-widget choices live in `shared_prefs/logdate_widget_instances.xml`. Nativ
 transfer include that specific file; launcher restoration remaps old widget IDs to replacement IDs.
 The selected entry, recall filters, photo shape, and prompt preference belong to the placed widget.
 
+Dynamic shortcuts are republished from current journal state after normal startup; a retained
+WorkManager request is not their recovery source. Static capture shortcuts keep stable IDs and
+use the variant's literal application ID, generated from one template. A string-resource reference
+in `android:targetPackage` is not resolved by Android's shortcut intent parser. The opt-in
+`RestoredShortcutTargetsRuntimeTest` reads the installed platform shortcut records and checks that
+every capture intent targets and resolves within the current application without launching capture.
+
 ## Emulator acceptance
 
 Worker tests use real `androidx.work.Data`: `Data.EMPTY` for ordinary requests and
@@ -389,6 +402,97 @@ scenario requires a distinct ID on the fresh destination and verifies recovery i
 
 After process death, a read-only probe must find the saved offline edit before the content
 verifier runs. A verifier that creates a missing edit cannot establish persistence.
+
+`tests/e2e/native-restore-work-restart-acceptance.py` first checks account and server
+transitions against real WorkManager on an offline emulator. The current account receives
+an immediate recovery request even when the previous account's request is queued or running.
+A previous request's failure or retry must not block the new account. Token refresh keeps
+the same schedule, and a server change remains observable even with identical credentials.
+Signing out and back into the same account also replaces a running pre-authentication request;
+its later failure or retry cannot consume the new authenticated wake.
+Scheduling acknowledges a target only after its WorkManager operations persist. Transient
+storage failures retry without requiring another authentication or network event. A newer account
+or policy cancels obsolete retries and reconciles partially applied periodic constraints.
+
+The same harness verifies an unresolved native delivery
+and its queued Cloud restore request across process death. Its fixture requires a non-null
+delivery ID before scheduling; restart and repeated enqueue must retain that ID and the same
+WorkManager request. A generic request without a native delivery cannot satisfy this check.
+
+`tests/e2e/native-device-enrollment-acceptance.py` combines a populated two-emulator native
+transfer with the real account/device API and an isolated PostgreSQL server. Build
+`:app:android-main:assembleDebug`, `:app:android-main:assembleDebugAndroidTest`, and
+`:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath`, then provide two fresh,
+rootable emulator serials, both APKs, the generated classpath file, a private database environment
+file, and a new output directory:
+
+```sh
+LOGDATE_NATIVE_ACCEPTANCE_PACKAGE=studio.hypertext.logdate.debug \
+python3 tests/e2e/native-device-enrollment-acceptance.py \
+  --source emulator-5554 --destination emulator-5556 \
+  --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+  --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+  --classpath integration/server-client-e2e/build/android-history-harness.classpath \
+  --fixture-environment /private/temporary/enrollment-environment.json \
+  --output /private/temporary/native-enrollment-result
+```
+
+The environment file must have mode `0600` and contain `DATABASE_URL`, `DATABASE_USER`,
+`DATABASE_PASSWORD`, `SERVER_ENCRYPTION_KEY`, and `LOGDATE_BLOB_STORAGE_DIR`. Use a disposable,
+loopback-only PostgreSQL database and a Base64-encoded random 32-byte server key. The harness
+creates its own synthetic passkey account. It supplies credentials through standard input to a
+private `no_backup` fixture; credentials never appear in instrumentation arguments. The destination
+receives that fixture only after native transfer, duplicate delivery, readable offline content,
+and process-restart checks pass. The fixture selects its local server through real discovery,
+then normal Activity startup and WorkManager must enroll the replacement and upload the retained
+draft and offline-created entry. Before authentication, the fixture continues the restored draft
+with a real repository save while the emulator is offline. Its block IDs, media, selected journals,
+and creation time remain intact. The server copy must decrypt to that new edit after ordinary
+startup sync. The test does not call registration or sync on the destination.
+A second process restart must execute new sync work and retain the same replacement identity
+and session, with exactly two installations in the real server registry.
+Both startup stages require a new successful WorkManager request. Server snapshot verification
+uses the raw API and the production decoders and cipher; the durable sync inbox contains only
+unapplied work and can correctly be empty after successful synchronization.
+The native transfer check waits for the retained text entry to appear on the Timeline, rather
+than accepting navigation over loading placeholders. Local entries publish independently of
+optional recommendations; a stalled or failed lookup cannot hide recovered entries or stop
+later local edits from appearing.
+Archive recovery must await `LogDateConfigDataSource.awaitConfigurationLoaded()` before
+capturing its owner/origin or creating a recovery record. The repository initially exposes the
+default Cloud origin; treating that initial value as a saved choice can bind accepted work to
+the wrong server before draft storage resolves its persisted scope. Use
+`currentArchiveRecoveryScope` for Android archive workers and scheduling. Never repair an older
+record by guessing that a different selected origin owns its pending work.
+
+Archive download, import, retained-source replay, attachment repair, and delayed repair retries
+require Android's `StorageNotLow` constraint. Cloud downloads also require a connected network;
+local archive work must remain eligible offline. Use `archiveRecoveryConstraints` for archive
+import and media requests so resume paths do not bypass the storage policy. Write failures during
+an attempt still retain its source and checkpoint for retry.
+
+`tests/e2e/native-storage-recovery-acceptance.py` accepts explicit emulator, app APK, test APK,
+private output directory, and `--synthetic-data` arguments. It interrupts metadata import after
+accepting a private archive, forces Android's low-storage state, and checks the source bytes and
+queued request across separate app processes. The final probe starts while storage is still low;
+the host releases the storage condition only after that probe is ready. The original WorkManager
+request must finish and restore the draft without another app launch. The harness resets and
+reads back Android's original storage state even when a stage fails. This validates platform
+deferral and interrupted-write custody, rather than physically filling the emulator's filesystem.
+
+The independent server verifier checks that the uploaded draft carries the replacement device ID
+and its original creation time. The historical entry keeps its creation time and encrypted capture
+metadata; the destination decrypts that metadata through the production content API and checks
+its original values. Content records expose capture platform and activity rather than a per-entry
+device UUID, so draft attribution and historical capture continuity have separate assertions.
+Successful cleanup conditionally clears only the fixture sessions and restores both radio states.
+
+The native acceptance workflow runs this scenario after the transport and permission checks.
+Publish only its explicit acceptance receipt and selected instrumentation logs. Keep the database
+environment, server control directory, credential fixture, and native transport payload private.
+This scenario does not establish Google credential delivery, setup-wizard acceptance, independent
+provider-issued replacement sessions, or enrollment key rotation. Account/device registration
+stores installation metadata; peer authentication keys have their own fresh-handshake checks.
 
 The local transport exercises file selection, native callbacks, and application recovery using
 test encryption and direct-transfer flags. Google credential delivery and setup transfer require
@@ -503,6 +607,20 @@ and `keyRestartStage=seed`, followed by stopping the synthetic app process and a
 Verification requires a different process ID and opens the unchanged encrypted journal using the
 only valid key retained in an interrupted write, before committing that key. Acceptance rejects
 both ignored tests and assumption failures; JUnit's `OK` summary alone does not prove execution.
+
+### Reminder schedules on the replacement installation
+
+Reconciliation and immediate evaluation share a scheduler lock and read current persisted reminder
+preferences before accepting work. Repeated startup retains an active evaluation. A late fixed-alarm
+callback respects its morning/evening switch and the active reminder mode; shared reminder consent
+gates moment signals. Cancellation waits for WorkManager persistence before another enqueue can
+enter the gate. Ordinary storage failures retry reconciliation and the pending signal without another
+preference change or input event; turning reminders off cancels those retries.
+
+Broadcast receivers release their pending result after asynchronous scheduling, including when the
+application scope was already cancelled. `RestoredReminderSchedulingRuntimeTest` runs on a Gradle
+Managed Device and checks actual AlarmManager registrations, unique periodic work, both reminder
+modes, and disabled callbacks. It restores the original preferences after checking those states.
 
 ### Recovery accessibility on an emulator
 

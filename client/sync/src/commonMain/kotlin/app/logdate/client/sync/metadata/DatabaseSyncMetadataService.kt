@@ -46,6 +46,22 @@ class DatabaseSyncMetadataService(
             }
         }
 
+    override suspend fun getPendingUploadForScope(
+        entityType: EntityType,
+        entityId: String,
+        scope: UploadScope,
+    ): PendingUpload? =
+        dao.getPending(scope.ownerId, scope.serverOrigin, entityType.name, entityId)?.let { entity ->
+            PendingUpload(
+                entity.entityId,
+                PendingOperation.fromStorage(entity.operation),
+                entity.retryCount,
+                entity.expectedServerVersion,
+                scope,
+                entity.operationId,
+            )
+        }
+
     override suspend fun hasPending(
         entityType: EntityType,
         entityId: String,

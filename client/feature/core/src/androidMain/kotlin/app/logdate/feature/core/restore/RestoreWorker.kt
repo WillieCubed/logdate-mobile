@@ -108,7 +108,7 @@ class RestoreWorker(
 
     private suspend fun restore(): Result {
         val native = NativeRestoreWorkState(context, inputData, sessionStorage)
-        if (!native.isCurrent()) return Result.success()
+        nativeValidationResult(native)?.let { return it }
         val scope = currentArchiveRecoveryScope(getKoin())
         val expectedOwner = inputData.getString(EXPECTED_OWNER_KEY)
         val expectedOrigin = inputData.getString(EXPECTED_ORIGIN_KEY)
@@ -142,6 +142,13 @@ class RestoreWorker(
         }
         return openAndRestore(attempt)
     }
+
+    private suspend fun nativeValidationResult(native: NativeRestoreWorkState): Result? =
+        when (native.validation()) {
+            NativeRestoreWorkState.Validation.CURRENT -> null
+            NativeRestoreWorkState.Validation.STALE -> Result.success()
+            NativeRestoreWorkState.Validation.WAITING_FOR_SESSION -> Result.retry()
+        }
 
     private suspend fun openAndRestore(attempt: Attempt): Result {
         val retained = if (attempt.previous != null && !attempt.replacement) store.source(recoveryId).takeIf { it.isFile } else null
@@ -185,7 +192,7 @@ class RestoreWorker(
             } catch (_: IllegalStateException) {
                 return invalidArchive()
             }
-        if (!attempt.native.isCurrent()) return Result.success()
+        nativeValidationResult(attempt.native)?.let { return it }
         check(currentArchiveRecoveryScope(getKoin()) == attempt.scope) { "Archive recovery account changed" }
         val record = store.begin(recoveryId, attempt.scope, file, ImportOptions(includeDrafts, includeMedia), label)
         if (store.read(recoveryId)?.pausedByUser == true) return Result.success()

@@ -16,9 +16,11 @@ class RoomSyncTransactionManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : SyncTransactionManager {
     override suspend fun <T> withTransaction(block: suspend () -> T): T =
-        withContext(ioDispatcher) {
-            database.useWriterConnection { transactor ->
-                transactor.immediateTransaction { block() }
+        withSyncTransactionCompletion(this, transaction = { operation ->
+            withContext(ioDispatcher) {
+                database.useWriterConnection { transactor ->
+                    transactor.immediateTransaction { operation() }
+                }
             }
-        }
+        }, block = block)
 }

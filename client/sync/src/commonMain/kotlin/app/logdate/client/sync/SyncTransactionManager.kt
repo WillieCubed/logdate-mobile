@@ -11,4 +11,7 @@ interface SyncTransactionManager {
      * Otherwise, all writes are committed atomically.
      */
     suspend fun <T> withTransaction(block: suspend () -> T): T
+
+    /** Runs after the enclosing transaction commits; outside a transaction, runs immediately. */
+    suspend fun afterCommit(block: suspend () -> Unit) = afterSyncTransactionCommit(this, block)
 }

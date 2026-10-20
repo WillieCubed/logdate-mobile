@@ -17,6 +17,7 @@ import java.io.File
 class LogDateReleasePlugin : Plugin<Project> {
     override fun apply(target: Project) {
         target.extensions.create("logdateRelease", LogDateReleaseExtension::class.java, target)
+        configureAndroidShortcuts(target)
     }
 }
 

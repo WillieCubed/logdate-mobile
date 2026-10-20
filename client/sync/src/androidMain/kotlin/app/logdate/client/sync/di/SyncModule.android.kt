@@ -115,6 +115,7 @@ actual val syncModule: Module =
                 get(),
                 get<NetworkAvailabilityMonitor>(),
                 get(),
+                get<LogDateConfigRepository>(),
             )
         }
         includes(

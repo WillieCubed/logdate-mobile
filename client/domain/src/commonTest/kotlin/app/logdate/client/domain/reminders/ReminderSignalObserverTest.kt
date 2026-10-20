@@ -135,4 +135,43 @@ class ReminderSignalObserverTest {
             assertEquals(1, attempts)
             assertEquals(0, evaluations)
         }
+
+    @Test fun failedEnqueueRetriesWithoutAnotherSignalAndKeepsObserving() =
+        runTest {
+            enabled.value = true
+            ReminderSignalObserver(enabled, places, { marks }, { locations }, {
+                evaluations++
+                if (evaluations == 1) error("Work persistence unavailable")
+            }, backgroundScope).start()
+            runCurrent()
+            marks.emit(Unit)
+            runCurrent()
+            advanceTimeBy(30_001)
+            assertEquals(1, evaluations)
+            advanceTimeBy(60_000)
+            assertEquals(2, evaluations)
+            marks.emit(Unit)
+            runCurrent()
+            advanceTimeBy(30_001)
+            assertEquals(3, evaluations)
+        }
+
+    @Test fun optOutCancelsThePendingEnqueueRetry() =
+        runTest {
+            enabled.value = true
+            ReminderSignalObserver(enabled, places, { marks }, { locations }, {
+                evaluations++
+                error("Work persistence unavailable")
+            }, backgroundScope).start()
+            runCurrent()
+            marks.emit(Unit)
+            runCurrent()
+            advanceTimeBy(30_001)
+            enabled.value = false
+            runCurrent()
+            advanceTimeBy(120_001)
+            assertEquals(1, evaluations)
+            assertEquals(0, marks.subscriptionCount.value)
+            assertEquals(0, locations.subscriptionCount.value)
+        }
 }

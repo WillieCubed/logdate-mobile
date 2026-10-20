@@ -212,10 +212,7 @@ private class AndroidApplicationRuntime(
         isolated("Failed to start the media reference migration") {
             resolve<StoredMediaReferenceMigrationLauncher>().start()
         }
-        isolated("Failed to initialize ambient prompt scheduling") {
-            resolve<AmbientPromptSchedulingObserver>().start()
-            resolve<AmbientPromptScheduler>().enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
-        }
+        isolated("Failed to initialize ambient prompt scheduling") { startAmbientScheduling() }
         isolated("Failed to observe reminder signals") {
             resolve<ReminderSignalObserver>().start()
         }
@@ -256,6 +253,20 @@ private class AndroidApplicationRuntime(
         startWatchReceipts()
         runCatching { resolve<WatchWindowPublisher>().start(resolve<CoroutineScope>()) }
             .onFailure { Napier.w("Failed to start publishing watch libraries", it) }
+    }
+
+    private fun startAmbientScheduling() {
+        resolve<AmbientPromptSchedulingObserver>().start()
+        val scheduler = resolve<AmbientPromptScheduler>()
+        resolve<CoroutineScope>().launch {
+            try {
+                scheduler.enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Napier.w("Ambient prompt evaluation will reconcile on the next startup", error)
+            }
+        }
     }
 
     private fun preserveExistingIdentityBackup() {

@@ -1,5 +1,6 @@
 package app.logdate.client.e2e
 
+import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
@@ -19,6 +20,7 @@ internal class RestoreWorkerTestBindings {
     private val launcher = koin.get<RestoreLauncher>()
     private val owner = koin.get<CanonicalOwnerProvider>()
     private val config = koin.get<LogDateConfigRepository>()
+    private val configuration = koin.get<LogDateConfigDataSource>()
     private val sessions = koin.get<SessionStorage>()
     private val diagnostics = koin.getOrNull<RestoreDiagnosticEvents>()
 
@@ -30,6 +32,7 @@ internal class RestoreWorkerTestBindings {
                 single<RestoreLauncher> { launcher }
                 single<CanonicalOwnerProvider> { owner }
                 single<LogDateConfigRepository> { config }
+                single { configuration }
                 single<SessionStorage> { sessions }
                 diagnostics?.let { original -> single<RestoreDiagnosticEvents> { original } }
             },

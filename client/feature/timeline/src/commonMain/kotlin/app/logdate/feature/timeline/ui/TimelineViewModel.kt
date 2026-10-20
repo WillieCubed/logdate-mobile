@@ -170,19 +170,18 @@ class TimelineViewModel(
                 timelineSuggestion = null,
                 snackbarMessage = snackbarMessageState.value,
             )
-        }.combine(getHomeRecommendation().map { it.toTimelineSuggestionBlock() }) { state, suggestion ->
-            state.copy(timelineSuggestion = suggestion)
-        }.combine(snackbarMessageState) { state, snackbarMessage ->
-            state.copy(snackbarMessage = snackbarMessage)
-        }.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5000),
-            // Immediate first paint with skeleton
-            HomeTimelineUiState(
-                loadingState = TimelineLoadingState.InitialLoading,
-                isLoading = true,
-            ),
-        )
+        }.withOptionalTimelineSuggestion(getHomeRecommendation().map { it.toTimelineSuggestionBlock() })
+            .combine(snackbarMessageState) { state, snackbarMessage ->
+                state.copy(snackbarMessage = snackbarMessage)
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                // Immediate first paint with skeleton
+                HomeTimelineUiState(
+                    loadingState = TimelineLoadingState.InitialLoading,
+                    isLoading = true,
+                ),
+            )
 
     /**
      * Removes a note from the timeline.

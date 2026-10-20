@@ -6,8 +6,10 @@ import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.watch.SharedPreferenceKey
 import app.logdate.client.domain.watch.WatchPreferencesRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -22,7 +24,7 @@ class AmbientPromptSchedulingObserver(
     private var job: Job? = null
 
     fun start() {
-        if (job != null) return
+        if (job?.isActive == true) return
 
         job =
             applicationScope.launch {
@@ -30,10 +32,24 @@ class AmbientPromptSchedulingObserver(
                     memoriesSettingsRepository.observeSettings(),
                     flags.observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                     shared.observe(SharedPreferenceKey.RemindersEnabled),
-                ) { settings, _, _ -> settings }.collectLatest { settings ->
+                ) { settings, _, _ -> settings }.collectLatest {
                     Napier.d("Refreshing ambient prompt schedules after settings change")
-                    scheduler.refreshSchedules(settings)
+                    refreshWithRetry()
                 }
             }
+    }
+
+    private suspend fun refreshWithRetry() {
+        while (true) {
+            try {
+                scheduler.refreshSchedules()
+                return
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Napier.w("Reminder schedules will retry when storage becomes available", error)
+                delay(30_000)
+            }
+        }
     }
 }

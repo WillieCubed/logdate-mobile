@@ -61,14 +61,8 @@ class OfflineFirstJournalRepository(
     private val mergeChanges: Flow<Unit>
         get() = if (database == null) flowOf(Unit) else combine(mergeScopeChanges, merges.observeAll()) { _, _ -> Unit }
 
-    private val syncDebouncer =
-        SyncDebouncer(scope = externalScope) {
-            syncManagerProvider().syncJournals()
-        }
-    private val draftSyncDebouncer =
-        SyncDebouncer(scope = externalScope) {
-            syncManagerProvider().syncDrafts()
-        }
+    private val syncDebouncer = SyncDebouncer(scope = externalScope) { syncManagerProvider().syncJournals() }
+    private val draftSyncDebouncer = SyncDebouncer(scope = externalScope) { syncManagerProvider().syncDrafts() }
 
     override val allJournalsObserved: Flow<List<Journal>>
         get() =
@@ -88,9 +82,7 @@ class OfflineFirstJournalRepository(
         JournalLocalMutations(
             journalDao,
             syncMetadataService,
-            mergeTransactionManager.takeIf {
-                database != null
-            },
+            mergeTransactionManager.takeIf { database != null },
             currentScope,
             ::resolveJournalId,
             syncDebouncer::trigger,
@@ -123,6 +115,7 @@ class OfflineFirstJournalRepository(
             ::resolveDraft,
             draftSyncDebouncer::trigger,
             mergeTransactionManager ?: DirectArchiveRecoveryTransactions,
+            currentScope,
         )
 
     override suspend fun saveDraft(draft: EditorDraft) = withContext(dispatcher) { draftPersistence.save(draft) }
@@ -154,20 +147,17 @@ class OfflineFirstJournalRepository(
     override suspend fun getAllDraftsForSync(): List<EditorDraft> =
         withContext(dispatcher) { draftRepository.getAllDraftsForSync().map { resolveDraft(it) } }
 
+    override suspend fun hasUnclaimedDraft(id: Uuid): Boolean = withContext(dispatcher) { draftRepository.hasUnclaimedDraft(id) }
+
     override suspend fun getDraft(id: Uuid): EditorDraft? =
         withContext(dispatcher) { draftRepository.getDraft(id)?.let { resolveDraft(it) } }
 
     override suspend fun deleteDraft(id: Uuid) = withContext(dispatcher) { draftPersistence.delete(id) }
 
     override suspend fun saveDraftFromSync(draft: EditorDraft) =
-        withContext(dispatcher) {
-            draftRepository.saveDraftFromSync(resolveDraft(draft))
-        }
+        withContext(dispatcher) { draftRepository.saveDraftFromSync(resolveDraft(draft)) }
 
-    override suspend fun deleteDraftFromSync(id: Uuid) =
-        withContext(dispatcher) {
-            draftRepository.deleteDraft(id)
-        }
+    override suspend fun deleteDraftFromSync(id: Uuid) = withContext(dispatcher) { draftRepository.deleteDraft(id) }
 
     override suspend fun createFromSync(journal: Journal) =
         withContext(dispatcher) {
@@ -189,10 +179,8 @@ class OfflineFirstJournalRepository(
                 if (database != null) {
                     val scope = currentScope()
                     merges
-                        .all(
-                            scope.ownerId,
-                            scope.serverOrigin,
-                        ).filter { it.pending && resolve(scope, it.destinationId) == journalId }
+                        .all(scope.ownerId, scope.serverOrigin)
+                        .filter { it.pending && resolve(scope, it.destinationId) == journalId }
                         .forEach { row ->
                             val retained = recoveryContents(scope, row)
                             merges.put(row.copy(recoveryContentIds = Json.encodeToString(retained.map { it.toString() })))
@@ -206,9 +194,7 @@ class OfflineFirstJournalRepository(
         journalId: Uuid,
         syncVersion: Long,
         syncedAt: Instant,
-    ) = withContext(dispatcher) {
-        journalDao.updateSyncMetadata(journalId, syncVersion, syncedAt)
-    }
+    ) = withContext(dispatcher) { journalDao.updateSyncMetadata(journalId, syncVersion, syncedAt) }
 
     override suspend fun previewMerge(
         sourceId: Uuid,
@@ -364,9 +350,8 @@ class OfflineFirstJournalRepository(
         outbox.deletePending(scope.ownerId, scope.serverOrigin, "JOURNAL", sourceId.toString())
         outbox
             .getPendingByType(scope.ownerId, scope.serverOrigin, "ASSOCIATION")
-            .filter {
-                AssociationPendingKey.fromPendingId(it.entityId)?.journalId == sourceId
-            }.forEach { outbox.deletePending(scope.ownerId, scope.serverOrigin, "ASSOCIATION", it.entityId) }
+            .filter { AssociationPendingKey.fromPendingId(it.entityId)?.journalId == sourceId }
+            .forEach { outbox.deletePending(scope.ownerId, scope.serverOrigin, "ASSOCIATION", it.entityId) }
     }
 
     private suspend fun settle(pending: PendingUploadEntity) =
