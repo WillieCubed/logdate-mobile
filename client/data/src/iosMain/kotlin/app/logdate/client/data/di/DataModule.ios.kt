@@ -12,7 +12,6 @@ import app.logdate.client.data.account.historyOwnerAdoptionModule
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
-import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.NoOpJournalDataSource
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
@@ -130,14 +129,7 @@ actual val dataModule: Module =
         // field is unused at runtime.
         factory<RemoteJournalDataSource> { NoOpJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
-        single<DraftRepository> {
-            LocalFirstDraftRepository(
-                get(),
-                get(),
-                get<app.logdate.client.datastore.SessionStorage>(),
-                get<app.logdate.shared.config.LogDateConfigRepository>(),
-            )
-        }
+        single<DraftRepository> { createLocalDraftRepository() }
         single<JournalRepository> {
             OfflineFirstJournalRepository(
                 get(),

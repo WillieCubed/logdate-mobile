@@ -32,6 +32,7 @@ class CloudRestoreScheduler(
                     Constraints
                         .Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiresStorageNotLow(true)
                         .build(),
                 ).addTag(CloudRestoreWorker.WORK_TAG)
                 .build()

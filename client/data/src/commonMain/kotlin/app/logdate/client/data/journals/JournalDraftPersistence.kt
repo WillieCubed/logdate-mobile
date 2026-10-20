@@ -16,15 +16,70 @@ internal class JournalDraftPersistence(
     private val resolve: suspend (EditorDraft) -> EditorDraft,
     private val changed: () -> Unit,
     private val transactions: app.logdate.client.sync.SyncTransactionManager = DirectArchiveRecoveryTransactions,
+    private val currentOutboxScope: (suspend () -> JournalMergeScope)? = null,
 ) {
     suspend fun save(draft: EditorDraft) {
-        drafts.saveDraft(resolve(draft))
-        enqueue(draft.id, PendingOperation.UPDATE)
+        val scope = mutationScope()
+        val resolved = resolve(draft)
+        persist(draft.id, resolved, scope)
     }
 
-    suspend fun delete(id: Uuid) {
-        drafts.deleteDraft(id)
-        enqueue(id, PendingOperation.DELETE)
+    suspend fun delete(id: Uuid) = persist(id, null, mutationScope())
+
+    private suspend fun mutationScope(): DraftRecoveryScope? {
+        val storage = drafts.getDraftRecoveryScope()
+        val outbox = currentOutboxScope?.invoke()
+        requireStorageScope(storage)
+        check(
+            storage?.ownerId == null ||
+                outbox == null ||
+                storage.ownerId == outbox.ownerId &&
+                storage.serverOrigin == outbox.serverOrigin,
+        ) {
+            "Draft storage and upload scope differ"
+        }
+        return storage?.copy(
+            outboxOwnerId = outbox?.ownerId?.takeIf { it.isNotBlank() } ?: storage.outboxOwnerId,
+            outboxServerOrigin = outbox?.serverOrigin?.takeIf { it.isNotBlank() } ?: storage.outboxServerOrigin,
+        )
+    }
+
+    private suspend fun persist(
+        id: Uuid,
+        replacement: EditorDraft?,
+        scope: DraftRecoveryScope?,
+    ) {
+        requireStorageScope(scope)
+        if (scope != null && drafts.persistDraftMutation(id, replacement, scope)) {
+            changed()
+            return
+        }
+        while (true) {
+            requireStorageScope(scope)
+            val expected = drafts.getDraftForRestore(id)
+            requireStorageScope(scope)
+            val updated =
+                replacement?.let {
+                    if (expected == null) {
+                        it
+                    } else {
+                        it.copy(
+                            lastModifiedAt =
+                                kotlin.time.Clock.System
+                                    .now(),
+                        )
+                    }
+                }
+            if (drafts.compareAndSetDraftForRestore(id, expected, updated, scope)) break
+        }
+        val operation = if (replacement == null) PendingOperation.DELETE else PendingOperation.UPDATE
+        val captured = uploadScope(scope)
+        if (captured == null) {
+            metadata.enqueuePending(id.toString(), EntityType.DRAFT, operation)
+        } else {
+            metadata.enqueuePendingForScope(id.toString(), EntityType.DRAFT, operation, captured)
+        }
+        changed()
     }
 
     suspend fun captureScope(currentOutboxScope: suspend () -> JournalMergeScope): DraftRecoveryScope? {
@@ -113,14 +168,6 @@ internal class JournalDraftPersistence(
             }
         if (applied && enqueue && expected != replacement) changed()
         return applied
-    }
-
-    private suspend fun enqueue(
-        id: Uuid,
-        operation: PendingOperation,
-    ) {
-        metadata.enqueuePending(id.toString(), EntityType.DRAFT, operation)
-        changed()
     }
 }
 

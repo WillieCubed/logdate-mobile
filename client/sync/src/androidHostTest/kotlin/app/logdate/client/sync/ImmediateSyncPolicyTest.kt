@@ -40,4 +40,20 @@ class ImmediateSyncPolicyTest {
     fun `a failed scheduler request does not prevent resumption`() {
         assertEquals(ExistingWorkPolicy.REPLACE, immediateSyncPolicy(listOf(WorkInfo.State.FAILED)))
     }
+
+    @Test
+    fun `an account switch replaces obsolete running work`() {
+        assertEquals(
+            ExistingWorkPolicy.REPLACE,
+            immediateSyncPolicy(listOf(WorkInfo.State.RUNNING), ownerChanged = true),
+        )
+    }
+
+    @Test
+    fun `the previous account consent cannot discard the new account recovery wake`() {
+        assertEquals(
+            ExistingWorkPolicy.REPLACE,
+            immediateSyncPolicy(listOf(WorkInfo.State.ENQUEUED), preserveConsentedRequest = true, ownerChanged = true),
+        )
+    }
 }

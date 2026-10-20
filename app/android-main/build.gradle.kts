@@ -388,15 +388,10 @@ extensions.configure<ApplicationExtension> {
 
 androidComponents {
     onVariants { variant ->
-        // XML resources do not expand manifest placeholders. Account authentication and launcher
-        // shortcuts must use the final package, including any variant suffix or legacy override.
+        // Account authentication must use the final package, including variant suffixes and overrides.
         variant.resValues.put(
             variant.makeResValueKey("string", "logdate_account_type"),
             variant.applicationId.map { ResValue("$it.account") },
-        )
-        variant.resValues.put(
-            variant.makeResValueKey("string", "logdate_application_id"),
-            variant.applicationId.map { ResValue(it) },
         )
     }
 }

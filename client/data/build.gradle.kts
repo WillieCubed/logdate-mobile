@@ -63,6 +63,7 @@ kotlin {
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
             implementation(libs.napier)
+            implementation(libs.okio)
         }
         androidMain.dependencies {
             implementation(libs.androidx.appsearch)

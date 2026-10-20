@@ -39,6 +39,10 @@ def adb(serial, *arguments, timeout=180):
 
 
 def probe(serial, mode, output):
+    account_transitions = mode == "account-transitions"
+    probe_class = "app.logdate.client.e2e.AndroidSyncAccountTransitionRuntimeTest" if account_transitions else PROBE
+    argument = "syncAccountTransitions" if account_transitions else "cloudRestoreWorkMode"
+    value = "true" if account_transitions else mode
     result = adb(
         serial,
         "shell",
@@ -48,15 +52,15 @@ def probe(serial, mode, output):
         "-r",
         "-e",
         "class",
-        PROBE,
+        probe_class,
         "-e",
-        "cloudRestoreWorkMode",
-        mode,
+        argument,
+        value,
         RUNNER,
     )
     output.write_bytes(result)
     output.chmod(0o600)
-    if not instrumentation_passed(result):
+    if not instrumentation_passed(result, 7 if account_transitions else 1):
         raise RuntimeError(f"Cloud restore work {mode} probe failed; inspect {output}")
 
 
@@ -107,6 +111,7 @@ def main():
     original_radio = radio_state(options.emulator)
     try:
         set_offline(options.emulator)
+        probe(options.emulator, "account-transitions", options.output / "account-transitions.log")
         probe(options.emulator, "enqueue", options.output / "enqueue.log")
         adb(options.emulator, "shell", "am", "force-stop", PACKAGE)
         probe(options.emulator, "verify", options.output / "after-process-restart.log")

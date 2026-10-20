@@ -10,5 +10,6 @@ import androidx.room.withTransaction
 class RoomSyncTransactionManager(
     private val database: RoomDatabase,
 ) : SyncTransactionManager {
-    override suspend fun <T> withTransaction(block: suspend () -> T): T = database.withTransaction(block)
+    override suspend fun <T> withTransaction(block: suspend () -> T): T =
+        withSyncTransactionCompletion(this, { operation -> database.withTransaction(operation) }, block)
 }

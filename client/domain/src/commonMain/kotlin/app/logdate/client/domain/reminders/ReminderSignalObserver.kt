@@ -24,7 +24,7 @@ class ReminderSignalObserver(
     private val placesEnabled: Flow<Boolean>,
     private val markChanges: () -> Flow<Unit>,
     private val locationChanges: () -> Flow<Unit>,
-    private val enqueue: () -> Unit,
+    private val enqueue: suspend () -> Unit,
     private val scope: CoroutineScope,
 ) {
     private var job: Job? = null
@@ -39,9 +39,23 @@ class ReminderSignalObserver(
                         merge(
                             resilient(markChanges),
                             if (places) resilient(locationChanges) else emptyFlow(),
-                        ).sample(30_000).collect { enqueue() }
+                        ).sample(30_000).collect { enqueueWithRetry() }
                     }
             }
+    }
+
+    private suspend fun enqueueWithRetry() {
+        while (true) {
+            try {
+                enqueue()
+                return
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Napier.w("Reminder scheduling unavailable; retrying the pending signal", error)
+                delay(60_000)
+            }
+        }
     }
 
     private fun resilient(changes: () -> Flow<Unit>): Flow<Unit> =

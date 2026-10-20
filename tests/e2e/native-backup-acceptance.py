@@ -271,7 +271,7 @@ def package_file_snapshot(serial):
 
 def assert_snapshot_preserved(before, after, *, require_database=True, ignored_paths=()):
     def is_volatile(path):
-        if path in {"databases/logdate-wal", "databases/logdate-shm"} or path.startswith(
+        if path in {"databases/logdate-wal", "databases/logdate-shm", "files/logdate.preferences_pb.tmp"} or path.startswith(
             RUNTIME_ONLY_SNAPSHOT_PREFIXES
         ):
             return True
@@ -619,7 +619,7 @@ def timeline_is_open(hierarchy):
     ):
         return False
     texts = {node.get("text") for node in nodes}
-    return "Search your log" in texts and "Timeline" in texts
+    return {"Search your log", "Timeline", "Text retained through native backup"}.issubset(texts)
 
 
 def system_ui_unresponsive_dialog_present(hierarchy):
@@ -712,7 +712,13 @@ def wait_for_timeline(serial, output, timeout_seconds=60, prefix="destination"):
     ui_path = output / f"{prefix}-ui.xml"
     screenshot_path = output / f"{prefix}-journal.png"
     while True:
-        dumped = adb(serial, "shell", "uiautomator", "dump", "/data/local/tmp/logdate-native-acceptance-ui.xml")
+        try:
+            dumped = adb(serial, "shell", "uiautomator", "dump", "/data/local/tmp/logdate-native-acceptance-ui.xml")
+        except subprocess.CalledProcessError as error:
+            if error.returncode != 137:
+                raise
+            print("Android killed the UI inspector; rechecking within the existing Timeline deadline", flush=True)
+            dumped = b""
         if b"dumped to:" in dumped:
             hierarchy = adb(serial, "exec-out", "cat", "/data/local/tmp/logdate-native-acceptance-ui.xml")
             screenshot = adb(serial, "exec-out", "screencap", "-p")

@@ -16,7 +16,6 @@ import app.logdate.client.data.account.historyOwnerAdoptionModule
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
-import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.NativeDraftMediaQuarantine
 import app.logdate.client.data.journals.NoOpJournalDataSource
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
@@ -145,9 +144,7 @@ actual val dataModule: Module =
         // Real journal sync runs through SyncManager and the Cloud Run sync API.
         factory<RemoteJournalDataSource> { NoOpJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
-        single<DraftRepository> {
-            LocalFirstDraftRepository(get(), get(), get<SessionStorage>(), get<app.logdate.shared.config.LogDateConfigRepository>())
-        }
+        single<DraftRepository> { createLocalDraftRepository() }
         single<JournalRepository> {
             OfflineFirstJournalRepository(
                 get(),

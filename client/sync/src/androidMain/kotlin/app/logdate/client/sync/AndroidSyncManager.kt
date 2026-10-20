@@ -12,6 +12,7 @@ import androidx.work.Operation
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.await
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.networking.DataUsageMode
@@ -19,18 +20,22 @@ import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
 import app.logdate.client.sync.metadata.UploadScope
+import app.logdate.shared.config.LogDateConfigRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -67,11 +72,11 @@ class AndroidSyncManager(
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val networkMonitor: NetworkAvailabilityMonitor,
     private val dataUsagePolicy: DataUsagePolicy,
+    private val configRepository: LogDateConfigRepository,
 ) : SyncManager {
     private val workManager = WorkManager.getInstance(applicationContext)
     private val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(supervisorJob + Dispatchers.IO)
-    private val periodicScheduleDecider = PeriodicSyncScheduleDecider()
     private val requestedBackupState =
         workManager
             .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
@@ -82,37 +87,23 @@ class AndroidSyncManager(
         // Keep one owner for periodic scheduling. Separate auth and policy collectors used to
         // replace the same work twice at startup and could schedule again after sign-out.
         scope.launch {
-            combine(
-                sessionStorage.getSessionFlow().map { it != null },
-                dataUsagePolicy.policy,
-            ) { authenticated, mode -> periodicScheduleDecider.next(authenticated, mode) }
-                .collect { change ->
-                    when (change) {
-                        is PeriodicSyncScheduleChange.Enable -> {
-                            try {
-                                setupPeriodicSync(change.requirement)
-                                defaultSyncManager.releaseUploadBackoff()
-                                resumeScheduledSync()
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                Napier.e("Could not schedule authenticated sync")
-                            }
-                        }
-                        PeriodicSyncScheduleChange.ResumeMedia -> {
-                            try {
-                                defaultSyncManager.releaseUploadBackoff()
-                                resumeScheduledSync()
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                Napier.w("Media recovery scheduling remains pending")
-                            }
-                        }
-                        PeriodicSyncScheduleChange.Disable -> disableBackgroundSync()
-                        PeriodicSyncScheduleChange.Unchanged -> Unit
+            val targets =
+                combine(
+                    sessionStorage.getSessionFlow(),
+                    configRepository.backendUrl,
+                    dataUsagePolicy.policy,
+                ) { _, origin, mode -> authenticatedScheduleTarget(origin, mode) }
+                    .filterNotNull()
+                    .retryWhen { failure, attempt ->
+                        if (failure is CancellationException) throw failure
+                        Napier.w("Authenticated recovery scheduling is waiting for session storage")
+                        delay((1_000L shl attempt.coerceAtMost(5).toInt()).coerceAtMost(30_000L))
+                        true
                     }
-                }
+            PeriodicSyncScheduleController(
+                isCurrent = ::isAuthenticatedScheduleCurrent,
+                apply = ::applyAuthenticatedSchedule,
+            ).collect(targets)
         }
         // Observe network state and trigger sync retry on network restoration
         scope.launch {
@@ -131,6 +122,53 @@ class AndroidSyncManager(
                     lastNetworkState = currentState
                 }
         }
+    }
+
+    private suspend fun applyAuthenticatedSchedule(change: PeriodicSyncScheduleChange) {
+        when (change) {
+            is PeriodicSyncScheduleChange.Enable -> {
+                setupPeriodicSync(change.requirement)
+                resumeAuthenticatedSync(ownerChanged = change.ownerChanged)
+            }
+            PeriodicSyncScheduleChange.ResumeOwner,
+            PeriodicSyncScheduleChange.ResumeMedia,
+            -> resumeAuthenticatedSync(ownerChanged = change == PeriodicSyncScheduleChange.ResumeOwner)
+            PeriodicSyncScheduleChange.Disable -> disableBackgroundSync()
+            PeriodicSyncScheduleChange.Unchanged -> Unit
+        }
+    }
+
+    private suspend fun resumeAuthenticatedSync(ownerChanged: Boolean) {
+        if (ownerChanged) {
+            // Retire obsolete work before waiting for a phase lock held by its running worker.
+            // A dependent request would inherit that worker's authentication failure or backoff.
+            workManager.cancelUniqueWork(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC).await()
+        }
+        defaultSyncManager.releaseUploadBackoff()
+        resumeScheduledSync(ownerChanged = ownerChanged).await()
+    }
+
+    private suspend fun authenticatedScheduleTarget(
+        origin: String,
+        mode: DataUsageMode,
+    ): PeriodicSyncScheduleTarget? {
+        if (configRepository.getCurrentBackendUrl() != origin) return null
+        // A server change can retain identical credentials and suppress the session-flow emission.
+        if (sessionStorage.getOriginBoundSession() == null) sessionStorage.hasValidSession()
+        if (configRepository.getCurrentBackendUrl() != origin) return null
+        val session = sessionStorage.getOriginBoundSession()?.takeIf { it.origin == origin }
+        val owner = session?.let { UploadScope(it.session.accountId, it.origin) }
+        return PeriodicSyncScheduleTarget(mode, owner, origin)
+    }
+
+    private suspend fun isAuthenticatedScheduleCurrent(target: PeriodicSyncScheduleTarget): Boolean {
+        if (configRepository.getCurrentBackendUrl() != target.origin) return false
+        if (dataUsagePolicy.currentMode() != target.mode) return false
+        val current = sessionStorage.getOriginBoundSession()
+        val owner = current?.let { UploadScope(it.session.accountId, it.origin) }
+        return owner == target.owner &&
+            sessionStorage.getSession()?.accountId == target.owner?.ownerId &&
+            configRepository.getCurrentBackendUrl() == target.origin
     }
 
     /**
@@ -201,7 +239,10 @@ class AndroidSyncManager(
         return resumeScheduledSync(consent)
     }
 
-    private suspend fun resumeScheduledSync(consent: UploadScope? = null): Operation {
+    private suspend fun resumeScheduledSync(
+        consent: UploadScope? = null,
+        ownerChanged: Boolean = false,
+    ): Operation {
         val policy =
             try {
                 val work =
@@ -211,13 +252,18 @@ class AndroidSyncManager(
                 immediateSyncPolicy(
                     work.map { it.state },
                     hasMobileDataConsent = consent != null,
+                    ownerChanged = ownerChanged,
                     preserveConsentedRequest = work.any { !it.state.isFinished && MOBILE_DATA_SYNC_TAG in it.tags },
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 Napier.e("Could not inspect scheduled sync; preserving any active request")
-                if (consent != null) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP
+                when {
+                    ownerChanged -> ExistingWorkPolicy.REPLACE
+                    consent != null -> ExistingWorkPolicy.APPEND_OR_REPLACE
+                    else -> ExistingWorkPolicy.KEEP
+                }
             }
         return scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL, policy = policy, consent = consent)
     }
@@ -275,7 +321,7 @@ class AndroidSyncManager(
      * - [DataUsageMode.Restricted]: Require unmetered network (WiFi only)
      * - [DataUsageMode.Conservative] / [DataUsageMode.Unrestricted]: Any connected network
      */
-    private fun setupPeriodicSync(requirement: PeriodicNetworkRequirement) {
+    private suspend fun setupPeriodicSync(requirement: PeriodicNetworkRequirement) {
         val networkType =
             when (requirement) {
                 PeriodicNetworkRequirement.UNMETERED -> NetworkType.UNMETERED
@@ -313,11 +359,12 @@ class AndroidSyncManager(
                 ).build()
 
         // UPDATE applies changed constraints without resetting the periodic clock on startup.
-        workManager.enqueueUniquePeriodicWork(
-            AndroidLogDateSyncWorker.WORK_NAME_PERIODIC_SYNC,
-            ExistingPeriodicWorkPolicy.UPDATE,
-            periodicRequest,
-        )
+        workManager
+            .enqueueUniquePeriodicWork(
+                AndroidLogDateSyncWorker.WORK_NAME_PERIODIC_SYNC,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                periodicRequest,
+            ).await()
 
         Napier.d("Scheduled periodic sync")
     }
@@ -326,8 +373,8 @@ class AndroidSyncManager(
      * Disables all background sync work.
      * Called automatically when authentication state changes to unauthenticated.
      */
-    private fun disableBackgroundSync() {
-        workManager.cancelUniqueWork(AndroidLogDateSyncWorker.WORK_NAME_PERIODIC_SYNC)
+    private suspend fun disableBackgroundSync() {
+        workManager.cancelUniqueWork(AndroidLogDateSyncWorker.WORK_NAME_PERIODIC_SYNC).await()
         Napier.i("Disabled background sync")
     }
 

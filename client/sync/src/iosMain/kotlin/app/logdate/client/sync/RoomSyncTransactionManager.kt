@@ -12,7 +12,9 @@ class RoomSyncTransactionManager(
     private val database: RoomDatabase,
 ) : SyncTransactionManager {
     override suspend fun <T> withTransaction(block: suspend () -> T): T =
-        database.useWriterConnection { transactor ->
-            transactor.immediateTransaction { block() }
-        }
+        withSyncTransactionCompletion(this, transaction = { operation ->
+            database.useWriterConnection { transactor ->
+                transactor.immediateTransaction { operation() }
+            }
+        }, block = block)
 }

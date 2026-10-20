@@ -38,15 +38,15 @@ internal class DraftUploader(
     private val supportsRichDrafts: () -> Boolean,
     private val draftRepairScope: () -> DownloadScope?,
 ) {
-    suspend fun uploadPending(): SyncResult {
+    suspend fun uploadPending(drafts: List<EditorDraft>): SyncResult {
         var uploadedCount = 0
         val errors = mutableListOf<SyncError>()
+        val draftsById = drafts.associateBy { it.id.toString() }
         val pendingUploads = syncMetadataService.getPendingUploads(EntityType.DRAFT).dueNow(EntityType.DRAFT, retryCoordinator)
         if (pendingUploads.isEmpty()) {
             return SyncResult(success = true, uploadedItems = 0)
         }
 
-        val draftsById = journalRepository.getAllDraftsForSync().associateBy { it.id.toString() }
         val deviceId = currentDeviceId()
 
         for (pending in pendingUploads) {
@@ -61,7 +61,7 @@ internal class DraftUploader(
                     PendingOperation.DELETE -> deleteDraft(pending, draftId, errors)
                     PendingOperation.CREATE,
                     PendingOperation.UPDATE,
-                    -> uploadDraft(pending, draftsById[pending.entityId], deviceId, errors)
+                    -> uploadDraft(pending, draftId, draftsById[pending.entityId], deviceId, errors)
                 }
             if (uploaded) uploadedCount++
         }
@@ -135,11 +135,13 @@ internal class DraftUploader(
     /** Returns true when the server accepted the draft; [draft] is null once it is gone locally. */
     private suspend fun uploadDraft(
         pending: PendingUpload,
+        draftId: Uuid,
         draft: EditorDraft?,
         deviceId: DeviceId,
         errors: MutableList<SyncError>,
     ): Boolean {
         if (draft == null) {
+            if (journalRepository.hasUnclaimedDraft(draftId)) return false
             Napier.w("Dropping queued draft: no longer present locally")
             retryCoordinator.markUploadSettled(EntityType.DRAFT, pending, Clock.System.now(), 0L)
             return false

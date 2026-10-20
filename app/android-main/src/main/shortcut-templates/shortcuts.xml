@@ -30,7 +30,7 @@
         <intent
             android:action="app.logdate.action.CAPTURE"
             android:targetClass="app.logdate.client.MainActivity"
-            android:targetPackage="@string/logdate_application_id">
+            android:targetPackage="@APPLICATION_ID@">
             <extra
                 android:name="mode"
                 android:value="text" />
@@ -47,7 +47,7 @@
         <intent
             android:action="app.logdate.action.CAPTURE"
             android:targetClass="app.logdate.client.MainActivity"
-            android:targetPackage="@string/logdate_application_id">
+            android:targetPackage="@APPLICATION_ID@">
             <extra
                 android:name="mode"
                 android:value="voice" />
@@ -64,7 +64,7 @@
         <intent
             android:action="app.logdate.action.CAPTURE"
             android:targetClass="app.logdate.client.MainActivity"
-            android:targetPackage="@string/logdate_application_id">
+            android:targetPackage="@APPLICATION_ID@">
             <extra
                 android:name="mode"
                 android:value="camera" />

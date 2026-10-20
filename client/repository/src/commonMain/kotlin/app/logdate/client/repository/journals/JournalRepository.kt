@@ -119,6 +119,9 @@ interface JournalRepository {
      */
     suspend fun getDraft(id: Uuid): EditorDraft?
 
+    /** Retained local data without selected-server provenance must not be treated as a deleted draft. */
+    suspend fun hasUnclaimedDraft(id: Uuid): Boolean = false
+
     /** Recovery reads must distinguish absent drafts from unavailable storage. */
     suspend fun getDraftForRestore(id: Uuid): EditorDraft? = getDraft(id)
 

@@ -84,9 +84,30 @@ class HistoryOwnerAdoption(
         val device: String,
     )
 
-    private companion object {
-        const val RECEIPT_KEY = "identity.completed_history_owner_adoption.v1"
-        const val JOURNAL_KEY = "identity.pending_history_owner_adoption.v1"
-        val adoptionMutex = Mutex()
+    internal companion object {
+        suspend fun completedSourceFor(
+            storage: KeyValueStorage,
+            newOwner: String,
+            origin: String,
+        ): String? {
+            val raw = storage.getStringOrThrow(RECEIPT_KEY) ?: return null
+            val receipt =
+                try {
+                    Json.decodeFromString<AdoptionJournal>(raw)
+                } catch (_: kotlinx.serialization.SerializationException) {
+                    return null
+                }
+            return receipt.oldOwner.takeIf {
+                it.isNotBlank() &&
+                    it != newOwner &&
+                    receipt.newOwner == newOwner &&
+                    receipt.origin == origin.trimEnd('/') &&
+                    receipt.device.isNotBlank()
+            }
+        }
+
+        private const val RECEIPT_KEY = "identity.completed_history_owner_adoption.v1"
+        private const val JOURNAL_KEY = "identity.pending_history_owner_adoption.v1"
+        private val adoptionMutex = Mutex()
     }
 }

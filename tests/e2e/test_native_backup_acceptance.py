@@ -2,6 +2,7 @@ import argparse
 import importlib.util
 import io
 from pathlib import Path
+import subprocess
 import tarfile
 import tempfile
 import time
@@ -21,6 +22,22 @@ D2D_SCRIPT = Path(__file__).with_name("native-d2d-acceptance.py")
 
 
 class RestoreSnapshotValidationTest(unittest.TestCase):
+    def test_datastore_atomic_write_staging_is_not_an_accepted_preferences_change(self):
+        retained = {
+            "databases/logdate": {"sha256": "journal"},
+            "files/logdate.preferences_pb": {"sha256": "preferences"},
+        }
+        during_write = {**retained, "files/logdate.preferences_pb.tmp": {"sha256": "staging"}}
+        NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(during_write, retained)
+
+    def test_atomic_write_exclusion_does_not_hide_accepted_preferences_or_recovery_keys(self):
+        for path in ("files/logdate.preferences_pb", "files/db_recovery/passphrase_backup.part", "files/media/original.tmp"):
+            with self.subTest(path=path):
+                before = {"databases/logdate": {"sha256": "journal"}, path: {"sha256": "before"}}
+                after = {"databases/logdate": {"sha256": "journal"}, path: {"sha256": "after"}}
+                with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
+                    NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(before, after)
+
     def test_first_backup_may_make_only_missing_privacy_defaults_explicit(self):
         harness = NATIVE_BACKUP_ACCEPTANCE
         original = harness.length_delimited_field(1, CredentialsOnlyBackupFilterTest.preference_entry("security_level", "BIOMETRIC"))
@@ -207,6 +224,50 @@ class EmulatorWakeStateTest(unittest.TestCase):
 
 
 class NativeTimelineSystemDialogTest(unittest.TestCase):
+    def test_navigation_over_loading_placeholders_is_not_a_loaded_restored_timeline(self):
+        hierarchy = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        self.assertFalse(NATIVE_BACKUP_ACCEPTANCE.timeline_is_open(hierarchy))
+
+    def test_restored_content_must_be_visible_beside_timeline_navigation(self):
+        hierarchy = (
+            b'<hierarchy><node text="Search your log"/><node text="Timeline"/>'
+            b'<node text="Text retained through native backup"/></hierarchy>'
+        )
+        self.assertTrue(NATIVE_BACKUP_ACCEPTANCE.timeline_is_open(hierarchy))
+
+    def test_killed_ui_inspector_is_retried_before_accepting_the_visible_timeline(self):
+        timeline = (
+            b'<hierarchy><node text="Search your log"/><node text="Timeline"/>'
+            b'<node text="Text retained through native backup"/></hierarchy>'
+        )
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE, "adb", side_effect=[
+                b"", b"", subprocess.CalledProcessError(137, "uiautomator"),
+                b"UI hierarchy dumped to: /data/local/tmp/ui.xml", timeline, b"journal screenshot",
+            ],
+        ), patch.object(NATIVE_BACKUP_ACCEPTANCE.time, "sleep"):
+            NATIVE_BACKUP_ACCEPTANCE.wait_for_timeline("emulator-5582", Path(temporary), timeout_seconds=5)
+            self.assertEqual(timeline, (Path(temporary) / "destination-ui.xml").read_bytes())
+
+    def test_killed_ui_inspector_cannot_extend_the_acceptance_deadline(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE, "adb", side_effect=[
+                b"", b"", subprocess.CalledProcessError(137, "uiautomator"),
+            ],
+        ), patch.object(NATIVE_BACKUP_ACCEPTANCE.time, "monotonic", side_effect=[0, 6]):
+            with self.assertRaisesRegex(RuntimeError, "did not open its Timeline"):
+                NATIVE_BACKUP_ACCEPTANCE.wait_for_timeline("emulator-5582", Path(temporary), timeout_seconds=5)
+            self.assertFalse((Path(temporary) / "destination-ui.xml").exists())
+
+    def test_other_ui_inspector_errors_remain_failures(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE, "adb", side_effect=[
+                b"", b"", subprocess.CalledProcessError(1, "uiautomator"),
+            ],
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                NATIVE_BACKUP_ACCEPTANCE.wait_for_timeline("emulator-5582", Path(temporary), timeout_seconds=5)
+
     def test_finds_only_the_close_button_for_the_known_bluetooth_system_crash_dialog(self):
         hierarchy = (
             '<hierarchy><node package="android" resource-id="android:id/alertTitle" '
@@ -295,7 +356,10 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
             b'<node text="Search your log"/><node text="Timeline"/></hierarchy>'
         )
         system_ui_dialog = system_ui_dialog.replace(b"System UI", title.encode())
-        timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        timeline = (
+            b'<hierarchy><node text="Search your log"/><node text="Timeline"/>'
+            b'<node text="Text retained through native backup"/></hierarchy>'
+        )
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             NATIVE_BACKUP_ACCEPTANCE,
             "adb",
@@ -323,7 +387,10 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
             b'text="System UI isn&#x27;t responding"/><node text="Search your log"/>'
             b'<node text="Timeline"/></hierarchy>'
         )
-        timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        timeline = (
+            b'<hierarchy><node text="Search your log"/><node text="Timeline"/>'
+            b'<node text="Text retained through native backup"/></hierarchy>'
+        )
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             NATIVE_BACKUP_ACCEPTANCE,
             "adb",
@@ -349,7 +416,10 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
             b'text="Bluetooth keeps stopping"/><node text="Search your log"/>'
             b'<node text="Timeline"/></hierarchy>'
         )
-        timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        timeline = (
+            b'<hierarchy><node text="Search your log"/><node text="Timeline"/>'
+            b'<node text="Text retained through native backup"/></hierarchy>'
+        )
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             NATIVE_BACKUP_ACCEPTANCE,
             "adb",
@@ -397,6 +467,23 @@ class NativeProbeDiagnosticsTest(unittest.TestCase):
 
 
 class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (7 tests)")
+    def test_account_transition_probe_runs_all_seven_runtime_cases(self, adb):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "account-transitions.log"
+            NATIVE_RESTORE_WORK_ACCEPTANCE.probe("emulator-5554", "account-transitions", output)
+            self.assertEqual(b"OK (7 tests)", output.read_bytes())
+            arguments = adb.call_args.args
+            self.assertIn("app.logdate.client.e2e.AndroidSyncAccountTransitionRuntimeTest", arguments)
+            self.assertIn("syncAccountTransitions", arguments)
+            self.assertNotIn("cloudRestoreWorkMode", arguments)
+
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (6 tests)")
+    def test_account_transition_probe_rejects_missing_runtime_cases(self, adb):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(RuntimeError):
+                NATIVE_RESTORE_WORK_ACCEPTANCE.probe("emulator-5554", "account-transitions", Path(directory) / "result.log")
+
     @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (1 test)")
     def test_targets_only_the_explicit_emulator_and_records_probe_output(self, adb):
         with tempfile.TemporaryDirectory() as directory:

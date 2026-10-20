@@ -10,6 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.await
 import androidx.work.workDataOf
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
@@ -21,6 +22,8 @@ import app.logdate.client.domain.watch.SharedPreferenceKey
 import app.logdate.client.domain.watch.WatchPreferencesRepository
 import app.logdate.client.reminders.MomentReminderWorker
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -30,53 +33,52 @@ class AmbientPromptScheduler(
     private val flags: FeatureFlagStore,
     private val shared: WatchPreferencesRepository,
 ) {
+    private val scheduling = Mutex()
     private val alarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val workManager = WorkManager.getInstance(context)
 
-    suspend fun refreshSchedules() {
-        refreshSchedules(memoriesSettingsRepository.getSettings())
-    }
-
-    suspend fun refreshSchedules(settings: MemoriesSettings) {
-        if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) {
-            cancelFixedAlarms()
-            if (shared.get(SharedPreferenceKey.RemindersEnabled)) {
-                enqueuePeriodicEvaluation(15, TimeUnit.MINUTES)
-            } else {
-                cancelAll()
+    suspend fun refreshSchedules() =
+        scheduling.withLock {
+            val settings = memoriesSettingsRepository.getSettings()
+            if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) {
+                cancelFixedAlarms()
+                if (shared.get(SharedPreferenceKey.RemindersEnabled)) {
+                    enqueuePeriodicEvaluation(15, TimeUnit.MINUTES)
+                } else {
+                    cancelAll()
+                }
+                return@withLock
             }
-            return
-        }
-        if (!settings.contextualRecommendationsEnabled || !settings.ambientPromptsEnabled || !hasAnyAmbientPromptFamily(settings)) {
-            cancelAll()
-            return
+            if (!settings.contextualRecommendationsEnabled || !settings.ambientPromptsEnabled || !hasAnyAmbientPromptFamily(settings)) {
+                cancelAll()
+                return@withLock
+            }
+
+            if (settings.captureNudgesEnabled && settings.morningPromptEnabled) {
+                scheduleDailyAlarm(
+                    requestCode = REQUEST_MORNING,
+                    action = ACTION_MORNING_PROMPT,
+                    time = settings.morningPromptTime,
+                )
+            } else {
+                alarmManager.cancel(pendingIntent(REQUEST_MORNING, ACTION_MORNING_PROMPT))
+            }
+
+            if (settings.captureNudgesEnabled && settings.eveningPromptEnabled) {
+                scheduleDailyAlarm(
+                    requestCode = REQUEST_EVENING,
+                    action = ACTION_EVENING_PROMPT,
+                    time = settings.eveningPromptTime,
+                )
+            } else {
+                alarmManager.cancel(pendingIntent(REQUEST_EVENING, ACTION_EVENING_PROMPT))
+            }
+
+            enqueuePeriodicEvaluation(6, TimeUnit.HOURS)
         }
 
-        if (settings.captureNudgesEnabled && settings.morningPromptEnabled) {
-            scheduleDailyAlarm(
-                requestCode = REQUEST_MORNING,
-                action = ACTION_MORNING_PROMPT,
-                time = settings.morningPromptTime,
-            )
-        } else {
-            alarmManager.cancel(pendingIntent(REQUEST_MORNING, ACTION_MORNING_PROMPT))
-        }
-
-        if (settings.captureNudgesEnabled && settings.eveningPromptEnabled) {
-            scheduleDailyAlarm(
-                requestCode = REQUEST_EVENING,
-                action = ACTION_EVENING_PROMPT,
-                time = settings.eveningPromptTime,
-            )
-        } else {
-            alarmManager.cancel(pendingIntent(REQUEST_EVENING, ACTION_EVENING_PROMPT))
-        }
-
-        enqueuePeriodicEvaluation(6, TimeUnit.HOURS)
-    }
-
-    private fun enqueuePeriodicEvaluation(
+    private suspend fun enqueuePeriodicEvaluation(
         interval: Long,
         unit: TimeUnit,
     ) {
@@ -84,42 +86,66 @@ class AmbientPromptScheduler(
             PeriodicWorkRequestBuilder<AmbientPromptWorker>(interval, unit)
                 .setInputData(workDataOf(AmbientPromptWorker.KEY_TRIGGER_CONTEXT to AmbientPromptTriggerContext.PERIODIC.name))
                 .build()
-        workManager.enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+        workManager.enqueueUniquePeriodicWork(PERIODIC_WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request).await()
     }
 
-    fun enqueueImmediateEvaluation(triggerContext: AmbientPromptTriggerContext) {
-        val request =
-            OneTimeWorkRequestBuilder<AmbientPromptWorker>()
-                .setInputData(workDataOf(AmbientPromptWorker.KEY_TRIGGER_CONTEXT to triggerContext.name))
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .build()
+    suspend fun enqueueImmediateEvaluation(triggerContext: AmbientPromptTriggerContext) =
+        scheduling.withLock {
+            if (!isEvaluationEnabled(triggerContext)) return@withLock
+            val request =
+                OneTimeWorkRequestBuilder<AmbientPromptWorker>()
+                    .setInputData(workDataOf(AmbientPromptWorker.KEY_TRIGGER_CONTEXT to triggerContext.name))
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .build()
 
-        workManager.enqueueUniqueWork(
-            "${IMMEDIATE_WORK_NAME}:${triggerContext.name.lowercase()}",
-            ExistingWorkPolicy.REPLACE,
-            request,
-        )
-    }
+            workManager
+                .enqueueUniqueWork(
+                    "${IMMEDIATE_WORK_NAME}:${triggerContext.name.lowercase()}",
+                    ExistingWorkPolicy.KEEP,
+                    request,
+                ).await()
+        }
 
-    fun enqueueMomentEvaluation() {
-        workManager.enqueueUniqueWork(
-            SIGNAL_WORK_NAME,
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
-            OneTimeWorkRequestBuilder<MomentReminderWorker>().build(),
-        )
-    }
+    suspend fun enqueueMomentEvaluation() =
+        scheduling.withLock {
+            if (!flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) || !shared.get(SharedPreferenceKey.RemindersEnabled)) return@withLock
+            workManager
+                .enqueueUniqueWork(
+                    SIGNAL_WORK_NAME,
+                    ExistingWorkPolicy.APPEND_OR_REPLACE,
+                    OneTimeWorkRequestBuilder<MomentReminderWorker>().build(),
+                ).await()
+        }
 
     private fun cancelFixedAlarms() {
         alarmManager.cancel(pendingIntent(REQUEST_MORNING, ACTION_MORNING_PROMPT))
         alarmManager.cancel(pendingIntent(REQUEST_EVENING, ACTION_EVENING_PROMPT))
     }
 
-    private fun cancelAll() {
+    private suspend fun cancelAll() {
         cancelFixedAlarms()
-        workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
-        workManager.cancelUniqueWork(SIGNAL_WORK_NAME)
+        workManager.cancelUniqueWork(PERIODIC_WORK_NAME).await()
+        workManager.cancelUniqueWork(SIGNAL_WORK_NAME).await()
         AmbientPromptTriggerContext.entries.forEach { trigger ->
-            workManager.cancelUniqueWork("${IMMEDIATE_WORK_NAME}:${trigger.name.lowercase()}")
+            workManager.cancelUniqueWork("${IMMEDIATE_WORK_NAME}:${trigger.name.lowercase()}").await()
+        }
+    }
+
+    private suspend fun isEvaluationEnabled(trigger: AmbientPromptTriggerContext): Boolean {
+        if (flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)) {
+            return trigger == AmbientPromptTriggerContext.PERIODIC && shared.get(SharedPreferenceKey.RemindersEnabled)
+        }
+        val settings = memoriesSettingsRepository.getSettings()
+        if (!settings.contextualRecommendationsEnabled ||
+            !settings.ambientPromptsEnabled ||
+            !hasAnyAmbientPromptFamily(settings)
+        ) {
+            return false
+        }
+        return when (trigger) {
+            AmbientPromptTriggerContext.PERIODIC -> true
+            AmbientPromptTriggerContext.MORNING_SCHEDULE -> settings.captureNudgesEnabled && settings.morningPromptEnabled
+            AmbientPromptTriggerContext.EVENING_SCHEDULE -> settings.captureNudgesEnabled && settings.eveningPromptEnabled
         }
     }
 

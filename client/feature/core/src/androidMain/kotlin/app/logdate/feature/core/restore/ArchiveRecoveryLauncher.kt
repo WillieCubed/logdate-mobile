@@ -46,7 +46,7 @@ internal class ArchiveRecoveryLauncher(
                 .putBoolean(RestoreWorker.INCLUDE_DRAFTS_KEY, options.includeDrafts)
                 .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, options.includeMedia)
                 .build()
-        val work = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(input).build()
+        val work = OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(input).setConstraints(archiveRecoveryConstraints).build()
         val operationContext = currentCoroutineContext()
         commit {
             operationContext.ensureActive()

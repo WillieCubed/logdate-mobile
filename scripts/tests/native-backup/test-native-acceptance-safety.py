@@ -947,9 +947,13 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertNotIn("files/cache/ignored.tmp", snapshot)
         self.assertEqual(4, adb.call_count)
 
-    def test_timeline_acceptance_uses_stable_destination_controls(self):
-        hierarchy = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+    def test_timeline_acceptance_requires_destination_controls_and_restored_content(self):
+        hierarchy = (
+            b'<hierarchy><node text="Search your log"/><node text="Timeline"/>'
+            b'<node text="Text retained through native backup"/></hierarchy>'
+        )
         self.assertTrue(HARNESS.timeline_is_open(hierarchy))
+        self.assertFalse(HARNESS.timeline_is_open(b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'))
 
     def test_ui_poll_evidence_can_be_updated_without_changing_private_permissions(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -961,8 +965,11 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             self.assertEqual(0o600, stat.S_IMODE(path.stat().st_mode))
 
     def test_timeline_wait_keeps_polling_until_restored_content_is_visible(self):
-        loading = b'<hierarchy><node text="Loading"/></hierarchy>'
-        timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        loading = b'<hierarchy><node text="Search your log"/><node text="Timeline"/><node text="Loading"/></hierarchy>'
+        timeline = (
+            b'<hierarchy><node text="Search your log"/><node text="Timeline"/>'
+            b'<node text="Text retained through native backup"/></hierarchy>'
+        )
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             HARNESS,
             "adb",

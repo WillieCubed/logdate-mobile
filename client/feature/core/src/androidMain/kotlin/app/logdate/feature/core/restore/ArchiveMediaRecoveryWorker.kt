@@ -105,6 +105,7 @@ internal object ArchiveRecoveryScheduler {
         val request =
             OneTimeWorkRequestBuilder<ArchiveMediaRecoveryWorker>()
                 .setInputData(retryData)
+                .setConstraints(archiveRecoveryConstraints)
                 .addTag(RETRY_DELAYED_TAG)
                 .setInitialDelay(retryDelayMillis(attempt), TimeUnit.MILLISECONDS)
                 .build()
@@ -219,9 +220,13 @@ internal object ArchiveRecoveryScheduler {
             )
         val work =
             if (record.metadataApplied) {
-                OneTimeWorkRequestBuilder<ArchiveMediaRecoveryWorker>().setInputData(input).build()
+                OneTimeWorkRequestBuilder<ArchiveMediaRecoveryWorker>()
+                    .setInputData(
+                        input,
+                    ).setConstraints(archiveRecoveryConstraints)
+                    .build()
             } else {
-                OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(input).build()
+                OneTimeWorkRequestBuilder<RestoreWorker>().setInputData(input).setConstraints(archiveRecoveryConstraints).build()
             }
         return WorkManager.getInstance(context).enqueueUniqueWork(workName(record.id, record.metadataApplied), policy, work)
     }

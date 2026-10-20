@@ -1,9 +1,11 @@
 package app.logdate.client.ambient
 
 import android.app.AlarmManager
+import android.app.Notification
 import android.content.Context
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.work.Configuration
+import androidx.work.ForegroundInfo
 import androidx.work.ListenableWorker
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -12,14 +14,16 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.watch.SharedPreferenceKey
 import app.logdate.client.domain.watch.WatchPreferencesRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -42,6 +46,7 @@ class AmbientPromptSchedulerTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val enabled = MutableStateFlow(false)
     private val reminders = MutableStateFlow(false)
+    private val savedSettings = MutableStateFlow(MemoriesSettings())
     private val flags =
         object : FeatureFlagStore {
             override fun observe(flag: FeatureFlag): Flow<Boolean> {
@@ -79,11 +84,13 @@ class AmbientPromptSchedulerTest {
         }
     private val settings =
         object : MemoriesSettingsRepository {
-            override suspend fun getSettings() = MemoriesSettings()
+            override suspend fun getSettings() = savedSettings.value
 
-            override fun observeSettings() = flowOf(MemoriesSettings())
+            override fun observeSettings() = savedSettings
 
-            override suspend fun updateSettings(settings: MemoriesSettings) = Unit
+            override suspend fun updateSettings(settings: MemoriesSettings) {
+                savedSettings.value = settings
+            }
         }
     private lateinit var scheduler: AmbientPromptScheduler
     private lateinit var work: WorkManager
@@ -103,6 +110,12 @@ class AmbientPromptSchedulerTest {
                         ): ListenableWorker =
                             object : ListenableWorker(appContext, workerParameters) {
                                 private var pending: CallbackToFutureAdapter.Completer<Result>? = null
+
+                                override fun getForegroundInfoAsync() =
+                                    CallbackToFutureAdapter.getFuture<ForegroundInfo> {
+                                        it.set(ForegroundInfo(1947999572, Notification()))
+                                        "Foreground information for held expedited test work"
+                                    }
 
                                 override fun startWork() =
                                     CallbackToFutureAdapter.getFuture<Result> {
@@ -131,6 +144,86 @@ class AmbientPromptSchedulerTest {
             .getWorkInfosForUniqueWork("logdate:ambient:periodic")
             .get(10, TimeUnit.SECONDS)
             .filter { it.state != WorkInfo.State.CANCELLED }
+
+    private fun immediate(trigger: AmbientPromptTriggerContext = AmbientPromptTriggerContext.PERIODIC) =
+        work
+            .getWorkInfosForUniqueWork("logdate:ambient:immediate:${trigger.name.lowercase()}")
+            .get(10, TimeUnit.SECONDS)
+            .filterNot { it.state.isFinished }
+
+    @Test fun startupOrBootCannotRecreateEvaluationAfterConsentWasDisabled() =
+        runBlocking {
+            enabled.value = true
+            reminders.value = false
+            scheduler.refreshSchedules()
+            scheduler.enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
+            assertTrue(immediate().isEmpty())
+        }
+
+    @Test fun legacyOptOutRejectsLateStartupAndAlarmCallbacks() =
+        runBlocking {
+            savedSettings.value = MemoriesSettings(ambientPromptsEnabled = false)
+            scheduler.refreshSchedules()
+            AmbientPromptTriggerContext.entries.forEach { scheduler.enqueueImmediateEvaluation(it) }
+            AmbientPromptTriggerContext.entries.forEach { assertTrue(immediate(it).isEmpty()) }
+        }
+
+    @Test fun repeatedStartupRetainsTheAcceptedEvaluation() =
+        runBlocking {
+            scheduler.enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
+            val original = immediate().single()
+            scheduler.enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
+            assertEquals(original.id, immediate().single().id)
+        }
+
+    @Test fun disabledMorningAlarmCannotRecreateAnEvaluation() =
+        runBlocking {
+            savedSettings.value = MemoriesSettings(morningPromptEnabled = false)
+            scheduler.enqueueImmediateEvaluation(AmbientPromptTriggerContext.MORNING_SCHEDULE)
+            assertTrue(immediate(AmbientPromptTriggerContext.MORNING_SCHEDULE).isEmpty())
+        }
+
+    @Test fun staleMomentSignalCannotRecreateEvaluationAfterOptOut() =
+        runBlocking {
+            enabled.value = true
+            reminders.value = false
+            scheduler.refreshSchedules()
+            scheduler.enqueueMomentEvaluation()
+            assertTrue(work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get().none { !it.state.isFinished })
+        }
+
+    @Test fun optOutWaitsForAnOlderEnqueueThenCancelsItsAcceptedWork() =
+        runTest {
+            val reading = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var firstRead = true
+            val delayedSettings =
+                object : MemoriesSettingsRepository by settings {
+                    override suspend fun getSettings(): MemoriesSettings {
+                        val snapshot = savedSettings.value
+                        if (firstRead) {
+                            firstRead = false
+                            reading.complete(Unit)
+                            release.await()
+                        }
+                        return snapshot
+                    }
+                }
+            val delayedScheduler = AmbientPromptScheduler(context, delayedSettings, flags, shared)
+            val enqueue = backgroundScope.launch { delayedScheduler.enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC) }
+            runCurrent()
+            assertTrue(reading.isCompleted)
+            savedSettings.value = MemoriesSettings(ambientPromptsEnabled = false)
+            val optOut = backgroundScope.launch { delayedScheduler.refreshSchedules() }
+            runCurrent()
+            assertTrue(!optOut.isCompleted, "Opt-out must serialize with the older accepted enqueue")
+            release.complete(Unit)
+            runCurrent()
+            assertTrue(enqueue.isCompleted)
+            assertTrue(optOut.isCompleted)
+            assertTrue(immediate().isEmpty())
+            assertTrue(scheduled().isEmpty())
+        }
 
     @Test fun flagOffPreservesExistingFixedAlarms() =
         runBlocking {
@@ -162,7 +255,8 @@ class AmbientPromptSchedulerTest {
         runBlocking {
             enabled.value = true
             reminders.value = true
-            scheduler.refreshSchedules(MemoriesSettings(contextualRecommendationsEnabled = false, ambientPromptsEnabled = false))
+            savedSettings.value = MemoriesSettings(contextualRecommendationsEnabled = false, ambientPromptsEnabled = false)
+            scheduler.refreshSchedules()
             assertEquals(0, alarms.size)
             assertEquals(TimeUnit.MINUTES.toMillis(15), scheduled().single().periodicityInfo?.repeatIntervalMillis)
         }
@@ -195,21 +289,26 @@ class AmbientPromptSchedulerTest {
             assertTrue(scheduled().isEmpty())
         }
 
-    @Test fun signalUpdatesQueueBehindActiveEvaluationWithoutCancellingIt() {
-        scheduler.enqueueMomentEvaluation()
-        val first = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS).single()
-        scheduler.enqueueMomentEvaluation()
-        val queued = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS)
-        assertEquals(2, queued.size)
-        assertEquals(WorkInfo.State.RUNNING, queued.single { it.id == first.id }.state)
-        assertEquals(WorkInfo.State.BLOCKED, queued.single { it.id != first.id }.state)
-    }
+    @Test fun signalUpdatesQueueBehindActiveEvaluationWithoutCancellingIt() =
+        runBlocking {
+            enabled.value = true
+            reminders.value = true
+            scheduler.enqueueMomentEvaluation()
+            val first = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS).single()
+            scheduler.enqueueMomentEvaluation()
+            val queued = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS)
+            assertEquals(2, queued.size)
+            assertEquals(WorkInfo.State.RUNNING, queued.single { it.id == first.id }.state)
+            assertEquals(WorkInfo.State.BLOCKED, queued.single { it.id != first.id }.state)
+        }
 
     @Test fun optingOutCancelsPendingSignalEvaluationsAsWellAsPeriodicWork() =
         runBlocking {
             enabled.value = true
+            reminders.value = true
             scheduler.enqueueMomentEvaluation()
             scheduler.enqueueMomentEvaluation()
+            reminders.value = false
             scheduler.refreshSchedules()
             val cancelled = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS)
             assertEquals(2, cancelled.size)

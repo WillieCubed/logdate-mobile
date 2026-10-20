@@ -281,6 +281,7 @@ internal fun testSyncUploader(
     firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
     supportsRichDrafts: () -> Boolean = { false },
     draftRepairScope: () -> app.logdate.client.sync.recovery.DownloadScope? = { null },
+    spaceSync: app.logdate.client.sync.space.SpaceSyncDependencies? = null,
 ): SyncUploader {
     val cloudApiClient = fakeCloudApiClient()
     val mediaSyncRefStore: MediaSyncRefStore = InMemoryMediaSyncRefStore()
@@ -322,6 +323,11 @@ internal fun testSyncUploader(
         setMediaDeferredForNetwork = {},
         supportsRichDrafts = supportsRichDrafts,
         draftRepairScope = draftRepairScope,
+        space =
+            spaceSync?.let {
+                app.logdate.client.sync.space
+                    .SpaceSync(it, tokenRefresher, syncMetadataService, retryCoordinator, null, {})
+            },
     )
 }
 

@@ -7,8 +7,10 @@ internal fun immediateSyncPolicy(
     states: List<WorkInfo.State>,
     hasMobileDataConsent: Boolean = false,
     preserveConsentedRequest: Boolean = false,
+    ownerChanged: Boolean = false,
 ): ExistingWorkPolicy =
     when {
+        ownerChanged -> ExistingWorkPolicy.REPLACE
         preserveConsentedRequest && !hasMobileDataConsent -> ExistingWorkPolicy.KEEP
         WorkInfo.State.RUNNING !in states -> ExistingWorkPolicy.REPLACE
         hasMobileDataConsent -> ExistingWorkPolicy.APPEND_OR_REPLACE
