@@ -2,6 +2,7 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.SharedPreferences
 import android.database.sqlite.SQLiteException
 import android.os.Build
 import android.system.Os
@@ -11,27 +12,43 @@ import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredExcepti
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.storage.SecureStorage
+import app.logdate.client.device.storage.SecureStorageInitializationException
+import app.logdate.client.device.storage.createAndroidSecureStorage
 import io.github.aakira.napier.Antilog
 import io.github.aakira.napier.LogLevel
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import java.io.File
 import java.io.IOException
 import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 import net.zetetic.database.sqlcipher.SQLiteDatabase as CipherDatabase
 
 @RunWith(AndroidJUnit4::class)
 class NativeRetainedKeyFailureTest {
+    @Test
+    fun failedVaultInitializationStillResolvesAndOpensThePortableJournal() =
+        withFixture {
+            verifyUnreadableVaultInitialization()
+        }
+
     @Test
     fun missingRecoveryMaterialPreservesTheRetainedJournal() =
         withFixture {
@@ -189,7 +206,7 @@ class NativeRetainedKeyFailureTest {
     }
 
     private class Fixture(
-        application: Context,
+        private val application: Context,
         id: String = Uuid.random().toString(),
         reopening: Boolean = false,
     ) {
@@ -259,6 +276,62 @@ class NativeRetainedKeyFailureTest {
             assertEquals("Retained original media", media.readText())
             openJournal(originalKey)
         }
+
+        suspend fun verifyUnreadableVaultInitialization() =
+            coroutineScope {
+                store.write(originalKey)
+                val protected = application.createDeviceProtectedStorageContext()
+                val prefix = "unreadable-vault-${Uuid.random()}-"
+                val fileName = "${prefix}logdate_secure_storage"
+                val raw = protected.getSharedPreferences(fileName, Context.MODE_PRIVATE)
+                check(raw.edit().putString("__androidx_security_crypto_encrypted_prefs_key_keyset__", "aabbccdd".repeat(16)).commit())
+                val file = File(protected.dataDir, "shared_prefs/$fileName.xml")
+                val retained = file.readBytes()
+                val context =
+                    object : ContextWrapper(protected) {
+                        override fun getApplicationContext(): Context = this
+
+                        override fun getSharedPreferences(
+                            name: String,
+                            mode: Int,
+                        ): SharedPreferences = protected.getSharedPreferences(prefix + name, mode)
+
+                        override fun deleteSharedPreferences(name: String): Boolean = error("Unreadable vault must not be deleted")
+                    }
+                val portable = store
+                val graph =
+                    koinApplication {
+                        modules(
+                            module {
+                                single<SecureStorage> { createAndroidSecureStorage(context) }
+                                single { DatabasePassphraseProvider(get(), portable) { true } }
+                            },
+                        )
+                    }
+                val secure = graph.koin.get<SecureStorage>()
+                val identity = async { secure.observeString("identity_key_v1").first() }
+                val all = async { secure.observeAll().first() }
+                try {
+                    val provider = graph.koin.get<DatabasePassphraseProvider>()
+                    val candidate = provider.getPassphraseCandidates().single()
+                    openJournal(candidate)
+                    val failure =
+                        assertFailsWith<SecureStorageInitializationException> {
+                            provider.confirmOpenedDatabasePassphrase(candidate)
+                        }
+                    assertNull(failure.cause, "Storage initialization diagnostics must not retain a private keyset cause")
+                    delay(100)
+                    assertFalse(identity.isCompleted, "An unreadable vault must not claim that its identity is absent")
+                    assertFalse(all.isCompleted, "Observers must remain available for a later successful storage retry")
+                    assertTrue(file.readBytes().contentEquals(retained), "Unreadable encrypted preferences must remain untouched")
+                    verifyJournal()
+                } finally {
+                    identity.cancelAndJoin()
+                    all.cancelAndJoin()
+                    graph.close()
+                    protected.deleteSharedPreferences(fileName)
+                }
+            }
 
         fun seedInterruptedKey() {
             store.write(originalKey)

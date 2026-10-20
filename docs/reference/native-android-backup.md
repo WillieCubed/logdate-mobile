@@ -465,11 +465,32 @@ For a rendered walkthrough, retain an entry beyond the AI input budget through B
 open and edit it, then compare its full stored text and ID. Android accessibility text is capped,
 so an accessibility snapshot alone cannot establish preservation of an oversized entry.
 
+### Secure storage availability during recovery
+
+Android dependency graphs and native backup callbacks construct secure storage through
+`createAndroidSecureStorage(context)`. This defers encrypted-preference initialization until an
+operation needs it, allowing the database provider to try retained portable keys when the local
+vault cannot open. Direct reads and writes still fail explicitly: unavailable identity material
+must never be treated as an empty vault or authorize a replacement key.
+
+```kotlin
+single<SecureStorage> { createAndroidSecureStorage(androidContext()) }
+```
+
+Identity observers are cold and wait without publishing missing-key values while initialization
+is unavailable. A later successful storage operation reconnects them; they do not poll, terminate
+optional watch/archive observers, or manufacture a signed-out identity event. Preference creation
+and cache hydration share one sanitized failure boundary. Initialization errors retain neither
+private keyset details nor their underlying exception causes, and unreadable preference files
+remain unchanged. Only after SQLCipher accepts a retained key may its primary copy be refreshed;
+a failed refresh leaves the readable journal available for a later retry.
+
 ### Retained-key failure acceptance
 
 `NativeRetainedKeyFailureTest` requires a verified emulator, an unprivileged synthetic debug app,
 and `retainedKeyFailures=true`. Its database, portable material, and original media live in an
-isolated fixture. Missing, malformed, truncated, mismatched, and file-permission-denied recovery
+isolated fixture. A separate prefixed vault exercises real encrypted-keyset initialization failure
+through an isolated dependency graph while preserving its original file. Missing, malformed, truncated, mismatched, and file-permission-denied recovery
 material must leave the encrypted journal and originals intact. A valid portable key must recover
 an invalid or unreadable primary, and a failed primary commit must remain recoverable when the
 provider is recreated. Capture diagnostics without disclosing the key or private storage errors.

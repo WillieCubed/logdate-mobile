@@ -46,7 +46,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 "elif 'shell am instrument' in arguments:\n"
                 "    status = os.environ['FAKE_INSTRUMENTATION_STATUS']\n"
                 "    ending = os.environ.get('FAKE_STATUS_CR', '')\n"
-                "    sys.stdout.write('INSTRUMENTATION_STATUS_CODE: ' + status + ending + '\\n\\nOK (7 tests)\\n')\n"
+                "    sys.stdout.write('INSTRUMENTATION_STATUS_CODE: ' + status + ending + '\\n\\nOK (8 tests)\\n')\n"
                 "else:\n"
                 "    raise SystemExit('Unexpected test command')\n"
             )

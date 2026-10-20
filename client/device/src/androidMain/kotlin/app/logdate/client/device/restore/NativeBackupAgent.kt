@@ -15,7 +15,7 @@ import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.crypto.AndroidCryptoManager
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
-import app.logdate.client.device.storage.AndroidSecureStorage
+import app.logdate.client.device.storage.createAndroidSecureStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -51,7 +51,7 @@ open class NativeBackupAgent : BackupAgent() {
         try {
             runBlocking {
                 IdentityKeyManager(
-                    AndroidSecureStorage(this@NativeBackupAgent),
+                    createAndroidSecureStorage(this@NativeBackupAgent),
                     AndroidCryptoManager(),
                     AndroidIdentityKeyBackupStore(this@NativeBackupAgent),
                 ).ensureExistingIdentityBackup()
