@@ -40,6 +40,10 @@
             android:name="app.logdate.watchExperienceDefault"
             android:value="${watchExperienceDefault}" />
 
+        <meta-data
+            android:name="app.logdate.quietSaveDefault"
+            android:value="${quietSaveDefault}" />
+
         <!-- Maps SDK 20 can load a legacy renderer on older Google Play services. -->
         <uses-library
             android:name="org.apache.http.legacy"

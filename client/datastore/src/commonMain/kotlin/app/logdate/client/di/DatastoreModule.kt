@@ -51,10 +51,13 @@ val commonDatastoreModule =
             DataStoreFeatureFlagStore(
                 get(named("mainDataStore")),
                 defaultOverrides =
-                    if (getOrNull<Boolean>(named("watchExperienceDefault")) == true) {
-                        mapOf(FeatureFlag.WATCH_EXPERIENCE_V2 to true)
-                    } else {
-                        emptyMap()
+                    buildMap {
+                        if (getOrNull<Boolean>(named("watchExperienceDefault")) == true) {
+                            put(FeatureFlag.WATCH_EXPERIENCE_V2, true)
+                        }
+                        if (getOrNull<Boolean>(named("quietSaveDefault")) == true) {
+                            put(FeatureFlag.QUIET_SAVE, true)
+                        }
                     },
             )
         }

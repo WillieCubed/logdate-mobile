@@ -13,6 +13,14 @@ import kotlin.test.assertFailsWith
 import kotlin.time.Instant
 
 class WindDownTimeResolverTest {
+    @Test
+    fun `known bedtime can match fallback hours without being a fallback`() =
+        runTest {
+            val sleep = Sessions(listOf(session("2026-10-11T22:30:00Z", "2026-10-12T07:30:00Z")))
+            assertEquals(WakingHours(LocalTime(7, 30), LocalTime(22, 30)), WindDownTimeResolver(sleep).resolveKnown(now, zone))
+            assertEquals(null, WindDownTimeResolver(Sessions(emptyList())).resolveKnown(now, zone))
+        }
+
     private val now = Instant.parse("2026-10-12T20:00:00Z")
     private val zone = TimeZone.UTC
 

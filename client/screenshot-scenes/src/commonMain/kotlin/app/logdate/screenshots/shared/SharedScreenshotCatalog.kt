@@ -8,7 +8,7 @@ object SharedScreenshotCatalog {
     val onboardingMainScenes: List<SharedScreenshotSceneSpec> = catalogOnboardingMainScenes
     val onboardingExtendedScenes: List<SharedScreenshotSceneSpec> = catalogOnboardingExtendedScenes
     val settingsScenes: List<SharedScreenshotSceneSpec> =
-        personalSettingsScenes + systemSettingsScenes + nativeBackupScenes + settingsRowScenes
+        personalSettingsScenes + quietSaveScenes + systemSettingsScenes + nativeBackupScenes + settingsRowScenes
     val searchScenes: List<SharedScreenshotSceneSpec> = catalogSearchScenes
     val desktopOnlyScenes: List<SharedScreenshotSceneSpec> = catalogDesktopOnlyScenes
     val allScenes: List<SharedScreenshotSceneSpec> =

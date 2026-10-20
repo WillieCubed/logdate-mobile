@@ -5,10 +5,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.di.commonDatastoreModule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.koin.core.qualifier.named
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -19,6 +23,34 @@ import kotlin.test.assertTrue
 class FeatureFlagStoreTest {
     private val preferences = TestPreferencesDataStore()
     private val store = DataStoreFeatureFlagStore(preferences)
+
+    @Test
+    fun `internal build enables Quiet Save without changing the user preference`() =
+        runTest {
+            val app =
+                koinApplication {
+                    modules(
+                        commonDatastoreModule,
+                        module {
+                            single<DataStore<Preferences>>(named("mainDataStore")) { preferences }
+                            single(named("quietSaveDefault")) { true }
+                        },
+                    )
+                }
+            try {
+                val internalStore = app.koin.get<FeatureFlagStore>()
+                assertTrue(internalStore.isEnabled(FeatureFlag.QUIET_SAVE))
+                assertFalse(store.isEnabled(FeatureFlag.QUIET_SAVE))
+                val settings = LogdatePreferencesDataSource(preferences)
+                settings.setQuietSaveEnabled(false)
+                assertTrue(internalStore.isEnabled(FeatureFlag.QUIET_SAVE))
+                assertFalse(settings.observeQuietSaveEnabled().first())
+                internalStore.setEnabled(FeatureFlag.QUIET_SAVE, false)
+                assertFalse(internalStore.isEnabled(FeatureFlag.QUIET_SAVE))
+            } finally {
+                app.close()
+            }
+        }
 
     @Test
     fun `an unset flag uses its declared default`() =

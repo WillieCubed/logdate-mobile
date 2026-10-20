@@ -1,4 +1,5 @@
 package app.logdate.client.media.audio
+
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -25,6 +26,7 @@ internal fun AudioRecordingService.acquireSessionResources() {
 internal fun AudioRecordingService.acquireWakeLock() {
     if (!options.holdWakeLock) return
     releaseWakeLock()
+    wakeLockAcquiredAt = android.os.SystemClock.elapsedRealtime()
     try {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         val timeoutMs =

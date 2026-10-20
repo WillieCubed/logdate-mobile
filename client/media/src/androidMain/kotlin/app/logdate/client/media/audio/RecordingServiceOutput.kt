@@ -1,4 +1,5 @@
 package app.logdate.client.media.audio
+
 import io.github.aakira.napier.Napier
 import java.io.File
 
@@ -15,9 +16,12 @@ internal fun AudioRecordingService.resolveOutputFile(outputPath: String?): File 
 /** The file the recorder writes: the m4a itself, or the raw AAC that is wrapped into it when it ends. */
 internal fun AudioRecordingService.recordingFileFor(finalFile: File): File =
     when {
-        options.crashSafe -> {
-            CrashSafeRecording.inFlightFile(finalFile, isolateForBackup = options.excludeIncompleteFromBackup).also { it.delete() }
-        }
+        options.crashSafe ->
+            CrashSafeRecording
+                .inFlightFile(
+                    finalFile,
+                    isolateForBackup = options.excludeIncompleteFromBackup,
+                ).also { it.delete() }
         options.excludeIncompleteFromBackup -> CrashSafeRecording.backupExcludedFile(finalFile).also { it.delete() }
         else -> finalFile
     }

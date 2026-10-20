@@ -31,6 +31,54 @@ class OfflineFirstEntryDraftRepository(
     coroutineScope: CoroutineScope,
     private val journalRepository: JournalRepository? = null,
 ) : EntryDraftRepository {
+    override suspend fun checkpointRecording(
+        blockId: Uuid,
+        path: String,
+        ownerId: String,
+    ): Uuid? {
+        initializationComplete.await()
+        return mutationMutex.withLock {
+            val draft =
+                draftsFlow.value.values.firstOrNull { draft -> draft.pendingMedia.any { it.blockId == blockId } }
+                    ?: return@withLock null
+            val updated = draft.checkpointRecording(blockId, path, ownerId) ?: return@withLock null
+            saveRecordingDraft(updated)
+        }
+    }
+
+    override suspend fun completeRecording(
+        blockId: Uuid,
+        path: String,
+        durationMs: Long,
+        ownerId: String,
+        quietSave: Boolean,
+    ): Uuid? {
+        initializationComplete.await()
+        return mutationMutex.withLock {
+            val draft =
+                draftsFlow.value.values.firstOrNull { draft ->
+                    draft.pendingMedia.any { it.blockId == blockId } || draft.notes.any { it.uid == blockId }
+                } ?: return@withLock null
+            val updated = draft.completeRecording(blockId, path, durationMs, ownerId, quietSave) ?: return@withLock null
+            saveRecordingDraft(updated)
+        }
+    }
+
+    override suspend fun acknowledgeQuietSave(draftId: Uuid) {
+        initializationComplete.await()
+        mutationMutex.withLock {
+            val draft = requireDraft(draftId)
+            val outcome = draft.quietSave ?: return@withLock
+            saveRecordingDraft(draft.copy(quietSave = outcome.copy(acknowledged = true)))
+        }
+    }
+
+    private suspend fun saveRecordingDraft(draft: EntryDraft): Uuid {
+        draftStore.saveDraft(draft)
+        draftsFlow.value = draftsFlow.value + (draft.id to draft)
+        return draft.id
+    }
+
     // StateFlow to store and emit drafts
     private val draftsFlow = MutableStateFlow<Map<Uuid, EntryDraft>>(emptyMap())
     private val mutationMutex = Mutex()
@@ -83,7 +131,7 @@ class OfflineFirstEntryDraftRepository(
         mutationMutex.withLock {
             val existing = draftsFlow.value[draft.id] ?: draftStore.getDraft(draft.id)
             val saved =
-                draft.copy(
+                (existing?.mergeRecordingSnapshot(draft) ?: draft).copy(
                     createdAt = existing?.createdAt ?: draft.createdAt,
                     updatedAt = Clock.System.now(),
                     selectedJournalIds = resolveSelection(draft.selectedJournalIds),
@@ -274,13 +322,15 @@ class OfflineFirstEntryDraftRepository(
         markId: String? = existingDraft.markId,
     ): Uuid {
         val updatedDraft =
-            existingDraft.copy(
-                notes = notes,
-                pendingMedia = pendingMedia,
-                selectedJournalIds = resolveSelection(selectedJournalIds),
-                updatedAt = Clock.System.now(),
-                visitContext = visitContext,
-                markId = markId,
+            existingDraft.mergeRecordingSnapshot(
+                existingDraft.copy(
+                    notes = notes,
+                    pendingMedia = pendingMedia,
+                    selectedJournalIds = resolveSelection(selectedJournalIds),
+                    updatedAt = Clock.System.now(),
+                    visitContext = visitContext,
+                    markId = markId,
+                ),
             )
         draftStore.saveDraft(updatedDraft)
         draftsFlow.value = draftsFlow.value + (existingDraft.id to updatedDraft)

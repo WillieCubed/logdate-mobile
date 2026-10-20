@@ -404,7 +404,10 @@ class AudioViewModel(
             val activeOwner = audioRecordingManager.currentRecordingTargetNoteId
             val ownsSession =
                 if (activeOwner != null) activeOwner == lastTargetNoteId else state.isRecording || state.isStartingRecording
-            if (ownsSession && (audioRecordingManager.isRecording || state.isRecording || state.isStartingRecording)) {
+            if (ownsSession &&
+                !audioRecordingManager.continuesWithoutEditor &&
+                (audioRecordingManager.isRecording || state.isRecording || state.isStartingRecording)
+            ) {
                 audioRecordingManager.requestStopRecording()
             }
             // AudioPlaybackManager is also a process-lifetime singleton.

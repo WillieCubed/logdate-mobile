@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="quiet_save_title">Quiet Save</string>
+    <string name="quiet_save_section_title">Recording</string>
+    <string name="quiet_save_bedtime">Rest easy. Quiet Save saved your recording as a draft.</string>
+    <string name="quiet_save_morning">Quiet Save saved your recording last night after things went quiet.</string>
+    <string name="quiet_save_neutral">Quiet Save saved your recording as a draft after 2 minutes of quiet.</string>
+    <string name="quiet_save_dated">Quiet Save saved your recording from %1$s as a draft.</string>
+    <string name="quiet_save_open_draft">Open draft</string>
+    <string name="quiet_save_description">Save as a draft after 2 minutes of quiet.</string>
+    <string name="quiet_save_preference_error">Couldn’t save this preference. Please try again.</string>
     <!-- Voice notes settings -->
     <string name="voice_notes_settings">Voice notes</string>
     <string name="voice_notes_settings_description">On-device transcription and ambient sound detection</string>

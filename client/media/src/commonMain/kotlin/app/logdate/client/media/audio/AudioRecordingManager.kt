@@ -116,9 +116,11 @@ interface AudioRecordingManager {
      */
     suspend fun resumeRecording(): Boolean = false
 
-    /**
-     * Whether recording is currently in progress
-     */
+    /** Whether this active session can safely continue after its editor is disposed. */
+    val continuesWithoutEditor: Boolean
+        get() = false
+
+    /** Whether recording is currently in progress. */
     val isRecording: Boolean
 
     /** Whether the platform is still confirming a requested recording start. */

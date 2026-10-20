@@ -50,6 +50,10 @@ class AndroidAudioRecordingManager(
     internal val serviceController: RecordingServiceController,
     internal val workDispatcher: CoroutineDispatcher = Dispatchers.Default,
     internal val startTimeout: Duration = DEFAULT_START_TIMEOUT,
+    internal val draftSession: RecordingDraftLifecycle? = null,
+    internal val quietSaveEnabled: suspend () -> Boolean = { false },
+    internal val onQuietSave: suspend (Uuid) -> Unit = {},
+    internal val finalizedFileAvailable: (String) -> Boolean = { path -> java.io.File(path).let { it.isFile && it.length() > 0 } },
 ) : AudioRecordingManager {
     internal val scope = CoroutineScope(SupervisorJob() + workDispatcher)
     internal val sessionMutex = Mutex()
@@ -110,6 +114,13 @@ class AndroidAudioRecordingManager(
     internal var transcriptionStartJob: Job? = null
     internal var transcriptionSessionInitialized = false
     internal var serviceStateJob: Job? = null
+    internal var quietSaveTriggered = false
+
+    @Volatile
+    internal var serviceEnded = false
+    internal var recordingDraftSaved = false
+    internal var lastCheckpointSeconds = 0
+    internal var lastCheckpointPaused = false
     internal var routeSyncJob: Job? = null
     internal val transcriptPersistenceLock = Any()
     internal val transcriptionInputRouter =
@@ -121,6 +132,11 @@ class AndroidAudioRecordingManager(
     internal var transcriptionWarmUpJob: Job? = null
     internal val transcriptWriter = RecordingTranscriptWriter(transcriptionRepository)
     internal var recordingTranscriptSession: RecordingTranscriptSession? = null
+
+    internal var quietSaveForSession = false
+
+    override val continuesWithoutEditor: Boolean
+        get() = quietSaveForSession && isRecording
 
     override val isRecording: Boolean
         get() = recordingStateFlow.value
@@ -168,25 +184,16 @@ class AndroidAudioRecordingManager(
         targetNoteId: Uuid?,
         onTargetReady: suspend (String) -> Boolean,
     ): Boolean {
-        if (recordingStateFlow.value || externallyRecordedPath != null) {
+        if (recordingStateFlow.value || (externallyRecordedPath != null && !recordingDraftSaved)) {
             Napier.w("Attempted to start recording while a session is active or awaiting handoff")
             return false
         }
         sessionGeneration++
         val target = prepareRecordingTarget(audioStorage, onTargetReady) ?: return false
         recordingTarget = target
+        recordingDraftSaved = false
         sessionTargetNoteId = targetNoteId
-        recordingTranscriptSession =
-            targetNoteId?.let {
-                try {
-                    transcriptWriter.begin(it, target.path)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Napier.e("Could not capture recording transcript ownership; file recovery remains available", e)
-                    null
-                }
-            }
+        recordingTranscriptSession = beginTranscriptSession(targetNoteId, target.path)
         externallyRecordedPath = null
         liveTranscriptionStarted = false
         transcriptionInputRouter.reset()
@@ -195,6 +202,13 @@ class AndroidAudioRecordingManager(
 
         var confirmed = false
         try {
+            if (targetNoteId != null) draftSession?.prepare(targetNoteId, target.path)
+            quietSaveTriggered = false
+            serviceEnded = false
+            lastCheckpointSeconds = 0
+            lastCheckpointPaused = false
+            quietSaveForSession = targetNoteId != null && draftSession != null && quietSaveEnabled()
+            serviceController.configureQuietSave(quietSaveForSession)
             val started = serviceController.start(target.path, audioRouteRepository.requestedInputDeviceIds.first())
             confirmed = started && awaitServiceStarted() != null
         } catch (e: CancellationException) {
@@ -260,6 +274,51 @@ class AndroidAudioRecordingManager(
                 isCurrentSession = { generation == sessionGeneration && recordingStateFlow.value },
                 onInputChanged = { updateTranscriptionInput(it) },
             )
+    }
+
+    private fun onServiceState(state: RecordingServiceState?) {
+        audioRouteRepository.updateRecordingInputDevice(state?.routedInputDeviceId, state?.isRecording == true, state?.inputRoutingError)
+        if (state?.isRecording == true && state.routedInputDeviceId != null) updateTranscriptionInput(state.routedInputDeviceId)
+        if (state == null) {
+            recordingPausedFlow.value = false
+            if (recordingStateFlow.value) {
+                Napier.w("Recording service went away mid-session")
+                recordingStateFlow.value = false
+            }
+            return
+        }
+        recordingPausedFlow.value = state.isRecording && state.isPaused
+        audioLevelFlow.value = state.audioLevel
+        durationFlow.value = state.durationSeconds.toLong() * 1000
+        if (state.isRecording && (state.durationSeconds - lastCheckpointSeconds >= 30 || state.isPaused != lastCheckpointPaused)) {
+            lastCheckpointSeconds = state.durationSeconds
+            lastCheckpointPaused = state.isPaused
+            val generation = sessionGeneration
+            scope.launch {
+                sessionMutex.withLock {
+                    if (generation == sessionGeneration && recordingStateFlow.value) {
+                        try {
+                            recordingTarget?.path?.let { draftSession?.checkpoint(it) }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Napier.e("Recording checkpoint failed; retaining the original audio", e)
+                            requestStopRecording()
+                        }
+                    }
+                }
+            }
+        }
+        if (!state.isRecording && recordingStateFlow.value) {
+            // The service ended the session on its own (notification action or recorder
+            // failure). Keep the file it produced for the editor's stop call.
+            Napier.d("Recording service stopped on its own; file=${state.recordedFilePath} error=${state.failureMessage}")
+            externallyRecordedPath = state.recordedFilePath
+            serviceEnded = true
+            quietSaveTriggered = state.quietSaveTriggered
+            recordingStateFlow.value = false
+            if (state.quietSaveTriggered || quietSaveForSession) requestStopRecording()
+        }
     }
 
     override suspend fun stopRecording(): String? =
@@ -342,7 +401,7 @@ class AndroidAudioRecordingManager(
         // the singleton's own scope so the foreground service is released and
         // the Whisper refinement coroutine — already launched on the long-lived
         // transcription service scope — keeps running to completion.
-        if (!recordingStateFlow.value && !startInFlight && externallyRecordedPath == null) return
+        if (!recordingStateFlow.value && !startInFlight && externallyRecordedPath == null && !serviceEnded) return
         val requestedSession = sessionGeneration
         scope.launch {
             try {

@@ -1,4 +1,7 @@
 <resources>
+    <string name="quiet_save_title">Quiet Save</string>
+    <string name="quiet_save_saved">Recording saved as a draft.</string>
+    <string name="quiet_save_open_draft">Open draft</string>
     <string name="audio_playback_channel_name">Audio playback</string>
     <string name="audio_recording_channel_name">Audio recording</string>
     <string name="audio_recording_notification_title">Recording audio</string>

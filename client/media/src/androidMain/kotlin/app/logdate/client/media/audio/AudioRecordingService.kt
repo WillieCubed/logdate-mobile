@@ -49,6 +49,7 @@ fun Context.startAudioRecordingService(
             putExtra(AudioRecordingService.EXTRA_HOLD_WAKE_LOCK, options.holdWakeLock)
             putExtra(AudioRecordingService.EXTRA_CRASH_SAFE, options.crashSafe)
             putExtra(AudioRecordingService.EXTRA_EXCLUDE_INCOMPLETE_FROM_BACKUP, options.excludeIncompleteFromBackup)
+            putExtra(AudioRecordingService.EXTRA_QUIET_SAVE, options.quietSave)
         }
     startForegroundService(intent)
 }
@@ -89,6 +90,7 @@ class AudioRecordingService : Service() {
         const val EXTRA_HOLD_WAKE_LOCK = "app.logdate.extra.HOLD_WAKE_LOCK"
         const val EXTRA_CRASH_SAFE = "app.logdate.extra.CRASH_SAFE"
         const val EXTRA_EXCLUDE_INCOMPLETE_FROM_BACKUP = "app.logdate.extra.EXCLUDE_INCOMPLETE_FROM_BACKUP"
+        const val EXTRA_QUIET_SAVE = "app.logdate.extra.QUIET_SAVE"
         internal const val WAKE_LOCK_TAG = "LogDate:AudioRecordingWakeLock"
         internal const val WAKE_LOCK_HEADROOM_MS = 60_000L
         internal const val DEFAULT_WAKE_LOCK_TIMEOUT_MS = 35 * 60_000L
@@ -108,7 +110,7 @@ class AudioRecordingService : Service() {
     internal val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Notification handler
-    private lateinit var notificationHandler: AndroidAudioNotificationHandler
+    internal lateinit var notificationHandler: AndroidAudioNotificationHandler
 
     // Recording state, guarded by recorderLock
     internal val recorderLock = Any()
@@ -127,8 +129,10 @@ class AudioRecordingService : Service() {
     internal var sessionGeneration: Int = 0
 
     internal var wakeLock: PowerManager.WakeLock? = null
+    internal var wakeLockAcquiredAt = 0L
     internal var focusRequest: AudioFocusRequest? = null
     internal var options = RecordingSessionOptions()
+    internal val quietSaveDetector = QuietSaveDetector()
 
     internal val audioFocusListener =
         AudioManager.OnAudioFocusChangeListener { change ->
@@ -165,6 +169,7 @@ class AudioRecordingService : Service() {
                         holdWakeLock = intent.getBooleanExtra(EXTRA_HOLD_WAKE_LOCK, false),
                         crashSafe = intent.getBooleanExtra(EXTRA_CRASH_SAFE, false),
                         excludeIncompleteFromBackup = intent.getBooleanExtra(EXTRA_EXCLUDE_INCOMPLETE_FROM_BACKUP, false),
+                        quietSave = intent.getBooleanExtra(EXTRA_QUIET_SAVE, false),
                     )
                 sessionGeneration++
                 startForegroundRecording(outputPath, inputDeviceId)
@@ -222,7 +227,7 @@ class AudioRecordingService : Service() {
      * the main thread. Any failure lands in [recordingState] as an error so the bound client
      * can report it instead of waiting on a recorder that never starts.
      */
-    private fun startForegroundRecording(
+    internal fun startForegroundRecording(
         outputPath: String?,
         inputDeviceId: String?,
     ) {
@@ -263,6 +268,7 @@ class AudioRecordingService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 synchronized(recorderLock) { mediaRecorder?.pause() }
                 isPaused = true
+                synchronized(recorderLock) { quietSaveDetector.reset() }
                 releaseWakeLock()
                 mutableRecordingState.update { it.copy(isPaused = true, pausedByInterruption = byInterruption) }
             } else {
@@ -295,6 +301,7 @@ class AudioRecordingService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 synchronized(recorderLock) { mediaRecorder?.resume() }
                 isPaused = false
+                synchronized(recorderLock) { quietSaveDetector.reset() }
                 acquireWakeLock()
                 mutableRecordingState.update { it.copy(isPaused = false, pausedByInterruption = false) }
             } else {
@@ -320,7 +327,7 @@ class AudioRecordingService : Service() {
      * running finalizes that recording first so its file is playable and the old recorder
      * does not leak the microphone.
      */
-    private fun startRecording(
+    internal fun startRecording(
         outputPath: String?,
         inputDeviceId: String?,
     ) {
@@ -346,6 +353,7 @@ class AudioRecordingService : Service() {
                 mediaRecorder = recorder
                 recordingStartTime = System.currentTimeMillis()
                 isPaused = false
+                synchronized(recorderLock) { quietSaveDetector.reset() }
                 acquireSessionResources()
                 mutableRecordingState.update {
                     it.copy(
@@ -355,6 +363,7 @@ class AudioRecordingService : Service() {
                         startTime = recordingStartTime,
                         recordedFilePath = null,
                         failureMessage = null,
+                        quietSaveTriggered = false,
                     )
                 }
                 publishInputRoute(recorder)
@@ -379,7 +388,7 @@ class AudioRecordingService : Service() {
      */
     fun stopRecording(): String? = synchronized(recorderLock) { stopRecordingLocked() }
 
-    private fun stopRecordingLocked(): String? {
+    internal fun stopRecordingLocked(): String? {
         if (!mutableRecordingState.value.isRecording) {
             return null
         }
@@ -431,7 +440,7 @@ class AudioRecordingService : Service() {
     fun isRecordingPaused(): Boolean = isPaused && mutableRecordingState.value.isRecording
 
     /** How much has been recorded so far, without pauses, to the second the duration ticker counts. */
-    private fun recordedMillis(): Long = mutableRecordingState.value.durationSeconds * 1_000L
+    internal fun recordedMillis(): Long = mutableRecordingState.value.durationSeconds * 1_000L
 
     /**
      * Re-applies the preferred microphone route while recording is active.
@@ -441,6 +450,7 @@ class AudioRecordingService : Service() {
      */
     fun updatePreferredInputDevice(inputDeviceId: String?) {
         if (!mutableRecordingState.value.isRecording) return
+        synchronized(recorderLock) { quietSaveDetector.reset() }
         synchronized(recorderLock) { mediaRecorder?.applyPreferredInputDevice(inputDeviceId) }
     }
 
@@ -477,4 +487,5 @@ data class RecordingServiceState(
     val recordedFilePath: String? = null,
     /** What went wrong when the recorder failed, for logs. The person sees the editor's own message. */
     val failureMessage: String? = null,
+    val quietSaveTriggered: Boolean = false,
 )

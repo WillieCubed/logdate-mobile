@@ -9,6 +9,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
 class AndroidAudioDurationResolver(
     private val context: Context,
@@ -19,6 +20,11 @@ class AndroidAudioDurationResolver(
         withContext(ioDispatcher) {
             val retriever = MediaMetadataRetriever()
             try {
+                val candidate = File(uri.removePrefix("file://"))
+                val recordingDirectory = File(context.filesDir, "audio_notes").canonicalFile
+                if (candidate.isAbsolute && candidate.parentFile?.canonicalFile == recordingDirectory && candidate.extension == "m4a") {
+                    CrashSafeRecording.recover(candidate)
+                }
                 val path = mediaFiles.filePath(uri)
                 if (path != null) {
                     retriever.setDataSource(path)
