@@ -23,7 +23,7 @@ def process_identity(pid):
 
 def real_command(adb, serial, *arguments):
     return subprocess.run([adb, "-s", serial, *arguments], check=True,
-                          capture_output=True, timeout=15).stdout
+                          stdin=subprocess.DEVNULL, capture_output=True, timeout=15).stdout
 
 
 def require_binding(custody, serial):

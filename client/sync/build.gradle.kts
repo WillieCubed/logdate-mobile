@@ -109,6 +109,7 @@ kotlin {
             implementation(libs.okio)
         }
         findByName("androidHostTest")?.dependencies {
+            implementation(libs.mockk)
             implementation(libs.kotlin.test)
             implementation(libs.kotlin.test.junit)
         }

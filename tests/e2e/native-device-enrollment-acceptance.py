@@ -22,6 +22,7 @@ RUNNER = H["RUNNER"]
 FIXTURE = "native-device-enrollment-fixture.json"
 RECEIPT = "native-device-enrollment-receipt.json"
 PROBE = "app.logdate.client.e2e.NativeDeviceEnrollmentProbeTest"
+AUTOMATIC_MEDIA = runpy.run_path(str(Path(__file__).with_name("native-automatic-media-worker-acceptance.py")))
 
 
 def server_environment(environment, port):
@@ -60,11 +61,43 @@ def probe(serial, stage, output):
         raise RuntimeError(f"Enrollment {stage} failed; inspect {output}")
 
 
+def retained_draft_probe(serial, stage, output):
+    checked_emulator(serial)
+    raw = H["adb"](
+        serial, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+        "app.logdate.client.e2e.NativeRetainedDraftShortcutProbeTest",
+        "-e", "retainedDraftShortcutStage", stage, RUNNER,
+    )
+    H["private_file"](output, raw)
+    if not H["instrumentation_passed"](raw):
+        if b"retainedDraftScreenshot=saved" in raw:
+            screenshot = H["adb"](serial, "exec-out", "run-as", PACKAGE, "cat", "no_backup/native-retained-draft-shortcut.png")
+            H["private_file"](output.with_suffix(".png"), screenshot)
+        raise RuntimeError(f"Current-editor draft {stage} did not pass; inspect {output}")
+
+
+
+def current_draft_probe(serial, stage, output):
+    checked_emulator(serial)
+    raw = H["adb"](
+        serial, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+        "app.logdate.client.e2e.NativeCurrentDraftRecoveryProbeTest",
+        "-e", "nativeCurrentDraftStage", stage, RUNNER,
+    )
+    H["private_file"](output, raw)
+    if not H["instrumentation_passed"](raw):
+        raise RuntimeError(f"Current-editor recovery {stage} did not pass; inspect {output}")
+
+
 def private_fixture(serial, fixture):
     checked_emulator(serial)
     H["adb"](serial, "shell", "run-as", PACKAGE, "mkdir", "-p", "no_backup")
     command = shlex.join(["run-as", PACKAGE, "sh", "-c", f"umask 077; cat > no_backup/{FIXTURE}"])
-    H["adb"](serial, "shell", command, input_bytes=json.dumps(fixture).encode())
+    payload = json.dumps(fixture).encode()
+    H["adb"](serial, "shell", command, input_bytes=payload)
+    actual = H["adb"](serial, "exec-out", "run-as", PACKAGE, "cat", "no_backup/" + FIXTURE)
+    if actual != payload:
+        raise RuntimeError("Private enrollment fixture did not round-trip through the owned transport")
 
 
 def receipt(serial):
@@ -153,7 +186,9 @@ def run_acceptance(options, control, process):
     private_fixture(options.source, fixture)
     probe(options.source, "source-prepare", options.output / "source-prepare.log")
     H["probe"](options.source, "seed", options.output / "source-seed.log", identity="account")
+    retained_draft_probe(options.source, "seed", options.output / "source-editor-draft.log")
     probe(options.source, "source-enroll", options.output / "source-enroll.log")
+    retained_draft_probe(options.source, "upload", options.output / "source-editor-original-upload.log")
     source = receipt(options.source)
     registry_check(control, process, "source", {source["device"]}, fixture["owner"])
     probe(options.source, "cleanup", options.output / "source-session-cleanup.log")
@@ -193,11 +228,33 @@ def run_acceptance(options, control, process):
     if any(restarted[field] != destination[field] for field in ("owner", "device", "fingerprint")):
         raise RuntimeError("Process restart replaced destination identity")
     registry_check(control, process, "replay", expected, fixture["owner"], proof)
+    media = AUTOMATIC_MEDIA["run"](options.destination, control, process, options.output / "automatic-media", wait_for)
+    H["set_offline"](options.destination, True)
+    current_draft_probe(options.destination, "prepare", options.output / "current-draft-prepare.log")
+    H["adb"](options.destination, "shell", "am", "force-stop", PACKAGE)
+    current_draft_probe(options.destination, "quarantine", options.output / "current-draft-quarantine.log")
+    H["set_offline"](options.destination, False)
+    H["adb"](options.destination, "shell", "am", "force-stop", PACKAGE)
+    current_draft_probe(options.destination, "complete", options.output / "current-draft-complete.log")
+    retained_draft_probe(options.destination, "verify", options.output / "destination-editor-shortcut.log")
+    H["adb"](options.destination, "shell", "am", "force-stop", PACKAGE)
+    current_draft_probe(options.destination, "reopened", options.output / "current-draft-reopened.log")
+    H["set_offline"](options.destination, True)
+    current_draft_probe(options.destination, "base-prepare", options.output / "current-draft-base-prepare.log")
+    H["adb"](options.destination, "shell", "am", "force-stop", PACKAGE)
+    H["set_offline"](options.destination, False)
+    current_draft_probe(options.destination, "base-complete", options.output / "current-draft-base-complete.log")
     probe(options.destination, "cleanup", options.output / "destination-session-cleanup.log")
     publish_control(control / "complete", b"complete")
     if process.wait(timeout=15) != 0:
         raise RuntimeError("The PostgreSQL registry did not confirm all native enrollment stages")
     return {
+        **media,
+        "currentEditorDraftShortcutRetained": True,
+        "currentEditorColdProviderCollisionQuarantined": True,
+        "currentEditorOriginalRecoveredByStartupWorker": True,
+        "currentEditorMissingRecordingMetadataRetained": True,
+        "currentEditorRecoveredBasePublishesWithoutFalseConflict": True,
         "nativeBackupServiceTransfer": True, "duplicateNativeDelivery": True,
         "offlineJournalAndOriginalsRetained": True, "sourceSessionNotTransferred": True,
         "journalOwnerAndKeyRetained": True, "distinctInstallationIds": True,

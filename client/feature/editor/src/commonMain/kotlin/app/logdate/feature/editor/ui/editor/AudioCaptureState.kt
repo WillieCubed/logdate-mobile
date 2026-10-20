@@ -56,8 +56,10 @@ sealed interface AudioCaptureState {
         val durationMs: Long,
     ) : AudioCaptureState
 
-    /** Recording could not be finalized. [reason] is the message shown to the person. */
+    /** Failed capture retains recovery anchors and draft metadata until explicitly discarded. */
     data class Failed(
         val reason: StringResource,
+        val filePath: String? = null,
+        val fallbackFilePath: String? = null,
     ) : AudioCaptureState
 }

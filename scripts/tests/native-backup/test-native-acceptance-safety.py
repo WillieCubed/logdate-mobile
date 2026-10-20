@@ -29,6 +29,36 @@ D2D_SPEC.loader.exec_module(D2D)
 
 
 class NativeAcceptanceSafetyTest(unittest.TestCase):
+    def test_d2d_transport_failure_retains_private_cause_and_original_error(self):
+        for diagnostics_fail in (False, True):
+            with self.subTest(diagnostics_fail=diagnostics_fail), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                app = root / "app.apk"
+                probe = root / "probe.apk"
+                app.touch()
+                probe.touch()
+                output = root / "result"
+                def command(serial, *args, **kwargs):
+                    if args[:3] == ("shell", "bmgr", "backupnow"):
+                        return b"Package @pm@ with result: Transport error\n"
+                    if args[:2] == ("shell", "logcat"):
+                        if diagnostics_fail:
+                            raise subprocess.TimeoutExpired("owned-adb", 30)
+                        return b"Backup: transport initialization failed\n"
+                    return b"null"
+                with patch.object(D2D, "verify_emulator"), patch.object(D2D, "require_empty_source"), patch.object(
+                    D2D, "selected_transport", return_value="original"
+                ), patch.object(D2D, "select_d2d_transport"), patch.object(D2D, "source_fixture", return_value=b"{}"), patch.object(
+                    D2D.HARNESS, "ensure_emulator_setup_complete"
+                ), patch.object(D2D.HARNESS, "probe"), patch.object(D2D.HARNESS, "adb", side_effect=command):
+                    with self.assertRaisesRegex(RuntimeError, "did not complete the native backup"):
+                        D2D.exercise_d2d("emulator-5582", app, probe, output)
+                diagnostic = output / "d2d-backup-transport.log"
+                self.assertTrue(diagnostic.is_file(), "Transport failure must retain its cause")
+                self.assertEqual(0o600, stat.S_IMODE(diagnostic.stat().st_mode))
+                expected = b"TimeoutExpired" if diagnostics_fail else b"transport initialization failed"
+                self.assertIn(expected, diagnostic.read_bytes())
+
     def test_retained_key_acceptance_rejects_skips_despite_a_success_summary(self):
         post = runpy.run_path(str(ROOT / "tests/e2e/native-post-transfer-acceptance.py"))
         for status, ending in (("0", ""), ("-3", ""), ("-4", ""), ("-3", "\r"), ("-4", "\r")):

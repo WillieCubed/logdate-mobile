@@ -23,7 +23,13 @@ import kotlin.time.Instant
 class AndroidPhotoLibraryMediaManager(
     private val delegate: MediaManager,
     private val context: Context,
-) : MediaManager by delegate {
+) : MediaManager by delegate,
+    ConditionalMediaSaver {
+    override suspend fun saveMedia(
+        payload: MediaPayload,
+        canCommit: () -> Boolean,
+    ): String = checkNotNull(delegate as? ConditionalMediaSaver) { "Guarded media storage unavailable" }.saveMedia(payload, canCommit)
+
     private val resolver = context.contentResolver
     private val recovery: MediaRecoveryGateway = ContentResolverMediaRecoveryGateway(resolver, context)
 

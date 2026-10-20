@@ -11,6 +11,24 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_gradle_installs_the_private_artifact_pair_even_when_build_settings_change(self):
+        with tempfile.TemporaryDirectory(prefix="pinned apks ") as folder:
+            app, probe = Path(folder) / "app.apk", Path(folder) / "probe.apk"
+            app.write_bytes(b"selected-app-207")
+            probe.write_bytes(b"selected-probe-207")
+            arguments = MODULE["pinned_install_arguments"](app, probe)
+            self.assertEqual([f"-Plogdate.nativeAcceptanceAppApk={app}",
+                              f"-Plogdate.nativeAcceptanceProbeApk={probe}"], arguments)
+            self.assertNotIn(":app:android-main:assembleDebug", arguments)
+
+    def test_pinned_installation_rejects_relative_or_missing_artifacts(self):
+        with tempfile.TemporaryDirectory() as folder:
+            present = Path(folder) / "app.apk"
+            present.touch()
+            for app, probe in ((Path("relative.apk"), present), (present, Path(folder) / "missing.apk")):
+                with self.subTest(app=app, probe=probe), self.assertRaises(ValueError):
+                    MODULE["pinned_install_arguments"](app, probe)
+
     def test_setup_process_can_disappear_before_initial_identity_capture(self):
         for failure in (subprocess.CalledProcessError(1, "ps"), RuntimeError("The owned process is no longer live")):
             self.assertIsNone(MODULE["discovery_identity"](12, process_identity=Mock(side_effect=failure)))

@@ -55,18 +55,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
-
-private data class DeviceEnrollmentScope(
-    val origin: String,
-    val accountId: String,
-    val deviceId: Uuid?,
-)
 
 /** Coordinates Cloud sync through the upload, download, and recovery services. */
 class DefaultSyncManager(
@@ -134,13 +126,12 @@ class DefaultSyncManager(
     serverAccounts: ServerAccountStore? = null,
     /** Syncs registered kinds through the account's personal space when its gate is open; null keeps every kind on its own endpoints. */
     spaceSync: SpaceSyncDependencies? = null,
+    private val entryDraftRecovery: app.logdate.client.repository.journals.EntryDraftRecoveryRepository? = null,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
     internal val lastErrorFlow = MutableStateFlow<SyncError?>(null)
     internal val syncMutex = Mutex()
-    private val deviceEnrollmentMutex = Mutex()
-    private var enrolledDeviceScope: DeviceEnrollmentScope? = null
 
     internal var isEnabled = true
 
@@ -222,17 +213,11 @@ class DefaultSyncManager(
 
     override suspend fun fullSync(): SyncResult = runCompleteSync()
 
-    internal suspend fun ensureDeviceEnrolled() {
-        if (!tokenRefresher.isAuthenticated()) return
-        val session = sessionStorage.getOriginBoundSession() ?: return
-        val deviceId = deviceIdProvider?.getDeviceId()?.value
-        val scope = DeviceEnrollmentScope(session.origin, session.session.accountId, deviceId)
-        deviceEnrollmentMutex.withLock {
-            if (enrolledDeviceScope == scope) return@withLock
-            deviceEnrollment()
-            if (sessionStorage.getOriginBoundSession() == session) enrolledDeviceScope = scope
-        }
+    private val enrollment by lazy {
+        SyncDeviceEnrollment(sessionStorage, deviceIdProvider, tokenRefresher::isAuthenticated, deviceEnrollment)
     }
+
+    internal suspend fun ensureDeviceEnrolled() = enrollment.ensureEnrolled()
 
     override suspend fun <T> whilePaused(block: suspend () -> T): T = syncMutex.withLock { block() }
 
@@ -330,18 +315,7 @@ class DefaultSyncManager(
         return statusPublisher.syncStatusFlow.value
     }
 
-    override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> =
-        combine(deadLetterStore.observe(), syncMetadataService.observePendingUploads()) { issues, pending ->
-            issues.filter { issue ->
-                pending.any { queued ->
-                    issue.entityType == queued.entityType?.name &&
-                        issue.entityId == queued.entityId &&
-                        issue.scope == queued.scope &&
-                        issue.operationId == queued.operationId &&
-                        issue.operation == queued.operation.name
-                }
-            }
-        }
+    override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = deadLetterStore.observeQueued(syncMetadataService)
 
     /** Reconsider transient work after connectivity returns or an immediate backup is requested. */
     suspend fun releaseUploadBackoff() {
@@ -406,66 +380,26 @@ class DefaultSyncManager(
         syncMetadataService.getLastSyncTime(entityType)
             ?: Instant.fromEpochMilliseconds(0)
 
-    internal suspend fun latestSyncTime(): Instant? {
-        val times =
-            listOf(
-                syncMetadataService.getLastSyncTime(EntityType.JOURNAL),
-                syncMetadataService.getLastSyncTime(EntityType.NOTE),
-                syncMetadataService.getLastSyncTime(EntityType.ASSOCIATION),
-                syncMetadataService.getLastSyncTime(EntityType.MEDIA),
-                syncMetadataService.getLastSyncTime(EntityType.DRAFT),
-                syncMetadataService.getLastSyncTime(EntityType.MOMENT),
-            ).filterNotNull()
+    internal suspend fun latestSyncTime(): Instant? = syncMetadataService.latestEntitySyncTime()
 
-        return times.maxOrNull()
+    private val mediaRecovery by lazy {
+        SyncMediaRecoveryCoordinator(
+            downloadInbox,
+            journalNotesRepository,
+            journalRepository,
+            mediaManager,
+            mediaTransfer,
+            mediaSyncRefStore,
+            transactionManager,
+            entryDraftRecovery,
+            mediaReferences,
+        )
     }
 
     internal suspend fun recoverMedia(
         accessToken: String,
         entityType: EntityType,
-    ) {
-        val inbox = downloadInbox ?: return
-        when (entityType) {
-            EntityType.NOTE ->
-                app.logdate.client.sync.recovery
-                    .SyncMediaRecovery(
-                        inbox,
-                        journalNotesRepository,
-                        mediaTransfer,
-                        mediaSyncRefStore,
-                        transactionManager,
-                    ).recover(accessToken)
-            EntityType.JOURNAL ->
-                app.logdate.client.sync.recovery
-                    .SyncJournalCoverRecovery(
-                        inbox,
-                        journalRepository,
-                        mediaTransfer,
-                        mediaSyncRefStore,
-                        transactionManager,
-                    ).recover(accessToken)
-            EntityType.DRAFT ->
-                app.logdate.client.sync.recovery
-                    .SyncDraftMediaRecovery(
-                        inbox,
-                        journalRepository,
-                        mediaTransfer,
-                        mediaSyncRefStore,
-                        transactionManager,
-                    ).recover(accessToken)
-            else -> Unit
-        }
-        app.logdate.client.sync.recovery
-            .NativeMediaRecovery(
-                inbox,
-                journalNotesRepository,
-                journalRepository,
-                mediaManager,
-                mediaTransfer,
-                mediaSyncRefStore,
-                transactionManager,
-            ).recover(accessToken, entityType)
-    }
+    ) = mediaRecovery.recover(accessToken, entityType)
 
     private val mediaTransfer =
         SyncMediaTransfer(

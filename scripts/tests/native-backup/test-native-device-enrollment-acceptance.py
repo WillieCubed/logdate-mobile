@@ -16,6 +16,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
+    def test_enrollment_ci_runtime_can_load_jvm_21_client_dependencies(self):
+        workflow = (SCRIPT.parents[2] / ".github/workflows/native-restore-acceptance.yml").read_text()
+        matrix_job = workflow.split("  native-transfer-scenarios:", 1)[1].split("  native-transfer:", 1)[0]
+        self.assertIn("java-version: '21'", matrix_job)
+        self.assertNotIn("java-version: '17'", matrix_job)
+
     def test_discovery_advertises_the_real_owned_emulator_server(self):
         previous = {"ATPROTO_PDS_SERVICE_URL": "https://outside.example"}
         actual = MODULE.server_environment(previous, 14321)
@@ -34,15 +40,20 @@ class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
         adb.assert_not_called()
 
     def test_credentials_travel_as_stdin_and_not_shell_arguments(self):
-        adb = Mock()
         fixture = {"accessToken": "secret-access-$(never-run)", "refreshToken": "secret-refresh"}
+        adb = Mock(return_value=json.dumps(fixture).encode())
         with patch.object(MODULE, "checked_emulator"), patch.dict(MODULE.H, adb=adb):
             MODULE.private_fixture("emulator-5558", fixture)
-        call = adb.call_args
+        call = next(call for call in adb.call_args_list if "input_bytes" in call.kwargs)
         self.assertEqual(fixture, json.loads(call.kwargs["input_bytes"]))
         for token in fixture.values():
             self.assertNotIn(token, " ".join(call.args))
         self.assertIn("no_backup/", " ".join(call.args))
+
+    def test_truncated_fixture_payload_cannot_reach_the_native_probe(self):
+        with patch.object(MODULE, "checked_emulator"), patch.dict(MODULE.H, adb=Mock(return_value=b"")):
+            with self.assertRaisesRegex(RuntimeError, "round-trip"):
+                MODULE.private_fixture("emulator-5558", {"accessToken": "synthetic"})
 
     def test_instrumentation_failure_or_skip_cannot_pass_a_success_summary(self):
         for status in (-1, -2, -3, -4):
@@ -97,21 +108,38 @@ class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
             destination = {**source, "device": "replacement", "automaticSyncObserved": True,
                            "syncWorkIds": ["owned-work"], "proof": {**source["proof"], "offlineCreatedAt": 3}}
             def transfer(*args, **kwargs):
+                events.append("native-transfer")
                 (args[4] / "source-fixture.json").write_text(json.dumps(source))
             options = SimpleNamespace(source="emulator-5578", destination="emulator-5580", output=output,
                                       app_apk=Path("app.apk"), test_apk=Path("test.apk"))
             with patch.object(MODULE, "wait_for"), patch.object(MODULE, "checked_emulator"), \
-                    patch.object(MODULE, "private_fixture"), patch.object(MODULE, "registry_check"), \
+                    patch.object(MODULE, "private_fixture"), \
+                    patch.object(MODULE, "current_draft_probe", create=True, side_effect=lambda serial, stage, *args: events.append("current-draft-" + stage)), \
+                    patch.object(MODULE, "retained_draft_probe", side_effect=lambda serial, stage, *args: events.append("editor-draft-" + stage)), patch.object(MODULE, "registry_check"), \
                     patch.object(MODULE, "receipt", side_effect=[source, destination, destination]), \
                     patch.object(MODULE, "probe", side_effect=lambda serial, stage, *args: events.append(stage)), \
+                    patch.dict(MODULE.AUTOMATIC_MEDIA, run=lambda *args: events.append("automatic-media") or {"automaticOriginalMediaRecovery": True}), \
                     patch.dict(MODULE.H, prepare=Mock(), probe=Mock(), adb=Mock(), transfer=transfer,
                                set_offline=lambda serial, offline: events.append((serial, offline))):
                 MODULE.run_acceptance(options, control, Mock(wait=Mock(return_value=0)))
+            self.assertEqual(["current-draft-prepare", "current-draft-quarantine", "current-draft-complete", "current-draft-reopened", "current-draft-base-prepare", "current-draft-base-complete"],
+                             [event for event in events if isinstance(event, str) and event.startswith("current-draft-")])
+            self.assertLess(events.index("current-draft-prepare"), events.index("current-draft-quarantine"))
+            self.assertLess(events.index("current-draft-complete"), events.index("editor-draft-verify"))
+            self.assertLess(events.index("editor-draft-verify"), events.index("current-draft-reopened"))
+            self.assertLess(events.index("editor-draft-seed"), events.index("source-enroll"))
+            self.assertLess(events.index("source-enroll"), events.index("editor-draft-upload"))
+            self.assertLess(events.index("editor-draft-upload"), events.index("native-transfer"))
+            self.assertLess(events.index("replay"), events.index("editor-draft-verify"))
+            self.assertLess(events.index("automatic-media"), events.index("editor-draft-verify"))
+            self.assertLess(events.index("editor-draft-verify"), max(i for i, event in enumerate(events) if event == "cleanup"))
             self.assertIn((options.destination, False), events)
             self.assertIn((options.destination, True), events)
             self.assertLess(events.index((options.destination, True)), events.index("destination-edit"))
             self.assertLess(events.index("destination-edit"), events.index((options.destination, False)))
             self.assertLess(events.index((options.destination, False)), events.index("destination-enroll"))
+            self.assertLess(events.index("replay"), events.index("automatic-media"))
+            self.assertLess(events.index("automatic-media"), max(i for i, event in enumerate(events) if event == "cleanup"))
 
     def test_a_remote_database_disguised_by_userinfo_is_rejected(self):
         with tempfile.TemporaryDirectory() as folder:

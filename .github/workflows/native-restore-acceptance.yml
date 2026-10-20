@@ -11,6 +11,8 @@ on:
       - 'app/android-main/src/androidTest/**/NativeTransferRuntimeChecks.kt'
       - 'app/android-main/src/androidTest/**/NativeSourceSession*.kt'
       - 'app/android-main/src/androidTest/**/NativeDeviceEnrollment*.kt'
+      - 'app/android-main/src/androidTest/**/NativeAutomaticMediaWorkerProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeRetainedDraftShortcutProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRetainedOfflineEditProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestorePrivacyRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeBackgroundCredentialCallbackTest.kt'
@@ -81,6 +83,7 @@ on:
       - 'tests/e2e/native-post-transfer-acceptance.py'
       - 'tests/e2e/native-restore-work-restart-acceptance.py'
       - 'tests/e2e/native-device-enrollment-acceptance.py'
+      - 'tests/e2e/native-automatic-media-worker-acceptance.py'
       - 'integration/server-client-e2e/src/test/kotlin/app/logdate/integration/e2e/harness/**'
       - 'integration/server-client-e2e/build.gradle.kts'
       - 'build.gradle.kts'
@@ -359,11 +362,11 @@ jobs:
           android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
           google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21 for the enrollment server and native harness
         uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.4.0

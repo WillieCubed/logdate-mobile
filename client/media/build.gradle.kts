@@ -100,6 +100,7 @@ kotlin {
             implementation(libs.commons.compress)
         }
         findByName("androidHostTest")?.dependencies {
+            implementation(libs.mockk)
             implementation(libs.kotlin.test)
             implementation(libs.kotlin.test.junit)
             implementation(libs.kotlinx.coroutines.test)

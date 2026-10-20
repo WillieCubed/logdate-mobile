@@ -48,6 +48,20 @@ Sensor Module
 - **Event Streaming**: Reactive data flow with Flow
 - **Error Handling**: Graceful handling of sensor unavailability
 
+### Android network policy
+
+`AndroidNetworkSaverModeProvider` follows Android's default network, which is the route ordinary
+LogDate requests use. Capabilities delivered to that callback own the connection type, metering,
+and validation state. Do not reread synchronous connectivity getters inside callbacks: Android can
+still return the previous network. A newly available default remains restricted until its own
+capabilities arrive; delayed events for the previous network cannot replace it.
+
+Data Saver broadcasts and explicit state reads refresh the app's background restriction separately.
+After callback state exists, these reads preserve its network capabilities. Synchronous network
+reads are only the startup fallback before callbacks arrive. Tests must exercise callback events
+while getters remain stale; a test that calls only `getCurrentDataSaverState()` misses this race.
+The callback regressions live in `AndroidNetworkPolicyCallbackTest`.
+
 ## Platform Support
 
 | Feature                | Android | iOS     | Desktop |
@@ -78,16 +92,16 @@ val batteryInfoProvider = get<BatteryInfoProvider>()
 // Collect battery updates
 coroutineScope.launch {
     batteryInfoProvider.currentBatteryState.collect { state ->
-        println("Battery level: ${state.level}%")
-        println("Charging: ${state.isCharging}")
-        println("Power save mode: ${state.isPowerSaveMode}")
+        Napier.d("Battery level: ${state.level}%")
+        Napier.d("Charging: ${state.isCharging}")
+        Napier.d("Power save mode: ${state.isPowerSaveMode}")
     }
 }
 
 // Get current state directly
 coroutineScope.launch {
     val currentState = batteryInfoProvider.getCurrentBatteryState()
-    println("Current battery level: ${currentState.level}%")
+    Napier.d("Current battery level: ${currentState.level}%")
 }
 
 // Clean up when done
@@ -105,9 +119,9 @@ coroutineScope.launch {
     networkSaverProvider.dataSaverModeState.collect { state ->
         if (state.isDataSaverEnabled) {
             // Adjust app behavior for data saving
-            println("Data saver enabled, connection: ${state.connectionType}")
+            Napier.d("Data saver enabled, connection: ${state.connectionType}")
         } else {
-            println("Normal data usage, connection: ${state.connectionType}")
+            Napier.d("Normal data usage, connection: ${state.connectionType}")
         }
     }
 }
@@ -132,7 +146,21 @@ networkSaverProvider.cleanup()
 - [ ] Implement gesture recognition
 - [ ] Add orientation detection
 
-### Platform Support
+#### Android network policy
+
+`AndroidNetworkSaverModeProvider` follows Android's default network, which is the route ordinary
+LogDate requests use. Capabilities delivered to that callback own the connection type, metering,
+and validation state. Do not reread synchronous connectivity getters inside callbacks: Android can
+still return the previous network. A newly available default remains restricted until its own
+capabilities arrive; delayed events for the previous network cannot replace it.
+
+Data Saver broadcasts and explicit state reads refresh the app's background restriction separately.
+After callback state exists, these reads preserve its network capabilities. Synchronous network
+reads are only the startup fallback before callbacks arrive. Tests must exercise callback events
+while getters remain stale; a test that calls only `getCurrentDataSaverState()` misses this race.
+The callback regressions live in `AndroidNetworkPolicyCallbackTest`.
+
+## Platform Support
 - [ ] Implement native desktop APIs for battery and sensor data where available (JNA/JNI on Windows/Linux/macOS)
 - [ ] Add watchOS sensor integration
 - [ ] Add sensor mocking for testing

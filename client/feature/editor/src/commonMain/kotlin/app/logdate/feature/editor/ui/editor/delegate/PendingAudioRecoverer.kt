@@ -62,12 +62,12 @@ class DefaultPendingAudioRecoverer(
                 ?.takeIf { it != path }
                 ?.let { resolvePath(it) }
                 ?.let { return it }
-            return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
+            return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered, path, state.fallbackFilePath)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Exception) {
             Napier.w("Could not resolve duration for recovered audio $path", error)
-            return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered)
+            return AudioCaptureState.Failed(Res.string.editor_error_recording_not_recovered, path, state.fallbackFilePath)
         }
     }
 

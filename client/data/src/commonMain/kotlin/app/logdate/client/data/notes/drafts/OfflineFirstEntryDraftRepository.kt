@@ -1,6 +1,7 @@
 package app.logdate.client.data.notes.drafts
 
 import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.repository.journals.EntryDraftRecoveryRepository
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
@@ -8,6 +9,7 @@ import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.shared.model.location.VisitMemoryContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.uuid.Uuid
@@ -30,7 +33,8 @@ class OfflineFirstEntryDraftRepository(
     private val draftStore: LocalEntryDraftStore,
     coroutineScope: CoroutineScope,
     private val journalRepository: JournalRepository? = null,
-) : EntryDraftRepository {
+) : EntryDraftRepository,
+    EntryDraftRecoveryRepository {
     override suspend fun checkpointRecording(
         blockId: Uuid,
         path: String,
@@ -83,6 +87,47 @@ class OfflineFirstEntryDraftRepository(
     private val draftsFlow = MutableStateFlow<Map<Uuid, EntryDraft>>(emptyMap())
     private val mutationMutex = Mutex()
     private val initializationComplete = CompletableDeferred<Unit>()
+
+    override suspend fun getDraftSnapshotsForRecovery(): List<EntryDraft> {
+        initializationComplete.await()
+        return mutationMutex.withLock { draftsFlow.value.values.toList() }
+    }
+
+    override suspend fun compareAndSetDraftForRecovery(
+        expected: EntryDraft,
+        replacement: EntryDraft,
+        canCommit: () -> Boolean,
+    ): Boolean {
+        require(expected.id == replacement.id) { "Recovery cannot change draft identity" }
+        initializationComplete.await()
+        return mutationMutex.withLock {
+            if (!canCommit() || draftsFlow.value[expected.id] != expected) return@withLock false
+            val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
+            try {
+                val applied = recoveryStore.compareAndSetForRecovery(expected, replacement, canCommit)
+                if (applied) {
+                    draftsFlow.value = draftsFlow.value + (replacement.id to replacement)
+                } else {
+                    reconcileStoredDraft(expected.id)
+                }
+                applied
+            } catch (error: Throwable) {
+                // A cancelled acknowledgement does not prove that storage rolled back the write.
+                try {
+                    reconcileStoredDraft(expected.id)
+                } catch (reconciliation: Throwable) {
+                    if (reconciliation !== error) error.addSuppressed(reconciliation)
+                }
+                throw error
+            }
+        }
+    }
+
+    private suspend fun reconcileStoredDraft(id: Uuid) =
+        withContext(NonCancellable) {
+            val stored = draftStore.getDraft(id)
+            draftsFlow.value = if (stored == null) draftsFlow.value - id else draftsFlow.value + (id to stored)
+        }
 
     init {
         // Load existing drafts from storage on initialization

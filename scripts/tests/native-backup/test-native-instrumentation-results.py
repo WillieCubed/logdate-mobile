@@ -84,6 +84,24 @@ class NativeInstrumentationResultTest(unittest.TestCase):
                                 self.run_probe(module, method, output, log)
                         self.assertEqual(output, log.read_bytes())
 
+    def test_media_probe_streams_private_evidence_before_the_runner_finishes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "result.log"
+            marker = b"INSTRUMENTATION_STATUS: stage=waiting-for-original\n"
+            def lines():
+                yield marker
+                self.assertTrue(log.exists(), "Live probe evidence must be available during a bounded wait")
+                self.assertEqual(marker, log.read_bytes())
+                self.assertEqual(0o600, stat.S_IMODE(log.stat().st_mode))
+                yield b"OK (1 test)\n"
+            process = MagicMock()
+            process.stdout = lines()
+            process.wait.return_value = 0
+            process.poll.return_value = 0
+            with patch.object(MEDIA, "safe_target"), patch.object(MEDIA, "adb"), \
+                    patch.object(MEDIA.subprocess, "Popen", return_value=process):
+                MEDIA.instrument("emulator-5554", "Example#test", log)
+
     def test_network_and_permission_acknowledgements_are_still_required(self):
         for kwargs in (
             {"release_network": MagicMock()},

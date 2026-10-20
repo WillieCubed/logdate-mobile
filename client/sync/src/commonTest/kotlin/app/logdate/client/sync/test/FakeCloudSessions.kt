@@ -1,5 +1,7 @@
 package app.logdate.client.sync.test
 
+import app.logdate.client.datastore.SessionAuthenticationSnapshot
+import app.logdate.client.datastore.SessionInstallationGuard
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.shared.model.AuthenticationResult
@@ -90,6 +92,7 @@ class FakeCloudAccountRepository : CloudAccountRepository {
 class FakeSessionStorage(
     authenticated: Boolean = true,
 ) : SessionStorage {
+    private var revision = 0L
     var currentOrigin: String = app.logdate.shared.config.DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
     private var sessionState: UserSession? =
         UserSession(
@@ -100,6 +103,19 @@ class FakeSessionStorage(
     private val sessionStateFlow = MutableStateFlow(sessionState)
 
     override fun getSession(): UserSession? = sessionState
+
+    override suspend fun captureAuthenticationSnapshot(): SessionAuthenticationSnapshot =
+        SessionAuthenticationSnapshot(getOriginBoundSession(), SessionInstallationGuard(currentOrigin, revision))
+
+    override suspend fun clearSessionIfUnchanged(
+        expected: SessionInstallationGuard,
+        onCleared: () -> Unit,
+    ): Boolean {
+        if (currentOrigin != expected.origin || revision != expected.revision) return false
+        clearSession()
+        onCleared()
+        return true
+    }
 
     override fun getOriginBoundSession(): app.logdate.client.datastore.OriginBoundSession? =
         sessionState?.let {
@@ -121,11 +137,13 @@ class FakeSessionStorage(
     override suspend fun hasValidSession(): Boolean = sessionState != null
 
     override suspend fun saveSession(session: UserSession) {
+        revision++
         sessionState = session
         sessionStateFlow.value = session
     }
 
     override suspend fun clearSession() {
+        revision++
         sessionState = null
         sessionStateFlow.value = null
     }

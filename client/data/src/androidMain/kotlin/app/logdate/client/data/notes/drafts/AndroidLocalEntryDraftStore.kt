@@ -8,9 +8,11 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.logdate.client.repository.journals.EntryDraft
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.uuid.Uuid
 
 private val Context.entryDraftDataStore by preferencesDataStore(name = "entry_drafts")
@@ -20,10 +22,35 @@ private val Context.entryDraftDataStore by preferencesDataStore(name = "entry_dr
  */
 class AndroidLocalEntryDraftStore internal constructor(
     private val dataStore: DataStore<Preferences>,
-) : LocalEntryDraftStore {
+) : LocalEntryDraftStore,
+    RecoveryEntryDraftStore {
     constructor(context: Context) : this(context.entryDraftDataStore)
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    override suspend fun compareAndSetForRecovery(
+        expected: EntryDraft,
+        replacement: EntryDraft,
+        canCommit: () -> Boolean,
+    ): Boolean {
+        require(expected.id == replacement.id) { "Recovery cannot change draft identity" }
+        val key = stringPreferencesKey(expected.id.toString())
+        val completeJson = Json(json) { encodeDefaults = true }
+        val expectedJson = completeJson.encodeToJsonElement(expected)
+        val replacementJson = completeJson.encodeToJsonElement(replacement)
+        var applied = false
+        dataStore.edit { preferences ->
+            if (!canCommit()) return@edit
+            val current = preferences[key]?.let { decodeDraft(it, expected.id.toString()) }
+            if (current != expected) return@edit
+            if (!canCommit()) return@edit
+            val raw = json.parseToJsonElement(requireNotNull(preferences[key]))
+            preferences[key] = patchDraftRecoveryJson(raw, expectedJson, replacementJson).toString()
+            if (!canCommit()) throw CancellationException("Draft recovery authority changed")
+            applied = true
+        }
+        return applied
+    }
 
     override suspend fun saveDraft(draft: EntryDraft) {
         val key = stringPreferencesKey(draft.id.toString())
@@ -77,9 +104,9 @@ class AndroidLocalEntryDraftStore internal constructor(
     ): EntryDraft =
         try {
             json.decodeFromString<EntryDraft>(serialized)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             val identitySuffix = draftIdentity?.let { " $it" }.orEmpty()
-            Napier.e("Failed to read local draft$identitySuffix", e)
-            throw EntryDraftStorageException("Local draft$identitySuffix is unreadable", e)
+            Napier.e("Failed to read local draft$identitySuffix")
+            throw EntryDraftStorageException("Local draft$identitySuffix is unreadable")
         }
 }

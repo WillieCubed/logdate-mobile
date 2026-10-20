@@ -641,7 +641,7 @@ def timeline_is_open(hierarchy):
 
 
 def system_ui_unresponsive_dialog_present(hierarchy):
-    """Detect Android's transient system ANR even when its Wait control is absent."""
+    """Detect known platform ANRs even when their Wait control is absent."""
     try:
         nodes = ET.fromstring(hierarchy).iter("node")
     except ET.ParseError:
@@ -649,13 +649,13 @@ def system_ui_unresponsive_dialog_present(hierarchy):
     return any(
         node.get("package") == "android"
         and node.get("resource-id") == "android:id/alertTitle"
-        and node.get("text") in ("System UI isn't responding", "Process system isn't responding")
+        and node.get("text") in {"System UI isn't responding", "Process system isn't responding", "Digital Wellbeing isn't responding"}
         for node in nodes
     )
 
 
 def system_ui_unresponsive_wait_target(hierarchy):
-    """Return Android's Wait button only for a known system ANR dialog."""
+    """Return Wait only for known platform ANRs; never dismiss a LogDate failure."""
     try:
         nodes = list(ET.fromstring(hierarchy).iter("node"))
     except ET.ParseError:
@@ -663,7 +663,7 @@ def system_ui_unresponsive_wait_target(hierarchy):
     has_system_anr = any(
         node.get("package") == "android"
         and node.get("resource-id") == "android:id/alertTitle"
-        and node.get("text") in ("System UI isn't responding", "Process system isn't responding")
+        and node.get("text") in {"System UI isn't responding", "Process system isn't responding", "Digital Wellbeing isn't responding"}
         for node in nodes
     )
     if not has_system_anr:
@@ -744,7 +744,7 @@ def wait_for_timeline(serial, output, timeout_seconds=60, prefix="destination"):
             overwrite_private_file(screenshot_path, screenshot)
             wait_target = system_ui_unresponsive_wait_target(hierarchy)
             if wait_target is not None:
-                print("Waiting for Android system services to recover over the restored Timeline", flush=True)
+                print("Waiting for an Android platform app to recover over the restored Timeline", flush=True)
                 adb(serial, "shell", "input", "tap", str(wait_target[0]), str(wait_target[1]))
                 time.sleep(0.25)
             elif system_ui_unresponsive_dialog_present(hierarchy):

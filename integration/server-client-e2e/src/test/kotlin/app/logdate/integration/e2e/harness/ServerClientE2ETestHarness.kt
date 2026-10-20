@@ -6,6 +6,9 @@ import app.logdate.shared.config.DefaultLogDateConfigRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -35,6 +38,7 @@ data class ServerClientE2EHarness(
 
 suspend fun <T> withServerClientHarness(
     serverPort: Int? = null,
+    beforeRequest: suspend (ApplicationCall) -> Unit = {},
     block: suspend ServerClientE2EHarness.() -> T,
 ): T =
     withHarnessDatabase { databaseAvailable ->
@@ -50,6 +54,7 @@ suspend fun <T> withServerClientHarness(
         val host = "127.0.0.1"
         val engine =
             embeddedServer(Netty, host = host, port = port) {
+                intercept(ApplicationCallPipeline.Setup) { beforeRequest(call) }
                 module(isDatabaseAvailable = databaseAvailable)
             }
 

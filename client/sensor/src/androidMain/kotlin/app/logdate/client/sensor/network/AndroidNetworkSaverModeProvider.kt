@@ -7,7 +7,6 @@ import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import app.logdate.client.networking.saver.NetworkConnectionType
 import app.logdate.client.networking.saver.NetworkSaverModeProvider
 import app.logdate.client.networking.saver.NetworkSaverState
@@ -23,23 +22,42 @@ class AndroidNetworkSaverModeProvider(
     private val context: Context,
 ) : NetworkSaverModeProvider {
     private val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
-    private val networkSaverStateFlow = MutableStateFlow(getCurrentNetworkSaverStateInternal())
+    private val stateLock = Any()
+    private var observedDefaultNetwork = false
+    private var defaultNetwork: Network? = null
+    private var defaultCapabilities: NetworkCapabilities? = null
+    private var backgroundRestricted = readBackgroundRestriction()
+    private val networkSaverStateFlow = MutableStateFlow(readInitialState())
 
     private val networkCallback =
         object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                networkSaverStateFlow.value = getCurrentNetworkSaverStateInternal()
+                synchronized(stateLock) {
+                    observedDefaultNetwork = true
+                    defaultNetwork = network
+                    defaultCapabilities = null
+                    publishCallbackState()
+                }
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 capabilities: NetworkCapabilities,
             ) {
-                networkSaverStateFlow.value = getCurrentNetworkSaverStateInternal()
+                synchronized(stateLock) {
+                    if (network != defaultNetwork) return
+                    defaultCapabilities = capabilities
+                    publishCallbackState()
+                }
             }
 
             override fun onLost(network: Network) {
-                networkSaverStateFlow.value = getCurrentNetworkSaverStateInternal()
+                synchronized(stateLock) {
+                    if (network != defaultNetwork) return
+                    defaultNetwork = null
+                    defaultCapabilities = null
+                    publishCallbackState()
+                }
             }
         }
 
@@ -49,15 +67,14 @@ class AndroidNetworkSaverModeProvider(
                 context: Context,
                 intent: Intent,
             ) {
-                networkSaverStateFlow.value = getCurrentNetworkSaverStateInternal()
+                refreshRestriction()
             }
         }
 
     init {
         // Register for network changes
         try {
-            val request = NetworkRequest.Builder().build()
-            connectivityManager.registerNetworkCallback(request, networkCallback)
+            connectivityManager.registerDefaultNetworkCallback(networkCallback)
         } catch (e: Exception) {
             // In case of security exception or other issues
         }
@@ -73,8 +90,35 @@ class AndroidNetworkSaverModeProvider(
 
     override val dataSaverModeState: Flow<NetworkSaverState> = networkSaverStateFlow.asStateFlow()
 
-    override suspend fun getCurrentDataSaverState(): NetworkSaverState =
-        getCurrentNetworkSaverStateInternal().also { networkSaverStateFlow.value = it }
+    override suspend fun getCurrentDataSaverState(): NetworkSaverState = refreshRestriction()
+
+    private fun refreshRestriction(): NetworkSaverState =
+        synchronized(stateLock) {
+            backgroundRestricted = readBackgroundRestriction()
+            val state = if (observedDefaultNetwork) callbackState() else readInitialState()
+            networkSaverStateFlow.value = state
+            state
+        }
+
+    private fun publishCallbackState() {
+        networkSaverStateFlow.value = callbackState()
+    }
+
+    // Callback arguments are ordered by Android. Synchronous getters in a callback may
+    // still describe the previous network; later policy reads must not overwrite this state.
+    private fun callbackState(): NetworkSaverState {
+        val connection = defaultCapabilities.toConnectionType()
+        return NetworkSaverState(
+            isDataSaverEnabled = backgroundRestricted,
+            connectionType = connection,
+            isMetered =
+                connection == NetworkConnectionType.BLUETOOTH_PROXY ||
+                    defaultCapabilities?.let {
+                        !runCatching { it.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) }.getOrDefault(false)
+                    } == true,
+            isValidated = defaultCapabilities.isValidated(),
+        )
+    }
 
     override suspend fun isDataSaverModeActive(): Boolean = getCurrentDataSaverState().isDataSaverEnabled
 
@@ -92,20 +136,17 @@ class AndroidNetworkSaverModeProvider(
         }
     }
 
-    private fun getCurrentNetworkSaverStateInternal(): NetworkSaverState {
-        val isBackgroundDataRestricted =
-            try {
-                connectivityManager.restrictBackgroundStatus ==
-                    ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
-            } catch (e: Exception) {
-                false
-            }
+    private fun readBackgroundRestriction(): Boolean =
+        runCatching {
+            connectivityManager.restrictBackgroundStatus == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
+        }.getOrDefault(false)
 
+    private fun readInitialState(): NetworkSaverState {
         val activeCapabilities = getActiveNetworkCapabilities()
         val connectionType = activeCapabilities.toConnectionType()
 
         return NetworkSaverState(
-            isDataSaverEnabled = isBackgroundDataRestricted,
+            isDataSaverEnabled = backgroundRestricted,
             connectionType = connectionType,
             isMetered =
                 connectionType == NetworkConnectionType.BLUETOOTH_PROXY ||

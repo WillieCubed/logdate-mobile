@@ -74,6 +74,12 @@ def managed_environment(sdk, inherited):
                 LOGDATE_NATIVE_ACCEPTANCE_PACKAGE="studio.hypertext.logdate.debug")
 
 
+def pinned_install_arguments(app, probe):
+    if any(not path.is_absolute() or not path.is_file() for path in (app, probe)):
+        raise ValueError("Managed installation requires both existing absolute pinned APK paths")
+    return [f"-Plogdate.nativeAcceptanceAppApk={app}", f"-Plogdate.nativeAcceptanceProbeApk={probe}"]
+
+
 def validate_native_arguments(arguments):
     allowed = {"--exercise-quota", "--exercise-archive-recovery", "--exercise-missing-keys",
                "--exercise-missing-privacy", "--exercise-credentials-only", "--exercise-data-only",
@@ -172,8 +178,8 @@ def run(options):
     for apk in (app, probe):
         if not apk.is_file():
             raise RuntimeError("Assemble LogDate and its probe APK before starting the managed pair")
-    # Gradle can rebuild the original paths. Native reinstallation uses these private,
-    # immutable copies of the bytes attested by the waiting driver instead.
+    # Both Gradle's initial installation and later native reinstallation use these
+    # immutable copies; another build cannot replace the attested candidate.
     artifacts = output / "apks"
     artifacts.mkdir(mode=0o700)
     pinned = []
@@ -191,6 +197,7 @@ def run(options):
     avd = f"dev34_{image}_{architecture}_Pixel_9_Pro"
     env = managed_environment(sdk, os.environ)
     args = ["./gradlew", f":tools:native-restore-driver:{group}GroupDebugAndroidTest",
+            *pinned_install_arguments(app, probe),
             f"-Pandroid.testInstrumentationRunnerArguments.class={DRIVER_CASE}",
             "-Pandroid.testInstrumentationRunnerArguments.nativeManagedTransport=true",
             f"-Pandroid.testInstrumentationRunnerArguments.nativeManagedNonce={nonce}",

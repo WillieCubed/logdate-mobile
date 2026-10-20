@@ -7,6 +7,7 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.identity.data.AccountDeviceApi
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
+import io.ktor.server.request.path
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -48,7 +49,8 @@ object NativeDeviceEnrollmentHarness {
             Files.createDirectories(control)
             Files.setPosixFilePermissions(control, PosixFilePermissions.fromString("rwx------"))
             require(!Files.exists(control.resolve("complete"))) { "A fresh enrollment control directory is required" }
-            withServerClientHarness(serverPort = port) {
+            val mediaGate = NativeMediaPhaseGate(control)
+            withServerClientHarness(serverPort = port, beforeRequest = { mediaGate.beforeRequest(it.request.path()) }) {
                 val account = apiClient.createAccountWithSyntheticPasskey("transfer_${Uuid.random().toString().take(8)}").data
                 val session =
                     OriginBoundSession(

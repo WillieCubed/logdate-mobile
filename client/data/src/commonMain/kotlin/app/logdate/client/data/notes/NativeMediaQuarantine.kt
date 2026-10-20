@@ -1,6 +1,7 @@
 package app.logdate.client.data.notes
 
 import app.logdate.client.data.journals.NativeDraftMediaQuarantine
+import app.logdate.client.data.notes.drafts.NativeEntryDraftMediaQuarantine
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.media.storage.MediaReference
@@ -20,6 +21,7 @@ class NativeMediaQuarantine(
     private val transactions: SyncTransactionManager,
     private val transcriptions: TranscriptionRepository,
     private val deliveryGate: NativeRestoreDeliveryGate = ImmediateNativeRestoreDeliveryGate,
+    private val entryDrafts: NativeEntryDraftMediaQuarantine? = null,
     private val mediaExists: suspend (String) -> Boolean,
 ) {
     suspend fun run(isCurrent: () -> Boolean): Boolean =
@@ -50,8 +52,9 @@ class NativeMediaQuarantine(
                 check(isCurrent()) { "Native media delivery changed" }
             }
             drafts.run(isCurrent, quarantine)
+            val currentDraftsComplete = entryDrafts?.run(isCurrent, quarantine) ?: true
             check(isCurrent()) { "Native media delivery changed" }
-            availabilityChecksComplete
+            availabilityChecksComplete && currentDraftsComplete
         }
 
     private suspend fun quarantined(
