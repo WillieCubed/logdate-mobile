@@ -39,6 +39,11 @@ on:
       - 'build.gradle.kts'
   workflow_dispatch:
 
+# Superseded PR runs use disposable hosted emulators and can release their runners.
+concurrency:
+  group: native-restore-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
