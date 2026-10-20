@@ -55,6 +55,8 @@ internal fun <T> openDatabaseWithPassphraseCandidates(
             return OpenedDatabase(openDatabase(candidate), candidate)
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (newer: NewerDatabaseVersionException) {
+            throw newer
         } catch (error: Exception) {
             lastError = error
             val message =
@@ -82,7 +84,12 @@ class DatabaseStartupMonitor {
 
     fun markRecoveryRequired(error: Throwable) {
         val rootCause = error.rootCause()
-        val reason = classifyRecoveryReason(rootCause.message.orEmpty())
+        val reason =
+            if (rootCause is NewerDatabaseVersionException) {
+                "Update LogDate to open this journal. Your journal has been kept safe."
+            } else {
+                classifyRecoveryReason(rootCause.message.orEmpty())
+            }
         val detail = "${rootCause::class.java.simpleName}: ${rootCause.message ?: "unknown"}"
         _state.value = DatabaseStartupState.RecoveryRequired(reason = reason, detail = detail)
         Napier.e("Database startup state: RecoveryRequired ($reason)", tag = DB_RECOVERY_TAG)

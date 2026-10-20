@@ -16,6 +16,7 @@ import app.logdate.client.location.R
 import app.logdate.client.location.history.LocationTracker
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionType
 import app.logdate.client.repository.location.LocationCapturePipeline
@@ -419,6 +420,7 @@ class ActivityAwareLocationService :
     }
 
     private fun buildNotification(): Notification {
+        LogDateNotificationRegistrar(this).registerChannel(LogDateNotificationChannelKey.LOCATION_HISTORY)
         val launchIntent =
             packageManager.getLaunchIntentForPackage(packageName) ?: Intent()
         launchIntent.apply {

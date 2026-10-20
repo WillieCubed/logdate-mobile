@@ -1,5 +1,11 @@
 package app.logdate.client.launch
 
+import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
@@ -16,6 +22,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.client.database.NativeRestoreInProgressException
+import app.logdate.client.database.NewerDatabaseVersionException
 import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
 import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
@@ -39,33 +46,30 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
             Surface(modifier = Modifier.fillMaxSize()) {
                 if (state is ApplicationStartupState.Loading) GenericLoadingScreen()
                 if (failure != null) {
+                    val message = applicationStartupFailureMessage(failure.cause)
                     AlertDialog(
                         onDismissRequest = {},
                         title = {
-                            Text(
-                                stringResource(
-                                    if (applicationStartupFailureMessage(failure.cause) in
-                                        setOf(
-                                            ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY,
-                                            ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY,
-                                        )
-                                    ) {
-                                        R.string.database_key_recovery_title
-                                    } else {
-                                        R.string.application_startup_failed_title
-                                    },
-                                ),
-                            )
+                            Text(stringResource(message.titleResource()))
                         },
                         text = {
                             Text(
-                                stringResource(applicationStartupFailureMessage(failure.cause).stringResource()),
+                                stringResource(message.stringResource()),
                                 modifier = Modifier.verticalScroll(rememberScrollState()),
                             )
                         },
                         confirmButton = {
-                            TextButton(onClick = startup::start) {
-                                Text(stringResource(R.string.application_startup_retry))
+                            val updateRequired = message == ApplicationStartupFailureMessage.UPDATE_REQUIRED
+                            TextButton(onClick = { if (updateRequired) openJournalAppUpdate() else startup.start() }) {
+                                Text(
+                                    stringResource(
+                                        if (updateRequired) {
+                                            R.string.database_update_required_action
+                                        } else {
+                                            R.string.application_startup_retry
+                                        },
+                                    ),
+                                )
                             }
                         },
                     )
@@ -86,6 +90,7 @@ internal enum class ApplicationStartupFailureMessage {
     STORAGE_FULL,
     DATABASE_KEY_RECOVERY,
     PRIVACY_METADATA_RECOVERY,
+    UPDATE_REQUIRED,
 }
 
 internal fun applicationStartupFailureMessage(cause: Throwable): ApplicationStartupFailureMessage =
@@ -93,12 +98,22 @@ internal fun applicationStartupFailureMessage(cause: Throwable): ApplicationStar
         cause.hasStorageFullCause() -> ApplicationStartupFailureMessage.STORAGE_FULL
         cause.hasNativeMediaQuarantinePending() -> ApplicationStartupFailureMessage.NATIVE_MEDIA_PENDING
         cause.hasNativeRestoreInProgress() -> ApplicationStartupFailureMessage.NATIVE_RESTORE_PENDING
+        cause.causesAndSuppressed().any { it is NewerDatabaseVersionException } -> ApplicationStartupFailureMessage.UPDATE_REQUIRED
         cause.causesAndSuppressed().any { it is NativeRestorePrivacyMetadataRequiredException } ->
             ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY
         cause.causesAndSuppressed().any {
             it is DatabaseKeyRecoveryRequiredException
         } -> ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY
         else -> ApplicationStartupFailureMessage.GENERIC
+    }
+
+private fun ApplicationStartupFailureMessage.titleResource(): Int =
+    when (this) {
+        ApplicationStartupFailureMessage.UPDATE_REQUIRED -> R.string.database_update_required_title
+        ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY,
+        ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY,
+        -> R.string.database_key_recovery_title
+        else -> R.string.application_startup_failed_title
     }
 
 private fun ApplicationStartupFailureMessage.stringResource(): Int =
@@ -109,7 +124,31 @@ private fun ApplicationStartupFailureMessage.stringResource(): Int =
         ApplicationStartupFailureMessage.STORAGE_FULL -> R.string.native_media_quarantine_storage_message
         ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY -> R.string.database_key_recovery_message
         ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY -> R.string.native_privacy_metadata_recovery_message
+        ApplicationStartupFailureMessage.UPDATE_REQUIRED -> R.string.database_update_required_message
     }
+
+private fun FragmentActivity.openJournalAppUpdate() {
+    val opened =
+        openLogDateUpdate(packageName) { url ->
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                true
+            } catch (_: ActivityNotFoundException) {
+                false
+            } catch (_: SecurityException) {
+                false
+            }
+        }
+    if (!opened) {
+        getSystemService(ClipboardManager::class.java).setPrimaryClip(
+            ClipData.newPlainText(
+                getString(R.string.database_update_required_action),
+                "https://play.google.com/store/apps/details?id=$packageName",
+            ),
+        )
+        Toast.makeText(this, R.string.database_update_link_copied, Toast.LENGTH_LONG).show()
+    }
+}
 
 private fun Throwable.hasNativeRestoreInProgress(): Boolean = causesAndSuppressed().any { it is NativeRestoreInProgressException }
 

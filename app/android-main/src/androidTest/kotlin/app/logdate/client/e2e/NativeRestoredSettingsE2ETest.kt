@@ -67,6 +67,22 @@ class NativeRestoredSettingsE2ETest {
     }
 
     private fun status(value: String) {
+        InstrumentationRegistry.getArguments().getString("managedPermissionNonce")?.let { nonce ->
+            require(nonce.matches(Regex("[a-z0-9-]+")))
+            val target = File(context.noBackupFilesDir, "permission-acceptance-$nonce.json")
+            val pending = File(target.path + ".pending")
+            FileOutputStream(pending).use {
+                it.write(
+                    JSONObject()
+                        .put("nonce", nonce)
+                        .put("phase", value)
+                        .toString()
+                        .encodeToByteArray(),
+                )
+                it.fd.sync()
+            }
+            check(pending.renameTo(target))
+        }
         instrumentation.sendStatus(0, Bundle().apply { putString("restorePermission", value) })
     }
 
@@ -248,46 +264,34 @@ class NativeRestoredSettingsE2ETest {
         return readyActivity
     }
 
-    private suspend fun startupDiagnostics(): String {
+    private fun startupDiagnostics(): String {
+        // A failed startup may own Main or Koin's singleton locks. Capture frames without
+        // dispatching to either; timeout diagnostics must not wait on the stalled work.
+        val threads =
+            Thread.getAllStackTraces().entries.sortedBy { it.key.name }.joinToString("\n") { (thread, stack) ->
+                "${thread.name} (${thread.state})\n${stack.joinToString("\n") { "  at $it" }}"
+            }
+        InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let { output ->
+            File(output, "permission-startup-threads.txt").writeText(threads)
+        }
         val application = context.applicationContext
         val startupState =
             runCatching {
-                val field = application.javaClass.declaredFields.firstOrNull { it.name == "startup" }
-                val startup =
-                    if (field != null) {
-                        field.apply { isAccessible = true }.get(application)
-                    } else {
-                        val coordinator = Class.forName("app.logdate.client.ApplicationStartupCoordinator")
-                        val startups = coordinator.getDeclaredField("fallbackStartups").apply { isAccessible = true }.get(null) as Map<*, *>
-                        synchronized(startups) { startups[application] }
-                    }
+                val field =
+                    application.javaClass.declaredFields.firstOrNull { it.name == "startup" }
+                        ?: return@runCatching "base Application"
+                val startup = field.apply { isAccessible = true }.get(application)
                 val state =
-                    startup!!
-                        .javaClass
+                    startup.javaClass
                         .getDeclaredField("state")
                         .apply { isAccessible = true }
                         .get(startup) as StateFlow<*>
-                val value = state.value!!
-                val cause =
-                    value.javaClass.declaredFields.firstOrNull { it.name == "cause" }?.apply { isAccessible = true }?.get(
-                        value,
-                    ) as? Throwable
-                value.javaClass.simpleName + generateSequence(cause) { it.cause }.take(12).map { it.javaClass.simpleName }.toList()
+                state.value
+                    ?.javaClass
+                    ?.simpleName
+                    .orEmpty()
             }.getOrElse { "unavailable:${it.javaClass.simpleName}" }
-        val activities =
-            withContext(Dispatchers.Main) {
-                Stage.entries.flatMap { stage ->
-                    ActivityLifecycleMonitorRegistry
-                        .getInstance()
-                        .getActivitiesInStage(stage)
-                        .filterIsInstance<MainActivity>()
-                        .map { activity ->
-                            val ready = MainActivity::class.java.getDeclaredField("bootstrapReady").apply { isAccessible = true }
-                            "$stage(finishing=${activity.isFinishing},ready=${ready.getBoolean(activity)})"
-                        }
-                }
-            }
-        return "startup=$startupState, activities=$activities"
+        return "startup=$startupState\n$threads"
     }
 
     private suspend fun awaitActivityStage(

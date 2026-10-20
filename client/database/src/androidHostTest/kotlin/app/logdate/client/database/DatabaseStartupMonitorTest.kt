@@ -20,6 +20,29 @@ import kotlin.test.assertTrue
 
 class DatabaseStartupMonitorTest {
     @Test
+    fun `a readable newer journal stops key probing without trying a replacement key`() {
+        val newer = NewerDatabaseVersionException(58, 57)
+        var attempts = 0
+        val error =
+            assertFailsWith<NewerDatabaseVersionException> {
+                openDatabaseWithPassphraseCandidates(listOf(ByteArray(32) { 1 }, ByteArray(32) { 2 })) {
+                    attempts++
+                    throw newer
+                }
+            }
+        assertSame(newer, error)
+        assertEquals(1, attempts)
+    }
+
+    @Test
+    fun `a newer journal has update guidance instead of key recovery`() {
+        val monitor = DatabaseStartupMonitor()
+        monitor.markRecoveryRequired(IllegalStateException("Dependency unavailable", NewerDatabaseVersionException(58, 57)))
+        val state = assertIs<DatabaseStartupState.RecoveryRequired>(monitor.state.value)
+        assertEquals("Update LogDate to open this journal. Your journal has been kept safe.", state.reason)
+    }
+
+    @Test
     fun `full storage remains actionable when another candidate also fails decryption`() {
         val full = IllegalStateException("no space left on device")
         val rejected = IllegalStateException("file is not a database (code 26)")

@@ -12,7 +12,6 @@ actual val databaseModule: Module =
             val database =
                 getRoomDatabase(
                     getDatabaseBuilder(),
-                    destroyTablesOnUpgrade = true,
                 )
             protectDatabaseFile()
             scheduleDatabaseEncryption(secureStorage)

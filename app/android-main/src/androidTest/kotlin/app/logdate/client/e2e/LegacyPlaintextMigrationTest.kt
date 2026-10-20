@@ -5,8 +5,10 @@ import android.content.ContextWrapper
 import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.client.database.NewerDatabaseVersionException
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import app.logdate.client.database.getDatabaseBuilder
 import app.logdate.client.database.migratePlaintextDatabaseIfNeeded
 import app.logdate.client.device.storage.SecureStorage
 import io.mockk.coEvery
@@ -17,6 +19,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -24,6 +27,94 @@ import net.zetetic.database.sqlcipher.SQLiteDatabase as CipherDatabase
 
 @RunWith(AndroidJUnit4::class)
 class LegacyPlaintextMigrationTest {
+    @Test
+    fun newerLegacyCipherJournalIsRefusedBeforeCipherMigration() {
+        System.loadLibrary("sqlcipher")
+        val application = ApplicationProvider.getApplicationContext<Context>()
+        val folder = File(application.cacheDir, "newer-legacy-cipher-${Uuid.random()}").apply { mkdirs() }
+        val context =
+            object : ContextWrapper(application) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getDatabasePath(name: String): File = File(folder, name)
+            }
+        val key = ByteArray(32) { 23 }
+        val hook =
+            object : net.zetetic.database.sqlcipher.SQLiteDatabaseHook {
+                override fun preKey(database: net.zetetic.database.sqlcipher.SQLiteConnection) {
+                    database.execute("PRAGMA cipher_compatibility = 3", emptyArray(), android.os.CancellationSignal())
+                }
+
+                override fun postKey(database: net.zetetic.database.sqlcipher.SQLiteConnection) = Unit
+            }
+        try {
+            val file = context.getDatabasePath("logdate")
+            CipherDatabase
+                .openDatabase(
+                    file.absolutePath,
+                    key,
+                    null,
+                    CipherDatabase.OPEN_READWRITE or CipherDatabase.CREATE_IF_NECESSARY,
+                    null,
+                    hook,
+                ).use { db ->
+                    db.execSQL("CREATE TABLE retained_entries (content TEXT NOT NULL)")
+                    db.execSQL("INSERT INTO retained_entries VALUES ('Retained newer legacy cipher journal')")
+                    db.version = Int.MAX_VALUE
+                }
+            val original = file.readBytes()
+            assertFailsWith<NewerDatabaseVersionException> { getDatabaseBuilder(context, key.copyOf()) }
+            assertContentEquals(original, file.readBytes())
+            CipherDatabase.openDatabase(file.absolutePath, key, null, CipherDatabase.OPEN_READONLY, null, hook).use { db ->
+                assertEquals(Int.MAX_VALUE, db.version)
+                db.rawQuery("SELECT content FROM retained_entries", emptyArray<String>()).use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals("Retained newer legacy cipher journal", it.getString(0))
+                }
+            }
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun newerPlaintextJournalIsRefusedBeforeAnyMigrationFileIsChanged() {
+        val application = ApplicationProvider.getApplicationContext<Context>()
+        val folder = File(application.cacheDir, "newer-plaintext-${Uuid.random()}").apply { mkdirs() }
+        val context =
+            object : ContextWrapper(application) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getDatabasePath(name: String): File = File(folder, name)
+            }
+        try {
+            val file = context.getDatabasePath("logdate")
+            SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+                db.execSQL("CREATE TABLE retained_entries (content TEXT NOT NULL)")
+                db.execSQL("INSERT INTO retained_entries VALUES ('Retained newer plaintext journal')")
+                db.version = Int.MAX_VALUE
+            }
+            val original = file.readBytes()
+            val temporary = folder.resolve("logdate.sqlcipher-migrating").apply { writeText("Preserved interrupted output") }
+            val names = folder.list().orEmpty().toSet()
+            assertFailsWith<NewerDatabaseVersionException> {
+                migratePlaintextDatabaseIfNeeded(context, ByteArray(32) { 19 })
+            }
+            assertContentEquals(original, file.readBytes())
+            assertEquals("Preserved interrupted output", temporary.readText())
+            assertEquals(names, folder.list().orEmpty().toSet(), "Refusal must not create a replacement or plaintext backup")
+            SQLiteDatabase.openDatabase(file.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+                assertEquals(Int.MAX_VALUE, db.version)
+                db.rawQuery("SELECT content FROM retained_entries", emptyArray<String>()).use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals("Retained newer plaintext journal", it.getString(0))
+                }
+            }
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
     @Test
     fun plaintextJournalUpgradesThroughTheProductionKeyProvider(): Unit =
         runBlocking {

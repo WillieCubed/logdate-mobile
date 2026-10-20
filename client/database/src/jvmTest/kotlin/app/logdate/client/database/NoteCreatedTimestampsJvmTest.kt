@@ -78,7 +78,6 @@ class NoteCreatedTimestampsJvmTest {
 
         return getRoomDatabase(
             builder = Room.databaseBuilder<LogDateDatabase>(databasePath.absolutePathString()),
-            destroyTablesOnUpgrade = true,
         ).also { database = it }
     }
 }

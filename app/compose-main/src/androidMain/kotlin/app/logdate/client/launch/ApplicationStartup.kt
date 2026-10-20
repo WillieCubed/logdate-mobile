@@ -1,5 +1,6 @@
 package app.logdate.client.launch
 
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -23,6 +24,7 @@ internal sealed interface ApplicationStartupState {
 /** Shares one off-main initialization attempt across activities and incoming watch work. */
 internal class ApplicationStartup(
     private val scope: CoroutineScope,
+    private val startDeviceWork: (suspend () -> Unit)? = null,
     private val initialize: suspend () -> Unit,
 ) {
     private val mutableState = MutableStateFlow<ApplicationStartupState>(ApplicationStartupState.Loading)
@@ -49,6 +51,19 @@ internal class ApplicationStartup(
                     try {
                         initialize()
                         mutableState.value = ApplicationStartupState.Ready
+                        startDeviceWork?.let { start ->
+                            // Device observers own installation work; their dependency graph must
+                            // not hold validated local content behind optional service startup.
+                            scope.launch {
+                                try {
+                                    start()
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    Napier.w("Device-owned startup work could not start; journal access remains available")
+                                }
+                            }
+                        }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
