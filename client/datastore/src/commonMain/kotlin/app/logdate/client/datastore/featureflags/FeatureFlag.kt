@@ -85,6 +85,9 @@ enum class FeatureFlag(
      */
     APP_FUNCTIONS(key = "app_functions_enabled", defaultEnabled = false),
 
+    /** Remote recall and reviewed capture; unavailable until the full connection is accepted. */
+    CONNECTED_ASSISTANTS(key = "connected_assistants_enabled", defaultEnabled = false, availableForLaunch = false),
+
     /** A capture-only widget for the lock screen and hub that never shows journal content. */
     LOCK_SCREEN_CAPTURE_WIDGET(key = "lock_screen_capture_widget_enabled", defaultEnabled = false),
 
