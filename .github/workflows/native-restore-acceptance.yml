@@ -29,7 +29,7 @@ on:
       - 'app/android-main/src/androidTest/**/NewerJournalRecoveryRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRecoveryWorkStateTest.kt'
       - 'app/android-main/src/androidTest/**/CloudRestoreWorkPersistenceProbeTest.kt'
-      - 'app/android-main/src/androidTest/**/AndroidSyncAccountTransitionRuntimeTest.kt'
+      - 'app/android-main/src/androidTest/**/AndroidSync*Runtime*.kt'
       - 'app/android-main/src/androidTest/**/RestoreWorkerSessionRecoveryTest.kt'
       - 'app/android-main/src/androidTest/**/RestoreWorkerTestBindings.kt'
       - 'app/android-main/src/androidTest/**/NativeRestoredEntryEditingTest.kt'

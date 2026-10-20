@@ -7,10 +7,9 @@ import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.await
 import app.logdate.client.datastore.LogdatePreferencesDataSource
@@ -39,6 +38,8 @@ import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
@@ -77,6 +78,7 @@ class AndroidSyncManager(
     private val workManager = WorkManager.getInstance(applicationContext)
     private val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(supervisorJob + Dispatchers.IO)
+    private val immediateScheduleMutex = Mutex()
     private val requestedBackupState =
         workManager
             .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
@@ -139,14 +141,60 @@ class AndroidSyncManager(
     }
 
     private suspend fun resumeAuthenticatedSync(ownerChanged: Boolean) {
+        val target = requireNotNull(authenticatedScheduleTarget(configRepository.getCurrentBackendUrl(), dataUsagePolicy.currentMode()))
+        check(target.owner != null && isAuthenticatedScheduleCurrent(target)) { "Recovery scope changed" }
         if (ownerChanged) {
             // Retire obsolete work before waiting for a phase lock held by its running worker.
             // A dependent request would inherit that worker's authentication failure or backoff.
-            workManager.cancelUniqueWork(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC).await()
+            immediateScheduleMutex.withLock {
+                check(isAuthenticatedScheduleCurrent(target)) { "Recovery scope changed" }
+                workManager.cancelUniqueWork(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC).await()
+            }
+        }
+        if (target.mode == DataUsageMode.Unrestricted) {
+            resumeMediaReadiness(
+                work =
+                    workManager
+                        .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
+                        .map { mediaReadinessSnapshot(it, target.owner) },
+                isCurrent = { isAuthenticatedScheduleCurrent(target) },
+                replace = { expected ->
+                    // Releasing queue backoff may wait for a writer's phase lock. Never hold the
+                    // scheduling mutex while doing that, or a consented successor could deadlock.
+                    defaultSyncManager.releaseUploadBackoff()
+                    immediateScheduleMutex.withLock {
+                        check(isAuthenticatedScheduleCurrent(target)) { "Recovery scope changed" }
+                        val latest = workManager.getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC).first()
+                        check(isAuthenticatedScheduleCurrent(target)) { "Recovery scope changed" }
+                        if (mediaReadinessSnapshot(latest, target.owner) != expected) {
+                            false
+                        } else {
+                            scheduleImmediateSync(policy = ExistingWorkPolicy.REPLACE).await()
+                            true
+                        }
+                    }
+                },
+            )
+            return
         }
         defaultSyncManager.releaseUploadBackoff()
+        check(isAuthenticatedScheduleCurrent(target)) { "Recovery scope changed" }
         resumeScheduledSync(ownerChanged = ownerChanged).await()
     }
+
+    private fun mediaReadinessSnapshot(
+        work: List<WorkInfo>,
+        owner: UploadScope,
+    ): List<MediaReadinessWork> =
+        work
+            .map {
+                MediaReadinessWork(
+                    id = "${it.id}:${it.generation}",
+                    state = it.state,
+                    hasMobileDataConsent = MOBILE_DATA_SYNC_TAG in it.tags,
+                    recoveredAllMedia = completedMediaRecoveryScope(it.outputData) == owner,
+                )
+            }.sortedBy { it.id }
 
     private suspend fun authenticatedScheduleTarget(
         origin: String,
@@ -242,64 +290,42 @@ class AndroidSyncManager(
     private suspend fun resumeScheduledSync(
         consent: UploadScope? = null,
         ownerChanged: Boolean = false,
-    ): Operation {
-        val policy =
-            try {
-                val work =
-                    workManager
-                        .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
-                        .first()
-                immediateSyncPolicy(
-                    work.map { it.state },
-                    hasMobileDataConsent = consent != null,
-                    ownerChanged = ownerChanged,
-                    preserveConsentedRequest = work.any { !it.state.isFinished && MOBILE_DATA_SYNC_TAG in it.tags },
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                Napier.e("Could not inspect scheduled sync; preserving any active request")
-                when {
-                    ownerChanged -> ExistingWorkPolicy.REPLACE
-                    consent != null -> ExistingWorkPolicy.APPEND_OR_REPLACE
-                    else -> ExistingWorkPolicy.KEEP
+    ): Operation =
+        immediateScheduleMutex.withLock {
+            val policy =
+                try {
+                    val work =
+                        workManager
+                            .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
+                            .first()
+                    immediateSyncPolicy(
+                        work.map { it.state },
+                        hasMobileDataConsent = consent != null,
+                        ownerChanged = ownerChanged,
+                        preserveConsentedRequest = work.any { !it.state.isFinished && MOBILE_DATA_SYNC_TAG in it.tags },
+                    )
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    Napier.e("Could not inspect scheduled sync; preserving any active request")
+                    when {
+                        ownerChanged -> ExistingWorkPolicy.REPLACE
+                        consent != null -> ExistingWorkPolicy.APPEND_OR_REPLACE
+                        else -> ExistingWorkPolicy.KEEP
+                    }
                 }
-            }
-        return scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL, policy = policy, consent = consent)
-    }
+            scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL, policy = policy, consent = consent).also { it.await() }
+        }
 
     /**
      * Schedules immediate sync work with high priority.
      */
-    internal fun scheduleImmediateSync(
+    private fun scheduleImmediateSync(
         syncType: String = AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
         policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP,
         consent: UploadScope? = null,
     ): Operation {
-        val constraints =
-            Constraints
-                .Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build()
-
-        val inputData =
-            Data
-                .Builder()
-                .putAll(mobileDataSyncInput(consent))
-                .putString(AndroidLogDateSyncWorker.KEY_SYNC_TYPE, syncType)
-                .build()
-
-        val request =
-            OneTimeWorkRequestBuilder<AndroidLogDateSyncWorker>()
-                .setConstraints(constraints)
-                .setInputData(inputData)
-                .apply { if (consent != null) addTag(MOBILE_DATA_SYNC_TAG) }
-                // Out of expedited quota, run it as ordinary work rather than drop it. This is what
-                // "Back up now" schedules, and dropping it threw the request away with nothing on
-                // screen changing: the backup waited for the next periodic run, hours later, while
-                // the app showed items waiting and a button that seemed to do nothing.
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .build()
+        val request = immediateSyncRequest(syncType, consent)
 
         // Unique, and an already-running sync wins. Stacking runs would put several writers on
         // the same account's repo at once, which is exactly the contention that used to drop
@@ -382,14 +408,26 @@ class AndroidSyncManager(
      * Schedules upload-only sync for immediate changes.
      */
     fun scheduleUploadSync() {
-        scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_UPLOAD)
+        schedulePartialSync(AndroidLogDateSyncWorker.SYNC_TYPE_UPLOAD)
     }
 
     /**
      * Schedules download-only sync for pulling remote changes.
      */
     fun scheduleDownloadSync() {
-        scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_DOWNLOAD)
+        schedulePartialSync(AndroidLogDateSyncWorker.SYNC_TYPE_DOWNLOAD)
+    }
+
+    private fun schedulePartialSync(syncType: String) {
+        scope.launch {
+            try {
+                immediateScheduleMutex.withLock { scheduleImmediateSync(syncType).await() }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Napier.w("Could not persist partial sync request")
+            }
+        }
     }
 
     override suspend fun uploadPendingChanges(): SyncResult = defaultSyncManager.uploadPendingChanges()

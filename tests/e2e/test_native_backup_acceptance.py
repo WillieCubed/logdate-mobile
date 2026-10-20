@@ -544,12 +544,12 @@ class NativeProbeDiagnosticsTest(unittest.TestCase):
 
 
 class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
-    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (7 tests)")
-    def test_account_transition_probe_runs_all_seven_runtime_cases(self, adb):
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (9 tests)")
+    def test_account_transition_probe_runs_all_nine_runtime_cases(self, adb):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "account-transitions.log"
             NATIVE_RESTORE_WORK_ACCEPTANCE.probe("emulator-5554", "account-transitions", output)
-            self.assertEqual(b"OK (7 tests)", output.read_bytes())
+            self.assertEqual(b"OK (9 tests)", output.read_bytes())
             arguments = adb.call_args.args
             self.assertIn("app.logdate.client.e2e.AndroidSyncAccountTransitionRuntimeTest", arguments)
             self.assertIn("syncAccountTransitions", arguments)

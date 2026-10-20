@@ -6,6 +6,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AppInfoProvider
+import app.logdate.client.sync.metadata.UploadScope
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
@@ -57,7 +58,8 @@ class AndroidLogDateSyncWorker(
                 Result.retry()
             } else if (result.success) {
                 Napier.i("Sync completed successfully")
-                Result.success()
+                val current = sessionStorage.getOriginBoundSession()?.let { UploadScope(it.session.accountId, it.origin) }
+                Result.success(mediaRecoveryCompletionOutput(syncType, result.recoveredMediaScope?.takeIf { it == current }))
             } else {
                 Napier.w("Sync did not complete")
 

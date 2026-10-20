@@ -16,6 +16,7 @@ import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 
 /**
  * Runs a server call, and if it comes back 401, refreshes the access token and tries once more.
@@ -50,6 +51,15 @@ internal class SyncTokenRefresher(
         }
 
         if (expectedScope != null && !expectedScope.matches(binding, currentSession)) {
+            return Result.failure(scopeChanged())
+        }
+        val fullRun = coroutineContext[FullSyncScope]
+        if (fullRun != null &&
+            (
+                fullRun.owner != currentUploadScope() ||
+                    (binding != null && fullRun.owner?.matches(binding, currentSession) != true)
+            )
+        ) {
             return Result.failure(scopeChanged())
         }
 
