@@ -170,7 +170,6 @@ fun SyncSettingsContent(
             item {
                 NativeBackupSettingsSection(
                     nativeBackupStatus,
-                    onExportArchive = null,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }

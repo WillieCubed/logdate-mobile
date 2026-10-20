@@ -2,14 +2,13 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Upload
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import app.logdate.ui.common.SettingsRow
+import app.logdate.ui.common.SettingsNavigationItem
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.export
-import logdate.client.feature.core.generated.resources.`import`
 import logdate.client.feature.core.generated.resources.import_backup
 import logdate.client.feature.core.generated.resources.restore_entries_from_a_logdate_export_archive
 import logdate.client.feature.core.generated.resources.settings_export_entries_description
@@ -18,36 +17,20 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun ExportDataItem(onShowExportOptions: () -> Unit) {
-    SettingsRow(
-        headlineContent = { Text(stringResource(Res.string.settings_export_entries_label)) },
-        supportingContent = {
-            Text(
-                text = stringResource(Res.string.settings_export_entries_description),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        trailingContent = {
-            Button(onClick = onShowExportOptions) {
-                Text(stringResource(Res.string.export))
-            }
-        },
+    SettingsNavigationItem(
+        title = stringResource(Res.string.settings_export_entries_label),
+        description = stringResource(Res.string.settings_export_entries_description),
+        icon = { Icon(Icons.Rounded.Download, contentDescription = null) },
+        onClick = onShowExportOptions,
     )
 }
 
 @Composable
 internal fun ImportBackupItem(onShowRestoreSheet: () -> Unit) {
-    SettingsRow(
-        headlineContent = { Text(stringResource(Res.string.import_backup)) },
-        supportingContent = {
-            Text(
-                text = stringResource(Res.string.restore_entries_from_a_logdate_export_archive),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        trailingContent = {
-            Button(onClick = onShowRestoreSheet) {
-                Text(stringResource(Res.string.`import`))
-            }
-        },
+    SettingsNavigationItem(
+        title = stringResource(Res.string.import_backup),
+        description = stringResource(Res.string.restore_entries_from_a_logdate_export_archive),
+        icon = { Icon(Icons.Rounded.Upload, contentDescription = null) },
+        onClick = onShowRestoreSheet,
     )
 }

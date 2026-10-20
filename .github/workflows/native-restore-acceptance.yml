@@ -14,6 +14,7 @@ on:
       - 'app/android-main/src/androidTest/**/NativeMissingMediaE2ETest.kt'
       - 'app/android-main/src/androidTest/**/ArchiveMediaRecoveryE2ETest.kt'
       - 'app/android-main/src/androidTest/**/ArchiveLowStorageRecoveryTest.kt'
+      - 'app/android-main/src/androidTest/**/RestoreStateAccessibilityRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/CloudArchiveWorkerFixture.kt'
       - 'app/android-main/src/androidTest/**/RestoredJournalLockRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredAppLockEnrollmentRuntimeTest.kt'
@@ -51,6 +52,7 @@ on:
       - 'tests/e2e/native-d2d-acceptance.py'
       - 'tests/e2e/native-missing-media-acceptance.py'
       - 'tests/e2e/native-storage-recovery-acceptance.py'
+      - 'tests/e2e/native-recovery-ui-acceptance.py'
       - 'tests/e2e/native-permission-acceptance.py'
       - 'tests/e2e/native-restore-work-restart-acceptance.py'
       - 'tests/e2e/native-device-enrollment-acceptance.py'
@@ -268,6 +270,15 @@ jobs:
             --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
             --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
             --output "$RUNNER_TEMP/native-storage-recovery" \
+            --synthetic-data
+
+      - name: Exercise recovery states and accessible actions at native display sizes
+        run: |
+          python3 tests/e2e/native-recovery-ui-acceptance.py \
+            --emulator emulator-5558 \
+            --app-apk app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            --test-apk app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            --output "$RUNNER_TEMP/native-recovery-ui" \
             --synthetic-data
 
       - name: Verify database keys and restart-safe native recovery
@@ -618,6 +629,10 @@ jobs:
             ${{ runner.temp }}/native-storage-recovery/environment-before.json
             ${{ runner.temp }}/native-storage-recovery/acceptance.json
             app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34/**
+            ${{ runner.temp }}/native-recovery-ui/**/*.log
+            ${{ runner.temp }}/native-recovery-ui/**/*.png
+            ${{ runner.temp }}/native-recovery-ui/environment-before.json
+            ${{ runner.temp }}/native-recovery-ui/acceptance.json
             ${{ runner.temp }}/native-lock-recovery/*.log
             ${{ runner.temp }}/native-key-recovery/*.log
             ${{ runner.temp }}/native-restore-missing-keys/*.log

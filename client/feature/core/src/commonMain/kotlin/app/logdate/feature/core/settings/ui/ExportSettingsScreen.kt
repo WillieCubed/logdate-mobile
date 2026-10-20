@@ -2,6 +2,8 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -86,43 +88,45 @@ fun ExportSettingsContent(
     onDismissRestore: () -> Unit,
     snackbarHostState: SnackbarHostState,
 ) {
-    if (isExportSheetVisible) {
-        ExportBottomSheet(
-            exportState = exportState,
-            onOptionsChanged = onUpdateExportOptions,
-            onConfirm = onConfirmExport,
-            onCancel = onCancelExport,
-            onRetry = onRetryExport,
-            onDismiss = onDismissExport,
-            onBrowse = onBrowseExport,
-        )
-    }
-
-    if (isRestoreSheetVisible) {
-        RestoreBottomSheet(
-            restoreState = restoreState,
-            onSelectFile = onSelectRestoreFile,
-            onUpdateOptions = onUpdateImportOptions,
-            onConfirmImport = onConfirmImport,
-            onCancel = onCancelRestore,
-            onRetry = onRetryRestore,
-            onDismiss = onDismissRestore,
-        )
-    }
-
-    SettingsScaffold(
-        title = stringResource(Res.string.export_and_import),
-        onBack = onBack,
-        snackbarHostState = snackbarHostState,
-    ) {
-        item {
-            SettingsSection(
-                title = stringResource(Res.string.data_management),
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            ) {
-                ExportDataItem(onShowExportOptions)
-                ImportBackupItem(onShowRestoreSheet)
+    Box(Modifier.fillMaxSize()) {
+        SettingsScaffold(
+            title = stringResource(Res.string.export_and_import),
+            onBack = onBack,
+            snackbarHostState = snackbarHostState,
+        ) {
+            item {
+                SettingsSection(
+                    title = stringResource(Res.string.data_management),
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ) {
+                    ExportDataItem(onShowExportOptions)
+                    ImportBackupItem(onShowRestoreSheet)
+                }
             }
+        }
+
+        if (isExportSheetVisible) {
+            ExportBottomSheet(
+                exportState = exportState,
+                onOptionsChanged = onUpdateExportOptions,
+                onConfirm = onConfirmExport,
+                onCancel = onCancelExport,
+                onRetry = onRetryExport,
+                onDismiss = onDismissExport,
+                onBrowse = onBrowseExport,
+            )
+        }
+
+        if (isRestoreSheetVisible) {
+            RestoreBottomSheet(
+                restoreState = restoreState,
+                onSelectFile = onSelectRestoreFile,
+                onUpdateOptions = onUpdateImportOptions,
+                onConfirmImport = onConfirmImport,
+                onCancel = onCancelRestore,
+                onRetry = onRetryRestore,
+                onDismiss = onDismissRestore,
+            )
         }
     }
 }

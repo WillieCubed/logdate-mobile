@@ -108,26 +108,39 @@ class NativeBackupSettingsTest {
     fun quotaFailureOffersArchiveExportWithoutAnAccount() =
         runDesktopComposeUiTest(width = 411, height = 900) {
             var exports = 0
+            var accounts = 0
+            var signIns = 0
             setContent {
                 LogDateTheme {
-                    NativeBackupSettingsSection(
-                        NativeBackupStatus.Available(NativeBackupQuotaFailure(30_000_000, 25_000_000)),
+                    SyncSettingsContent(
+                        onBack = {},
+                        syncStatus = null,
+                        isAuthenticated = false,
+                        onSyncNow = {},
+                        onNavigateToCloudAccountCreation = { accounts++ },
+                        onNavigateToSignIn = { signIns++ },
+                        quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 B", formattedUsed = "0 B"),
+                        isQuotaAvailable = false,
+                        snackbarHostState = SnackbarHostState(),
+                        nativeBackupStatus = NativeBackupStatus.Available(NativeBackupQuotaFailure(30_000_000, 25_000_000)),
                         onExportArchive = { exports++ },
                     )
                 }
             }
             onNodeWithText("Android backup").assertExists()
-            onNodeWithText("Last Android backup was too large. Export an archive to save a copy.", substring = true).assertExists()
+            onNodeWithText("An Android backup exceeded its size limit. Export an archive to save a copy.", substring = true).assertExists()
+            onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Export archive"))
             onNodeWithText("Export archive").performClick()
             assertEquals(1, exports)
-            onNodeWithText("Create account").assertDoesNotExist()
+            assertEquals(0, accounts)
+            assertEquals(0, signIns)
             onNodeWithText("Backed up").assertDoesNotExist()
         }
 
     @Test
     fun otherPlatformsDoNotShowAndroidBackup() =
         runDesktopComposeUiTest {
-            setContent { NativeBackupSettingsSection(NativeBackupStatus.Unsupported, {}) }
+            setContent { NativeBackupSettingsSection(NativeBackupStatus.Unsupported) }
             onNodeWithText("Android backup").assertDoesNotExist()
         }
 }

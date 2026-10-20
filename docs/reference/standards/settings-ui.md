@@ -19,6 +19,12 @@ new presentation. These are production examples of navigation and passive status
 | Feature-wide enablement | `MasterFeatureToggle` | Enables or disables a real feature, not a status indicator |
 | Account or backup summary | `MaterialCard` | Uses theme shape and filled-card defaults; semantic colors are paired |
 
+Export and import options are destinations, including when they open sheets. Use
+`SettingsNavigationItem` for the entire row rather than a button beside a passive
+label. Keep one export action per page. `NativeBackupSettingsSection` contains
+platform coverage only; place archive navigation in the page's data-management
+section or its separate archive row.
+
 Android cloud backup and device transfer are platform-managed capabilities. Their
 coverage rows are passive information, not in-app switches or navigation targets.
 Keep LogDate Cloud account actions in the shared `SyncPromotionCard` and signed-in
@@ -46,7 +52,8 @@ needed, so no font's metrics break it mid-word. It retains one toggle action in
 either layout. A passive `SimpleSettingsItem` has no
 click action unless a real callback is supplied.
 
-Use the slot-based `SettingsRow` for compound controls such as passkey removal,
+A button does not make an ordinary settings destination a compound row. Use the
+slot-based `SettingsRow` for compound controls such as passkey removal,
 checkbox confirmation or a time-picker button, keeping each action's enabled
 state explicit. Editors, segmented choice forms, diagnostic log previews,
 calendar event lists, journal insights and destructive confirmation dialogs keep
@@ -65,7 +72,10 @@ imports. It also rejects local supporting text styles in `SettingsRow`. Its grou
 also recognize `SettingsRow`. Cards that group multiple shared rows must use a
 `SettingsSection`; summary cards without a preference group remain valid. Extend
 its tests when introducing a new component
-rather than bypassing the shared base.
+rather than bypassing the shared base. Standalone button controls directly inside
+`SettingsSection`, including conditional and aliased calls, are rejected; actions
+inside shared rows and specialized forms remain supported, including sections
+whose direct children include editable fields or form inputs.
 
 ## Emit rows directly
 
@@ -123,6 +133,43 @@ conditional rows, forms, comments and strings. Extend the row-name set when addi
 a shared row primitive. This check cannot inspect rows emitted by arbitrary helper
 functions; review the emitted layout when extracting a helper.
 
+## Archive options inside sheets
+
+Export and restore category preferences use the same section and toggle rows as
+Settings, even though the containing destination is a sheet. Emit each category
+directly inside `SettingsSection`; do not recreate `ListItem`, `Switch`, supporting
+text styles or divider rules. Keep the section inside the sheet's scrolling
+content, and retain the sheet's confirmation actions outside the section.
+
+```kotlin
+SettingsSection(title = stringResource(Res.string.restore_import_options_label)) {
+    if (preview.hasDrafts) {
+        ToggleSettingsItem(
+            title = stringResource(Res.string.export_category_drafts),
+            description = pluralStringResource(Res.plurals.export_category_item_count, preview.stats.draftCount, preview.stats.draftCount),
+            checked = options.includeDrafts,
+            onCheckedChange = { updateOptions(options.copy(includeDrafts = it)) },
+        )
+    }
+}
+```
+
+Omit the restore section when the archive has no optional categories. Export
+keeps all four categories available and passes its `buttonsEnabled` state to
+every row while the destination picker is active. Each callback copies only its
+own preference so toggling drafts cannot alter media, journals or notes.
+`RestorePreviewOptionsTest` and `ExportCategoryOptionsTest` exercise label and
+switch targets, independent option updates, absent categories and disabled input.
+`checkSettingsUiContract` recognizes `RestoreBottomSheet.kt` and
+`ExportOptionsBottomSheet.kt` even if a local implementation removes all shared
+settings imports.
+
+Compose the page scaffold first and its sheet overlays afterward inside a
+full-size `Box`. `PlatformSheet` renders inline during inspection, so a scaffold
+composed last can cover the entire sheet in screenshots. The real-touch overlay
+regression in `ArchiveSettingsNavigationTest` renders `ExportSettingsContent`
+with inspection enabled and confirms both sheets remain above their background.
+
 ## Use theme roles and tokens
 
 Use `Spacing` for padding and gaps, and `MaterialTheme.typography` for text roles.
@@ -141,6 +188,13 @@ app can resolve automatically.
 `SettingsRowScreenshotScenes.kt` is a runnable shared example containing passive,
 navigation, toggle, linked-toggle and disabled rows with matching descriptions.
 Render the `settings-components` scene to compare their typography together.
+`ArchiveSettingsNavigationTest` checks one export per populated Data Settings page
+and whole-row export/import navigation. `ArchiveSettingsVisualAcceptanceTest`
+compares Data Settings and Backup with Android coverage and recorded quota feedback
+on phones, tablets and at 200% text. A recorded quota failure describes a past
+provider report; it does not establish whether the latest Android backup succeeded.
+The visual test writes initial, archive-action and native-coverage views to
+`LOGDATE_SETTINGS_FOLLOWUP_RENDER_DIR` (default `/tmp/logdate-settings-followup-renders`).
 `SettingsRowsTest.kt` verifies the supporting text role, passive semantics,
 disabled preferences and independent linked actions. `SettingsMasterLayoutTest`
 checks long-word wrapping, including a word wider than the whole control, and the
@@ -156,6 +210,8 @@ Run the composition check and shared scene tests:
 
 ```sh
 ./gradlew :client:feature:core:checkSettingsUiContract :client:screenshot-scenes:desktopTest
+JAVA_TOOL_OPTIONS=-Djava.awt.headless=true ./gradlew :client:feature:core:desktopTest \
+  --tests '*ArchiveSettings*' --tests '*NativeBackupSettingsTest'
 ```
 
 Render and validate the shared native states with the desktop harness:

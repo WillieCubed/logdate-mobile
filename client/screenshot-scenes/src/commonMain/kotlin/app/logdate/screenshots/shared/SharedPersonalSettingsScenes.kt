@@ -5,6 +5,7 @@ package app.logdate.screenshots.shared
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import app.logdate.client.device.restore.NativeBackupStatus
 import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
@@ -277,6 +278,7 @@ internal val personalSettingsScenes: List<SharedScreenshotSceneSpec> =
                 onCancelRestore = {},
                 onRetryRestore = {},
                 onDismissRestore = {},
+                nativeBackupStatus = NativeBackupStatus.Available(),
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
