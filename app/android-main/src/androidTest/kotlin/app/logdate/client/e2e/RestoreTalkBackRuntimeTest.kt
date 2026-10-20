@@ -206,52 +206,13 @@ class RestoreTalkBackRuntimeTest {
                         root?.packageName?.toString() == context.packageName &&
                             observedFontScale.get() == fontScale.toFloat()
                     }
-                    persist(
-                        JSONObject()
-                            .put(
-                                "phase",
-                                "ready",
-                            ).put("observedFontScale", observedFontScale.get())
-                            .put("scene", scene.name)
-                            .put("action", scene.action),
-                    )
-                    val deadline = SystemClock.elapsedRealtime() + 90_000
-                    while (clicked.get() == 0) {
-                        val focused =
-                            automation.rootInActiveWindow
-                                ?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
-                        val currentLabel =
-                            focused
-                                ?.let(::windowText)
-                                ?.trim()
-                                .orEmpty()
-                                .ifBlank { focused?.contentDescription?.toString().orEmpty() }
-                        if (currentLabel.isNotBlank() && focus.lastOrNull() != currentLabel) focus += currentLabel
-                        check(
-                            SystemClock.elapsedRealtime() < deadline,
-                        ) { "Native TalkBack activation timed out for ${scene.name}; focus=$focus" }
-                        persist(
-                            JSONObject()
-                                .put("phase", "ready")
-                                .put("observedFontScale", observedFontScale.get())
-                                .put("scene", scene.name)
-                                .put("action", scene.action)
-                                .put("focus", JSONArray(focus.toList())),
-                        )
-                        SystemClock.sleep(100)
-                    }
-                    SystemClock.sleep(400)
+                    awaitTalkBackAction(scene.name, scene.action, observedFontScale.get()) { clicked.get() > 0 }
                     assertEquals(1, clicked.get(), "Double-tap must invoke the action once")
-                    val labels = focus.toList()
-                    val first = labels.indexOfFirst { it == scene.action }
-                    assertTrue(first >= 0, "TalkBack must focus the labeled action")
-                    val away = (first + 1 until labels.size).firstOrNull { labels[it] != scene.action }
-                    assertTrue(
-                        away != null && (away + 1 until labels.size).any { labels[it] == scene.action },
-                        "Forward, backward, and return focus must precede activation: $labels",
-                    )
                 }
             }
+            StartupRecoveryTalkBackScenario(automation) { scene, action, activated ->
+                awaitTalkBackAction(scene, action, fontScale.toFloat(), activated)
+            }.run(fontScale.toFloat())
         } finally {
             automation.setOnAccessibilityEventListener(null)
             val actions =
@@ -287,8 +248,63 @@ class RestoreTalkBackRuntimeTest {
                 .put("phase", "passed")
                 .put("observedFontScale", observedFontScale.get())
                 .put("fontScale", fontScale)
-                .put("sceneCount", 3)
+                .put("sceneCount", 7)
+                .put("actualStartupKeyRecovery", true)
+                .put("syntheticLateKeyDelivery", true)
+                .put("lockedJournalSemanticsHidden", true)
                 .put("settingsRestored", true),
+        )
+    }
+
+    private fun awaitTalkBackAction(
+        name: String,
+        action: String,
+        fontScale: Float,
+        activated: () -> Boolean,
+    ) {
+        focus.clear()
+        persist(
+            JSONObject()
+                .put(
+                    "phase",
+                    "ready",
+                ).put("observedFontScale", fontScale)
+                .put("scene", name)
+                .put("action", action),
+        )
+        val deadline = SystemClock.elapsedRealtime() + 90_000
+        while (!activated()) {
+            val focused =
+                automation.rootInActiveWindow
+                    ?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+            val currentLabel =
+                focused
+                    ?.let(::windowText)
+                    ?.trim()
+                    .orEmpty()
+                    .ifBlank { focused?.contentDescription?.toString().orEmpty() }
+            if (currentLabel.isNotBlank() && focus.lastOrNull() != currentLabel) focus += currentLabel
+            check(
+                SystemClock.elapsedRealtime() < deadline,
+            ) { "Native TalkBack activation timed out for $name; focus=$focus" }
+            persist(
+                JSONObject()
+                    .put("phase", "ready")
+                    .put("observedFontScale", fontScale)
+                    .put("scene", name)
+                    .put("action", action)
+                    .put("focus", JSONArray(focus.toList())),
+            )
+            SystemClock.sleep(100)
+        }
+        SystemClock.sleep(400)
+        val labels = focus.toList()
+        val first = labels.indexOfFirst { it == action }
+        assertTrue(first >= 0, "TalkBack must focus the labeled action")
+        val away = (first + 1 until labels.size).firstOrNull { labels[it] != action }
+        assertTrue(
+            away != null && (away + 1 until labels.size).any { labels[it] == action },
+            "Forward, backward, and return focus must precede activation: $labels",
         )
     }
 

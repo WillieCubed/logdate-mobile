@@ -1,6 +1,8 @@
 package app.logdate.client.domain.recommendation
 
 import app.logdate.client.datastore.KeyValueStorage
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
@@ -25,50 +27,60 @@ class DefaultAmbientPromptHistoryRepository(
     private val keyValueStorage: KeyValueStorage,
     private val now: () -> Instant = { Clock.System.now() },
 ) : AmbientPromptHistoryRepository {
-    override suspend fun canShow(candidate: AmbientPromptCandidate): Boolean {
-        val currentTime = now()
-        val records = loadRecords(currentTime)
-        if (records.any { record -> currentTime - record.shownAt < GLOBAL_SUPPRESSION_WINDOW }) {
-            return false
-        }
+    private val mutex = Mutex()
+    private val pendingHistory = mutableListOf<AmbientPromptHistoryRecord>()
 
-        val policy = candidate.family.policy()
-        val familyRecords = records.filter { it.family == candidate.family }
-        if (familyRecords.any { record -> record.dedupeKey == candidate.dedupeKey }) {
-            return false
-        }
-        if (familyRecords.any { record -> currentTime - record.shownAt < policy.minGap }) {
-            return false
-        }
-
-        val today = currentTime.toLocalDateTime(TimeZone.currentSystemDefault()).date
-        val shownToday =
-            familyRecords.count { record ->
-                record.shownAt.toLocalDateTime(TimeZone.currentSystemDefault()).date == today
+    override suspend fun canShow(candidate: AmbientPromptCandidate): Boolean =
+        mutex.withLock {
+            val currentTime = now()
+            val records = loadRecords(currentTime)
+            if (records.any { record -> currentTime - record.shownAt < GLOBAL_SUPPRESSION_WINDOW }) {
+                return@withLock false
             }
-        return shownToday < policy.maxPerDay
-    }
+
+            val policy = candidate.family.policy()
+            val familyRecords = records.filter { it.family == candidate.family }
+            if (familyRecords.any { record -> record.dedupeKey == candidate.dedupeKey }) {
+                return@withLock false
+            }
+            if (familyRecords.any { record -> currentTime - record.shownAt < policy.minGap }) {
+                return@withLock false
+            }
+
+            val today = currentTime.toLocalDateTime(TimeZone.currentSystemDefault()).date
+            val shownToday =
+                familyRecords.count { record ->
+                    record.shownAt.toLocalDateTime(TimeZone.currentSystemDefault()).date == today
+                }
+            shownToday < policy.maxPerDay
+        }
 
     override suspend fun recordShown(
         candidate: AmbientPromptCandidate,
         shownAt: Instant,
-    ) {
-        val records = loadRecords(shownAt).toMutableList()
-        records += AmbientPromptHistoryRecord(candidate.family, candidate.dedupeKey, shownAt)
-        persist(records)
+    ) = mutex.withLock {
+        pendingHistory +=
+            AmbientPromptHistoryRecord(candidate.family, candidate.dedupeKey, Instant.fromEpochMilliseconds(shownAt.toEpochMilliseconds()))
+        loadRecords(shownAt)
+        Unit
     }
 
     private suspend fun loadRecords(referenceTime: Instant): List<AmbientPromptHistoryRecord> {
-        val stored = keyValueStorage.getString(KEY_PROMPT_HISTORY) ?: return emptyList()
+        val stored = keyValueStorage.getStringOrThrow(KEY_PROMPT_HISTORY)
         val decoded =
-            runCatching { json.decodeFromString<List<AmbientPromptHistoryRecord>>(stored) }
+            runCatching { stored?.let { json.decodeFromString<List<AmbientPromptHistoryRecord>>(it) }.orEmpty() }
                 .getOrDefault(emptyList())
         val cutoff = referenceTime - HISTORY_RETENTION
-        return decoded.filter { it.shownAt >= cutoff }
+        val records = (decoded + pendingHistory).distinct().filter { it.shownAt >= cutoff }
+        if (pendingHistory.isNotEmpty()) {
+            persist(records)
+            pendingHistory.clear()
+        }
+        return records
     }
 
     private suspend fun persist(records: List<AmbientPromptHistoryRecord>) {
-        keyValueStorage.putString(KEY_PROMPT_HISTORY, json.encodeToString(records.sortedBy(AmbientPromptHistoryRecord::shownAt)))
+        keyValueStorage.putStringOrThrow(KEY_PROMPT_HISTORY, json.encodeToString(records.sortedBy(AmbientPromptHistoryRecord::shownAt)))
     }
 
     private fun AmbientPromptFamily.policy(): AmbientPromptPolicy =

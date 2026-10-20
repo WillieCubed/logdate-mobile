@@ -15,6 +15,8 @@ on:
       - 'app/android-main/src/androidTest/**/ArchiveMediaRecoveryE2ETest.kt'
       - 'app/android-main/src/androidTest/**/ArchiveLowStorageRecoveryTest.kt'
       - 'app/android-main/src/androidTest/**/RestoreStateAccessibilityRuntimeTest.kt'
+      - 'app/android-main/src/androidTest/**/RestoreTalkBackRuntimeTest.kt'
+      - 'app/android-main/src/androidTest/**/StartupRecoveryTalkBackScenario.kt'
       - 'app/android-main/src/androidTest/**/CloudArchiveWorkerFixture.kt'
       - 'app/android-main/src/androidTest/**/RestoredJournalLockRuntimeTest.kt'
       - 'app/android-main/src/androidTest/**/RestoredAppLockEnrollmentRuntimeTest.kt'
@@ -206,6 +208,36 @@ jobs:
           output = Path("app/android-main/build/intermediates/managed_device_android_test_additional_output/debugAndroidTest/phoneApi34DebugAndroidTest")
           if output.exists():
               shutil.copytree(output, destination / "output")
+          PYVERIFY
+
+      - name: Verify reconstructed notification and shortcut delivery
+        run: |
+          ./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+            '-Plogdate.androidTestClass=app.logdate.client.e2e.RestoredNotificationDeliveryTest#concurrent_recreated_workers_post_once_with_durable_history,app.logdate.client.e2e.RestoredShortcutTargetsRuntimeTest,app.logdate.client.e2e.ArchiveLowStorageRecoveryTest#managedAcceptedArchiveWaitsForStorageThenResumes' \
+            -Plogdate.androidTestOrchestrator=false \
+            -Pandroid.testInstrumentationRunnerArguments.restorePermissionAcceptance=true \
+            -Pandroid.testInstrumentationRunnerArguments.notificationDedupeAcceptance=true \
+            -Pandroid.testInstrumentationRunnerArguments.nativeShortcutAcceptance=true \
+            -Pandroid.testInstrumentationRunnerArguments.managedStorageRecoveryAcceptance=true \
+            -Pandroid.testInstrumentationRunnerArguments.storageRecoveryLabel=managed-storage-acceptance \
+            --no-daemon --console=plain
+          python3 - <<'PYVERIFY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          directory = Path("app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34")
+          cases = [case for report in directory.glob("TEST-*.xml")
+                   for case in ET.parse(report).getroot().iter("testcase")]
+          expected = {
+              ("app.logdate.client.e2e.RestoredNotificationDeliveryTest", "concurrent_recreated_workers_post_once_with_durable_history"),
+              ("app.logdate.client.e2e.RestoredShortcutTargetsRuntimeTest", "recreatedDraftShortcutTargetsTheRetainedDraftWithoutDuplicates"),
+              ("app.logdate.client.e2e.RestoredShortcutTargetsRuntimeTest", "manifestCaptureShortcutsTargetInstalledApp"),
+              ("app.logdate.client.e2e.ArchiveLowStorageRecoveryTest", "managedAcceptedArchiveWaitsForStorageThenResumes"),
+          }
+          assert len(cases) == len(expected) and {(case.get("classname"), case.get("name")) for case in cases} == expected
+          assert not any(case.find(tag) is not None for case in cases for tag in ["skipped", "failure", "error"])
+          import os, shutil
+          destination = Path(os.environ["RUNNER_TEMP"]) / "native-gmd" / "device-surfaces"
+          shutil.copytree(directory, destination / "results")
           PYVERIFY
 
       - name: Upload managed startup acceptance evidence

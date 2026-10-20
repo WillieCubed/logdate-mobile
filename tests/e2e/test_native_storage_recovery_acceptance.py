@@ -15,6 +15,23 @@ spec.loader.exec_module(acceptance)
 
 
 class StorageAcceptanceTest(unittest.TestCase):
+    def test_storage_command_waits_for_asynchronous_platform_transition(self):
+        expected = {"forced": "NORMAL", "level": "NORMAL"}
+        with patch.object(acceptance, "safe_target"), patch.object(acceptance, "adb"), \
+             patch.object(acceptance, "storage_state", side_effect=[{"forced": "NORMAL", "level": "LOW"}, expected]) as read, \
+             patch("time.sleep"):
+            acceptance.set_storage("emulator-5580", "force-not-low", expected)
+        self.assertEqual(2, read.call_count)
+
+    def test_storage_transition_deadline_preserves_the_failure(self):
+        expected = {"forced": "NORMAL", "level": "NORMAL"}
+        observed = {"forced": "NORMAL", "level": "LOW"}
+        with patch.object(acceptance, "safe_target"), patch.object(acceptance, "adb"), \
+             patch.object(acceptance, "storage_state", return_value=observed), \
+             patch("time.monotonic", side_effect=[0, 11]):
+            with self.assertRaisesRegex(RuntimeError, "force-not-low.*observed.*LOW"):
+                acceptance.set_storage("emulator-5580", "force-not-low", expected)
+
     def exercise(self, *, failure=None, initial=("UNKNOWN", "NORMAL"), reset_fails=False):
         state = list(initial)
         commands = []

@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutPublisher
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -28,9 +29,14 @@ class DynamicShortcutRefreshWorker(
     override suspend fun doWork(): Result =
         try {
             val descriptors = publisher.computeShortcuts()
-            applier.apply(descriptors)
-            Napier.d("Dynamic shortcuts published: ${descriptors.size} entries")
-            Result.success()
+            if (applier.apply(descriptors)) {
+                Napier.d("Dynamic shortcuts published: ${descriptors.size} entries")
+                Result.success()
+            } else {
+                Result.retry()
+            }
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             Napier.w("Failed to publish dynamic shortcuts", error)
             Result.retry()

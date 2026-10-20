@@ -1,11 +1,17 @@
 package app.logdate.client.domain.recommendation
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
+import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.KeyValueStorage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
@@ -19,6 +25,81 @@ import kotlin.time.Instant
  * are correctly enforced to prevent prompt fatigue.
  */
 class DefaultAmbientPromptHistoryRepositoryTest {
+    @Test
+    fun `a committed write with a failed acknowledgement does not consume the daily budget twice`() =
+        runTest {
+            val preferences = MutableStateFlow(emptyPreferences())
+            var acknowledgementFailed = false
+            val store =
+                object : DataStore<Preferences> {
+                    override val data: Flow<Preferences> = preferences
+
+                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                        preferences.value = transform(preferences.value)
+                        if (!acknowledgementFailed) {
+                            acknowledgementFailed = true
+                            error("Synthetic acknowledgement failure after persistence")
+                        }
+                        return preferences.value
+                    }
+                }
+            val postedAt = Instant.parse("2026-04-02T08:00:00.000123456Z")
+            val repository = DefaultAmbientPromptHistoryRepository(DataStoreKeyValueStorage(store), now = { postedAt + 4.hours })
+            assertFailsWith<IllegalStateException> { repository.recordShown(captureCandidate("capture:first"), postedAt) }
+            assertTrue(repository.canShow(captureCandidate("capture:second")))
+        }
+
+    @Test
+    fun `another reminder mode repairs a failed history write before deciding eligibility`() =
+        runTest {
+            val preferences = MutableStateFlow(emptyPreferences())
+            var writeFailed = false
+            val store =
+                object : DataStore<Preferences> {
+                    override val data: Flow<Preferences> = preferences
+
+                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                        if (!writeFailed) {
+                            writeFailed = true
+                            error("Synthetic disk full after notification delivery")
+                        }
+                        preferences.value = transform(preferences.value)
+                        return preferences.value
+                    }
+                }
+            val repository = DefaultAmbientPromptHistoryRepository(DataStoreKeyValueStorage(store))
+            val candidate = captureCandidate("retained-draft")
+            assertFailsWith<IllegalStateException> { repository.recordShown(candidate) }
+            assertFalse(repository.canShow(candidate), "Every reminder mode shares the original successful delivery")
+        }
+
+    @Test
+    fun `unreadable reminder history cannot authorize another notification`() =
+        runTest {
+            val store =
+                object : DataStore<Preferences> {
+                    override val data: Flow<Preferences> = flow { error("Preferences unavailable") }
+
+                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences) = transform(emptyPreferences())
+                }
+            val repository = DefaultAmbientPromptHistoryRepository(DataStoreKeyValueStorage(store))
+            assertFailsWith<IllegalStateException> { repository.canShow(captureCandidate("retained-draft")) }
+        }
+
+    @Test
+    fun `failed reminder history persistence cannot report a recorded delivery`() =
+        runTest {
+            val store =
+                object : DataStore<Preferences> {
+                    override val data: Flow<Preferences> = flow { emit(emptyPreferences()) }
+
+                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
+                        error("Preferences full")
+                }
+            val repository = DefaultAmbientPromptHistoryRepository(DataStoreKeyValueStorage(store))
+            assertFailsWith<IllegalStateException> { repository.recordShown(captureCandidate("retained-draft")) }
+        }
+
     @Test
     fun `suppresses any prompt when another prompt was shown within the last hour`() =
         runTest {
