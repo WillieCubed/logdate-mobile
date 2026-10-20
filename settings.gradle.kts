@@ -123,6 +123,7 @@ include(":integration:server-client-e2e")
 
 // Developer tooling (not shipped)
 include(":tools:passkey-test-provider")
+include(":tools:native-restore-driver")
 // Sample apps
 //
 // samples/atproto-consumer is wired as a *composite-build* (includeBuild)

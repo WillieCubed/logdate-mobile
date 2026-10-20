@@ -49,19 +49,23 @@ class CompletedRecordingRestartTest {
         assertContentEquals(expected, final.readBytes())
         assertFalse(staged.exists())
         assertFalse(File(staged.parentFile, "${staged.name}.ready").exists())
-        val player = MediaPlayer()
-        try {
-            player.setDataSource(final.absolutePath)
-            player.setVolume(0f, 0f)
-            player.prepare()
-            assertTrue(player.duration >= 500)
-            player.start()
-            val deadline = SystemClock.elapsedRealtime() + 3_000
-            while (player.currentPosition == 0 && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(25)
-            assertTrue(player.currentPosition > 0, "The recovered recording must decode offline")
-        } finally {
-            player.release()
-            check(final.delete())
-        }
+        verifyRecoveredAudioPlayback(final)
+        check(final.delete())
+    }
+}
+
+internal fun verifyRecoveredAudioPlayback(final: File) {
+    val player = MediaPlayer()
+    try {
+        player.setDataSource(final.absolutePath)
+        player.setVolume(0f, 0f)
+        player.prepare()
+        assertTrue(player.duration >= 500)
+        player.start()
+        val deadline = SystemClock.elapsedRealtime() + 3_000
+        while (player.currentPosition == 0 && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(25)
+        assertTrue(player.currentPosition > 0, "The recovered recording must decode offline")
+    } finally {
+        player.release()
     }
 }

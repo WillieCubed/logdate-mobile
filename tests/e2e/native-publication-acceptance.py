@@ -38,7 +38,7 @@ def verify_restarted_publication(serial, fixture, metadata, output):
 
 
 def run(options):
-    native.prepare(options.source, allow_existing=options.resume_seeded_source)
+    native.prepare(options.source, allow_existing=options.resume_seeded_source, allow_preinstalled_empty=options.seed_empty_source)
     native.prepare(options.destination, allow_preinstalled_empty=True)
     if options.resume_seeded_source:
         for apk in (options.app_apk, options.test_apk):
@@ -82,7 +82,10 @@ def main():
     parser.add_argument("--test-apk", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--resume-seeded-source", action="store_true")
+    parser.add_argument("--seed-empty-source", action="store_true", help="Use an owned preinstalled source only when it has no journal or media")
     options = parser.parse_args()
+    if options.resume_seeded_source and options.seed_empty_source:
+        parser.error("Choose a retained synthetic source or an empty installed source")
     if options.source == options.destination:
         parser.error("source and destination must be different emulators")
     if not options.app_apk.is_file() or not options.test_apk.is_file():

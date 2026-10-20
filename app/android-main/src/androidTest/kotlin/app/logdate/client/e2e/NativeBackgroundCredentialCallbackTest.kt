@@ -81,6 +81,10 @@ class NativeBackgroundCredentialCallbackTest {
 
     @Test
     fun modernFullRestoreCallbackCopiesFileAndCompletesRecoveryWhenAvailable() {
+        InstrumentationRegistry.getArguments().getString("nativeRestoreRequiredSdkFull")?.let { required ->
+            assertTrue(Build.VERSION.SDK_INT >= 36, "This acceptance run requires a modern restore platform")
+            assertEquals(required.toInt(), Build.VERSION.SDK_INT_FULL, "The callback must execute on the requested minor SDK")
+        }
         assertTrue(context.cacheDir.isDirectory, "The callback's isolated cache directory must exist")
         assertTrue(context.cacheDir.canWrite(), "The callback's isolated cache directory must be writable")
         if (!supportsFullRestoreInput()) return

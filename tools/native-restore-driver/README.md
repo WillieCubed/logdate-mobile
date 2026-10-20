@@ -1,0 +1,69 @@
+# Native restore test driver
+
+This unshipped app keeps Gradle Managed Devices alive while Android restarts LogDate
+during native backup and restore. Its instrumentation runs in a separate package.
+The transport waiting driver never acquires `UiAutomation`; nested LogDate probes own that connection.
+
+The host entry point is `tests/e2e/managed-native-restore-acceptance.py`. Assemble the
+LogDate app and instrumentation APKs before invoking it:
+
+```sh
+./gradlew :app:android-main:assembleDebug :app:android-main:assembleDebugAndroidTest
+python3 tests/e2e/managed-native-restore-acceptance.py \
+  --output /tmp/logdate-managed-native-transfer \
+  --after-transfer missing-media --after-transfer storage --after-transfer ui \
+  -- --exercise-duplicate-restore
+```
+
+Use a new private output directory for each run. APKs, journal fixtures, and transport
+payloads in that directory can contain private data. The host records its active
+Gradle handle there; inspect that process before starting a replacement after an
+observation failure. A timeout does not establish that Gradle or its devices stopped.
+
+One managed-device task requests two concurrent shards. Each driver method occupies a
+different AndroidJUnitRunner shard and publishes its source or destination role.
+Two named tasks in the same project cannot replace this arrangement: the reviewed
+UTP task retains the project lock while waiting for instrumentation. The driver
+rejects reduced shard allocation before publishing readiness. The controller pins
+the reviewed UTP backend, requires both roles, and checks both final test methods.
+
+Before readiness, each driver verifies the installed app and probe APK hashes,
+matching signing certificates, and instrumentation target. Native harness reinstalls
+use private copies of those attested APKs. The host binds every ADB operation to its
+live Gradle process, newly started managed QEMU processes, and nonce-bearing driver
+receipts with process birth identities. Protected transport access uses `su` without
+restarting ADB. Normal instrumentation retains its shell identity.
+
+The host marks the drivers accepted only after all selected native content and
+transport oracles pass. Terminal completion closes transport commands and validates
+each remaining endpoint independently, because its peer may already have shut down.
+Both driver results must pass without skips. Driver success alone does not prove
+native restore, Google-provider restore, or setup-wizard transfer.
+
+`tests/e2e/managed-modern-callback-acceptance.sh` runs the separate Android 16 QPR2
+callback contract on `restoreCallbackApi36_1`. A separate driver case launches the
+LogDate suite with `am instrument --no-hidden-api-checks`, preserving access to the
+framework's test-fixture constructor. This exemption belongs only to the nested test
+process. The driver checks every named callback result and the exact full SDK value;
+the host requires the outer managed case to pass too. Its device configuration uses the minor-version
+input of the pinned AGP implementation until the public managed-device interface
+exposes that setting; an incompatible plugin upgrade fails configuration. Passing
+the test on Android 36.0 would not exercise `FullRestoreDataInput`.
+
+`--mode publication` adds data-only/session-exclusion, replacement peer trust,
+restart replay, and encrypted archive capture. The synthetic source account is
+bound through the normal owner provider, draft adoption finishes before the backup
+baseline, and its source remains offline until session cleanup. This prevents
+unrelated cloud work from racing the strict durable-file comparison.
+
+`--mode work-restart` retains the cloud-work process-death and account-transition
+oracles. Pair it with `--after-transfer permissions` to test permissions and widget
+ID remapping on the untouched managed peer. `--mode d2d` selects the managed Google
+Play image and the guide's single-device transport simulation. `--mode enrollment`
+requires `--classpath` and a private `--fixture-environment` for the isolated server.
+Neither mode establishes Google credential delivery or setup-wizard acceptance.
+
+The `contracts` follow-up keeps the retained-key failure, two-process key persistence,
+entry editing, journal lock, and legacy callback checks on a populated restored app.
+CI runs independent scenarios on fresh managed generations and retains the existing
+aggregate required check. Gradle alone starts and stops every emulator.

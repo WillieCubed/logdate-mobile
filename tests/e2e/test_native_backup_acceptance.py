@@ -21,6 +21,72 @@ WORK_SPEC.loader.exec_module(NATIVE_RESTORE_WORK_ACCEPTANCE)
 D2D_SCRIPT = Path(__file__).with_name("native-d2d-acceptance.py")
 
 
+class ManagedWorkSourceGuardTest(unittest.TestCase):
+    def test_preinstalled_guard_checks_the_selected_package_even_when_import_defaults_differ(self):
+        harness = NATIVE_RESTORE_WORK_ACCEPTANCE
+        with patch.object(harness, "adb", return_value=("package:" + harness.PACKAGE).encode()), patch.dict(
+            harness.NATIVE, {"package_user_files": lambda serial, package: self.assertEqual(harness.PACKAGE, package) or []}
+        ):
+            harness.require_empty_install("emulator-5556", True)
+
+    def test_preinstalled_source_requires_explicit_opt_in_and_refuses_retained_content(self):
+        harness = NATIVE_RESTORE_WORK_ACCEPTANCE
+        installed = ("package:" + harness.PACKAGE).encode()
+        with patch.object(harness, "adb", return_value=installed), patch.dict(harness.NATIVE, {"package_user_files": lambda serial, package: []}):
+            with self.assertRaisesRegex(RuntimeError, "fresh isolated"):
+                harness.require_empty_install("emulator-5556", False)
+            harness.require_empty_install("emulator-5556", True)
+        for path in ("./databases/logdate", "./files/logdate.preferences_pb", "./files/audio_notes/draft.m4a", "./files/db_recovery/passphrase_backup"):
+            with self.subTest(path=path), patch.object(harness, "adb", return_value=installed), patch.dict(
+                harness.NATIVE, {"package_user_files": lambda serial, package: [path]}
+            ):
+                with self.assertRaisesRegex(RuntimeError, "retained data"):
+                    harness.require_empty_install("emulator-5556", True)
+
+
+class DataOnlySourceSessionTest(unittest.TestCase):
+    def test_synthetic_session_stays_offline_through_backup_and_restores_radio_on_failure(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        events = []
+        failure = RuntimeError("backup rejected")
+        with tempfile.TemporaryDirectory() as directory, patch.object(harness, "radio_state", return_value=(False, b"1")), patch.object(
+            harness, "set_offline", side_effect=lambda *args: events.append(("offline", args))
+        ), patch.object(harness, "probe", side_effect=lambda serial, mode, output, **kwargs: events.append(mode)), patch.object(
+            harness, "adb", side_effect=lambda *args: events.append(("adb", args))
+        ), patch.object(harness, "restore_radio_state", side_effect=lambda *args: events.append(("restore", args))):
+            with self.assertRaises(RuntimeError) as raised:
+                with harness.data_only_source_session("emulator-5556", Path(directory), True):
+                    events.append("backup")
+                    raise failure
+        self.assertIs(failure, raised.exception)
+        self.assertEqual([("offline", ("emulator-5556", True)), "source-account-session", "backup",
+                          "source-account-session-cleanup", ("adb", ("emulator-5556", "shell", "am", "force-stop", harness.PACKAGE)),
+                          ("restore", ("emulator-5556", (False, b"1")))], events)
+
+    def test_failed_setup_cleanup_retains_the_same_unique_session_identity(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        failure = RuntimeError("existing session refused")
+        with tempfile.TemporaryDirectory() as directory, patch.object(harness, "radio_state", return_value=(False, b"1")), patch.object(
+            harness, "set_offline"
+        ), patch.object(harness, "probe", side_effect=[failure, None]) as probe, patch.object(harness, "adb"), patch.object(
+            harness, "restore_radio_state"
+        ):
+            with self.assertRaises(RuntimeError) as raised:
+                with harness.data_only_source_session("emulator-5556", Path(directory), True):
+                    self.fail("A rejected source session cannot reach backup")
+        self.assertIs(failure, raised.exception)
+        identifiers = [call.kwargs["source_session_id"] for call in probe.call_args_list]
+        self.assertEqual(2, len(identifiers))
+        self.assertEqual(identifiers[0], identifiers[1])
+        self.assertRegex(identifiers[0], r"^[a-f0-9-]{36}$")
+
+    def test_normal_transfer_does_not_change_source_connectivity(self):
+        with patch.object(NATIVE_BACKUP_ACCEPTANCE, "radio_state") as radio:
+            with NATIVE_BACKUP_ACCEPTANCE.data_only_source_session("emulator-5556", Path("unused"), False):
+                pass
+        radio.assert_not_called()
+
+
 class RestoreSnapshotValidationTest(unittest.TestCase):
     def test_datastore_atomic_write_staging_is_not_an_accepted_preferences_change(self):
         retained = {
@@ -37,6 +103,17 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
                 after = {"databases/logdate": {"sha256": "journal"}, path: {"sha256": "after"}}
                 with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data"):
                     NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(before, after)
+
+    def test_preference_change_diagnostics_identify_keys_without_values(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        def preferences(items):
+            return b"".join(harness.length_delimited_field(1, CredentialsOnlyBackupFilterTest.preference_entry(k, v))
+                            for k, v in items.items())
+        before = preferences({"same": "retained", "changed": "old-secret", "removed": "removed-secret"})
+        after = preferences({"same": "retained", "changed": "new-secret", "added": "added-secret"})
+        changes = harness.preference_changes(before, after)
+        self.assertEqual({"added": ["added"], "removed": ["removed"], "changed": ["changed"]}, changes)
+        self.assertNotIn("secret", str(changes))
 
     def test_first_backup_may_make_only_missing_privacy_defaults_explicit(self):
         harness = NATIVE_BACKUP_ACCEPTANCE

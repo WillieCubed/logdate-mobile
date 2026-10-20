@@ -5,6 +5,7 @@ import argparse
 import importlib.util
 import io
 import os
+import runpy
 from pathlib import Path
 import subprocess
 import stat
@@ -29,45 +30,28 @@ D2D_SPEC.loader.exec_module(D2D)
 
 class NativeAcceptanceSafetyTest(unittest.TestCase):
     def test_retained_key_acceptance_rejects_skips_despite_a_success_summary(self):
+        post = runpy.run_path(str(ROOT / "tests/e2e/native-post-transfer-acceptance.py"))
+        for status, ending in (("0", ""), ("-3", ""), ("-4", ""), ("-3", "\r"), ("-4", "\r")):
+            result = f"INSTRUMENTATION_STATUS_CODE: {status}{ending}\nOK (8 tests)\n".encode()
+            with self.subTest(status=status, ending=ending), tempfile.TemporaryDirectory() as temporary, patch.dict(
+                post["NATIVE"], {"adb": lambda *args: result}
+            ):
+                output = Path(temporary) / "retained-keys.log"
+                if status == "0":
+                    post["instrument"]("emulator-5556", "fixture.Keys", 8, output)
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "did not pass every required case"):
+                        post["instrument"]("emulator-5556", "fixture.Keys", 8, output)
+                self.assertEqual(result, output.read_bytes())
+
+    def test_native_ci_retains_all_scenarios_without_manual_emulator_lifecycle(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
-        step = workflow.split("- name: Verify retained keys under Android storage failures", 1)[1]
-        step = step.split("\n      - name:", 1)[0]
-        script = textwrap.dedent(step.split("run: |\n", 1)[1])
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "native-key-recovery").mkdir()
-            fake_adb = root / "adb"
-            fake_adb.write_text(
-                "#!/usr/bin/env python3\n"
-                "import os, sys\n"
-                "arguments = ' '.join(sys.argv[1:])\n"
-                "if 'getprop ro.kernel.qemu' in arguments:\n"
-                "    print('1')\n"
-                "elif 'shell am instrument' in arguments:\n"
-                "    status = os.environ['FAKE_INSTRUMENTATION_STATUS']\n"
-                "    ending = os.environ.get('FAKE_STATUS_CR', '')\n"
-                "    sys.stdout.write('INSTRUMENTATION_STATUS_CODE: ' + status + ending + '\\n\\nOK (8 tests)\\n')\n"
-                "else:\n"
-                "    raise SystemExit('Unexpected test command')\n"
-            )
-            fake_adb.chmod(0o700)
-            for status, ending in (("0", ""), ("-3", ""), ("-4", ""), ("-3", "\r"), ("-4", "\r")):
-                with self.subTest(status=status, carriage_return=bool(ending)):
-                    environment = dict(
-                        os.environ,
-                        PATH=str(root) + os.pathsep + os.environ["PATH"],
-                        RUNNER_TEMP=str(root),
-                        FAKE_INSTRUMENTATION_STATUS=status,
-                        FAKE_STATUS_CR=ending,
-                    )
-                    result = subprocess.run(
-                        ["bash", "-e", "-o", "pipefail", "-c", script],
-                        env=environment,
-                        capture_output=True,
-                        text=True,
-                        timeout=10,
-                    )
-                    self.assertEqual(status == "0", result.returncode == 0, result.stderr)
+        for forbidden in ("avdmanager create", "emulator -avd", "adb -s", "emu kill", "pm clear", "adb uninstall"):
+            self.assertNotIn(forbidden, workflow)
+        for scenario in ("partial", "publication", "contracts", "missing-keys", "credentials-only", "privacy", "work-restart", "d2d", "enrollment"):
+            self.assertIn(f"{scenario})", workflow)
+        self.assertIn("needs: native-transfer-scenarios", workflow)
+        self.assertIn('test "$RESULT" = success', workflow)
 
     def test_d2d_acceptance_refuses_non_emulators_before_device_access(self):
         for serial in ("38191FDJG00FNY", "192.0.2.1:5555", "adb-phone._tcp"):
@@ -169,8 +153,9 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
         d2d_harness = (ROOT / "tests/e2e/native-d2d-acceptance.py").read_text()
         self.assertIn("system-images;android-34;google_apis_playstore;x86_64", workflow)
-        self.assertIn(r"disk\.dataPartition\.size[[:space:]]*=.*/disk.dataPartition.size=2147483648/", workflow)
-        self.assertIn("native-d2d-acceptance.py", workflow)
+        self.assertIn("--mode d2d", workflow)
+        controller = (ROOT / "tests/e2e/managed-native-restore-acceptance.py").read_text()
+        self.assertIn('"d2d": "native-d2d-acceptance.py"', controller)
         self.assertIn("single-device D2D test-mode simulation", d2d_harness)
         self.assertIn("does not prove setup-wizard transfer", d2d_harness)
         self.assertIn("https://developer.android.com/identity/data/testingbackup", d2d_harness)
@@ -230,33 +215,23 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 [arguments.args[1:] for arguments in adb.call_args_list],
             )
 
-    def test_api_36_1_waits_for_package_manager_before_installing_apks(self):
+    def test_api_36_1_uses_managed_lifecycle_and_requires_the_exact_minor_sdk(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
-        scenario = workflow.split("- name: Boot API 36.1 emulator", 1)[1]
-        scenario = scenario.split("- name: Exercise Android 16 QPR2 full restore callback", 1)[0]
-        self.assertIn("-gpu swiftshader_indirect", scenario)
-        self.assertIn("settings get global device_provisioned", scenario)
-        self.assertIn("device_provisioned\" == '0'", scenario)
-        self.assertIn("for _ in $(seq 1 180)", scenario)
-        self.assertIn("package_manager_ready=false", scenario)
-        self.assertIn("for _ in $(seq 1 60)", scenario)
-        self.assertIn("api36-1-package-manager-wait.log", scenario)
-        self.assertIn("adb -s emulator-5562 shell pm list packages", scenario)
-        callback = workflow.split("- name: Exercise Android 16 QPR2 full restore callback", 1)[1]
-        self.assertIn("for attempt in $(seq 1 12)", callback)
-        self.assertIn("adb -s emulator-5562 shell pm list packages", callback)
-        self.assertIn("adb -s emulator-5562 shell settings get global device_provisioned", callback)
-        self.assertIn("device_provisioned\" == '0'", callback)
-        self.assertIn("shell pm install-create -r", callback)
-        self.assertIn("shell pm install-abandon", callback)
-        self.assertIn("install-session-attempt-${attempt}.log", callback)
-        self.assertIn("sleep 5", callback)
-        self.assertIn("adb -s emulator-5562 logcat -d -b all", callback)
-        self.assertIn("install_api36_apk app", callback)
-        self.assertIn("install_api36_apk android-test", callback)
-        self.assertIn("shell am instrument --user 0 --no-hidden-api-checks -w -r", callback)
-        self.assertIn("NativeBackgroundCredentialCallbackTest", callback)
-        self.assertIn("api36-1-*-install-attempt-*.log", workflow)
+        scenario = workflow.split("  native-transfer-api-36-1:", 1)[1]
+        self.assertNotIn("avdmanager create", scenario)
+        self.assertNotIn("emulator -avd", scenario)
+        self.assertNotIn("adb -s", scenario)
+        self.assertIn("managed-modern-callback-acceptance.sh", scenario)
+        runner = (ROOT / "tests/e2e/managed-modern-callback-acceptance.sh").read_text()
+        self.assertIn(":tools:native-restore-driver:restoreCallbackApi36_1DebugAndroidTest", runner)
+        driver = (ROOT / "tools/native-restore-driver/src/androidTest/kotlin/app/logdate/tools/restoredriver/NativeModernRestoreCallbackTest.kt").read_text()
+        self.assertIn("nativeRestoreRequiredSdkFull 3600001", driver)
+        self.assertIn("--no-hidden-api-checks", driver)
+        self.assertIn("requireAttestedApks()", driver)
+        self.assertIn("native-modern-callback-driver-cases.json", runner)
+        self.assertIn("native-modern-callback-cases.json", runner)
+        self.assertIn("--managed-results", runner)
+        self.assertNotIn("am instrument", runner)
 
     def test_api_36_restore_probe_fails_if_full_restore_callback_is_missing(self):
         probe = (
@@ -270,10 +245,10 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
 
     def test_background_restore_callback_checks_do_not_launch_an_activity(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
-        scenario = workflow.split("- name: Run restart-safe restore work and native callback checks", 1)[1]
-        scenario = scenario.split("- name: Verify permission recovery", 1)[0]
-        self.assertIn("am instrument", scenario)
-        self.assertNotIn("am start", scenario)
+        self.assertIn("--mode work-restart", workflow)
+        post = (ROOT / "tests/e2e/native-post-transfer-acceptance.py").read_text()
+        self.assertIn('PREFIX + "NativeBackgroundCredentialCallbackTest"', post)
+        self.assertNotIn("am start", post)
         callback_test = (
             ROOT
             / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundCredentialCallbackTest.kt"
@@ -305,26 +280,17 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
 
     def test_native_restore_ci_checks_a_populated_signed_out_destination(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
-        scenario = workflow.split("- name: Exercise populated restore and replacement-device publication", 1)[1]
-        scenario = scenario.split("- name: Exercise missing-media and network recovery", 1)[0]
-        self.assertIn("--source emulator-5554", scenario)
-        self.assertIn("--destination emulator-5558", scenario)
-        self.assertIn("native-publication-acceptance.py", scenario)
-        self.assertIn("--resume-seeded-source", scenario)
+        self.assertIn("--mode publication", workflow)
+        self.assertIn("managed-native-restore-acceptance.py", workflow)
         publication = (ROOT / "tests/e2e/native-publication-acceptance.py").read_text()
         self.assertIn("exercise_data_only=True", publication)
-        self.assertIn('adb -s emulator-5558 emu kill || true', workflow)
-        self.assertIn("native-restore-data-only/destination-ui.xml", workflow)
-        self.assertIn("native-restore-data-only/destination-journal.png", workflow)
 
     def test_native_restore_ci_runs_missing_media_and_network_recovery(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
-        scenario = workflow.split("- name: Exercise missing-media and network recovery", 1)[1]
-        scenario = scenario.split("- name: Upload native restore acceptance evidence", 1)[0]
-        self.assertIn("native-missing-media-acceptance.py", scenario)
-        self.assertIn("--emulator emulator-5558", scenario)
-        self.assertIn("--synthetic-data", scenario)
-        self.assertIn("native-missing-media-recovery/", workflow)
+        self.assertIn("--after-transfer missing-media", workflow)
+        controller = (ROOT / "tests/e2e/managed-native-restore-acceptance.py").read_text()
+        self.assertIn('"missing-media": "native-missing-media-acceptance.py"', controller)
+        self.assertIn('"--synthetic-data"', controller)
         self.assertIn("ArchiveMediaRecoveryE2ETest.kt", workflow)
         self.assertIn("CloudArchiveWorkerFixture.kt", workflow)
         self.assertIn("app/compose-main/src/androidMain/", workflow)

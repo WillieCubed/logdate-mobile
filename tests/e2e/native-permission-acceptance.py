@@ -18,6 +18,12 @@ LOCATION = ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
 PERMISSIONS = h.PERMISSIONS + LOCATION + ["ACTIVITY_RECOGNITION"]
 
 
+def verify_shortcuts(serial, directory):
+    for method in ("manifestCaptureShortcutsTargetInstalledApp", "recreatedDraftShortcutTargetsTheRetainedDraftWithoutDuplicates"):
+        h.instrument(serial, "app.logdate.client.e2e.RestoredShortcutTargetsRuntimeTest#" + method,
+                     directory / ("shortcut-" + method + ".log"), extras=["-e", "nativeShortcutAcceptance", "true"])
+
+
 def run(args, serial):
     h.safe_target(serial)
     directory = args.output / serial
@@ -52,8 +58,7 @@ def run(args, serial):
         if "mWakefulness=Awake" not in awake:
             raise RuntimeError("The emulator did not wake for the permission acceptance run")
         probe("restoreOriginalTrackingSettings", "initial-settings-cleanup.log")
-        h.instrument(serial, "app.logdate.client.e2e.RestoredShortcutTargetsRuntimeTest", directory / "shortcut-targets.log",
-                     extras=["-e", "nativeShortcutAcceptance", "true"])
+        verify_shortcuts(serial, directory)
         for permission in PERMISSIONS:
             result = h.adb(serial, "shell", "pm", "revoke", h.PACKAGE, "android.permission." + permission, check=False)
             if result.returncode and b"has not requested permission" not in result.stderr + result.stdout:

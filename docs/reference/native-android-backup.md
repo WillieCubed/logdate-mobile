@@ -7,6 +7,19 @@ ID. Content availability and account authentication have independent recovery st
 The [credential custody model](native-android-recovery-custody.md) defines the owner, transport,
 recovery, and invalidation boundaries for each key and credential, including deliberate Block Store non-use.
 
+All Android execution uses Gradle Managed Devices. External host actions select the current run's
+new QEMU process, expected AVD and managed-device identifier, derived console port, and matching
+fixture nonce before addressing a device. An `emulator-NNNN` serial alone does not establish custody.
+The native acceptance workflow allocates fresh managed generations for each scenario. Payload
+drivers run only inside that lifecycle; selecting a serial directly does not establish ownership.
+
+The [native restore test driver](../../tools/native-restore-driver/README.md) hosts transport checks
+on two concurrent managed instances while BackupManager restarts LogDate. Its host controller
+verifies current-run custody before each device command, preserves shell identity for nested probes,
+and requires both the native content oracles and the two waiting-driver results. Invoke it through
+`tests/e2e/managed-native-restore-acceptance.py`; running a payload driver directly does not establish
+managed-device ownership.
+
 ## Backup coverage
 
 The manifest selects `backup_rules.xml` for older Android versions and `data_extraction_rules.xml`
@@ -115,8 +128,10 @@ Malformed pending material also prevents generation of a replacement key. Pendin
 excluded from Android backup; this repairs local interruption, not a key omitted from a transfer.
 
 Missing database keys must be recognized through dependency wrappers in `ApplicationStartupGate`.
-That surface runs before database-backed navigation and explains how to repeat the transfer from
-an updated original device or restore a complete backup, while retaining the encrypted journal.
+That surface runs before database-backed navigation and retains the encrypted journal while allowing
+another key-open attempt. Archive and account recovery currently depend on ready storage and cannot
+be reached through this gate. Adding those actions requires an isolated recovery destination;
+passing a different archive or account into the failed journal is not a key-recovery mechanism.
 An identity recovery phrase does not recover the independent SQLCipher database key. Never invoke
 the storage-reset controller automatically or replace retained content with an empty database.
 
@@ -703,6 +718,53 @@ application scope was already cancelled. `RestoredReminderSchedulingRuntimeTest`
 Managed Device and checks actual AlarmManager registrations, unique periodic work, both reminder
 modes, and disabled callbacks. It restores the original preferences after checking those states.
 
+`RestoredAlarmDeliveryRuntimeTest` retrieves the morning PendingIntent registered by the production
+scheduler and brings its trigger forward with AlarmManager. The actual receiver must create exactly
+one uniquely named evaluation request. It does not call the receiver or worker directly, grant exact
+alarm access, or replace WorkManager with a test implementation. This fresh fixture keeps foreground
+observers unstarted so they cannot replace the accelerated trigger. It observes request identity beyond
+the receiver's bounded scheduling window. The cold-start fixture separately covers normal foreground
+reconstruction. Cleanup restores reminder preferences and their normal schedules.
+
+### Exact managed recovery cases
+
+Named case contracts in `tests/e2e/native-*-cases.json` define the key/session/identity, completed
+recording, and alarm-delivery groups. The workflow uses the key contract to select classes and
+`native-instrumentation-results.py` to validate the resulting XML. Every required method executes
+once; unexpected cases, duplicates, skips, failures, and suite setup errors fail verification.
+The harness tests compare contracts with their Kotlin declarations so adding cases cannot silently
+leave an obsolete test-count assertion behind.
+
+```sh
+classes="$(python3 tests/e2e/native-instrumentation-results.py --expected-cases tests/e2e/native-key-recovery-cases.json --print-classes)"
+./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+  "-Plogdate.androidTestClass=$classes" -Plogdate.androidTestOrchestrator=false
+python3 tests/e2e/native-instrumentation-results.py \
+  --managed-results app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34 \
+  --expected-cases tests/e2e/native-key-recovery-cases.json
+```
+
+### Completed recording recovery across app processes
+
+`CompletedRecordingColdStartTest` uses two ordered Orchestrator stages without clearing application
+data. The first durably stages completed audio and its completion marker beside an unfinished
+container. The second requires a different process and launches the real MainActivity. Startup
+must publish byte-identical completed audio, remove its consumed staging marker, leave unfinished
+container bytes staged, and permit muted offline playback without starting AudioRecordingService.
+The fixture restores the exact original security preference and retains its completed recording.
+This checks local recording interruption; native transfer excludes temporary recording files.
+
+```sh
+./gradlew :app:android-main:phoneApi34DebugAndroidTest \
+  -Plogdate.androidTestClass=app.logdate.client.e2e.CompletedRecordingColdStartTest \
+  -Plogdate.androidTestOrchestrator=true \
+  -Pandroid.testInstrumentationRunnerArguments.clearPackageData=false \
+  -Pandroid.testInstrumentationRunnerArguments.recordingColdStartAcceptance=true
+python3 tests/e2e/native-instrumentation-results.py \
+  --managed-results app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34 \
+  --expected-cases tests/e2e/native-recording-recovery-cases.json
+```
+
 ### Reminder recovery across app processes
 
 `RestoredReminderColdStartTest` adds six ordered stages on a fresh Gradle Managed Device.
@@ -770,7 +832,9 @@ starting another run; an observer failure does not mean the managed-device task 
 
 The modern callback fixture constructs a real framework `FullRestoreDataInput` from a private
 file descriptor. Its constructor is hidden from the SDK, so the API 36.1 instrumentation command
-uses `--no-hidden-api-checks` on its verified emulator. This keeps the callback test independent
+uses `--no-hidden-api-checks` in a nested instrumentation launched by the separate managed test
+driver. The driver attests APK bytes, checks Android's full SDK value, and requires all eleven named
+callback cases. The host also verifies the single outer managed test. This keeps the callback test independent
 of MockK's JVMTI agent and the runtime temporary directory, which may be unavailable on a fresh
 emulator. Production callback handling uses the public callback and accessors.
 

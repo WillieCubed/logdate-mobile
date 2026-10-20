@@ -1,0 +1,5 @@
+{
+  "app.logdate.client.e2e.RestoredAlarmDeliveryRuntimeTest": [
+    "restoredMorningAlarmInvokesReceiverAndQueuesOneEvaluation"
+  ]
+}

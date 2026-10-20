@@ -1,0 +1,5 @@
+{
+  "app.logdate.tools.restoredriver.NativeModernRestoreCallbackTest": [
+    "executesEveryModernCallbackCaseWithFrameworkFixtureAccess"
+  ]
+}
