@@ -526,7 +526,9 @@ transfer with the real account/device API and an isolated PostgreSQL server. Bui
 `:app:android-main:assembleDebug`, `:app:android-main:assembleDebugAndroidTest`, and
 `:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath`, then use the managed controller
 with the generated classpath, a private database environment file, and a new output directory.
-The controller owns both fresh emulator instances and pins the APKs for the duration of the run:
+The controller owns both fresh emulator instances and pins the APKs for the duration of the run.
+Enrollment has a bounded 30-minute native phase shared with its local server; the driver also
+covers boot, requested follow-ups, and teardown, with a 90-minute upper limit:
 
 ```sh
 LOGDATE_NATIVE_ACCEPTANCE_PACKAGE=studio.hypertext.logdate.debug \
@@ -671,6 +673,38 @@ Run filtered payload scenarios
 on a fresh destination because they intentionally alter the transported fixture. These modes use
 synthetic app data and do not establish Google Restore Credentials or setup-transfer provider
 acceptance.
+
+### Released-version upgrade and native restore
+
+`native-released-upgrade-acceptance.py` verifies two histories in one fresh managed pair: an
+installed upgrade of a released encrypted journal, and native delivery of that released app's
+backup into the candidate. The released agent must write the transport before installing the
+candidate. Compile `NativeReleasedUpgradeProbeTest` against each version separately; changing
+production code in the released checkout or running its instrumentation against a different
+client invalidates the comparison.
+
+Use `managed-native-restore-acceptance.py --mode upgrade --fixture-environment <private-json>
+--output <new-private-directory>`. The mode accepts no follow-ups because their initial APK may
+have a lower version than the upgraded app. Both managed installations must be empty and unlaunched.
+Their initial APK version must allow an ordinary ascending installation of the baseline and
+candidate; the harness never clears app data or enables downgrades.
+
+The mode-`0600` fixture JSON selects `baselineVersion` 205, `baselineSchema` 55, a higher
+`candidateVersion`, and `candidateSchema` 57. Its `baselineApp`, `baselineProbe`, and `candidateApp`
+objects each contain an absolute `path` and the reviewed APK's `sha256`. Preserve the original
+released-source APK and build receipt before adding instrumentation. The controller supplies the
+current candidate probe, and the child pins and rechecks the additional APKs before installation.
+These debug-signed builds establish released-source compatibility; they do not establish a
+Play-signed installation or Google-provider acceptance.
+
+Read-only comparisons retain encryption keys, journal owner, creation/capture timestamps,
+deletions, outbox operation identities, and both editor draft stores. Media-path normalization
+permits equivalent local and portable references without ignoring draft metadata. The source
+keeps its device ID; the destination gets a distinct ID that survives restart. Unfinished recording
+metadata survives while cache recording bytes stay outside native backup. Compare all retained
+state before existing verification helpers create an offline edit, then check original media bytes,
+media-key decryption, and the normal Timeline launch. Duplicate delivery and a cold restart must
+pass independently on the destination.
 
 ### Privacy metadata during partial delivery
 

@@ -64,7 +64,7 @@ if [[ -z "$message" ]]; then
     exit 1
 fi
 
-title="$(echo "$message" | head -n 1)"
+title="${message%%$'\n'*}"
 errors=()
 
 # Skip merge/fixup/squash commits.
@@ -124,7 +124,7 @@ while IFS= read -r line; do
     if [[ $line_len -gt $MAX_BODY_LINE_LENGTH ]]; then
         errors+=("LENGTH: Body line $line_number is $line_len chars (max $MAX_BODY_LINE_LENGTH).")
     fi
-done < <(echo "$message" | tail -n +2)
+done < <(tail -n +2 <<< "$message")
 
 if echo "$title" | grep -qE "^($VALID_TYPES)\([^)]+\)!?: .+"; then
     scope="$(echo "$title" | sed -E "s/^($VALID_TYPES)\(([^)]+)\)!?: .*/\2/")"
@@ -136,7 +136,7 @@ if echo "$title" | grep -qE "^($VALID_TYPES)\([^)]+\)!?: .+"; then
     fi
 fi
 
-if echo "$message" | grep -qiE "phase[[:space:]]+[0-9]"; then
+if grep -qiE "phase[[:space:]]+[0-9]" <<< "$message"; then
     errors+=("PHASE: Phase numbers are forbidden in commit messages.")
 fi
 

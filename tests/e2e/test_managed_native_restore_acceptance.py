@@ -97,6 +97,18 @@ class ManagedDriverControllerTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE["scenario_command"]("enrollment", "s", "d", Path("a"), Path("b"), Path("c"), [])
 
+    def test_released_upgrade_uses_owned_pair_pinned_probe_and_private_artifact_fixture(self):
+        command = MODULE["scenario_command"]("upgrade", "emulator-5556", "emulator-5558", Path("/pinned/app.apk"),
+                                              Path("/pinned/probe.apk"), Path("/private/results"), [],
+                                              fixture_environment=Path("/private/compatibility.json"))
+        self.assertTrue(command[1].endswith("native-released-upgrade-acceptance.py"))
+        self.assertIn("--seed-empty-source", command)
+        self.assertEqual("/private/compatibility.json", command[command.index("--fixture-environment") + 1])
+        self.assertEqual("/pinned/probe.apk", command[command.index("--test-apk") + 1])
+        self.assertTrue(MODULE["acceptance_receipt"]("upgrade", [], [])["crossDeviceTransferAccepted"])
+        with self.assertRaises(ValueError):
+            MODULE["scenario_command"]("upgrade", "s", "d", Path("/a"), Path("/b"), Path("/c"), [])
+
     def test_publication_mode_uses_the_existing_restore_and_trust_oracles(self):
         command = MODULE["scenario_command"]("publication", "emulator-5556", "emulator-5558", Path("/pinned/app.apk"),
                                               Path("/pinned/probe.apk"), Path("/private/results"), [])
@@ -105,12 +117,32 @@ class ManagedDriverControllerTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE["scenario_command"]("publication", "emulator-5556", "emulator-5558", Path("a"), Path("b"), Path("c"), ["--exercise-quota"])
 
+    def test_enrollment_keeps_server_and_outer_driver_alive_for_all_draft_phases(self):
+        budget = MODULE["acceptance_budget"](0, mode="enrollment")
+        self.assertEqual(1800, budget["native"])
+        self.assertGreaterEqual(budget["driverMillis"], 1000 * (budget["boot"] + budget["native"] + budget["teardown"]))
+        self.assertEqual(1200, MODULE["acceptance_budget"](0, mode="transfer")["native"])
+
+    def test_oversized_combined_profiles_fail_before_starting_gradle(self):
+        with self.assertRaises(ValueError):
+            MODULE["acceptance_budget"](5, mode="enrollment")
+        self.assertLessEqual(MODULE["acceptance_budget"](4, mode="enrollment")["driverMillis"], 90 * 60_000)
+
     def test_driver_lifetime_covers_all_host_phases_and_peer_boot_skew(self):
         for count in (0, 1, 3):
             with self.subTest(count=count):
                 budget = MODULE["acceptance_budget"](count)
                 self.assertGreaterEqual(budget["driverMillis"],
                                         1000 * (budget["boot"] + budget["native"] + count * budget["followup"] + budget["teardown"]))
+
+    def test_upgrade_followups_cannot_reinstall_the_initial_lower_version(self):
+        MODULE["validate_followups"]("upgrade", [])
+        for followups in (["storage"], ["missing-media", "ui"]):
+            with self.subTest(followups=followups), self.assertRaises(ValueError):
+                MODULE["validate_followups"]("upgrade", followups)
+        MODULE["validate_followups"]("enrollment", ["storage", "ui"])
+        with self.assertRaises(ValueError):
+            MODULE["validate_followups"]("transfer", ["ui", "ui"])
 
     def test_followups_keep_the_owned_target_and_pinned_artifacts(self):
         command = MODULE["followup_command"]("missing-media", "emulator-5558", Path("/pinned/app.apk"),
