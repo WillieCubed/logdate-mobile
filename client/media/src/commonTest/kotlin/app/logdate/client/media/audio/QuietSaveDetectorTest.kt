@@ -6,6 +6,52 @@ import kotlin.test.assertTrue
 
 class QuietSaveDetectorTest {
     @Test
+    fun `sound resets both clocks even when the encoder is behind`() {
+        val detector = QuietSaveDetector()
+        for (time in 0L..89_900L step 100) {
+            assertFalse(detector.observe(0f, time, capturedAudioMs = time / 3))
+        }
+        assertFalse(detector.observe(0.04f, 90_000, capturedAudioMs = 30_000))
+        for (time in 90_100L..210_000L step 100) {
+            assertFalse(detector.observe(0f, time, capturedAudioMs = time - 60_000))
+        }
+        assertTrue(detector.observe(0f, 210_100, capturedAudioMs = 150_100))
+    }
+
+    @Test
+    fun `encoder backlog cannot finish a quiet window before its audio is written`() {
+        val detector = QuietSaveDetector()
+        for (time in 0L..119_900L step 100) {
+            assertFalse(detector.observe(0f, time, capturedAudioMs = minOf(time, 116_000)))
+        }
+        assertFalse(detector.observe(0f, 120_000, capturedAudioMs = 116_000))
+        for (time in 120_100L..123_900L step 100) {
+            assertFalse(detector.observe(0f, time, capturedAudioMs = time - 4_000))
+        }
+        assertTrue(detector.observe(0f, 124_000, capturedAudioMs = 120_000))
+    }
+
+    @Test
+    fun `encoded audio cannot shorten the elapsed quiet window when it catches up`() {
+        val detector = QuietSaveDetector()
+        for (time in 0L..119_900L step 100) {
+            assertFalse(detector.observe(0f, time, capturedAudioMs = time * 2))
+        }
+        assertTrue(detector.observe(0f, 120_000, capturedAudioMs = 240_000))
+    }
+
+    @Test
+    fun `a replaced audio stream starts a fresh quiet window`() {
+        val detector = QuietSaveDetector()
+        for (time in 0L..119_900L step 100) assertFalse(detector.observe(0f, time, capturedAudioMs = time))
+        assertFalse(detector.observe(0f, 120_000, capturedAudioMs = 0))
+        for (time in 120_100L..239_900L step 100) {
+            assertFalse(detector.observe(0f, time, capturedAudioMs = time - 120_000))
+        }
+        assertTrue(detector.observe(0f, 240_000, capturedAudioMs = 120_000))
+    }
+
+    @Test
     fun `an automatic microphone change starts a new window`() {
         val detector = QuietSaveDetector()
         for (time in 0L..119_900L step 100) assertFalse(detector.observe(0f, time, "bluetooth"))

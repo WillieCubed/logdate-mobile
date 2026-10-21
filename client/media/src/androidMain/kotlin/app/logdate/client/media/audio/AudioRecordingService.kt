@@ -367,7 +367,7 @@ class AudioRecordingService : Service() {
                     )
                 }
                 publishInputRoute(recorder)
-                monitorRecording()
+                monitorRecording(requireNotNull(recordingFile))
                 Napier.d("Recording started successfully")
             } catch (e: Exception) {
                 Napier.e("Failed to start recording", e)
