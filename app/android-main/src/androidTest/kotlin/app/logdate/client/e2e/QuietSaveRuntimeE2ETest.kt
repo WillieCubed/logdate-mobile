@@ -7,7 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import androidx.lifecycle.ViewModelProvider
+import android.os.SystemClock
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -45,6 +45,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.androidx.viewmodel.ext.android.getViewModel
 import org.koin.core.context.GlobalContext
 import java.io.File
 import kotlin.time.Clock
@@ -61,12 +62,19 @@ class QuietSaveRuntimeE2ETest {
         )
 
     @Test
-    fun nativeQuietRecordingIsSavedWhileLockedAndOpensFromItsNotification() =
+    fun nativeQuietRecordingIsSavedWhileLockedAndOpensFromItsNotification() = verifyQuietRecording(injectEncoderBackpressure = false)
+
+    @Test
+    fun encoderBackpressureCannotShortenTheSavedQuietWindow() = verifyQuietRecording(injectEncoderBackpressure = true)
+
+    private fun verifyQuietRecording(injectEncoderBackpressure: Boolean) =
         runBlocking<Unit> {
             check(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") { "Quiet Save acceptance requires an emulator" }
             val context = ApplicationProvider.getApplicationContext<Context>()
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             val scenario = ActivityScenario.launch(EditorActivity::class.java)
+            var durationEvidence: QuietSaveDurationEvidence? = null
+            var encoderBackpressure: QuietSaveEncoderBackpressure? = null
             try {
                 val koin = GlobalContext.get()
                 val flags = koin.get<FeatureFlagStore>()
@@ -105,7 +113,9 @@ class QuietSaveRuntimeE2ETest {
                             ),
                         ),
                     )
+                val recordingStartedAt = SystemClock.elapsedRealtime()
                 assertTrue(recorder.startRecording(blockId))
+                val confirmedAt = SystemClock.elapsedRealtime()
                 InstrumentationRegistry.getInstrumentation().sendStatus(
                     2,
                     Bundle().apply { putString("stream", "QUIET_SAVE_RECORDING_STARTED\n") },
@@ -118,6 +128,13 @@ class QuietSaveRuntimeE2ETest {
                         .pendingMedia
                         .single()
                 assertNotNull(active.filePath)
+                durationEvidence =
+                    QuietSaveDurationEvidence(
+                        File(checkNotNull(active.filePath)),
+                        recordingStartedAt,
+                        if (injectEncoderBackpressure) "encoder-backpressure" else "quiet-recording",
+                    )
+                if (injectEncoderBackpressure && !optOut) encoderBackpressure = QuietSaveEncoderBackpressure(confirmedAt)
                 if (!optOut) {
                     val draftIntent =
                         Intent(context, EditorActivity::class.java)
@@ -126,7 +143,7 @@ class QuietSaveRuntimeE2ETest {
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     val draftEditor = ActivityScenario.launch<EditorActivity>(draftIntent)
                     val editor = CompletableDeferred<EntryEditorViewModel>()
-                    draftEditor.onActivity { editor.complete(ViewModelProvider(it)[EntryEditorViewModel::class.java]) }
+                    draftEditor.onActivity { editor.complete(it.getViewModel<EntryEditorViewModel>()) }
                     val loaded =
                         withTimeoutOrNull(15_000) {
                             editor.await().editorState.first { state ->
@@ -176,8 +193,10 @@ class QuietSaveRuntimeE2ETest {
                 assertEquals(blockId, audio.uid)
                 assertTrue(File(audio.mediaRef).length() > 0)
                 val retainedDuration = koin.get<AudioDurationResolver>().resolveDurationMs(audio.mediaRef) ?: 0
+                val evidence = durationEvidence.verify(File(audio.mediaRef), retainedDuration)
+                encoderBackpressure?.assertApplied()
                 assertTrue(
-                    "Quiet Save retained ${retainedDuration}ms of audio; expected at least ${minimumDuration}ms",
+                    "Native capture retained ${retainedDuration}ms; expected at least ${minimumDuration}ms. $evidence",
                     retainedDuration >= minimumDuration,
                 )
                 if (!expectNotification) {
@@ -237,6 +256,8 @@ class QuietSaveRuntimeE2ETest {
                 File(audio.mediaRef).copyTo(File(context.getExternalFilesDir(null), "quiet-save-recording.m4a"), overwrite = true)
                 returnedHome.close()
             } finally {
+                encoderBackpressure?.close()
+                durationEvidence?.close()
                 device.wakeUp()
                 scenario.close()
             }

@@ -45,6 +45,13 @@ background estimate adapts to low room noise without rising above that ceiling.
 A missing, invalid, or more than one-second-late observation starts a new window.
 These thresholds identify quiet; they do not identify speech or sleep.
 
+For crash-safe Android recordings, the quiet window must also contain two minutes
+of completed AAC frames. An encoder delay can make elapsed time run ahead of the
+audio written to disk. Quiet Save waits for both timelines before stopping, so
+time spent waiting for the encoder does not count as completed audio.
+Incomplete trailing frames wait for their remaining bytes; unreadable encoded
+progress cannot trigger automatic stopping.
+
 `QuietSaveDetectorTest` covers the exact two-minute boundary, room noise, soft
 speech, sustained sound, interrupted input, and resets. Recording lifecycle tests
 cover preparation before microphone capture, checkpointing, overlapping stop
@@ -60,6 +67,19 @@ injection before the first quiet window ends. `logdate.quietSaveNotification=fal
 checks saving with notification permission denied; `logdate.quietSaveOptOut=true`
 checks that intentional recording continues beyond two minutes of quiet.
 Notification permission must match the selected scenario before starting the test.
+
+The runtime test retains the source AAC and saved M4A in the Managed Device's
+additional test output. It compares the count and ordered payloads of their AAC
+frames, checks the reported duration against the captured samples, and separately
+requires the minimum native recording duration. Start-to-publication elapsed time
+is diagnostic; it includes startup and finalization. `QuietSaveAudioRetentionTest`
+checks complete capture, truncated output, and incorrect duration metadata with
+deterministic AAC fixtures.
+
+The runtime suite also delays the Managed Device's software encoder across the
+quiet deadline and verifies the saved duration with the same minimum bound.
+This regression requires a rooted Gradle Managed Device and resumes the encoder
+in cleanup, including when the test fails.
 
 `QuietSaveRecoveryE2ETest` has two phases. Run
 `prepareRecordingForProcessTermination`, terminate the emulator app after its ready

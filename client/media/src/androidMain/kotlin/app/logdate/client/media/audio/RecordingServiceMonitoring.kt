@@ -15,50 +15,42 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /** Polls the input level and advances the elapsed time while the recorder runs. */
-internal fun AudioRecordingService.monitorRecording() {
+internal fun AudioRecordingService.monitorRecording(captureFile: File) {
     val generation = sessionGeneration
     serviceScope.launch {
-        while (mutableRecordingState.value.isRecording && sessionGeneration == generation) {
-            if (!isPaused) {
-                if (options.holdWakeLock && android.os.SystemClock.elapsedRealtime() - wakeLockAcquiredAt >= 15 * 60_000L) {
-                    acquireWakeLock()
-                }
-                val amplitude =
-                    try {
+        val progress = openCaptureProgress(captureFile)
+        try {
+            while (mutableRecordingState.value.isRecording && sessionGeneration == generation) {
+                if (!isPaused) {
+                    if (options.holdWakeLock && android.os.SystemClock.elapsedRealtime() - wakeLockAcquiredAt >= 15 * 60_000L) {
+                        acquireWakeLock()
+                    }
+                    val level = readAudioLevel()
+                    mutableRecordingState.update { it.copy(audioLevel = level ?: 0f) }
+                    val elapsedMs = android.os.SystemClock.elapsedRealtime()
+                    val capturedMs = capturedAudioDuration(progress, elapsedMs)
+                    if (options.quietSave &&
                         synchronized(recorderLock) {
-                            val recorder = mediaRecorder
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                                recorder?.activeRecordingConfiguration?.isClientSilenced == true
-                            ) {
-                                null
-                            } else {
-                                recorder?.maxAmplitude
-                            }
+                            quietSaveDetector.observe(
+                                level.takeIf { capturedMs != null },
+                                elapsedMs,
+                                mutableRecordingState.value.routedInputDeviceId,
+                                capturedAudioMs = capturedMs ?: 0L,
+                            )
                         }
-                    } catch (e: Exception) {
-                        Napier.e("Error getting audio level", e)
-                        null
+                    ) {
+                        synchronized(recorderLock) {
+                            if (sessionGeneration != generation || !mutableRecordingState.value.isRecording || isPaused) return@launch
+                            mutableRecordingState.update { it.copy(quietSaveTriggered = true) }
+                            stopRecordingLocked()
+                        }
+                        break
                     }
-                val level = amplitude?.let { (it / MAX_AMPLITUDE).coerceIn(0f, 1f) }
-                mutableRecordingState.update { it.copy(audioLevel = level ?: 0f) }
-                if (options.quietSave &&
-                    synchronized(recorderLock) {
-                        quietSaveDetector.observe(
-                            level,
-                            android.os.SystemClock.elapsedRealtime(),
-                            mutableRecordingState.value.routedInputDeviceId,
-                        )
-                    }
-                ) {
-                    synchronized(recorderLock) {
-                        if (sessionGeneration != generation || !mutableRecordingState.value.isRecording || isPaused) return@launch
-                        mutableRecordingState.update { it.copy(quietSaveTriggered = true) }
-                        stopRecordingLocked()
-                    }
-                    break
                 }
+                delay(LEVEL_POLL_INTERVAL_MS)
             }
-            delay(LEVEL_POLL_INTERVAL_MS)
+        } finally {
+            progress?.close()
         }
     }
     serviceScope.launch {
@@ -73,6 +65,48 @@ internal fun AudioRecordingService.monitorRecording() {
         }
     }
 }
+
+private fun AudioRecordingService.readAudioLevel(): Float? =
+    try {
+        synchronized(recorderLock) {
+            val recorder = mediaRecorder
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && recorder?.activeRecordingConfiguration?.isClientSilenced == true) {
+                null
+            } else {
+                recorder?.maxAmplitude?.let { (it / MAX_AMPLITUDE).coerceIn(0f, 1f) }
+            }
+        }
+    } catch (error: Exception) {
+        Napier.e("Error getting audio level", error)
+        null
+    }
+
+private fun AudioRecordingService.openCaptureProgress(file: File): AdtsRecordingProgress? =
+    if (!options.quietSave || !options.crashSafe) {
+        null
+    } else {
+        try {
+            AdtsRecordingProgress(file)
+        } catch (error: Exception) {
+            Napier.e("Could not read encoded recording progress", error)
+            null
+        }
+    }
+
+private fun AudioRecordingService.capturedAudioDuration(
+    progress: AdtsRecordingProgress?,
+    elapsedMs: Long,
+): Long? =
+    if (!options.crashSafe || !options.quietSave) {
+        elapsedMs
+    } else {
+        try {
+            progress?.capturedDurationMs()
+        } catch (error: Exception) {
+            Napier.e("Could not read encoded recording progress", error)
+            null
+        }
+    }
 
 internal fun AudioRecordingService.createRecorder(
     file: File,
