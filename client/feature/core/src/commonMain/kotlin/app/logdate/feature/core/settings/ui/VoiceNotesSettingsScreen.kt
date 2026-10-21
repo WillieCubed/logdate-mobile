@@ -129,8 +129,10 @@ fun VoiceNotesSettingsContent(
                 onBack = onBack,
                 modifier = modifier,
             ) {
-                item {
-                    QuietSaveSettingsSection(state, onQuietSaveChanged, Modifier.padding(horizontal = Spacing.lg))
+                if (state.quietSaveAvailable) {
+                    item {
+                        QuietSaveSettingsSection(state, onQuietSaveChanged, Modifier.padding(horizontal = Spacing.lg))
+                    }
                 }
                 item {
                     Text(
