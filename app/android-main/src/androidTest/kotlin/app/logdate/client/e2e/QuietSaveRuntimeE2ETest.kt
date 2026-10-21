@@ -175,7 +175,11 @@ class QuietSaveRuntimeE2ETest {
                 val audio = saved.notes.filterIsInstance<JournalNote.Audio>().single()
                 assertEquals(blockId, audio.uid)
                 assertTrue(File(audio.mediaRef).length() > 0)
-                assertTrue((koin.get<AudioDurationResolver>().resolveDurationMs(audio.mediaRef) ?: 0) >= minimumDuration)
+                val retainedDuration = koin.get<AudioDurationResolver>().resolveDurationMs(audio.mediaRef) ?: 0
+                assertTrue(
+                    "Quiet Save retained ${retainedDuration}ms of audio; expected at least ${minimumDuration}ms",
+                    retainedDuration >= minimumDuration,
+                )
                 if (!expectNotification) {
                     assertTrue(
                         context.getSystemService(NotificationManager::class.java).activeNotifications.none {
