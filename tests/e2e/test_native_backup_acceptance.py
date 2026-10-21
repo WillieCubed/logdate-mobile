@@ -250,13 +250,51 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
 
         self.assertIsNone(target)
 
+    def test_process_system_anr_has_an_android_wait_control(self):
+        hierarchy = (
+            '<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            'text="Process system isn&#x27;t responding"/><node package="android" '
+            'resource-id="android:id/aerr_wait" bounds="[70,1028][1010,1154]"/></hierarchy>'
+        )
+        self.assertTrue(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_dialog_present(hierarchy))
+        self.assertEqual((540, 1091), NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(hierarchy))
+        no_wait = hierarchy.replace("android:id/aerr_wait", "android:id/other")
+        self.assertTrue(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_dialog_present(no_wait))
+        self.assertIsNone(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(no_wait))
+        app_owned = hierarchy.replace('package="android"', 'package="studio.hypertext.logdate.debug"')
+        self.assertFalse(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_dialog_present(app_owned))
+        self.assertIsNone(NATIVE_BACKUP_ACCEPTANCE.system_ui_unresponsive_wait_target(app_owned))
+
+    def test_timeline_poll_rejects_an_app_anr_even_with_timeline_content_behind_it(self):
+        hierarchy = (
+            b'<hierarchy><node package="android" resource-id="android:id/alertTitle" '
+            b'text="LogDate isn&#x27;t responding"/><node package="android" '
+            b'resource-id="android:id/aerr_wait" bounds="[70,1028][1010,1154]"/>'
+            b'<node text="Search your log"/><node text="Timeline"/></hierarchy>'
+        )
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE,
+            "adb",
+            side_effect=[b"", b"", b"UI hierarchy dumped to: /data/local/tmp/ui.xml", hierarchy, b"app ANR"],
+        ) as adb:
+            with self.assertRaisesRegex(RuntimeError, "replacement app did not open its Timeline"):
+                NATIVE_BACKUP_ACCEPTANCE.wait_for_timeline("emulator-5582", Path(temporary), timeout_seconds=0)
+            self.assertEqual(5, adb.call_count)
+
+    def test_timeline_poll_waits_for_process_system_recovery_then_rechecks_content(self):
+        self.assert_system_anr_recovery("Process system")
+
     def test_timeline_poll_waits_for_system_ui_recovery_then_rechecks_content(self):
+        self.assert_system_anr_recovery("System UI")
+
+    def assert_system_anr_recovery(self, title):
         system_ui_dialog = (
             b'<hierarchy><node package="android" resource-id="android:id/alertTitle" '
             b'text="System UI isn&#x27;t responding"/><node package="android" '
             b'resource-id="android:id/aerr_wait" bounds="[70,1028][1010,1154]"/>'
             b'<node text="Search your log"/><node text="Timeline"/></hierarchy>'
         )
+        system_ui_dialog = system_ui_dialog.replace(b"System UI", title.encode())
         timeline = b'<hierarchy><node text="Search your log"/><node text="Timeline"/></hierarchy>'
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             NATIVE_BACKUP_ACCEPTANCE,

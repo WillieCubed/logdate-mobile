@@ -97,8 +97,9 @@ PY
 python3 "$TMP_DIR/stub.py" "$STUB_CONFIG" "$STUB_PORT_FILE" &
 STUB_PID=$!
 
-for _ in $(seq 1 50); do
+for _ in $(seq 1 300); do
     [[ -s "$STUB_PORT_FILE" ]] && break
+    kill -0 "$STUB_PID" 2>/dev/null || fail "stub server exited before binding"
     sleep 0.1
 done
 [[ -s "$STUB_PORT_FILE" ]] || fail "stub server did not start"
