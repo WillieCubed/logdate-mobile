@@ -78,10 +78,11 @@ def restore_radio_state(serial, original):
     adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable" if airplane else "disable")
     adb(serial, "shell", "svc", "wifi", "disable" if wifi == b"0" else "enable")
     for _ in range(20):
-        if radio_state(serial) == original:
+        observed = radio_state(serial)
+        if observed == original:
             return
         time.sleep(0.25)
-    raise RuntimeError("Could not restore the emulator's original network state")
+    raise RuntimeError(f"Could not restore the emulator's original network state: expected {original!r}, observed {observed!r}")
 
 
 def main():

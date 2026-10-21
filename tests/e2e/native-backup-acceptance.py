@@ -791,7 +791,12 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
     result = adb(serial, *arguments)
     private_file(output, result)
     if not instrumentation_passed(result):
-        raise RuntimeError(f"native {mode} probe failed; inspect {output}")
+        failure = RuntimeError(f"native {mode} probe failed; inspect {output}")
+        try:
+            private_file(output.with_suffix(".logcat.log"), adb(serial, "logcat", "-d", "-b", "crash", "-v", "threadtime"))
+        except Exception as error:
+            failure.add_note(f"Crash diagnostics could not be collected: {error}")
+        raise failure
 
 
 def verify_restarted_content(serial, output, metadata, identity):
