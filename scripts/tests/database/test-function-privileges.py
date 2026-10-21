@@ -1,6 +1,7 @@
 """Exercise the reader boundary and account triggers on disposable PostgreSQL."""
 from pathlib import Path
 import os
+import json
 import subprocess
 import time
 import unittest
@@ -15,21 +16,37 @@ class FunctionPrivilegesPostgresTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.container = 'logdate-reader-test-' + uuid.uuid4().hex[:12]
-        subprocess.run([
-            'docker', 'run', '--detach', '--rm', '--name', cls.container,
-            '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
-            os.environ.get('LOGDATE_TEST_POSTGRES_IMAGE', 'postgres:18-alpine'),
-        ], check=True, capture_output=True, text=True)
+        image = os.environ.get('LOGDATE_TEST_POSTGRES_IMAGE', 'postgres:18-alpine')
+        config = json.loads(subprocess.run(
+            ['docker', 'image', 'inspect', image, '--format', '{{json .Config}}'],
+            check=True, capture_output=True, text=True, timeout=10).stdout)
+        volumes = list(config.get('Volumes') or {})
+        if len(volumes) != 1 or volumes[0] not in ('/var/lib/postgresql', '/var/lib/postgresql/data'):
+            raise RuntimeError('Use a cached official PostgreSQL image with one supported data volume')
+        started = subprocess.run([
+            'docker', 'run', '--detach', '--rm', '--pull=never', '--name', cls.container,
+            '--cpus=1', '--memory=256m', '--memory-swap=256m', '--shm-size=16m',
+            '--pids-limit=128', '--network=none',
+            '--tmpfs', volumes[0]+':rw,size=96m',
+            '--log-driver=json-file', '--log-opt=max-size=1m', '--log-opt=max-file=1', '--entrypoint=timeout',
+            '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', image,
+            '-k', '5', '90', 'docker-entrypoint.sh', 'postgres',
+            '-c', 'shared_buffers=16MB', '-c', 'max_connections=10', '-c', 'statement_timeout=10000',
+        ], capture_output=True, text=True, timeout=20)
+        if started.returncode:
+            subprocess.run(['docker', 'rm', '--force', cls.container], capture_output=True, timeout=10)
+            raise RuntimeError('Disposable PostgreSQL could not start: '+started.stderr.strip())
         cls.addClassCleanup(subprocess.run, ['docker', 'rm', '--force', cls.container],
-                            check=True, capture_output=True, text=True)
-        for _ in range(60):
+                            check=True, capture_output=True, text=True, timeout=10)
+        deadline = time.monotonic()+20
+        while time.monotonic() < deadline:
             ready = subprocess.run(['docker', 'exec', cls.container, 'pg_isready', '-h', '127.0.0.1', '-U', 'postgres'],
-                                   capture_output=True)
+                                   capture_output=True, timeout=3)
             if ready.returncode == 0:
                 break
             time.sleep(0.2)
         else:
-            raise RuntimeError('Disposable PostgreSQL did not become ready')
+            raise RuntimeError('Disposable PostgreSQL did not become ready within 20 seconds')
         cls.execute('CREATE ROLE app_owner LOGIN; CREATE ROLE named_executor; '
                     'CREATE ROLE reporting_reader; CREATE DATABASE boundary OWNER app_owner;')
         cls.execute('SET ROLE app_owner; GRANT USAGE ON SCHEMA public TO named_executor, reporting_reader; '
@@ -51,7 +68,7 @@ class FunctionPrivilegesPostgresTest(unittest.TestCase):
     def execute(cls, statement, database='postgres', check=True):
         result = subprocess.run(['docker', 'exec', '-i', cls.container, 'psql', '-X', '-A', '-t',
                                  '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', database],
-                                input=statement, capture_output=True, text=True)
+                                input=statement, capture_output=True, text=True, timeout=15)
         if check and result.returncode:
             raise AssertionError(result.stderr)
         return result
