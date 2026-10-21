@@ -12,6 +12,7 @@ import app.logdate.client.notifications.FLOAT_RECORDER_RECEIVER_CLASS
 import app.logdate.client.notifications.LiveUpdateChip
 import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.client.notifications.RecordingBubbleSwitch
 import app.logdate.client.notifications.recordingLiveUpdate
 import io.github.aakira.napier.Napier
@@ -89,6 +90,7 @@ class AndroidAudioNotificationHandler(
         startTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
         recordedMillis: Long = 0L,
     ): Notification {
+        LogDateNotificationRegistrar(context).registerChannel(LogDateNotificationChannelKey.AUDIO_RECORDING)
         val titleRes =
             if (isRecording) {
                 R.string.audio_recording_notification_title
