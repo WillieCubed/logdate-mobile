@@ -610,12 +610,20 @@ def radio_state(serial):
 
 
 def timeline_is_open(hierarchy):
-    texts = {node.get("text") for node in ET.fromstring(hierarchy).iter("node")}
+    nodes = list(ET.fromstring(hierarchy).iter("node"))
+    if any(
+        node.get("package") == "android"
+        and node.get("resource-id") == "android:id/alertTitle"
+        and (node.get("text") or "").endswith("isn't responding")
+        for node in nodes
+    ):
+        return False
+    texts = {node.get("text") for node in nodes}
     return "Search your log" in texts and "Timeline" in texts
 
 
 def system_ui_unresponsive_dialog_present(hierarchy):
-    """Detect Android's transient System UI ANR even when its Wait control is absent."""
+    """Detect Android's transient system ANR even when its Wait control is absent."""
     try:
         nodes = ET.fromstring(hierarchy).iter("node")
     except ET.ParseError:
@@ -623,24 +631,24 @@ def system_ui_unresponsive_dialog_present(hierarchy):
     return any(
         node.get("package") == "android"
         and node.get("resource-id") == "android:id/alertTitle"
-        and node.get("text") == "System UI isn't responding"
+        and node.get("text") in ("System UI isn't responding", "Process system isn't responding")
         for node in nodes
     )
 
 
 def system_ui_unresponsive_wait_target(hierarchy):
-    """Return Android's Wait button only for its transient System UI ANR dialog."""
+    """Return Android's Wait button only for a known system ANR dialog."""
     try:
         nodes = list(ET.fromstring(hierarchy).iter("node"))
     except ET.ParseError:
         return None
-    has_system_ui_anr = any(
+    has_system_anr = any(
         node.get("package") == "android"
         and node.get("resource-id") == "android:id/alertTitle"
-        and node.get("text") == "System UI isn't responding"
+        and node.get("text") in ("System UI isn't responding", "Process system isn't responding")
         for node in nodes
     )
-    if not has_system_ui_anr:
+    if not has_system_anr:
         return None
     for node in nodes:
         if node.get("package") != "android" or node.get("resource-id") != "android:id/aerr_wait":
@@ -712,7 +720,7 @@ def wait_for_timeline(serial, output, timeout_seconds=60, prefix="destination"):
             overwrite_private_file(screenshot_path, screenshot)
             wait_target = system_ui_unresponsive_wait_target(hierarchy)
             if wait_target is not None:
-                print("Waiting for Android System UI to recover over the restored Timeline", flush=True)
+                print("Waiting for Android system services to recover over the restored Timeline", flush=True)
                 adb(serial, "shell", "input", "tap", str(wait_target[0]), str(wait_target[1]))
                 time.sleep(0.25)
             elif system_ui_unresponsive_dialog_present(hierarchy):
