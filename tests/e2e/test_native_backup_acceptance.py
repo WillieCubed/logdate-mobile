@@ -381,6 +381,21 @@ class NativeTimelineSystemDialogTest(unittest.TestCase):
         self.assertIsNone(target)
 
 
+class NativeProbeDiagnosticsTest(unittest.TestCase):
+    @patch.object(NATIVE_BACKUP_ACCEPTANCE, "adb", side_effect=[
+        b"INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nINSTRUMENTATION_CODE: 0\n",
+        b"synthetic fatal exception\n",
+    ])
+    def test_failed_probe_retains_crash_diagnostics_and_still_fails(self, adb):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "source-recording-policy.log"
+            with self.assertRaisesRegex(RuntimeError, "native recording-policy probe failed"):
+                NATIVE_BACKUP_ACCEPTANCE.probe("emulator-5554", "recording-policy", output)
+            self.assertEqual(b"synthetic fatal exception\n", output.with_suffix(".logcat.log").read_bytes())
+            self.assertEqual(0o600, output.with_suffix(".logcat.log").stat().st_mode & 0o777)
+            self.assertEqual(call("emulator-5554", "logcat", "-d", "-b", "crash", "-v", "threadtime"), adb.call_args_list[-1])
+
+
 class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
     @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb", return_value=b"OK (1 test)")
     def test_targets_only_the_explicit_emulator_and_records_probe_output(self, adb):
@@ -436,6 +451,13 @@ class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
             NATIVE_RESTORE_WORK_ACCEPTANCE.restore_radio_state("emulator-5554", (False, b"1"))
 
         self.assertGreater(radio_state.call_count, 1)
+
+    @patch.object(time, "sleep")
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "radio_state", return_value=(True, b"0"))
+    @patch.object(NATIVE_RESTORE_WORK_ACCEPTANCE, "adb")
+    def test_radio_failure_reports_expected_and_observed_state(self, adb, radio_state, sleep):
+        with self.assertRaisesRegex(RuntimeError, "expected.*False.*1.*observed.*True.*0"):
+            NATIVE_RESTORE_WORK_ACCEPTANCE.restore_radio_state("emulator-5554", (False, b"1"))
 
 
 class PartialNativeTransportTest(unittest.TestCase):
