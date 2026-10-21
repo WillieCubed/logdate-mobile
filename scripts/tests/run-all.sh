@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs every repository script test (scripts/tests/**/test-*.sh and *.py) and
-# reports each result. Exits non-zero if any test fails.
+# Runs host script checks and reports each result. Docker-backed database
+# integration checks run in the Linux server/client e2e lane.
 set -uo pipefail
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -20,7 +20,7 @@ while IFS= read -r test; do
         printf '%s\n' "$output" | tail -20 | sed 's/^/      /'
         failed+=("$test")
     fi
-done < <(find scripts/tests -type f \( -name 'test-*.sh' -o -name 'test-*.py' \) | sort)
+done < <(find scripts/tests -path scripts/tests/database -prune -o -type f \( -name 'test-*.sh' -o -name 'test-*.py' \) -print | sort)
 
 printf '\n%d of %d script tests passed\n' "$((count - ${#failed[@]}))" "$count"
 [[ ${#failed[@]} -eq 0 ]]
