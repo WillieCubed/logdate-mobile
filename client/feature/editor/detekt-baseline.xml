@@ -2,8 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>LargeClass:AndroidCameraCaptureManager.kt:AndroidCameraCaptureManager : CameraCaptureManager</ID>
-    <ID>LongMethod:AndroidCameraCaptureManager.kt:AndroidCameraCaptureManager$@RequiresPermission(Manifest.permission.RECORD_AUDIO) override suspend fun startVideoRecording</ID>
     <ID>LongMethod:AndroidCameraCaptureManager.kt:AndroidCameraCaptureManager$override suspend fun switchCamera</ID>
     <ID>LongMethod:AutoSaveHandler.kt:AutoSaveCoordinator$suspend fun save</ID>
     <ID>LongMethod:InlineMarkdown.kt:internal fun parseInlineMarkdown: List&lt;InlineMarkdownSpan></ID>

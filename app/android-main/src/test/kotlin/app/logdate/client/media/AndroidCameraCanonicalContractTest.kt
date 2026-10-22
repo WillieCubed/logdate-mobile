@@ -13,11 +13,12 @@ class AndroidCameraCanonicalContractTest {
     @Test
     fun `camera capture cannot publish directly to media store`() {
         val source =
-            repoRoot
-                .resolve(
-                    "client/feature/editor/src/androidMain/kotlin/app/logdate/feature/editor/ui/camera/" +
-                        "AndroidCameraCaptureManager.kt",
-                ).readText()
+            listOf("AndroidCameraCaptureManager.kt", "AndroidCameraCaptureOutput.kt", "AndroidCameraDeviceSelection.kt")
+                .joinToString("\n") { fileName ->
+                    repoRoot
+                        .resolve("client/feature/editor/src/androidMain/kotlin/app/logdate/feature/editor/ui/camera/$fileName")
+                        .readText()
+                }
         val violations =
             buildList {
                 if ("MediaStore.Images.Media.EXTERNAL_CONTENT_URI" in source) {
