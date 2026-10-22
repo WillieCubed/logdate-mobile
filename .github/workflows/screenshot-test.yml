@@ -14,6 +14,8 @@ on:
       - 'config/workspace/**'
       - 'build-logic/**'
       - '.github/workflows/screenshot-test.yml'
+      - 'scripts/ci/screenshot-build-cache.gradle.kts'
+      - 'scripts/tests/ci/test-acceptance-parallelism.py'
       - 'gradle/**'
   pull_request:
     branches: [main, develop]
@@ -25,6 +27,8 @@ on:
       - 'client/ui/**'
       - 'client/theme/**'
       - '.github/workflows/screenshot-test.yml'
+      - 'scripts/ci/screenshot-build-cache.gradle.kts'
+      - 'scripts/tests/ci/test-acceptance-parallelism.py'
       - 'build-logic/**'
       - 'gradle/**'
       - '*.gradle.kts'
@@ -41,9 +45,77 @@ permissions:
   contents: read
 
 jobs:
+  android-screenshot-compile:
+    name: Compile shared Android screenshot inputs
+    runs-on: macos-latest
+    timeout-minutes: 35
+    env:
+      LOGDATE_CI_BUILD_CACHE_DIR: ${{ github.workspace }}/ci-screenshot-build-cache
+    outputs:
+      artifact_id: ${{ steps.shared-build.outputs.artifact-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          lfs: true
+
+      - name: Materialize Android Firebase config
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6.0.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          distribution: jetbrains
+          java-version: '21'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Fit Gradle memory to the runner
+        # macOS runners have about 7 GB of memory, which cannot hold the local defaults: an
+        # 8 GB Gradle daemon, a 6 GB Kotlin daemon and a 12 GB preview renderer. The renderer
+        # also keeps native memory for every preview until its process exits, and it was
+        # killed partway through the previews. CI compiles first, stops both daemons, and then
+        # renders with a smaller heap in a fresh renderer for each preview class.
+        run: |
+          gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+          mkdir -p "$gradle_home"
+          {
+            echo 'org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1536M -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED'
+            echo 'kotlin.daemon.jvmargs=-Xmx3g'
+            echo 'logdate.screenshotTest.maxHeap=3g'
+            echo 'logdate.screenshotTest.forkEvery=1'
+          } >> "$gradle_home/gradle.properties"
+
+      - name: Compile Android screenshot inputs once
+        run: >-
+          ./gradlew :app:android-main:compileDebugScreenshotTestKotlin
+          --init-script scripts/ci/screenshot-build-cache.gradle.kts --build-cache
+
+      - name: Share same-run Android compilation cache
+        id: shared-build
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: android-screenshot-build-cache-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ env.LOGDATE_CI_BUILD_CACHE_DIR }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
   android-wear-screenshots:
     name: ${{ matrix.platform }} screenshots${{ matrix.shard && format(' ({0})', matrix.shard) || '' }}
     runs-on: ${{ matrix.runner }}
+    needs: android-screenshot-compile
+    env:
+      LOGDATE_CI_BUILD_CACHE_DIR: ${{ github.workspace }}/ci-screenshot-build-cache
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -71,11 +143,6 @@ jobs:
             shard: remaining
             module: android-main
             exclude: app.logdate.screenshots.audit.*,app.logdate.screenshots.components.*
-            runner: macos-latest
-            distribution: jetbrains
-            java-version: '21'
-          - platform: Wear
-            module: wear
             runner: macos-latest
             distribution: jetbrains
             java-version: '21'
@@ -121,8 +188,21 @@ jobs:
             echo 'logdate.screenshotTest.forkEvery=1'
           } >> "$gradle_home/gradle.properties"
 
-      - name: Compile ${{ matrix.platform }} screenshot tests
-        run: ./gradlew :app:${{ matrix.module }}:compileDebugScreenshotTestKotlin
+      - name: Verify same-run build artifact binding
+        env:
+          ARTIFACT_ID: ${{ needs.android-screenshot-compile.outputs.artifact_id }}
+        run: '[[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
+
+      - name: Restore same-run Android compilation cache
+        uses: actions/download-artifact@v8.0.1
+        with:
+          artifact-ids: ${{ needs.android-screenshot-compile.outputs.artifact_id }}
+          path: ${{ env.LOGDATE_CI_BUILD_CACHE_DIR }}
+
+      - name: Restore compiled Android screenshot inputs
+        run: >-
+          ./gradlew :app:android-main:compileDebugScreenshotTestKotlin
+          --init-script scripts/ci/screenshot-build-cache.gradle.kts --build-cache
 
       - name: Release compiler memory
         run: |
@@ -141,7 +221,7 @@ jobs:
           shard_args=()
           if [ -n "$SCREENSHOT_INCLUDE" ]; then shard_args+=("-Plogdate.screenshotTest.include=$SCREENSHOT_INCLUDE"); fi
           if [ -n "$SCREENSHOT_EXCLUDE" ]; then shard_args+=("-Plogdate.screenshotTest.exclude=$SCREENSHOT_EXCLUDE"); fi
-          ./gradlew :app:${{ matrix.module }}:validateDebugScreenshotTest --continue "${shard_args[@]}"
+          ./gradlew :app:${{ matrix.module }}:validateDebugScreenshotTest --continue "${shard_args[@]}" --init-script scripts/ci/screenshot-build-cache.gradle.kts --build-cache
 
       - name: Upload ${{ matrix.platform }} screenshot reports
         if: always()
@@ -152,6 +232,85 @@ jobs:
             app/${{ matrix.module }}/build/outputs/screenshotTest-results/
             app/${{ matrix.module }}/build/test-results/validateDebugScreenshotTest/
             app/${{ matrix.module }}/build/reports/screenshotTest/
+          retention-days: 14
+
+  wear-screenshots:
+    name: Wear screenshots
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          lfs: true
+
+      - name: Materialize Android Firebase config
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v6.0.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          distribution: jetbrains
+          java-version: '21'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Fit Gradle memory to the runner
+        # macOS runners have about 7 GB of memory, which cannot hold the local defaults: an
+        # 8 GB Gradle daemon, a 6 GB Kotlin daemon and a 12 GB preview renderer. The renderer
+        # also keeps native memory for every preview until its process exits, and it was
+        # killed partway through the previews. CI compiles first, stops both daemons, and then
+        # renders with a smaller heap in a fresh renderer for each preview class.
+        run: |
+          gradle_home="${GRADLE_USER_HOME:-$HOME/.gradle}"
+          mkdir -p "$gradle_home"
+          {
+            echo 'org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1536M -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED'
+            echo 'kotlin.daemon.jvmargs=-Xmx3g'
+            echo 'logdate.screenshotTest.maxHeap=3g'
+            echo 'logdate.screenshotTest.forkEvery=1'
+          } >> "$gradle_home/gradle.properties"
+
+      - name: Compile Wear screenshot tests
+        run: ./gradlew :app:wear:compileDebugScreenshotTestKotlin
+
+      - name: Release compiler memory
+        run: |
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
+
+      - name: Validate Wear screenshots
+        timeout-minutes: 40
+        env:
+          # Fixture instants were recorded in this zone; keep date/time labels reproducible.
+          TZ: America/Los_Angeles
+          JAVA_TOOL_OPTIONS: -Duser.timezone=America/Los_Angeles
+          SCREENSHOT_INCLUDE: ''
+          SCREENSHOT_EXCLUDE: ''
+        run: |
+          shard_args=()
+          if [ -n "$SCREENSHOT_INCLUDE" ]; then shard_args+=("-Plogdate.screenshotTest.include=$SCREENSHOT_INCLUDE"); fi
+          if [ -n "$SCREENSHOT_EXCLUDE" ]; then shard_args+=("-Plogdate.screenshotTest.exclude=$SCREENSHOT_EXCLUDE"); fi
+          ./gradlew :app:wear:validateDebugScreenshotTest --continue "${shard_args[@]}"
+
+      - name: Upload Wear screenshot reports
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: wear-screenshot-report
+          path: |
+            app/wear/build/outputs/screenshotTest-results/
+            app/wear/build/test-results/validateDebugScreenshotTest/
+            app/wear/build/reports/screenshotTest/
           retention-days: 14
 
   desktop-screenshots:
