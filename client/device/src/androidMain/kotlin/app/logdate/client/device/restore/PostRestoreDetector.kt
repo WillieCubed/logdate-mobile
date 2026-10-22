@@ -44,7 +44,7 @@ class PostRestoreDetector(
             if (!restoreInProgress && !payloadReceived && fingerprint != null && fingerprint in readRestoreFingerprints()) {
                 return@synchronized
             }
-            val id = Uuid.random().toString()
+            val id = nativeRestoreSessionId()?.let { readIdentifier(accountAdmissionFile(it)) } ?: Uuid.random().toString()
             writeAtomically(mediaQuarantineFile(), id)
             writeAtomically(pendingRestoreFile(), "$DELIVERY_PENDING:$id")
             writeAtomically(accountRecoveryFile(), id)
@@ -63,6 +63,30 @@ class PostRestoreDetector(
             }
         }
     }
+
+    /** Reserved only after the framework completion callback has finalized preference custody. */
+    internal fun reserveAccountRecoveryForCompletion(): String =
+        synchronized(lock) {
+            val generation = checkNotNull(nativeRestoreSessionId())
+            val file = accountAdmissionFile(generation)
+            readIdentifier(file)?.let { return@synchronized it }
+            check(!file.exists()) { "Native account completion admission is unreadable" }
+            Uuid.random().toString().also { writeAtomically(file, it) }
+        }
+
+    internal fun completeReservedAccountRecovery(
+        delivery: String,
+        generation: String,
+    ): Boolean =
+        synchronized(lock) {
+            if (nativeRestoreSessionId() != generation ||
+                readIdentifier(accountAdmissionFile(generation)) != delivery
+            ) {
+                return@synchronized false
+            }
+            if (!isNativeRestoreDeliveryComplete()) recordRestoreCompletedUnderDeliveryLock()
+            isNativeRestoreDeliveryComplete() && pendingAccountRecoveryId() == delivery
+        }
 
     /** Records Android delivering a backed-up file, distinguishing a retry from a duplicate callback. */
     fun markNativeRestorePayloadReceived(databaseDelivered: Boolean) =
@@ -392,6 +416,8 @@ class PostRestoreDetector(
     private fun mediaQuarantineFile() = File(context.noBackupFilesDir, ".logdate_media_quarantine_pending")
 
     private fun accountRecoveryFile() = File(context.noBackupFilesDir, ".logdate_account_restore_pending")
+
+    private fun accountAdmissionFile(generation: String) = File(context.noBackupFilesDir, ".logdate_account_admission_$generation")
 
     private fun accountResolvedFile() = File(context.noBackupFilesDir, ".logdate_account_restore_resolved")
 

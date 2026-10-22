@@ -129,6 +129,26 @@ class SecureSessionStorage(
         session: UserSession,
     ): Boolean = install(expected, session, false)
 
+    suspend fun installNativeRestoreSessionIfCurrent(
+        expected: SessionInstallationGuard,
+        session: UserSession,
+        commitEpoch: app.logdate.shared.config.PrivacyScopeEpoch? = null,
+        expectedEpoch: String? = null,
+        beforePersist: suspend () -> Boolean,
+    ): Boolean =
+        identityMutex.withLock {
+            val publish = suspend { installLocked(expected, session, false, beforePersist) }
+            val installed = if (commitEpoch == null) publish() else commitEpoch.withStableValue(expectedEpoch, publish) ?: false
+            if (installed) {
+                val host = connectedVault
+                val after = sessionState.value
+                if (host != null && host.configRepository.getCurrentBackendUrl() == expected.origin) {
+                    host.cache(expected.origin, after.session, after.restoreDecision)
+                }
+            }
+            installed
+        }
+
     override suspend fun installExplicitSessionIfCurrent(
         expected: SessionInstallationGuard,
         session: UserSession,
@@ -140,44 +160,54 @@ class SecureSessionStorage(
         explicit: Boolean,
     ): Boolean =
         mutateIdentity({ getSession()?.accountId != session.accountId }) {
-            val snapshot = guards.remove(expected.token) ?: return@mutateIdentity false
-            val cached = sessionState.value
-            if (cached.origin != expected.origin ||
-                cached.revision != expected.revision ||
-                configRepository.getCurrentBackendUrl() != expected.origin
-            ) {
-                return@mutateIdentity false
-            }
-            val decision = nativeRestorePolicy?.decision(expected.origin)
-            val persisted = secureStorage.getString(scopedSessionKey(SessionRecordKeys.RECORD, expected.origin))
-            if (persisted != snapshot.record ||
-                decision != snapshot.decision ||
-                authorizationRevision(expected.origin) != snapshot.authorizationRevision ||
-                (!explicit && !NativeRestorePolicy.allows(decision))
-            ) {
-                sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
-                return@mutateIdentity false
-            }
-            try {
-                persistSession(expected.origin, session)
-                if (explicit) {
-                    nativeRestorePolicy?.setAllowed(expected.origin, true)
-                    advanceAuthorization(expected.origin)
-                }
-            } catch (error: Exception) {
-                sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
-                invalidateConnectedCache(expected.origin)
-                throw error
-            }
-            if (configRepository.getCurrentBackendUrl() != expected.origin) return@mutateIdentity false
-            val installed =
-                sessionState.compareAndSet(
-                    cached,
-                    CachedSession(expected.origin, session, cached.revision + 1, nativeRestorePolicy?.decision(expected.origin)),
-                )
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            installed
+            installLocked(expected, session, explicit)
         }
+
+    private suspend fun installLocked(
+        expected: SessionInstallationGuard,
+        session: UserSession,
+        explicit: Boolean,
+        beforePersist: suspend () -> Boolean = { true },
+    ): Boolean {
+        val snapshot = guards.remove(expected.token) ?: return false
+        val cached = sessionState.value
+        if (cached.origin != expected.origin ||
+            cached.revision != expected.revision ||
+            configRepository.getCurrentBackendUrl() != expected.origin
+        ) {
+            return false
+        }
+        val decision = nativeRestorePolicy?.decision(expected.origin)
+        val persisted = secureStorage.getString(scopedSessionKey(SessionRecordKeys.RECORD, expected.origin))
+        if (persisted != snapshot.record ||
+            decision != snapshot.decision ||
+            authorizationRevision(expected.origin) != snapshot.authorizationRevision ||
+            (!explicit && !NativeRestorePolicy.allows(decision))
+        ) {
+            sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
+            return false
+        }
+        if (!beforePersist()) return false
+        try {
+            persistSession(expected.origin, session)
+            if (explicit) {
+                nativeRestorePolicy?.setAllowed(expected.origin, true)
+                advanceAuthorization(expected.origin)
+            }
+        } catch (error: Exception) {
+            sessionState.compareAndSet(cached, CachedSession(null, null, cached.revision + 1))
+            invalidateConnectedCache(expected.origin)
+            throw error
+        }
+        if (configRepository.getCurrentBackendUrl() != expected.origin) return false
+        val installed =
+            sessionState.compareAndSet(
+                cached,
+                CachedSession(expected.origin, session, cached.revision + 1, nativeRestorePolicy?.decision(expected.origin)),
+            )
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        return installed
+    }
 
     override suspend fun clearSessionIfUnchanged(
         expected: SessionInstallationGuard,

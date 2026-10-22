@@ -56,6 +56,7 @@ class NativeBackupTransferProbeTest {
                         "seed",
                         "verify",
                         "verify-in-place",
+                        "verify-restored",
                         "quota",
                         "quota-cleanup",
                         "missing-keys",
@@ -365,7 +366,7 @@ class NativeBackupTransferProbeTest {
                     fixture.verifyPartialTransfer(requireNotNull(arguments.getString("expectedMissingMediaPath")))
                     return@runBlocking
                 }
-                fixture.verifyAndEdit()
+                if (mode == "verify-restored") fixture.verifyFixture() else fixture.verifyAndEdit()
             }
         }
 }

@@ -2,6 +2,7 @@ package app.logdate.client.media.storage
 
 import android.system.Os
 import android.system.OsConstants
+import app.logdate.client.device.restore.admitNativeContent
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,7 @@ class AndroidCanonicalMediaStore(
     ): String {
         require(expectedSizeBytes >= 0) { "Expected media size cannot be negative" }
         val extension = extensionFor(mimeType)
+        admitNativeContent(File(filesDir, "media"))
         ensurePrivateDirectory(stagingDirectory)
         ensurePrivateDirectory(objectsDirectory)
         removeStaleStagingFiles()

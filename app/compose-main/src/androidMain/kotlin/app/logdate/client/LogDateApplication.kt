@@ -14,6 +14,7 @@ import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.data.account.RestoreCredentialLifecycle
 import app.logdate.client.data.notes.NativeMediaQuarantine
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
+import app.logdate.client.data.restore.resumeNativeAccountRecovery
 import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.featureflags.FeatureFlag
@@ -154,6 +155,7 @@ class LogdateApplication :
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         dependenciesInitialized = true
+        startupScope.launch { resumeNativeAccountRecovery(this@LogdateApplication) }
         runCatching { resumeWidgetLifecycle(this) }.onFailure { Napier.w("Widget lifecycle recovery remains pending", it) }
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
     }
@@ -370,6 +372,7 @@ internal object ApplicationStartupCoordinator {
                                     application.initializeKoin()
                                 }
                             }
+                            resumeNativeAccountRecovery(application)
                             recoverCompletedRecordingFiles(application.filesDir)
                             val koin = GlobalContext.get()
                             koin.get<LogDateDatabase>()

@@ -222,6 +222,13 @@ class ManagedDriverControllerTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE["validate_followups"]("transfer", ["ui", "ui"])
 
+    def test_account_job_acceptance_uses_the_owned_transfer_destination(self):
+        command = MODULE["followup_command"]("account-job", "emulator-5558", Path("/pinned/app.apk"),
+                                             Path("/pinned/probe.apk"), Path("/private/account-job"))
+        self.assertTrue(command[1].endswith("native-account-job-acceptance.py"))
+        self.assertEqual("emulator-5558", command[command.index("--emulator") + 1])
+        self.assertIn("--synthetic-data", command)
+
     def test_followups_keep_the_owned_target_and_pinned_artifacts(self):
         command = MODULE["followup_command"]("missing-media", "emulator-5558", Path("/pinned/app.apk"),
                                               Path("/pinned/probe.apk"), Path("/private/results"))

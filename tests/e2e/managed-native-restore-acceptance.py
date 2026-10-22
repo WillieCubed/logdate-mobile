@@ -22,7 +22,7 @@ TARGET = runpy.run_path(str(Path(__file__).with_name("managed-native-target.py")
 EMULATOR = runpy.run_path(str(Path(__file__).with_name("managed-native-emulator.py")))
 DRIVER = TARGET["DRIVER"]
 DRIVER_CASE = "app.logdate.tools.restoredriver.NativeRestoreDriverTest"
-FOLLOWUPS = {"missing-media": "native-missing-media-acceptance.py",
+FOLLOWUPS = {"account-job": "native-account-job-acceptance.py", "missing-media": "native-missing-media-acceptance.py",
              "storage": "native-storage-recovery-acceptance.py", "ui": "native-recovery-ui-acceptance.py",
              "permissions": "native-permission-acceptance.py", "contracts": "native-post-transfer-acceptance.py"}
 

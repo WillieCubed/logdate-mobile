@@ -13,7 +13,16 @@ internal fun hasRetainedNativeContent(
         preferences.asMap().any { (key, value) ->
             key.name.contains("draft") && value.toString().isNotBlank()
         } ||
-        listOf("media", "user_media", "audio_notes", "camera-captures", "db_recovery", "identity_recovery", "datastore").any {
+        listOf(
+            "media",
+            "user_media",
+            "audio_notes",
+            "camera-captures",
+            "watch_incoming",
+            "db_recovery",
+            "identity_recovery",
+            "datastore",
+        ).any {
             // An unreadable directory is retained content, too; background recovery cannot prove it empty.
             File(files, it).exists()
         }

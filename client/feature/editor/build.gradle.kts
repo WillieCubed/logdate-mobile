@@ -116,6 +116,7 @@ kotlin {
         }
 
         androidMain.dependencies {
+            implementation(projects.client.device)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)
             // CameraX

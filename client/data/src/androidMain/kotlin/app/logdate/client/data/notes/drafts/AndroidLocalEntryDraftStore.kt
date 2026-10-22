@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.logdate.client.device.restore.admitNativeContent
 import app.logdate.client.repository.journals.EntryDraft
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
+import java.io.File
 import kotlin.uuid.Uuid
 
 private val Context.entryDraftDataStore by preferencesDataStore(name = "entry_drafts")
@@ -22,9 +24,10 @@ private val Context.entryDraftDataStore by preferencesDataStore(name = "entry_dr
  */
 class AndroidLocalEntryDraftStore internal constructor(
     private val dataStore: DataStore<Preferences>,
+    private val admitContent: suspend () -> Unit = {},
 ) : LocalEntryDraftStore,
     RecoveryEntryDraftStore {
-    constructor(context: Context) : this(context.entryDraftDataStore)
+    constructor(context: Context) : this(context.entryDraftDataStore, { admitNativeContent(File(context.filesDir, "datastore")) })
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -53,6 +56,7 @@ class AndroidLocalEntryDraftStore internal constructor(
     }
 
     override suspend fun saveDraft(draft: EntryDraft) {
+        admitContent()
         val key = stringPreferencesKey(draft.id.toString())
         val serializedDraft = json.encodeToString(draft)
 

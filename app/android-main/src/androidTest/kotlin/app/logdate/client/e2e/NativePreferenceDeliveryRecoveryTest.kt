@@ -99,11 +99,12 @@ class NativePreferenceDeliveryRecoveryTest {
         try {
             deliverFile(original, context.getDatabasePath("logdate"), "synthetic database payload".encodeToByteArray())
             val generation = assertNotNull(detector.retainedPreferenceSessionId())
+            val destination = File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
+            assertEquals(names.single(), retained.observe(destination, names))
             val transferred = "<map><string name=\"7.chosenNoteId\">prepared-entry</string></map>".encodeToByteArray()
             val snapshot = File(context.noBackupFilesDir, "native-restored-preferences/$generation/logdate_widget_instances.json")
             val encoded = Base64.getEncoder().encodeToString(transferred)
             snapshot.writeText("""{"generation":"$generation","state":"prepared","source":"$encoded"}""")
-            val destination = File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
             destination.parentFile?.mkdirs()
             destination.writeText("<map>")
             original.onDestroy()

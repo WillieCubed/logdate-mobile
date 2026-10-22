@@ -1,6 +1,7 @@
 package app.logdate.client.media.audio
 
 import android.content.Context
+import app.logdate.client.device.restore.admitNativeContent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,11 +19,7 @@ class AndroidAudioStorage(
         withContext(ioDispatcher) {
             val safeExtension = extension.trimStart('.').ifBlank { "m4a" }
             val directory =
-                File(context.filesDir, "audio_notes").apply {
-                    if (!exists()) {
-                        mkdirs()
-                    }
-                }
+                File(context.filesDir, "audio_notes").also { admitNativeContent(it) }
 
             val baseName = "recording_${Uuid.random()}"
             val targetFile = File(directory, "$baseName.$safeExtension")

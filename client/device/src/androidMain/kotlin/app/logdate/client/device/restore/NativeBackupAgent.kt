@@ -11,7 +11,6 @@ import android.os.ParcelFileDescriptor
 import android.system.OsConstants
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.crypto.AndroidCryptoManager
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
@@ -19,8 +18,8 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.storage.createAndroidSecureStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.IOException
@@ -102,12 +101,18 @@ open class NativeBackupAgent : BackupAgent() {
             }
             val finalDelivery = restoredPreferences().recordFinalDelivery(retainedPreferenceNames)
             retainOptionalPreferences { finish(retainedPreferenceNames, finalDelivery) }
-            PostRestoreDetector(this).recordRestoreCompletedUnderDeliveryLock()
+            val detector = PostRestoreDetector(this)
+            val preferences = createAndroidMainDataStore(this)
+            val admission = detector.reserveAccountRecoveryForCompletion()
+            runBlocking(Dispatchers.IO) {
+                withTimeout(15_000) { retainAccountRecoveryBeforeCompletion(preferences, admission) }
+            }
+            detector.recordRestoreCompletedUnderDeliveryLock()
             synchronized(callbackLock) { restoreCompletionRecorded = true }
             try {
-                val preferences = createAndroidMainDataStore(this)
                 runBlocking(Dispatchers.IO) {
                     withTimeoutOrNull(15_000) {
+                        retainAccountRecovery(preferences, freshDelivery = true)
                         prepareRestoredInstallationState(preferences)
                         restoreAccount(preferences)
                     }
@@ -238,6 +243,7 @@ open class NativeBackupAgent : BackupAgent() {
             val preferences = createAndroidMainDataStore(this)
             runBlocking(Dispatchers.IO) {
                 withTimeoutOrNull(15_000) {
+                    retainAccountRecovery(preferences, freshDelivery = false)
                     prepareRestoredInstallationState(preferences)
                     restoreAccount(preferences)
                 }
@@ -249,13 +255,19 @@ open class NativeBackupAgent : BackupAgent() {
 
     private suspend fun prepareRestoredInstallationState(preferences: DataStore<Preferences>) {
         if (synchronized(callbackLock) { installationStateReset }) return
-        val deviceIdKey = stringPreferencesKey("device.id")
-        val currentDeviceId = preferences.data.first()[deviceIdKey]
-        val sourceDeviceId = NativeInstallationResetMarker(noBackupFilesDir).sourceDeviceId(currentDeviceId)
-        resetRestoredInstallationState(preferences, sourceDeviceId)
-        PostRestoreDetector(this).refreshRestoreFingerprint()
+        prepareNativeRestoredInstallationState(this, preferences)
         synchronized(callbackLock) { installationStateReset = true }
     }
+
+    protected open suspend fun retainAccountRecoveryBeforeCompletion(
+        preferences: DataStore<Preferences>,
+        deliveryId: String,
+    ) = Unit
+
+    protected open suspend fun retainAccountRecovery(
+        preferences: DataStore<Preferences>,
+        freshDelivery: Boolean,
+    ) = Unit
 
     protected open suspend fun restoreAccount(preferences: DataStore<Preferences>) = Unit
 

@@ -1,12 +1,13 @@
 package app.logdate.client.media.audio
 
+import app.logdate.client.device.restore.admitNativeContentBlocking
 import io.github.aakira.napier.Napier
 import java.io.File
 
 internal fun AudioRecordingService.resolveOutputFile(outputPath: String?): File =
     if (outputPath != null) {
         File(outputPath).also { file ->
-            file.parentFile?.mkdirs()
+            file.parentFile?.let(::admitNativeContentBlocking)
             if (file.exists()) file.delete()
         }
     } else {

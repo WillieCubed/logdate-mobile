@@ -4,6 +4,8 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.PrivacyEpochStorage
 import app.logdate.shared.config.PrivacyScopeEpoch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,6 +13,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PrivacyScopeIntegrationTest {
     private class EpochStorage : PrivacyEpochStorage {
         var stored: String? = null
@@ -23,6 +26,48 @@ class PrivacyScopeIntegrationTest {
             stored = epoch
         }
     }
+
+    @Test
+    fun `API version changes invalidate consent while repeated versions preserve it`() =
+        runTest {
+            val epoch = PrivacyScopeEpoch(EpochStorage())
+            epoch.initialize()
+            val config = DefaultLogDateConfigRepository(privacyEpoch = epoch)
+            val original = epoch.value.value
+            config.updateApiVersion("v2")
+            assertNotEquals(original, epoch.value.value)
+            val changed = epoch.value.value
+            config.updateApiVersion("v2")
+            assertEquals(changed, epoch.value.value)
+        }
+
+    @Test
+    fun `configuration waits until a native owner and session commit finishes`() =
+        runTest {
+            val epoch = PrivacyScopeEpoch(EpochStorage())
+            epoch.initialize()
+            val config = DefaultLogDateConfigRepository(privacyEpoch = epoch)
+            val vault = SecureSessionStorage(FakeSecureStorage(), config, backgroundScope)
+            val guard = kotlin.test.assertNotNull(vault.captureInstallationGuard())
+            val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val install =
+                async {
+                    vault.installNativeRestoreSessionIfCurrent(guard, UserSession("native", "refresh", "owner"), epoch, epoch.value.value) {
+                        entered.complete(Unit)
+                        release.await()
+                        true
+                    }
+                }
+            entered.await()
+            val change = async { config.updateApiVersion("v2") }
+            runCurrent()
+            kotlin.test.assertFalse(change.isCompleted)
+            release.complete(Unit)
+            assertTrue(install.await())
+            change.await()
+            assertEquals("v2", config.apiVersion.value)
+        }
 
     @Test
     fun `pinned mutations preserve alternate consent and revoke connected consent`() =

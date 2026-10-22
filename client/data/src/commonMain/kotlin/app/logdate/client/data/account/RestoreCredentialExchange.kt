@@ -16,9 +16,9 @@ internal class RestoreCredentialExchange(
     private val begin: suspend () -> Result<BeginAuthenticationData>,
     private val getCredential: suspend (PasskeyAuthenticationOptions) -> Result<String>,
     private val complete: suspend (CompleteAuthenticationRequest) -> Result<CompleteAuthenticationData>,
-    private val isCurrent: () -> Boolean = { true },
+    private val isCurrent: suspend () -> Boolean = { true },
 ) {
-    constructor(api: PasskeyApiClientContract, credentials: RestoreCredentialManager, isCurrent: () -> Boolean = { true }) : this(
+    constructor(api: PasskeyApiClientContract, credentials: RestoreCredentialManager, isCurrent: suspend () -> Boolean = { true }) : this(
         api::beginRestoreSignIn,
         credentials::getRestoreCredential,
         api::completeRestoreSignIn,

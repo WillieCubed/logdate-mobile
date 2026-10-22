@@ -1,5 +1,6 @@
 package app.logdate.feature.core.restore
 
+import app.logdate.client.device.restore.admitNativeContentBlocking
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -15,7 +16,7 @@ internal class ArchiveAudioFileStore(
         source: File,
         fileName: String,
     ): File {
-        directory.mkdirs()
+        admitNativeContentBlocking(directory)
         stagingDirectory.mkdirs()
         val extension = fileName.substringAfterLast('.', "bin").lowercase().takeIf { it.matches(Regex("[a-z0-9]{1,8}")) } ?: "bin"
         val destination = File(directory, "restored-${Uuid.random()}.$extension")

@@ -97,9 +97,10 @@ class DefaultLogDateConfigRepository(
         }
     }
 
-    override suspend fun updateApiVersion(version: String) {
-        _apiVersion.value = version
-    }
+    override suspend fun updateApiVersion(version: String) =
+        selectionMutex.withLock {
+            changeSelection(_apiVersion.value != version) { _apiVersion.value = version }
+        }
 
     override suspend fun updateLocalServerAddress(address: String) {
         _localServerAddress.value = address
@@ -108,20 +109,33 @@ class DefaultLogDateConfigRepository(
     override suspend fun updateServerDescriptor(descriptor: ServerDescriptor?) {
         selectionMutex.withLock {
             if (descriptor == null || descriptor.serverOrigin.trimEnd('/') == _backendUrl.value) {
-                _serverDescriptor.value = descriptor
+                changeSelection(descriptorSecurity(_serverDescriptor.value) != descriptorSecurity(descriptor)) {
+                    _serverDescriptor.value = descriptor
+                }
             }
         }
     }
 
     override suspend fun resetToDefaults() =
         selectionMutex.withLock {
-            changeSelection(_backendUrl.value != DEFAULT_BACKEND_URL) {
+            changeSelection(
+                _backendUrl.value != DEFAULT_BACKEND_URL || _apiVersion.value != DEFAULT_API_VERSION || _serverDescriptor.value != null,
+            ) {
                 _serverDescriptor.value = null
                 _backendUrl.value = DEFAULT_BACKEND_URL
                 _apiVersion.value = DEFAULT_API_VERSION
                 _localServerAddress.value = DEFAULT_LOCAL_SERVER_ADDRESS
             }
         }
+
+    private fun descriptorSecurity(descriptor: ServerDescriptor?): List<Any?> =
+        listOf(
+            descriptor?.serverOrigin?.trimEnd('/'),
+            descriptor?.apiBaseUrl?.trimEnd('/'),
+            descriptor?.passkey?.rpId,
+            descriptor?.hasCapability(app.logdate.shared.model.ServerCapability.AUTH_PASSKEY),
+            descriptor?.hasProtocolFeature(app.logdate.shared.model.ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1),
+        )
 
     private suspend fun changeSelection(
         changed: Boolean,

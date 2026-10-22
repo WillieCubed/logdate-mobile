@@ -19,6 +19,63 @@ class RestoreSessionInstallationTest {
     private val recovered = UserSession("recovered", "refresh", "owner")
 
     @Test
+    fun `native owner admission rejection leaves secure credentials untouched`() =
+        runTest {
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = origin)
+            val backing = FakeSecureStorage()
+            val vault = SecureSessionStorage(backing, config, backgroundScope)
+            val guard = assertNotNull(vault.captureInstallationGuard())
+            assertFalse(vault.installNativeRestoreSessionIfCurrent(guard, recovered) { false })
+            assertNull(SecureSessionStorage(backing, config, backgroundScope).read(origin))
+        }
+
+    @Test
+    fun `stale native admission cannot write owner preferences after sign out`() =
+        runTest {
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = origin)
+            val vault = SecureSessionStorage(FakeSecureStorage(), config, backgroundScope)
+            val guard = assertNotNull(vault.captureInstallationGuard())
+            vault.clearSession()
+            var ownerWritten = false
+            assertFalse(
+                vault.installNativeRestoreSessionIfCurrent(guard, recovered) {
+                    ownerWritten = true
+                    true
+                },
+            )
+            assertFalse(ownerWritten)
+        }
+
+    @Test
+    fun `owner admission and secure publication share the sign out boundary`() =
+        runTest {
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = origin)
+            val backing = FakeSecureStorage()
+            val background = SecureSessionStorage(backing, config, backgroundScope)
+            val foreground = SecureSessionStorage(backing, config, backgroundScope)
+            val guard = assertNotNull(background.captureInstallationGuard())
+            val admitted = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val installation =
+                async {
+                    background.installNativeRestoreSessionIfCurrent(guard, recovered) {
+                        admitted.complete(Unit)
+                        release.await()
+                        true
+                    }
+                }
+            runCurrent()
+            assertTrue(admitted.isCompleted)
+            val signOut = async { foreground.clearSession() }
+            runCurrent()
+            assertFalse(signOut.isCompleted)
+            release.complete(Unit)
+            assertTrue(installation.await())
+            signOut.await()
+            assertNull(SecureSessionStorage(backing, config, backgroundScope).captureInstallationGuard())
+        }
+
+    @Test
     fun `installation guard loads retained credentials before permitting restore`() =
         runTest {
             val config = DefaultLogDateConfigRepository(initialBackendUrl = origin)

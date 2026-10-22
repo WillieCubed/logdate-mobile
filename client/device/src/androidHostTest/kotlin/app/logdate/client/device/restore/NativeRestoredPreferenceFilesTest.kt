@@ -10,6 +10,8 @@ import io.mockk.unmockkConstructor
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlin.io.path.createTempDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -17,6 +19,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class NativeRestoredPreferenceFilesTest {
@@ -96,6 +99,252 @@ class NativeRestoredPreferenceFilesTest {
     }
 
     @Test
+    fun `recreated completion retains omission when its optional snapshot is obstructed`() {
+        val generation = beginUnobserved()
+        val obstruction = File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json")
+        assertTrue(obstruction.delete())
+        assertTrue(obstruction.mkdir())
+        val evidence = File(obstruction, "retained-evidence").apply { writeText("Preserve obstructing bytes") }
+
+        val recreated = NativeRestoredPreferenceFiles(context)
+        assertEquals(emptySet(), recreated.recordFinalDelivery(names))
+        assertFailsWith<IOException> { recreated.finish(names, emptySet()) }
+        detector.recordRestoreCompleted()
+        assertEquals("Preserve obstructing bytes", evidence.readText())
+        assertFailsWith<IOException> { recreated.read(names.single(), generation) }
+        assertTrue(evidence.delete())
+        assertTrue(obstruction.delete())
+
+        assertNull(NativeRestoredPreferenceFiles(context).read(names.single(), generation))
+    }
+
+    @Test
+    fun `failed initial snapshot still retains an unobserved delivery decision`() {
+        val generation = snapshot("pending")
+        val snapshot = File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json")
+        assertTrue(snapshot.delete())
+        val obstruction = File(snapshot.path + ".new").apply { mkdir() }
+
+        assertFailsWith<IOException> { retained.begin(names) }
+
+        assertEquals(emptySet(), NativeRestoredPreferenceFiles(context).recordFinalDelivery(names))
+        assertTrue(obstruction.isDirectory)
+    }
+
+    @Test
+    fun `failed final seal retries the same omission without reading an obstructed snapshot`() {
+        val generation = beginUnobserved()
+        val directory = File(noBackup, "native-restored-preferences/$generation")
+        val snapshot = File(directory, "logdate_widget_instances.json")
+        assertTrue(snapshot.delete())
+        assertTrue(snapshot.mkdir())
+        val obstruction = File(directory, ".delivery.json.part").apply { mkdir() }
+
+        assertFailsWith<IOException> { retained.recordFinalDelivery(names) }
+        assertFalse(detector.hasCompletedNativeRestoreDelivery())
+        assertTrue(obstruction.delete())
+
+        assertEquals(emptySet(), NativeRestoredPreferenceFiles(context).recordFinalDelivery(names))
+        assertTrue(snapshot.isDirectory)
+    }
+
+    @Test
+    fun `observed prepared input cannot become omission when its snapshot is obstructed`() {
+        val generation = beginUnobserved()
+        val destination = File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
+        destination.parentFile?.mkdirs()
+        val incoming = "<map><string name=\"7.chosenNoteId\">retained-entry</string></map>".encodeToByteArray()
+        assertFailsWith<IOException> {
+            retained.restore(destination, names, incoming.size.toLong(), { incoming }, {
+                destination.writeText("Interrupted copy")
+                throw IOException("Interrupted framework copy")
+            }, { error("Not a duplicate") })
+        }
+        val snapshot = File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json")
+        val prepared = snapshot.readBytes()
+        assertTrue(snapshot.delete())
+        assertTrue(snapshot.mkdir())
+        val evidence = File(snapshot, "retained-prepared-input").apply { writeBytes(prepared) }
+
+        assertFailsWith<IOException> { NativeRestoredPreferenceFiles(context).recordFinalDelivery(names) }
+        assertFalse(detector.hasCompletedNativeRestoreDelivery())
+        assertEquals(prepared.decodeToString(), evidence.readText())
+        assertEquals("Interrupted copy", destination.readText())
+        assertTrue(evidence.delete())
+        assertTrue(snapshot.delete())
+        snapshot.writeBytes(prepared)
+        val replaying = NativeRestoredPreferenceFiles(context) { target, bytes -> target.writeBytes(bytes) }
+
+        assertEquals(names, replaying.recordFinalDelivery(names))
+        assertEquals(incoming.decodeToString(), destination.readText())
+    }
+
+    @Test
+    fun `failed durable observation cannot invoke the platform copy`() {
+        val generation = beginUnobserved()
+        val obstruction = File(noBackup, "native-restored-preferences/$generation/.delivery.json.part").apply { mkdir() }
+        val destination = File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
+        destination.parentFile?.mkdirs()
+        destination.writeText("Existing destination choice")
+        val incoming = "<map/>".encodeToByteArray()
+
+        assertFailsWith<IOException> {
+            retained.restore(destination, names, incoming.size.toLong(), { incoming }, {
+                destination.writeBytes(it)
+            }, { error("Not a duplicate") })
+        }
+
+        assertEquals("Existing destination choice", destination.readText())
+        assertTrue(obstruction.isDirectory)
+        assertTrue(obstruction.delete())
+        assertTrue(
+            retained.restore(destination, names, incoming.size.toLong(), { incoming }, {
+                destination.writeBytes(it)
+            }, { error("The failed observation did not accept the first delivery") }),
+        )
+        var drained = false
+        assertTrue(
+            NativeRestoredPreferenceFiles(context).restore(destination, names, incoming.size.toLong(), {
+                error("Accepted duplicate input must not replace retained bytes")
+            }, { error("Accepted duplicate must not invoke the platform copy") }, { drained = true }),
+        )
+        assertTrue(drained)
+        assertEquals(incoming.decodeToString(), destination.readText())
+        assertEquals(names, NativeRestoredPreferenceFiles(context).recordFinalDelivery(names))
+    }
+
+    @Test
+    fun `legacy sealed delivery remains authoritative over an unreadable snapshot`() {
+        val generation = snapshot("pending")
+        val directory = File(noBackup, "native-restored-preferences/$generation")
+        File(directory, ".delivery.json").writeText(
+            """{"generation":"$generation","names":["logdate_widget_instances"],"delivered":["logdate_widget_instances"]}""",
+        )
+        val snapshot = File(directory, "logdate_widget_instances.json")
+        assertTrue(snapshot.delete())
+        assertTrue(snapshot.mkdir())
+
+        assertEquals(names, NativeRestoredPreferenceFiles(context).recordFinalDelivery(names))
+        assertTrue(snapshot.isDirectory)
+    }
+
+    @Test
+    fun `missing legacy decision cannot treat an unreadable snapshot as omission`() {
+        val generation = snapshot("pending")
+        val snapshot = File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json")
+        assertTrue(snapshot.delete())
+        assertTrue(snapshot.mkdir())
+
+        assertFailsWith<IOException> { NativeRestoredPreferenceFiles(context).recordFinalDelivery(names) }
+        assertFalse(detector.hasCompletedNativeRestoreDelivery())
+        assertTrue(snapshot.isDirectory)
+    }
+
+    @Test
+    fun `repeated begin cannot reset an observed callback into omission`() {
+        val generation = beginUnobserved()
+        val destination = File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
+        assertEquals(names.single(), retained.observe(destination, names))
+        val snapshot = File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json")
+        val observed = snapshot.readText()
+
+        NativeRestoredPreferenceFiles(context).begin(names)
+
+        assertEquals(observed, snapshot.readText())
+        assertFailsWith<IOException> { retained.recordFinalDelivery(names) }
+    }
+
+    @Test
+    fun `failed snapshot observation remains pending until the platform redelivers its input`() {
+        for (removePendingSnapshot in listOf(false, true)) {
+            val generation = beginUnobserved()
+            val directory = File(noBackup, "native-restored-preferences/$generation")
+            val snapshot = File(directory, "logdate_widget_instances.json")
+            val pending = snapshot.readText()
+            val obstruction = File(directory, "logdate_widget_instances.json.new").apply { mkdir() }
+            val destination = File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
+            destination.parentFile?.mkdirs()
+            destination.writeText("Existing choice")
+            val incoming = "<map><string name=\"7.chosenNoteId\">redelivered-entry</string></map>".encodeToByteArray()
+            assertFailsWith<IOException> {
+                retained.restore(destination, names, incoming.size.toLong(), {
+                    error("Failed observation must not consume platform input")
+                }, { error("Failed observation must not copy preference bytes") }, { error("Not a duplicate") })
+            }
+            assertEquals(pending, snapshot.readText())
+            if (removePendingSnapshot) assertTrue(snapshot.delete())
+
+            assertFailsWith<IOException> { NativeRestoredPreferenceFiles(context).recordFinalDelivery(names) }
+            assertFalse(detector.hasCompletedNativeRestoreDelivery())
+            assertEquals("Existing choice", destination.readText())
+            assertTrue(obstruction.delete())
+            assertTrue(
+                retained.restore(destination, names, incoming.size.toLong(), { incoming }, {
+                    destination.writeBytes(it)
+                }, { error("The first delivery did not accept any bytes") }),
+            )
+            assertEquals(names, NativeRestoredPreferenceFiles(context).recordFinalDelivery(names))
+            assertEquals(incoming.decodeToString(), destination.readText())
+        }
+    }
+
+    @Test
+    fun `repeated begin preserves prepared bytes until a recreated completion repairs them`() {
+        beginUnobserved()
+        val destination = File(context.applicationInfo.dataDir, "shared_prefs/logdate_widget_instances.xml")
+        destination.parentFile?.mkdirs()
+        val incoming = "<map><string name=\"7.chosenNoteId\">prepared-entry</string></map>".encodeToByteArray()
+        assertFailsWith<IOException> {
+            retained.restore(destination, names, incoming.size.toLong(), { incoming }, {
+                destination.writeText("Interrupted copy")
+                throw IOException("Interrupted framework copy")
+            }, { error("Not a duplicate") })
+        }
+
+        NativeRestoredPreferenceFiles(context).begin(names)
+        val replaying = NativeRestoredPreferenceFiles(context) { target, bytes -> target.writeBytes(bytes) }
+
+        assertEquals(names, replaying.recordFinalDelivery(names))
+        assertEquals(incoming.decodeToString(), destination.readText())
+    }
+
+    @Test
+    fun `repeated begin preserves a sealed legacy snapshot`() {
+        val generation = snapshot("captured", "AA==")
+        assertEquals(names, retained.recordFinalDelivery(names))
+        val snapshot = File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json")
+        val captured = snapshot.readText()
+
+        NativeRestoredPreferenceFiles(context).begin(names)
+
+        assertEquals(captured, snapshot.readText())
+        assertEquals(names, retained.recordFinalDelivery(names))
+    }
+
+    @Test
+    fun `begin preserves legacy snapshot provenance when the delivery journal is missing`() {
+        for (state in listOf("observed", "pending", "prepared", "delivered", "captured")) {
+            val generation = snapshot(state, if (state in setOf("prepared", "delivered", "captured")) "AA==" else null)
+            val snapshot = File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json")
+            val original = snapshot.readText()
+
+            NativeRestoredPreferenceFiles(context).begin(names)
+
+            assertEquals(original, snapshot.readText(), state)
+            if (state in setOf("observed", "pending")) {
+                assertFailsWith<IOException> { retained.recordFinalDelivery(names) }
+            } else {
+                val replaying =
+                    NativeRestoredPreferenceFiles(context) { target, bytes ->
+                        target.parentFile?.mkdirs()
+                        target.writeBytes(bytes)
+                    }
+                assertEquals(names, replaying.recordFinalDelivery(names), state)
+            }
+        }
+    }
+
+    @Test
     fun `completion recreates delivered decision from a captured snapshot without callback memory`() {
         val generation = snapshot("captured", "AA==")
 
@@ -155,6 +404,13 @@ class NativeRestoredPreferenceFilesTest {
         assertFalse(retained.canResumeFinalization(names))
     }
 
+    private fun beginUnobserved(): String {
+        val generation = snapshot("pending")
+        assertTrue(File(noBackup, "native-restored-preferences/$generation/logdate_widget_instances.json").delete())
+        retained.begin(names)
+        return generation
+    }
+
     private fun snapshot(
         state: String,
         source: String? = null,
@@ -171,9 +427,18 @@ class NativeRestoredPreferenceFilesTest {
         mockkConstructor(AtomicFile::class)
         every { anyConstructed<AtomicFile>().baseFile } returns snapshot
         every { anyConstructed<AtomicFile>().openRead() } answers { snapshot.inputStream() }
-        every { anyConstructed<AtomicFile>().startWrite() } answers { snapshot.outputStream() }
-        every { anyConstructed<AtomicFile>().finishWrite(any()) } answers { firstArg<FileOutputStream>().close() }
-        every { anyConstructed<AtomicFile>().failWrite(any()) } answers { firstArg<FileOutputStream>().close() }
+        val temporary = File(snapshot.path + ".new")
+        every { anyConstructed<AtomicFile>().startWrite() } answers { temporary.outputStream() }
+        every { anyConstructed<AtomicFile>().finishWrite(any()) } answers {
+            firstArg<FileOutputStream>().close()
+            Files.move(temporary.toPath(), snapshot.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            Unit
+        }
+        every { anyConstructed<AtomicFile>().failWrite(any()) } answers {
+            firstArg<FileOutputStream>().close()
+            temporary.delete()
+            Unit
+        }
         return generation
     }
 }
