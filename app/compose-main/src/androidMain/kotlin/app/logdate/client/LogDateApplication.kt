@@ -25,6 +25,7 @@ import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.feature.widgets.publishWidgetPreviews
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.launch.ApplicationStartup
+import app.logdate.client.launch.awaitAndroidUserUnlock
 import app.logdate.client.launch.recoverCompletedRecordingFiles
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
@@ -59,6 +60,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.setResourceReaderAndroidContext
 import org.koin.core.component.KoinComponent
@@ -76,9 +78,12 @@ class LogdateApplication :
     KoinComponent,
     SingletonImageLoader.Factory {
     private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var dependenciesInitialized = false
     internal val startup =
         ApplicationStartup(startupScope) {
             try {
+                awaitAndroidUserUnlock()
+                withContext(Dispatchers.Main.immediate) { initializeUnlockedApplication() }
                 recoverCompletedRecordingFiles(filesDir)
                 get<LogDateDatabase>()
                 val detector = PostRestoreDetector(this@LogdateApplication)
@@ -125,6 +130,14 @@ class LogdateApplication :
 
     override fun onCreate() {
         super.onCreate()
+        startupScope.launch(Dispatchers.Main.immediate) {
+            awaitAndroidUserUnlock()
+            initializeUnlockedApplication()
+        }
+    }
+
+    private fun initializeUnlockedApplication() {
+        if (dependenciesInitialized) return
         Napier.i("Application onCreate: initializing logging and DI", tag = APP_STARTUP_TAG)
 
         installStrictModeIfDebuggable()
@@ -138,6 +151,7 @@ class LogdateApplication :
         Napier.base(LogcatAntilog(isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0))
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
+        dependenciesInitialized = true
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
     }
 
@@ -327,15 +341,18 @@ internal object ApplicationStartupCoordinator {
             fallbackStartups
                 .getOrPut(application) {
                     setResourceReaderAndroidContext(application.applicationContext)
-                    if (GlobalContext.getOrNull() == null) {
-                        val isDebuggable = (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                        Napier.base(LogcatAntilog(isDebuggable = isDebuggable))
-                        Napier.base(CrashlyticsAntilog())
-                        application.initializeKoin()
-                    }
                     val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
                     ApplicationStartup(startupScope) {
                         try {
+                            application.awaitAndroidUserUnlock()
+                            withContext(Dispatchers.Main.immediate) {
+                                if (GlobalContext.getOrNull() == null) {
+                                    val isDebuggable = (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                                    Napier.base(LogcatAntilog(isDebuggable = isDebuggable))
+                                    Napier.base(CrashlyticsAntilog())
+                                    application.initializeKoin()
+                                }
+                            }
                             recoverCompletedRecordingFiles(application.filesDir)
                             val koin = GlobalContext.get()
                             koin.get<LogDateDatabase>()
