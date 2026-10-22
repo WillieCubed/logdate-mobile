@@ -113,7 +113,7 @@ public object CarCodec {
         return CarArchive(roots = roots, blocks = blocks)
     }
 
-    private fun decodeSignedCommitBlock(block: RepoBlock): SignedRepoCommit? =
+    internal fun decodeSignedCommitBlock(block: RepoBlock): SignedRepoCommit? =
         runCatching {
             val encoded = DagCborCodec.decode(block.bytes).jsonObject
             val signature =
