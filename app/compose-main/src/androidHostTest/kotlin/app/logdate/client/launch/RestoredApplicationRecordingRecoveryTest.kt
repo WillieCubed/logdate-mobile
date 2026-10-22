@@ -4,7 +4,13 @@ import android.app.Application
 import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.media.audio.CrashSafeRecording
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.setResourceReaderAndroidContext
 import org.junit.Test
@@ -25,13 +31,17 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [30])
 class RestoredApplicationRecordingRecoveryTest {
-    @OptIn(ExperimentalResourceApi::class)
+    @OptIn(ExperimentalResourceApi::class, ExperimentalCoroutinesApi::class)
     @Test
     fun `restore retained Application salvages completed recording before database access and retry is idempotent`() =
         runBlocking {
             val folder = Files.createTempDirectory("restored-application-audio").toFile()
             val application =
                 object : Application() {
+                    init {
+                        attachBaseContext(RuntimeEnvironment.getApplication())
+                    }
+
                     override fun getFilesDir(): File = folder
 
                     override fun getApplicationContext(): android.content.Context = this
@@ -41,20 +51,32 @@ class RestoredApplicationRecordingRecoveryTest {
             val audio = byteArrayOf(1, 2, 3, 4)
             staged.writeBytes(audio)
             assertTrue(CrashSafeRecording.markCompletedForRetry(staged))
+            var databaseReached = false
             startKoin {
-                modules(module { single<LogDateDatabase> { error("Synthetic database boundary reached") } })
+                modules(
+                    module {
+                        single<LogDateDatabase> {
+                            databaseReached = true
+                            assertTrue(final.isFile, "Completed recording must be recovered before database access")
+                            error("Synthetic database boundary reached")
+                        }
+                    },
+                )
             }
+            Dispatchers.setMain(UnconfinedTestDispatcher())
             try {
                 val startup = ApplicationStartupCoordinator.get(application)
-                assertFalse(startup.awaitReady())
-                assertTrue(final.isFile)
+                assertFalse(withTimeout(5_000) { startup.awaitReady() })
+                assertTrue(databaseReached, "Startup must reach the deliberate database failure")
+                assertTrue(final.isFile, "Recording recovery did not reach the database boundary: ${startup.state.value}")
                 assertContentEquals(audio, final.readBytes())
                 assertFalse(staged.exists())
                 val retry = ApplicationStartupCoordinator.get(application)
                 assertSame(startup, retry)
-                assertFalse(retry.awaitReady())
+                assertFalse(withTimeout(5_000) { retry.awaitReady() })
                 assertContentEquals(audio, final.readBytes())
             } finally {
+                Dispatchers.resetMain()
                 stopKoin()
                 setResourceReaderAndroidContext(RuntimeEnvironment.getApplication())
                 folder.deleteRecursively()

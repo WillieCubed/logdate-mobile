@@ -36,6 +36,10 @@ to recover available audio when it is reopened. Audio that the recorder had not
 yet written may be lost. A failed save never produces a success notification, and
 the completed file or unfinished AAC source remains available for recovery.
 
+After a device reboot, Android recovery waits for the first user unlock before
+accessing credential-encrypted storage. Locking the screen again does not make
+that storage unavailable or prevent Quiet Save from saving the recording.
+
 ## Detection and validation
 
 Quiet Save uses microphone peak levels, independently of the optional transcription
