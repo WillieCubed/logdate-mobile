@@ -62,6 +62,66 @@ and offer archive export without requiring an account. A native quota callback r
 reported failure in non-backed-up storage; the UI displays that failed attempt independently of
 LogDate Cloud status.
 
+## Background account recovery
+
+The restricted backup callback retains the original delivery, generation, server/privacy digest,
+owner, and binding before publishing completion. It schedules a persisted `JobScheduler` job with
+network connectivity and exponential backoff. It never resolves Koin or performs credential exchange.
+Ordinary unlocked startup and boot/package-replacement reconciliation reschedule retained work,
+including a callback interrupted before its completion receipt. A running job can finish only the
+reserved ticket for that native generation. Network loss, dependency initialization, and expired
+per-attempt privacy epochs preserve a still-authorized durable request for a fresh attempt.
+
+The account choice has a separate durable receipt in `noBackupFilesDir`. It is written before the
+main inbox and updated before owner preferences or secure session publication. Persisted system
+job extras can repair an unreadable inbox after validating the original configuration and owner.
+A matching receipt or exact interrupted-commit stamp preserves the accepted account; conflicting
+accounts or changed privacy/server settings cannot authorize reconstruction. Unreadable bytes are
+retained. Recovery metadata contains no credential, access token, or refresh token.
+
+Publication takes the native delivery gate, the session identity mutex, and the shared durable
+privacy-epoch fence, in that order. HTTP and provider calls stay outside those locks. Owner admission
+and secure persistence run inside the guarded publication. Use the shared API rather than saving
+a session and validating afterward:
+
+```kotlin
+vault.installNativeRestoreSessionIfCurrent(guard, session, privacyEpoch, capturedEpoch) {
+    admitOriginalRestoreOwner()
+}
+```
+
+Every first write of local journal content must use the native delivery gate as well. Existing
+Room opening already observes that gate. Draft stores, camera captures, canonical media, audio
+recordings, archives, and watch reception admit their destination directory before writing bytes:
+
+```kotlin
+admitNativeContent(destinationDirectory)
+writeCapture(destinationDirectory)
+```
+
+Synchronous platform entrypoints use `admitNativeContentBlocking` for directory admission only.
+Never hold the gate through recording, media copying, network work, or a whole editor session.
+An unbound restore cannot claim a journal after local content appears during authentication.
+
+Host tests cover retained scheduling, callback process death, interrupted writes, account changes,
+sign-out, delayed configuration persistence, and first-content races. Managed-device acceptance
+must additionally verify persisted worker execution and transfer behavior. Synthetic credential
+exchange does not verify Google Restore Credentials, which requires its dedicated provider setup.
+The account-bound transfer profile can additionally execute the actual persisted system job,
+verify retry after process restart, and check the journal while no provider credential is available:
+
+```sh
+python3 tests/e2e/managed-native-restore-acceptance.py \
+  --output /absolute/path/to/new-account-job-evidence \
+  --after-transfer account-job -- --identity account
+```
+
+The Android probe checks the effective service/receiver manifest and exact persisted request.
+The host requires an increased failure counter for this registered service after each forced
+execution, preserves the same request and pending account ticket, and runs the populated journal
+oracle after restart. These checks verify system scheduling and retry with retained journal data. The system failure
+counter does not identify the retry reason or establish successful Google credential restoration.
+
 ## Restore lifecycle and keys
 
 `NativeBackupAgent` uses file-based Auto Backup (`fullBackupOnly`). Its restore-completion callback

@@ -75,6 +75,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         androidMain.dependencies {
+            implementation(projects.client.device)
             implementation(projects.client.logdateDatastore)
             implementation(projects.shared.model)
             implementation(libs.koin.android)

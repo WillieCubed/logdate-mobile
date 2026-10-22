@@ -11,6 +11,7 @@ import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.ContextCompat
+import app.logdate.client.device.restore.admitNativeContent
 import app.logdate.client.media.MediaManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CompletableDeferred
@@ -48,7 +49,7 @@ internal class AndroidCameraCaptureOutput(
      * intentionally live in app-private durable storage rather than [Context.getCacheDir].
      */
     private val captureStagingDirectory =
-        java.io.File(appContext.filesDir, "camera-captures").apply { mkdirs() }
+        java.io.File(appContext.filesDir, "camera-captures")
     private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
 
     suspend fun capturePhoto(imageCapture: () -> ImageCapture?): String? =
@@ -62,6 +63,7 @@ internal class AndroidCameraCaptureOutput(
 
             val timeStamp = timestampFormat.format(Date())
             val fileName = "LOGDATE_$timeStamp.jpg"
+            admitNativeContent(captureStagingDirectory)
             val sourceFile = java.io.File.createTempFile("logdate-camera-", ".jpg", captureStagingDirectory)
             val outputOptions = ImageCapture.OutputFileOptions.Builder(sourceFile).build()
             val capturedPath = awaitPhotoCapture(capture, outputOptions, sourceFile)
@@ -140,6 +142,7 @@ internal class AndroidCameraCaptureOutput(
         val timeStamp = timestampFormat.format(Date())
         val fileName = "LOGDATE_$timeStamp.mp4"
 
+        admitNativeContent(captureStagingDirectory)
         val outputFile = java.io.File.createTempFile("logdate-camera-", ".mp4", captureStagingDirectory)
         val outputOptions = FileOutputOptions.Builder(outputFile).build()
 

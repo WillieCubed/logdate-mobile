@@ -1,14 +1,37 @@
 package app.logdate.client.device.restore
 
+import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.client.datastore.LegacyCloudCredentialMigration
+import kotlinx.coroutines.flow.first
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+
+/** Caller holds the native delivery gate; duplicate attempts preserve any fresh installation id. */
+suspend fun prepareNativeRestoredInstallationState(
+    context: Context,
+    preferences: DataStore<Preferences>,
+) {
+    val current = preferences.data.first()[stringPreferencesKey("device.id")]
+    val source = NativeInstallationResetMarker(context.noBackupFilesDir).sourceDeviceId(current)
+    resetRestoredInstallationState(preferences, source)
+    PostRestoreDetector(context).refreshRestoreFingerprint()
+}
+
+/** Resumes a framework-completed delivery whose process died before publishing its completion receipt. */
+suspend fun completeNativeAccountRecoveryDelivery(
+    context: Context,
+    delivery: String,
+    generation: String,
+): Boolean =
+    AndroidNativeRestoreDeliveryGate.withLock {
+        PostRestoreDetector(context).completeReservedAccountRecovery(delivery, generation)
+    }
 
 internal suspend fun resetRestoredInstallationState(
     preferences: DataStore<Preferences>,

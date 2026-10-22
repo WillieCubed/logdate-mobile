@@ -18,10 +18,29 @@ interface PrivacyEpochStorage {
 class PrivacyScopeEpoch(
     private val storage: PrivacyEpochStorage,
 ) {
-    private val mutex = Mutex()
     private val current = MutableStateFlow<String?>(null)
     private var initialized = false
     val value: StateFlow<String?> = current.asStateFlow()
+
+    private companion object {
+        // Restore jobs and the foreground repository can have different storage wrappers in one process.
+        val mutex = Mutex()
+    }
+
+    suspend fun snapshot(): String? = mutex.withLock { readValidated() }
+
+    suspend fun <T> withStableValue(
+        expected: String?,
+        publish: suspend () -> T,
+    ): T? =
+        mutex.withLock {
+            if (readValidated() != expected) null else publish()
+        }
+
+    private suspend fun readValidated(): String? =
+        storage.read().also { value ->
+            check(value == null || runCatching { Uuid.parse(value) }.isSuccess) { "Privacy boundary is unreadable" }
+        }
 
     suspend fun initialize() = mutex.withLock { load() }
 

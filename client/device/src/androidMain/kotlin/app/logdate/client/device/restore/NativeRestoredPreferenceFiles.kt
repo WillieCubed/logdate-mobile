@@ -15,7 +15,15 @@ class NativeRestoredPreferenceFiles(
 ) {
     fun begin(names: Set<String>) =
         locked {
-            names.forEach { captureFor(it).begin() }
+            if (names.isEmpty()) return@locked
+            val generation = generation()
+            val legacy =
+                names.filterTo(mutableSetOf()) { name ->
+                    val snapshot = file(name, generation).baseFile
+                    snapshot.exists() || File(snapshot.path + ".bak").exists()
+                }
+            val enrollment = deliveryJournal(generation).begin(names, legacy)
+            names.filterNot { enrollment.finalized || it in enrollment.observed }.forEach { captureFor(it).begin() }
         }
 
     fun observe(
@@ -24,6 +32,7 @@ class NativeRestoredPreferenceFiles(
     ): String? =
         locked {
             val name = matchingName(destination, names) ?: return@locked null
+            deliveryJournal(generation()).observe(names, name)
             captureFor(name).observe()
             name
         }
@@ -33,6 +42,7 @@ class NativeRestoredPreferenceFiles(
         names: Set<String>,
     ) = locked {
         val name = matchingName(destination, names) ?: return@locked
+        deliveryJournal(generation()).observe(names, name)
         captureFor(name).capture()
     }
 
@@ -49,6 +59,7 @@ class NativeRestoredPreferenceFiles(
         return locked {
             val name = matchingName(destination, names) ?: return@locked false
             if (size !in 0..MAX_BYTES.toLong()) throw IOException("Native preference payload has an invalid size")
+            deliveryJournal(generation()).observe(names, name)
             captureFor(name).restore(
                 incoming = {
                     incoming().also { if (it.size.toLong() != size) throw IOException("Native preference input is incomplete") }
@@ -80,11 +91,19 @@ class NativeRestoredPreferenceFiles(
         return locked {
             val journal = deliveryJournal(generation())
             val decision = journal.read()
-            if (decision != null) {
-                if (decision.names != names) throw IOException("Native preference delivery enrollment changed")
+            if (decision != null && decision.names != names) throw IOException("Native preference delivery enrollment changed")
+            if (decision?.finalized == true) {
                 decision.delivered
             } else {
-                val delivered = names.filterTo(mutableSetOf()) { captureFor(it).deliveryDecision() }
+                val delivered =
+                    names.filterTo(mutableSetOf()) {
+                        when {
+                            decision == null -> captureFor(it).deliveryDecision()
+                            it !in decision.observed -> false
+                            captureFor(it).deliveryDecision() -> true
+                            else -> throw IOException("An observed native preference delivery is still unconfirmed")
+                        }
+                    }
                 journal.record(names, delivered).delivered
             }
         }
@@ -135,7 +154,10 @@ class NativeRestoredPreferenceFiles(
             if (PostRestoreDetector(context).retainedPreferenceSessionId() != expectedGeneration) {
                 null
             } else {
-                deliveryJournal(expectedGeneration).read()?.takeIf { name in it.names }?.let { name in it.delivered }
+                deliveryJournal(expectedGeneration).read()?.takeIf { name in it.names }?.let {
+                    if (!it.finalized) throw IOException("Restored preference delivery is still pending")
+                    name in it.delivered
+                }
             }
         },
         { bytes -> repairDestination(name, expectedGeneration, bytes) },

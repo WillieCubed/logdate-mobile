@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import android.content.Context
+import app.logdate.client.device.restore.admitNativeContent
 import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.audioDigest
 import app.logdate.client.sync.datalayer.copyToDigesting
@@ -57,7 +58,7 @@ class FileWatchAudioStore(
         withContext(ioDispatcher) {
             val staging = File(audioDirectory, "wear_$noteId.m4a.part")
             try {
-                audioDirectory.mkdirs()
+                admitNativeContent(audioDirectory)
                 clearOlderThan(audioDirectory, STAGING_MAX_AGE_MS) { it.name.endsWith(STAGING_SUFFIX) }
                 val digest =
                     FileOutputStream(staging).use { output ->
@@ -98,7 +99,7 @@ class FileWatchAudioStore(
         data: Map<String, String>,
     ) {
         withContext(ioDispatcher) {
-            incomingDirectory.mkdirs()
+            admitNativeContent(incomingDirectory)
             clearOlderThan(incomingDirectory, STASHED_METADATA_MAX_AGE_MS) { it.name.endsWith(METADATA_SUFFIX) }
             metadataFile(noteId).writeText(Json.encodeToString(metadataSerializer, data))
         }
@@ -133,7 +134,7 @@ class FileWatchAudioStore(
 
     override suspend fun markDeleted(noteId: Uuid) {
         withContext(ioDispatcher) {
-            incomingDirectory.mkdirs()
+            admitNativeContent(incomingDirectory)
             deletionMarker(noteId).writeText("")
         }
     }
@@ -141,12 +142,12 @@ class FileWatchAudioStore(
     override suspend fun isDeleted(noteId: Uuid): Boolean = withContext(ioDispatcher) { deletionMarker(noteId).isFile }
 
     /** Best effort: [storedDigest] measures the file itself when nothing is recorded. */
-    private fun recordDigest(
+    private suspend fun recordDigest(
         noteId: Uuid,
         digest: AudioFileDigest,
     ) {
         try {
-            incomingDirectory.mkdirs()
+            admitNativeContent(incomingDirectory)
             digestFile(noteId).writeText("${digest.sizeBytes} ${digest.sha256Hex}")
         } catch (e: IOException) {
             Napier.w("Could not record the digest of watch audio for note $noteId; it is measured when needed", e)

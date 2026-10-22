@@ -82,6 +82,7 @@ kotlin {
         }
         findByName("androidHostTest")?.dependencies {
             implementation(libs.androidx.test.core)
+            implementation(libs.robolectric)
         }
     }
 }
