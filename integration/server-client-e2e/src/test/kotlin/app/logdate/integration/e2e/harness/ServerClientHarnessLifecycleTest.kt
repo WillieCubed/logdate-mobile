@@ -1,13 +1,16 @@
 package app.logdate.integration.e2e.harness
 
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assume.assumeTrue
 import java.net.BindException
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.sql.DriverManager
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -16,12 +19,12 @@ class ServerClientHarnessLifecycleTest {
     fun `stopping a test server releases its database connections`() =
         runBlocking {
             assumeTrue(!System.getenv("DATABASE_URL").isNullOrBlank())
-            val initialConnections = connectionCount()
+            assertDatabaseConnectionsReleased()
             repeat(3) {
                 withServerClientHarness {
-                    assertTrue(connectionCount() > initialConnections)
+                    assertTrue(connectionCount() > 0)
                 }
-                assertEquals(initialConnections, connectionCount(), "The stopped harness leaked database connections")
+                assertDatabaseConnectionsReleased()
             }
         }
 
@@ -29,18 +32,18 @@ class ServerClientHarnessLifecycleTest {
     fun `a failed test block releases its database connections`() =
         runBlocking {
             assumeTrue(!System.getenv("DATABASE_URL").isNullOrBlank())
-            val initialConnections = connectionCount()
+            assertDatabaseConnectionsReleased()
             assertFailsWith<IllegalStateException> {
                 withServerClientHarness { error("test failure") }
             }
-            assertEquals(initialConnections, connectionCount())
+            assertDatabaseConnectionsReleased()
         }
 
     @Test
     fun `a failed server startup releases its database connections`() =
         runBlocking {
             assumeTrue(!System.getenv("DATABASE_URL").isNullOrBlank())
-            val initialConnections = connectionCount()
+            assertDatabaseConnectionsReleased()
             ServerSocket().use { occupied ->
                 occupied.reuseAddress = false
                 occupied.bind(InetSocketAddress("127.0.0.1", 0))
@@ -50,8 +53,58 @@ class ServerClientHarnessLifecycleTest {
                     }
                 }
             }
-            assertEquals(initialConnections, connectionCount())
+            assertDatabaseConnectionsReleased()
         }
+
+    @Test
+    fun `cleanup assertion waits for a closing database session`() =
+        runBlocking {
+            assumeTrue(!System.getenv("DATABASE_URL").isNullOrBlank())
+            assertDatabaseConnectionsReleased()
+            val connection =
+                DriverManager.getConnection(
+                    System.getenv("DATABASE_URL"),
+                    System.getenv("DATABASE_USER"),
+                    System.getenv("DATABASE_PASSWORD"),
+                )
+            try {
+                assertTrue(connectionCount() > 0)
+                val closing =
+                    launch {
+                        delay(200)
+                        connection.close()
+                    }
+                assertDatabaseConnectionsReleased()
+                closing.join()
+            } finally {
+                connection.close()
+            }
+        }
+
+    @Test
+    fun `cleanup assertion rejects a retained database session`() =
+        runBlocking {
+            assumeTrue(!System.getenv("DATABASE_URL").isNullOrBlank())
+            assertDatabaseConnectionsReleased()
+            DriverManager
+                .getConnection(
+                    System.getenv("DATABASE_URL"),
+                    System.getenv("DATABASE_USER"),
+                    System.getenv("DATABASE_PASSWORD"),
+                ).use {
+                    assertTrue(connectionCount() > 0)
+                    assertFailsWith<TimeoutCancellationException> {
+                        assertDatabaseConnectionsReleased(timeoutMillis = 250)
+                    }
+                }
+            assertDatabaseConnectionsReleased()
+        }
+
+    private suspend fun assertDatabaseConnectionsReleased(timeoutMillis: Long = 5_000) {
+        withTimeout(timeoutMillis) {
+            while (connectionCount() != 0) delay(25)
+        }
+    }
 
     private fun connectionCount(): Int =
         DriverManager
