@@ -29,6 +29,11 @@ instrumentation_passed = runpy.run_path(
 )["instrumentation_passed"]
 
 
+managed_adb_command = runpy.run_path(
+    str(Path(__file__).with_name("managed-native-target.py"))
+)["managed_adb_command"]
+
+
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 PROBE = "app.logdate.client.e2e.NativeBackupTransferProbeTest"
@@ -241,10 +246,22 @@ def emulator_serial(value):
 
 def adb(serial, *arguments, timeout=180, input_bytes=None):
     emulator_serial(serial)
-    return subprocess.run(
-        ["adb", "-s", serial, *arguments], input=input_bytes,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=True,
-    ).stdout
+    started_ns = time.monotonic_ns()
+    try:
+        return subprocess.run(
+            managed_adb_command(serial, arguments), input=input_bytes,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        failed_ns = time.monotonic_ns()
+        stderr = error.stderr or b""
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        error.add_note(
+            f"Managed ADB failure: start_monotonic_ns={started_ns}, failure_monotonic_ns={failed_ns}, "
+            f"failure_unix_ns={time.time_ns()}, stderr={stderr[:4096]}"
+        )
+        raise
 
 
 def wait_for_package_manager(serial, attempts=60):
@@ -1022,10 +1039,51 @@ def data_only_source_session(source, output, enabled):
             primary_error.add_note("Synthetic source cleanup also failed: " + ", ".join(type(error).__name__ for error in cleanup_errors))
 
 
+def restore_transport(serial, *, system_widgets=False):
+    if system_widgets:
+        # A filtered single-package restore never finishes Android's system widget restore.
+        # Restore-all is safe here only when the *actual* dataset holds our synthetic app.
+        payload = adb(serial, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
+        validate_widget_restore_dataset(payload)
+    arguments = () if system_widgets else (PACKAGE,)
+    return adb(serial, "shell", "bmgr", "restore", "1", *arguments)
+
+
+def validate_widget_restore_dataset(payload):
+    found_app = False
+    found_metadata = False
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as archive:
+        for item in archive:
+            name = item.name.removeprefix("./").rstrip("/")
+            if item.issym() or item.islnk() or any(part in {"", ".", ".."} for part in name.split("/")):
+                raise RuntimeError("System widget restore requires an isolated LogDate dataset")
+            if item.isdir() and name in {"1", "1/_full", "1/_delta", "1/_delta/@pm@"}:
+                continue
+            if item.isfile() and name == f"1/_full/{PACKAGE}":
+                if found_app:
+                    raise RuntimeError("System widget restore contains duplicate app payloads")
+                found_app = True
+            elif item.isfile() and name.startswith("1/_delta/@pm@/") and len(name.split("/")) == 4:
+                found_metadata = True
+                continue
+            else:
+                raise RuntimeError("System widget restore contains an unrelated payload")
+    if not found_app:
+        raise RuntimeError("System widget restore is missing the LogDate payload")
+    if not found_metadata:
+        raise RuntimeError("System widget restore is missing package metadata")
+
+
+def capture_widget_restore_delivery(serial, output):
+    private_file(output.with_suffix(".system.log"), adb(serial, "logcat", "-b", "all", "-d", "-v", "threadtime"))
+    for service in ("appwidget", "activity broadcasts", "package " + PACKAGE):
+        private_file(output.with_suffix("." + service.split()[0] + ".txt"), adb(serial, "shell", "dumpsys", *service.split()))
+
+
 def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False,
              exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False,
              exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False,
-             exercise_missing_privacy=False):
+             exercise_missing_privacy=False, exercise_system_widgets=False):
     prepare_source(
         source,
         app_apk,
@@ -1088,20 +1146,27 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     # Some clean destination AVDs already have the debug package installed but
     # have never created app data. Updating keeps that safe test slot reusable.
     adb(destination, "install", "-r", "-t", str(app_apk))
-    restored = adb(destination, "shell", "bmgr", "restore", "1", PACKAGE)
+    restored = restore_transport(destination, system_widgets=exercise_system_widgets)
     private_file(output / "native-restore.log", restored)
     if b"restoreFinished: 0" not in restored:
         raise RuntimeError("Android did not complete the native restore")
+    if exercise_system_widgets:
+        capture_widget_restore_delivery(destination, output / "widget-delivery-initial")
     if exercise_duplicate_restore:
         before_replay = package_file_snapshot(destination)
-        replay = adb(destination, "shell", "bmgr", "restore", "1", PACKAGE)
+        replay = restore_transport(destination, system_widgets=exercise_system_widgets)
         private_file(output / "native-restore-replay.log", replay)
         if b"restoreFinished: 0" not in replay:
             raise RuntimeError("Android did not complete the replayed native restore")
+        if exercise_system_widgets:
+            capture_widget_restore_delivery(destination, output / "widget-delivery-replay")
         assert_snapshot_preserved(
             before_replay,
             package_file_snapshot(destination),
             require_database=not exercise_credentials_only,
+            # Widget IDs are newly allocated by each full system restore; the widget
+            # acceptance probe checks every retained choice against the real binding.
+            ignored_paths={"shared_prefs/logdate_widget_instances.xml"} if exercise_system_widgets else (),
         )
     restored_files = package_file_snapshot(destination)
     private_file(output / "source-files-before-backup.json", json.dumps(source_files, indent=2).encode())

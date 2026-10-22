@@ -599,6 +599,13 @@ class AndroidMediaManager(
         sourceFilePath: String,
         fileName: String,
         mimeType: String,
+    ): String = saveMediaFromFile(sourceFilePath, fileName, mimeType) { true }
+
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+        canCommit: () -> Boolean,
     ): String {
         val sourceFile = File(sourceFilePath)
         val supportedMimeType = requireSupportedMediaMimeType(mimeType, fileName)
@@ -609,6 +616,7 @@ class AndroidMediaManager(
                     input = FileInputStream(sourceFile),
                     mimeType = supportedMimeType,
                     expectedSizeBytes = sourceFile.length(),
+                    canCommit = canCommit,
                 )
             }
         } catch (cancellation: CancellationException) {

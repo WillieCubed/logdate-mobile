@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application>
         <receiver
             android:name="app.logdate.client.feature.widgets.OnThisDayWidgetReceiver"
+            android:process=":widget_ingress"
             android:exported="false"
             android:label="@string/widget_name_on_this_day">
             <intent-filter>
@@ -15,6 +17,7 @@
 
         <receiver
             android:name="app.logdate.client.feature.widgets.FixedMemoryWidgetReceiver"
+            android:process=":widget_ingress"
             android:exported="false"
             android:label="@string/widget_name_fixed_memory">
             <intent-filter>
@@ -27,6 +30,7 @@
 
         <receiver
             android:name="app.logdate.client.feature.widgets.NewEntryWidgetReceiver"
+            android:process=":widget_ingress"
             android:exported="false"
             android:label="@string/widget_name_new_entry">
             <intent-filter>
@@ -43,6 +47,7 @@
         -->
         <receiver
             android:name="app.logdate.client.feature.widgets.CaptureWidgetReceiver"
+            android:process=":widget_ingress"
             android:enabled="false"
             android:exported="false"
             android:label="@string/widget_name_capture">
@@ -52,6 +57,19 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/capture_widget_info" />
+        </receiver>
+
+        <service
+            android:name="app.logdate.client.feature.widgets.WidgetLifecycleJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <receiver
+            android:name="app.logdate.client.feature.widgets.WidgetLifecycleRestartReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
 
         <activity

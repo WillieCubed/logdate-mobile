@@ -22,7 +22,9 @@ import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.reminders.ReminderSignalObserver
 import app.logdate.client.events.EventInferenceScheduler
+import app.logdate.client.feature.widgets.isWidgetIngressProcess
 import app.logdate.client.feature.widgets.publishWidgetPreviews
+import app.logdate.client.feature.widgets.resumeWidgetLifecycle
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.launch.ApplicationStartup
 import app.logdate.client.launch.awaitAndroidUserUnlock
@@ -129,6 +131,7 @@ class LogdateApplication :
 
     override fun onCreate() {
         super.onCreate()
+        if (isWidgetIngressProcess(packageName)) return
         startupScope.launch(Dispatchers.Main.immediate) {
             awaitAndroidUserUnlock()
             initializeUnlockedApplication()
@@ -151,6 +154,7 @@ class LogdateApplication :
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         dependenciesInitialized = true
+        runCatching { resumeWidgetLifecycle(this) }.onFailure { Napier.w("Widget lifecycle recovery remains pending", it) }
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
     }
 

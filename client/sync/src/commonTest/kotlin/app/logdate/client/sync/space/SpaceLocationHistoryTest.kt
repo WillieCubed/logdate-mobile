@@ -2,6 +2,8 @@ package app.logdate.client.sync.space
 
 import app.logdate.client.database.entities.UserPlaceEntity
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.runSyncBatches
 import app.logdate.client.sync.space.mappers.LocationHour
 import app.logdate.client.sync.space.mappers.PlaceEntryLinkRecordMapper
 import app.logdate.client.sync.space.mappers.changeAt
@@ -69,6 +71,40 @@ class SpaceLocationHistoryTest {
                 ),
             ) as HistoryPayload.Place
         ).value
+
+    @Test
+    fun `held location uploads yield to durable retry and resume without losing samples`() =
+        runTest {
+            val sample = phone.sample(0)
+            phone.record(sample)
+            val hourId = LocationHour.itemId(phone.deviceId, firstHour)
+            phone.metadata.enqueuePending(hourId, EntityType.LOCATION_SAMPLES, PendingOperation.UPDATE)
+            phone.retrySchedule.setNextAttemptAt(EntityType.LOCATION_SAMPLES, hourId, Long.MAX_VALUE)
+            var passes = 0
+
+            val held =
+                runSyncBatches {
+                    assertTrue(++passes <= 8, "Backoff-held work must return to the worker instead of spinning")
+                    phone.manager.uploadPendingChanges()
+                }
+
+            assertTrue(held.success)
+            assertTrue(held.hasMorePending)
+            assertEquals(0, home.writes)
+            assertNotNull(phone.sampleRecord(sample.id))
+            assertEquals(1, phone.store.pending(HISTORY_ACCOUNT, phone.sessions.currentOrigin, 100).size)
+            assertEquals(1, phone.pending(EntityType.LOCATION_SAMPLES).size)
+
+            phone.retrySchedule.clear(EntityType.LOCATION_SAMPLES, hourId)
+            val resumed = runSyncBatches { phone.manager.uploadPendingChanges() }
+
+            assertTrue(resumed.success)
+            assertFalse(resumed.hasMorePending)
+            assertEquals(listOf(sample), phone.liveSamples(phone.deviceId, firstHour))
+            assertTrue(phone.pending(EntityType.LOCATION_SAMPLES).isEmpty())
+            assertTrue(phone.store.pending(HISTORY_ACCOUNT, phone.sessions.currentOrigin, 100).isEmpty())
+            assertEquals(1, home.writes)
+        }
 
     @Test
     fun `samples recorded in two hours reach another device as one record for each hour`() =

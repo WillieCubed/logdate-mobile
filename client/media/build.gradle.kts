@@ -53,6 +53,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.core)
             // MediaFileSource exposes kotlinx-io sources so uploads can stream from disk.
             api(libs.kotlinx.io.core)
+            implementation(libs.okio)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
@@ -67,6 +68,7 @@ kotlin {
             implementation(libs.napier)
             // Repository
             implementation(projects.client.repository)
+            implementation(projects.client.util)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

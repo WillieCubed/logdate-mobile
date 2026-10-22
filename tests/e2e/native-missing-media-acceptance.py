@@ -19,16 +19,21 @@ instrumentation_passed = runpy.run_path(
 )["instrumentation_passed"]
 
 
+managed_adb_command = runpy.run_path(
+    str(Path(__file__).with_name("managed-native-target.py"))
+)["managed_adb_command"]
+
+
 PACKAGE = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
 RUNNER = PACKAGE + ".test/androidx.test.runner.AndroidJUnitRunner"
 TEST = "app.logdate.client.e2e.NativeMissingMediaE2ETest"
 PERMISSIONS = ["READ_MEDIA_IMAGES", "READ_MEDIA_VIDEO", "READ_MEDIA_AUDIO", "POST_NOTIFICATIONS"]
 
 
-def adb(serial, *args, timeout=180, check=True):
+def adb(serial, *args, timeout=180, check=True, input=None):
     if not re.fullmatch(r"emulator-[0-9]+", serial):
         raise ValueError("An explicit emulator-NNNN serial is required")
-    return subprocess.run(["adb", "-s", serial, *map(str, args)], capture_output=True, timeout=timeout, check=check)
+    return subprocess.run(managed_adb_command(serial, args), input=input, capture_output=True, timeout=timeout, check=check)
 
 
 def safe_target(serial):
@@ -47,10 +52,60 @@ def set_metered(serial, network, mode):
         raise RuntimeError("Metered-network configuration did not match the requested state")
 
 
+def release_network_handoff(serial, network, nonce, report_path):
+    if not re.fullmatch(r"[a-f0-9]{32}", nonce):
+        raise ValueError("Network handoff requires a fresh fixture nonce")
+    started = time.monotonic()
+    report = {"acknowledged": False, "steps": []}
+
+    def completed(stage):
+        report["steps"].append({"stage": stage, "elapsedSeconds": time.monotonic() - started})
+
+    try:
+        adb(serial, "shell", "cmd", "netpolicy", "set", "restrict-background", "false")
+        completed("dataSaverSet")
+        state = adb(serial, "shell", "cmd", "netpolicy", "get", "restrict-background").stdout
+        if b"disabled" not in state or b"enabled" in state:
+            raise RuntimeError("Data Saver did not reach its requested disabled state")
+        completed("dataSaverVerified")
+        set_metered(serial, network, "false")
+        completed("meteredVerified")
+        remote = f"no_backup/restore-network-handoff-{nonce}.txt"
+        # The device may consume the ACK immediately after publication.
+        script = f"umask 077; cat > {remote}.part && cat {remote}.part && mv {remote}.part {remote}"
+        result = adb(serial, "shell", shlex.join(["run-as", PACKAGE, "sh", "-c", script]), input=b"applied")
+        if result.stdout != b"applied":
+            raise RuntimeError("Network handoff acknowledgment did not round-trip")
+        completed("acknowledged")
+        report["acknowledged"] = True
+    except BaseException as error:
+        report["failureType"] = type(error).__name__
+        if isinstance(error, subprocess.CalledProcessError):
+            report["commandFailure"] = (error.stderr or b"").decode(errors="replace")[-2000:]
+        raise
+    finally:
+        report_path.write_text(json.dumps(report, indent=2) + "\n")
+        report_path.chmod(0o600)
+
+
+def run_network_cases(serial, network, directory):
+    for saver in [False, True]:
+        adb(serial, "shell", "cmd", "netpolicy", "set", "restrict-background", str(saver).lower())
+        set_metered(serial, network, "true")
+        nonce = uuid.uuid4().hex
+        label = "data-saver" if saver else "metered"
+        instrument(serial, TEST + "#dMeteredRecoveryResumesWhenPlatformAllowsMedia",
+                   directory / (label + "-recovery.log"),
+                   extras=["-e", "restoreNetworkPolicyExpected", "restricted" if saver else "metered",
+                           "-e", "restoreNetworkHandoff", nonce],
+                   release_network=lambda: release_network_handoff(serial, network, nonce, directory / (label + "-handoff.json")),
+                   timeout=180)
+
+
 def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None, timeout=120):
     safe_target(serial)
     command = shlex.join(["am", "instrument", "-w", "-r", "-e", "class", selector, *extras, RUNNER])
-    process = subprocess.Popen(["adb", "-s", serial, "shell", command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    process = subprocess.Popen(managed_adb_command(serial, ["shell", command]), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     timer = threading.Timer(timeout, process.kill)
     timer.start()
     output = bytearray()
@@ -150,30 +205,37 @@ def run(args, serial):
     wifi = adb(serial, "shell", "settings", "get", "global", "wifi_on").stdout.strip()
     if wifi not in [b"0", b"1", b"2"]:
         raise RuntimeError("Could not determine the original Wi-Fi state")
+    cellular = adb(serial, "shell", "settings", "get", "global", "mobile_data").stdout.strip()
+    if cellular not in (b"0", b"1"):
+        raise RuntimeError("Could not determine the original cellular state")
     (directory / "environment-before.json").write_text(json.dumps({"grants": grants, "meteredOverride": original,
         "dataSaver": original_saver, "airplane": airplane, "wifi": wifi.decode()}, indent=2))
     try:
+        adb(serial, "shell", "svc", "data", "disable")
+        if getattr(args, "network_only", False):
+            # Exercise the same radio round-trip as an offline first launch before
+            # checking policy delivery on each managed replacement candidate.
+            adb(serial, "shell", "svc", "wifi", "disable")
+            adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable")
         adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "disable")
         adb(serial, "shell", "svc", "wifi", "enable")
+        if args.wifi_network != "AndroidWifi":
+            raise RuntimeError("Network acceptance requires the managed emulator's open AndroidWifi fixture")
+        adb(serial, "shell", "cmd", "wifi", "connect-network", args.wifi_network, "open")
+        if getattr(args, "network_only", False):
+            run_network_cases(serial, args.wifi_network, directory)
+            return {"serial": serial, "avd": avd, "tests": 2, "networkPolicyOnly": True}
         for permission in PERMISSIONS:
             result = adb(serial, "shell", "pm", "revoke", PACKAGE, "android.permission." + permission, check=False)
             if result.returncode and b"has not requested permission" not in result.stderr + result.stdout:
                 raise RuntimeError("Could not revoke a fixture permission")
-        for method in ["aSeedProviderCollisionForColdRestore", "bQuarantinedOriginalSurvivesProcessRestart", "cPrivateOriginalWorksWithoutLibraryOrNotificationPermission"]:
+        for method in ["aSeedProviderCollisionForColdRestore", "bQuarantinedOriginalSurvivesProcessRestart",
+                       "cPrivateOriginalWorksWithoutLibraryOrNotificationPermission", "eCorruptCanonicalOriginalsAreRepairedOnce"]:
             if method == "bQuarantinedOriginalSurvivesProcessRestart":
                 safe_target(serial)
                 adb(serial, "shell", "am", "force-stop", PACKAGE)
             instrument(serial, TEST + "#" + method, directory / (method + ".log"))
-        for saver in [False, True]:
-            adb(serial, "shell", "cmd", "netpolicy", "set", "restrict-background", str(saver).lower())
-            set_metered(serial, args.wifi_network, "true")
-            def release_network():
-                adb(serial, "shell", "cmd", "netpolicy", "set", "restrict-background", "false")
-                set_metered(serial, args.wifi_network, "false")
-            instrument(serial, TEST + "#dMeteredRecoveryResumesWhenPlatformAllowsMedia",
-                       directory / ("data-saver-recovery.log" if saver else "metered-recovery.log"),
-                       extras=["-e", "restoreNetworkPolicyExpected", "restricted" if saver else "metered"],
-                       release_network=release_network)
+        run_network_cases(serial, args.wifi_network, directory)
         label = "permissions-" + uuid.uuid4().hex
         for mode in ["seed", "automatic", "verify"]:
             instrument(serial, "app.logdate.client.e2e.ArchiveMediaRecoveryE2ETest#archiveRecoveryAcrossProcessRestart",
@@ -182,8 +244,14 @@ def run(args, serial):
             safe_target(serial)
             adb(serial, "shell", "am", "force-stop", PACKAGE)
     finally:
-        restore_environment(serial, args.wifi_network, original, original_saver, airplane, wifi, grants)
-    return {"serial": serial, "avd": avd, "tests": 8, "originalNetworkOverride": original}
+        try:
+            restore_environment(serial, args.wifi_network, original, original_saver, airplane, wifi, grants)
+        finally:
+            adb(serial, "shell", "svc", "data", "enable" if cellular == b"1" else "disable")
+            if adb(serial, "shell", "settings", "get", "global", "mobile_data").stdout.strip() != cellular:
+                raise RuntimeError("The owned fixture's cellular setting was not restored")
+    return {"serial": serial, "avd": avd, "tests": 9, "originalNetworkOverride": original,
+            "corruptOriginalRecoveryVerified": True}
 
 
 def main():
@@ -193,6 +261,7 @@ def main():
     parser.add_argument("--test-apk", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--wifi-network", default="AndroidWifi")
+    parser.add_argument("--network-only", action="store_true", help="Run only the metered and Data Saver policy cases")
     parser.add_argument("--synthetic-data", action="store_true", required=True, help="Confirm these emulators contain only synthetic LogDate data")
     args = parser.parse_args()
     os.umask(0o077)

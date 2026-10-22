@@ -24,7 +24,12 @@ class PostRestoreDetector(
     internal fun recordRestoreCompletedUnderDeliveryLock() {
         synchronized(lock) {
             val delivery = readDelivery()
-            val restoreSessionId = delivery?.takeIf { it.first == RESTORE_IN_PROGRESS }?.second
+            val restoreSessionId =
+                when (delivery?.first) {
+                    RESTORE_IN_PROGRESS -> delivery.second
+                    DELIVERY_PENDING -> nativeRestoreSessionId()
+                    else -> null
+                }
             val payloadReceived = wasReceivedForSession(restorePayloadReceivedFile(), restoreSessionId, RESTORE_PAYLOAD_RECEIVED)
             val databaseReceived = wasReceivedForSession(restoreDatabaseReceivedFile(), restoreSessionId, RESTORE_DATABASE_RECEIVED)
             val restoreInProgress = restoreSessionId != null
@@ -41,7 +46,7 @@ class PostRestoreDetector(
             }
             val id = Uuid.random().toString()
             writeAtomically(mediaQuarantineFile(), id)
-            writeAtomically(pendingRestoreFile(), "delivery-pending:$id")
+            writeAtomically(pendingRestoreFile(), "$DELIVERY_PENDING:$id")
             writeAtomically(accountRecoveryFile(), id)
             deleteIfPresent(accountResolvedFile())
             val contentPresent =
@@ -73,11 +78,11 @@ class PostRestoreDetector(
         }
 
     /** A new BackupAgent instance starts a new delivery boundary; abandoned receipts cannot cross it. */
-    fun beginNativeRestoreSession() =
+    fun beginNativeRestoreSession(retainPreferences: Boolean = false) =
         synchronized(lock) {
             NativeInstallationResetMarker(context.noBackupFilesDir).clear()
             val sessionId = Uuid.random().toString()
-            writeAtomically(restorePrivacyFile(), "pending:$sessionId")
+            writeAtomically(restorePrivacyFile(), "pending:$sessionId${if (retainPreferences) ":prefs-v1" else ""}")
             // Publish the new generation first. If deletion is interrupted, prior receipts still
             // carry the old generation and cannot establish that this delivery contained a file.
             writeAtomically(pendingRestoreFile(), "$RESTORE_IN_PROGRESS:$sessionId")
@@ -97,18 +102,52 @@ class PostRestoreDetector(
             val file = restorePrivacyFile()
             if (!file.exists()) return@synchronized false
             val receipt = readSmallFile(file) ?: return@synchronized true
-            !receipt.startsWith("received:") || runCatching { Uuid.parse(receipt.removePrefix("received:")) }.isFailure
+            val parts = receipt.split(':')
+            parts.first() != "received" || !validPrivacyReceipt(parts)
         }
+
+    /** The privacy receipt retains the delivery generation after content reconciliation. */
+    fun nativeRestoreSessionId(): String? =
+        synchronized(lock) {
+            readSmallFile(restorePrivacyFile())?.split(':')?.takeIf(::validPrivacyReceipt)?.get(1)
+        }
+
+    fun retainedPreferenceSessionId(): String? =
+        synchronized(lock) {
+            readSmallFile(restorePrivacyFile())?.split(':')?.takeIf { validPrivacyReceipt(it) && it.last() == "prefs-v1" }?.get(1)
+        }
+
+    internal fun canResumeNativeRestoreFinalization(expectedSessionId: String): Boolean =
+        synchronized(lock) {
+            if (retainedPreferenceSessionId() != expectedSessionId) return@synchronized false
+            val delivery = readDelivery() ?: return@synchronized false
+            when (delivery.first) {
+                RESTORE_IN_PROGRESS -> delivery.second == expectedSessionId
+                DELIVERY_PENDING -> true
+                else -> false
+            }
+        }
+
+    private fun validPrivacyReceipt(parts: List<String>): Boolean =
+        parts.size in 2..3 &&
+            parts[0] in setOf("pending", "received") &&
+            runCatching { Uuid.parse(parts[1]) }.isSuccess &&
+            (parts.size == 2 || parts[2] == "prefs-v1")
 
     fun markNativePrivacyPayloadReceived() =
         synchronized(lock) {
             val session = readDelivery()?.takeIf { it.first == RESTORE_IN_PROGRESS }?.second ?: return@synchronized
-            writeAtomically(restorePrivacyFile(), "received:$session")
+            val suffix = if (retainedPreferenceSessionId() != null) ":prefs-v1" else ""
+            writeAtomically(restorePrivacyFile(), "received:$session$suffix")
         }
 
     internal fun acknowledgeEmptyNativePrivacyPayload() =
         synchronized(lock) {
-            if (hasMissingNativePrivacyPayload()) writeAtomically(restorePrivacyFile(), "received:${Uuid.random()}")
+            if (hasMissingNativePrivacyPayload()) {
+                val suffix = if (retainedPreferenceSessionId() != null) ":prefs-v1" else ""
+                val session = nativeRestoreSessionId() ?: Uuid.random().toString()
+                writeAtomically(restorePrivacyFile(), "received:$session$suffix")
+            }
         }
 
     fun pendingMediaQuarantineId(): String? =
@@ -370,6 +409,7 @@ class PostRestoreDetector(
         const val CONTENT_MISSING = "content-missing"
         const val CONTENT_COMPLETE = "content-complete"
         const val RESTORE_IN_PROGRESS = "restore-in-progress"
+        const val DELIVERY_PENDING = "delivery-pending"
         const val RESTORE_PAYLOAD_RECEIVED = "received"
         const val RESTORE_DATABASE_RECEIVED = "received"
         const val MAX_RESTORE_FINGERPRINTS = 4

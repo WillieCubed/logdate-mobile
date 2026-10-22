@@ -33,7 +33,7 @@ def emulator_serial(value):
 def adb(serial, *arguments, timeout=180):
     emulator_serial(serial)
     return subprocess.run(
-        ["adb", "-s", serial, *arguments],
+        NATIVE["managed_adb_command"](serial, arguments),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=timeout,

@@ -22,6 +22,7 @@ RUNNER = H["RUNNER"]
 FIXTURE = "native-device-enrollment-fixture.json"
 RECEIPT = "native-device-enrollment-receipt.json"
 PROBE = "app.logdate.client.e2e.NativeDeviceEnrollmentProbeTest"
+REAUTHENTICATION = runpy.run_path(str(Path(__file__).with_name("native-media-reauthentication-acceptance.py")))
 AUTOMATIC_MEDIA = runpy.run_path(str(Path(__file__).with_name("native-automatic-media-worker-acceptance.py")))
 
 
@@ -45,6 +46,17 @@ def checked_emulator(serial):
     H["emulator_serial"](serial)
     if H["adb"](serial, "shell", "getprop", "ro.kernel.qemu").strip() != b"1":
         raise RuntimeError("An Android emulator is required")
+
+
+def bring_fixture_online(serial, output=None):
+    checked_emulator(serial)
+    H["set_offline"](serial, False)
+    try:
+        H["adb"](serial, "shell", "cmd", "wifi", "connect-network", "AndroidWifi", "open")
+    except subprocess.CalledProcessError as failure:
+        if output is not None:
+            H["private_file"](output, (failure.stdout or b"")[-2000:] + (failure.stderr or b"")[-2000:])
+        raise RuntimeError("The owned emulator Wi-Fi reconnect failed") from failure
 
 
 def wait_for(path, process, seconds=120):
@@ -188,6 +200,7 @@ def run_acceptance(options, control, process):
     for serial in (options.source, options.destination):
         checked_emulator(serial)
         H["prepare"](serial, allow_preinstalled_empty=getattr(options, "seed_empty_source", False))
+    bring_fixture_online(options.source, options.output / "source-network-preflight.txt")
     for apk in (options.app_apk, options.test_apk):
         H["adb"](options.source, "install", "-r", "-t", str(apk))
     private_fixture(options.source, fixture)
@@ -218,7 +231,7 @@ def run_acceptance(options, control, process):
                                           "sourceProof": source["proof"]})
     H["set_offline"](options.destination, True)
     probe(options.destination, "destination-edit", options.output / "destination-offline-edit.log")
-    H["set_offline"](options.destination, False)
+    bring_fixture_online(options.destination, options.output / "destination-network-reconnect.txt")
     probe(options.destination, "destination-enroll", options.output / "destination-enroll.log")
     destination = receipt(options.destination)
     if destination.get("automaticSyncObserved") is not True or not destination.get("syncWorkIds"):
@@ -236,11 +249,12 @@ def run_acceptance(options, control, process):
         raise RuntimeError("Process restart replaced destination identity")
     registry_check(control, process, "replay", expected, fixture["owner"], proof)
     media = AUTOMATIC_MEDIA["run"](options.destination, control, process, options.output / "automatic-media", wait_for)
+    media.update(REAUTHENTICATION["run"](options.destination, control, process, options.output / "media-reauthentication", wait_for, publish_control))
     H["set_offline"](options.destination, True)
     current_draft_probe(options.destination, "prepare", options.output / "current-draft-prepare.log")
     H["adb"](options.destination, "shell", "am", "force-stop", PACKAGE)
     current_draft_probe(options.destination, "quarantine", options.output / "current-draft-quarantine.log")
-    H["set_offline"](options.destination, False)
+    bring_fixture_online(options.destination, options.output / "draft-network-reconnect.txt")
     H["adb"](options.destination, "shell", "am", "force-stop", PACKAGE)
     current_draft_probe(options.destination, "complete", options.output / "current-draft-complete.log")
     retained_draft_probe(options.destination, "verify", options.output / "destination-editor-shortcut.log")
@@ -249,7 +263,7 @@ def run_acceptance(options, control, process):
     H["set_offline"](options.destination, True)
     current_draft_probe(options.destination, "base-prepare", options.output / "current-draft-base-prepare.log")
     H["adb"](options.destination, "shell", "am", "force-stop", PACKAGE)
-    H["set_offline"](options.destination, False)
+    bring_fixture_online(options.destination, options.output / "base-network-reconnect.txt")
     current_draft_probe(options.destination, "base-complete", options.output / "current-draft-base-complete.log")
     probe(options.destination, "cleanup", options.output / "destination-session-cleanup.log")
     publish_control(control / "complete", b"complete")

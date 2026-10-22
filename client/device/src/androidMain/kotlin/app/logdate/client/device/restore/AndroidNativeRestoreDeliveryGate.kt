@@ -33,6 +33,7 @@ internal object AndroidNativeRestoreDeliveryGate : NativeRestoreDeliveryGate {
 
     fun beginRestoreCompletion() =
         lifecycleLock.withLifecycleLock {
+            while (completionStarted) callbacksIdle.awaitUninterruptibly()
             ensureRestoreSession()
             completionStarted = true
             while (activeCallbacks > 0) callbacksIdle.awaitUninterruptibly()

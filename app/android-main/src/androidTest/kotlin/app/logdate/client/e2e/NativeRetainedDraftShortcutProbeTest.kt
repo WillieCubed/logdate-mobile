@@ -99,32 +99,36 @@ class NativeRetainedDraftShortcutProbeTest {
                 val bound = requireNotNull(sessions.captureAuthenticationSnapshot()?.session)
                 assertEquals(credentials.owner, bound.session.accountId)
                 assertEquals(credentials.origin, bound.origin)
-                val image =
+                val draftImage =
                     drafts
                         .getDraft(id)
                         .first()
                         .getOrThrow()
                         .notes
                         .single { it.uid == fixtureId(23) } as JournalNote.Image
-                val upload =
-                    koin
-                        .get<CloudMediaDataSource>()
-                        .uploadMedia(
-                            bound.session.accessToken,
-                            image.uid,
-                            koin.get<MediaManager>().openMedia(image.mediaRef),
-                        ).getOrThrow()
-                koin.get<MediaSyncRefStore>().upsert(
-                    MediaSyncRef(
-                        image.uid.toString(),
-                        image.mediaRef,
-                        upload.downloadUrl,
-                        upload.mediaId,
-                        Clock.System.now().toEpochMilliseconds(),
-                        bound.origin,
-                        bound.session.accountId,
-                    ),
-                )
+                val committedImage = koin.get<JournalNotesRepository>().getNoteById(fixtureId(4)) as JournalNote.Image
+                // Seed both server originals without draining the deliberately retained source outbox.
+                for (image in listOf(draftImage, committedImage)) {
+                    val upload =
+                        koin
+                            .get<CloudMediaDataSource>()
+                            .uploadMedia(
+                                bound.session.accessToken,
+                                image.uid,
+                                koin.get<MediaManager>().openMedia(image.mediaRef),
+                            ).getOrThrow()
+                    koin.get<MediaSyncRefStore>().upsert(
+                        MediaSyncRef(
+                            image.uid.toString(),
+                            image.mediaRef,
+                            upload.downloadUrl,
+                            upload.mediaId,
+                            Clock.System.now().toEpochMilliseconds(),
+                            bound.origin,
+                            bound.session.accountId,
+                        ),
+                    )
+                }
                 return@runBlocking
             }
             val original = drafts.getDraft(id).first().getOrThrow()
@@ -168,9 +172,7 @@ class NativeRetainedDraftShortcutProbeTest {
                             }
                             // Match the same exact unrelated platform crash accepted by the
                             // native Timeline oracle. A LogDate crash must remain a failure.
-                            if (device.hasObject(By.pkg("android").res("android:id/alertTitle").text("Bluetooth keeps stopping"))) {
-                                device.findObject(By.pkg("android").res("android:id/aerr_close"))?.click()
-                            }
+                            dismissNativeEmulatorPlatformDialog(device)
                         }
                         if (!visible) {
                             val hierarchy = ByteArrayOutputStream().also { device.dumpWindowHierarchy(it) }.toString("UTF-8")

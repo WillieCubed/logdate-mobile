@@ -100,7 +100,8 @@ def run(args, serial):
         h.instrument(serial, recording_test, directory / "recording-after-restart.log",
                      extras=["-e", "recordingRecoveryMode", "verify", "-e", "recordingRecoveryFixture", fixture])
         for method, name in [("widget settings survive launcher ID remapping", "widget-remap.log"),
-                             ("overlapping restored IDs preserve both widget choices", "widget-overlapping-remap.log")]:
+                             ("overlapping restored IDs preserve both widget choices", "widget-overlapping-remap.log"),
+                             ("restored source ID collision preserves an independent live widget after restart", "widget-live-collision.log")]:
             h.instrument(serial, "app.logdate.client.e2e.WidgetInstanceSettingsTest#" + method, directory / name)
     finally:
         try:

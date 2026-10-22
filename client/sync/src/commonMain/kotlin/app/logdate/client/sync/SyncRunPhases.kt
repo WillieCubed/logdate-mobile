@@ -325,6 +325,7 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
             // Each phase updates the shared last error. A successful upload must not erase a failed
             // download from the same full run, or the worker retries with no visible reason.
             lastErrorFlow.value = errors.mostSevere()
+            val recovery = downloadInbox?.recoveryCounts(includePolicyDeferred = mediaRecoveryAllowed())
 
             SyncResult(
                 success =
@@ -332,7 +333,7 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
                         uploadResult.success &&
                         downloadResult.success &&
                         draftResult.success &&
-                        (downloadInbox?.count() ?: 0) == 0,
+                        (recovery?.failed ?: 0) == 0,
                 uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
                 downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
                 conflictsResolved = downloadResult.conflictsResolved,
@@ -342,13 +343,17 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
                     downloadResult.hasMorePending ||
                         uploadResult.hasMorePending ||
                         draftResult.hasMorePending ||
-                        (downloadInbox?.count() ?: 0) > 0,
+                        (recovery?.retryable ?: 0) > 0,
             ).let { result ->
                 result.copy(
                     recoveredMediaScope =
                         selected.takeIf {
                             result.success &&
                                 !result.hasMorePending &&
+                                (recovery?.retained ?: 0) == 0 &&
+                                // A policy-deferred upload can outlive a successful full pass.
+                                // It must not consume the readiness wake waiting behind this writer.
+                                syncMetadataService.getPendingCount() == 0 &&
                                 tokenRefresher.isFullSyncScopeCurrent()
                         },
                 )

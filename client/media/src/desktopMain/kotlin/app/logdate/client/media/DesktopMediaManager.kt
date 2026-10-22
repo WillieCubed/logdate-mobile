@@ -161,6 +161,21 @@ class DesktopMediaManager(
 
     private fun resolvePath(uri: String): Path = Path.of(mediaFiles.filePath(uri) ?: error("Not a local media file: $uri"))
 
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+        canCommit: () -> Boolean,
+    ): String {
+        if (!canCommit()) throw CancellationException("Media hydration scope changed")
+        val uri = saveMediaFromFile(sourceFilePath, fileName, mimeType)
+        if (!canCommit()) {
+            withContext(NonCancellable) { deleteOwnedMedia(uri) }
+            throw CancellationException("Media hydration scope changed")
+        }
+        return uri
+    }
+
     private fun ensureMediaDir(): Path {
         val directory = mediaRoot
         directory.createDirectories()

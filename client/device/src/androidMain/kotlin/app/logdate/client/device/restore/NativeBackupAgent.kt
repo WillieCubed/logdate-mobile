@@ -8,6 +8,7 @@ import android.app.backup.FullBackupDataOutput
 import android.app.backup.FullRestoreDataInput
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.system.OsConstants
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -26,8 +27,14 @@ import java.io.IOException
 
 /** Records platform callbacks without opening the database or starting application services. */
 open class NativeBackupAgent : BackupAgent() {
-    private val nativeRestoreSession = NativeRestoreSessionBoundary { PostRestoreDetector(this).beginNativeRestoreSession() }
+    protected open val retainedPreferenceNames: Set<String> = emptySet()
+    private val nativeRestoreSession =
+        NativeRestoreSessionBoundary {
+            PostRestoreDetector(this).beginNativeRestoreSession(retainPreferences = retainedPreferenceNames.isNotEmpty())
+            retainOptionalPreferences { begin(retainedPreferenceNames) }
+        }
     private val callbackLock = Any()
+    private val restoreFormat = NativeRestoreFormatGuard { noBackupFilesDir }
     private var restoreCompletionRecorded = false
     private var installationStateReset = false
 
@@ -70,7 +77,12 @@ open class NativeBackupAgent : BackupAgent() {
     }
 
     override fun onRestoreFinished() {
+        AndroidNativeRestoreDeliveryGate.beginRestoreCompletion()
         try {
+            if (synchronized(callbackLock) { restoreFormat.isRejected() }) {
+                super.onRestoreFinished()
+                return
+            }
             val duplicateCompletion =
                 synchronized(callbackLock) {
                     if (restoreCompletionRecorded) {
@@ -79,7 +91,7 @@ open class NativeBackupAgent : BackupAgent() {
                         restoreCompletionRecorded = true
                         true
                     } else {
-                        beginNativeRestoreSessionOnce()
+                        beginNativeRestoreSessionOnce(resumeFinalization = true)
                         false
                     }
                 }
@@ -88,26 +100,24 @@ open class NativeBackupAgent : BackupAgent() {
                 retryAccountRecovery()
                 return
             }
-            AndroidNativeRestoreDeliveryGate.beginRestoreCompletion()
+            val finalDelivery = restoredPreferences().recordFinalDelivery(retainedPreferenceNames)
+            retainOptionalPreferences { finish(retainedPreferenceNames, finalDelivery) }
+            PostRestoreDetector(this).recordRestoreCompletedUnderDeliveryLock()
+            synchronized(callbackLock) { restoreCompletionRecorded = true }
             try {
-                PostRestoreDetector(this).recordRestoreCompletedUnderDeliveryLock()
-                synchronized(callbackLock) { restoreCompletionRecorded = true }
-                try {
-                    val preferences = createAndroidMainDataStore(this)
-                    runBlocking(Dispatchers.IO) {
-                        withTimeoutOrNull(15_000) {
-                            prepareRestoredInstallationState(preferences)
-                            restoreAccount(preferences)
-                        }
+                val preferences = createAndroidMainDataStore(this)
+                runBlocking(Dispatchers.IO) {
+                    withTimeoutOrNull(15_000) {
+                        prepareRestoredInstallationState(preferences)
+                        restoreAccount(preferences)
                     }
-                } catch (_: Exception) {
-                    Napier.w("Background native account recovery remains pending")
                 }
-            } finally {
-                AndroidNativeRestoreDeliveryGate.endRestore()
+            } catch (_: Exception) {
+                Napier.w("Background native account recovery remains pending")
             }
         } finally {
             nativeRestoreSession.finish()
+            AndroidNativeRestoreDeliveryGate.endRestore()
         }
     }
 
@@ -126,7 +136,13 @@ open class NativeBackupAgent : BackupAgent() {
 
     @TargetApi(Build.VERSION_CODES.BAKLAVA)
     override fun onRestoreFile(data: FullRestoreDataInput) {
-        restoreNativeFile(data.destination, data.data, data.size) { descriptor, target ->
+        restoreNativeFile(
+            data.destination,
+            data.data,
+            data.size,
+            nativeFormat =
+                data.transportFlags and FLAG_CROSS_PLATFORM_DATA_TRANSFER_IOS == 0 && data.contentVersion.isEmpty(),
+        ) { descriptor, target ->
             super.onRestoreFile(descriptor, data.size, target, data.type, data.mode, data.modificationTimeSeconds)
         }
     }
@@ -135,27 +151,66 @@ open class NativeBackupAgent : BackupAgent() {
         destination: File,
         data: ParcelFileDescriptor,
         size: Long,
+        nativeFormat: Boolean? = null,
         restore: (ParcelFileDescriptor, File) -> Unit,
     ) {
         AndroidNativeRestoreDeliveryGate.beginRestoreCallback()
         try {
             synchronized(callbackLock) {
+                restoreFormat.requireNativeFile(nativeFormat)
                 restoreCompletionRecorded = false
                 installationStateReset = false
                 beginNativeRestoreSessionOnce()
+                val preferenceDelivered =
+                    restoredPreferences().restore(
+                        destination,
+                        retainedPreferenceNames,
+                        size,
+                        { readNativePreferencePayload(data, size) },
+                        { bytes -> restoreNativePreferencePayload(this, bytes) { restore(it, destination) } },
+                        { drainDuplicatePreference(data, size) },
+                    )
+                if (!preferenceDelivered && destination.canonicalFile == File(filesDir, "logdate.preferences_pb").canonicalFile) {
+                    restoreMainPreferences(this, data, size) { descriptor -> restore(descriptor, destination) }
+                    PostRestoreDetector(this).markNativePrivacyPayloadReceived()
+                } else if (!preferenceDelivered) {
+                    restore(data, destination)
+                }
+                retainOptionalPreferences { capture(destination, retainedPreferenceNames) }
+                val databaseDelivered =
+                    runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
+                        .getOrDefault(false)
+                PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered)
             }
-            if (destination.canonicalFile == File(filesDir, "logdate.preferences_pb").canonicalFile) {
-                restoreMainPreferences(this, data, size) { descriptor -> restore(descriptor, destination) }
-                PostRestoreDetector(this).markNativePrivacyPayloadReceived()
-            } else {
-                restore(data, destination)
-            }
-            val databaseDelivered =
-                runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
-                    .getOrDefault(false)
-            PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered)
         } finally {
             AndroidNativeRestoreDeliveryGate.endRestoreCallback()
+        }
+    }
+
+    private fun restoredPreferences() = NativeRestoredPreferenceFiles(this, ::replayPreference)
+
+    private fun replayPreference(
+        destination: File,
+        bytes: ByteArray,
+    ) {
+        restoreNativePreferencePayload(this, bytes) { descriptor ->
+            val privateMode = (OsConstants.S_IRUSR or OsConstants.S_IWUSR).toLong()
+            super.onRestoreFile(descriptor, bytes.size.toLong(), destination, TYPE_FILE, privateMode, 0L)
+        }
+    }
+
+    private fun drainDuplicatePreference(
+        data: ParcelFileDescriptor,
+        size: Long,
+    ) {
+        ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+            val buffer = ByteArray(8192)
+            var remaining = size
+            while (remaining > 0) {
+                val count = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                if (count < 0) throw IOException("Duplicate native preference delivery ended before its declared size")
+                remaining -= count
+            }
         }
     }
 
@@ -165,7 +220,18 @@ open class NativeBackupAgent : BackupAgent() {
         super.onDestroy()
     }
 
-    private fun beginNativeRestoreSessionOnce() = nativeRestoreSession.beginIfNeeded()
+    private fun beginNativeRestoreSessionOnce(resumeFinalization: Boolean = false) =
+        nativeRestoreSession.beginIfNeeded {
+            resumeFinalization && NativeRestoredPreferenceFiles(this).canResumeFinalization(retainedPreferenceNames)
+        }
+
+    private fun retainOptionalPreferences(operation: NativeRestoredPreferenceFiles.() -> Unit) {
+        try {
+            NativeRestoredPreferenceFiles(this).operation()
+        } catch (_: Exception) {
+            Napier.w("Optional restored preference retention remains pending")
+        }
+    }
 
     private fun retryAccountRecovery() {
         try {
@@ -201,26 +267,4 @@ open class NativeBackupAgent : BackupAgent() {
         NativeBackupQuotaStore(noBackupFilesDir).record(backupDataBytes, quotaBytes)
         Napier.w("Android native backup exceeded the transport quota")
     }
-}
-
-internal class NativeRestoreSessionBoundary(
-    private val begin: () -> Unit,
-) {
-    private val lock = Any()
-    private var started = false
-
-    fun beginIfNeeded() =
-        synchronized(lock) {
-            if (!started) {
-                begin()
-                started = true
-            }
-        }
-
-    fun finish() =
-        synchronized(lock) {
-            started = false
-        }
-
-    fun isStarted(): Boolean = synchronized(lock) { started }
 }

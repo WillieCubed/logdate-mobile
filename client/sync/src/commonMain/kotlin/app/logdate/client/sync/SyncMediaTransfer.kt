@@ -484,15 +484,18 @@ internal class SyncMediaTransfer(
             if (isStillCurrent != null && !isStillCurrent()) throw CancellationException("Media hydration scope changed")
             val localUri =
                 try {
-                    mediaManager.saveMediaFromFile(file.path.toString(), file.fileName, file.mimeType)
+                    if (isStillCurrent == null) {
+                        mediaManager.saveMediaFromFile(file.path.toString(), file.fileName, file.mimeType)
+                    } else {
+                        val saver = mediaManager as? ConditionalMediaSaver ?: error("Conditional media saver unavailable")
+                        saver.saveMediaFromFile(file.path.toString(), file.fileName, file.mimeType, isStillCurrent)
+                    }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
                     return MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)
                 }
             if (isStillCurrent != null && !isStillCurrent()) {
-                // The store writes a uniquely named file, so one nothing refers to is removed here.
-                runCatching { mediaManager.deleteOwnedMedia(localUri) }
                 throw CancellationException("Media hydration scope changed")
             }
             if (!originalAvailable(localUri)) return MediaHydrationResult.Pending(DiagnosticReason.LOCAL_STORAGE)

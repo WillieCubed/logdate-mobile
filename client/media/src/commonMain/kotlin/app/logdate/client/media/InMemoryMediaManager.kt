@@ -77,4 +77,16 @@ open class InMemoryMediaManager :
         fileName: String,
         mimeType: String,
     ): String = "file:///tmp/$fileName"
+
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+        canCommit: () -> Boolean,
+    ): String {
+        if (!canCommit()) throw kotlinx.coroutines.CancellationException("Media hydration scope changed")
+        val uri = saveMediaFromFile(sourceFilePath, fileName, mimeType)
+        if (!canCommit()) throw kotlinx.coroutines.CancellationException("Media hydration scope changed")
+        return uri
+    }
 }

@@ -496,4 +496,7 @@ class DownloadInbox(
     }
 
     suspend fun count(): Int = scope().let { dao.count(it.owner, it.origin) }
+
+    internal suspend fun recoveryCounts(includePolicyDeferred: Boolean = false) =
+        scope().let { dao.recoveryCounts(it.owner, it.origin, now(), includePolicyDeferred) }
 }

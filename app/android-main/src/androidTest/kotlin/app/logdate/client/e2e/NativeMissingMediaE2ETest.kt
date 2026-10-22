@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Bundle
 import android.os.Process
 import android.provider.MediaStore
 import android.util.Base64
@@ -28,6 +27,7 @@ import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
+import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.media.storage.isRecoveredOriginal
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
@@ -231,6 +231,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
     fun dMeteredRecoveryResumesWhenPlatformAllowsMedia() =
         runBlocking {
             requireEmulator()
+            awaitValidatedNativeWifi(context)
             ensureApplicationStarted()
             val policy = koin.get<DataUsagePolicy>()
             val expectedMode =
@@ -245,71 +246,118 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
             val id = Uuid.random()
             val origin = "https://sync.example"
             val source = "content://media/external/images/media/987654321"
-            val storage =
-                object : DataStore<Preferences> {
-                    override val data = MutableStateFlow(emptyPreferences())
-
-                    override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
-                        transform(data.value).also { data.value = it }
-                }
-            val refs = KeyValueMediaSyncRefStore(DataStoreKeyValueStorage(storage), { origin }, { "account" })
-            refs.upsert(MediaSyncRef(id.toString(), source, "$origin/media/original", "original", 1))
             var downloads = 0
-            val cloud =
-                object : CloudMediaDataSource {
-                    override suspend fun uploadMedia(
-                        accessToken: String,
-                        contentId: Uuid,
-                        media: MediaFileSource,
-                    ): Result<MediaUploadResult> = error("No upload")
-
-                    override suspend fun downloadMedia(
-                        accessToken: String,
-                        mediaId: String,
-                    ): Result<MediaFile> {
-                        downloads++
-                        return Result.success(MediaFile(id, "metered-original.png", "image/png", png.size.toLong(), png))
-                    }
-                }
-            val account =
-                object : CloudAccountRepository by mockk(relaxed = true), CloudRequestLocationProvider {
-                    override fun captureLocation() = CloudRequestLocation(origin, "$origin/api")
-
-                    override fun isCurrentOrigin(origin: String) = origin == "https://sync.example"
-                }
-            val owner =
-                object : CanonicalOwnerProvider {
-                    override suspend fun getCanonicalOwnerId() = "account"
-
-                    override suspend fun hasBoundOwner() = true
-                }
-            val recovery =
-                AutomaticMediaRecovery(
-                    media,
-                    refs,
-                    cloud,
-                    FakeSessionStorage(UserSession("access", "refresh", "account")),
-                    account,
-                    owner,
-                    DefaultLogDateConfigRepository(initialBackendUrl = origin),
-                    references,
-                    policy,
-                )
+            val (recovery, _) = recoveryFixture(id, source, policy) { downloads++ }
             val scope = UploadScope("account", origin)
             val quarantined = UnavailableMediaReferences.nativeRestore(source)
             val pending =
                 assertIs<AutomaticMediaRecoveryResult.Pending>(recovery.recover(id, null, "image", quarantined, quarantined, scope))
             assertEquals(DiagnosticReason.NETWORK_POLICY, pending.reason)
             assertEquals(0, downloads)
-            InstrumentationRegistry.getInstrumentation().sendStatus(
-                0,
-                Bundle().apply { putString("restoreNetwork", "RESTORE_NETWORK_DEFERRED") },
-            )
-            withTimeout(45_000) { policy.policy.first { it == DataUsageMode.Unrestricted } }
+            awaitUnrestrictedNativeNetwork(context, policy)
             val recovered =
                 assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", quarantined, quarantined, scope))
             assertEquals(1, downloads)
             assertTrue(media.isRecoveredOriginal(recovered.reference, references))
             assertContentEquals(png, media.readMedia(recovered.reference).data)
         }
+
+    @Test
+    fun eCorruptCanonicalOriginalsAreRepairedOnce() =
+        runBlocking {
+            requireEmulator()
+            ensureApplicationStarted()
+            val payload = MediaPayload("integrity-original.png", "image/png", png.size.toLong(), png)
+            val local = media.saveMedia(payload)
+            val target = File(requireNotNull(androidMediaFileResolver(context).filePath(local))).canonicalFile
+            val objects = File(context.filesDir, "media/objects/sha256").canonicalFile
+            require(target.path.startsWith(objects.path + File.separator))
+            val corruptions =
+                listOf(
+                    png.copyOf(png.size / 2),
+                    png.copyOf().apply { this[0] = (this[0].toInt() xor 0xff).toByte() },
+                )
+            try {
+                for (corrupted in corruptions) {
+                    FileOutputStream(target).use {
+                        it.write(corrupted)
+                        it.fd.sync()
+                    }
+                    assertTrue(media.exists(local))
+                    assertFalse(media.isRecoveredOriginal(local, references))
+                    val id = Uuid.random()
+                    var downloads = 0
+                    val (recovery, refs) = recoveryFixture(id, local) { downloads++ }
+                    val scope = UploadScope("account", "https://sync.example")
+                    val recovered =
+                        assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", local, local, scope))
+                    assertEquals(1, downloads)
+                    assertEquals(local, recovered.reference)
+                    assertContentEquals(png, media.readMedia(recovered.reference).data)
+                    assertTrue(media.isRecoveredOriginal(recovered.reference, references))
+                    assertEquals(local, requireNotNull(refs.getScoped(id, scope)).localUri)
+                    assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", local, local, scope))
+                    assertEquals(1, downloads, "The repaired object must be reused on retry")
+                }
+            } finally {
+                media.saveMedia(payload)
+            }
+        }
+
+    private suspend fun recoveryFixture(
+        id: Uuid,
+        source: String,
+        policy: DataUsagePolicy? = null,
+        onDownload: () -> Unit,
+    ): Pair<AutomaticMediaRecovery, KeyValueMediaSyncRefStore> {
+        val origin = "https://sync.example"
+        val storage =
+            object : DataStore<Preferences> {
+                override val data = MutableStateFlow(emptyPreferences())
+
+                override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
+                    transform(data.value).also { data.value = it }
+            }
+        val refs = KeyValueMediaSyncRefStore(DataStoreKeyValueStorage(storage), { origin }, { "account" })
+        refs.upsert(MediaSyncRef(id.toString(), source, "$origin/media/original", "original", 1))
+        val cloud =
+            object : CloudMediaDataSource {
+                override suspend fun uploadMedia(
+                    accessToken: String,
+                    contentId: Uuid,
+                    media: MediaFileSource,
+                ): Result<MediaUploadResult> = error("No upload")
+
+                override suspend fun downloadMedia(
+                    accessToken: String,
+                    mediaId: String,
+                ): Result<MediaFile> {
+                    onDownload()
+                    return Result.success(MediaFile(id, "metered-original.png", "image/png", png.size.toLong(), png))
+                }
+            }
+        val account =
+            object : CloudAccountRepository by mockk(relaxed = true), CloudRequestLocationProvider {
+                override fun captureLocation() = CloudRequestLocation(origin, "$origin/api")
+
+                override fun isCurrentOrigin(origin: String) = origin == "https://sync.example"
+            }
+        val owner =
+            object : CanonicalOwnerProvider {
+                override suspend fun getCanonicalOwnerId() = "account"
+
+                override suspend fun hasBoundOwner() = true
+            }
+        return AutomaticMediaRecovery(
+            media,
+            refs,
+            cloud,
+            FakeSessionStorage(UserSession("access", "refresh", "account")),
+            account,
+            owner,
+            DefaultLogDateConfigRepository(initialBackendUrl = origin),
+            references,
+            policy,
+        ) to refs
+    }
 }

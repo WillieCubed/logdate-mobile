@@ -172,6 +172,9 @@ private val featureCoverageModules =
     )
 
 subprojects {
+    tasks.withType<Test>().matching { it.name == "desktopTest" }.configureEach {
+        systemProperty("java.awt.headless", "true")
+    }
     if (path in featureCoverageModules) {
         apply(plugin = "jacoco")
 

@@ -249,8 +249,8 @@ jobs:
   scripts:
     name: Script tests
     # The scripts target developer Macs and use macOS tools (plutil, BSD stat),
-    # so their tests run there too.
-    runs-on: macos-latest
+    # without an Apple Silicon dependency, so the standard Intel image is sufficient.
+    runs-on: macos-15-intel
     timeout-minutes: 15
     steps:
       - name: Check out repository

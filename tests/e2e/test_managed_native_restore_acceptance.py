@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import json
 import re
 import runpy
@@ -11,6 +12,83 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_ci_runs_required_recovery_profiles_through_the_owned_transfer_controller(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/native-restore-acceptance.yml").read_text()
+        matrix = re.search(r"scenario: \[([^\]]+)\]", workflow)
+        self.assertIsNotNone(matrix, "Native restore scenarios must be enumerated")
+        dispatch = re.search(r'          case "\$NATIVE_SCENARIO" in\n(.*?)          esac', workflow, re.DOTALL)
+        self.assertIsNotNone(dispatch)
+        script = ('set -euo pipefail\narguments=()\ncase "$NATIVE_SCENARIO" in\n'
+                  + dispatch.group(1) + 'esac\nprintf \'%s\\0\' "${arguments[@]}"\n')
+        for scenario, flag in (("archive", "--exercise-archive-recovery"), ("data-only", "--exercise-data-only")):
+            with self.subTest(scenario=scenario):
+                self.assertIn(scenario, [value.strip() for value in matrix.group(1).split(",")],
+                              "Required recovery profiles must run, not merely exist as CLI options")
+                result = subprocess.run(["bash", "-c", script], env=dict(os.environ, NATIVE_SCENARIO=scenario),
+                                        capture_output=True, check=True, timeout=5)
+                arguments = [item.decode() for item in result.stdout.split(b"\0") if item]
+                self.assertEqual(["--", flag], arguments)
+                command = MODULE["scenario_command"]("transfer", "emulator-5556", "emulator-5558",
+                                                     Path("/pinned/app.apk"), Path("/pinned/probe.apk"),
+                                                     Path("/private/results"), arguments[1:])
+                self.assertTrue(command[1].endswith("native-backup-acceptance.py"))
+                self.assertIn("--seed-empty-source", command)
+                self.assertEqual(flag, command[-1])
+        self.assertIn('test "$RESULT" = success', workflow)
+
+    def test_failed_terminal_generation_retains_only_its_own_results(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            results = root / "gradle-results"
+            results.mkdir()
+            (results / "current.log").write_text("current native failure")
+            (results / "old.log").write_text("obsolete generation")
+            os.utime(results / "old.log", ns=(1, 1))
+            output = root / "private-run"
+            output.mkdir()
+            process = Mock(poll=Mock(return_value=1))
+            retained = MODULE["retain_terminal_results"](process, results, output, 2)
+            self.assertIsNotNone(retained)
+            self.assertEqual("current native failure", (retained / "current.log").read_text())
+            self.assertFalse((retained / "old.log").exists())
+            self.assertEqual(0o600, (retained / "current.log").stat().st_mode & 0o777)
+
+    def test_live_generation_results_are_not_copied_as_terminal_evidence(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.assertIsNone(MODULE["retain_terminal_results"](Mock(poll=Mock(return_value=None)), root / "results", root, 1))
+            self.assertFalse((root / "managed-results").exists())
+    def test_widget_profile_transfers_the_real_source_choice_before_restoring_the_registered_widget(self):
+        try:
+            command = MODULE["scenario_command"]("widget", "emulator-5556", "emulator-5558", Path("/pinned/app.apk"),
+                                                  Path("/pinned/probe.apk"), Path("/private/results"), [])
+        except ValueError as error:
+            self.fail(f"Missing native widget acceptance route: {error}")
+        self.assertTrue(command[1].endswith("native-widget-transfer-acceptance.py"))
+        self.assertEqual("emulator-5556", command[command.index("--source") + 1])
+        self.assertEqual("emulator-5558", command[command.index("--destination") + 1])
+        self.assertIn("--seed-empty-source", command)
+        self.assertTrue(MODULE["acceptance_receipt"]("widget", [], [])["crossDeviceTransferAccepted"])
+
+    def test_focused_network_policy_profile_keeps_custody_without_claiming_a_transfer(self):
+        try:
+            command = MODULE["scenario_command"]("network-policy", "emulator-5556", "emulator-5558", Path("/pinned/app.apk"),
+                                                  Path("/pinned/probe.apk"), Path("/private/results"), [])
+        except ValueError as error:
+            self.fail(f"Missing focused policy acceptance route: {error}")
+        self.assertTrue(command[1].endswith("native-missing-media-acceptance.py"))
+        self.assertEqual("emulator-5556", command[command.index("--emulator") + 1])
+        self.assertEqual(["emulator-5556", "emulator-5558"],
+                         [command[index + 1] for index, value in enumerate(command) if value == "--emulator"])
+        self.assertIn("--network-only", command)
+        self.assertIn("--synthetic-data", command)
+        self.assertNotIn("--seed-empty-source", command)
+        receipt = MODULE["acceptance_receipt"]("network-policy", [], [])
+        self.assertFalse(receipt["managedNativeTransport"])
+        self.assertFalse(receipt["crossDeviceTransferAccepted"])
+        self.assertFalse(receipt["googleRestoreProviderAccepted"])
+
     def test_gradle_installs_the_private_artifact_pair_even_when_build_settings_change(self):
         with tempfile.TemporaryDirectory(prefix="pinned apks ") as folder:
             app, probe = Path(folder) / "app.apk", Path(folder) / "probe.apk"
@@ -198,10 +276,50 @@ class ManagedDriverControllerTest(unittest.TestCase):
             for index, name in enumerate(("source", "destination"), start=1):
                 (directory / f"TEST-{name}.xml").write_text(f"<testsuite>{case.replace('Lifecycle1', f'Lifecycle{index}')}</testsuite>")
             MODULE["require_outer_results"](directory)
-            for bad in (case.replace("/>", "><skipped/></testcase>"), case.replace("retainsManaged", "unrelated"), case):
+            for bad in (case.replace("/>", "><skipped/></testcase>"), case.replace("/>", "><failure/></testcase>"),
+                        case.replace("/>", "><error/></testcase>"), case.replace("retainsManaged", "unrelated"), case):
                 (directory / "TEST-destination.xml").write_text(f"<testsuite>{bad}</testsuite>")
                 with self.assertRaises(RuntimeError):
                     MODULE["require_outer_results"](directory)
+
+    def test_canceled_outer_cases_do_not_count_as_completed(self):
+        for message in ("Test driver was canceled", "DeferredCoroutine was cancelled", "job cancellation"):
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                cases = ''.join(
+                    f'<testcase classname="app.logdate.tools.restoredriver.NativeRestoreDriverTest" '
+                    f'name="retainsManagedLifecycle{index}" time="1.25"/>' for index in (1, 2)
+                )
+                (directory / "TEST-pair.xml").write_text(
+                    f'<testsuite tests="2" failures="0" errors="0" skipped="0">{cases}'
+                    f'<system-err>{message}</system-err></testsuite>'
+                )
+                with self.assertRaisesRegex(RuntimeError, "canceled"):
+                    MODULE["require_outer_results"](directory)
+
+    def test_invalid_outer_case_durations_do_not_count_as_completed(self):
+        for duration in ("-1.0", "nan", "inf", "not-a-duration"):
+            with self.subTest(duration=duration), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                cases = ''.join(
+                    f'<testcase classname="app.logdate.tools.restoredriver.NativeRestoreDriverTest" '
+                    f'name="retainsManagedLifecycle{index}" time="{duration}"/>' for index in (1, 2)
+                )
+                (directory / "TEST-pair.xml").write_text(f'<testsuite>{cases}</testsuite>')
+                with self.assertRaisesRegex(RuntimeError, "duration"):
+                    MODULE["require_outer_results"](directory)
+
+    def test_completed_outer_pair_allows_ordinary_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            cases = ''.join(
+                f'<testcase classname="app.logdate.tools.restoredriver.NativeRestoreDriverTest" '
+                f'name="retainsManagedLifecycle{index}" time="1.25"/>' for index in (1, 2)
+            )
+            (directory / "TEST-pair.xml").write_text(
+                f'<testsuite>{cases}<system-err>ordinary diagnostics</system-err></testsuite>'
+            )
+            MODULE["require_outer_results"](directory)
 
     def test_console_port_rejects_ambiguous_or_non_loopback_listener(self):
         self.assertEqual(5558, MODULE["console_port"]("n127.0.0.1:5558\nn127.0.0.1:5559\n"))

@@ -12,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PostRestoreDetectorTest {
@@ -32,6 +33,37 @@ class PostRestoreDetectorTest {
     private val detector = PostRestoreDetector(context)
 
     @Test
+    fun `legacy completed deliveries do not require preference capture metadata after upgrade`() {
+        val id = "123e4567-e89b-12d3-a456-426614174000"
+        File(noBackup, ".logdate_native_restore_privacy_received").writeText("received:$id")
+        assertFalse(detector.hasMissingNativePrivacyPayload())
+        assertEquals(id, detector.nativeRestoreSessionId())
+        assertNull(detector.retainedPreferenceSessionId())
+    }
+
+    @Test
+    fun `preference enrollment remains bound to the same delivery after privacy payload and acknowledgement`() {
+        detector.beginNativeRestoreSession(retainPreferences = true)
+        val id = assertNotNull(detector.retainedPreferenceSessionId())
+        assertTrue(detector.hasMissingNativePrivacyPayload())
+        detector.markNativePrivacyPayloadReceived()
+        assertFalse(detector.hasMissingNativePrivacyPayload())
+        assertEquals(id, detector.retainedPreferenceSessionId())
+        detector.markDeviceInitialized()
+        assertEquals(id, PostRestoreDetector(context).retainedPreferenceSessionId())
+    }
+
+    @Test
+    fun `unknown enrollment fields cannot accept missing privacy metadata`() {
+        val file = File(noBackup, ".logdate_native_restore_privacy_received")
+        for (receipt in listOf("received:123e4567-e89b-12d3-a456-426614174000:unknown", "received:broken:prefs-v1")) {
+            file.writeText(receipt)
+            assertTrue(detector.hasMissingNativePrivacyPayload())
+            assertNull(detector.retainedPreferenceSessionId())
+        }
+    }
+
+    @Test
     fun `database startup remains blocked until the active delivery is finalized`() {
         detector.beginNativeRestoreSession()
 
@@ -49,6 +81,36 @@ class PostRestoreDetectorTest {
             .writeText("delivery-pending:123e4567-e89b-12d3-a456-426614174000")
 
         assertFalse(detector.isNativeRestoreDeliveryComplete())
+    }
+
+    @Test
+    fun `finalization resume requires the same active generation and ends after acknowledgement`() {
+        detector.beginNativeRestoreSession(retainPreferences = true)
+        val generation = assertNotNull(detector.retainedPreferenceSessionId())
+        assertTrue(detector.canResumeNativeRestoreFinalization(generation))
+        assertFalse(detector.canResumeNativeRestoreFinalization("123e4567-e89b-12d3-a456-426614174000"))
+
+        File(noBackup, ".logdate_native_restore_pending")
+            .writeText("delivery-pending:123e4567-e89b-12d3-a456-426614174000")
+        assertTrue(PostRestoreDetector(context).canResumeNativeRestoreFinalization(generation))
+
+        detector.recordRestoreCompleted()
+        assertFalse(detector.canResumeNativeRestoreFinalization(generation))
+        detector.markDeviceInitialized()
+        assertFalse(PostRestoreDetector(context).canResumeNativeRestoreFinalization(generation))
+    }
+
+    @Test
+    fun `resumed metadata-only finalization cannot bless a database created by startup`() {
+        detector.beginNativeRestoreSession(retainPreferences = true)
+        detector.markNativeRestorePayloadReceived(databaseDelivered = false)
+        database.writeBytes(byteArrayOf(1, 2, 3))
+        File(noBackup, ".logdate_native_restore_pending")
+            .writeText("delivery-pending:123e4567-e89b-12d3-a456-426614174000")
+
+        detector.recordRestoreCompleted()
+
+        assertEquals(PostRestoreType.CONTENT_MISSING, detector.detect(true))
     }
 
     @Test

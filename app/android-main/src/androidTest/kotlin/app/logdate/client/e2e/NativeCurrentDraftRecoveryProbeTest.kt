@@ -32,6 +32,7 @@ import app.logdate.client.repository.journals.PendingMediaType
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.shared.config.LogDateConfigRepository
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -197,6 +198,14 @@ class NativeCurrentDraftRecoveryProbeTest {
                         File(context.noBackupFilesDir, "native-automatic-media-restart.json").readText(),
                     ).getString("missing")
             require(UnavailableMediaReferences.nativeSource(stale) != null)
+            val provenance = requireNotNull(koin.get<MediaSyncRefStore>().getScoped(id(4), scope))
+            val source = requireNotNull(UnavailableMediaReferences.nativeSource(stale))
+            assertTrue(
+                (listOf(provenance.localUri) + provenance.localAliases).any {
+                    it == stale || it == source || UnavailableMediaReferences.nativeSource(it) == source
+                },
+                "The base fixture must retain provenance for its earlier original reference",
+            )
             val bytes = proof() + byteArrayOf(99)
             val replacement = koin.get<MediaManager>().saveMedia(MediaPayload("replacement.png", "image/png", bytes.size.toLong(), bytes))
             drafts.saveDraftSnapshot(
@@ -217,9 +226,25 @@ class NativeCurrentDraftRecoveryProbeTest {
         }
         val expected = Json.decodeFromString<EntryDraft>(baseMarker.readText())
         val actual =
-            withTimeout(120_000) {
-                while (true) {
-                    val current = drafts.getDraft(id).first().getOrThrow()
+            try {
+                withTimeout(120_000) {
+                    while (true) {
+                        val current = drafts.getDraft(id).first().getOrThrow()
+                        val row =
+                            koin.get<LogDateDatabase>().downloadInboxDao().get(
+                                scope.ownerId,
+                                scope.serverOrigin,
+                                "MEDIA_NATIVE_ENTRY_DRAFT",
+                                id.toString(),
+                            )
+                        if (row?.state == "APPLIED") return@withTimeout current
+                        delay(100)
+                    }
+                    @Suppress("UNREACHABLE_CODE")
+                    error("Draft recovery did not finish")
+                }
+            } catch (failure: TimeoutCancellationException) {
+                runCatching {
                     val row =
                         koin.get<LogDateDatabase>().downloadInboxDao().get(
                             scope.ownerId,
@@ -227,11 +252,17 @@ class NativeCurrentDraftRecoveryProbeTest {
                             "MEDIA_NATIVE_ENTRY_DRAFT",
                             id.toString(),
                         )
-                    if (row?.state == "APPLIED") return@withTimeout current
-                    delay(100)
-                }
-                @Suppress("UNREACHABLE_CODE")
-                error("Draft recovery did not finish")
+                    report(
+                        org.json
+                            .JSONObject()
+                            .put(
+                                "draftRecoveryState",
+                                row?.state ?: "absent",
+                            ).put("reason", row?.reason ?: "absent")
+                            .toString(),
+                    )
+                }.exceptionOrNull()?.let(failure::addSuppressed)
+                throw failure
             }
         val base = requireNotNull(actual.editBase)
         val committed = notes.getNoteById(id(4)) as JournalNote.Image

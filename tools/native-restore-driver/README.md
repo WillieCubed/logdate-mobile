@@ -20,12 +20,31 @@ payloads in that directory can contain private data. The host records its active
 Gradle handle there; inspect that process before starting a replacement after an
 observation failure. A timeout does not establish that Gradle or its devices stopped.
 
+Underlying native harnesses require the controller's custody environment. Their command builders
+always use the same managed-target proxy, including streaming instrumentation. The proxy validates
+the current Gradle, QEMU, and driver identities before replacing itself with the real ADB process;
+host timeouts and cancellation remain attached to that ADB process. Failed probes separately stop
+remote instrumentation through the owned endpoint cleanup.
+Do not invoke a native harness against an independently selected emulator.
+
 One managed-device task requests two concurrent shards. Each driver method occupies a
 different AndroidJUnitRunner shard and publishes its source or destination role.
 Two named tasks in the same project cannot replace this arrangement: the reviewed
 UTP task retains the project lock while waiting for instrumentation. The driver
 rejects reduced shard allocation before publishing readiness. The controller pins
 the reviewed UTP backend, requires both roles, and checks both final test methods.
+
+The controller cold boots each read-only test instance through a private SDK facade, preserving
+Gradle's device ownership and the installed SDK. It requires current launch receipts and distinct
+actual Wi-Fi addresses before rooted app probes start. The focused network profile then checks
+both devices after an offline/online radio cycle. See [the native backup reference](../../docs/reference/native-android-backup.md)
+for launch guards, evidence, and cleanup rules.
+
+Only a live QEMU process with this generation's launch receipt and matching PID is eligible for
+discovery; Gradle's snapshot-setup process is excluded. Each run uses a single-use daemon with the
+configuration cache disabled because its SDK facade is temporary. The shared device limit leaves
+bounded headroom for other jobs while this task still requests exactly two shards. A reduced pair
+remains a failure.
 
 Before readiness, each driver verifies the installed app and probe APK hashes,
 matching signing certificates, and instrumentation target. The controller copies both

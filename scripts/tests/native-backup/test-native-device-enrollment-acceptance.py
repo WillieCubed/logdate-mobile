@@ -16,6 +16,12 @@ SPEC.loader.exec_module(MODULE)
 
 
 class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
+    def setUp(self):
+        for name in ("run", "Popen"):
+            guard = patch.object(MODULE.subprocess, name, side_effect=AssertionError("Host safety tests cannot start external commands"))
+            guard.start()
+            self.addCleanup(guard.stop)
+
     def test_enrollment_ci_runtime_can_load_jvm_21_client_dependencies(self):
         workflow = (SCRIPT.parents[2] / ".github/workflows/native-restore-acceptance.yml").read_text()
         matrix_job = workflow.split("  native-transfer-scenarios:", 1)[1].split("  native-transfer:", 1)[0]
@@ -119,7 +125,9 @@ class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
                     patch.object(MODULE, "receipt", side_effect=[source, destination, destination]), \
                     patch.object(MODULE, "probe", side_effect=lambda serial, stage, *args: events.append(stage)), \
                     patch.dict(MODULE.AUTOMATIC_MEDIA, run=lambda *args: events.append("automatic-media") or {"automaticOriginalMediaRecovery": True}), \
-                    patch.dict(MODULE.H, prepare=Mock(), probe=Mock(), adb=Mock(), transfer=transfer,
+                    patch.dict(MODULE.REAUTHENTICATION, run=lambda *args: events.append("media-reauthentication") or {"realPasskeyRepositoryResumesSameMediaOperation": True}), \
+                    patch.dict(MODULE.H, prepare=Mock(), probe=Mock(),
+                               adb=lambda serial, *args: events.append((serial, args)) or b"", transfer=transfer,
                                set_offline=lambda serial, offline: events.append((serial, offline))):
                 MODULE.run_acceptance(options, control, Mock(wait=Mock(return_value=0)))
             self.assertEqual(["current-draft-prepare", "current-draft-quarantine", "current-draft-complete", "current-draft-reopened", "current-draft-base-prepare", "current-draft-base-complete"],
@@ -132,12 +140,20 @@ class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
             self.assertLess(events.index("editor-draft-upload"), events.index("native-transfer"))
             self.assertLess(events.index("replay"), events.index("editor-draft-verify"))
             self.assertLess(events.index("automatic-media"), events.index("editor-draft-verify"))
+            self.assertLess(events.index("automatic-media"), events.index("media-reauthentication"))
+            self.assertLess(events.index("media-reauthentication"), events.index("current-draft-prepare"))
             self.assertLess(events.index("editor-draft-verify"), max(i for i, event in enumerate(events) if event == "cleanup"))
             self.assertIn((options.destination, False), events)
             self.assertIn((options.destination, True), events)
             self.assertLess(events.index((options.destination, True)), events.index("destination-edit"))
             self.assertLess(events.index("destination-edit"), events.index((options.destination, False)))
             self.assertLess(events.index((options.destination, False)), events.index("destination-enroll"))
+            reconnect = (options.destination, ("shell", "cmd", "wifi", "connect-network", "AndroidWifi", "open"))
+            connections = [i for i, event in enumerate(events) if event == reconnect]
+            self.assertEqual(3, len(connections))
+            for connection, stage in zip(connections, ("destination-enroll", "current-draft-complete", "current-draft-base-complete")):
+                self.assertEqual((options.destination, False), events[connection - 1])
+                self.assertLess(connection, events.index(stage))
             self.assertLess(events.index("replay"), events.index("automatic-media"))
             self.assertLess(events.index("automatic-media"), max(i for i, event in enumerate(events) if event == "cleanup"))
 

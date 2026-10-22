@@ -179,6 +179,14 @@ requires that:
    for you through a registered mapper).
 2. **Expect every spelling.** Stored strings include `logdate-media://` references, `file:///` and `file:/`
    URIs (encoded or not), bare absolute paths, and external URIs. `filePath` handles all of them.
+3. **Verify originals before completing recovery.** Use `media.isRecoveredOriginal(reference, mediaReferences)`.
+   File existence, a provider query, or a readable first byte cannot establish completeness. The shared
+   check reads bounded chunks, verifies length, and compares canonical objects with the SHA-256 in their
+   path. The helper owns the platform IO boundary, including opening and closing the stream;
+   callers may invoke it from Main. Keep corruption, late read failure, cancellation, and bounded-buffer cases in
+   [the integrity tests](../../client/media/src/commonTest/kotlin/app/logdate/client/media/storage/RecoveredMediaIntegrityTest.kt).
+   [The dispatcher test](../../client/media/src/androidHostTest/kotlin/app/logdate/client/media/storage/RecoveredMediaDispatcherTest.kt)
+   covers file operations off Main and resumption on the caller's dispatcher.
 
 ## Legacy references and migration
 

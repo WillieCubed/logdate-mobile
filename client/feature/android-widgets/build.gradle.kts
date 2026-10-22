@@ -53,10 +53,15 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
         }
+        val androidHostTest by getting
+        androidHostTest.dependencies {
+            implementation(libs.robolectric)
+        }
         jvmMain.dependencies {
             implementation(libs.compose.runtime)
         }
         androidMain.dependencies {
+            implementation(projects.client.device)
             implementation(projects.client.feature.core)
             // Glance
             implementation(libs.androidx.glance.appwidget)
@@ -64,6 +69,7 @@ kotlin {
 
             // Compose (for config Activity — regular Compose, not Glance)
             implementation(projects.client.theme)
+            implementation(projects.client.ui)
             implementation(libs.compose.ui)
             implementation(libs.compose.material3)
             implementation(libs.compose.foundation)

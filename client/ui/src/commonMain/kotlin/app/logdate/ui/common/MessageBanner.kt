@@ -10,7 +10,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -25,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.ui.generated.resources.Res
@@ -55,6 +56,7 @@ data class BannerContent(
 fun MessageBanner(
     content: BannerContent?,
     modifier: Modifier = Modifier,
+    outerPadding: PaddingValues = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
     onDismiss: () -> Unit = {},
 ) {
     AnimatedVisibility(
@@ -83,34 +85,32 @@ fun MessageBanner(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    .padding(outerPadding),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Icon(
-                    imageVector = content.icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                )
-                Box(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    Icon(
+                        imageVector = content.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
                     Text(
                         text = content.message,
+                        modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                content.action?.let { (label, onAction) ->
-                    TextButton(onClick = onAction) {
-                        Text(label)
-                    }
-                }
-                if (content.dismissible) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(Res.string.common_dismiss))
+                if (content.action != null || content.dismissible) {
+                    FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        content.action?.let { (label, onAction) ->
+                            TextButton(onClick = onAction) { Text(label) }
+                        }
+                        if (content.dismissible) {
+                            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.common_dismiss)) }
+                        }
                     }
                 }
             }

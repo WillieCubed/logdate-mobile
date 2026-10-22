@@ -20,13 +20,21 @@ class AndroidCanonicalMediaStoreTest {
             val bytes = "a private journal photo".encodeToByteArray()
 
             val first = store.store(bytes.inputStream(), "image/jpeg", bytes.size.toLong())
-            val second = store.store(bytes.inputStream(), "image/jpeg", bytes.size.toLong())
-
-            assertEquals(first, second)
             val file = File(java.net.URI(first))
             assertTrue(file.startsWith(File(root, "media/objects/sha256")))
             assertEquals("jpg", file.extension)
-            assertContentEquals(bytes, file.readBytes())
+
+            repeat(4) {
+                val duplicate = store.store(bytes.inputStream(), "image/jpeg", bytes.size.toLong())
+
+                assertEquals(first, duplicate)
+                assertContentEquals(bytes, file.readBytes())
+                assertEquals(1, File(root, "media/objects").walkTopDown().count { it.isFile })
+                assertTrue(
+                    File(root, "media/staging").walkTopDown().none { it.isFile },
+                    "A successful duplicate import must immediately discard its staging copy",
+                )
+            }
         }
 
     @Test
@@ -39,6 +47,7 @@ class AndroidCanonicalMediaStoreTest {
             }
 
             assertTrue(File(root, "media/objects").walkTopDown().none { it.isFile })
+            assertTrue(File(root, "media/staging").walkTopDown().none { it.isFile })
         }
 
     @Test

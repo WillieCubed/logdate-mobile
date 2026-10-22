@@ -13,6 +13,7 @@ import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.IdentityKeyFingerprint
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -198,6 +199,13 @@ class NativeReleasedUpgradeProbeTest {
                 }
             }
         val identity = koin.get<IdentityKeyManager>()
+        val owner = koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId()
+        val backup = requireNotNull(AndroidIdentityKeyBackupStore(context).readAccountIdentity())
+        assertEquals(owner, backup.accountId, "Portable identity belongs to a different journal")
+        val fingerprint = IdentityKeyFingerprint.of(backup.key, koin.get<CryptoManager>())
+        if (identity.hasIdentityKey()) {
+            assertEquals(fingerprint, IdentityKeyFingerprint.of(identity.getIdentityKey(), koin.get<CryptoManager>()))
+        }
         return JSONObject()
             .put("owner", koin.get<CanonicalOwnerProvider>().getCanonicalOwnerId())
             .put(
@@ -207,7 +215,7 @@ class NativeReleasedUpgradeProbeTest {
                     .getDeviceId()
                     .value
                     .toString(),
-            ).put("fingerprint", IdentityKeyFingerprint.of(identity.getIdentityKey(), koin.get<CryptoManager>()))
+            ).put("fingerprint", fingerprint)
             .put("databaseKeySha256", MessageDigest.getInstance("SHA-256").digest(key).joinToString("") { "%02x".format(it) })
             .put("records", records)
             .put("legacyDraft", Json.encodeToString(portableLegacyDraft(requireNotNull(koin.get<JournalRepository>().getDraft(id(10))))))

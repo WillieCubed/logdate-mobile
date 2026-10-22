@@ -20,6 +20,22 @@ and requires both the native content oracles and the two waiting-driver results.
 `tests/e2e/managed-native-restore-acceptance.py`; running a payload driver directly does not establish
 managed-device ownership.
 
+The controller cold boots each read-only managed clone through a private SDK facade. Reusing
+snapshot RAM can copy the guest's network identity and provisioning state between instances. The
+facade adds `-no-snapshot-load` only to the current managed AVD's read-only test launches; capability
+queries and snapshot creation pass through to the installed executable. The installed SDK and its
+packages are unchanged. Gradle still starts and stops every device, with no data wipe or snapshot
+save. Conflicting launch arguments and a `local.properties` SDK override fail before testing.
+
+For rooted paired tests, both cold-boot launch receipts must match the current nonce, AVD, and
+managed-device identifiers. Each actual `wlan0` address must be readable, valid, and distinct before
+app probes start. The focused network profile checks both devices after an offline/online radio
+cycle. The app must observe validated Wi-Fi and its real network-policy callbacks; a shell connection
+request alone does not prove connectivity. Private launch records remain with the results. The
+facade is removed only after a successful process observation confirms Gradle and its observed
+launch processes have stopped; ambiguous observations retain it for inspection. CI excludes the
+facade from uploaded evidence.
+
 ## Backup coverage
 
 The manifest selects `backup_rules.xml` for older Android versions and `data_extraction_rules.xml`
@@ -60,6 +76,14 @@ Android runs the agent in restricted backup mode, where the framework instantiat
 the app's content providers. Keep backup callbacks independent of Koin, Room, WorkManager,
 location services, and same-app providers. Do not cast or depend on the `Application` object;
 persist a small durable marker and let ordinary startup reconcile it after restore completes.
+
+Ordinary startup must also wait for the first user unlock after boot. Credential-encrypted
+storage and WorkManager are unavailable before that unlock, even when instrumentation or a
+platform callback has already created the application process. Both the manifest Application
+and the retained base-Application startup path await `UserManager.isUserUnlocked()` before
+initializing Koin or opening the journal. Register for `ACTION_USER_UNLOCKED`, recheck the
+platform state after registration to close the missed-broadcast race, and unregister when the
+wait completes or is canceled. An unlock broadcast alone cannot authorize storage access.
 
 Journal readiness waits for completed-recording salvage, database/key/privacy validation, and required
 native media quarantine. Device observers and background scheduling start once in the application
@@ -336,6 +360,14 @@ original. Outbound pending edits resolve the mapped remote URL; an unresolved ma
 A preview does not count as its original. Download validation checks the wire length before
 legacy plaintext acceptance or authenticated decryption.
 
+Recovery uses `MediaManager.isRecoveredOriginal` to read the complete private stream with bounded
+buffers and verify its advertised length. Canonical `objects/sha256` files must also match the
+digest encoded in their path. A nonempty truncated file or same-length corruption remains missing
+and is downloaded again; the canonical store replaces the damaged object atomically. Legacy
+references have no expected digest, so their check establishes complete readability and length.
+The shared helper runs file operations on the platform IO dispatcher, including stream opening
+and closing, so initial sign-in can await verification without blocking Main.
+
 The Android photo-library manager must expose `ConditionalMediaSaver` as well as `MediaManager`.
 Kotlin interface delegation forwards only the declared interface, so wrapping a guarded store can
 otherwise make native recovery fail after downloading the original. Forward the original commit
@@ -344,8 +376,8 @@ Host regressions must exercise the manager returned by production DI, including 
 during persistence, rather than testing only the underlying file store.
 
 Local originals and retained archive files repair without media-library or notification permission.
-Availability requires an owned file whose bytes can be opened, rather than a successful provider
-metadata query. Network downloads obey the current data policy and account-scoped explicit
+Availability requires an owned file that passes the shared integrity check, rather than a successful
+provider metadata query. Network downloads obey the current data policy and account-scoped explicit
 mobile-data consent. A deferred download retains its recovery state; an allowed-network transition
 wakes recovery automatically. It does not require another sign-in or a manual retry.
 
@@ -356,11 +388,68 @@ cannot overwrite the new default's state. Recovery remains deferred while the cu
 disallows its download; an allowed policy does not guarantee a reachable server, so failed
 connections must retain the operation for retry.
 
+A successful full worker acknowledges media readiness only when both the download inbox and the
+current owner's upload queue have drained. A metered pass may finish successfully with original
+uploads deferred; it must not consume the Wi-Fi recovery wake waiting behind that worker. Queue
+read failures cannot establish completion, and account/server checks follow the final queue read.
+
+Download scheduling distinguishes retained rows, runnable recovery, and failed attempts held by
+backoff. Network-policy pauses do not fail an otherwise successful sync. Successful inbox pages
+continue in a bounded group in the same worker. Unfinished work at that bound returns to durable
+retry without acknowledging completion; a pending flag can include held uploads and must never
+cause an unbounded loop. Test this with location uploads held in backoff as well as media pages.
+After connectivity returns, released failures are ready work rather than evidence of a new failure.
+Policy-paused rows become runnable when both the current policy allows media and their delay has
+been released or elapsed. Retained rows that require a newer app still prevent media-completion
+proof. Keep these distinctions in the aggregate DAO query and test them through full sync, including
+more than one inbox page and a reopened Room database.
+
+The missing-media network oracle separates host configuration from app callback delivery. A fresh
+private nonce identifies each metered/Data Saver case. After the deferred-download marker, the host
+disables Data Saver, verifies its state and the unmetered override, then acknowledges the change
+through the app's private directory. The device allows a bounded host handoff and then retains its
+45-second policy-Flow deadline. It never refreshes the provider through synchronous getters to make
+the assertion pass. Failure evidence includes host step timings and a device snapshot of the active
+transport, metering, restriction and last observed policy, without network identifiers.
+The host reads back the staged acknowledgment before publishing it atomically. The device can
+consume the published file immediately without racing a second host read.
+
+Use `managed-native-restore-acceptance.py --mode network-policy --output <new-private-directory>`
+for a focused reproduction under the same two-driver custody checks. This route tests policy-driven
+original recovery; it does not perform a native transfer or establish Google-provider acceptance.
+
 Restored entries retain their complete text. Optional enrichment counts the combined input before
 concatenating it, and day previews allocate only their displayed range. Oversized entries must not
 exhaust the replacement device's heap during timeline startup.
 
+The publication profile also seeds synthetic access and refresh tokens in Android's separate
+AccountManager store on the source. It reads them through the production account manager, then
+requires both the OS account and its tokens to be absent on the replacement and after restart.
+Source cleanup removes only that fixture's exact account and must succeed before acceptance is
+written. This verifies package-backup exclusion; Google account delivery and Setup Wizard account
+migration require their own provider acceptance.
+
 ## Replacement-device permissions and widget choices
+
+The managed `--mode widget` route binds a real Fixed Memory widget to the synthetic source's entry
+before native backup. Android delivers that backup twice before the replacement app opens. The
+source allocator advances beyond both restore deliveries so replacement registration must exercise
+a nonidentity ID remap. This route uses the system restore lifecycle: a single-package `bmgr`
+restore does not finish Android's widget restore. Before each system restore, the controller inspects
+the actual local transport dataset and requires exactly the synthetic LogDate app payload plus
+package-manager metadata. Other app payloads, links, special files and unsafe archive paths fail
+the run before restore begins. Ordinary native-transfer scenarios keep their package-specific scope.
+The destination must retain exactly one registered widget and its chosen entry and shape after
+duplicate delivery. The test does not inject provider callbacks or modify destination choices.
+The production worker and Glance implementation must render the chosen entry inside an actual
+`AppWidgetHostView`; a real tap must open that entry's viewer. A cold restart must retain both the
+registered ID and the working tap. Screenshots preserve the rendered widgets and opened entries.
+
+The test host temporarily adopts `BIND_APPWIDGET` only for platform binding and drops it before
+refresh, rendering or interaction. It does not substitute preview RemoteViews, fake repositories or
+a hand-built launch intent. Both source and destination host allocations are cleaned up. This tests
+app restore callbacks and interaction; launcher migration during Android setup remains a separate
+Google-provider acceptance route.
 
 Restored tracking settings preserve the user's intent independently of the replacement device's
 grants. Resume reads the current saved setting before reconciling permissions, so a recently saved
@@ -376,6 +465,88 @@ recording a reminder as shown. A blocked reminder remains eligible for a later e
 Placed-widget choices live in `shared_prefs/logdate_widget_instances.xml`. Native cloud and device
 transfer include that specific file; launcher restoration remaps old widget IDs to replacement IDs.
 The selected entry, recall filters, photo shape, and prompt preference belong to the placed widget.
+
+The canonical widget receivers run in a lightweight `:widget_ingress` process. Application startup
+must skip DI, WorkManager, and journal initialization there. Ingress retains validated lifecycle
+events in an installation-local inbox before reading optional source metadata, then enqueues a
+main-process JobService. API 34 persists queued work; earlier versions reconcile the file inbox on
+boot and startup. All settings and Glance state mutations belong to the main process. Glance dispatch
+uses a real private broadcast to a registered instance of the same receiver class so its canonical
+provider identity and asynchronous broadcast lifetime remain valid.
+
+The backup agent retains raw widget preferences by native delivery generation. Pending, observed,
+prepared, delivered, captured, and omitted payloads have distinct meanings. Observation persists
+before input is read. Complete incoming bytes are bounded to 1 MiB, synced, and read back in a
+prepared snapshot before Android can change the destination. Truncated input never reaches the
+platform copier. Destination bytes must match the complete retained input before a delivery receipt
+can commit.
+
+If copying or its receipt fails, completion replays the prepared original without requiring Android
+to redeliver the file. Replay calls the framework restore method at the original destination, retaining
+its eligibility checks, then verifies exact bytes before recording delivery. Another failed receipt
+keeps the prepared original for the next completion attempt. Replay is limited to the current active
+generation. Its scratch input file is serialized by the snapshot lock and bounded to one copy.
+Duplicates drain their input and repair from the original prepared payload. Captures remain immutable.
+
+Before accepting completion, the agent persists an immutable manifest of enrolled and delivered files.
+A completion retry retains the active generation even if manifest creation was interrupted. It recovers
+the delivered set from successful captures, per-file receipts, or repaired prepared input, preserving database delivery receipts
+from that session. Empty recreated callback memory cannot establish omission. An existing final manifest
+remains authoritative. File callbacks settle before duplicate completion detection, completion callbacks
+run serially, and the session closes before admitting a new file.
+
+Foreground reads use the completed generation's manifest to retry failed capture or omission writes.
+An omitted file never reads destination defaults. Captured historical bytes remain available, while
+an unfinished historical snapshot cannot recapture another delivery's XML. The manifest survives content
+acknowledgement. Snapshot file locks are released before recording detector completion.
+`NativePreferenceDeliveryRecoveryTest` exercises manifest-write failure on the same and recreated agent,
+pre-copy retention, truncated input and retry, prepared replay after recreation, another receipt failure
+during replay, duplicate delivery, omission retry, and historical generation reads in the managed storage follow-up. Host tests cover the persistence decisions; the
+native cases exercise the platform file-copy and snapshot APIs.
+The isolated native fixture uses test-APK metadata without include/exclude rules. Keep assertions on
+the complete destination bytes after replay and preservation of the destination after truncated
+input. A receipt-write obstruction must be nonempty: AtomicFile.openRead removes an empty .new
+directory before the next write. Verify the retained prepared record survives the failure before
+removing only the isolated obstruction and recreating completion.
+
+Lifecycle events retain the corresponding generation and copy its immutable choices before applying
+a remap. New explicit choices win over delayed mappings, including overlapping IDs and ABA edits.
+Automatic defaults are not explicit choices. Settings writes drain accepted pending repairs first;
+deletion checks current bindings before changing preferences or dispatching Glance cleanup. An event
+is acknowledged only after its settings decision is durable and its runtime callback completes.
+
+Source IDs and destination IDs belong to different installations. A matching integer must not erase
+an independently live local widget or copy its unrelated restoration lineage. Cleanup removes obsolete
+source keys while retaining live local choices. Remote-source deletion provenance remains authoritative
+through ID reuse, duplicate delivery, and process recreation, including deletion events that have not
+yet been compacted. An accepted different source may replace a removed destination, after retaining
+the deleted source's provenance. Identity mappings also record their source. Missing or null remote
+provenance in older metadata is treated conservatively. Seed raw restored preferences in fixtures;
+calling a settings save records a new explicit user choice and tests a different contract.
+
+Completed native deliveries from versions without preference retention do not require new metadata.
+The job awaits WorkManager's refresh/cancellation persistence before dispatch and requires a matching
+event ID in the private ordered-broadcast result. Glance's own exception handling cannot acknowledge
+app scheduling. All widget configuration screens use the same durable refresh path.
+New lifecycle jobs request expedited execution where supported, with a regular-job fallback
+when expedited quota is exhausted. Reuse an existing job's exact metadata to avoid restarting
+running work. Re-read pending state after a rejected enqueue: the observed job may have
+completed in between, so its earlier existence cannot suppress the regular fallback.
+
+Widget setup retains an unfinished save instead of closing after a storage or scheduling failure.
+The selected entry, filters, or shape remain in the form while automatic retries use a bounded
+backoff. A storage action opens Android's storage management; returning requires fresh app-lock
+authorization before private content or writes resume. Saved instance state contains only validated
+control values and identifiers, never entry text or media. Editing the form invalidates the previous
+submission, and a canceled write cannot complete a newer selection.
+
+A setup save succeeds only after both its settings and refresh handoff are accepted. Persisting an
+inbox record without an accepted scheduler wake keeps setup pending. Retries and recreation reuse
+one serialized event ID with an immutable refresh payload; current provider IDs are resolved at
+delivery rather than captured on every retry. Keep the inbox record when a wake is rejected. Do not
+create a new lifecycle event for each retry or finish the activity merely because settings were
+written. The shared message banner supplies recovery text and the storage action, including at large
+text sizes; configuration screens must not add independent error cards or transient failure toasts.
 
 Dynamic shortcuts are republished from current journal state after normal startup; a retained
 WorkManager request is not their recovery source. Static capture shortcuts keep stable IDs and
@@ -561,6 +732,12 @@ optional recommendations; a stalled or failed lookup cannot hide recovered entri
 later local edits from appearing.
 
 The enrollment session also runs `NativeAutomaticMediaWorkerProbeTest` against the real server.
+The host saves the managed device's cellular setting and temporarily disables mobile data so
+Wi-Fi metering affects the active transport. After radio cycling it explicitly reconnects the
+emulator's open `AndroidWifi` fixture; enabling the radio does not establish a connection.
+Each probe observes active validated Wi-Fi before
+establishing its worker baseline; `wifi_on` alone is insufficient. Cleanup restores cellular even
+if other environment restoration fails and verifies the original setting.
 It quarantines one synthetic note's mapping while preserving its original file, defers the resulting
 download under metered and Data Saver policies, and verifies automatic repair after each policy
 lifts. An incomplete running sync must receive a persisted successor before ordinary retry backoff
@@ -569,6 +746,31 @@ server only after the retained operation is applied and exact original bytes are
 A separate process-death case retains the download operation and recovers on normal
 startup. Every case requires exact original bytes, unchanged timestamps, an applied inbox operation,
 and no pending download before accepting completion; the host never requests recovery a second time.
+
+The source fixture uploads the committed photo and current-editor attachment through the real media
+API before backup. This establishes the server-original precondition without draining its deliberately
+pending deletion and edits. It does not establish automatic source backup scheduling.
+
+`NativeDeferredOriginalUploadProbeTest` retains a new original upload while the server holds the
+worker after its upload phase. With no periodic writer running, the host lifts the network policy.
+The pending operation must remain unchanged until release, and a distinct immediate request must
+persist before normal retry backoff. That request must drain the operation; downloading from the
+real server must return the exact original bytes without another backup request from the fixture.
+
+`NativeMediaReauthenticationProbeTest` retains a fourth download across authentication loss.
+The local server revokes the destination's actual refresh token and supplies a correctly signed,
+already expired access token. The ordinary client must encounter the refusal and durably clear
+its session; the fixture never clears it directly. The same owner, server, inbox operation,
+unavailable reference, timestamps and encryption identity must survive a signed-out cold restart.
+The server observes the client's refresh attempt, and binary-request counts must stay unchanged
+through cold startup, assertion exchange, and the real authentication response.
+
+Sign-in uses `DefaultPasskeyAccountRepository` and the production HTTP routes. Its sole ceremony
+substitute is the same retained P-256 test authenticator that created the synthetic account. The
+normal session observers must resume the original operation and recover its exact bytes without a
+second backup request. `NativeOriginalMediaProbe` shares those byte, metadata, operation and
+completion checks with the network-policy cases. Google restore-key enrollment is excluded from
+this fixture; it does not establish platform Credential Manager or provider acceptance.
 
 `NativeRetainedDraftShortcutProbeTest` seeds the current editor's `EntryDraftRepository` before
 backup, separately from the legacy rich-draft fixture. On the replacement device it checks text,
@@ -697,7 +899,10 @@ current candidate probe, and the child pins and rechecks the additional APKs bef
 These debug-signed builds establish released-source compatibility; they do not establish a
 Play-signed installation or Google-provider acceptance.
 
-Read-only comparisons retain encryption keys, journal owner, creation/capture timestamps,
+Read-only comparisons validate the portable identity owner and fingerprint, and any installed
+identity key. Signed-out startup need not install that identity before opening the local journal;
+authenticated sync installs it before encryption. The later restoration/decryption probe exercises
+the actual key-installation API. Comparisons retain encryption keys, journal owner, creation/capture timestamps,
 deletions, outbox operation identities, and both editor draft stores. Media-path normalization
 permits equivalent local and portable references without ignoring draft metadata. The source
 keeps its device ID; the destination gets a distinct ID that survives restart. Unfinished recording
@@ -944,10 +1149,24 @@ starting another run; an observer failure does not mean the managed-device task 
 The modern callback fixture constructs a real framework `FullRestoreDataInput` from a private
 file descriptor. Its constructor is hidden from the SDK, so the API 36.1 instrumentation command
 uses `--no-hidden-api-checks` in a nested instrumentation launched by the separate managed test
-driver. The driver attests APK bytes, checks Android's full SDK value, and requires all eleven named
-callback cases. The host also verifies the single outer managed test. This keeps the callback test independent
+driver. The driver attests APK bytes, checks Android's full SDK value, and requires every named
+case in `native-modern-callback-cases.json`. The host also verifies the single outer managed test. This keeps the callback test independent
 of MockK's JVMTI agent and the runtime temporary directory, which may be unavailable on a fresh
 emulator. Production callback handling uses the public callback and accessors.
+
+Native file restoration accepts modern inputs only when the iOS transfer flag is absent and
+`contentVersion` is empty. Unsupported inputs fail before reading their descriptor or replacing
+journal files, key backups, preferences, or recovery receipts. A rejection marker in `noBackupFilesDir`
+prevents a recreated agent, legacy callback, or completion-only callback from treating the rejected
+stream as a native restore. A new agent can admit a later explicitly native modern delivery. The
+callback gate serializes file admission and completion; the marker covers interrupted writes through
+AtomicFile's base, temporary, and backup files. Files accepted before a mixed stream changes formats
+cannot be rolled back by this guard. Portable transfer needs its own importer and version contract.
+The managed fixture checks retained encrypted contents and key bindings, partial rejection markers,
+failed marker writes, rejection across agent recreation, and subsequent native delivery with
+transport flags 0, 1, 2, and 3. If storage cannot create any marker, rejection remains local to that
+agent; the incoming bytes still remain unread. A recreated agent can retry an existing valid account
+recovery, retaining its tickets and installation identity.
 
 `RestoreCredentialCleanupRuntimeTest` checks encrypted-storage recreation, worker retry, and
 production dependency injection and scheduling. Its `cleanupSurvivesAppProcessRestart` test accepts
@@ -1015,10 +1234,14 @@ and verifies the exact size and SHA-256 of the image, audio and video originals.
 restart, the same link, key and counter must remain stable, with no session installed in the app.
 Source cleanup verifies that the original pair key was unchanged before removing only its own fixture.
 
-The native CI data-only lane runs this combined check. Its captured upload proves the app's
+The native CI publication lane runs this combined check. Its captured upload proves the app's
 export, encryption and attribution behavior; hosted uploads and Google restore delivery require
 their own acceptance runs. The BackupManager transport and emulator setup follow
 [Android's backup testing guide](https://developer.android.com/identity/data/testingbackup).
+
+The separate data-only lane starts with a signed-in source, transfers its journal and media,
+and verifies that the destination remains signed out. Its source-integrity check also confirms
+that backup preserves the source session.
 
 ### Instrumentation result validation
 

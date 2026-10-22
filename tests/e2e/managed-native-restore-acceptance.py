@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -18,6 +19,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = runpy.run_path(str(Path(__file__).with_name("managed-native-target.py")))
+EMULATOR = runpy.run_path(str(Path(__file__).with_name("managed-native-emulator.py")))
 DRIVER = TARGET["DRIVER"]
 DRIVER_CASE = "app.logdate.tools.restoredriver.NativeRestoreDriverTest"
 FOLLOWUPS = {"missing-media": "native-missing-media-acceptance.py",
@@ -25,10 +27,25 @@ FOLLOWUPS = {"missing-media": "native-missing-media-acceptance.py",
              "permissions": "native-permission-acceptance.py", "contracts": "native-post-transfer-acceptance.py"}
 
 
+def retain_terminal_results(process, results, output, started_ns):
+    if process.poll() is None or not results.is_dir():
+        return None
+    retained = output / "managed-results"
+    retained.mkdir(mode=0o700)
+    for source in results.rglob("*"):
+        if source.is_symlink() or not source.is_file() or source.stat().st_mtime_ns < started_ns:
+            continue
+        target = retained / source.relative_to(results)
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+        target.chmod(0o600)
+    return retained
+
+
 def acceptance_receipt(mode, native_arguments, followups):
     return {"managedDeviceLifecycleAccepted": True, "outerDrivers": 2, "mode": mode,
-            "managedNativeTransport": mode != "work-restart",
-            "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment", "upgrade"},
+            "managedNativeTransport": mode not in {"work-restart", "network-policy"},
+            "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment", "upgrade", "widget"},
             "nativeArguments": native_arguments, "followups": followups,
             "googleRestoreProviderAccepted": False}
 
@@ -57,19 +74,22 @@ def followup_command(name, destination, app, probe, output):
 
 def scenario_command(mode, source, destination, app, probe, output, arguments, *, classpath=None, fixture_environment=None):
     validate_native_arguments(arguments)
-    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade"} or (mode != "transfer" and arguments):
+    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget"} or (mode != "transfer" and arguments):
         raise ValueError("Only transfer mode accepts native scenario arguments")
     filenames = {"transfer": "native-backup-acceptance.py", "publication": "native-publication-acceptance.py",
                  "work-restart": "native-restore-work-restart-acceptance.py", "d2d": "native-d2d-acceptance.py",
-                 "enrollment": "native-device-enrollment-acceptance.py", "upgrade": "native-released-upgrade-acceptance.py"}
+                 "enrollment": "native-device-enrollment-acceptance.py", "upgrade": "native-released-upgrade-acceptance.py",
+                 "network-policy": "native-missing-media-acceptance.py", "widget": "native-widget-transfer-acceptance.py"}
     command = [sys.executable, str(ROOT / "tests/e2e" / filenames[mode])]
-    if mode in {"work-restart", "d2d"}:
+    if mode in {"work-restart", "d2d", "network-policy"}:
         command += ["--emulator", source]
     else:
         command += ["--source", source, "--destination", destination]
     command += ["--app-apk", str(app), "--test-apk", str(probe), "--output", str(output)]
-    if mode != "d2d":
+    if mode not in {"d2d", "network-policy"}:
         command += ["--seed-empty-source"]
+    if mode == "network-policy":
+        command += ["--emulator", destination, "--network-only", "--synthetic-data"]
     if mode == "enrollment":
         if classpath is None or fixture_environment is None:
             raise ValueError("Enrollment requires an existing private database fixture and server classpath")
@@ -161,10 +181,19 @@ def require_outer_results(directory):
     cases = []
     for report in reports:
         root = ET.parse(report).getroot()
+        if any(re.search(r"\bcancel(?:ed|led|lation)\b", error.text or "", re.IGNORECASE)
+               for error in root.iter("system-err")):
+            raise RuntimeError("The managed driver was canceled")
         for suite in root.iter("testsuite"):
             if any(int(suite.get(attribute, "0")) for attribute in ("failures", "errors", "skipped")):
                 raise RuntimeError("The managed driver reported a failed or skipped suite")
         for case in root.iter("testcase"):
+            try:
+                duration = float(case.get("time", "0"))
+            except ValueError as error:
+                raise RuntimeError("The managed case has an invalid duration") from error
+            if not math.isfinite(duration) or duration < 0:
+                raise RuntimeError("The managed case did not complete with a valid duration")
             if any(case.find(tag) is not None for tag in ("failure", "error", "skipped")):
                 raise RuntimeError("The managed driver failed or skipped")
             cases.append((case.get("classname"), case.get("name")))
@@ -209,8 +238,18 @@ def run(options):
     group = "nativeD2dPair" if options.mode == "d2d" else "nativeRestorePair"
     device_name = "d2dPairApi34" if options.mode == "d2d" else "restorePairApi34"
     avd = f"dev34_{image}_{architecture}_Pixel_9_Pro"
-    env = managed_environment(sdk, os.environ)
+    properties = ROOT / "local.properties"
+    if properties.is_file() and re.search(r"(?m)^\s*sdk(?:\\\.|\.)dir(?:\s|:|=)", properties.read_text()):
+        raise RuntimeError("The managed SDK facade cannot override sdk.dir in local.properties")
+    capability = command(str(sdk / "emulator/emulator"), "-help-no-snapshot-load")
+    if b"snapshot" not in capability.stdout + capability.stderr:
+        raise RuntimeError("The installed emulator must support cold boots of managed instances")
+    managed_sdk = EMULATOR["create_managed_sdk"](sdk, output / "managed-sdk", avd, nonce)
+    command(str(managed_sdk / "emulator/emulator"), "-version")
+    env = managed_environment(managed_sdk, os.environ)
     env["LOGDATE_NATIVE_ACCEPTANCE_TIMEOUT_SECONDS"] = str(budget["native"])
+    initial_processes = command("ps", "-axo", "pid,args").stdout.decode().splitlines()
+    capacity = TARGET["managed_device_capacity"](initial_processes)
     args = ["./gradlew", f":tools:native-restore-driver:{group}GroupDebugAndroidTest",
             *pinned_install_arguments(app, probe),
             f"-Pandroid.testInstrumentationRunnerArguments.class={DRIVER_CASE}",
@@ -219,14 +258,18 @@ def run(options):
             f"-Pandroid.testInstrumentationRunnerArguments.nativeAppSha256={hashes[0]}",
             f"-Pandroid.testInstrumentationRunnerArguments.nativeProbeSha256={hashes[1]}",
             f"-Pandroid.testInstrumentationRunnerArguments.nativeManagedLifetimeMillis={budget['driverMillis']}",
-            "-Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=2",
+            f"-Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices={capacity}",
             "-Pandroid.experimental.androidTest.numManagedDeviceShards=2",
             "-Pandroid.experimental.androidTest.builtin_test_platform=false",
             "-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader",
-            "--max-workers=2", "--console=plain"]
-    existing = {int(line.split(None, 1)[0]) for line in command("ps", "-axo", "pid,args").stdout.decode().splitlines()
+            # AGP retains SDK environment properties in daemon-static state.
+            # A fresh single-use daemon cannot reuse a deleted generation's SDK.
+            "--no-daemon", "--no-configuration-cache", "--max-workers=2", "--console=plain"]
+    existing = {int(line.split(None, 1)[0]) for line in initial_processes
                 if line.strip().split(None, 1)[0].isdigit() and "qemu-system" in line}
     custody_path = output / "custody.json"
+    results = ROOT / "tools/native-restore-driver/build/outputs/androidTest-results/managedDevice/debug" / device_name
+    results_started_ns = time.time_ns()
     with (output / "gradle.log").open("wb") as log:
         process = subprocess.Popen(args, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
         # Retain this handle even if boot observation times out; never launch a replacement
@@ -235,6 +278,8 @@ def run(options):
                    "gradle": {"pid": process.pid}}
         save(output / "active-process.json", custody)
         accepted = False
+        primary = None
+        observed_managed_pids = set()
         try:
             deadline = time.monotonic() + budget["boot"]
             while len(custody["targets"]) < 2:
@@ -249,6 +294,9 @@ def run(options):
                 custody["gradle"]["identity"] = identity
                 processes = command("ps", "-axo", "pid,args").stdout.decode().splitlines()
                 candidates = TARGET["managed_candidates"](processes, existing, avd)
+                candidates = EMULATOR["owned_managed_candidates"](
+                    output / "managed-emulator-launches", candidates, nonce)
+                observed_managed_pids.update(candidates)
                 if len(candidates) > 2:
                     raise RuntimeError("More than two new managed devices; custody is ambiguous")
                 for pid, candidate in candidates.items():
@@ -291,6 +339,21 @@ def run(options):
                 raise RuntimeError("Expected distinct source/destination roles on both managed shards")
             source = next(serial for serial, target in targets.items() if target["role"] == "source")
             destination = next(serial for serial, target in targets.items() if target["role"] == "destination")
+            network_identity = {}
+            stations = {}
+            for serial, binding in targets.items():
+                for peer in targets:
+                    TARGET["require_binding"](custody, peer)
+                observed = command(*TARGET["device_command"](adb, serial, ["shell", "ip", "-o", "link", "show", "wlan0"]), check=False)
+                network_identity[binding["role"]] = {"returnCode": observed.returncode, "interface": observed.stdout.decode(), "error": observed.stderr.decode()}
+                stations[serial] = TARGET["wifi_station_address"](observed.stdout)
+            save(output / "managed-network-identities.json", network_identity)
+            # The Play Store image forbids root reads; its provider-only profile
+            # remains separate from the rooted, paired transport/network oracles.
+            if options.mode != "d2d":
+                station_identity = EMULATOR["require_managed_station_launches"](
+                    output / "managed-emulator-launches", targets, nonce, stations)
+                save(output / "managed-network-stations.json", station_identity)
             scenario_args = scenario_command(options.mode, source, destination, app, probe, output / "native-transfer", options.native_arguments,
                                              classpath=options.classpath, fixture_environment=options.fixture_environment)
             with (output / "native-harness.log").open("wb") as harness_log:
@@ -300,6 +363,9 @@ def run(options):
                     subprocess.run(followup_command(followup, destination, app, probe, output / followup),
                                    cwd=ROOT, env=env, stdout=harness_log, stderr=subprocess.STDOUT, check=True, timeout=budget["followup"])
             accepted = True
+        except BaseException as failure:
+            primary = failure
+            raise
         finally:
             custody["phase"] = "completing"
             save(custody_path, custody)
@@ -322,13 +388,31 @@ def run(options):
                     process.wait(timeout=budget["teardown"])
                 except subprocess.TimeoutExpired:
                     pass
+            try:
+                listing = command("ps", "-axo", "pid,args", check=False)
+                process_lines = listing.stdout.decode().splitlines() if listing.returncode == 0 else None
+                invocations = [json.loads(path.read_text()) for path in (output / "managed-emulator-invocations").glob("*.json")]
+                if EMULATOR["managed_processes_stopped"](process, invocations, observed_managed_pids, process_lines, managed_sdk):
+                    shutil.rmtree(managed_sdk)
+            except Exception as failure:
+                if primary is None:
+                    primary = failure
+                else:
+                    primary.add_note("Could not remove private managed SDK facade: " + type(failure).__name__)
+            if len(custody["targets"]) == 2:
+                try:
+                    retain_terminal_results(process, results, output, results_started_ns)
+                except Exception as failure:
+                    if primary is None:
+                        raise
+                    primary.add_note("Could not retain managed results: " + type(failure).__name__)
+        if primary is not None:
+            raise primary
         if process.poll() is None:
             raise RuntimeError("Gradle is still live; inspect the retained process handle")
         if process.returncode != 0 or completion_errors:
             raise RuntimeError("The managed pair did not finish successfully")
-        results = ROOT / "tools/native-restore-driver/build/outputs/androidTest-results/managedDevice/debug" / device_name
-        require_outer_results(results)
-        shutil.copytree(results, output / "managed-results")
+        require_outer_results(output / "managed-results")
         save(output / "acceptance.json", acceptance_receipt(options.mode, options.native_arguments, options.after_transfer))
 
 
@@ -337,7 +421,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--sdk", type=Path, default=Path(os.environ.get("ANDROID_HOME", str(Path.home() / "Library/Android/sdk"))))
     parser.add_argument("--after-transfer", action="append", choices=sorted(FOLLOWUPS), default=[])
-    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade"), default="transfer")
+    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget"), default="transfer")
     parser.add_argument("--classpath", type=Path)
     parser.add_argument("--fixture-environment", type=Path)
     options, native_arguments = parser.parse_known_args()
