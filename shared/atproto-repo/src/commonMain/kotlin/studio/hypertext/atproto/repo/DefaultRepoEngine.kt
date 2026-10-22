@@ -286,7 +286,16 @@ public class DefaultRepoEngine(
         runCatching {
             val snapshot = loadSnapshot(repo)
             val head = requireNotNull(snapshot.head) { "Unknown repo: $repo" }
-            val commits = blockStore.listCommits(repo).getOrThrow()
+            val storedCommits = blockStore.listCommits(repo).getOrThrow()
+            val commits =
+                if (storedCommits.none { it.cid == head.commitCid }) {
+                    val block =
+                        requireNotNull(blockStore.readBlock(head.commitCid).getOrThrow()) { "Missing head commit ${head.commitCid}" }
+                    val recovered = requireNotNull(CarCodec.decodeSignedCommitBlock(block)) { "Invalid head commit ${head.commitCid}" }
+                    (storedCommits + recovered).sortedBy { it.commit.revision }
+                } else {
+                    storedCommits
+                }
             val exportCommits =
                 commits.filter { commit ->
                     since == null || commit.commit.revision > since.toLong()
@@ -345,11 +354,7 @@ public class DefaultRepoEngine(
                         requireNotNull(providedBlocks[commit.cid] ?: blockStore.readBlock(commit.cid).getOrThrow()) {
                             "Commit block ${commit.cid} is missing"
                         }
-                    val signed = DagCborCodec.decode(block.bytes).jsonObject
-                    require(decodeCommitSignature(signed.getValue(COMMIT_SIGNATURE_FIELD)) == commit.signature) {
-                        "Commit ${commit.cid} lists a signature its block does not carry"
-                    }
-                    commit.cid to signed
+                    commit.cid to validateImportedCommit(block, commit, export.repo, head.commitCid)
                 }
             // Only the head has to verify against the account's current key: older commits may be
             // signed by a key the account has since rotated away from. The signature covers the

@@ -84,7 +84,7 @@ class EcKeySupportTest {
             val highS = signature.copyOfRange(0, width) + order.subtract(s).toFixedWidth(width)
 
             assertTrue(EcKeySupport.hasLowS(signature, curve))
-            assertTrue(EcKeySupport.verifySha256(keyPair.public, curve, payload, highS))
+            assertTrue(EcKeySupport.verifySha256(keyPair.public, curve, payload, highS, allowHighS = true))
             assertTrue(!EcKeySupport.hasLowS(highS, curve))
         }
     }

@@ -53,6 +53,9 @@ class RepoEngineIntegrityTest {
             val export = engine.export(repo).getOrThrow()
 
             assertTrue(export.blocks.any { it.cid == head.commitCid })
+            val restored = DefaultRepoEngine(InMemoryRepoBlockStore())
+            restored.import(export).getOrThrow()
+            assertEquals(entry("one"), assertNotNull(restored.getRecord(recordId("entry-1")).getOrThrow()).value)
         }
 
     @Test
