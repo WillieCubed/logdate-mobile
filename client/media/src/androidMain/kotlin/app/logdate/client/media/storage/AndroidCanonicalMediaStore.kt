@@ -86,13 +86,13 @@ class AndroidCanonicalMediaStore(
                 currentCoroutineContext().ensureActive()
                 destination.toURI().toString()
             }
-        } catch (error: Throwable) {
+        } finally {
             withContext(NonCancellable) {
-                if (stagingFile.exists() && !stagingFile.delete()) {
-                    Napier.w("Unable to remove incomplete private media staging file", error)
+                val cleanup = runCatching { !stagingFile.exists() || stagingFile.delete() }
+                if (!cleanup.getOrDefault(false)) {
+                    Napier.w("Unable to remove private media staging file", cleanup.exceptionOrNull())
                 }
             }
-            throw error
         }
     }
 

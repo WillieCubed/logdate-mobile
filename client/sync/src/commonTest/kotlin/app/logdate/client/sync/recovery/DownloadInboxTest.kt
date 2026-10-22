@@ -1,6 +1,7 @@
 package app.logdate.client.sync.recovery
 
 import app.logdate.client.database.dao.sync.DownloadInboxDao
+import app.logdate.client.database.dao.sync.DownloadRecoveryCounts
 import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
 import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.sync.SyncTransactionManager
@@ -117,13 +118,15 @@ class DownloadInboxTest {
             origin: String,
             type: String,
             now: Long,
-        ) = rows.filter {
-            it.ownerId == owner &&
-                it.serverOrigin == origin &&
-                it.entityType == type &&
-                it.state != "APPLIED" &&
-                it.nextAttemptAt <= now
-        }
+        ) = rows
+            .filter {
+                it.ownerId == owner &&
+                    it.serverOrigin == origin &&
+                    it.entityType == type &&
+                    it.state != "APPLIED" &&
+                    it.nextAttemptAt <= now
+            }.sortedWith(compareBy({ it.nextAttemptAt }, { it.version }))
+            .take(100)
 
         override suspend fun all(
             owner: String,
@@ -139,6 +142,19 @@ class DownloadInboxTest {
                 it.serverOrigin == origin &&
                 it.state != "APPLIED" &&
                 it.reason != "UNSUPPORTED_FORMAT"
+        }
+
+        override suspend fun recoveryCounts(
+            owner: String,
+            origin: String,
+            now: Long,
+            includePolicyDeferred: Boolean,
+        ): DownloadRecoveryCounts {
+            val retained = rows.filter { it.ownerId == owner && it.serverOrigin == origin && it.state != "APPLIED" }
+            val supported = retained.filter { it.reason != "UNSUPPORTED_FORMAT" }
+            val retryable = supported.filter { it.reason != "NETWORK_POLICY" || (includePolicyDeferred && it.nextAttemptAt <= now) }
+            val failed = supported.count { it.state == "FAILED" && it.nextAttemptAt > now && it.reason != "NETWORK_POLICY" }
+            return DownloadRecoveryCounts(retained.size, retryable.size, failed)
         }
 
         override suspend fun put(row: DownloadInboxEntity) {

@@ -4,6 +4,7 @@
 import argparse
 import importlib.util
 import io
+import json
 import os
 import runpy
 from pathlib import Path
@@ -277,17 +278,44 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
         self.assertIn("--mode work-restart", workflow)
         post = (ROOT / "tests/e2e/native-post-transfer-acceptance.py").read_text()
-        self.assertIn('PREFIX + "NativeBackgroundCredentialCallbackTest"', post)
         self.assertNotIn("am start", post)
-        callback_test = (
-            ROOT
-            / "app/android-main/src/androidTest/kotlin/app/logdate/client/e2e/NativeBackgroundCredentialCallbackTest.kt"
-        ).read_text()
-        self.assertIn(
-            'application.createDeviceProtectedStorageContext().getDir("native-restore-probe", Context.MODE_PRIVATE)',
-            callback_test,
-        )
-        self.assertNotIn("application.noBackupFilesDir", callback_test)
+        contract = json.loads((ROOT / "tests/e2e/native-modern-callback-cases.json").read_text())
+        for classname in contract:
+            callback_test = (
+                ROOT / "app/android-main/src/androidTest/kotlin" / (classname.replace(".", "/") + ".kt")
+            ).read_text()
+            self.assertIn('getDir("native-restore-probe", Context.MODE_PRIVATE)', callback_test)
+            self.assertNotIn("application.noBackupFilesDir", callback_test)
+
+    def test_post_transfer_callbacks_execute_and_report_the_supplied_contract(self):
+        post = runpy.run_path(str(ROOT / "tests/e2e/native-post-transfer-acceptance.py"))
+        saved = json.loads((ROOT / "tests/e2e/native-modern-callback-cases.json").read_text())
+        changed = {"fixture.Callbacks": ["first", "second"], "fixture.MoreCallbacks": ["third"]}
+        for contract in (saved, changed):
+            with self.subTest(contract=contract), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root / "native-modern-callback-cases.json").write_text(json.dumps(contract))
+                calls = []
+                commands = []
+                def instrument(*args, **kwargs):
+                    calls.append(args)
+                def adb(*args, **kwargs):
+                    commands.append(args)
+                    return b"1"
+                with patch.dict(post["run"].__globals__, {
+                    "instrument": instrument, "__file__": str(root / "native-post-transfer-acceptance.py"),
+                }), patch.dict(post["NATIVE"], {"adb": adb}):
+                    post["run"]("emulator-5556", root / "output")
+                expected_count = sum(len(methods) for methods in contract.values())
+                callback_calls = [call for call in calls if call[3].name == "callbacks.log"]
+                self.assertEqual([
+                    ("emulator-5556", ",".join(contract), expected_count, root / "output/callbacks.log"),
+                ], callback_calls)
+                receipt = json.loads((root / "output/acceptance.json").read_text())
+                self.assertEqual(expected_count, receipt["callbackCases"])
+                self.assertFalse(receipt["modernCallbackAccepted"])
+                self.assertFalse(receipt["googleProviderAccepted"])
+                self.assertFalse(any(command[1:4] == ("shell", "am", "start") for command in commands))
 
     def test_native_restore_ci_exercises_the_real_cloud_quota_rejection_callback(self):
         workflow = (ROOT / ".github/workflows/native-restore-acceptance.yml").read_text()
@@ -1197,6 +1225,45 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             with self.subTest(serial=value):
                 with self.assertRaises(argparse.ArgumentTypeError):
                     HARNESS.emulator_serial(value)
+
+    def test_failed_managed_adb_retains_timing_and_stderr_without_input_or_stdout(self):
+        failures = (
+            subprocess.CalledProcessError(1, ["owned-adb"], output=b"private-output",
+                                          stderr=b"cat files/media/original.wav: No such file"),
+            subprocess.TimeoutExpired(["owned-adb"], 180, output=b"private-output", stderr=b"device unavailable"),
+        )
+        for failure in failures:
+            with self.subTest(failure=type(failure).__name__), patch.object(
+                HARNESS, "managed_adb_command", return_value=["owned-adb"]
+            ), patch.object(HARNESS.subprocess, "run", side_effect=failure), patch.object(
+                HARNESS.time, "monotonic_ns", side_effect=(100, 150)
+            ), patch.object(HARNESS.time, "time_ns", return_value=200):
+                with self.assertRaises(type(failure)) as caught:
+                    HARNESS.adb("emulator-5554", "exec-out", "fixture", input_bytes=b"private-input")
+            notes = " ".join(getattr(caught.exception, "__notes__", []))
+            self.assertIn("start_monotonic_ns=100", notes)
+            self.assertIn("failure_monotonic_ns=150", notes)
+            self.assertIn("failure_unix_ns=200", notes)
+            self.assertIn(failure.stderr.decode(), notes)
+            self.assertNotIn("private-input", notes)
+            self.assertNotIn("private-output", notes)
+
+    def test_managed_adb_failure_stderr_is_bounded(self):
+        failure = subprocess.CalledProcessError(1, ["owned-adb"], stderr=b"x" * 10_000)
+        with patch.object(HARNESS, "managed_adb_command", return_value=["owned-adb"]), patch.object(
+            HARNESS.subprocess, "run", side_effect=failure
+        ):
+            with self.assertRaises(subprocess.CalledProcessError) as caught:
+                HARNESS.adb("emulator-5554", "exec-out", "fixture")
+        notes = " ".join(getattr(caught.exception, "__notes__", []))
+        self.assertIn("x" * 4096, notes)
+        self.assertNotIn("x" * 4097, notes)
+
+    def test_successful_managed_adb_returns_original_bytes(self):
+        with patch.object(HARNESS, "managed_adb_command", return_value=["owned-adb"]), patch.object(
+            HARNESS.subprocess, "run", return_value=subprocess.CompletedProcess(["owned-adb"], 0, stdout=b"original", stderr=b"")
+        ):
+            self.assertEqual(b"original", HARNESS.adb("emulator-5554", "exec-out", "fixture"))
 
     def test_explicit_emulator_serial_is_accepted(self):
         self.assertEqual("emulator-5582", HARNESS.emulator_serial("emulator-5582"))

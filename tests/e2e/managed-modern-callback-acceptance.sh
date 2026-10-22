@@ -27,6 +27,7 @@ print(hashlib.sha256(app.read_bytes()).hexdigest(), hashlib.sha256(probe.read_by
 PYARGS
 )
 EOF
+managed_status=0
 ./gradlew :tools:native-restore-driver:restoreCallbackApi36_1DebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=app.logdate.tools.restoredriver.NativeModernRestoreCallbackTest \
   "-Pandroid.testInstrumentationRunnerArguments.nativeAppSha256=$app_sha" \
@@ -34,28 +35,31 @@ EOF
   "-Pandroid.testInstrumentationRunnerArguments.nativeCallbackContract=$contract" \
   -Pandroid.experimental.androidTest.builtin_test_platform=false \
   -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader \
-  --max-workers=2 --no-daemon --console=plain > "$output/managed.log" 2>&1
+  --max-workers=2 --no-daemon --console=plain > "$output/managed.log" 2>&1 || managed_status=$?
 
 results=tools/native-restore-driver/build/outputs/androidTest-results/managedDevice/debug/restoreCallbackApi36_1
-python3 tests/e2e/native-instrumentation-results.py \
-  --managed-results "$results" --expected-cases tests/e2e/native-modern-callback-driver-cases.json
-cp -R "$results" "$output/results"
+if [[ -d "$results" ]]; then
+  cp -R "$results" "$output/results"
+fi
 additional=tools/native-restore-driver/build/intermediates/managed_device_android_test_additional_output/debugAndroidTest/restoreCallbackApi36_1DebugAndroidTest
 if [[ -d "$additional" ]]; then
   cp -R "$additional" "$output/additional-output"
 fi
-python3 - "$output" <<'PY'
-import hashlib
+if (( managed_status != 0 )); then
+  exit "$managed_status"
+fi
+python3 tests/e2e/native-instrumentation-results.py \
+  --managed-results "$output/results" --expected-cases tests/e2e/native-modern-callback-driver-cases.json
+python3 - "$output" "$app_sha" "$probe_sha" <<'PY'
 import json
 from pathlib import Path
 import sys
 
 output = Path(sys.argv[1])
-artifacts = [Path("app/android-main/build/outputs/apk/debug/android-main-debug.apk"),
-             Path("app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk")]
+artifacts = {"android-main-debug.apk": sys.argv[2], "android-main-debug-androidTest.apk": sys.argv[3]}
 with (output / "acceptance.json").open("w") as receipt:
     json.dump({"managedModernRestoreCallback": True, "requiredSdkFull": 3600001,
                "googleRestoreProviderAccepted": False,
-               "apks": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in artifacts}}, receipt, indent=2)
+               "apks": artifacts}, receipt, indent=2)
     receipt.write("\n")
 PY

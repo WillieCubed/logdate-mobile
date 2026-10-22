@@ -42,6 +42,22 @@ interface DownloadInboxDao {
         origin: String,
     ): Int
 
+    @Query(
+        "SELECT COUNT(*) AS retained, " +
+            "COALESCE(SUM(CASE WHEN reason != 'UNSUPPORTED_FORMAT' " +
+            "AND (reason != 'NETWORK_POLICY' OR (:includePolicyDeferred AND nextAttemptAt <= :now)) " +
+            "THEN 1 ELSE 0 END), 0) AS retryable, " +
+            "COALESCE(SUM(CASE WHEN state = 'FAILED' AND nextAttemptAt > :now " +
+            "AND reason NOT IN ('NETWORK_POLICY', 'UNSUPPORTED_FORMAT') THEN 1 ELSE 0 END), 0) AS failed " +
+            "FROM sync_download_inbox WHERE ownerId = :owner AND serverOrigin = :origin AND state != 'APPLIED'",
+    )
+    suspend fun recoveryCounts(
+        owner: String,
+        origin: String,
+        now: Long,
+        includePolicyDeferred: Boolean = false,
+    ): DownloadRecoveryCounts
+
     /** Every row of [type], applied or not. */
     @Query("SELECT * FROM sync_download_inbox WHERE ownerId = :owner AND serverOrigin = :origin AND entityType = :type")
     suspend fun all(

@@ -3,7 +3,6 @@ package app.logdate.client.e2e
 import android.app.Application
 import android.os.Build
 import android.os.Bundle
-import android.util.AtomicFile
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -16,14 +15,11 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.StoredMediaReferences
-import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.media.storage.isRecoveredOriginal
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.sync.AndroidLogDateSyncWorker
-import app.logdate.client.sync.BackupRequestState
 import app.logdate.client.sync.SyncManager
-import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.TimeoutCancellationException
@@ -38,11 +34,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 import java.io.File
-import java.security.MessageDigest
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 /** Requires the synthetic enrollment server; verification never invokes recovery or sync itself. */
@@ -52,6 +45,7 @@ class NativeAutomaticMediaWorkerProbeTest {
     private val koin get() = GlobalContext.get()
     private val database get() = koin.get<LogDateDatabase>()
     private val media get() = koin.get<MediaManager>()
+    private val originals by lazy { NativeOriginalMediaProbe(context, koin, ::reportFailureState) }
     private val noteId = Uuid.parse("00000000-0000-0000-0000-000000000004")
 
     @Test
@@ -67,6 +61,7 @@ class NativeAutomaticMediaWorkerProbeTest {
             require(context.packageName.endsWith(".debug"))
             val credentials = readNativeDeviceEnrollmentCredentials(context)
             require(credentials.sourceDevice != null) { "An enrolled synthetic destination is required" }
+            awaitValidatedNativeWifi(context)
             ensureLogDateApplicationStarted(context.applicationContext as Application)
             ActivityScenario.launch(MainActivity::class.java).use {
                 val sessions = koin.get<SessionStorage>()
@@ -89,7 +84,7 @@ class NativeAutomaticMediaWorkerProbeTest {
                                 .first { work -> work.none { !it.state.isFinished } }
                         }
                     }
-                    prepareMissingOriginal(marker, scope)
+                    originals.prepareMissingOriginal(marker, scope)
                     if (mode == "metered") {
                         val armed = File(context.noBackupFilesDir, "native-media-worker-gate-armed")
                         assertFalse(armed.exists())
@@ -99,7 +94,7 @@ class NativeAutomaticMediaWorkerProbeTest {
                     // Only the initial request is explicit. Policy changes and cold startup must
                     // resume accepted work without another request from the fixture.
                     koin.get<SyncManager>().requestBackup()
-                    retainDeferredOperation(marker, scope)
+                    originals.retainDeferredOperation(marker, scope)
                     if (stage == "prepare") return@use
                     val gated =
                         if (mode == "metered") {
@@ -114,7 +109,7 @@ class NativeAutomaticMediaWorkerProbeTest {
                             null
                         }
                     report("RESTORE_MEDIA_DEFERRED")
-                    withTimeout(30_000) { koin.get<DataUsagePolicy>().policy.first { it == DataUsageMode.Unrestricted } }
+                    awaitUnrestrictedNativeNetwork(context, koin.get<DataUsagePolicy>(), callbackTimeoutMillis = 30_000)
                     if (mode == "metered") {
                         try {
                             requirePromptSuccessorOrCompletedOriginal(marker, requireNotNull(gated), scope)
@@ -125,7 +120,7 @@ class NativeAutomaticMediaWorkerProbeTest {
                     }
                 }
                 try {
-                    verifyAutomaticOriginal(marker, scope)
+                    originals.verifyAutomaticOriginal(marker, scope)
                 } catch (timeout: TimeoutCancellationException) {
                     reportFailureState(scope)
                     throw timeout
@@ -205,183 +200,19 @@ class NativeAutomaticMediaWorkerProbeTest {
                     .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
                     .first { work ->
                         work.any { it.id != predecessor.id && it.id.toString() !in baseline } ||
-                            (work.any { it.id == predecessor.id && completedForScope(it, scope) } && appliedOriginal(marker, scope))
+                            (
+                                work.any { it.id == predecessor.id && completedMediaForScope(it, scope) } &&
+                                    originals.appliedOriginal(marker, scope)
+                            )
                     }.let { work ->
                         work.firstOrNull { it.id != predecessor.id && it.id.toString() !in baseline }
-                            ?: work.single { it.id == predecessor.id && completedForScope(it, scope) }
+                            ?: work.single { it.id == predecessor.id && completedMediaForScope(it, scope) }
                     }
             }
-        writeCheckpoint(marker, JSONObject(marker.readText()).put("completionWorkId", completion.id.toString()))
-    }
-
-    private fun completedForScope(
-        work: WorkInfo,
-        scope: UploadScope,
-    ): Boolean =
-        work.state == WorkInfo.State.SUCCEEDED &&
-            work.outputData.getString("recovered_media_owner") == scope.ownerId &&
-            work.outputData.getString("recovered_media_origin") == scope.serverOrigin
-
-    private suspend fun appliedOriginal(
-        marker: File,
-        scope: UploadScope,
-    ): Boolean {
-        val checkpoint = JSONObject(marker.readText())
-        val row = database.downloadInboxDao().get(scope.ownerId, scope.serverOrigin, "MEDIA_NATIVE_NOTE", noteId.toString())
-        if (row?.operationId != checkpoint.getString("operationId") || row.state != "APPLIED") return false
-        val note = database.imageNoteDao().getNoteOneOff(noteId)
-        return media.isRecoveredOriginal(note.contentUri, koin.get<StoredMediaReferences>()) &&
-            digest(media.readMedia(note.contentUri).data) == checkpoint.getString("sha256")
-    }
-
-    private suspend fun prepareMissingOriginal(
-        marker: File,
-        scope: UploadScope,
-    ) {
-        require(!marker.exists()) { "Do not replace an earlier synthetic recovery checkpoint" }
-        val note = database.imageNoteDao().getNoteOneOff(noteId)
-        assertTrue(media.isRecoveredOriginal(note.contentUri, koin.get<StoredMediaReferences>()))
-        val expectedDigest = digest(media.readMedia(note.contentUri).data)
-        val refs = koin.get<MediaSyncRefStore>()
-        val remote = requireNotNull(refs.getScoped(noteId, scope)) { "The original must already exist on the real fixture server" }
-        val missing = File(context.filesDir, "native-media-acceptance-missing/${Uuid.random()}.png")
-        assertFalse(missing.exists())
-        val source = "file://${missing.absolutePath}"
-        val unavailable = UnavailableMediaReferences.nativeRestore(source)
-        val prior =
-            WorkManager
-                .getInstance(context)
-                .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
-                .first()
-        writeCheckpoint(
-            marker,
-            JSONObject()
-                .put("owner", scope.ownerId)
-                .put("origin", scope.serverOrigin)
-                .put("id", noteId.toString())
-                .put("missing", unavailable)
-                .put("sha256", expectedDigest)
-                .put("created", note.created.toEpochMilliseconds())
-                .put("updated", note.lastUpdated.toEpochMilliseconds())
-                .put("priorWorkIds", JSONArray(prior.map { it.id.toString() })),
-        )
-        // Preserve the original file. Only this synthetic note's mapping is made unavailable;
-        // successful recovery must fetch its original through the existing server media record.
-        refs.upsert(remote.copy(localUri = source, localAliases = emptyList()))
-        database.imageNoteDao().updateContentUri(noteId, unavailable)
-    }
-
-    private suspend fun retainDeferredOperation(
-        marker: File,
-        scope: UploadScope,
-    ) {
-        val checkpoint = JSONObject(marker.readText())
-        val row =
-            withTimeout(90_000) {
-                while (true) {
-                    val current = database.downloadInboxDao().get(scope.ownerId, scope.serverOrigin, "MEDIA_NATIVE_NOTE", noteId.toString())
-                    if (current != null && current.payload == checkpoint.getString("missing") && current.reason == "NETWORK_POLICY") {
-                        assertNotEquals("APPLIED", current.state)
-                        return@withTimeout current
-                    }
-                    delay(50)
-                }
-                error("Unreachable")
-            }
-        withTimeout(10_000) {
-            while (true) {
-                val status = koin.get<SyncManager>().getSyncStatus()
-                if (status.pendingDownloads > 0 && status.requestState != BackupRequestState.COMPLETED) break
-                delay(25)
-            }
-        }
-        checkpoint.put("operationId", row.operationId)
-        writeCheckpoint(marker, checkpoint)
-        assertEquals(checkpoint.getString("missing"), database.imageNoteDao().getNoteOneOff(noteId).contentUri)
-    }
-
-    private suspend fun verifyAutomaticOriginal(
-        marker: File,
-        scope: UploadScope,
-    ) {
-        require(marker.isFile) { "The previous process must retain its deferred operation" }
-        val checkpoint = JSONObject(marker.readText())
-        assertEquals(scope.ownerId, checkpoint.getString("owner"))
-        assertEquals(scope.serverOrigin, checkpoint.getString("origin"))
-        var persistenceFailureReported = false
-        val recovered =
-            withTimeout(120_000) {
-                while (true) {
-                    if (!persistenceFailureReported) {
-                        val pending =
-                            database.downloadInboxDao().get(
-                                scope.ownerId,
-                                scope.serverOrigin,
-                                "MEDIA_NATIVE_NOTE",
-                                noteId.toString(),
-                            )
-                        if (pending?.reason == "LOCAL_STORAGE") {
-                            reportFailureState(scope)
-                            persistenceFailureReported = true
-                        }
-                    }
-                    val note = database.imageNoteDao().getNoteOneOff(noteId)
-                    if (note.contentUri != checkpoint.getString("missing") &&
-                        media.isRecoveredOriginal(note.contentUri, koin.get<StoredMediaReferences>())
-                    ) {
-                        return@withTimeout note
-                    }
-                    delay(50)
-                }
-                error("Unreachable")
-            }
-        assertEquals(checkpoint.getString("sha256"), digest(media.readMedia(recovered.contentUri).data))
-        assertEquals(checkpoint.getLong("created"), recovered.created.toEpochMilliseconds())
-        assertEquals(checkpoint.getLong("updated"), recovered.lastUpdated.toEpochMilliseconds())
-        val row = requireNotNull(database.downloadInboxDao().get(scope.ownerId, scope.serverOrigin, "MEDIA_NATIVE_NOTE", noteId.toString()))
-        assertEquals(checkpoint.getString("operationId"), row.operationId)
-        assertEquals("APPLIED", row.state)
-        val prior = checkpoint.getJSONArray("priorWorkIds").let { ids -> (0 until ids.length()).map { ids.getString(it) }.toSet() }
-        withTimeout(60_000) {
-            WorkManager
-                .getInstance(context)
-                .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
-                .first { work ->
-                    work.any {
-                        (it.id.toString() !in prior || it.id.toString() == checkpoint.optString("completionWorkId")) &&
-                            (
-                                checkpoint
-                                    .optString(
-                                        "completionWorkId",
-                                    ).isEmpty() ||
-                                    it.id.toString() == checkpoint.getString("completionWorkId")
-                            ) &&
-                            completedForScope(it, scope)
-                    } &&
-                        work.none { !it.state.isFinished }
-                }
-        }
-        assertEquals(0, koin.get<SyncManager>().getSyncStatus().pendingDownloads)
+        originals.writeCheckpoint(marker, JSONObject(marker.readText()).put("completionWorkId", completion.id.toString()))
     }
 
     private fun report(marker: String) {
         InstrumentationRegistry.getInstrumentation().sendStatus(0, Bundle().apply { putString("nativeMediaRecovery", marker) })
     }
-
-    private fun writeCheckpoint(
-        marker: File,
-        contents: JSONObject,
-    ) {
-        val file = AtomicFile(marker)
-        val output = file.startWrite()
-        try {
-            output.write(contents.toString().encodeToByteArray())
-            file.finishWrite(output)
-        } catch (failure: Throwable) {
-            file.failWrite(output)
-            throw failure
-        }
-    }
-
-    private fun digest(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }

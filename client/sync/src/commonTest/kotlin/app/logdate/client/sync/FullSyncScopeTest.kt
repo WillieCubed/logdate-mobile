@@ -1,14 +1,23 @@
 package app.logdate.client.sync
 
+import app.logdate.client.networking.DataUsageMode
+import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.cloud.ContentChangesResponse
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
+import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.client.sync.test.FakeCloudApiClient
+import app.logdate.client.sync.test.fakeDataUsagePolicy
+import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeSessionStorage
+import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -17,9 +26,60 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FullSyncScopeTest {
+    @Test
+    fun `deferred originals cannot consume a readiness wake when policy lifts after upload`() =
+        runTest {
+            for (liftDuringEnrollment in listOf(false, true)) {
+                val session = fakeSessionStorage(authenticated = true)
+                val bound = requireNotNull(session.getOriginBoundSession())
+                val metadata = fakeSyncMetadataService(session)
+                val notes = fakeJournalNotesRepository()
+                val date = Instant.fromEpochMilliseconds(123)
+                val image = JournalNote.Image(Uuid.random(), date, date, "file:///deferred-original.jpg")
+                notes.create(image)
+                metadata.enqueuePending(image.uid.toString(), EntityType.NOTE, PendingOperation.CREATE)
+                val mode = MutableStateFlow<DataUsageMode>(DataUsageMode.Conservative)
+                val policy =
+                    object : DataUsagePolicy by fakeDataUsagePolicy() {
+                        override val policy = mode
+
+                        override suspend fun currentMode(): DataUsageMode = mode.value
+                    }
+                val api = FakeCloudApiClient()
+                val manager =
+                    testDefaultSyncManager(
+                        sessionStorage = session,
+                        syncMetadataService = metadata,
+                        journalNotesRepository = notes,
+                        cloudContentDataSource = DefaultCloudContentDataSource(api),
+                        cloudMediaDataSource = DefaultCloudMediaDataSource(api),
+                        dataUsagePolicy = policy,
+                        syncScope = backgroundScope,
+                        deviceEnrollment = { if (liftDuringEnrollment) mode.value = DataUsageMode.Unrestricted },
+                    )
+
+                val deferred = manager.fullSync()
+
+                assertTrue(deferred.success, "A policy deferral is not a failed sync")
+                assertFalse(deferred.hasMorePending, "Policy deferral must not create a worker retry loop")
+                assertEquals(1, metadata.getPendingUploads(EntityType.NOTE).size)
+                assertFalse(api.wasMethodCalled("uploadMedia"))
+                assertNull(deferred.recoveredMediaScope, "An undrained original cannot acknowledge the policy-change wake")
+
+                mode.value = DataUsageMode.Unrestricted
+                val resumed = manager.fullSync()
+                assertTrue(resumed.success)
+                assertTrue(metadata.getPendingUploads(EntityType.NOTE).isEmpty())
+                assertTrue(api.wasMethodCalled("uploadMedia"))
+                assertEquals(UploadScope(bound.session.accountId, bound.origin), resumed.recoveredMediaScope)
+            }
+        }
+
     @Test
     fun `successful full sync proves recovery for its owner and server`() =
         runTest {

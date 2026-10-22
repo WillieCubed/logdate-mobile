@@ -8,8 +8,49 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 
 DRIVER = "app.logdate.tools.restoredriver"
+
+
+def managed_adb_command(serial, arguments):
+    if not re.fullmatch(r"emulator-[0-9]+", serial):
+        raise ValueError("An explicit emulator-NNNN serial is required")
+    if not os.environ.get("LOGDATE_MANAGED_CUSTODY"):
+        raise RuntimeError("Run native scenarios through managed-native-restore-acceptance.py to establish device ownership")
+    return [sys.executable, str(Path(__file__).resolve()), "-s", serial, *map(str, arguments)]
+
+
+def managed_device_capacity(process_lines):
+    existing = set()
+    for line in process_lines:
+        fields = line.strip().split(None, 1)
+        if len(fields) != 2 or not fields[0].isdigit():
+            continue
+        try:
+            arguments = shlex.split(fields[1])
+        except ValueError:
+            continue
+        if not arguments or not PurePosixPath(arguments[0]).name.startswith("qemu-system-") or "-id" not in arguments:
+            continue
+        position = arguments.index("-id") + 1
+        if position < len(arguments) and re.fullmatch(r"[\w-]+_GradleManagedDevice", arguments[position]):
+            existing.add(int(fields[0]))
+    if len(existing) > 2:
+        raise RuntimeError("The shared host has insufficient bounded capacity for a managed restore pair")
+    # The shared limit includes reservations made before another job starts QEMU.
+    # Keep bounded headroom for those jobs; this run still requests exactly two.
+    return 4
+
+
+def wifi_station_address(raw):
+    match = re.search(rb"link/ether ([0-9a-fA-F:]{17})(?:\s|$)", raw)
+    if match is None:
+        return None
+    address = match[1].decode().lower()
+    if not re.fullmatch(r"(?:[0-9a-f]{2}:){5}[0-9a-f]{2}", address) or int(address[:2], 16) & 1 or address == "00:00:00:00:00:00":
+        return None
+    return address
 
 
 def process_identity(pid):
@@ -99,9 +140,12 @@ def device_command(real_adb, serial, arguments):
         if "rm" in tokens and any("/data/" in p for p in tokens):
             raise ValueError("Application data deletion is forbidden")
         # Probes, run-as, settings and BackupManager retain the shell caller. Only
-        # protected payload reads/extraction and the existing root capability check use su.
+        # protected payload reads/extraction, the root capability check and Android's
+        # root-only reconnect of the owned open emulator network use su.
         protected = tokens and (tokens[0] in {"tar", "chown", "restorecon"}
                                 or tokens[:2] == ["id", "-u"]
+                                or tokens in (["cmd", "wifi", "connect-network", "AndroidWifi", "open"],
+                                              ["ip", "-o", "link", "show", "wlan0"])
                                 or (tokens[0] == "cat" and any(p.startswith("/data/user/") for p in tokens[1:])))
         return [*prefix, operation, shlex.join(["su", "0", "sh", "-c", script]) if protected else script]
     return [*prefix, *arguments]
@@ -118,7 +162,9 @@ def proxy_main(arguments):
         raise ValueError("The serial is outside this managed test generation")
     for target in custody["targets"]:
         require_binding(custody, target)
-    return subprocess.call(device_command(custody["adb"], serial, arguments[2:]))
+    command = device_command(custody["adb"], serial, arguments[2:])
+    # Keep the controller's process handle attached to ADB for cancellation and streaming timeouts.
+    return os.execv(command[0], command)
 
 
 if __name__ == "__main__":

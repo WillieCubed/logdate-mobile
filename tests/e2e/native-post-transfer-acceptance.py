@@ -34,10 +34,12 @@ def run(serial, output):
     instrument(serial, PREFIX + "NativeRestoredEntryEditingTest", 7, output / "entry-editing.log", ("-e", "restoredEntryEditing", "true"))
     instrument(serial, PREFIX + "RestoredJournalLockRuntimeTest," + PREFIX + "RestoredAppLockEnrollmentRuntimeTest", 8,
                output / "journal-lock.log")
-    instrument(serial, PREFIX + "NativeBackgroundCredentialCallbackTest", 11, output / "callbacks.log")
+    callback_contract = json.loads(Path(__file__).with_name("native-modern-callback-cases.json").read_text())
+    callback_count = sum(len(methods) for methods in callback_contract.values())
+    instrument(serial, ",".join(callback_contract), callback_count, output / "callbacks.log")
     NATIVE["private_file"](output / "acceptance.json", json.dumps({
         "retainedKeyCases": 8, "pendingKeyAcrossProcesses": True, "editingCases": 7,
-        "privacyCases": 8, "callbackCases": 11, "modernCallbackAccepted": False,
+        "privacyCases": 8, "callbackCases": callback_count, "modernCallbackAccepted": False,
         "googleProviderAccepted": False,
     }, indent=2).encode())
 

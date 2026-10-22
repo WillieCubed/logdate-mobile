@@ -5,8 +5,11 @@ package app.logdate.integration.e2e.harness
 import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.identity.data.AccountDeviceApi
+import app.logdate.client.networking.PasskeyApiClient
 import app.logdate.client.sync.cloud.CloudApiClient
-import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
+import app.logdate.integration.e2e.fixtures.createPasskeyOnlyAccount
+import app.logdate.server.auth.TokenService
+import app.logdate.shared.config.DefaultLogDateConfigRepository
 import io.ktor.server.request.path
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -19,12 +22,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
+import org.koin.core.context.GlobalContext
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermissions
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.uuid.Uuid
 
 /** Local PostgreSQL-backed registry for the host's two-emulator native transfer fixture. */
@@ -52,8 +57,13 @@ object NativeDeviceEnrollmentHarness {
             Files.setPosixFilePermissions(control, PosixFilePermissions.fromString("rwx------"))
             require(!Files.exists(control.resolve("complete"))) { "A fresh enrollment control directory is required" }
             val mediaGate = NativeMediaPhaseGate(control)
-            withServerClientHarness(serverPort = port, beforeRequest = { mediaGate.beforeRequest(it.request.path()) }) {
-                val account = apiClient.createAccountWithSyntheticPasskey("transfer_${Uuid.random().toString().take(8)}").data
+            val reauthentication = AtomicReference<NativeMediaReauthenticationServer>()
+            withServerClientHarness(serverPort = port, beforeRequest = {
+                mediaGate.beforeRequest(it.request.path())
+                reauthentication.get()?.observeRequest(it.request.path())
+            }) {
+                val registered = apiClient.createPasskeyOnlyAccount("transfer_${Uuid.random().toString().take(8)}")
+                val account = registered.response.data
                 val session =
                     OriginBoundSession(
                         baseUrl.removeSuffix("/api/v1"),
@@ -68,9 +78,19 @@ object NativeDeviceEnrollmentHarness {
                         put("refreshToken", account.tokens.refreshToken)
                     }.toString(),
                 )
+                val reauth =
+                    NativeMediaReauthenticationServer(
+                        control,
+                        registered,
+                        session.origin.replace("127.0.0.1", "10.0.2.2"),
+                        GlobalContext.get().get<TokenService>(),
+                        PasskeyApiClient(httpClient, DefaultLogDateConfigRepository(initialBackendUrl = session.origin)),
+                        ::privateFile,
+                    )
+                reauthentication.set(reauth)
                 privateFile(control.resolve("ready"), "ready")
                 try {
-                    awaitRegistryChecks(control, AccountDeviceApi(httpClient), apiClient, session, acceptanceSeconds)
+                    awaitRegistryChecks(control, AccountDeviceApi(httpClient), apiClient, session, acceptanceSeconds, reauth)
                 } finally {
                     Files.deleteIfExists(control.resolve("ready"))
                 }
@@ -83,14 +103,17 @@ object NativeDeviceEnrollmentHarness {
         api: CloudApiClient,
         session: OriginBoundSession,
         acceptanceSeconds: Long,
+        reauthentication: NativeMediaReauthenticationServer,
     ) {
         val stages = listOf("source", "destination", "replay")
         val deadline = System.nanoTime() + acceptanceSeconds * 1_000_000_000
         while (!Files.exists(control.resolve("complete"))) {
             check(System.nanoTime() < deadline) { "Native device enrollment acceptance timed out" }
+            reauthentication.processRequests()
             for (stage in stages) verifyRegistryStage(control, stage, devices, api, session)
             delay(100)
         }
+        reauthentication.requireCompleted()
         check(stages.all { Files.isRegularFile(control.resolve("verified-$it.json")) }) {
             "Native enrollment cannot complete without every verified registry stage"
         }

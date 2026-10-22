@@ -13,7 +13,6 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
@@ -159,6 +158,6 @@ private fun CaptureWidgetContent() {
  * Hosts [CaptureWidget]. Declared disabled in the manifest; the app enables it while the
  * LOCK_SCREEN_CAPTURE_WIDGET flag is on.
  */
-class CaptureWidgetReceiver : GlanceAppWidgetReceiver() {
+class CaptureWidgetReceiver : DurableWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = CaptureWidget()
 }

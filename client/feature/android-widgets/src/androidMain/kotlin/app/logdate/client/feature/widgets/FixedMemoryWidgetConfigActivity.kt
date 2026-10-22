@@ -3,7 +3,6 @@
 package app.logdate.client.feature.widgets
 
 import android.appwidget.AppWidgetManager
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -42,9 +41,11 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ import kotlinx.datetime.LocalDate
 import org.koin.android.ext.android.inject
 
 class FixedMemoryWidgetConfigActivity : SecureWidgetConfigActivity() {
+    internal override val widgetSetupTarget = WidgetSetupTarget.PINNED_MEMORY
     private val notesRepository: JournalNotesRepository by inject()
     private val transcriptionRepository: TranscriptionRepository by inject()
     private val userStateRepository: UserStateRepository by inject()
@@ -86,11 +88,15 @@ class FixedMemoryWidgetConfigActivity : SecureWidgetConfigActivity() {
             val selectedId = WidgetInstanceSettings(this@FixedMemoryWidgetConfigActivity).chosenNoteId(widgetId)
             setContent {
                 LogDateTheme {
-                    FixedMemorySetup(notes, selectedId, transcriptionRepository) { note ->
-                        WidgetInstanceSettings(this@FixedMemoryWidgetConfigActivity).saveChosenNote(widgetId, note.uid.toString())
-                        enqueueWidgetRefresh(this@FixedMemoryWidgetConfigActivity)
-                        setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
-                        finish()
+                    FixedMemorySetup(
+                        notes,
+                        selectedId,
+                        transcriptionRepository,
+                        recoveryState = widgetSetupSaveState.collectAsState().value,
+                        onManageStorage = ::openWidgetStorageSettings,
+                        onSelectionChanged = ::cancelPendingWidgetSetup,
+                    ) { note ->
+                        persistWidgetSetup(WidgetSetupRequest.pinned(widgetId, note.uid))
                     }
                 }
             }
@@ -104,9 +110,13 @@ private fun FixedMemorySetup(
     notes: List<JournalNote>,
     selectedId: String?,
     transcriptionRepository: TranscriptionRepository,
+    recoveryState: WidgetSetupSaveState,
+    onManageStorage: () -> Unit,
+    onSelectionChanged: () -> Unit,
     onDone: (JournalNote) -> Unit,
 ) {
-    var selected by remember { mutableStateOf(notes.firstOrNull { it.uid.toString() == selectedId }) }
+    var selectedNoteId by rememberSaveable { mutableStateOf(selectedId) }
+    val selected = notes.firstOrNull { it.uid.toString() == selectedNoteId }
     var selectedTranscript by remember(selected?.uid) { mutableStateOf<String?>(null) }
     LaunchedEffect(selected?.uid) {
         selectedTranscript =
@@ -114,7 +124,7 @@ private fun FixedMemorySetup(
                 runCatching { transcriptionRepository.getTranscription(note.uid)?.displayText() }.getOrNull()
             }
     }
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     val visibleNotes =
         remember(notes, query) {
             notes.filter { note ->
@@ -132,6 +142,7 @@ private fun FixedMemorySetup(
             topBar = { TopAppBar(title = { Text(stringResource(R.string.widget_config_fixed_memory_title)) }) },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
+                WidgetSetupRecoveryBanner(recoveryState, onManageStorage)
                 if (notes.isEmpty()) {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                         WidgetSetupPreview(FixedMemoryWidget(displayPreview), displayPreview)
@@ -190,7 +201,10 @@ private fun FixedMemorySetup(
                                 remember(content.imageUri) { content.imageUri?.let { loadScaledThumbnail(context, it)?.asImageBitmap() } }
                             WidgetSetupChoice(
                                 selected = selected?.uid == note.uid,
-                                onClick = { selected = note },
+                                onClick = {
+                                    selectedNoteId = note.uid.toString()
+                                    onSelectionChanged()
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {

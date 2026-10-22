@@ -52,6 +52,9 @@
     <string name="widget_config_shape_circle">Circle</string>
     <string name="widget_config_allow_photos">Allow photos</string>
     <string name="widget_config_save">Save</string>
+    <string name="widget_config_save_pending">Saving your widget… Your selection is kept here while we retry.</string>
+    <string name="widget_config_storage_pending">Free up storage to finish saving your widget. Your selection is kept here.</string>
+    <string name="widget_config_manage_storage">Manage storage</string>
 
     <!-- Dynamic launcher shortcuts -->
     <string name="dynamic_shortcut_continue_draft_short">Continue draft</string>

@@ -1,16 +1,54 @@
 package app.logdate.client.feature.widgets
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import app.logdate.client.device.restore.NativeRestoredPreferenceFiles
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
-
-enum class PhotoWidgetShape { SYSTEM, SOFT, CIRCLE }
+import io.github.aakira.napier.Napier
 
 /** Launcher widget IDs are independent, so choices must be stored per placed widget. */
 class WidgetInstanceSettings(
     context: Context,
 ) {
-    private val preferences = context.applicationContext.getSharedPreferences("logdate_widget_instances", Context.MODE_PRIVATE)
+    private val application = context.applicationContext
+    private val preferences = application.getSharedPreferences("logdate_widget_instances", Context.MODE_PRIVATE)
+    private val preferenceStore = AndroidWidgetPreferencesStore(preferences)
+    private val repair =
+        WidgetRestoreRepair(
+            AndroidWidgetRestoreStateStore(application.noBackupFilesDir) {
+                WidgetRestoreState(
+                    preferenceStore
+                        .read()
+                        .filterKeys { it in liveWidgetIds() }
+                        .mapValues { RestoredWidgetChoices(values = it.value) },
+                )
+            },
+            preferenceStore,
+        )
+    var isRecoveryPending: Boolean = false
+        private set
+
+    init {
+        synchronized(restoreLock) {
+            try {
+                NativeRestoredPreferenceFiles(application).read("logdate_widget_instances")
+                applyPendingWidgetSettings(application, repair, liveWidgetIds())
+                repair.reconcile(liveWidgetIds())
+            } catch (_: Exception) {
+                isRecoveryPending = true
+                Napier.w("Widget choice recovery remains pending")
+            }
+        }
+    }
+
+    private fun liveWidgetIds(): Set<Int> {
+        val manager = AppWidgetManager.getInstance(application)
+        return listOf(FixedMemoryWidgetReceiver::class.java, OnThisDayWidgetReceiver::class.java, NewEntryWidgetReceiver::class.java)
+            .flatMap { manager.getAppWidgetIds(ComponentName(application, it)).toList() }
+            .toSet()
+    }
 
     fun recallMode(
         id: Int,
@@ -45,42 +83,59 @@ class WidgetInstanceSettings(
         mode: RecallMode,
         types: Set<WidgetContentType>,
     ) {
-        if (preferences.contains("$id.recallMode")) return
-        saveRecall(id, mode, types)
+        synchronized(restoreLock) {
+            NativeRestoredPreferenceFiles(application).read("logdate_widget_instances")
+            applyPendingWidgetSettings(application, repair, liveWidgetIds())
+            if (preferences.contains("$id.recallMode")) return
+            repair.update(id, explicitlyChosen = false) { values ->
+                values.copy(
+                    strings =
+                        values.strings + mapOf("recallMode" to mode.name, "contentTypes" to types.joinToString(",") { it.name }),
+                )
+            }
+        }
     }
 
     fun saveRecall(
         id: Int,
         mode: RecallMode,
         types: Set<WidgetContentType>,
-    ) {
-        preferences
-            .edit()
-            .putString("$id.recallMode", mode.name)
-            .putString("$id.contentTypes", types.joinToString(",") { it.name })
-            .apply()
-    }
+    ): Boolean =
+        update(id) { values ->
+            values.copy(strings = values.strings + mapOf("recallMode" to mode.name, "contentTypes" to types.joinToString(",") { it.name }))
+        }
 
     fun saveChosenNote(
         id: Int,
         noteId: String,
-    ) {
-        preferences.edit().putString("$id.chosenNoteId", noteId).apply()
-    }
+    ): Boolean = update(id) { it.copy(strings = it.strings + ("chosenNoteId" to noteId)) }
 
     fun saveUsePhotoPrompt(
         id: Int,
         enabled: Boolean,
-    ) {
-        preferences.edit().putBoolean("$id.usePhotoPrompt", enabled).apply()
-    }
+    ): Boolean = update(id) { it.copy(flags = it.flags + ("usePhotoPrompt" to enabled)) }
 
     fun savePhotoShape(
         id: Int,
         shape: PhotoWidgetShape,
-    ) {
-        preferences.edit().putString("$id.photoShape", shape.name).apply()
-    }
+    ): Boolean = update(id) { it.copy(strings = it.strings + ("photoShape" to shape.name)) }
+
+    fun savePhotoPrompt(
+        id: Int,
+        enabled: Boolean,
+        shape: PhotoWidgetShape,
+    ): Boolean =
+        update(id) { values ->
+            values.copy(strings = values.strings + ("photoShape" to shape.name), flags = values.flags + ("usePhotoPrompt" to enabled))
+        }
+
+    internal fun saveSetup(
+        request: WidgetSetupRequest,
+        canCommit: () -> Boolean,
+    ): Boolean =
+        update(request.widgetId, canCommit) { existing ->
+            existing.copy(strings = existing.strings + request.values.strings, flags = existing.flags + request.values.flags)
+        }
 
     fun remap(
         oldId: Int,
@@ -91,37 +146,33 @@ class WidgetInstanceSettings(
         oldIds: IntArray,
         newIds: IntArray,
     ) {
-        val moves = oldIds.zip(newIds).filter { (oldId, newId) -> oldId != newId }
-        if (moves.isEmpty()) return
-        val snapshot = preferences.all.toMap()
-        val editor = preferences.edit()
-        moves.forEach { (oldId, _) ->
-            val oldPrefix = "$oldId."
-            snapshot.keys.filter { it.startsWith(oldPrefix) }.forEach { editor.remove(it) }
-        }
-        moves.forEach { (oldId, newId) ->
-            val oldPrefix = "$oldId."
-            snapshot.forEach { (key, value) ->
-                if (key.startsWith(oldPrefix)) {
-                    val newKey = "$newId.${key.removePrefix(oldPrefix)}"
-                    when (value) {
-                        is String -> editor.putString(newKey, value)
-                        is Boolean -> editor.putBoolean(newKey, value)
-                    }
-                }
-            }
-        }
-        editor.apply()
+        synchronized(restoreLock) { repair.remap(oldIds, newIds, liveWidgetIds()) }
     }
 
     fun remove(id: Int) {
-        preferences
-            .edit()
-            .remove("$id.recallMode")
-            .remove("$id.contentTypes")
-            .remove("$id.chosenNoteId")
-            .remove("$id.usePhotoPrompt")
-            .remove("$id.photoShape")
-            .apply()
+        synchronized(restoreLock) { repair.remove(id) }
+    }
+
+    private fun update(
+        id: Int,
+        canCommit: () -> Boolean = { true },
+        change: (WidgetSettingValues) -> WidgetSettingValues,
+    ): Boolean =
+        synchronized(restoreLock) {
+            try {
+                NativeRestoredPreferenceFiles(application).read("logdate_widget_instances")
+                applyPendingWidgetSettings(application, repair, liveWidgetIds())
+                if (!repair.update(id, canCommit = canCommit, change = change)) return@synchronized false
+                isRecoveryPending = false
+                true
+            } catch (_: Exception) {
+                isRecoveryPending = true
+                Napier.w("Widget selection has not been saved yet")
+                false
+            }
+        }
+
+    private companion object {
+        val restoreLock = Any()
     }
 }

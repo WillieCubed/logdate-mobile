@@ -30,6 +30,15 @@ class AndroidPhotoLibraryMediaManager(
         canCommit: () -> Boolean,
     ): String = checkNotNull(delegate as? ConditionalMediaSaver) { "Guarded media storage unavailable" }.saveMedia(payload, canCommit)
 
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+        canCommit: () -> Boolean,
+    ): String =
+        checkNotNull(delegate as? ConditionalMediaSaver) { "Guarded media storage unavailable" }
+            .saveMediaFromFile(sourceFilePath, fileName, mimeType, canCommit)
+
     private val resolver = context.contentResolver
     private val recovery: MediaRecoveryGateway = ContentResolverMediaRecoveryGateway(resolver, context)
 

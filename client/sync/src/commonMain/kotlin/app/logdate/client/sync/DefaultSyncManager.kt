@@ -219,6 +219,13 @@ class DefaultSyncManager(
 
     internal suspend fun ensureDeviceEnrolled() = enrollment.ensureEnrolled()
 
+    internal suspend fun mediaRecoveryAllowed() =
+        mediaDownloadAllowed(
+            profile.downloadsMedia,
+            dataUsagePolicy,
+            downloadInbox?.currentScope(),
+        )
+
     override suspend fun <T> whilePaused(block: suspend () -> T): T = syncMutex.withLock { block() }
 
     /**
@@ -407,7 +414,7 @@ class DefaultSyncManager(
             mediaSyncRefStore = mediaSyncRefStore,
             cloudMediaDataSource = cloudMediaDataSource,
             mediaReferences = mediaReferences,
-            mayDownload = { mediaDownloadAllowed(profile.downloadsMedia, dataUsagePolicy, downloadInbox?.currentScope()) },
+            mayDownload = { mediaRecoveryAllowed() },
         )
 
     internal val retryCoordinator =

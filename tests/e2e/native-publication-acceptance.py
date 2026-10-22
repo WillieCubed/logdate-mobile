@@ -54,14 +54,11 @@ def run(options):
                          f"no_backup/native-publication-{fixture}.json")
         native.private_file(options.output / "source-publication.json", raw)
         metadata = json.loads(raw)
+        if metadata.get("platformAccountTokensSeeded") is not True:
+            raise RuntimeError("The source must seed and verify its Android AccountManager tokens")
         native.transfer(options.source, options.destination, options.app_apk, options.test_apk,
                         options.output, "phrase", seed_source=False, exercise_data_only=True)
         verify_restarted_publication(options.destination, fixture, metadata, options.output)
-        native.private_file(options.output / "publication-acceptance.json", json.dumps({
-            "nativeTransfer": True, "replacementTrust": True, "restartReplay": True,
-            "replacementDevicePublication": True, "originalMediaBytes": True,
-            "hostedUpload": False, "googleProviderAcceptance": False,
-        }, indent=2).encode())
     except BaseException as error:
         primary_error = error
         raise
@@ -72,6 +69,14 @@ def run(options):
             if primary_error is None:
                 raise
             primary_error.add_note(f"Source fixture cleanup also failed: {error}")
+
+    native.private_file(options.output / "publication-acceptance.json", json.dumps({
+        "nativeTransfer": True, "replacementTrust": True, "restartReplay": True,
+        "replacementDevicePublication": True, "originalMediaBytes": True,
+        "sourcePlatformAccountTokensSeeded": True, "sourcePlatformAccountTokensNotTransferred": True,
+        "sourcePlatformAccountFixtureRemoved": True, "setupWizardAccountMigrationAccepted": False,
+        "hostedUpload": False, "googleProviderAcceptance": False,
+    }, indent=2).encode())
 
 
 def main():

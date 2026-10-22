@@ -135,13 +135,21 @@ interface MediaManager {
 
 /**
  * Optional media-store capability for callers that must bind durable media writes to live state.
- * Implementations must not leave an unreferenced durable object when [canCommit] becomes false.
+ * Implementations must reject revoked writes before durable finalization.
  * Stores with an atomic finalization boundary should check there; stores that write uniquely named
- * objects may check after writing and remove that object before returning.
+ * objects may check after writing and remove that object before returning. A save can return a shared
+ * content-addressed object; callers must never delete that object to roll back cancellation.
  */
 interface ConditionalMediaSaver {
     suspend fun saveMedia(
         payload: MediaPayload,
+        canCommit: () -> Boolean,
+    ): String
+
+    suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
         canCommit: () -> Boolean,
     ): String
 }

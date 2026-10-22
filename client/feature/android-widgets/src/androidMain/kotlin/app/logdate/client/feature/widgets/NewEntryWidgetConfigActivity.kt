@@ -5,7 +5,6 @@ package app.logdate.client.feature.widgets
 import android.Manifest
 import android.appwidget.AppWidgetManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -37,10 +36,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +65,7 @@ import org.koin.android.ext.android.inject
 import kotlin.time.Clock
 
 class NewEntryWidgetConfigActivity : SecureWidgetConfigActivity() {
+    internal override val widgetSetupTarget = WidgetSetupTarget.PHOTO_PROMPT
     private val mediaManager: MediaManager by inject()
     private val userStateRepository: UserStateRepository by inject()
 
@@ -82,12 +84,14 @@ class NewEntryWidgetConfigActivity : SecureWidgetConfigActivity() {
             val initialShape = instanceSettings.photoShape(widgetId)
             setContent {
                 LogDateTheme {
-                    NewEntrySetup(mediaManager, initialShape) { shape ->
-                        instanceSettings.saveUsePhotoPrompt(widgetId, true)
-                        instanceSettings.savePhotoShape(widgetId, shape)
-                        enqueueWidgetRefresh(this@NewEntryWidgetConfigActivity)
-                        setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId))
-                        finish()
+                    NewEntrySetup(
+                        mediaManager,
+                        initialShape,
+                        recoveryState = widgetSetupSaveState.collectAsState().value,
+                        onManageStorage = ::openWidgetStorageSettings,
+                        onSelectionChanged = ::cancelPendingWidgetSetup,
+                    ) { shape ->
+                        persistWidgetSetup(WidgetSetupRequest.photoPrompt(widgetId, shape))
                     }
                 }
             }
@@ -100,10 +104,14 @@ class NewEntryWidgetConfigActivity : SecureWidgetConfigActivity() {
 private fun NewEntrySetup(
     mediaManager: MediaManager,
     initialShape: PhotoWidgetShape,
+    recoveryState: WidgetSetupSaveState,
+    onManageStorage: () -> Unit,
+    onSelectionChanged: () -> Unit,
     onDone: (PhotoWidgetShape) -> Unit,
 ) {
     val context = LocalContext.current
-    var shape by remember { mutableStateOf(initialShape) }
+    var shapeName by rememberSaveable { mutableStateOf(initialShape.name) }
+    val shape = PhotoWidgetShape.entries.firstOrNull { it.name == shapeName } ?: initialShape
     var permissionRevision by remember { mutableIntStateOf(0) }
     var photoState by remember { mutableStateOf<OnThisDayWidgetState>(OnThisDayWidgetState.PhotoUnavailable) }
     val permissions = remember { imagePermissionsForWidget() }
@@ -137,6 +145,7 @@ private fun NewEntrySetup(
             topBar = { TopAppBar(title = { Text(stringResource(R.string.widget_config_new_entry_title)) }) },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp)) {
+                WidgetSetupRecoveryBanner(recoveryState, onManageStorage)
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     WidgetSetupPreview(
                         NewEntryWidget(previewState, shape),
@@ -167,7 +176,10 @@ private fun NewEntrySetup(
                             }
                         WidgetSetupChoice(
                             selected = shape == option,
-                            onClick = { shape = option },
+                            onClick = {
+                                shapeName = option.name
+                                onSelectionChanged()
+                            },
                             modifier = Modifier.weight(1f).height(116.dp),
                         ) {
                             Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) {

@@ -16,6 +16,35 @@ SPEC.loader.exec_module(PUBLICATION)
 
 
 class PublicationProbeTest(unittest.TestCase):
+    def test_source_platform_tokens_must_be_seeded_before_native_transfer(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(PUBLICATION.native, "prepare"), patch.object(
+            PUBLICATION.native, "prepare_source"
+        ), patch.object(PUBLICATION, "probe"), patch.object(PUBLICATION.native, "adb", return_value=b"{}"), patch.object(
+            PUBLICATION.native, "transfer"
+        ) as transfer, patch.object(PUBLICATION, "verify_restarted_publication"):
+            options = SimpleNamespace(source="emulator-5580", destination="emulator-5582",
+                                      app_apk=Path("app.apk"), test_apk=Path("tests.apk"), output=Path(folder),
+                                      resume_seeded_source=False, seed_empty_source=True)
+            with self.assertRaisesRegex(RuntimeError, "AccountManager"):
+                PUBLICATION.run(options)
+            transfer.assert_not_called()
+
+    def test_platform_fixture_cleanup_failure_cannot_leave_an_acceptance_receipt(self):
+        def probe(serial, stage, *args):
+            if stage == "cleanup":
+                raise RuntimeError("Platform fixture cleanup failed")
+        with tempfile.TemporaryDirectory() as folder, patch.object(PUBLICATION.native, "prepare"), patch.object(
+            PUBLICATION.native, "prepare_source"
+        ), patch.object(PUBLICATION, "probe", side_effect=probe), patch.object(
+            PUBLICATION.native, "adb", return_value=b'{"platformAccountTokensSeeded":true}'
+        ), patch.object(PUBLICATION.native, "transfer"), patch.object(PUBLICATION, "verify_restarted_publication"):
+            options = SimpleNamespace(source="emulator-5580", destination="emulator-5582",
+                                      app_apk=Path("app.apk"), test_apk=Path("tests.apk"), output=Path(folder),
+                                      resume_seeded_source=False, seed_empty_source=True)
+            with self.assertRaisesRegex(RuntimeError, "Platform fixture cleanup failed"):
+                PUBLICATION.run(options)
+            self.assertFalse((Path(folder) / "publication-acceptance.json").exists())
+
     def test_owned_preinstalled_empty_source_is_allowed_but_retained_content_is_refused(self):
         stopped = RuntimeError("source preparation reached")
         def adb(serial, *arguments):

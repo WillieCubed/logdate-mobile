@@ -1,7 +1,10 @@
 package app.logdate.client.e2e
 
+import android.accounts.Account
+import android.accounts.AccountManager
 import android.app.Application
 import android.os.Build
+import android.os.Bundle
 import android.util.AtomicFile
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -9,6 +12,7 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.AndroidAccountManager
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.IdentityKeyFingerprint
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -64,6 +68,10 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
     private val peer get() = "native-publication-$fixture"
     private val sentinel get() = "native.publication.$fixture"
     private val receipt get() = File(context.noBackupFilesDir, "$peer.json")
+    private val platformAccounts get() = AccountManager.get(context)
+    private val platformUsername get() = "native-publication-$fixture"
+    private val platformOrigin = "https://native-backup-fixture.invalid"
+    private val platformAccount get() = Account("$platformUsername@$platformOrigin", "${context.packageName}.account")
 
     @Test
     fun transferredPublication() =
@@ -99,6 +107,27 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         val scope = PeerDeliveryContext(sealed.linkId, source.getString("device"), peer, LinkMode.PAIR)
         repeat(3) { koin.get<WindowManifestStore>().reserveRevision(scope) }
         koin.get<SecureStorage>().putString(sentinel, "owned-source-vault-sentinel")
+        seedPlatformAccountTokens()
+        source.put("platformAccountTokensSeeded", true)
+        writeReceipt(source)
+    }
+
+    private suspend fun seedPlatformAccountTokens() {
+        assertTrue(
+            platformAccounts.getAccountsByType(platformAccount.type).isEmpty(),
+            "The owned source must have no preexisting LogDate account",
+        )
+        val metadata =
+            Bundle().apply {
+                putString(AndroidAccountManager.KEY_USERNAME, platformUsername)
+                putString(AndroidAccountManager.KEY_BACKEND_URL, platformOrigin)
+            }
+        assertTrue(platformAccounts.addAccountExplicitly(platformAccount, null, metadata))
+        platformAccounts.setAuthToken(platformAccount, AndroidAccountManager.TOKEN_TYPE_ACCESS, "synthetic-platform-access-$fixture")
+        platformAccounts.setAuthToken(platformAccount, AndroidAccountManager.TOKEN_TYPE_REFRESH, "synthetic-platform-refresh-$fixture")
+        val tokens = assertNotNull(AndroidAccountManager(context).getTokens(platformUsername, platformOrigin).getOrThrow())
+        assertEquals("synthetic-platform-access-$fixture", tokens.accessToken)
+        assertEquals("synthetic-platform-refresh-$fixture", tokens.refreshToken)
     }
 
     private suspend fun verifyDestination(replay: Boolean) {
@@ -108,6 +137,12 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         assertEquals(source.getString("fingerprint"), current.getString("fingerprint"))
         assertNotEquals(source.getString("device"), current.getString("device"))
         assertNull(koin.get<SessionStorage>().getSession(), "A source session must not be restored")
+        assertTrue(source.getBoolean("platformAccountTokensSeeded"), "The source must exercise Android's separate token store")
+        assertTrue(
+            platformAccounts.getAccountsByType(platformAccount.type).isEmpty(),
+            "Package restore must not create a source OS account",
+        )
+        assertNull(AndroidAccountManager(context).getTokens(platformUsername, platformOrigin).getOrThrow())
         assertNull(koin.get<SecureStorage>().getString(sentinel), "The source vault must not transfer")
         val oldPeer = PeerDeliveryContext(source.getString("link"), source.getString("device"), peer, LinkMode.PAIR)
         val manifests = koin.get<WindowManifestStore>()
@@ -275,6 +310,12 @@ class NativeTransferredPublicationProbeTest : CloudArchiveWorkerFixture() {
         koin.get<PairKeyVault>().get(peer)?.let { key ->
             assertEquals(source.getString("pairSha256"), digest(key))
         }
+        if (platformAccounts.getAccountsByType(platformAccount.type).contains(platformAccount)) {
+            assertEquals(platformUsername, platformAccounts.getUserData(platformAccount, AndroidAccountManager.KEY_USERNAME))
+            assertEquals(platformOrigin, platformAccounts.getUserData(platformAccount, AndroidAccountManager.KEY_BACKEND_URL))
+            assertTrue(platformAccounts.removeAccountExplicitly(platformAccount), "Only the owned synthetic account is removed")
+        }
+        assertNull(AndroidAccountManager(context).getTokens(platformUsername, platformOrigin).getOrThrow())
         koin.get<PhoneWatchLinkStore>().forget(peer)
         koin.get<SecureStorage>().remove(sentinel)
         receipt.delete()

@@ -7,12 +7,49 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidNativeRestoreDeliveryGateTest {
+    @Test
+    fun `overlapping completion waits until the previous completion releases its delivery boundary`() {
+        AndroidNativeRestoreDeliveryGate.beginRestoreCompletion()
+        val attempted = CountDownLatch(1)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val failure = AtomicReference<Throwable?>()
+        val duplicate =
+            thread {
+                try {
+                    attempted.countDown()
+                    AndroidNativeRestoreDeliveryGate.beginRestoreCompletion()
+                    entered.countDown()
+                    try {
+                        check(release.await(2, TimeUnit.SECONDS))
+                    } finally {
+                        AndroidNativeRestoreDeliveryGate.endRestore()
+                    }
+                } catch (error: Throwable) {
+                    failure.set(error)
+                }
+            }
+        try {
+            assertTrue(attempted.await(1, TimeUnit.SECONDS))
+            assertFalse(entered.await(100, TimeUnit.MILLISECONDS), "A duplicate completion cannot share the active completion owner")
+        } finally {
+            AndroidNativeRestoreDeliveryGate.endRestore()
+            release.countDown()
+            duplicate.join(1_000)
+        }
+        assertFalse(duplicate.isAlive)
+        assertTrue(entered.count == 0L, "The queued completion must run after its predecessor")
+        assertNull(failure.get())
+    }
+
     @Test
     fun `failed overlapping callback cannot release reconciliation while another callback is active`() =
         runTest {

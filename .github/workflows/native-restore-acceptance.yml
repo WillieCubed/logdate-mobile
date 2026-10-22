@@ -12,6 +12,14 @@ on:
       - 'app/android-main/src/androidTest/**/NativeSourceSession*.kt'
       - 'app/android-main/src/androidTest/**/NativeDeviceEnrollment*.kt'
       - 'app/android-main/src/androidTest/**/NativeAutomaticMediaWorkerProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeDeferredOriginalUploadProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeOriginalMediaProbe.kt'
+      - 'app/android-main/src/androidTest/**/NativeMediaReauthenticationProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeCurrentDraftRecoveryProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeNetworkPolicyHandoff.kt'
+      - 'app/android-main/src/androidTest/**/NativeEmulatorUiObstructions.kt'
+      - 'app/android-main/src/androidTest/**/NativeRestoredWidgetProbeTest.kt'
+      - 'app/android-main/src/androidTest/**/NativeReleasedUpgradeProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRetainedDraftShortcutProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRetainedOfflineEditProbeTest.kt'
       - 'app/android-main/src/androidTest/**/NativeRestorePrivacyRuntimeTest.kt'
@@ -84,6 +92,9 @@ on:
       - 'tests/e2e/native-restore-work-restart-acceptance.py'
       - 'tests/e2e/native-device-enrollment-acceptance.py'
       - 'tests/e2e/native-automatic-media-worker-acceptance.py'
+      - 'tests/e2e/native-media-reauthentication-acceptance.py'
+      - 'tests/e2e/native-widget-transfer-acceptance.py'
+      - 'tests/e2e/native-released-upgrade-acceptance.py'
       - 'integration/server-client-e2e/src/test/kotlin/app/logdate/integration/e2e/harness/**'
       - 'integration/server-client-e2e/build.gradle.kts'
       - 'build.gradle.kts'
@@ -336,7 +347,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        scenario: [partial, publication, contracts, missing-keys, credentials-only, privacy, work-restart, d2d, enrollment]
+        scenario: [partial, archive, publication, contracts, missing-keys, credentials-only, data-only, privacy, work-restart, d2d, enrollment, widget]
     env:
       ANDROID_AVD_HOME: ${{ github.workspace }}/.native-managed-avds
       LOGDATE_NATIVE_ACCEPTANCE_PACKAGE: studio.hypertext.logdate.debug
@@ -424,6 +435,8 @@ jobs:
           case "$NATIVE_SCENARIO" in
             partial)
               arguments+=(-- --exercise-quota --exercise-partial-media --exercise-duplicate-restore) ;;
+            archive)
+              arguments+=(-- --exercise-archive-recovery) ;;
             publication)
               arguments+=(--mode publication --after-transfer missing-media --after-transfer storage --after-transfer ui) ;;
             contracts)
@@ -432,6 +445,8 @@ jobs:
               arguments+=(-- --exercise-missing-keys) ;;
             credentials-only)
               arguments+=(-- --exercise-credentials-only) ;;
+            data-only)
+              arguments+=(-- --exercise-data-only) ;;
             privacy)
               arguments+=(-- --exercise-missing-privacy) ;;
             work-restart)
@@ -442,6 +457,8 @@ jobs:
               arguments+=(--mode enrollment
                 --classpath integration/server-client-e2e/build/android-history-harness.classpath
                 --fixture-environment "$RUNNER_TEMP/native-enrollment-environment.json") ;;
+            widget)
+              arguments+=(--mode widget) ;;
             *) exit 2 ;;
           esac
           python3 tests/e2e/managed-native-restore-acceptance.py "${arguments[@]}"
@@ -459,6 +476,7 @@ jobs:
             ${{ runner.temp }}/native-managed/**
             !${{ runner.temp }}/native-managed/**/apks/**
             !${{ runner.temp }}/native-managed/**/server-control/**
+            !${{ runner.temp }}/native-managed/**/managed-sdk/**
           if-no-files-found: warn
           retention-days: 14
 

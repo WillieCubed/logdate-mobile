@@ -249,6 +249,21 @@ class IosMediaManager(
             return@withContext NSURL.fileURLWithPath(destPath).absoluteString ?: "file://$destPath"
         }
 
+    override suspend fun saveMediaFromFile(
+        sourceFilePath: String,
+        fileName: String,
+        mimeType: String,
+        canCommit: () -> Boolean,
+    ): String {
+        if (!canCommit()) throw CancellationException("Media hydration scope changed")
+        val uri = saveMediaFromFile(sourceFilePath, fileName, mimeType)
+        if (!canCommit()) {
+            withContext(NonCancellable) { deleteOwnedMedia(uri) }
+            throw CancellationException("Media hydration scope changed")
+        }
+        return uri
+    }
+
     /**
      * A file URL for a photo the user picked, copied into the media library so the entry that
      * stores it keeps it. The renderable cache is purgeable and not restored from a backup.

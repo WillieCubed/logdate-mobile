@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import runpy
+import uuid
 
 MEDIA = runpy.run_path(str(Path(__file__).with_name("native-missing-media-acceptance.py")))
 
@@ -17,48 +18,90 @@ def run(serial, control, server, output, wait_for):
     saver = b"enabled" in MEDIA["adb"](serial, "shell", "cmd", "netpolicy", "get", "restrict-background").stdout
     airplane = MEDIA["adb"](serial, "shell", "settings", "get", "global", "airplane_mode_on").stdout.strip() == b"1"
     wifi = MEDIA["adb"](serial, "shell", "settings", "get", "global", "wifi_on").stdout.strip()
+    cellular = MEDIA["adb"](serial, "shell", "settings", "get", "global", "mobile_data").stdout.strip()
     if wifi not in (b"0", b"1", b"2") or airplane or wifi == b"0":
         raise RuntimeError("Original-media acceptance requires the owned fixture online")
+    if cellular not in (b"0", b"1"):
+        raise RuntimeError("The owned fixture's cellular setting must be readable before network isolation")
 
     def release_network():
         MEDIA["adb"](serial, "shell", "cmd", "netpolicy", "set", "restrict-background", "false")
         MEDIA["set_metered"](serial, network, "false")
 
-    def release_after_media_phase():
-        wait_for(control / "media-gate-held", server, seconds=30)
-        release_network()
-
     def arm_after_startup():
         (control / "media-gate-arm").write_bytes(b"armed")
         MEDIA["adb"](serial, "shell", "run-as", MEDIA["PACKAGE"], "touch", "no_backup/native-media-worker-gate-armed")
 
+    def arm_upload_after_startup():
+        (control / "media-upload-gate-arm").write_bytes(b"armed")
+        MEDIA["adb"](serial, "shell", "run-as", MEDIA["PACKAGE"], "touch", "no_backup/native-media-upload-gate-armed")
+
     def instrument(mode, stage, actions=None):
+        selector = ("NativeDeferredOriginalUploadProbeTest#policyLiftAfterUploadPhaseResumesTheRetainedOriginal"
+                    if mode == "upload" else "NativeAutomaticMediaWorkerProbeTest#automaticRecovery")
+        nonce = uuid.uuid4().hex if stage == "recover" else None
+
+        def handoff():
+            if mode in {"metered", "upload"}:
+                prefix = "media-upload" if mode == "upload" else "media"
+                wait_for(control / (prefix + "-gate-held"), server, seconds=30)
+            MEDIA["release_network_handoff"](serial, network, nonce, output / f"{mode}-{stage}-handoff.json")
+
+        extras = ["-e", "nativeAutomaticMediaMode", mode, "-e", "nativeAutomaticMediaStage", stage]
+        if nonce is not None:
+            extras += ["-e", "restoreNetworkHandoff", nonce]
         MEDIA["instrument"](
-            serial, "app.logdate.client.e2e.NativeAutomaticMediaWorkerProbeTest#automaticRecovery",
+            serial, "app.logdate.client.e2e." + selector,
             output / f"{mode}-{stage}.log",
-            extras=["-e", "nativeAutomaticMediaMode", mode, "-e", "nativeAutomaticMediaStage", stage],
-            status_actions=actions, timeout=180,
+            extras=extras, release_network=handoff if nonce is not None else None,
+            status_actions=actions, timeout=300 if nonce is not None else 180,
         )
 
     try:
+        # Metering AndroidWifi cannot exercise policy changes while cellular is the default.
+        MEDIA["adb"](serial, "shell", "svc", "data", "disable")
+        MEDIA["adb"](serial, "shell", "svc", "wifi", "enable")
+        MEDIA["adb"](serial, "shell", "cmd", "wifi", "connect-network", network, "open")
         MEDIA["set_metered"](serial, network, "true")
         MEDIA["adb"](serial, "shell", "cmd", "netpolicy", "set", "restrict-background", "false")
         instrument("metered", "recover", {
             b"RESTORE_MEDIA_READY": arm_after_startup,
-            b"RESTORE_MEDIA_DEFERRED": release_after_media_phase,
             b"RESTORE_MEDIA_POLICY_LIFTED": lambda: (control / "media-gate-release").write_bytes(b"release"),
         })
         MEDIA["set_metered"](serial, network, "true")
         MEDIA["adb"](serial, "shell", "cmd", "netpolicy", "set", "restrict-background", "true")
-        instrument("restricted", "recover", {b"RESTORE_MEDIA_DEFERRED": release_network})
+        instrument("restricted", "recover")
         MEDIA["set_metered"](serial, network, "true")
         instrument("restart", "prepare")
         MEDIA["safe_target"](serial)
         MEDIA["adb"](serial, "shell", "am", "force-stop", MEDIA["PACKAGE"])
         release_network()
         instrument("restart", "verify")
+        MEDIA["set_metered"](serial, network, "true")
+        instrument("upload", "recover", {
+            b"RESTORE_MEDIA_UPLOAD_READY": arm_upload_after_startup,
+            b"RESTORE_MEDIA_UPLOAD_POLICY_LIFTED": lambda: (control / "media-upload-gate-release").write_bytes(b"release"),
+        })
+    except BaseException as failure:
+        for label, arguments in (("wifi", ("cmd", "wifi", "status")), ("connectivity", ("dumpsys", "connectivity"))):
+            try:
+                snapshot = MEDIA["adb"](serial, "shell", *arguments).stdout
+                path = output / f"failure-network-{label}.txt"
+                path.write_bytes(snapshot)
+                path.chmod(0o600)
+            except Exception as error:
+                failure.add_note(f"Could not retain managed {label} diagnostics: {type(error).__name__}")
+        raise
     finally:
-        # Always release an armed test-server request, including failed app probes.
-        (control / "media-gate-release").write_bytes(b"release")
-        MEDIA["restore_environment"](serial, network, original, saver, airplane, wifi, {})
-    return {"automaticOriginalMediaRecovery": True, "mediaInboxOperationRetainedAcrossRestart": True}
+        try:
+            # Always release an armed test-server request, including failed app probes.
+            (control / "media-gate-release").write_bytes(b"release")
+            (control / "media-upload-gate-release").write_bytes(b"release")
+            MEDIA["restore_environment"](serial, network, original, saver, airplane, wifi, {})
+        finally:
+            MEDIA["adb"](serial, "shell", "svc", "data", "enable" if cellular == b"1" else "disable")
+            actual = MEDIA["adb"](serial, "shell", "settings", "get", "global", "mobile_data").stdout.strip()
+            if actual != cellular:
+                raise RuntimeError("The owned fixture's cellular setting was not restored")
+    return {"automaticOriginalMediaRecovery": True, "mediaInboxOperationRetainedAcrossRestart": True,
+            "deferredOriginalUploadResumesAfterPolicyLiftDuringWorker": True}

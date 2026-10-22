@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
 
 /** Uses only restore-safe dependencies; no Koin, Room, application services, or archive import. */
 class NativeAccountBackupAgent : NativeBackupAgent() {
+    override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
     private val ownerKey = stringPreferencesKey("identity.canonical_owner_id")
     private val boundKey = stringPreferencesKey("identity.canonical_owner_bound")
 

@@ -11,5 +11,12 @@
     "transferred sign out preference prevents background account recovery without changing content",
     "cachedUnlockedPolicyIsReplacedByTransferredBiometricPolicyInSameProcess",
     "incompletePolicyCanBeRepairedWithoutReplacingLivePreferencesReaders"
+  ],
+  "app.logdate.client.e2e.NativeModernRestoreFormatTest": [
+    "iosAndVersionedInputsPreserveEveryNativeDestination",
+    "rejectedDeliveryCannotCompleteOrFallBackAfterAgentRecreation",
+    "rejectedFirstDeliveryCreatesNoRecoveryReceipts",
+    "explicitNativeTransportFlagsRecoverOnANewAgent",
+    "interruptedMarkersAndFailedRejectionWritesPreserveRetainedContent"
   ]
 }

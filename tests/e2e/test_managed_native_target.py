@@ -10,6 +10,23 @@ AVD = "dev34_google_apis_arm64-v8a_Pixel_9_Pro"
 
 
 class ManagedNativeCustodyTest(unittest.TestCase):
+    def test_pair_capacity_accounts_for_existing_managed_jobs_without_adopting_them(self):
+        capacity = TARGET.get("managed_device_capacity")
+        self.assertIsNotNone(capacity, "The pair needs two slots alongside existing managed jobs")
+        lines = [f"100 /sdk/qemu-system-aarch64 @{AVD} -id other_GradleManagedDevice",
+                 "101 /sdk/qemu-system-aarch64 @manual -id unrelated",
+                 "102 sh -c 'qemu-system-aarch64 @manual -id fake_GradleManagedDevice'"]
+        # A concurrent Gradle job may reserve a slot before its QEMU starts.
+        self.assertEqual(4, capacity(lines))
+        self.assertEqual(4, capacity([]))
+        self.assertEqual(4, capacity(lines + [f"103 /sdk/qemu-system-aarch64 @{AVD} -id second_GradleManagedDevice"]))
+        with self.assertRaisesRegex(RuntimeError, "capacity"):
+            capacity(lines + [f"{pid} /sdk/qemu-system-aarch64 @{AVD} -id {pid}_GradleManagedDevice" for pid in (103,104)])
+
+    def test_station_address_requires_a_real_unicast_interface_address(self):
+        self.assertEqual("02:15:b2:00:00:01", TARGET["wifi_station_address"](b"1: wlan0 link/ether 02:15:b2:00:00:01 brd ff:ff:ff:ff:ff:ff"))
+        for address in ("00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff", "01:15:b2:00:00:01", "missing"):
+            self.assertIsNone(TARGET["wifi_station_address"](f"link/ether {address}".encode()))
     def test_binding_reads_cannot_consume_the_native_commands_stdin_payload(self):
         function = TARGET["real_command"]
         run = Mock(return_value=Mock(stdout=b"owned-driver"))
@@ -66,6 +83,16 @@ class ManagedNativeCustodyTest(unittest.TestCase):
         arguments = ["shell", "tar", "-C", "/data/user/0/com.android.localtransport/files", "-xf", "/data/local/tmp/a.tar"]
         command = TARGET["device_command"]("/sdk/adb", "emulator-5558", arguments)
         self.assertEqual(["su", "0", "sh", "-c", shlex.join(arguments[1:])], shlex.split(command[-1]))
+
+    def test_only_the_owned_open_emulator_network_reconnect_gets_required_privilege(self):
+        arguments = ["shell", "cmd", "wifi", "connect-network", "AndroidWifi", "open"]
+        command = TARGET["device_command"]("/sdk/adb", "emulator-5558", arguments)
+        self.assertEqual(["su", "0", "sh", "-c", shlex.join(arguments[1:])], shlex.split(command[-1]))
+        for other in (["shell", "cmd", "wifi", "status"],
+                      ["shell", "cmd", "wifi", "connect-network", "OtherNetwork", "open"],
+                      ["shell", "cmd", "wifi", "connect-network", "AndroidWifi", "wpa2", "password"]):
+            with self.subTest(arguments=other):
+                self.assertNotEqual("su", shlex.split(TARGET["device_command"]("/sdk/adb", "emulator-5558", other)[-1])[0])
 
     def test_rejects_non_emulator_serials_and_empty_commands(self):
         for serial, arguments in (("physical", ["shell", "id"]), ("emulator-5558", [])):

@@ -15,14 +15,18 @@ internal class NativeMediaPhaseGate(
         if (path.startsWith("/api/v1/media/") && Files.isRegularFile(control.resolve("media-gate-arm"))) {
             Files.writeString(control.resolve("media-request-paths.log"), path + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND)
         }
-        if (path != "/api/v1/drafts/changes" || !Files.isRegularFile(control.resolve("media-gate-arm"))) return
-        try {
-            Files.createFile(control.resolve("media-gate-held"))
-        } catch (_: FileAlreadyExistsException) {
-            return
-        }
-        withTimeout(45_000) {
-            while (!Files.isRegularFile(control.resolve("media-gate-release"))) delay(50)
+        if (path != "/api/v1/drafts/changes") return
+        for (prefix in listOf("media", "media-upload")) {
+            if (!Files.isRegularFile(control.resolve("$prefix-gate-arm"))) continue
+            try {
+                Files.createFile(control.resolve("$prefix-gate-held"))
+            } catch (_: FileAlreadyExistsException) {
+                continue
+            }
+            // The host has 90s to acknowledge policy changes; the app then has 30s to react.
+            withTimeout(150_000) {
+                while (!Files.isRegularFile(control.resolve("$prefix-gate-release"))) delay(50)
+            }
         }
     }
 }

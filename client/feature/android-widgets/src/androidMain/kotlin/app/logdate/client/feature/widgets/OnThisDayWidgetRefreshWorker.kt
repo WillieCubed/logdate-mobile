@@ -41,6 +41,7 @@ class OnThisDayWidgetRefreshWorker(
         try {
             val manager = GlanceAppWidgetManager(context)
             val instanceSettings = WidgetInstanceSettings(context)
+            check(!instanceSettings.isRecoveryPending) { "Widget choices are waiting for recovery" }
             val failed =
                 listOf(
                     refreshRecallWidgets(manager, instanceSettings),

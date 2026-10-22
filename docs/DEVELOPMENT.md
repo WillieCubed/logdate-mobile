@@ -136,6 +136,17 @@ machine and CI lane tests the same devices. Never create an emulator by hand.
 | `largeScreenTabletApi37` | Tablet | Pixel Tablet | 37 |
 | `desktopApi34` | Desktop windowing | Medium Desktop | 34 |
 | `wearSmallRoundApi34` (`:app:wear`) | Watch | Wear OS Small Round | 34 |
+| `restorePairApi34` (`:tools:native-restore-driver`) | Native backup/restore source and destination shards | Pixel 9 Pro | 34 |
+| `d2dPairApi34` (`:tools:native-restore-driver`) | Google Play D2D transport source and destination shards | Pixel 9 Pro | 34 |
+| `restoreCallbackApi36_1` (`:tools:native-restore-driver`) | Modern full-restore callback contract | Pixel 9 Pro | 36.1 |
+
+Native transfer acceptance runs through
+[`managed-native-restore-acceptance.py`](../tests/e2e/managed-native-restore-acceptance.py).
+It pins the app/probe APKs and requires two concurrent Gradle-owned shards with matching
+run-generation receipts. Use the [driver instructions](../tools/native-restore-driver/README.md)
+for the native transfer, widget, media, and permission scenarios. A standalone emulator or a passing
+waiting driver does not verify those journeys. The modern callback uses its separate managed-device
+entrypoint and checks the full SDK version, including the minor version.
 
 The phone behavior-boundary devices exist because LogDate's code branches on Android 12, 13, and
 14 behavior. When a minimum-SDK raise or a code change removes such a branch, remove its device too.

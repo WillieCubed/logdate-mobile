@@ -20,6 +20,12 @@ exercise the manager exposed by dependency injection as well as the underlying s
 scope change immediately before the delegate commits. `AndroidPhotoLibraryConditionalSaveTest` and
 `NativeMediaRecoveryProductionWrapperTest` cover both the capability and the recovery operation.
 
+File downloads use the same capability through its `saveMediaFromFile` overload. Forward the guard
+through decorators into the store's finalization boundary. A returned URI may name a deduplicated
+original used by another entry, so cancellation must never delete it from the sync layer.
+`FileMediaHydrationScopeTest` checks both shared-original preservation and rejection before a new
+object becomes durable.
+
 ## Architecture
 
 ```

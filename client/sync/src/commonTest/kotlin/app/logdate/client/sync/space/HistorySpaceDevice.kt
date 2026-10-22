@@ -79,6 +79,7 @@ internal class HistorySpaceDevice(
     val savedPlaces = InMemoryUserPlaces()
     val marks = SpaceMarks(metadata)
     val swapStore = InMemorySpaceSwapStore()
+    val retrySchedule = InMemorySyncRetryScheduleStore()
 
     /** Whether this device syncs location history and marks through the personal space at all. */
     var spaceEnabled = true
@@ -116,7 +117,7 @@ internal class HistorySpaceDevice(
             syncMetadataService = metadata,
             sessionStorage = sessions,
             downloadInbox = inbox,
-            retryScheduleStore = InMemorySyncRetryScheduleStore(),
+            retryScheduleStore = retrySchedule,
             deadLetterStore = InMemorySyncDeadLetterStore(),
             locationHistorySyncEngine = engine,
             momentSyncConfig = MomentSyncConfig(NoMomentEndpoints, marks) { false },

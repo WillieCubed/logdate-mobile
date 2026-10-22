@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -51,7 +52,7 @@ class StorageAcceptanceTest(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, b"", b"")
 
         def instrument(serial, selector, log, extras, status_actions=None):
-            mode = extras[2]
+            mode = selector.split("#")[-1] if "NativePreferenceDeliveryRecoveryTest#" in selector else extras[2]
             stages.append(mode)
             if mode == failure:
                 raise RuntimeError("Instrumentation failed")
@@ -70,8 +71,48 @@ class StorageAcceptanceTest(unittest.TestCase):
                     error = None
                 except RuntimeError as caught:
                     error = caught
-            receipt = (args.output / "acceptance.json").exists()
+            receipt_path = args.output / "acceptance.json"
+            receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
         return state, commands, stages, receipt, error
+
+    def test_storage_followup_requires_all_preference_delivery_recovery_cases(self):
+        state, _, stages, receipt, error = self.exercise()
+        self.assertEqual(["UNKNOWN", "NORMAL"], state)
+        self.assertIsNone(error)
+        self.assertEqual([
+            "seed", "enqueue", "waiting", "resume",
+            "truncatedPreferenceDeliveryStaysPendingUntilACompleteRetry",
+            "preparedPreferenceInputRepairsInterruptedDestinationOnRecreatedCompletion",
+            "preparedPreferenceReplaySurvivesAnotherReceiptFailureWithoutRedelivery",
+            "failedPreferenceObservationCannotOverwriteTheDestination",
+            "duplicatePreferenceDeliveryCannotReplaceAcceptedBytes",
+            "finalManifestWriteFailureKeepsDeliveredPreferencesOnSameAgentRetry",
+            "finalManifestWriteFailureKeepsDeliveredPreferencesOnRecreatedAgentRetry",
+            "omittedPreferencesRecoverAfterSnapshotFinalizationFailureAndContentAcknowledgement",
+            "recreatedCompletionResumesTheFinalDeliveryAndNeverRecapturesLaterWidgetEdits",
+            "unfinishedHistoricalSnapshotCannotCapturePreferencesFromAnotherDelivery",
+        ], stages)
+        self.assertTrue(receipt["preferenceDeliveryRecoveryVerified"])
+
+    def test_any_failed_preference_case_prevents_a_success_receipt(self):
+        for method in [
+            "truncatedPreferenceDeliveryStaysPendingUntilACompleteRetry",
+            "preparedPreferenceInputRepairsInterruptedDestinationOnRecreatedCompletion",
+            "preparedPreferenceReplaySurvivesAnotherReceiptFailureWithoutRedelivery",
+            "failedPreferenceObservationCannotOverwriteTheDestination",
+            "duplicatePreferenceDeliveryCannotReplaceAcceptedBytes",
+            "finalManifestWriteFailureKeepsDeliveredPreferencesOnSameAgentRetry",
+            "finalManifestWriteFailureKeepsDeliveredPreferencesOnRecreatedAgentRetry",
+            "omittedPreferencesRecoverAfterSnapshotFinalizationFailureAndContentAcknowledgement",
+            "recreatedCompletionResumesTheFinalDeliveryAndNeverRecapturesLaterWidgetEdits",
+            "unfinishedHistoricalSnapshotCannotCapturePreferencesFromAnotherDelivery",
+        ]:
+            with self.subTest(method=method):
+                state, _, stages, receipt, error = self.exercise(failure=method)
+                self.assertEqual(["UNKNOWN", "NORMAL"], state)
+                self.assertEqual(method, stages[-1])
+                self.assertFalse(receipt)
+                self.assertIsNotNone(error)
 
     def test_failed_restart_verification_restores_storage_without_success_receipt(self):
         state, commands, stages, receipt, error = self.exercise(failure="waiting")

@@ -3,7 +3,6 @@
 package app.logdate.client.feature.widgets
 
 import android.appwidget.AppWidgetManager
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -34,9 +33,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,8 +45,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.recommendation.RecallMode
@@ -68,6 +67,7 @@ import org.koin.android.ext.android.inject
  * Lets the user choose recall mode and content types for one widget instance.
  */
 class OnThisDayWidgetConfigActivity : SecureWidgetConfigActivity() {
+    internal override val widgetSetupTarget = WidgetSetupTarget.MEMORIES
     private val settingsRepository: MemoriesSettingsRepository by inject()
     private val getMemoryRecall: GetMemoryRecallUseCase by inject()
     private val notesRepository: JournalNotesRepository by inject()
@@ -100,6 +100,9 @@ class OnThisDayWidgetConfigActivity : SecureWidgetConfigActivity() {
                     WidgetConfigScreen(
                         initialRecallMode = instanceSettings.recallMode(appWidgetId, currentSettings.recallMode),
                         initialContentTypes = instanceSettings.contentTypes(appWidgetId, currentSettings.widgetContentTypes),
+                        recoveryState = widgetSetupSaveState.collectAsState().value,
+                        onManageStorage = ::openWidgetStorageSettings,
+                        onSelectionChanged = ::cancelPendingWidgetSetup,
                         previewFor = { mode, types ->
                             runCatching {
                                 getMemoryRecall(
@@ -135,17 +138,7 @@ class OnThisDayWidgetConfigActivity : SecureWidgetConfigActivity() {
         recallMode: RecallMode,
         contentTypes: Set<WidgetContentType>,
     ) {
-        lifecycleScope.launch {
-            WidgetInstanceSettings(this@OnThisDayWidgetConfigActivity).saveRecall(appWidgetId, recallMode, contentTypes)
-
-            WorkManager.getInstance(this@OnThisDayWidgetConfigActivity).enqueue(
-                OneTimeWorkRequestBuilder<OnThisDayWidgetRefreshWorker>().build(),
-            )
-
-            val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            setResult(RESULT_OK, result)
-            finish()
-        }
+        persistWidgetSetup(WidgetSetupRequest.memories(appWidgetId, recallMode, contentTypes))
     }
 }
 
@@ -154,11 +147,16 @@ class OnThisDayWidgetConfigActivity : SecureWidgetConfigActivity() {
 private fun WidgetConfigScreen(
     initialRecallMode: RecallMode,
     initialContentTypes: Set<WidgetContentType>,
+    recoveryState: WidgetSetupSaveState,
+    onManageStorage: () -> Unit,
+    onSelectionChanged: () -> Unit,
     previewFor: suspend (RecallMode, Set<WidgetContentType>) -> OnThisDayWidgetState,
     onDone: (RecallMode, Set<WidgetContentType>) -> Unit,
 ) {
-    var recallMode by remember { mutableStateOf(initialRecallMode) }
-    var contentTypes by remember { mutableStateOf(initialContentTypes) }
+    var recallModeName by rememberSaveable { mutableStateOf(initialRecallMode.name) }
+    val recallMode = RecallMode.entries.firstOrNull { it.name == recallModeName } ?: initialRecallMode
+    var contentTypeNames by rememberSaveable { mutableStateOf(initialContentTypes.joinToString(",") { it.name }) }
+    val contentTypes = contentTypeNames.split(',').mapNotNull { name -> WidgetContentType.entries.firstOrNull { it.name == name } }.toSet()
     var previewState by remember { mutableStateOf<OnThisDayWidgetState>(OnThisDayWidgetState.Loading) }
     LaunchedEffect(recallMode, contentTypes) { previewState = previewFor(recallMode, contentTypes) }
     val context = LocalContext.current
@@ -171,6 +169,7 @@ private fun WidgetConfigScreen(
             topBar = { TopAppBar(title = { Text(stringResource(R.string.widget_name_on_this_day)) }) },
         ) { innerPadding ->
             Column(Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 20.dp)) {
+                WidgetSetupRecoveryBanner(recoveryState, onManageStorage)
                 Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     WidgetSetupPreview(OnThisDayWidget(displayPreview), displayPreview)
                 }
@@ -187,7 +186,10 @@ private fun WidgetConfigScreen(
                     )) {
                         WidgetSetupChoice(
                             selected = recallMode == mode,
-                            onClick = { recallMode = mode },
+                            onClick = {
+                                recallModeName = mode.name
+                                onSelectionChanged()
+                            },
                             modifier = Modifier.weight(1f).height(72.dp),
                         ) {
                             Row(
@@ -216,7 +218,10 @@ private fun WidgetConfigScreen(
                     )) {
                         WidgetSetupChoice(
                             selected = type in contentTypes,
-                            onClick = { contentTypes = contentTypes.toggle(type) },
+                            onClick = {
+                                contentTypeNames = contentTypes.toggle(type).joinToString(",") { it.name }
+                                onSelectionChanged()
+                            },
                             modifier = Modifier.weight(1f).height(84.dp),
                         ) {
                             Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))

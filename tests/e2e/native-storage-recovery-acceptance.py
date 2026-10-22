@@ -66,9 +66,24 @@ def run(args):
             adb(serial, "shell", "am", "force-stop", PACKAGE)
     finally:
         set_storage(serial, "reset", original)
+    for method in [
+        "truncatedPreferenceDeliveryStaysPendingUntilACompleteRetry",
+            "preparedPreferenceInputRepairsInterruptedDestinationOnRecreatedCompletion",
+            "preparedPreferenceReplaySurvivesAnotherReceiptFailureWithoutRedelivery",
+        "failedPreferenceObservationCannotOverwriteTheDestination",
+        "duplicatePreferenceDeliveryCannotReplaceAcceptedBytes",
+        "finalManifestWriteFailureKeepsDeliveredPreferencesOnSameAgentRetry",
+        "finalManifestWriteFailureKeepsDeliveredPreferencesOnRecreatedAgentRetry",
+        "omittedPreferencesRecoverAfterSnapshotFinalizationFailureAndContentAcknowledgement",
+        "recreatedCompletionResumesTheFinalDeliveryAndNeverRecapturesLaterWidgetEdits",
+        "unfinishedHistoricalSnapshotCannotCapturePreferencesFromAnotherDelivery",
+    ]:
+        instrument(serial, "app.logdate.client.e2e.NativePreferenceDeliveryRecoveryTest#" + method,
+                   args.output / ("preference-" + method + ".log"), extras=())
     receipt = {"serial": serial, "avd": avd, "acceptedSourceRetained": True,
                "waitedForPlatformStorage": True, "sameRequestSurvivedProcessDeath": True,
-               "restoredAutomaticallyWhenStorageRecovered": True, "storageStateRestored": True}
+               "restoredAutomaticallyWhenStorageRecovered": True, "storageStateRestored": True,
+               "preferenceDeliveryRecoveryVerified": True}
     (args.output / "acceptance.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 

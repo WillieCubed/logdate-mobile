@@ -50,11 +50,16 @@ class AndroidLogDateSyncWorker(
             val syncType = inputData.getString(KEY_SYNC_TYPE) ?: SYNC_TYPE_FULL
             val consent = mobileDataSyncScope(inputData, sessionStorage.getOriginBoundSession())
             val run: suspend () -> SyncResult = {
-                if (consent != null) withMobileDataConsent(consent) { runSync(syncType) } else runSync(syncType)
+                if (consent != null) {
+                    withMobileDataConsent(consent) { runSyncBatches { runSync(syncType) } }
+                } else {
+                    runSyncBatches { runSync(syncType) }
+                }
             }
             val result = if (promoted) withProgressNotification(run) else run()
 
             if (result.success && result.hasMorePending) {
+                Napier.i("Sync has unfinished work; continuing through durable retry")
                 Result.retry()
             } else if (result.success) {
                 Napier.i("Sync completed successfully")
