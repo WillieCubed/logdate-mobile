@@ -204,7 +204,7 @@ class NativeD2DRestoreEvidenceTest(unittest.TestCase):
         )
         probe = probe_path.read_text()
 
-        backup_call = harness.index('HARNESS.adb(serial, "shell", "bmgr", "backupnow"')
+        backup_call = harness.index("backup_d2d_source(serial, output)", harness.index("def exercise_d2d("))
         mutation_probe = harness.index('HARNESS.probe(serial, "post-backup-mutation"')
         restore_call = harness.index('HARNESS.adb(serial, "shell", "bmgr", "restore"')
 

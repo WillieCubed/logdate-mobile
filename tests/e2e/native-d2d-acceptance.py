@@ -68,7 +68,7 @@ def select_d2d_restore_transport(serial):
         raise RuntimeError("Google backup transport was not selected for D2D test-mode restore")
 
 
-def select_d2d_transport(serial, attempts=30):
+def select_d2d_transport(serial, attempts=30, output=None):
     registered = None
     selection = None
     for attempt in range(attempts):
@@ -76,7 +76,9 @@ def select_d2d_transport(serial, attempts=30):
             registered = HARNESS.adb(serial, "shell", "bmgr", "list", "transports", timeout=60).decode().splitlines()
             if any(line.lstrip("* ").strip() == D2D_TRANSPORT for line in registered):
                 selection = HARNESS.adb(serial, "shell", "bmgr", "transport", D2D_TRANSPORT, timeout=60)
-                HARNESS.adb(serial, "shell", "bmgr", "init", D2D_TRANSPORT, timeout=60)
+                initialized = HARNESS.adb(serial, "shell", "bmgr", "init", D2D_TRANSPORT, timeout=60)
+                if output is not None:
+                    HARNESS.private_file(output / f"d2d-init-{attempt + 1}.log", initialized)
                 if selected_transport(serial) == D2D_TRANSPORT:
                     return
         except Exception as error:
@@ -88,6 +90,42 @@ def select_d2d_transport(serial, attempts=30):
         "Google D2D transport is not available or was not selected; "
         f"registered={registered!r}, selection={selection!r}"
     )
+
+
+def capture_transport_failure(serial, output):
+    errors = []
+    commands = {
+        "d2d-backup-state.log": ("shell", "dumpsys", "backup"),
+        "d2d-logcat.log": ("logcat", "-d", "-b", "all", "-t", "4000"),
+    }
+    for name, command in commands.items():
+        try:
+            HARNESS.private_file(output / name, HARNESS.adb(serial, *command, timeout=30))
+        except Exception as error:
+            errors.append(f"{name}: {error}")
+    if errors:
+        try:
+            HARNESS.private_file(output / "d2d-diagnostic-errors.log", "\n".join(errors).encode())
+        except Exception:
+            print("D2D diagnostic output could not be retained", file=sys.stderr)
+
+
+def backup_d2d_source(serial, output):
+    # Match Android Studio's backup tooling: a newly initialized transport needs
+    # a full package-manager metadata snapshot, not an incremental baseline.
+    backup = HARNESS.adb(
+        serial, "shell", "bmgr", "backupnow", "@pm@", HARNESS.PACKAGE,
+        "--non-incremental", "--monitor-verbose", timeout=180,
+    )
+    HARNESS.private_file(output / "d2d-backup.log", backup)
+    required = [
+        b"Package @pm@ with result: Success",
+        f"Package {HARNESS.PACKAGE} with result: Success".encode(),
+        b"Backup finished with result: Success",
+    ]
+    if not all(result in backup for result in required):
+        retain_transport_failure(serial, output, "backup")
+        raise RuntimeError("Google D2D test transport did not complete the native backup")
 
 
 def restore_device_settings(serial, previous_transport, previous_mode, backup_was_enabled):
@@ -145,7 +183,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
     try:
         HARNESS.adb(serial, "shell", "bmgr", "enable", "true")
         HARNESS.adb(serial, "shell", "settings", "put", "secure", D2D_TEST_MODE, "1")
-        select_d2d_transport(serial)
+        select_d2d_transport(serial, output=output)
 
         HARNESS.adb(serial, "install", "-r", "-t", str(app_apk.resolve()))
         HARNESS.adb(serial, "install", "-r", "-t", str(test_apk.resolve()))
@@ -154,11 +192,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
         metadata = json.loads(raw_fixture)
         HARNESS.private_file(output / "source-fixture.json", raw_fixture)
 
-        backup = HARNESS.adb(serial, "shell", "bmgr", "backupnow", HARNESS.PACKAGE, timeout=180)
-        HARNESS.private_file(output / "d2d-backup.log", backup)
-        if f"Package {HARNESS.PACKAGE} with result: Success".encode() not in backup:
-            retain_transport_failure(serial, output, "backup")
-            raise RuntimeError("Google D2D test transport did not complete the native backup")
+        backup_d2d_source(serial, output)
 
         HARNESS.probe(serial, "post-backup-mutation", output / "post-backup-mutation.log")
         select_d2d_restore_transport(serial)
@@ -176,6 +210,9 @@ def exercise_d2d(serial, app_apk, test_apk, output):
         HARNESS.probe(serial, "native-restore-status", output / "d2d-callback-status.log")
         HARNESS.probe(serial, "verify-in-place", output / "d2d-restored-content.log", metadata)
         print("Google D2D test-mode backup, restore callback, and restored content passed", flush=True)
+    except Exception:
+        capture_transport_failure(serial, output)
+        raise
     finally:
         restore_device_settings(serial, previous_transport, previous_mode, backup_was_enabled)
 
