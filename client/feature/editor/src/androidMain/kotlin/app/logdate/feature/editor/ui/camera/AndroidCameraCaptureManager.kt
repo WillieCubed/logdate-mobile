@@ -2,81 +2,50 @@ package app.logdate.feature.editor.ui.camera
 
 import android.Manifest
 import android.content.Context
-import android.hardware.camera2.CameraCharacteristics
 import android.os.Build
 import android.view.Surface
 import androidx.annotation.RequiresPermission
-import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.Camera
-import androidx.camera.core.CameraInfo
-import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.video.FallbackStrategy
-import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
-import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import app.logdate.client.media.MediaManager
-import app.logdate.client.media.device.DefaultMediaDevices
-import app.logdate.client.media.device.MediaDeviceCategory
-import app.logdate.client.media.device.MediaDeviceKind
-import app.logdate.client.media.device.MediaDeviceSelectionUiState
-import app.logdate.client.media.device.MediaDeviceUiState
-import app.logdate.client.media.device.unavailableRouteMessage
-import app.logdate.client.text.UiText
 import app.logdate.client.text.toUiText
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import logdate.client.feature.editor.generated.resources.Res
-import logdate.client.feature.editor.generated.resources.capture_state_camera_numbered
 import logdate.client.feature.editor.generated.resources.capture_state_camera_provider_not_ready
 import logdate.client.feature.editor.generated.resources.capture_state_camera_selection_failed
-import logdate.client.feature.editor.generated.resources.capture_state_external_camera_numbered
-import logdate.client.feature.editor.generated.resources.capture_state_external_cameras_hint
 import logdate.client.feature.editor.generated.resources.capture_state_lifecycle_owner_not_ready
 import logdate.client.feature.editor.generated.resources.capture_state_switch_failed
 import logdate.client.feature.editor.generated.resources.capture_state_unknown_error
-import org.jetbrains.compose.resources.StringResource
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
-import kotlin.coroutines.resume
 
 /**
  * Android implementation of [CameraCaptureManager] using CameraX.
  */
 class AndroidCameraCaptureManager(
     private val context: Context,
-    private val mediaManager: MediaManager,
+    mediaManager: MediaManager,
 ) : CameraCaptureManager {
-    private val appContext = context.applicationContext
-    private val preferences = appContext.getSharedPreferences(CAMERA_ROUTE_PREFS_NAME, Context.MODE_PRIVATE)
+    private val deviceSelection = AndroidCameraDeviceSelection(context)
     private val _state = MutableStateFlow(CameraCaptureState())
     override val state: StateFlow<CameraCaptureState> = _state.asStateFlow()
 
@@ -91,25 +60,12 @@ class AndroidCameraCaptureManager(
     private var preview: Preview? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
-    private var currentRecording: Recording? = null
     private var lifecycleOwner: LifecycleOwner? = null
     private var camera: Camera? = null
-    private var recordingDeferred: CompletableDeferred<String?>? = null
-    private var recordingFile: java.io.File? = null
     private var previewView: PreviewView? = null
     private var previewStreamObserver: Observer<PreviewView.StreamState>? = null
 
-    private val mainExecutor: Executor = ContextCompat.getMainExecutor(context)
-    private val captureScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
-    /**
-     * Capture output must survive activity teardown and Android's cache eviction. The
-     * finalizer may still be running after the camera ViewModel is cleared, so these files
-     * intentionally live in app-private durable storage rather than [Context.getCacheDir].
-     */
-    private val captureStagingDirectory =
-        java.io.File(appContext.filesDir, "camera-captures").apply { mkdirs() }
-    private val timestampFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+    private val captureOutput = AndroidCameraCaptureOutput(context, mediaManager, _state)
 
     /**
      * Sets the lifecycle owner for camera binding.
@@ -192,13 +148,13 @@ class AndroidCameraCaptureManager(
                 cameraProvider = provider
                 val owner = lifecycleOwner ?: error("LifecycleOwner is not set")
                 val cameraSelection =
-                    cameraSelectionFor(
+                    deviceSelection.cameraSelectionFor(
                         provider = provider,
-                        preferredDeviceId = _state.value.cameraSelection.selectedDeviceId ?: preferredCameraDeviceId(),
+                        preferredDeviceId = _state.value.cameraSelection.selectedDeviceId ?: deviceSelection.preferredCameraDeviceId(),
                         fallbackFacing = facing,
                     )
                 val selectedDeviceId = cameraSelection.selectedDeviceId
-                val selector = cameraSelectorForDeviceId(selectedDeviceId)
+                val selector = deviceSelection.cameraSelectorForDeviceId(selectedDeviceId)
 
                 _previewStreaming.value = false
                 createUseCases()
@@ -220,7 +176,7 @@ class AndroidCameraCaptureManager(
                         cameraSelection = cameraSelection,
                     )
                 }
-                persistPreferredCameraDeviceId(selectedDeviceId)
+                deviceSelection.persistPreferredCameraDeviceId(selectedDeviceId)
             } catch (e: Exception) {
                 Napier.e("Failed to start camera preview", e)
                 _previewStreaming.value = false
@@ -236,8 +192,7 @@ class AndroidCameraCaptureManager(
     override suspend fun stopPreview() =
         withContext(Dispatchers.Main) {
             try {
-                currentRecording?.stop()
-                currentRecording = null
+                captureOutput.stopRecording()
                 camera = null
                 _previewStreaming.value = false
                 cameraProvider?.unbindAll()
@@ -253,190 +208,14 @@ class AndroidCameraCaptureManager(
             }
         }
 
-    override suspend fun capturePhoto(): String? =
-        withContext(Dispatchers.Main) {
-            val capture =
-                imageCapture ?: run {
-                    Napier.e("ImageCapture is not initialized")
-                    _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                    return@withContext null
-                }
-
-            val timeStamp = timestampFormat.format(Date())
-            val fileName = "LOGDATE_$timeStamp.jpg"
-            val sourceFile = java.io.File.createTempFile("logdate-camera-", ".jpg", captureStagingDirectory)
-            val outputOptions = ImageCapture.OutputFileOptions.Builder(sourceFile).build()
-            val capturedPath =
-                suspendCancellableCoroutine<String?> { continuation ->
-                    continuation.invokeOnCancellation {
-                        // Keep the durable staged file for the capture finalizer/recovery path.
-                        // Deleting it here loses a valid capture when the activity is destroyed
-                        // while CameraX is delivering the callback.
-                    }
-                    capture.takePicture(
-                        outputOptions,
-                        mainExecutor,
-                        object : ImageCapture.OnImageSavedCallback {
-                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                if (continuation.isActive) {
-                                    continuation.resume(sourceFile.absolutePath)
-                                } else {
-                                    // The callback can arrive after the activity/VM was torn down.
-                                    // Keep the durable staged file for recovery instead of losing
-                                    // a successfully captured photo.
-                                    Napier.d("Photo capture completed after camera teardown; retaining staged output")
-                                }
-                            }
-
-                            override fun onError(exception: ImageCaptureException) {
-                                Napier.e("Photo capture failed", exception)
-                                _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                                sourceFile.delete()
-                                continuation.resume(null)
-                            }
-                        },
-                    )
-                }
-            capturedPath ?: return@withContext null
-            try {
-                val uri =
-                    withContext(Dispatchers.IO) {
-                        mediaManager.saveMediaFromFile(capturedPath, fileName, "image/jpeg")
-                    }
-                _state.update {
-                    it.copy(
-                        lastCapturedUri = uri,
-                        error = null,
-                    )
-                }
-                uri
-            } catch (exception: Exception) {
-                Napier.e("Failed to persist photo capture", exception)
-                _state.update { it.copy(error = CameraCaptureError.CaptureFailed) }
-                null
-            } finally {
-                java.io.File(capturedPath).delete()
-            }
-        }
+    override suspend fun capturePhoto(): String? = captureOutput.capturePhoto { imageCapture }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     override suspend fun startVideoRecording() {
-        val capture =
-            videoCapture ?: run {
-                Napier.e("VideoCapture is not initialized")
-                _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
-                return
-            }
-
-        if (currentRecording != null) {
-            Napier.w("Recording already in progress")
-            return
-        }
-
-        val timeStamp = timestampFormat.format(Date())
-        val fileName = "LOGDATE_$timeStamp.mp4"
-
-        val outputFile = java.io.File.createTempFile("logdate-camera-", ".mp4", captureStagingDirectory)
-        val outputOptions = FileOutputOptions.Builder(outputFile).build()
-
-        val deferred = CompletableDeferred<String?>()
-        recordingDeferred = deferred
-        recordingFile = outputFile
-
-        try {
-            currentRecording =
-                capture.output
-                    .prepareRecording(context, outputOptions)
-                    .withAudioEnabled()
-                    .start(mainExecutor) { event ->
-                        when (event) {
-                            is VideoRecordEvent.Start -> {
-                                _state.update {
-                                    it.copy(
-                                        isRecording = true,
-                                        recordingDurationMs = 0L,
-                                        error = null,
-                                    )
-                                }
-                            }
-
-                            is VideoRecordEvent.Status -> {
-                                _state.update {
-                                    it.copy(recordingDurationMs = event.recordingStats.recordedDurationNanos / 1_000_000)
-                                }
-                            }
-
-                            is VideoRecordEvent.Finalize -> {
-                                val file = recordingFile
-                                currentRecording = null
-                                recordingFile = null
-                                captureScope.launch(Dispatchers.IO) {
-                                    val uri =
-                                        if (!event.hasError() && file != null) {
-                                            runCatching {
-                                                mediaManager.saveMediaFromFile(
-                                                    sourceFilePath = file.absolutePath,
-                                                    fileName = fileName,
-                                                    mimeType = "video/mp4",
-                                                )
-                                            }.onFailure { error ->
-                                                Napier.e("Failed to persist video capture", error)
-                                            }.getOrNull()
-                                        } else {
-                                            Napier.e("Video recording failed with error: ${event.error}")
-                                            null
-                                        }
-                                    file?.delete()
-                                    withContext(Dispatchers.Main.immediate) {
-                                        _state.update {
-                                            it.copy(
-                                                isRecording = false,
-                                                lastCapturedUri = uri,
-                                                error =
-                                                    if (uri == null) CameraCaptureError.RecordingFailed else null,
-                                            )
-                                        }
-                                        recordingDeferred?.complete(uri)
-                                        recordingDeferred = null
-                                    }
-                                }
-                            }
-                        }
-                    }
-        } catch (e: SecurityException) {
-            Napier.e("Audio permission required for video recording", e)
-            _state.update { it.copy(error = CameraCaptureError.PermissionDenied) }
-            outputFile.delete()
-            recordingFile = null
-            deferred.complete(null)
-            recordingDeferred = null
-        } catch (e: Exception) {
-            Napier.e("Failed to start video recording", e)
-            _state.update { it.copy(error = CameraCaptureError.RecordingFailed) }
-            outputFile.delete()
-            recordingFile = null
-            deferred.complete(null)
-            recordingDeferred = null
-        }
+        captureOutput.startVideoRecording(videoCapture)
     }
 
-    override suspend fun stopVideoRecording(): String? {
-        val recording =
-            currentRecording ?: run {
-                Napier.w("No recording in progress")
-                return null
-            }
-
-        val deferred =
-            recordingDeferred ?: run {
-                Napier.w("No recording deferred available")
-                recording.stop()
-                return null
-            }
-
-        recording.stop()
-        return deferred.await()
-    }
+    override suspend fun stopVideoRecording(): String? = captureOutput.stopVideoRecording()
 
     override suspend fun switchCamera() =
         withContext(Dispatchers.Main) {
@@ -465,7 +244,7 @@ class AndroidCameraCaptureManager(
                     CameraFacing.BACK -> CameraFacing.FRONT
                 }
             val cameraSelection =
-                cameraSelectionFor(
+                deviceSelection.cameraSelectionFor(
                     provider = provider,
                     fallbackFacing = newFacing,
                     requireBuiltIn = true,
@@ -485,7 +264,7 @@ class AndroidCameraCaptureManager(
                 camera =
                     provider.bindToLifecycle(
                         owner,
-                        cameraSelectorForDeviceId(selectedDeviceId),
+                        deviceSelection.cameraSelectorForDeviceId(selectedDeviceId),
                         preview,
                         imageCapture,
                         videoCapture,
@@ -497,7 +276,7 @@ class AndroidCameraCaptureManager(
                         cameraSelection = cameraSelection.copy(selectedDeviceId = selectedDeviceId),
                     )
                 }
-                persistPreferredCameraDeviceId(selectedDeviceId)
+                deviceSelection.persistPreferredCameraDeviceId(selectedDeviceId)
             } catch (e: Exception) {
                 Napier.e("Failed to switch camera", e)
                 _previewStreaming.value = false
@@ -529,7 +308,7 @@ class AndroidCameraCaptureManager(
                     return@withContext
                 }
             val cameraSelection =
-                cameraSelectionFor(
+                deviceSelection.cameraSelectionFor(
                     provider = provider,
                     preferredDeviceId = deviceId,
                     fallbackFacing = _state.value.cameraFacing,
@@ -549,7 +328,7 @@ class AndroidCameraCaptureManager(
                 camera =
                     provider.bindToLifecycle(
                         owner,
-                        cameraSelectorForDeviceId(deviceId),
+                        deviceSelection.cameraSelectorForDeviceId(deviceId),
                         preview,
                         imageCapture,
                         videoCapture,
@@ -561,7 +340,7 @@ class AndroidCameraCaptureManager(
                         cameraSelection = cameraSelection,
                     )
                 }
-                persistPreferredCameraDeviceId(deviceId)
+                deviceSelection.persistPreferredCameraDeviceId(deviceId)
             } catch (e: Exception) {
                 Napier.e("Failed to select camera", e)
                 _previewStreaming.value = false
@@ -584,10 +363,9 @@ class AndroidCameraCaptureManager(
     }
 
     override fun release() {
-        currentRecording?.stop()
-        currentRecording = null
+        captureOutput.stopRecording()
         // Camera resources are activity-scoped; capture finalization is not. Do not delete
-        // staged output, complete the deferred with failure, or cancel captureScope here:
+        // staged output, complete the deferred with failure, or cancel the output finalizer here:
         // release() is called from ViewModel.onCleared during navigation/configuration and
         // the CameraX Finalize callback may still be handing the file to MediaManager.
         previewStreamObserver?.let { observer ->
@@ -605,117 +383,6 @@ class AndroidCameraCaptureManager(
         lifecycleOwner = null
         _state.update { CameraCaptureState() }
     }
-
-    private fun cameraSelectorForDeviceId(deviceId: String?): CameraSelector {
-        val cameraId = deviceId?.removePrefix(CAMERA_DEVICE_ID_PREFIX)
-        if (cameraId.isNullOrBlank() || cameraId == deviceId) {
-            return CameraSelector.DEFAULT_BACK_CAMERA
-        }
-
-        return CameraSelector
-            .Builder()
-            .addCameraFilter { cameraInfos ->
-                cameraInfos.filter { info ->
-                    Camera2CameraInfo.from(info).cameraId == cameraId
-                }
-            }.build()
-    }
-
-    private fun cameraSelectionFor(
-        provider: ProcessCameraProvider,
-        preferredDeviceId: String? = null,
-        fallbackFacing: CameraFacing = CameraFacing.BACK,
-        requireBuiltIn: Boolean = false,
-    ): MediaDeviceSelectionUiState {
-        val devices =
-            provider
-                .availableCameraInfos
-                .mapIndexed { index, cameraInfo -> cameraInfo.toMediaDeviceUiState(index) }
-                .filter {
-                    !requireBuiltIn ||
-                        it.category == MediaDeviceCategory.FRONT_CAMERA ||
-                        it.category == MediaDeviceCategory.BACK_CAMERA
-                }.ifEmpty { defaultCameraSelection(fallbackFacing).devices }
-
-        val selectedId =
-            preferredDeviceId?.takeIf { preferred -> devices.any { it.id == preferred } }
-                ?: devices.firstOrNull { it.category.matchesFacing(fallbackFacing) }?.id
-                ?: devices.first().id
-        val routeControlMessage =
-            when {
-                preferredDeviceId != null && preferredDeviceId != selectedId ->
-                    unavailableRouteMessage(MediaDeviceKind.CAMERA, devices.first { it.id == selectedId }.label)
-                devices.none { it.isExternal } ->
-                    Res.string.capture_state_external_cameras_hint.toUiText()
-                else -> null
-            }
-
-        return MediaDeviceSelectionUiState(
-            kind = MediaDeviceKind.CAMERA,
-            devices = devices,
-            selectedDeviceId = selectedId,
-            isSelectionControllable = devices.size > 1,
-            routeControlMessage = routeControlMessage,
-        )
-    }
-
-    private fun preferredCameraDeviceId(): String? = preferences.getString(KEY_PREFERRED_CAMERA_DEVICE_ID, null)
-
-    private fun persistPreferredCameraDeviceId(deviceId: String?) {
-        if (deviceId == null) return
-        preferences
-            .edit()
-            .putString(KEY_PREFERRED_CAMERA_DEVICE_ID, deviceId)
-            .apply()
-    }
-
-    private fun CameraInfo.toMediaDeviceUiState(index: Int): MediaDeviceUiState {
-        val camera2Info = Camera2CameraInfo.from(this)
-        val lensFacing = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_FACING)
-        val category = lensFacing.toCameraCategory()
-        return MediaDeviceUiState(
-            id = "$CAMERA_DEVICE_ID_PREFIX${camera2Info.cameraId}",
-            label = cameraLabel(category, index),
-            kind = MediaDeviceKind.CAMERA,
-            category = category,
-            isExternal = category == MediaDeviceCategory.EXTERNAL,
-        )
-    }
-
-    private fun Int?.toCameraCategory(): MediaDeviceCategory =
-        when (this) {
-            CameraCharacteristics.LENS_FACING_FRONT -> MediaDeviceCategory.FRONT_CAMERA
-            CameraCharacteristics.LENS_FACING_BACK -> MediaDeviceCategory.BACK_CAMERA
-            CameraCharacteristics.LENS_FACING_EXTERNAL -> MediaDeviceCategory.EXTERNAL
-            else -> MediaDeviceCategory.EXTERNAL
-        }
-
-    private fun cameraLabel(
-        category: MediaDeviceCategory,
-        index: Int,
-    ): UiText =
-        when (category) {
-            MediaDeviceCategory.FRONT_CAMERA -> DefaultMediaDevices.frontCamera.label
-            MediaDeviceCategory.BACK_CAMERA -> DefaultMediaDevices.backCamera.label
-            MediaDeviceCategory.EXTERNAL -> Res.string.capture_state_external_camera_numbered.toUiText(index + 1)
-            else -> Res.string.capture_state_camera_numbered.toUiText(index + 1)
-        }
-
-    /** The platform's own words for a camera failure, or [fallback] when it gives none. */
-    private fun Exception.cameraFailure(fallback: StringResource): CameraCaptureError =
-        CameraCaptureError.Unknown(message?.toUiText() ?: fallback.toUiText())
-
-    private fun MediaDeviceCategory.matchesFacing(facing: CameraFacing): Boolean =
-        when (facing) {
-            CameraFacing.FRONT -> this == MediaDeviceCategory.FRONT_CAMERA
-            CameraFacing.BACK -> this == MediaDeviceCategory.BACK_CAMERA
-        }
-
-    private fun MediaDeviceSelectionUiState.facingForSelection(): CameraFacing =
-        when (selectedDevice?.category) {
-            MediaDeviceCategory.FRONT_CAMERA -> CameraFacing.FRONT
-            else -> CameraFacing.BACK
-        }
 
     private fun createUseCases() {
         val currentPreviewView = previewView ?: error("PreviewView is not attached")
@@ -787,11 +454,5 @@ class AndroidCameraCaptureManager(
             .Builder()
             .setAspectRatioStrategy(aspectRatioStrategy)
             .build()
-    }
-
-    private companion object {
-        const val CAMERA_DEVICE_ID_PREFIX = "camera-"
-        const val CAMERA_ROUTE_PREFS_NAME = "logdate_camera_routes"
-        const val KEY_PREFERRED_CAMERA_DEVICE_ID = "preferred_camera_device_id"
     }
 }
