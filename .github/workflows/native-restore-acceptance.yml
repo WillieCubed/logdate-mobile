@@ -63,6 +63,8 @@ on:
       - 'build-logic/src/main/kotlin/app/logdate/LogDateReleasePlugin.kt'
       - 'scripts/tests/native-backup/**'
       - 'scripts/ci/start-test-services.py'
+      - 'scripts/ci/screenshot-build-cache.gradle.kts'
+      - 'scripts/tests/ci/test-acceptance-parallelism.py'
       - 'server/**'
       - 'shared/model/**'
       - 'tests/e2e/managed-talkback-acceptance.py'
@@ -109,10 +111,77 @@ permissions:
   contents: read
 
 jobs:
+  native-apks:
+    name: Compile shared managed acceptance inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      LOGDATE_CI_BUILD_CACHE_DIR: ${{ github.workspace }}/ci-native-build-cache
+    outputs:
+      artifact_id: ${{ steps.shared-build.outputs.artifact-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate native acceptance harnesses
+        run: |
+          python3 -m unittest discover -s tests/e2e -p 'test_native*.py'
+          python3 -m unittest discover -s tests/e2e -p 'test_managed*.py'
+          python3 scripts/tests/native-backup/test-native-acceptance-safety.py
+          python3 scripts/tests/native-backup/test-native-instrumentation-results.py
+          python3 scripts/tests/native-backup/test-native-device-enrollment-acceptance.py
+
+      - name: Materialize Android Firebase config
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+
+      - name: Set up JDK 21 for the enrollment server and native harness
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+
+      - name: Prepare Android compile SDK
+        shell: bash
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-37.0'
+
+      - name: Compile the app and managed driver once
+        run: |
+          ./gradlew :app:android-main:assembleDebug :app:android-main:assembleDebugAndroidTest \
+            :tools:native-restore-driver:assembleDebug :tools:native-restore-driver:assembleDebugAndroidTest \
+            --init-script scripts/ci/screenshot-build-cache.gradle.kts --build-cache \
+            --max-workers=2 --no-daemon --console=plain
+          git rev-parse HEAD > "$LOGDATE_CI_BUILD_CACHE_DIR/native-acceptance-source.txt"
+
+      - name: Share exact-source native compilation cache
+        id: shared-build
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: native-build-cache-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ env.LOGDATE_CI_BUILD_CACHE_DIR }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
   managed-startup:
     name: Verify restored startup and journal compatibility on managed devices
     runs-on: ubuntu-latest
+    needs: native-apks
     timeout-minutes: 40
+    env:
+      LOGDATE_CI_BUILD_CACHE_DIR: ${{ github.workspace }}/ci-native-build-cache
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
@@ -124,14 +193,33 @@ jobs:
           android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
           google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.4.0
+
+      - name: Verify same-run native compilation artifact binding
+        env:
+          ARTIFACT_ID: ${{ needs.native-apks.outputs.artifact_id }}
+        run: '[[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
+
+      - name: Restore exact-source native compilation cache
+        uses: actions/download-artifact@v8.0.1
+        with:
+          artifact-ids: ${{ needs.native-apks.outputs.artifact_id }}
+          path: ${{ env.LOGDATE_CI_BUILD_CACHE_DIR }}
+
+      - name: Bind all managed builds to the compilation cache
+        shell: bash
+        run: |
+          test "$(cat "$LOGDATE_CI_BUILD_CACHE_DIR/native-acceptance-source.txt")" = "$GITHUB_SHA"
+          init_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+          mkdir -p "$init_dir"
+          cp scripts/ci/screenshot-build-cache.gradle.kts "$init_dir/logdate-shared-native.gradle.kts"
 
       - name: Prepare the managed API 34 image
         shell: bash
@@ -150,8 +238,22 @@ jobs:
           free -h
           df -h "$GITHUB_WORKSPACE"
           ./gradlew :app:android-main:assembleDebug :app:android-main:assembleDebugAndroidTest \
+            :tools:native-restore-driver:assembleDebug :tools:native-restore-driver:assembleDebugAndroidTest \
             --max-workers=2 --no-daemon --console=plain
           free -h
+
+      - name: Record exact managed acceptance candidate
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/native-inputs"
+          git rev-parse HEAD > "$RUNNER_TEMP/native-inputs/native-acceptance-source.txt"
+          sha256sum app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            tools/native-restore-driver/build/outputs/apk/debug/native-restore-driver-debug.apk \
+            tools/native-restore-driver/build/outputs/apk/androidTest/debug/native-restore-driver-debug-androidTest.apk \
+            > "$RUNNER_TEMP/native-inputs/native-acceptance-apks.sha256"
+          sha256sum --check "$RUNNER_TEMP/native-inputs/native-acceptance-apks.sha256"
 
       - name: Verify restored reminder schedules on a managed device
         run: |
@@ -333,6 +435,7 @@ jobs:
         with:
           name: native-managed-startup-${{ github.sha }}
           path: |
+            ${{ runner.temp }}/native-inputs/**
             ${{ runner.temp }}/native-gmd/**
             app/android-main/build/outputs/androidTest-results/managedDevice/debug/phoneApi34/**
             app/android-main/build/intermediates/managed_device_android_test_additional_output/debugAndroidTest/phoneApi34DebugAndroidTest/**
@@ -342,13 +445,14 @@ jobs:
   native-transfer-scenarios:
     name: Managed native restore (${{ matrix.scenario }})
     runs-on: ubuntu-latest
+    needs: native-apks
     timeout-minutes: 75
     strategy:
       fail-fast: false
-      max-parallel: 3
       matrix:
         scenario: [partial, archive, publication, contracts, missing-keys, credentials-only, data-only, privacy, work-restart, d2d, enrollment, widget]
     env:
+      LOGDATE_CI_BUILD_CACHE_DIR: ${{ github.workspace }}/ci-native-build-cache
       ANDROID_AVD_HOME: ${{ github.workspace }}/.native-managed-avds
       LOGDATE_NATIVE_ACCEPTANCE_PACKAGE: studio.hypertext.logdate.debug
       NATIVE_SCENARIO: ${{ matrix.scenario }}
@@ -382,6 +486,25 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.4.0
 
+      - name: Verify same-run native compilation artifact binding
+        env:
+          ARTIFACT_ID: ${{ needs.native-apks.outputs.artifact_id }}
+        run: '[[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
+
+      - name: Restore exact-source native compilation cache
+        uses: actions/download-artifact@v8.0.1
+        with:
+          artifact-ids: ${{ needs.native-apks.outputs.artifact_id }}
+          path: ${{ env.LOGDATE_CI_BUILD_CACHE_DIR }}
+
+      - name: Bind all managed builds to the compilation cache
+        shell: bash
+        run: |
+          test "$(cat "$LOGDATE_CI_BUILD_CACHE_DIR/native-acceptance-source.txt")" = "$GITHUB_SHA"
+          init_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+          mkdir -p "$init_dir"
+          cp scripts/ci/screenshot-build-cache.gradle.kts "$init_dir/logdate-shared-native.gradle.kts"
+
       - name: Prepare managed Android images
         shell: bash
         run: |
@@ -410,6 +533,19 @@ jobs:
             tasks+=(:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath)
           fi
           ./gradlew "${tasks[@]}" --max-workers=2 --no-daemon --console=plain
+
+      - name: Record exact managed acceptance candidate
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/native-inputs"
+          git rev-parse HEAD > "$RUNNER_TEMP/native-inputs/native-acceptance-source.txt"
+          sha256sum app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            tools/native-restore-driver/build/outputs/apk/debug/native-restore-driver-debug.apk \
+            tools/native-restore-driver/build/outputs/apk/androidTest/debug/native-restore-driver-debug-androidTest.apk \
+            > "$RUNNER_TEMP/native-inputs/native-acceptance-apks.sha256"
+          sha256sum --check "$RUNNER_TEMP/native-inputs/native-acceptance-apks.sha256"
 
       - name: Start isolated enrollment database
         if: matrix.scenario == 'enrollment'
@@ -473,6 +609,7 @@ jobs:
         with:
           name: native-restore-${{ matrix.scenario }}-${{ github.sha }}
           path: |
+            ${{ runner.temp }}/native-inputs/**
             ${{ runner.temp }}/native-managed/**
             !${{ runner.temp }}/native-managed/**/apks/**
             !${{ runner.temp }}/native-managed/**/server-control/**
@@ -494,8 +631,10 @@ jobs:
   native-transfer-api-36-1:
     name: Verify Android 16 QPR2 restore callback on emulators
     runs-on: ubuntu-latest
+    needs: native-apks
     timeout-minutes: 35
     env:
+      LOGDATE_CI_BUILD_CACHE_DIR: ${{ github.workspace }}/ci-native-build-cache
       ANDROID_AVD_HOME: ${{ github.workspace }}/.native-modern-avds
       LOGDATE_NATIVE_ACCEPTANCE_PACKAGE: studio.hypertext.logdate.debug
     steps:
@@ -511,14 +650,33 @@ jobs:
           android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
           google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.4.0
+
+      - name: Verify same-run native compilation artifact binding
+        env:
+          ARTIFACT_ID: ${{ needs.native-apks.outputs.artifact_id }}
+        run: '[[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
+
+      - name: Restore exact-source native compilation cache
+        uses: actions/download-artifact@v8.0.1
+        with:
+          artifact-ids: ${{ needs.native-apks.outputs.artifact_id }}
+          path: ${{ env.LOGDATE_CI_BUILD_CACHE_DIR }}
+
+      - name: Bind all managed builds to the compilation cache
+        shell: bash
+        run: |
+          test "$(cat "$LOGDATE_CI_BUILD_CACHE_DIR/native-acceptance-source.txt")" = "$GITHUB_SHA"
+          init_dir="${GRADLE_USER_HOME:-$HOME/.gradle}/init.d"
+          mkdir -p "$init_dir"
+          cp scripts/ci/screenshot-build-cache.gradle.kts "$init_dir/logdate-shared-native.gradle.kts"
 
       - name: Prepare the managed Android 16 QPR2 image
         shell: bash
@@ -534,6 +692,25 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Restore compiled managed callback inputs
+        run: >-
+          ./gradlew :app:android-main:assembleDebug :app:android-main:assembleDebugAndroidTest
+          :tools:native-restore-driver:assembleDebug :tools:native-restore-driver:assembleDebugAndroidTest
+          --max-workers=2 --no-daemon --console=plain
+
+      - name: Record exact managed acceptance candidate
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          mkdir -p "$RUNNER_TEMP/native-inputs"
+          git rev-parse HEAD > "$RUNNER_TEMP/native-inputs/native-acceptance-source.txt"
+          sha256sum app/android-main/build/outputs/apk/debug/android-main-debug.apk \
+            app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk \
+            tools/native-restore-driver/build/outputs/apk/debug/native-restore-driver-debug.apk \
+            tools/native-restore-driver/build/outputs/apk/androidTest/debug/native-restore-driver-debug-androidTest.apk \
+            > "$RUNNER_TEMP/native-inputs/native-acceptance-apks.sha256"
+          sha256sum --check "$RUNNER_TEMP/native-inputs/native-acceptance-apks.sha256"
+
       - name: Verify the exact Android 16 QPR2 callback contract on a managed device
         run: bash tests/e2e/managed-modern-callback-acceptance.sh "$RUNNER_TEMP/native-restore-api36-1"
 
@@ -542,6 +719,8 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with:
           name: native-restore-api36-1-${{ github.sha }}
-          path: ${{ runner.temp }}/native-restore-api36-1/**
+          path: |
+            ${{ runner.temp }}/native-inputs/**
+            ${{ runner.temp }}/native-restore-api36-1/**
           if-no-files-found: warn
           retention-days: 14
