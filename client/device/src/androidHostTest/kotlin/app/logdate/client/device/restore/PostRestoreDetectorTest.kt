@@ -33,6 +33,26 @@ class PostRestoreDetectorTest {
     private val detector = PostRestoreDetector(context)
 
     @Test
+    fun `legacy trust history survives reconciliation and damaged receipts remain evidence`() {
+        assertFalse(detector.hasNativeRestoreHistory())
+        detector.markDeviceInitialized()
+        assertFalse(detector.hasNativeRestoreHistory())
+        for (name in listOf(
+            ".logdate_native_restore_pending",
+            ".logdate_native_restore_privacy_received",
+            ".logdate_native_restore_fingerprints",
+        )) {
+            val marker = File(noBackup, name).apply { writeText("damaged") }
+            assertTrue(detector.hasNativeRestoreHistory(), name)
+            marker.delete()
+        }
+        detector.beginNativeRestoreSession()
+        assertTrue(detector.hasNativeRestoreHistory())
+        detector.markDeviceInitialized()
+        assertTrue(detector.hasNativeRestoreHistory())
+    }
+
+    @Test
     fun `legacy completed deliveries do not require preference capture metadata after upgrade`() {
         val id = "123e4567-e89b-12d3-a456-426614174000"
         File(noBackup, ".logdate_native_restore_privacy_received").writeText("received:$id")

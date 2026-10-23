@@ -18,6 +18,7 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.storage.createAndroidSecureStorage
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -39,6 +40,7 @@ open class NativeBackupAgent : BackupAgent() {
 
     override fun onCreate() {
         super.onCreate()
+        runBlocking(Dispatchers.IO) { createAndroidInstallationWatchDataStore(this@NativeBackupAgent).data.first() }
     }
 
     override fun onBackup(

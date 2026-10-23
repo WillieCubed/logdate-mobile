@@ -65,6 +65,7 @@ data class PhoneWatchLink(
 class PhoneWatchLinkStore(
     private val storage: KeyValueStorage,
     private val pairKeys: PairKeyVault,
+    private val choices: KeyValueStorage = storage,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = MapSerializer(String.serializer(), PhoneWatchLink.serializer())
@@ -229,19 +230,19 @@ class PhoneWatchLinkStore(
         }
     }
 
-    suspend fun removalSuppressed(nodeId: String): Boolean = storage.getBooleanOrThrow("watch.removed.$nodeId")
+    suspend fun removalSuppressed(nodeId: String): Boolean = choices.getBooleanOrThrow("watch.removed.$nodeId")
 
     suspend fun allowRelink(nodeId: String) =
         mutex.withLock {
             generations[nodeId] = (generations[nodeId] ?: 0L) + 1
-            storage.remove("watch.removed.$nodeId")
+            choices.remove("watch.removed.$nodeId")
         }
 
     suspend fun forget(nodeId: String) =
         mutex.withLock {
             generations[nodeId] = (generations[nodeId] ?: 0L) + 1
-            storage.putBoolean("watch.removed.$nodeId", true)
-            check(storage.getBooleanOrThrow("watch.removed.$nodeId"))
+            choices.putBoolean("watch.removed.$nodeId", true)
+            check(choices.getBooleanOrThrow("watch.removed.$nodeId"))
             val records = decode(storage.getStringOrThrow(KEY)) - nodeId
             storage.putStringOrThrow(KEY, json.encodeToString(serializer, records))
             check(decode(storage.getString(KEY))[nodeId] == null)

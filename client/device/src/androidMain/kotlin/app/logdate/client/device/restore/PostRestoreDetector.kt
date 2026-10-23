@@ -5,7 +5,10 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import kotlin.uuid.Uuid
 
@@ -13,6 +16,19 @@ import kotlin.uuid.Uuid
 class PostRestoreDetector(
     private val context: Context,
 ) {
+    /** Even damaged retained delivery receipts prevent portable legacy state becoming local authority. */
+    fun hasNativeRestoreHistory(): Boolean =
+        synchronized(lock) {
+            listOf(pendingRestoreFile(), restorePrivacyFile(), restoreFingerprintFile()).any { file ->
+                try {
+                    Files.readAttributes(file.toPath(), BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+                    true
+                } catch (_: NoSuchFileException) {
+                    false
+                }
+            }
+        }
+
     fun recordRestoreCompleted() {
         runBlocking {
             AndroidNativeRestoreDeliveryGate.withLock {

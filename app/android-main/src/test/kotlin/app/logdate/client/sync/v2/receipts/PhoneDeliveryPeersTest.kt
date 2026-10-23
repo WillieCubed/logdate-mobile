@@ -29,7 +29,8 @@ import kotlin.test.assertTrue
 
 class PhoneDeliveryPeersTest {
     private val sessions = FakeSessions(OriginBoundSession(ORIGIN, UserSession("access", "refresh", "account")))
-    private val links = PhoneWatchLinkStore(MemoryKeyValueStorage(), MemoryPairKeyVault())
+    private val pairKeys = MemoryPairKeyVault()
+    private val links = PhoneWatchLinkStore(MemoryKeyValueStorage(), pairKeys)
     private val config = mockk<LogDateConfigRepository>()
     private var active = true
     private var beforeNode: suspend () -> Unit = {}
@@ -53,6 +54,28 @@ class PhoneDeliveryPeersTest {
             assertEquals(context, peers.current("watch"))
             assertTrue(peers.isCurrent(context))
             assertNull(peers.current("another-watch"))
+        }
+
+    @Test
+    fun `copied metadata without its pair key cannot authorize delivery or removal`() =
+        runTest {
+            link()
+            pairKeys.remove("watch")
+            assertNull(peers.current("watch"))
+            link()
+            pairKeys.remove("watch")
+            assertNull(peers.forRemoval("watch"))
+            link()
+            pairKeys.remove("watch")
+            assertTrue(peers.all().isEmpty())
+        }
+
+    @Test
+    fun `losing the pair key during lookup discards the audience`() =
+        runTest {
+            link()
+            beforeNode = { pairKeys.remove("watch") }
+            assertNull(peers.current("watch"))
         }
 
     @Test
@@ -168,7 +191,7 @@ class PhoneDeliveryPeersTest {
         runTest {
             link()
             val mismatched = mockk<PhoneWatchLinkStore>()
-            coEvery { mismatched.get("another-watch") } returns links.get("watch")
+            coEvery { mismatched.getForReconciliation("another-watch") } returns links.get("watch")
             val resolver = PhoneDeliveryPeers(mismatched, sessions, config, { "phone" }, { true })
             assertNull(resolver.current("another-watch"))
         }
