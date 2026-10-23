@@ -15,11 +15,10 @@ production account moves. Turning it on takes a server change and an app change.
 1. Confirm that the staging database has the migration that adds `space_migrations`
    (`V50__Add_space_migrations.sql`). The Deploy Server Staging workflow runs migrations before it
    deploys, so any staging deploy of a revision that contains it is enough.
-2. Add `LOGDATE_PERSONAL_SPACE_ENABLED = "true"` and
-   `LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = "true"` to `cloud_run_env` in
-   `infra/terraform/staging.tfvars`, add the same two values to
-   `infra/terraform/staging-contract-template.json`, and deploy staging. Accounts created from then
-   on start in their personal spaces, so create the accounts you rehearse with before this deploy.
+2. Staging already runs with `LOGDATE_PERSONAL_SPACE_ENABLED = "true"`. Add
+   `LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = "true"` next to it in `cloud_run_env` in
+   `infra/terraform/staging.tfvars` and in `infra/terraform/staging-contract-template.json`, and
+   deploy staging. The deployment contract renderer accepts the flag in every environment.
 3. Check that the server offers moves. Its description should list `personalSpaceMigrationV1`:
 
    ```bash
@@ -37,17 +36,28 @@ A rehearsal is only useful when the journal looks like a real one: thousands of 
 recordings, drafts, marked moments, location history and journals that share entries. The quickest
 way to get one is a tester's own export archive, which keeps the data inside the tester's own account.
 
-1. Before turning moves on, sign in to a staging account on a phone with the switches off, import the
-   tester's export archive from Settings, and let the phone sync until the Backup page says
-   everything is backed up. Sign the same account in on a second device and let it download
-   everything; this device writes during the move later.
-2. Turn on moves as described above, then turn on Upgrade existing journals on the phone. Its next sync starts
-   the move, and the Backup page shows Upgrading to sealed storage with a count of items uploaded.
-3. While the phone uploads, write an entry and attach a photo on the second device. Both reach legacy
+1. Create a staging account for the rehearsal. Staging creates new accounts in their personal
+   spaces, so before the account holds anything, put it on legacy storage, the way every account
+   created before personal spaces is:
+
+   ```sql
+   UPDATE accounts SET storage_mode = 'legacy' WHERE username = '<tester username>';
+   ```
+
+   Only do this to an account that has never synced, because it changes which store the account's
+   devices read.
+2. Sign in to that account on a phone with both switches off, import the tester's export archive
+   from Settings, and let the phone sync until the Backup page says everything is backed up. Sign
+   the same account in on a second device with both switches off and let it download everything;
+   this device writes during the move later.
+3. Turn on moves as described above, then turn on Upgrade existing journals on the phone. Its next
+   sync starts the move, and the Backup page shows Upgrading to sealed storage with a count of
+   items uploaded.
+4. While the phone uploads, write an entry and attach a photo on the second device. Both reach legacy
    storage, and the phone includes them when it checks.
-4. Close the app on the phone partway through the upload and open it again. The count resumes from
+5. Close the app on the phone partway through the upload and open it again. The count resumes from
    where it stopped instead of starting over.
-5. When the Backup page shows Sealed storage, check the account from the server side. The account's
+6. When the Backup page shows Sealed storage, check the account from the server side. The account's
    storage mode is `personalSpaceV1`, and its row in `space_migrations` is `switched`:
 
    ```sql
@@ -56,13 +66,13 @@ way to get one is a tester's own export archive, which keeps the data inside the
    WHERE a.username = '<tester username>';
    ```
 
-6. On the second device, which still has the switches off, sync again. Sync pauses and the Backup page
-   says to update LogDate to keep syncing. Turn on Personal space sync and sync: the device settles onto the
-   personal space and shows the entry and photo it wrote earlier.
-7. Compare the journal on both devices with the tester's archive: entry counts in Timeline, a few
+7. On the second device, which still has the switches off, sync again. Sync pauses and the Backup
+   page says to update LogDate to keep syncing. Turn on Personal space sync and sync: the device
+   settles onto the personal space and shows the entry and photo it wrote earlier.
+8. Compare the journal on both devices with the tester's archive: entry counts in Timeline, a few
    photos and recordings opened in full, the drafts, the marked moments and a day of location
    history.
-8. Switch back from the phone, as described in [Switch an account back](#switch-an-account-back),
+9. Switch back from the phone, as described in [Switch an account back](#switch-an-account-back),
    and check that both devices return to legacy storage with everything intact, including an entry
    written after the switch.
 

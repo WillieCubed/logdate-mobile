@@ -1252,6 +1252,23 @@ jq '.env_vars.LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED = "yes"' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-passkey-oauth.json"
 expect_failure invalid-passkey-oauth staging "$RELEASE_SHA" invalid-passkey-oauth.json \
     "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED must be true or false"
+# Moving existing journals into personal spaces is an opt-in for every environment, preserved verbatim.
+for environment in staging production; do
+    for enabled in true false; do
+        jq --arg enabled "$enabled" '.env_vars.LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = $enabled' \
+            "$FIXTURE_DIR/$environment-source.json" >"$FIXTURE_DIR/journal-moves-$environment-$enabled.json"
+        output="$TMP_DIR/journal-moves-$environment-$enabled.out.json"
+        if ! run_renderer "$environment" "$RELEASE_SHA" "journal-moves-$environment-$enabled.json" "$output" "$LOG_DIR/journal-moves-$environment-$enabled.err"; then
+            cat "$LOG_DIR/journal-moves-$environment-$enabled.err" >&2
+            fail "journal moves opt-in could not be rendered for $environment"
+        fi
+        assert_equals "$enabled" "$(jq -r '.env_vars.LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED' "$output")"
+    done
+done
+jq '.env_vars.LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = "yes"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-journal-moves.json"
+expect_failure invalid-journal-moves staging "$RELEASE_SHA" invalid-journal-moves.json \
+    "LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED must be true or false"
 # Identity publishing is a production-only opt-in, preserved verbatim.
 for enabled in true false; do
     jq --arg enabled "$enabled" '.env_vars.ATPROTO_PLC_PUBLISH_ENABLED = $enabled' \
