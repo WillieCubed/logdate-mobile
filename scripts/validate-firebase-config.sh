@@ -65,7 +65,10 @@ validate_android_debug_client() {
 }
 
 plist_value() {
-    plutil -extract "$2" raw -o - "$1" 2>/dev/null || true
+    local value
+    if value="$(plutil -extract "$2" raw -o - "$1" 2>/dev/null)"; then
+        printf '%s' "$value"
+    fi
 }
 
 validate_ios() {
