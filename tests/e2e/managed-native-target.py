@@ -53,37 +53,69 @@ def wifi_station_address(raw):
     return address
 
 
-def process_identity(pid):
+def process_identity(pid, *, timeout=10):
     result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart=", "-o", "command="],
-                            check=True, capture_output=True, text=True, timeout=10)
+                            check=True, capture_output=True, text=True, timeout=timeout)
     fields = result.stdout.strip().split(None, 5)
     if len(fields) != 6:
         raise RuntimeError("The owned process is no longer live")
     return {"birth": " ".join(fields[:5]), "command": fields[5]}
 
 
-def real_command(adb, serial, *arguments):
+def real_command(adb, serial, *arguments, timeout=15):
     return subprocess.run([adb, "-s", serial, *arguments], check=True,
-                          stdin=subprocess.DEVNULL, capture_output=True, timeout=15).stdout
+                          stdin=subprocess.DEVNULL, capture_output=True, timeout=timeout).stdout
 
 
-def require_binding(custody, serial):
-    """Check process birth identities and the nonce-bearing waiting driver before device use."""
+def remaining_driver_budget(deadline):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError("The managed waiting driver observation budget expired")
+    return remaining
+
+
+def require_host_binding(custody, serial, deadline=None):
+    def identity(pid):
+        if deadline is None:
+            return process_identity(pid)
+        result = process_identity(pid, timeout=min(10, remaining_driver_budget(deadline)))
+        remaining_driver_budget(deadline)
+        return result
+
     gradle = custody["gradle"]
-    if process_identity(gradle["pid"]) != gradle["identity"]:
+    if identity(gradle["pid"]) != gradle["identity"]:
         raise RuntimeError("The owned Gradle process changed")
     if custody["nonce"] not in gradle["identity"]["command"]:
         raise RuntimeError("Gradle does not own this acceptance generation")
     binding = custody["targets"][serial]
-    if process_identity(binding["pid"]) != binding["identity"]:
+    if identity(binding["pid"]) != binding["identity"]:
         raise RuntimeError("The owned managed QEMU process changed")
     candidates = managed_candidates([f'{binding["pid"]} {binding["identity"]["command"]}'], set(), binding["avd"])
     if candidates.get(binding["pid"], {}).get("managedId") != binding["managedId"]:
         raise RuntimeError("The target is not the owned managed emulator")
+    return binding
+
+
+def require_binding(custody, serial):
+    """Check process birth identities and the nonce-bearing waiting driver before device use."""
+    binding = require_host_binding(custody, serial)
     adb, nonce = custody["adb"], custody["nonce"]
-    pids = real_command(adb, serial, "shell", "pidof", DRIVER).decode().strip().split()
-    if pids != [str(binding["driverPid"])]:
-        raise RuntimeError("The managed waiting driver changed")
+    expected = str(binding["driverPid"])
+    deadline = time.monotonic() + 15
+    while True:
+        pids = real_command(adb, serial, "shell", "pidof", DRIVER,
+                            timeout=remaining_driver_budget(deadline)).decode().strip().split()
+        observed = [pid[:64] for pid in pids[:8]]
+        detail = (f"The managed waiting driver changed for {serial}: expected PID {expected}, "
+                  f"observed PIDs {observed!r} (count {len(pids)})")
+        if pids != [expected] and (pids.count(expected) != 1 or not all(re.fullmatch(r"[1-9][0-9]*", pid) for pid in pids)):
+            raise RuntimeError(detail)
+        if time.monotonic() >= deadline:
+            raise RuntimeError(detail + "; observation budget expired")
+        if pids == [expected]:
+            break
+        time.sleep(min(0.05, remaining_driver_budget(deadline)))
+        require_host_binding(custody, serial, deadline)
     receipt = json.loads(real_command(adb, serial, "exec-out", "run-as", DRIVER, "cat", f"no_backup/managed-restore-{nonce}.json"))
     if not validate_driver_receipt(receipt, nonce, binding["driverPid"]) or receipt.get("startTicks") != binding["driverStartTicks"]:
         raise RuntimeError("The managed receipt is stale or no longer ready")
