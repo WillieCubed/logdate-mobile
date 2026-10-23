@@ -9,6 +9,10 @@ import uuid
 
 NATIVE = runpy.run_path(str(Path(__file__).with_name("native-backup-acceptance.py")))
 PREFIX = "app.logdate.client.e2e."
+LOCK_EVIDENCE_STAGES = (
+    "native-enrollment", "enrollment-canceled", "initial-pin-challenge", "foreground-pin-challenge",
+    "recreated-pin-challenge", "initial-unlocked", "foreground-unlocked", "recreated-unlocked",
+)
 
 
 def instrument(serial, classname, count, output, extras=()):
@@ -17,6 +21,39 @@ def instrument(serial, classname, count, output, extras=()):
     NATIVE["private_file"](output, result)
     if not NATIVE["instrumentation_passed"](result, count):
         raise RuntimeError(f"Post-transfer {classname.rsplit('.', 1)[-1]} did not pass every required case; inspect {output}")
+
+
+def retain_lock_evidence(serial, output):
+    remote = f"/sdcard/Android/data/{NATIVE['PACKAGE']}/cache/restored-app-lock"
+    NATIVE["adb"](serial, "pull", remote, str(output))
+    if not output.is_dir():
+        raise RuntimeError("Native lock evidence was not retained")
+    for path in (output, *output.rglob("*")):
+        if path.is_symlink():
+            raise RuntimeError("Native lock evidence contains an unexpected link")
+        path.chmod(0o700 if path.is_dir() else 0o600)
+    for stage in LOCK_EVIDENCE_STAGES:
+        for name in (f"{stage}.png", f"{stage}.xml", f"{stage}-state.txt"):
+            path = output / name
+            if not path.is_file() or path.stat().st_size == 0:
+                raise RuntimeError(f"Missing native lock evidence: {name}")
+
+
+def instrument_journal_lock(serial, output):
+    failure = None
+    try:
+        instrument(serial, PREFIX + "RestoredJournalLockRuntimeTest," + PREFIX + "RestoredAppLockEnrollmentRuntimeTest", 8,
+                   output / "journal-lock.log")
+    except Exception as error:
+        failure = error
+        raise
+    finally:
+        try:
+            retain_lock_evidence(serial, output / "restored-app-lock")
+        except Exception as capture_error:
+            if failure is None:
+                raise
+            failure.add_note(f"Native lock evidence capture failed: {capture_error}")
 
 
 def run(serial, output):
@@ -32,8 +69,7 @@ def run(serial, output):
         if stage == "seed":
             NATIVE["adb"](serial, "shell", "am", "force-stop", NATIVE["PACKAGE"])
     instrument(serial, PREFIX + "NativeRestoredEntryEditingTest", 7, output / "entry-editing.log", ("-e", "restoredEntryEditing", "true"))
-    instrument(serial, PREFIX + "RestoredJournalLockRuntimeTest," + PREFIX + "RestoredAppLockEnrollmentRuntimeTest", 8,
-               output / "journal-lock.log")
+    instrument_journal_lock(serial, output)
     callback_contract = json.loads(Path(__file__).with_name("native-modern-callback-cases.json").read_text())
     callback_count = sum(len(methods) for methods in callback_contract.values())
     instrument(serial, ",".join(callback_contract), callback_count, output / "callbacks.log")
