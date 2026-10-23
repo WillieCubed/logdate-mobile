@@ -15,6 +15,10 @@ import kotlin.uuid.Uuid
 interface CanonicalOwnerProvider {
     suspend fun getCanonicalOwnerId(): String
 
+    /** Observes persisted ownership atomically, without creating or adopting an owner. */
+    suspend fun readExistingOwner(): ExistingCanonicalOwner? =
+        throw UnsupportedOperationException("Existing journal ownership cannot be read")
+
     /**
      * Whether this installation has already been bound to a Cloud account.
      *
@@ -32,7 +36,7 @@ interface CanonicalOwnerProvider {
      *
      * Implementations already bound to an account must return false for a different remote owner.
      */
-    suspend fun adoptRemoteOwnerIfUninitialized(remoteOwnerId: String): Boolean = getCanonicalOwnerId() == remoteOwnerId
+    suspend fun adoptRemoteOwnerIfUninitialized(remoteOwnerId: String): Boolean = sameOwnerId(getCanonicalOwnerId(), remoteOwnerId)
 
     /**
      * Forgets this installation's owner and its account binding, as part of erasing a device removed
@@ -50,50 +54,69 @@ class DefaultCanonicalOwnerProvider(
 ) : CanonicalOwnerProvider {
     private val mutex = Mutex()
 
-    override suspend fun hasBoundOwner(): Boolean =
-        mutex.withLock {
-            storage.getString(CANONICAL_OWNER_BOUND_KEY) == BOUND
+    override suspend fun hasBoundOwner(): Boolean = readExistingOwner()?.isBound == true
+
+    override suspend fun readExistingOwner(): ExistingCanonicalOwner? = mutex.withLock { readExistingOwnerLocked() }
+
+    private suspend fun readExistingOwnerLocked(): ExistingCanonicalOwner? {
+        val snapshot = readRawOwnerLocked()
+        val rawOwner = snapshot[CANONICAL_OWNER_ID_KEY]
+        val rawBinding = snapshot[CANONICAL_OWNER_BOUND_KEY]
+        if (rawBinding != null && rawBinding != BOUND) throw CanonicalOwnerProvider.CorruptCanonicalOwnerException()
+        if (rawOwner == null) {
+            if (rawBinding == BOUND) throw CanonicalOwnerProvider.CorruptCanonicalOwnerException()
+            return null
         }
+        return ExistingCanonicalOwner(rawOwner.requireUuid(), rawBinding == BOUND)
+    }
+
+    private suspend fun readRawOwnerLocked(): Map<String, String?> {
+        val fields = setOf(CANONICAL_OWNER_ID_KEY, CANONICAL_OWNER_BOUND_KEY)
+        val snapshot = storage.getStringsOrThrow(fields)
+        check(snapshot.keys == fields) { "Incomplete journal ownership snapshot" }
+        return snapshot
+    }
 
     override suspend fun getCanonicalOwnerId(): String =
         mutex.withLock {
-            val storedOwnerId = storage.getString(CANONICAL_OWNER_ID_KEY)
-            if (storedOwnerId != null) {
-                return@withLock storedOwnerId.requireUuid()
-            }
-
+            readExistingOwnerLocked()?.let { return@withLock it.rawId }
             val createdOwnerId = Uuid.random().toString()
-            storage.putString(CANONICAL_OWNER_ID_KEY, createdOwnerId)
-            val persistedOwnerId = storage.getString(CANONICAL_OWNER_ID_KEY)
-            check(persistedOwnerId == createdOwnerId) {
-                "Failed to persist the local LogDate identity"
-            }
-            createdOwnerId
+            storage.compareAndSetStringsOrThrow(
+                mapOf(CANONICAL_OWNER_ID_KEY to null, CANONICAL_OWNER_BOUND_KEY to null),
+                mapOf(CANONICAL_OWNER_ID_KEY to createdOwnerId),
+            )
+            checkNotNull(readExistingOwnerLocked()) { "Failed to persist the local LogDate identity" }.rawId
         }
 
     override suspend fun adoptRemoteOwnerIfUninitialized(remoteOwnerId: String): Boolean =
         mutex.withLock {
             val verifiedRemoteOwnerId = remoteOwnerId.requireUuid()
-
-            // Once an account has claimed this installation the binding is final: signing in as
-            // somebody else would fold two people's journals together.
-            if (storage.getString(CANONICAL_OWNER_BOUND_KEY) == BOUND) {
-                return@withLock storage.getString(CANONICAL_OWNER_ID_KEY)?.requireUuid() == verifiedRemoteOwnerId
+            val existing = readExistingOwnerLocked()
+            if (existing?.isBound == true) return@withLock sameOwnerId(existing.rawId, verifiedRemoteOwnerId)
+            val matched =
+                storage.compareAndSetStringsOrThrow(
+                    mapOf(CANONICAL_OWNER_ID_KEY to existing?.rawId, CANONICAL_OWNER_BOUND_KEY to null),
+                    mapOf(CANONICAL_OWNER_ID_KEY to verifiedRemoteOwnerId, CANONICAL_OWNER_BOUND_KEY to BOUND),
+                )
+            val committed = readExistingOwnerLocked()
+            if (matched) {
+                check(committed?.isBound == true && committed.rawId == verifiedRemoteOwnerId) {
+                    "Failed to persist the local LogDate account binding"
+                }
             }
-
-            storage.putString(CANONICAL_OWNER_ID_KEY, verifiedRemoteOwnerId)
-            val persistedOwnerId = storage.getString(CANONICAL_OWNER_ID_KEY)
-            check(persistedOwnerId == verifiedRemoteOwnerId) {
-                "Failed to persist the local LogDate identity"
-            }
-            storage.putString(CANONICAL_OWNER_BOUND_KEY, BOUND)
-            true
+            committed?.isBound == true && sameOwnerId(committed.rawId, verifiedRemoteOwnerId)
         }
 
     override suspend fun resetForDeviceWipe() {
         mutex.withLock {
-            storage.remove(CANONICAL_OWNER_ID_KEY)
-            storage.remove(CANONICAL_OWNER_BOUND_KEY)
+            val before = readRawOwnerLocked()
+            check(
+                storage.compareAndSetStringsOrThrow(
+                    before,
+                    mapOf(CANONICAL_OWNER_ID_KEY to null, CANONICAL_OWNER_BOUND_KEY to null),
+                ),
+            ) { "Journal ownership changed before device removal" }
+            check(readRawOwnerLocked().values.all { it == null }) { "Failed to forget the local LogDate identity" }
         }
     }
 

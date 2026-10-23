@@ -60,44 +60,47 @@ class AccountKeyUnlockCoordinatorTest {
                     .getOrThrow()
                     .account.id
                     .toString()
-            val local = keys()
-            local.identity.installAccountKey(owner, ByteArray(32) { 5 })
-            val remote = EnvelopeRemote()
-            val passkey =
-                DefaultPasskeyAccountRepositoryTest.FakePasskeyManager().apply {
-                    val first = Base64.UrlSafe.encode(ByteArray(32) { 9 }).trimEnd('=')
-                    authenticateWithPasskeyResponse =
-                        Result.success(
-                            """
-                            {"id":"AQ","rawId":"AQ","type":"public-key",
-                             "response":{"clientDataJSON":"e30","authenticatorData":"AQ","signature":"Ag","userHandle":""},
-                             "clientExtensionResults":{"prf":{"results":{"first":"$first"}}}}
-                            """.trimIndent(),
-                        )
-                }
-            val canonical =
-                object : app.logdate.client.device.identity.CanonicalOwnerProvider {
-                    override suspend fun getCanonicalOwnerId(): String = owner
+            for (retainedOwner in listOf(owner, owner.uppercase())) {
+                val local = keys()
+                local.identity.installAccountKey(retainedOwner, ByteArray(32) { 5 })
+                val remote = EnvelopeRemote()
+                val passkey =
+                    DefaultPasskeyAccountRepositoryTest.FakePasskeyManager().apply {
+                        val first = Base64.UrlSafe.encode(ByteArray(32) { 9 }).trimEnd('=')
+                        authenticateWithPasskeyResponse =
+                            Result.success(
+                                """
+                                {"id":"AQ","rawId":"AQ","type":"public-key",
+                                 "response":{"clientDataJSON":"e30","authenticatorData":"AQ","signature":"Ag","userHandle":""},
+                                 "clientExtensionResults":{"prf":{"results":{"first":"$first"}}}}
+                                """.trimIndent(),
+                            )
+                    }
+                val canonical =
+                    object : app.logdate.client.device.identity.CanonicalOwnerProvider {
+                        override suspend fun getCanonicalOwnerId(): String = retainedOwner
 
-                    override suspend fun hasBoundOwner(): Boolean = true
-                }
-            val repository =
-                DefaultPasskeyAccountRepository(
-                    apiClient = auth,
-                    passkeyManager = passkey,
-                    restoreCredentialManager = DefaultPasskeyAccountRepositoryTest.FakeRestoreCredentialManager(),
-                    sessionStorage = DefaultPasskeyAccountRepositoryTest.FakeSessionStorage(),
-                    platformAccountManager = DefaultPasskeyAccountRepositoryTest.FakePlatformAccountManager(),
-                    configRepository = DefaultPasskeyAccountRepositoryTest.FakeConfigRepository(),
-                    canonicalOwnerProvider = canonical,
-                    hasLocalData = { true },
-                    repositoryScope = backgroundScope,
-                    accountKeyUnlockCoordinator = coordinator(remote, local),
-                )
-            repository.authenticateWithPasskey("testuser").getOrThrow()
-            assertEquals(1, remote.writes)
-            assertNotNull(remote.ciphertext)
-            assertContentEquals(ByteArray(32) { 5 }, local.identity.getIdentityKey())
+                        override suspend fun hasBoundOwner(): Boolean = true
+                    }
+                val repository =
+                    DefaultPasskeyAccountRepository(
+                        apiClient = auth,
+                        passkeyManager = passkey,
+                        restoreCredentialManager = DefaultPasskeyAccountRepositoryTest.FakeRestoreCredentialManager(),
+                        sessionStorage = DefaultPasskeyAccountRepositoryTest.FakeSessionStorage(),
+                        platformAccountManager = DefaultPasskeyAccountRepositoryTest.FakePlatformAccountManager(),
+                        configRepository = DefaultPasskeyAccountRepositoryTest.FakeConfigRepository(),
+                        canonicalOwnerProvider = canonical,
+                        hasLocalData = { true },
+                        repositoryScope = backgroundScope,
+                        accountKeyUnlockCoordinator = coordinator(remote, local),
+                    )
+                repository.authenticateWithPasskey("testuser").getOrThrow()
+                assertEquals(1, remote.writes)
+                assertNotNull(remote.ciphertext)
+                assertContentEquals(ByteArray(32) { 5 }, local.identity.getIdentityKey())
+                assertEquals(retainedOwner, local.storage.getString("identity_account_id_v1"))
+            }
         }
 
     @Test
@@ -220,7 +223,7 @@ class AccountKeyUnlockCoordinatorTest {
         val storage = UnlockTestStorage()
         val crypto = DesktopCryptoManager()
         val identity = IdentityKeyManager(storage, crypto, backup)
-        return LocalKeys(identity, MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto)))
+        return LocalKeys(identity, MediaPayloadKeyProvider(storage, crypto, identity, KeyDerivation(crypto)), storage)
     }
 
     private fun coordinator(
@@ -231,6 +234,7 @@ class AccountKeyUnlockCoordinatorTest {
     private class LocalKeys(
         val identity: IdentityKeyManager,
         val media: MediaPayloadKeyProvider,
+        val storage: SecureStorage,
     )
 
     private class EnvelopeRemote(

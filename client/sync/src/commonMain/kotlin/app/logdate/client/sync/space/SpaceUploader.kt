@@ -1,5 +1,6 @@
 package app.logdate.client.sync.space
 
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncResult
@@ -56,7 +57,11 @@ internal class SpaceUploader(
         for (pending in syncMetadataService.getPendingUploads(type).dueNow(type, retryCoordinator)) {
             if (rateLimit.refusal() != null) break
             // An entry queued for another account or server waits until that one is signed in again.
-            if (pending.scope != null && pending.scope != access.scope) continue
+            if (pending.scope != null &&
+                (pending.scope.serverOrigin != access.scope.serverOrigin || !sameOwnerId(pending.scope.ownerId, access.scope.ownerId))
+            ) {
+                continue
+            }
             val upload = Upload(kind, access, client, pending, errors)
             try {
                 if (pending.operation == PendingOperation.DELETE) {

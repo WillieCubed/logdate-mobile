@@ -1,5 +1,6 @@
 package app.logdate.client.device.crypto
 
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
@@ -50,15 +51,15 @@ class IdentityKeyManager(
 
     suspend fun canUseForAccount(accountId: String): Boolean {
         val owner = secureStorage.getString(KEY_ACCOUNT_ID)
-        return owner == null || owner == accountId
+        return owner == null || sameOwnerId(owner, accountId)
     }
 
     /** Bind a locally held key to one account before provisioning an encrypted unlock envelope. */
     suspend fun bindToAccount(accountId: String): Boolean =
         identityMutex.withLock {
             val owner = secureStorage.getString(KEY_ACCOUNT_ID)
-            if (owner != null && owner != accountId) return@withLock false
-            secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+            if (owner != null && !sameOwnerId(owner, accountId)) return@withLock false
+            if (owner == null) secureStorage.putString(KEY_ACCOUNT_ID, accountId)
             true
         }
 
@@ -72,9 +73,9 @@ class IdentityKeyManager(
         require(key.size == 32) { "Invalid identity key length" }
         identityMutex.withLock {
             val owner = secureStorage.getString(KEY_ACCOUNT_ID)
-            require(owner == null || owner == accountId) { "Identity key belongs to a different account" }
+            require(owner == null || sameOwnerId(owner, accountId)) { "Identity key belongs to a different account" }
             expectedAccountOwner?.invoke()?.let { expected ->
-                require(expected == accountId) { "Identity key does not match the retained journal owner" }
+                require(sameOwnerId(expected, accountId)) { "Identity key does not match the retained journal owner" }
             }
             val existing = secureStorage.getBytes(KEY_IDENTITY_KEY)
             require(existing == null || existing.contentEquals(key)) { "Local identity key conflicts with account key" }
@@ -87,11 +88,13 @@ class IdentityKeyManager(
             val installedMedia = mediaKey ?: cachedMedia ?: selectedMedia
             val phrase = secureStorage.getString(KEY_RECOVERY_PHRASE) ?: retainedPhrase
             if (phrase == null) {
-                backupStore.writeAccountIdentity(AccountIdentityBackup(accountId, key, installedMedia))
+                backupStore.writeAccountIdentity(
+                    AccountIdentityBackup(retainedAccount?.accountId ?: owner ?: accountId, key, installedMedia),
+                )
             } else if (installedMedia != null) {
                 portable.preserveMedia(key, installedMedia)
             }
-            secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+            if (owner == null) secureStorage.putString(KEY_ACCOUNT_ID, retainedAccount?.accountId ?: accountId)
             secureStorage.putBytes(KEY_IDENTITY_KEY, key)
             if (phrase != null) secureStorage.putString(KEY_RECOVERY_PHRASE, phrase)
             if (installedMedia != null) secureStorage.putBytes(KEY_MEDIA_KEY, installedMedia)
@@ -193,12 +196,56 @@ class IdentityKeyManager(
         identityMutex.withLock {
             ensureIdentityKeyLocked()
             require(canUseForAccount(accountId)) { "Local keys belong to another account" }
-            expectedAccountOwner?.invoke()?.let { require(it == accountId) { "Keys do not match the retained journal owner" } }
-            secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+            expectedAccountOwner?.invoke()?.let { require(sameOwnerId(it, accountId)) { "Keys do not match the retained journal owner" } }
+            if (secureStorage.getString(KEY_ACCOUNT_ID) == null) secureStorage.putString(KEY_ACCOUNT_ID, accountId)
             val root = getIdentityKey()
             val media = selectMedia(root)
             ensurePortableBackupLocked()
             AccountIdentityBackup(accountId, root, media)
+        }
+
+    /** Reads existing keys only; null ownership explicitly requests a local-only identity. */
+    suspend fun snapshotExistingKeys(
+        expectedOwner: String?,
+        deriveMedia: (ByteArray) -> ByteArray,
+    ): ExistingIdentityKeySnapshot? =
+        identityMutex.withLock {
+            val observedOwner = secureStorage.getString(KEY_ACCOUNT_ID)
+            if (!sameOwnerId(observedOwner, expectedOwner)) return@withLock null
+            expectedAccountOwner?.let { retained ->
+                if (!sameOwnerId(retained(), expectedOwner)) return@withLock null
+            }
+            val root = secureStorage.readExistingTransferKey(KEY_IDENTITY_KEY) ?: return@withLock null
+            val (account, _) = portable.validateRoot(root, expectedOwner)
+            secureStorage.getString(KEY_RECOVERY_PHRASE)?.let { portable.validatePhrase(it, root) }
+            val cached = secureStorage.readExistingTransferKey(KEY_MEDIA_KEY)
+            val retained = portable.validateMedia(root, cached, account)
+            val source =
+                when {
+                    cached != null -> ExistingMediaKeySource.CACHED
+                    retained != null -> ExistingMediaKeySource.RETAINED
+                    else -> ExistingMediaKeySource.DERIVED_EXISTING_ROOT
+                }
+            val media = cached ?: retained ?: deriveMedia(root.copyOf())
+            check(media.size == 32) { "Invalid selected media key" }
+            ExistingIdentityKeySnapshot(observedOwner, root, media, source)
+        }
+
+    /** Observes rootless material only; never classifies original files as plaintext or creates keys. */
+    suspend fun observeRootlessKeys(): RootlessIdentityKeyObservation? =
+        identityMutex.withLock {
+            if (expectedAccountOwner?.invoke() != null || secureStorage.getString(KEY_ACCOUNT_ID) != null) return@withLock null
+            if (secureStorage.getString(KEY_RECOVERY_PHRASE) != null || secureStorage.getString(KEY_RECOVERY_VERIFIED) != null) {
+                return@withLock null
+            }
+            if (secureStorage.readExistingTransferKey(KEY_IDENTITY_KEY) != null) return@withLock null
+            if (backupStore.hasRootBackup() || backupStore.readPhrase() != null || backupStore.readAccountIdentity() != null) {
+                return@withLock null
+            }
+            RootlessIdentityKeyObservation(
+                secureStorage.readExistingTransferKey(KEY_MEDIA_KEY),
+                backupStore.hasMediaBackup(),
+            )
         }
 
     /**
@@ -283,11 +330,13 @@ class IdentityKeyManager(
         if (accountBackup != null) {
             check(accountBackup.key.size == 32 && accountBackup.accountId.isNotBlank()) { "Invalid account identity backup" }
             val storedAccount = secureStorage.getString(KEY_ACCOUNT_ID)
-            check(storedAccount == null || storedAccount == accountBackup.accountId) { "Identity backup belongs to another account" }
+            check(
+                storedAccount == null || sameOwnerId(storedAccount, accountBackup.accountId),
+            ) { "Identity backup belongs to another account" }
             expectedAccountOwner?.let { expected ->
-                check(expected() == accountBackup.accountId) { "Identity backup does not match the retained journal owner" }
+                check(sameOwnerId(expected(), accountBackup.accountId)) { "Identity backup does not match the retained journal owner" }
             }
-            secureStorage.putString(KEY_ACCOUNT_ID, accountBackup.accountId)
+            if (storedAccount == null) secureStorage.putString(KEY_ACCOUNT_ID, accountBackup.accountId)
             secureStorage.putBytes(KEY_IDENTITY_KEY, accountBackup.key)
             secureStorage.remove(KEY_RECOVERY_PHRASE)
             secureStorage.remove(KEY_RECOVERY_VERIFIED)

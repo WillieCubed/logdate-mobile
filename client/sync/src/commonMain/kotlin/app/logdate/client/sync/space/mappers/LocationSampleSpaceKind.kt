@@ -74,8 +74,8 @@ internal class StoredLocationParts(
             ): ConflictResolution<LocationHourPart> {
                 val merged = local.merge(remote)
                 return when {
-                    merged.stored() == remote.stored() -> ConflictResolution.KeepRemote(remote)
-                    merged.stored() == local.stored() -> ConflictResolution.KeepLocal(local)
+                    sameStoredLocationPart(merged, remote) -> ConflictResolution.KeepRemote(remote)
+                    sameStoredLocationPart(merged, local) -> ConflictResolution.KeepLocal(local)
                     else -> ConflictResolution.Merge(merged)
                 }
             }
@@ -143,7 +143,7 @@ internal class StoredLocationParts(
                     if (row.entry.deleted) {
                         row.entry.id in deletedSamples
                     } else {
-                        samples[row.entry.id] == row.entry.observation?.let(LocationHour::atRecordPrecision)
+                        sameStoredLocationSample(samples[row.entry.id], row.entry.observation)
                     }
             }.forEach { access.acknowledge(it.record, seq) }
         current.transitionRows
@@ -193,13 +193,13 @@ internal class StoredLocationParts(
         if (writes.isNotEmpty()) access.put(*writes.toTypedArray())
     }
 
-    private fun liveSample(
+    private suspend fun liveSample(
         part: LocationHourPart,
         observation: LocationObservation,
     ) = HistoryRecord(
         id = SAMPLE_PREFIX + observation.id,
         recordType = SAMPLE,
-        payload = access.encode(HistoryPayload.Observation(observation)),
+        payload = access.encode(HistoryPayload.Observation(observation.copy(ownerId = access.scope().owner))),
         deviceId = part.deviceId,
         deviceVersion = 1,
         serverVersion = part.syncVersion,
@@ -224,13 +224,13 @@ internal class StoredLocationParts(
         observedAtMillis = at.toEpochMilliseconds(),
     )
 
-    private fun liveTransition(
+    private suspend fun liveTransition(
         part: LocationHourPart,
         activity: ActivityObservation,
     ) = HistoryRecord(
         id = activityHistoryRecordId(activity.id),
         recordType = TRANSITION,
-        payload = access.encode(HistoryPayload.Activity(activity)),
+        payload = access.encode(HistoryPayload.Activity(activity.copy(ownerId = access.scope().owner))),
         deviceId = part.deviceId,
         deviceVersion = 1,
         serverVersion = part.syncVersion,
@@ -242,7 +242,7 @@ internal class StoredLocationParts(
      * A deleted activity change keeps only its id and time, in a payload that says nothing else,
      * because its stored id is a digest the id can't be recovered from.
      */
-    private fun deletedTransition(
+    private suspend fun deletedTransition(
         part: LocationHourPart,
         id: String,
         at: Instant,

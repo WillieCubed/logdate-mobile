@@ -2,7 +2,9 @@ package app.logdate.client.sync.di
 
 import app.logdate.client.database.dao.UserPlaceDao
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.device.identity.ExistingCanonicalOwner
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -70,7 +72,16 @@ class SpaceSyncModuleTest {
                     single<SyncableMarkedMomentRepository> { marks }
                     single<HistoryRecordStore> { history }
                     single<UserPlaceDao> { savedPlaces }
-                    single<SessionStorage> { FakeSessionStorage() }
+                    single<SessionStorage> { FakeSessionStorage().apply { currentOrigin = "https://space.test" } }
+                    single<CanonicalOwnerProvider> {
+                        object : CanonicalOwnerProvider {
+                            override suspend fun getCanonicalOwnerId() = HISTORY_ACCOUNT
+
+                            override suspend fun readExistingOwner() = ExistingCanonicalOwner(HISTORY_ACCOUNT, true)
+
+                            override suspend fun hasBoundOwner() = true
+                        }
+                    }
                     single<LogDateConfigRepository> { DefaultLogDateConfigRepository(initialBackendUrl = "https://space.test") }
                     single<DeviceIdProvider> { FixedDeviceId(deviceId) }
                 },

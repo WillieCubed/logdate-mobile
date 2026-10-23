@@ -96,6 +96,8 @@ class AndroidIdentityKeyBackupStore(
         }
     }
 
+    override suspend fun hasRootBackup(): Boolean = backupFileMutex.withLock { backupFile().exists() || accountFile().exists() }
+
     override suspend fun hasBackup(): Boolean =
         backupFileMutex.withLock { backupFile().exists() || accountFile().exists() || mediaFile().exists() }
 

@@ -2,6 +2,7 @@ package app.logdate.client.data.account
 
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
@@ -29,7 +30,7 @@ internal class CanonicalOwnerBindingGuard(
         adoptLocalData: Boolean,
     ): OwnerBinding {
         if (canonicalOwnerProvider.hasBoundOwner()) {
-            val matches = account.id.toString() == canonicalOwnerProvider.getCanonicalOwnerId()
+            val matches = sameOwnerId(account.id.toString(), canonicalOwnerProvider.getCanonicalOwnerId())
             return if (matches && adoptOwner(account.id.toString())) OwnerBinding.ALLOWED else OwnerBinding.REFUSED
         }
 
@@ -53,7 +54,7 @@ internal class CanonicalOwnerBindingGuard(
         ownerBindingFor(account, adoptLocalData = false) == OwnerBinding.ALLOWED
 
     suspend fun sessionBelongsToCanonicalOwner(session: UserSession): Boolean =
-        runCatching { session.accountId == canonicalOwnerProvider.getCanonicalOwnerId() }.getOrDefault(false)
+        runCatching { sameOwnerId(session.accountId, canonicalOwnerProvider.getCanonicalOwnerId()) }.getOrDefault(false)
 
     fun requireCanonicalOwnerBinding() {
         if (!currentServerSupportsCanonicalOwnerBinding()) {

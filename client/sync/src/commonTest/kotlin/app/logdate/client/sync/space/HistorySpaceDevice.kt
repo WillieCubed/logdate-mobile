@@ -7,7 +7,6 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.networking.LocationHistoryApiClientContract
 import app.logdate.client.repository.location.HistoryRecord
-import app.logdate.client.repository.location.HistoryRecordStore
 import app.logdate.client.repository.moments.MarkLocation
 import app.logdate.client.repository.moments.MarkState
 import app.logdate.client.repository.moments.MarkedMoment
@@ -29,8 +28,6 @@ import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadInboxTest
 import app.logdate.client.sync.recovery.DownloadScope
-import app.logdate.client.sync.space.mappers.HistoryScope
-import app.logdate.client.sync.space.mappers.HistoryScopeProvider
 import app.logdate.client.sync.space.mappers.LocationHour
 import app.logdate.client.sync.space.mappers.locationSamplesSpaceKind
 import app.logdate.client.sync.space.mappers.markedMomentSpaceKind
@@ -54,7 +51,6 @@ import app.logdate.shared.model.sync.LocationHistoryChangesResponse
 import app.logdate.shared.model.sync.LocationHistoryRecord
 import app.logdate.shared.model.sync.LocationHistoryUpload
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
@@ -70,12 +66,14 @@ internal const val HISTORY_ACCOUNT = "test-account-id"
 internal class HistorySpaceDevice(
     val home: FakeDataHome,
     val deviceId: String = Uuid.random().toString(),
+    val localOwner: String = HISTORY_ACCOUNT,
 ) {
     val sessions = FakeSessionStorage()
     val metadata = FakeSyncMetadataService()
     val database = DownloadInboxTest.Database()
-    val inbox = DownloadInbox(database, database, { DownloadScope(HISTORY_ACCOUNT, sessions.currentOrigin) }, { 0L })
-    val store = SpaceHistoryStore()
+    val inbox =
+        DownloadInbox(database, database, { DownloadScope(sessions.getSession()?.accountId.orEmpty(), sessions.currentOrigin) }, { 0L })
+    val store = SpaceHistoryStore(localOwner)
     val savedPlaces = InMemoryUserPlaces()
     val marks = SpaceMarks(metadata)
     val swapStore = InMemorySpaceSwapStore()
@@ -84,7 +82,22 @@ internal class HistorySpaceDevice(
     /** Whether this device syncs location history and marks through the personal space at all. */
     var spaceEnabled = true
 
-    private val scope = HistoryScopeProvider { HistoryScope(HISTORY_ACCOUNT, sessions.currentOrigin) }
+    private val provider =
+        object : app.logdate.client.device.identity.CanonicalOwnerProvider {
+            override suspend fun readExistingOwner() =
+                app.logdate.client.device.identity
+                    .ExistingCanonicalOwner(localOwner, true)
+
+            override suspend fun getCanonicalOwnerId(): String = error("History sync must only observe ownership")
+
+            override suspend fun hasBoundOwner() = true
+        }
+    private val scope =
+        app.logdate.client.sync.location.CanonicalHistoryScopeProvider(
+            sessions,
+            DefaultLogDateConfigRepository(initialBackendUrl = sessions.currentOrigin),
+            provider,
+        )
 
     private val engine =
         run {
@@ -98,6 +111,7 @@ internal class HistorySpaceDevice(
                 config = DefaultLogDateConfigRepository(initialBackendUrl = sessions.currentOrigin),
                 enabled = { true },
                 savedPlaceIds = { savedPlaces.getAllPlaces().map { it.id } },
+                canonicalOwner = provider,
             )
         }
 
@@ -109,7 +123,7 @@ internal class HistorySpaceDevice(
             placeCorrectionSpaceKind(scope, store) { deviceId },
             placeEntryLinkSpaceKind(scope, store) { deviceId },
             placeJourneySpaceKind(scope, store) { deviceId },
-            locationSamplesSpaceKind(scope, store, { HISTORY_ACCOUNT }) { deviceId },
+            locationSamplesSpaceKind(scope, store, { sessions.getSession()?.accountId }) { deviceId },
         )
 
     val manager =
@@ -135,7 +149,7 @@ internal class HistorySpaceDevice(
     /** Records [sample] the way the history stager does: one record, waiting to upload. */
     suspend fun record(sample: LocationObservation) {
         store.put(
-            HISTORY_ACCOUNT,
+            localOwner,
             sessions.currentOrigin,
             HistoryRecord(
                 "observation:${sample.id}",
@@ -148,7 +162,7 @@ internal class HistorySpaceDevice(
 
     suspend fun record(change: ActivityObservation) {
         store.put(
-            HISTORY_ACCOUNT,
+            localOwner,
             sessions.currentOrigin,
             HistoryRecord(
                 app.logdate.client.device.crypto
@@ -166,9 +180,9 @@ internal class HistorySpaceDevice(
         type: String,
         payload: HistoryPayload,
     ) {
-        val existing = store.record(HISTORY_ACCOUNT, sessions.currentOrigin, id)
+        val existing = store.record(localOwner, sessions.currentOrigin, id)
         store.put(
-            HISTORY_ACCOUNT,
+            localOwner,
             sessions.currentOrigin,
             HistoryRecord(
                 id,
@@ -183,9 +197,9 @@ internal class HistorySpaceDevice(
     /** Deletes a sample the way the person's delete does: the record stays as a tombstone without its location. */
     suspend fun deleteSample(sampleId: String) {
         val id = "observation:$sampleId"
-        val previous = checkNotNull(store.record(HISTORY_ACCOUNT, sessions.currentOrigin, id)) { "No sample $sampleId" }
+        val previous = checkNotNull(store.record(localOwner, sessions.currentOrigin, id)) { "No sample $sampleId" }
         store.putBatch(
-            HISTORY_ACCOUNT,
+            localOwner,
             sessions.currentOrigin,
             listOf(
                 HistoryRecord(
@@ -201,8 +215,7 @@ internal class HistorySpaceDevice(
         )
     }
 
-    suspend fun sampleRecord(sampleId: String): HistoryRecord? =
-        store.record(HISTORY_ACCOUNT, sessions.currentOrigin, "observation:$sampleId")
+    suspend fun sampleRecord(sampleId: String): HistoryRecord? = store.record(localOwner, sessions.currentOrigin, "observation:$sampleId")
 
     /** Every live sample of [device] in the hour of [at], as the device stores them. */
     suspend fun liveSamples(
@@ -211,7 +224,7 @@ internal class HistorySpaceDevice(
     ): List<LocationObservation> =
         store
             .recordsBetween(
-                HISTORY_ACCOUNT,
+                localOwner,
                 sessions.currentOrigin,
                 "observation",
                 device,
@@ -347,91 +360,6 @@ internal class SpaceMarks(
         location: MarkLocation,
         updatedAt: Instant,
     ): Boolean = error("Unused")
-}
-
-/**
- * Location history records kept in memory with the rules the stored ones have: a deletion stays
- * (a record never comes back after it), and keeps the time its record had.
- */
-internal class SpaceHistoryStore : HistoryRecordStore {
-    val items = mutableListOf<HistoryRecord>()
-    private val json = Json { ignoreUnknownKeys = true }
-
-    override fun observe(
-        ownerId: String,
-        origin: String,
-    ): Flow<List<HistoryRecord>> = MutableStateFlow(items.toList())
-
-    override suspend fun records(
-        ownerId: String,
-        origin: String,
-    ): List<HistoryRecord> = items.toList()
-
-    override suspend fun record(
-        ownerId: String,
-        origin: String,
-        id: String,
-    ): HistoryRecord? = items.firstOrNull { it.id == id }
-
-    override suspend fun put(
-        ownerId: String,
-        origin: String,
-        record: HistoryRecord,
-    ) {
-        val existing = items.firstOrNull { it.id == record.id }
-        if (existing?.deleted == true && !record.deleted) return
-        val observedAt = payloadTime(record) ?: record.observedAtMillis ?: if (record.deleted) existing?.observedAtMillis else null
-        val stored = record.copy(observedAtMillis = observedAt)
-        if (existing == null) items += stored else items[items.indexOf(existing)] = stored
-    }
-
-    override suspend fun putBatch(
-        ownerId: String,
-        origin: String,
-        records: List<HistoryRecord>,
-    ) = records.forEach { put(ownerId, origin, it) }
-
-    override suspend fun pending(
-        ownerId: String,
-        origin: String,
-        limit: Int,
-    ): List<HistoryRecord> = items.filter { it.dirty }.sortedBy { it.id }.take(limit)
-
-    override suspend fun cursor(
-        ownerId: String,
-        origin: String,
-    ): Long = 0
-
-    override suspend fun applyPage(
-        ownerId: String,
-        origin: String,
-        records: List<HistoryRecord>,
-        cursor: Long,
-    ) = error("Location history from the personal space doesn't use pages")
-
-    override suspend fun acknowledge(
-        ownerId: String,
-        origin: String,
-        id: String,
-        deviceVersion: Long,
-        serverVersion: Long,
-    ) {
-        val existing = items.firstOrNull { it.id == id } ?: return
-        items[items.indexOf(existing)] =
-            existing.copy(
-                dirty = if (existing.deviceVersion == deviceVersion && serverVersion >= existing.serverVersion) false else existing.dirty,
-                serverVersion = maxOf(existing.serverVersion, serverVersion),
-            )
-    }
-
-    private fun payloadTime(record: HistoryRecord): Long? =
-        record.payload?.let {
-            when (val value = runCatching { json.decodeFromString(HistoryPayload.serializer(), it) }.getOrNull()) {
-                is HistoryPayload.Observation -> value.value.timestamp.toEpochMilliseconds()
-                is HistoryPayload.Activity -> value.value.timestamp.toEpochMilliseconds()
-                else -> null
-            }
-        }
 }
 
 /** Saved places kept in memory. */

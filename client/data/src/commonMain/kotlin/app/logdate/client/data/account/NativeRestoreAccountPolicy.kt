@@ -1,5 +1,6 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.device.identity.sameOwnerId
 import kotlin.uuid.Uuid
 
 /** Background authentication cannot claim an offline journal or replace its existing owner. */
@@ -14,5 +15,5 @@ internal class NativeRestoreAccountPolicy(
             if (bound == "true") ownerId != null else !hasLocalData
 
     fun accepts(accountId: String): Boolean =
-        canAttempt && runCatching { Uuid.parse(accountId) }.isSuccess && (bound != "true" || ownerId == accountId)
+        canAttempt && runCatching { Uuid.parse(accountId) }.isSuccess && (bound != "true" || sameOwnerId(ownerId, accountId))
 }

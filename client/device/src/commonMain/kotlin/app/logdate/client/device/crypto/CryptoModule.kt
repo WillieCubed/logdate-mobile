@@ -28,7 +28,7 @@ val cryptoModule: Module =
                 backupStore = get(),
                 expectedAccountOwner = {
                     val owner = get<CanonicalOwnerProvider>()
-                    if (owner.hasBoundOwner()) owner.getCanonicalOwnerId() else null
+                    owner.readExistingOwner()?.takeIf { it.isBound }?.rawId
                 },
             )
         }

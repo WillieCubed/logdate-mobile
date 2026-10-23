@@ -7,6 +7,7 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.addAccountIfCurrent
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.account.AccountCreationRequest
@@ -87,7 +88,7 @@ internal class PasskeyRegistrationCoordinator(
                 )
 
             val completeData = apiClient.completeAccountCreation(completeRequest).getOrThrow()
-            if (completeData.account.id.toString() != canonicalOwnerId) {
+            if (!sameOwnerId(completeData.account.id.toString(), canonicalOwnerId)) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
 
@@ -216,7 +217,7 @@ internal class PasskeyRegistrationCoordinator(
             accessToken = completeData.tokens.accessToken,
             credentialId = credentialId,
             unlockSecret = unlockSecret,
-            mayPublishLocalKeys = originalOwner == completeData.account.id.toString(),
+            mayPublishLocalKeys = sameOwnerId(originalOwner, completeData.account.id.toString()),
         )
     }
 

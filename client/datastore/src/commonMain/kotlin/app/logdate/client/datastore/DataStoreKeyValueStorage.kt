@@ -23,6 +23,35 @@ import kotlinx.coroutines.flow.map
 class DataStoreKeyValueStorage(
     private val dataStore: DataStore<Preferences>,
 ) : KeyValueStorage {
+    override suspend fun getStringsOrThrow(keys: Set<String>): Map<String, String?> {
+        val snapshot = dataStore.data.first()
+        return keys.associateWith { snapshot[stringPreferencesKey(it)] }
+    }
+
+    override suspend fun updateStringsOrThrow(values: Map<String, String?>) {
+        dataStore.edit { snapshot ->
+            values.forEach { (key, value) ->
+                if (value == null) snapshot.remove(stringPreferencesKey(key)) else snapshot[stringPreferencesKey(key)] = value
+            }
+        }
+    }
+
+    override suspend fun compareAndSetStringsOrThrow(
+        expected: Map<String, String?>,
+        values: Map<String, String?>,
+    ): Boolean {
+        var matched = false
+        dataStore.edit { snapshot ->
+            if (expected.all { (key, value) -> snapshot[stringPreferencesKey(key)] == value }) {
+                values.forEach { (key, value) ->
+                    if (value == null) snapshot.remove(stringPreferencesKey(key)) else snapshot[stringPreferencesKey(key)] = value
+                }
+                matched = true
+            }
+        }
+        return matched
+    }
+
     override suspend fun getStringOrThrow(key: String): String? = dataStore.data.first()[stringPreferencesKey(key)]
 
     override suspend fun getBooleanOrThrow(

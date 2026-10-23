@@ -17,6 +17,9 @@ package app.logdate.client.device.crypto
  * irrecoverably orphaning a user's already-synced data.
  */
 interface IdentityKeyBackupStore {
+    /** Conservative by default: unknown retained state must not be mistaken for an absent root. */
+    suspend fun hasRootBackup(): Boolean = hasBackup()
+
     suspend fun readAccountIdentity(): AccountIdentityBackup? = null
 
     suspend fun writeAccountIdentity(identity: AccountIdentityBackup) = clear()

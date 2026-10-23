@@ -3,6 +3,7 @@ package app.logdate.client.data.journals
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.repository.journals.DraftRecoveryScope
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.sync.metadata.PendingOperation
@@ -78,7 +79,7 @@ class LocalFirstDraftRepository(
             configurationReady()
             canonicalOwner == null ||
                 !canonicalOwner.hasBoundOwner() ||
-                sessionStorage.getSession()?.accountId.let { it == null || it == canonicalOwner.getCanonicalOwnerId() }
+                sessionStorage.getSession()?.accountId.let { it == null || sameOwnerId(it, canonicalOwner.getCanonicalOwnerId()) }
         },
     )
 

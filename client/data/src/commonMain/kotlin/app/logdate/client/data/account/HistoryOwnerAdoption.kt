@@ -2,6 +2,7 @@ package app.logdate.client.data.account
 
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.repository.location.HistoryOwnerAdoptionRepair
 import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.sync.Mutex
@@ -35,15 +36,17 @@ class HistoryOwnerAdoption(
             val current = owner.getCanonicalOwnerId()
             if (pending != null &&
                 (
-                    pending.newOwner != newOwner ||
+                    !sameOwnerId(pending.newOwner, newOwner) ||
                         pending.origin != normalizedOrigin ||
-                        current !in setOf(pending.oldOwner, pending.newOwner)
+                        !sameOwnerId(current, pending.oldOwner) &&
+                        !sameOwnerId(current, pending.newOwner)
                 )
             ) {
                 return@withLock false
             }
-            if (owner.hasBoundOwner() && current != newOwner) return@withLock false
-            if (pending == null && current == newOwner) {
+            val bound = owner.hasBoundOwner()
+            if (bound && !sameOwnerId(current, newOwner)) return@withLock false
+            if (pending == null && (bound || current == newOwner)) {
                 return@withLock owner.adoptRemoteOwnerIfUninitialized(newOwner)
             }
             val journal =
@@ -52,7 +55,7 @@ class HistoryOwnerAdoption(
                     check(storage.getString(JOURNAL_KEY) == Json.encodeToString(it)) { "Could not persist history adoption" }
                 }
             moveRows(journal.oldOwner, journal.newOwner, journal.origin, journal.device)
-            check(owner.adoptRemoteOwnerIfUninitialized(newOwner)) { "Could not bind the adopted history owner" }
+            check(owner.adoptRemoteOwnerIfUninitialized(journal.newOwner)) { "Could not bind the adopted history owner" }
             storage.putString(RECEIPT_KEY, Json.encodeToString(journal))
             check(storage.getString(RECEIPT_KEY) == Json.encodeToString(journal)) { "Could not persist history adoption receipt" }
             storage.remove(JOURNAL_KEY)
@@ -65,10 +68,10 @@ class HistoryOwnerAdoption(
     ) {
         adoptionMutex.withLock {
             val receipt = storage.getString(RECEIPT_KEY)?.let { Json.decodeFromString<AdoptionJournal>(it) } ?: return
-            if (receipt.newOwner != ownerId ||
+            if (!sameOwnerId(receipt.newOwner, ownerId) ||
                 receipt.origin != origin.trimEnd('/') ||
                 !owner.hasBoundOwner() ||
-                owner.getCanonicalOwnerId() != ownerId
+                !sameOwnerId(owner.getCanonicalOwnerId(), ownerId)
             ) {
                 return
             }
