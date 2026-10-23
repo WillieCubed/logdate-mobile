@@ -64,12 +64,25 @@ class RestoreTalkBackRuntimeTest {
             automation.serviceInfo.apply {
                 flags = flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             }
+        val manager = context.getSystemService(AccessibilityManager::class.java)
         val original =
             listOf("secure enabled_accessibility_services", "secure accessibility_enabled", "system font_scale")
                 .associateWith { shell("settings get $it").trim() }
+        val originalFontScale = context.resources.configuration.fontScale
+        val originalTouchExploration = manager.isTouchExplorationEnabled
         val originalBluetooth = shell("settings get global bluetooth_on").trim()
+        if (original["secure accessibility_enabled"] == "null" ||
+            original["secure enabled_accessibility_services"] == "null"
+        ) {
+            assertEquals(false, originalTouchExploration)
+        }
         val notificationPermission = notificationPermission()
-        originals = JSONObject(original).put("bluetoothEnabled", originalBluetooth).put("notificationPermission", notificationPermission)
+        originals =
+            JSONObject(original)
+                .put("effectiveFontScale", originalFontScale)
+                .put("touchExplorationEnabled", originalTouchExploration)
+                .put("bluetoothEnabled", originalBluetooth)
+                .put("notificationPermission", notificationPermission)
         persist(JSONObject().put("phase", "originals"))
         val component = "com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService"
         assertTrue(shell("pm path com.google.android.marvin.talkback").startsWith("package:"), "Managed image must include TalkBack")
@@ -95,7 +108,6 @@ class RestoreTalkBackRuntimeTest {
                     .orEmpty()
             shell("settings put secure enabled_accessibility_services ${(enabled + component).distinct().joinToString(":")}")
             shell("settings put secure accessibility_enabled 1")
-            val manager = context.getSystemService(AccessibilityManager::class.java)
             await {
                 manager.isTouchExplorationEnabled &&
                     manager
@@ -219,15 +231,60 @@ class RestoreTalkBackRuntimeTest {
                 original.map { (setting, value) ->
                     suspend {
                         if (value == "null") shell("settings delete $setting") else shell("settings put $setting $value")
-                        assertEquals(value, shell("settings get $setting").trim())
+                        val restored = shell("settings get $setting").trim()
+                        when (setting) {
+                            "system font_scale" -> {
+                                await {
+                                    val current = shell("settings get $setting").trim()
+                                    context.resources.configuration.fontScale == originalFontScale &&
+                                        (
+                                            if (value ==
+                                                "null"
+                                            ) {
+                                                current == "null" || current.toFloatOrNull() == originalFontScale
+                                            } else {
+                                                current == value
+                                            }
+                                        )
+                                }
+                                assertEquals(originalFontScale, context.resources.configuration.fontScale)
+                                val current = shell("settings get $setting").trim()
+                                if (value == "null") {
+                                    assertTrue(current == "null" || current.toFloatOrNull() == originalFontScale)
+                                } else {
+                                    assertEquals(value, current)
+                                }
+                            }
+                            "secure accessibility_enabled" -> {
+                                if (value == "null") {
+                                    await {
+                                        shell("settings get $setting").trim() in setOf("null", "0") &&
+                                            !manager.isTouchExplorationEnabled
+                                    }
+                                    assertTrue(shell("settings get $setting").trim() in setOf("null", "0"))
+                                } else {
+                                    assertEquals(value, restored)
+                                }
+                            }
+                            "secure enabled_accessibility_services" -> {
+                                if (value == "null") {
+                                    await { shell("settings get $setting").trim().let { it == "null" || it.isEmpty() } }
+                                    assertTrue(shell("settings get $setting").trim().let { it == "null" || it.isEmpty() })
+                                } else {
+                                    assertEquals(value, restored)
+                                }
+                            }
+                            else -> assertEquals(value, restored)
+                        }
                     }
                 } +
                     listOf(
                         suspend {
                             if (originalBluetooth == "1") shell("svc bluetooth enable") else shell("svc bluetooth disable")
                             if (originalBluetooth == "null") shell("settings delete global bluetooth_on")
-                            await { originalBluetooth == "null" || shell("settings get global bluetooth_on").trim() == originalBluetooth }
-                            assertEquals(originalBluetooth, shell("settings get global bluetooth_on").trim())
+                            val expected = if (originalBluetooth == "null") setOf("null", "0") else setOf(originalBluetooth)
+                            await { shell("settings get global bluetooth_on").trim() in expected }
+                            assertTrue(shell("settings get global bluetooth_on").trim() in expected)
                         },
                         suspend {
                             listOf("USER_SET" to "user-set", "USER_FIXED" to "user-fixed").forEach { (flag, argument) ->

@@ -1,10 +1,11 @@
 from pathlib import Path
 import json
+import os
 import runpy
 import tempfile
 import subprocess
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 MODULE_PATH = Path(__file__).with_name("managed-native-emulator.py")
@@ -139,6 +140,54 @@ class ManagedEmulatorLaunchTest(unittest.TestCase):
             path.unlink()
             with self.assertRaises(FileNotFoundError):
                 require(directory, targets, NONCE, stations)
+
+    def test_adapter_overrides_inherited_android_temp_for_queries_and_cold_boots(self):
+        with tempfile.TemporaryDirectory(prefix="managed sdk ") as folder:
+            root = Path(folder)
+            sdk = root / "original"
+            (sdk / "emulator").mkdir(parents=True)
+            original = sdk / "emulator/emulator"
+            original.write_text('#!/bin/sh\nprintf "%s\\n" "$ANDROID_TMP"\n')
+            original.chmod(0o700)
+            facade = MODULE["create_managed_sdk"](sdk, root / "private-sdk", AVD, NONCE)
+            config = json.loads((facade / "managed-launch.json").read_text())
+            android_tmp = Path(config["androidTmp"])
+            self.assertTrue(android_tmp.is_absolute())
+            self.assertEqual(root.resolve(), android_tmp.parent)
+            self.assertEqual(0o700, android_tmp.stat().st_mode & 0o777)
+            self.assertFalse(android_tmp.is_symlink())
+            environment = {**os.environ, "TMPDIR": str(root / "generic-temp"),
+                           "ANDROID_TMP": str(root / "unowned-temp")}
+            launches = (["-version"], self.arguments("1011b945-34b2-4349-a963-fc37d94eccb6_GradleManagedDevice"))
+            for arguments in launches:
+                result = subprocess.run([str(facade / "emulator/emulator"), *arguments],
+                                        env=environment, capture_output=True, text=True, timeout=5)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(str(android_tmp), result.stdout.strip())
+            for receipt in (root / "managed-emulator-invocations").glob("*.json"):
+                self.assertEqual(str(android_tmp), json.loads(receipt.read_text())["androidTmp"])
+            receipt = next((root / "managed-emulator-launches").glob("*.json"))
+            self.assertEqual(str(android_tmp), json.loads(receipt.read_text())["androidTmp"])
+            self.assertFalse((root / "unowned-temp").exists())
+
+    def test_adapter_rejects_missing_relative_and_redirected_temporary_directories(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            target = root / "target"
+            target.mkdir()
+            redirected = root / "redirected"
+            redirected.symlink_to(target, target_is_directory=True)
+            config = {"original": "/not-run/emulator", "avd": AVD, "nonce": NONCE,
+                      "receipts": str(root / "managed-emulator-launches")}
+            path = root / "managed-launch.json"
+            for invalid in (str(root / "missing"), "relative-temp", str(redirected)):
+                path.write_text(json.dumps({**config, "androidTmp": invalid}))
+                with self.subTest(path=invalid), patch("os.execv") as legacy, patch("os.execve") as launch:
+                    with self.assertRaises(ValueError):
+                        MODULE["main"](path, ["-version"])
+                    legacy.assert_not_called()
+                    launch.assert_not_called()
+            self.assertFalse((root / "managed-emulator-invocations").exists())
 
     def test_facade_cleanup_requires_positive_disappearance_even_before_driver_binding(self):
         stopped = MODULE.get("managed_processes_stopped")
