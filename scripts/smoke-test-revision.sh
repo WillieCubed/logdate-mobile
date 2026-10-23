@@ -323,6 +323,8 @@ AUTH_HEADER_FILE=""
 CREDENTIAL_FILE="${STATE_FILE}.credential"
 CLEANUP_ARMED=0
 USE_PRIVATE_HEADERS=0
+STORAGE_MODE=""
+ACCOUNT_DID=""
 
 write_header_file() {
     local path="$1"
@@ -402,6 +404,14 @@ http_request() {
 
 is_token_safe() {
     [[ "$1" =~ ^[A-Za-z0-9._~-]+$ ]]
+}
+
+is_personal_space_uri() {
+    [[ "$1" =~ ^at://did:[a-z]+:[A-Za-z0-9._:%-]+/space/app\.logdate\.space\.personal/self$ ]]
+}
+
+uri_encode() {
+    jq -rn --arg value "$1" '$value | @uri'
 }
 
 remove_local_state() {
@@ -868,7 +878,81 @@ verify_reauthenticated_identity() {
         fail "reauthenticated identity does not match prepared state"
         return 1
     fi
+    STORAGE_MODE="$(jq -r '.data.account.storageMode // empty' "$body")"
+    ACCOUNT_DID="$(jq -r '.data.account.did // empty' "$body")"
     set_cleanup_identity true
+}
+
+require_known_storage_mode() {
+    local reported
+    case "$STORAGE_MODE" in
+        legacy | personalSpaceV1) return 0 ;;
+        "")
+            fail "/auth/me did not report a storageMode for the account"
+            return 1
+            ;;
+    esac
+    reported="${STORAGE_MODE//[^A-Za-z0-9_.-]/?}"
+    fail "account storageMode '${reported:0:40}' is not covered by this smoke test (expected legacy or personalSpaceV1)"
+    return 1
+}
+
+require_unchanged_storage_mode() {
+    local prepared
+    prepared="$(jq -r '.storageMode // empty' "$STATE_FILE")"
+    if [[ "$prepared" != "$STORAGE_MODE" ]]; then
+        fail "account storageMode changed since prepare (prepared '${prepared:0:40}', now '${STORAGE_MODE:0:40}')"
+        return 1
+    fi
+}
+
+delete_media_fixture() {
+    local media_id="$1"
+    local body status
+    if [[ ! "$media_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        fail "state file media ID is malformed"
+        return 1
+    fi
+    body="$WORK_DIR/media-delete.json"
+    status="$(http_request DELETE "$SERVICE_URL/api/v1/media/$media_id" "$body" "$AUTH_HEADER_FILE")"
+    if [[ "$status" != "204" && "$status" != "404" ]]; then
+        fail "media deletion did not return 204 or 404"
+        return 1
+    fi
+    body="$WORK_DIR/media-after-delete.json"
+    status="$(http_request GET "$SERVICE_URL/api/v1/media/$media_id/binary" "$body" "$AUTH_HEADER_FILE")"
+    if [[ "$status" != "404" ]]; then
+        fail "media remained readable after deletion"
+        return 1
+    fi
+}
+
+# The space has no blob delete method: deleting the record that refers to the blob leaves it
+# unreferenced, and the server's maintenance purge removes it after its grace period.
+delete_space_fixture() {
+    local rkey="$1"
+    local space request body status
+    space="$(jq -r '.spaceUri // empty' "$STATE_FILE")"
+    if [[ ! "$rkey" =~ ^[A-Za-z0-9._:~-]{1,255}$ ]] || ! is_personal_space_uri "$space"; then
+        fail "state file personal space record is malformed"
+        return 1
+    fi
+    request="$WORK_DIR/space-delete-request.json"
+    jq -nc --arg space "$space" --arg rkey "$rkey" '{space:$space,rkey:$rkey}' >"$request"
+    body="$WORK_DIR/space-delete.json"
+    status="$(http_request POST "$SERVICE_URL/xrpc/app.logdate.space.deleteRecord" "$body" "$AUTH_HEADER_FILE" \
+        --header 'Content-Type: application/json' --data-binary "@$request")"
+    if [[ "$status" != "200" ]]; then
+        fail "space record deletion did not return 200"
+        return 1
+    fi
+    body="$WORK_DIR/space-after-delete.json"
+    status="$(http_request GET "$SERVICE_URL/xrpc/app.logdate.space.getRecord?space=$(uri_encode "$space")&rkey=$rkey" \
+        "$body" "$AUTH_HEADER_FILE")"
+    if [[ "$status" != "400" ]] || [[ "$(jq -r '.error // empty' "$body" 2>/dev/null)" != "RecordNotFound" ]]; then
+        fail "space record remained readable after deletion"
+        return 1
+    fi
 }
 
 resume_cleanup() {
@@ -881,10 +965,11 @@ resume_cleanup() {
         return 1
     fi
 
-    local access_token refresh_token media_id body status logout_request
+    local access_token refresh_token media_id space_rkey body status logout_request
     access_token="$(jq -r '.accessToken // empty' "$STATE_FILE")"
     refresh_token="$(jq -r '.refreshToken // empty' "$STATE_FILE")"
     media_id="$(jq -r '.mediaId // empty' "$STATE_FILE")"
+    space_rkey="$(jq -r '.spaceRecordRkey // empty' "$STATE_FILE")"
     if [[ -z "$access_token" ]] || ! is_token_safe "$access_token"; then
         fail "state file access token is missing or malformed"
         return 1
@@ -894,22 +979,10 @@ resume_cleanup() {
 
     if ! jq -e '.cleanup.mediaDeleted == true' "$STATE_FILE" >/dev/null; then
         if [[ -n "$media_id" ]]; then
-            if [[ ! "$media_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
-                fail "state file media ID is malformed"
-                return 1
-            fi
-            body="$WORK_DIR/media-delete.json"
-            status="$(http_request DELETE "$SERVICE_URL/api/v1/media/$media_id" "$body" "$AUTH_HEADER_FILE")"
-            if [[ "$status" != "204" && "$status" != "404" ]]; then
-                fail "media deletion did not return 204 or 404"
-                return 1
-            fi
-            body="$WORK_DIR/media-after-delete.json"
-            status="$(http_request GET "$SERVICE_URL/api/v1/media/$media_id/binary" "$body" "$AUTH_HEADER_FILE")"
-            if [[ "$status" != "404" ]]; then
-                fail "media remained readable after deletion"
-                return 1
-            fi
+            delete_media_fixture "$media_id" || return 1
+        fi
+        if [[ -n "$space_rkey" ]]; then
+            delete_space_fixture "$space_rkey" || return 1
         fi
         update_cleanup_phase mediaDeleted true
     fi
@@ -1016,7 +1089,7 @@ upload_media_fixture() {
     local media_file="$WORK_DIR/media.bin"
     dd if=/dev/urandom of="$media_file" bs=1024 count=1 2>/dev/null
     chmod 600 "$media_file"
-    local media_size media_sha body status media_id updated_state
+    local media_size media_sha body status media_id
     media_size="$(wc -c <"$media_file" | tr -d ' ')"
     media_sha="$(sha256_file "$media_file")"
     body="$WORK_DIR/media-upload.json"
@@ -1036,19 +1109,25 @@ upload_media_fixture() {
         fail "media upload response omitted a safe media ID"
         return 1
     fi
-    updated_state="$WORK_DIR/state-with-media.json"
-    jq -S \
+    save_fixture_state "$(jq -nc \
         --arg media_id "$media_id" \
         --arg media_sha "$media_sha" \
         --argjson media_size "$media_size" \
+        '{mediaId:$media_id, mediaSha256:$media_sha, mediaSizeBytes:$media_size}')"
+}
+
+save_fixture_state() {
+    local fixture="$1"
+    local updated_state="$WORK_DIR/state-with-fixture.json"
+    jq -S \
+        --argjson fixture "$fixture" \
+        --arg storage_mode "$STORAGE_MODE" \
         --arg release "$EXPECTED_RELEASE" \
         --arg canonical "$CANONICAL_ORIGIN" \
         --arg webauthn_origin "$WEBAUTHN_ORIGIN" \
         --arg contract_sha "$CONTRACT_SHA256" \
-        '. + {
-            mediaId:$media_id,
-            mediaSha256:$media_sha,
-            mediaSizeBytes:$media_size,
+        '. + $fixture + {
+            storageMode:$storage_mode,
             expectedRelease:$release,
             canonicalOrigin:$canonical,
             webauthnOrigin:$webauthn_origin,
@@ -1057,6 +1136,160 @@ upload_media_fixture() {
         "$STATE_FILE" >"$updated_state"
     chmod 600 "$updated_state"
     replace_private_state "$updated_state"
+}
+
+# The smallest padded size bucket the server accepts for a sealed record (512 bytes) plus the
+# 16-byte authentication tag. The server checks the envelope's shape, not that it decrypts.
+SPACE_CIPHERTEXT_BYTES=528
+SPACE_RECORD_RKEY="deploy-smoke-record"
+
+random_base64() {
+    head -c "$1" /dev/urandom | base64 | tr -d '\n='
+}
+
+# Stores one sealed record that refers to one blob in the account's personal space through the
+# app.logdate.space XRPC methods, which space accounts use instead of the legacy media routes.
+upload_space_fixture() {
+    if [[ ! "$ACCOUNT_DID" =~ ^did:[a-z]+:[A-Za-z0-9._:%-]+$ ]]; then
+        fail "/auth/me did not report a DID, so the account's personal space cannot be addressed"
+        return 1
+    fi
+    local space="at://$ACCOUNT_DID/space/app.logdate.space.personal/self"
+    local blob_file="$WORK_DIR/space-blob.bin"
+    dd if=/dev/urandom of="$blob_file" bs=1024 count=1 2>/dev/null
+    chmod 600 "$blob_file"
+    local blob_size blob_sha body status blob_cid record record_request record_cid
+    blob_size="$(wc -c <"$blob_file" | tr -d ' ')"
+    blob_sha="$(sha256_file "$blob_file")"
+    body="$WORK_DIR/space-blob-upload.json"
+    status="$(http_request POST "$SERVICE_URL/xrpc/app.logdate.space.uploadBlob?space=$(uri_encode "$space")" \
+        "$body" "$AUTH_HEADER_FILE" \
+        --header 'Content-Type: application/octet-stream' --data-binary "@$blob_file")"
+    if [[ "$status" != "200" ]]; then
+        fail "space blob upload did not return 200"
+        return 1
+    fi
+    blob_cid="$(jq -r '.blob.ref["$link"] // empty' "$body")"
+    if [[ ! "$blob_cid" =~ ^[A-Za-z0-9]{1,255}$ ]] ||
+        [[ "$(jq -r '.blob.size // empty' "$body")" != "$blob_size" ]]; then
+        fail "space blob upload response omitted a safe CID or the uploaded size"
+        return 1
+    fi
+    record="$(jq -nSc \
+        --arg nonce "$(random_base64 12)" \
+        --arg ciphertext "$(random_base64 "$SPACE_CIPHERTEXT_BYTES")" \
+        '{"$type":"app.logdate.crypto.sealed", version:1, keyId:"deploy-smoke",
+          nonce:{"$bytes":$nonce}, ciphertext:{"$bytes":$ciphertext}}')"
+    record_request="$WORK_DIR/space-put-request.json"
+    jq -nc --arg space "$space" --arg rkey "$SPACE_RECORD_RKEY" --argjson record "$record" --arg blob "$blob_cid" \
+        '{space:$space, rkey:$rkey, record:$record, blobs:[$blob], createOnly:true}' >"$record_request"
+    chmod 600 "$record_request"
+    body="$WORK_DIR/space-put.json"
+    status="$(http_request POST "$SERVICE_URL/xrpc/app.logdate.space.putRecord" "$body" "$AUTH_HEADER_FILE" \
+        --header 'Content-Type: application/json' --data-binary "@$record_request")"
+    if [[ "$status" != "200" ]]; then
+        fail "space record write did not return 200"
+        return 1
+    fi
+    record_cid="$(jq -r '.cid // empty' "$body")"
+    if [[ ! "$record_cid" =~ ^[A-Za-z0-9]{1,255}$ ]]; then
+        fail "space record write response omitted a safe CID"
+        return 1
+    fi
+    save_fixture_state "$(jq -nc \
+        --arg space "$space" \
+        --arg rkey "$SPACE_RECORD_RKEY" \
+        --arg record_cid "$record_cid" \
+        --argjson record "$record" \
+        --arg blob_cid "$blob_cid" \
+        --arg blob_sha "$blob_sha" \
+        --argjson blob_size "$blob_size" \
+        '{spaceUri:$space, spaceRecordRkey:$rkey, spaceRecordCid:$record_cid, spaceRecord:$record,
+          spaceBlobCid:$blob_cid, spaceBlobSha256:$blob_sha, spaceBlobSizeBytes:$blob_size}')"
+}
+
+# Reads back what upload_space_fixture stored: the sealed record exactly as written, under the
+# CID the write returned, and the blob byte for byte.
+verify_space_fixture() {
+    local space rkey blob_cid body status downloaded
+    space="$(jq -r '.spaceUri' "$STATE_FILE")"
+    rkey="$(jq -r '.spaceRecordRkey' "$STATE_FILE")"
+    blob_cid="$(jq -r '.spaceBlobCid' "$STATE_FILE")"
+    if ! is_personal_space_uri "$space" ||
+        [[ ! "$rkey" =~ ^[A-Za-z0-9._:~-]{1,255}$ ]] ||
+        [[ ! "$blob_cid" =~ ^[A-Za-z0-9]{1,255}$ ]]; then
+        fail "state file personal space proof is malformed"
+        return 1
+    fi
+    body="$WORK_DIR/space-record.json"
+    status="$(http_request GET "$SERVICE_URL/xrpc/app.logdate.space.getRecord?space=$(uri_encode "$space")&rkey=$rkey" \
+        "$body" "$AUTH_HEADER_FILE")"
+    [[ "$status" == "200" ]] || { fail "prepared space record read did not return 200"; return 1; }
+    if ! jq -e --slurpfile state "$STATE_FILE" '
+        .cid == $state[0].spaceRecordCid and
+        (.value | del(."$type")) == ($state[0].spaceRecord | del(."$type"))
+    ' "$body" >/dev/null 2>&1; then
+        fail "prepared space record does not match what was written"
+        return 1
+    fi
+    downloaded="$WORK_DIR/space-blob-downloaded.bin"
+    status="$(http_request GET \
+        "$SERVICE_URL/xrpc/app.logdate.space.getBlob?space=$(uri_encode "$space")&cid=$blob_cid" \
+        "$downloaded" "$AUTH_HEADER_FILE")"
+    [[ "$status" == "200" ]] || { fail "prepared space blob download did not return 200"; return 1; }
+    if [[ "$(sha256_file "$downloaded")" != "$(jq -r '.spaceBlobSha256' "$STATE_FILE")" ]]; then
+        fail "downloaded space blob SHA-256 does not match prepared blob"
+        return 1
+    fi
+}
+
+verify_media_fixture() {
+    local media_id expected_media_sha downloaded_media download_status actual_media_sha
+    media_id="$(jq -r '.mediaId' "$STATE_FILE")"
+    expected_media_sha="$(jq -r '.mediaSha256' "$STATE_FILE")"
+    downloaded_media="$WORK_DIR/downloaded-media.bin"
+    download_status="$(http_request GET "$SERVICE_URL/api/v1/media/$media_id/binary" "$downloaded_media" "$AUTH_HEADER_FILE")"
+    [[ "$download_status" == "200" ]] || { fail "prepared media download did not return 200"; return 1; }
+    actual_media_sha="$(sha256_file "$downloaded_media")"
+    if [[ "$actual_media_sha" != "$expected_media_sha" ]]; then
+        fail "downloaded media SHA-256 does not match prepared media"
+        return 1
+    fi
+}
+
+# The proof the prepare phase left for the account's storage mode, or a failure naming what is missing.
+require_prepared_fixture() {
+    case "$(jq -r '.storageMode // empty' "$STATE_FILE")" in
+        legacy)
+            jq -e '
+                (.mediaId | type == "string" and length > 0) and
+                (.mediaSha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+                (.mediaSizeBytes | type == "number" and . > 0)
+            ' "$STATE_FILE" >/dev/null 2>&1 || { fail "state file is missing prepared media proof"; return 1; }
+            ;;
+        personalSpaceV1)
+            jq -e '
+                (.spaceUri | type == "string" and length > 0) and
+                (.spaceRecordRkey | type == "string" and length > 0) and
+                (.spaceRecordCid | type == "string" and length > 0) and
+                (.spaceRecord | type == "object") and
+                (.spaceBlobCid | type == "string" and length > 0) and
+                (.spaceBlobSha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+                (.spaceBlobSizeBytes | type == "number" and . > 0)
+            ' "$STATE_FILE" >/dev/null 2>&1 || { fail "state file is missing prepared personal space proof"; return 1; }
+            ;;
+        *)
+            fail "state file is missing a known prepared storage mode"
+            return 1
+            ;;
+    esac
+}
+
+prepared_fixture_bytes() {
+    case "$STORAGE_MODE" in
+        legacy) jq -r '.mediaSizeBytes' "$STATE_FILE" ;;
+        personalSpaceV1) jq -r '.spaceBlobSizeBytes' "$STATE_FILE" ;;
+    esac
 }
 
 strict_cleanup() {
@@ -1073,7 +1306,8 @@ case "$PHASE" in
         if [[ -s "$STATE_FILE" ]]; then
             if jq -e '
                 .format == "logdate-deploy-smoke-v2" and
-                (.recoveryMode == true or ((.mediaId // "") | length == 0))
+                (.recoveryMode == true or
+                    (((.mediaId // "") | length == 0) and ((.spaceRecordRkey // "") | length == 0)))
             ' \
                 "$STATE_FILE" >/dev/null 2>&1; then
                 validate_deploy_state
@@ -1108,9 +1342,13 @@ case "$PHASE" in
         make_auth_header
         verify_reauthenticated_identity
         CLEANUP_ARMED=1
+        require_known_storage_mode
         probe_seeded_free_entitlement
-        upload_media_fixture
-        probe_quota_usage "$(jq -r '.mediaSizeBytes' "$STATE_FILE")"
+        case "$STORAGE_MODE" in
+            legacy) upload_media_fixture ;;
+            personalSpaceV1) upload_space_fixture ;;
+        esac
+        probe_quota_usage "$(prepared_fixture_bytes)"
         set_cleanup_identity false
         CLEANUP_ARMED=0
         echo "Durability prepare passed for $SERVICE_URL"
@@ -1137,33 +1375,21 @@ case "$PHASE" in
             validate_prepared_state_binding
             configure_health_header
             run_identity_probes
-            if ! jq -e '
-                (.mediaId | type == "string" and length > 0) and
-                (.mediaSha256 | type == "string" and test("^[0-9a-f]{64}$")) and
-                (.mediaSizeBytes | type == "number" and . > 0)
-            ' "$STATE_FILE" >/dev/null 2>&1; then
-                fail "state file is missing prepared media proof"
-                exit 1
-            fi
+            require_prepared_fixture
             username="$(jq -r '.username' "$STATE_FILE")"
             invoke_passkey_signin "$username"
             validate_deploy_state
             make_auth_header
             verify_reauthenticated_identity
             CLEANUP_ARMED=1
+            require_known_storage_mode
+            require_unchanged_storage_mode
             probe_seeded_free_entitlement
-            media_id="$(jq -r '.mediaId' "$STATE_FILE")"
-            expected_media_sha="$(jq -r '.mediaSha256' "$STATE_FILE")"
-            media_size="$(jq -r '.mediaSizeBytes' "$STATE_FILE")"
-            downloaded_media="$WORK_DIR/downloaded-media.bin"
-            download_status="$(http_request GET "$SERVICE_URL/api/v1/media/$media_id/binary" "$downloaded_media" "$AUTH_HEADER_FILE")"
-            [[ "$download_status" == "200" ]] || { fail "prepared media download did not return 200"; exit 1; }
-            actual_media_sha="$(sha256_file "$downloaded_media")"
-            if [[ "$actual_media_sha" != "$expected_media_sha" ]]; then
-                fail "downloaded media SHA-256 does not match prepared media"
-                exit 1
-            fi
-            probe_quota_usage "$media_size"
+            case "$STORAGE_MODE" in
+                legacy) verify_media_fixture ;;
+                personalSpaceV1) verify_space_fixture ;;
+            esac
+            probe_quota_usage "$(prepared_fixture_bytes)"
             CLEANUP_ARMED=0
             strict_cleanup
         fi
