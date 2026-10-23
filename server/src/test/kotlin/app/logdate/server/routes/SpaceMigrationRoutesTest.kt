@@ -3,6 +3,7 @@ package app.logdate.server.routes
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.migration.MigrationFixture
 import app.logdate.server.migration.legacyMedia
+import app.logdate.server.migration.switchedAccount
 import app.logdate.server.routes.sync.spaceMigrationRoutes
 import app.logdate.server.transfer.TransferSlots
 import app.logdate.shared.model.AccountStorageMode
@@ -13,6 +14,7 @@ import app.logdate.shared.model.sync.SpaceMigrationErrorCodes
 import app.logdate.shared.model.sync.SpaceMigrationPhase
 import app.logdate.shared.model.sync.SpaceMigrationRequest
 import app.logdate.shared.model.sync.SpaceMigrationStatus
+import app.logdate.shared.model.sync.SpaceMigrationSwitchBackRequest
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -37,6 +39,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.days
 
 /** `/api/v1/space-migration` over HTTP: who may call it, and what each step answers. */
 class SpaceMigrationRoutesTest {
@@ -124,21 +128,53 @@ class SpaceMigrationRoutesTest {
         }
 
     @Test
-    fun `every call answers feature disabled while the migration is off`() =
+    fun `no new move starts or advances while the migration is off`() =
         testApplication {
             val fixture = MigrationFixture()
             serve(fixture, enabled = false)
             val account = fixture.legacyAccount()
 
             listOf(
-                client.get("/api/v1/space-migration") { bearer(account) },
                 post(account, "begin", SpaceMigrationRequest("move-1")),
+                post(account, "hold", SpaceMigrationRequest("move-1")),
                 post(account, "media/m1", SpaceMigrationRequest("move-1")),
+                post(account, "switch", fixture.proof(account, "move-1")),
                 client.get("/api/v1/space-migration/legacy-inventory") { bearer(account) },
             ).forEach { response ->
                 assertEquals(HttpStatusCode.NotFound, response.status)
                 assertEquals("FEATURE_DISABLED", response.code())
             }
+            assertEquals(
+                SpaceMigrationPhase.NONE,
+                client.get("/api/v1/space-migration") { bearer(account) }.decode<SpaceMigrationStatus>().phase,
+            )
+            assertEquals(AccountStorageMode.LEGACY, fixture.mode(account))
+        }
+
+    @Test
+    fun `a switched journal still switches back after the migration is turned off`() =
+        testApplication {
+            val fixture = MigrationFixture()
+            serve(fixture, enabled = false)
+            val account = fixture.switchedAccount()
+            fixture.clock.advance(29.days)
+
+            val status = client.get("/api/v1/space-migration") { bearer(account) }.decode<SpaceMigrationStatus>()
+            assertEquals(SpaceMigrationPhase.SWITCHED, status.phase)
+            post(account, "hold", SpaceMigrationRequest("move-1")).decode<SpaceMigrationStatus>()
+            client
+                .get(
+                    "/api/v1/space-migration/legacy-inventory?ids=${LegacyRecordKinds.ENTRIES}",
+                ) { bearer(account) }
+                .decode<LegacyInventory>()
+            fixture.clock.advance(fixture.config.holdGrace)
+            val seq = assertNotNull(status.switchedAtSeq)
+            val back = post(account, "switch-back", SpaceMigrationSwitchBackRequest("move-1", seq)).decode<SpaceMigrationStatus>()
+
+            assertEquals(SpaceMigrationPhase.REVERTED, back.phase)
+            assertEquals(AccountStorageMode.LEGACY, fixture.mode(account))
+            val again = post(account, "begin", SpaceMigrationRequest("move-2"))
+            assertEquals("FEATURE_DISABLED", again.code(), "Switching back doesn't let a new move start")
         }
 
     @Test
@@ -166,7 +202,7 @@ class SpaceMigrationRoutesTest {
             install(ContentNegotiation) { json() }
             routing {
                 route("/api/v1") {
-                    spaceMigrationRoutes(tokens, fixture.service.takeIf { enabled }, fixture.copier, fixture.accounts, TransferSlots())
+                    spaceMigrationRoutes(tokens, fixture.service, fixture.copier, fixture.accounts, TransferSlots(), newMoves = { enabled })
                 }
             }
         }

@@ -65,26 +65,30 @@ internal class SpaceJournalMigration(
 
     private suspend fun attempt(manual: Boolean) {
         val scope = env.tokens.currentUploadScope() ?: return publish(JournalMoveState.NotOffered)
-        if (!offered()) return publish(JournalMoveState.NotOffered)
+        if (!env.deps.enabledInThisBuild()) return publish(JournalMoveState.NotOffered)
         val saved = env.deps.checkpoints.load(scope)
         if (saved?.stage == SpaceMigrationStage.SWITCHING_BACK) {
             return guarded(scope, saved) { SpaceMigrationSwitchBack(env, scope) { current.value = it }.finish(saved) }
         }
         when (env.space.gate.route()) {
-            SpaceRoute.Space -> return guarded(scope, saved) { settleIfNeeded(scope, saved) }
+            SpaceRoute.Space -> {
+                if (!env.deps.serverOffersMove()) return showMoved(scope, saved)
+                return guarded(scope, saved) { settleIfNeeded(scope, saved) }
+            }
             is SpaceRoute.Blocked -> return publish(JournalMoveState.NotOffered)
             SpaceRoute.Legacy -> Unit
         }
+        // A server that stopped offering moves still lets a moved journal switch back, but starts no new move.
+        if (!env.deps.serverOffersMove()) return publish(JournalMoveState.NotOffered)
         if (saved?.stage == SpaceMigrationStage.SWITCHED_BACK && !manual) return publish(JournalMoveState.SwitchedBack)
         val retryAt = saved?.retryAt
-        if (!manual &&
-            saved?.problem != null &&
+        val waiting =
             retryAt != null &&
-            retryAt >
-            env.deps.clock
-                .now()
-                .toEpochMilliseconds()
-        ) {
+                retryAt >
+                env.deps.clock
+                    .now()
+                    .toEpochMilliseconds()
+        if (!manual && saved?.problem != null && waiting) {
             return publish(JournalMoveState.Stopped(saved.problem, Instant.fromEpochMilliseconds(retryAt)))
         }
         if (!env.hasIdentityKey()) return stop(scope, saved ?: fresh(), JournalMoveProblem.IdentityKeyMissing)
@@ -104,12 +108,27 @@ internal class SpaceJournalMigration(
         }
     }
 
+    /**
+     * Reports a journal that moved while the server no longer offers moves, so it can still be
+     * switched back during its window. A server that never moved this account, or that has no move
+     * calls at all, shows nothing rather than a problem.
+     */
+    private suspend fun showMoved(
+        scope: UploadScope,
+        saved: SpaceMigrationCheckpoint?,
+    ) {
+        val status = statusOrNull(scope)
+        if (status == null || status.phase !in MOVED) return publish(JournalMoveState.NotOffered)
+        guarded(scope, saved) { settleIfNeeded(scope, saved, status) }
+    }
+
     /** Finishes settling on the personal space after a switch the app stopped during, then reports the move. */
     private suspend fun settleIfNeeded(
         scope: UploadScope,
         saved: SpaceMigrationCheckpoint?,
+        known: SpaceMigrationStatus? = null,
     ) {
-        val status = server(scope, "status") { env.deps.api.status(it) }
+        val status = known ?: server(scope, "status") { env.deps.api.status(it) }
         if (status.phase !in MOVED) return publish(JournalMoveState.NotOffered)
         val seq = status.switchedAtSeq
         if (saved != null && saved.migrationId == status.migrationId && !saved.settled && seq != null) {
@@ -121,12 +140,13 @@ internal class SpaceJournalMigration(
 
     private suspend fun describe() {
         val scope = env.tokens.currentUploadScope() ?: return publish(JournalMoveState.NotOffered)
-        if (!offered()) return publish(JournalMoveState.NotOffered)
+        if (!env.deps.enabledInThisBuild()) return publish(JournalMoveState.NotOffered)
         val saved = env.deps.checkpoints.load(scope)
-        val status = runCatching { server(scope, "status") { env.deps.api.status(it) } }.getOrNull()
+        val status = statusOrNull(scope)
         publish(
             when {
                 status != null && status.phase in MOVED -> status.moved()
+                !env.deps.serverOffersMove() -> JournalMoveState.NotOffered
                 saved?.stage == SpaceMigrationStage.SWITCHED_BACK -> JournalMoveState.SwitchedBack
                 saved?.problem != null -> JournalMoveState.Stopped(saved.problem, saved.retryAt?.let(Instant::fromEpochMilliseconds))
                 else -> JournalMoveState.WaitingForSync
@@ -134,7 +154,16 @@ internal class SpaceJournalMigration(
         )
     }
 
-    private suspend fun offered(): Boolean = env.deps.enabledInThisBuild() && env.deps.serverOffersMove()
+    /** The account's move as the server reports it, or null when the server can't say. */
+    private suspend fun statusOrNull(scope: UploadScope): SpaceMigrationStatus? =
+        try {
+            server(scope, "status") { env.deps.api.status(it) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.w("Reading the journal move's status failed: ${error::class.simpleName}")
+            null
+        }
 
     /** Whether this device finished syncing everything with legacy storage, so its copy is complete. */
     private suspend fun ready(scope: UploadScope): Boolean =

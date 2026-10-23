@@ -517,8 +517,19 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Notes**:
   - It takes effect only together with `LOGDATE_PERSONAL_SPACE_ENABLED`. With both on, the server adds `personalSpaceMigrationV1` to its server description; otherwise every move call answers `404 FEATURE_DISABLED`.
   - Leave it off until the database migration that adds `space_migrations` (`V50__Add_space_migrations.sql`) is deployed everywhere.
-  - Turning it off stops new moves and switching back, but doesn't undo a move. Accounts that switched stay in their personal spaces, the legacy sync routes keep answering them with `403 SYNC_FORMAT_UPGRADE_REQUIRED`, and their legacy copies are still deleted 30 days after each switch by the maintenance loop that `SYNC_TOMBSTONE_PURGE_ENABLED` controls.
+  - Turning it off only stops new moves. Accounts that switched stay in their personal spaces, the legacy sync routes keep answering them with `403 SYNC_FORMAT_UPGRADE_REQUIRED`, and they can still switch back until their legacy copies are deleted 30 days after each switch: the status and switch-back calls keep working, and so do the hold and inventory calls for an account that switched. `LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED` pauses that deletion.
   - The [journal moves runbook](../../docs/runbook/journal-moves.md) describes rehearsing moves in staging and operating them.
+
+### `LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED`
+- **Description**: Whether the maintenance loop deletes the legacy copy of each journal that moved into its personal space, 30 days after its switch. Turning it off pauses only that deletion, so switching back keeps working for those accounts while it is paused.
+- **Type**: Boolean
+- **Default**: `true`
+- **Example**: `LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED=false`
+- **Required**: No
+- **Notes**:
+  - Unset or `true` deletes copies when they are due. Any other value pauses the deletion, so a mistyped value keeps data rather than deleting it. The deployment contract renderer accepts only `true` or `false`.
+  - While it is paused, the server logs `SERVER_LEGACY_COPY_CLEANUP_PAUSED` when maintenance starts. Tombstone and personal-space purges keep running; `SYNC_TOMBSTONE_PURGE_ENABLED=false` stops the whole maintenance loop, this deletion included.
+  - A copy whose 30 days passed while the deletion was paused is deleted on the first maintenance run after it is turned back on. The window for switching back is still 30 days, so pausing the deletion doesn't extend it.
 
 ### `LOGDATE_SPACE_MIGRATION_HOLD_GRACE_SECONDS`
 - **Description**: How long a hold on an account's legacy writes must stand before a device may switch the account into its personal space, so that every write that started before the hold has finished.

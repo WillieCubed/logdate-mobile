@@ -53,7 +53,9 @@ internal object SpaceMigrationDocs {
     private val disabled =
         ErrorCase(
             "FEATURE_DISABLED",
-            "This server doesn't move journals. Use these calls only when the server descriptor lists `personalSpaceMigrationV1`.",
+            "This server doesn't start new moves, because its descriptor doesn't list `personalSpaceMigrationV1`. The status " +
+                "and switching back always work, and holds and the legacy inventory still work for an account that switched, " +
+                "so it can switch back while its legacy copy is kept.",
             "Moving journals into personal spaces isn't turned on for this server",
         )
 

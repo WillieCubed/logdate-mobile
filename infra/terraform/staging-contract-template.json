@@ -19,6 +19,7 @@
     "LOGDATE_ENV": "production",
     "LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED": "true",
     "LOGDATE_PERSONAL_SPACE_ENABLED": "true",
+    "LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED": "true",
     "LOGDATE_EXPECT_FIRST_PARTY": "true",
     "LOGDATE_PUBLIC_ORIGIN": "https://cloud-staging.logdate.app",
     "LOGDATE_SERVER_DISPLAY_NAME": "LogDate Cloud (Staging)",

@@ -1269,6 +1269,23 @@ jq '.env_vars.LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = "yes"' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-journal-moves.json"
 expect_failure invalid-journal-moves staging "$RELEASE_SHA" invalid-journal-moves.json \
     "LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED must be true or false"
+# Pausing the deletion of moved journals' old data is a switch for every environment, preserved verbatim.
+for environment in staging production; do
+    for enabled in true false; do
+        jq --arg enabled "$enabled" '.env_vars.LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED = $enabled' \
+            "$FIXTURE_DIR/$environment-source.json" >"$FIXTURE_DIR/old-data-purge-$environment-$enabled.json"
+        output="$TMP_DIR/old-data-purge-$environment-$enabled.out.json"
+        if ! run_renderer "$environment" "$RELEASE_SHA" "old-data-purge-$environment-$enabled.json" "$output" "$LOG_DIR/old-data-purge-$environment-$enabled.err"; then
+            cat "$LOG_DIR/old-data-purge-$environment-$enabled.err" >&2
+            fail "old data purge switch could not be rendered for $environment"
+        fi
+        assert_equals "$enabled" "$(jq -r '.env_vars.LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED' "$output")"
+    done
+done
+jq '.env_vars.LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED = "no"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-old-data-purge.json"
+expect_failure invalid-old-data-purge staging "$RELEASE_SHA" invalid-old-data-purge.json \
+    "LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED must be true or false"
 # Identity publishing is a production-only opt-in, preserved verbatim.
 for enabled in true false; do
     jq --arg enabled "$enabled" '.env_vars.ATPROTO_PLC_PUBLISH_ENABLED = $enabled' \
