@@ -3,6 +3,7 @@ package app.logdate.client.e2e
 import android.app.Application
 import android.os.Build
 import android.os.Bundle
+import android.os.Looper
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -63,70 +64,108 @@ class NativeAutomaticMediaWorkerProbeTest {
             require(credentials.sourceDevice != null) { "An enrolled synthetic destination is required" }
             awaitValidatedNativeWifi(context)
             ensureLogDateApplicationStarted(context.applicationContext as Application)
-            ActivityScenario.launch(MainActivity::class.java).use {
-                val sessions = koin.get<SessionStorage>()
-                koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
-                assertEquals(credentials.origin, koin.get<LogDateConfigRepository>().getCurrentBackendUrl())
-                withTimeout(30_000) { sessions.getSessionFlow().first { it?.accountId == credentials.owner } }
-                val bound = requireNotNull(sessions.getOriginBoundSession())
-                assertEquals(credentials.owner, bound.session.accountId)
-                assertEquals(credentials.origin, bound.origin)
-                val scope = UploadScope(credentials.owner, credentials.origin)
-                val marker = File(context.noBackupFilesDir, "native-automatic-media-$mode.json")
-                if (stage != "verify") {
-                    val expected = if (mode == "restricted") DataUsageMode.Restricted else DataUsageMode.Conservative
-                    withTimeout(30_000) { koin.get<DataUsagePolicy>().policy.first { it == expected } }
-                    if (mode == "metered") {
-                        withTimeout(60_000) {
-                            WorkManager
-                                .getInstance(context)
-                                .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
-                                .first { work -> work.none { !it.state.isFinished } }
-                        }
-                    }
-                    originals.prepareMissingOriginal(marker, scope)
-                    if (mode == "metered") {
-                        val armed = File(context.noBackupFilesDir, "native-media-worker-gate-armed")
-                        assertFalse(armed.exists())
-                        report("RESTORE_MEDIA_READY")
-                        withTimeout(10_000) { while (!armed.exists()) delay(25) }
-                    }
-                    // Only the initial request is explicit. Policy changes and cold startup must
-                    // resume accepted work without another request from the fixture.
-                    koin.get<SyncManager>().requestBackup()
-                    originals.retainDeferredOperation(marker, scope)
-                    if (stage == "prepare") return@use
-                    val gated =
+            val scenario = ActivityScenario.launch(MainActivity::class.java)
+            try {
+                scenario.use {
+                    val sessions = koin.get<SessionStorage>()
+                    koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+                    assertEquals(credentials.origin, koin.get<LogDateConfigRepository>().getCurrentBackendUrl())
+                    withTimeout(30_000) { sessions.getSessionFlow().first { it?.accountId == credentials.owner } }
+                    val bound = requireNotNull(sessions.getOriginBoundSession())
+                    assertEquals(credentials.owner, bound.session.accountId)
+                    assertEquals(credentials.origin, bound.origin)
+                    val scope = UploadScope(credentials.owner, credentials.origin)
+                    val marker = File(context.noBackupFilesDir, "native-automatic-media-$mode.json")
+                    if (stage != "verify") {
+                        val expected = if (mode == "restricted") DataUsageMode.Restricted else DataUsageMode.Conservative
+                        withTimeout(30_000) { koin.get<DataUsagePolicy>().policy.first { it == expected } }
                         if (mode == "metered") {
-                            withTimeout(10_000) {
+                            withTimeout(60_000) {
                                 WorkManager
                                     .getInstance(context)
                                     .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
-                                    .first { work -> work.any { it.state == WorkInfo.State.RUNNING } }
-                                    .single { it.state == WorkInfo.State.RUNNING }
+                                    .first { work -> work.none { !it.state.isFinished } }
                             }
-                        } else {
-                            null
                         }
-                    report("RESTORE_MEDIA_DEFERRED")
-                    awaitUnrestrictedNativeNetwork(context, koin.get<DataUsagePolicy>(), callbackTimeoutMillis = 30_000)
-                    if (mode == "metered") {
-                        try {
-                            requirePromptSuccessorOrCompletedOriginal(marker, requireNotNull(gated), scope)
-                        } catch (timeout: TimeoutCancellationException) {
-                            reportFailureState(scope)
-                            throw timeout
+                        originals.prepareMissingOriginal(marker, scope)
+                        if (mode == "metered") {
+                            val armed = File(context.noBackupFilesDir, "native-media-worker-gate-armed")
+                            assertFalse(armed.exists())
+                            report("RESTORE_MEDIA_READY")
+                            withTimeout(10_000) { while (!armed.exists()) delay(25) }
+                        }
+                        // Only the initial request is explicit. Policy changes and cold startup must
+                        // resume accepted work without another request from the fixture.
+                        koin.get<SyncManager>().requestBackup()
+                        originals.retainDeferredOperation(marker, scope)
+                        if (stage == "prepare") {
+                            report("RESTORE_MEDIA_RESTART_PREPARED")
+                            return@use
+                        }
+                        val gated =
+                            if (mode == "metered") {
+                                withTimeout(10_000) {
+                                    WorkManager
+                                        .getInstance(context)
+                                        .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
+                                        .first { work -> work.any { it.state == WorkInfo.State.RUNNING } }
+                                        .single { it.state == WorkInfo.State.RUNNING }
+                                }
+                            } else {
+                                null
+                            }
+                        report("RESTORE_MEDIA_DEFERRED")
+                        awaitUnrestrictedNativeNetwork(context, koin.get<DataUsagePolicy>(), callbackTimeoutMillis = 30_000)
+                        if (mode == "metered") {
+                            try {
+                                requirePromptSuccessorOrCompletedOriginal(marker, requireNotNull(gated), scope)
+                            } catch (timeout: TimeoutCancellationException) {
+                                reportFailureState(scope)
+                                throw timeout
+                            }
                         }
                     }
+                    try {
+                        originals.verifyAutomaticOriginal(marker, scope)
+                    } catch (timeout: TimeoutCancellationException) {
+                        reportFailureState(scope)
+                        throw timeout
+                    }
                 }
+            } catch (failure: Throwable) {
                 try {
-                    originals.verifyAutomaticOriginal(marker, scope)
-                } catch (timeout: TimeoutCancellationException) {
-                    reportFailureState(scope)
-                    throw timeout
+                    retainLifecycleFailure(mode, stage, scenario.state.name)
+                } catch (diagnosticFailure: Throwable) {
+                    failure.addSuppressed(diagnosticFailure)
                 }
+                throw failure
             }
         }
+
+    private fun retainLifecycleFailure(
+        mode: String?,
+        stage: String?,
+        lifecycle: String,
+    ) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val output = File(checkNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")))
+        check(output.isDirectory || output.mkdirs())
+        val main = Looper.getMainLooper().thread
+        val stacks = Thread.getAllStackTraces().entries.sortedBy { if (it.key === main) 0 else 1 }
+        val diagnostic =
+            buildString {
+                appendLine("mode=$mode stage=$stage lifecycle=$lifecycle")
+                stacks.take(64).forEach { (thread, frames) ->
+                    appendLine("thread=${thread.name} state=${thread.state} main=${thread === main}")
+                    frames.take(64).forEach { appendLine(it.toString().take(512)) }
+                }
+            }.take(262_144)
+        File(output, "automatic-media-$mode-$stage-lifecycle.txt").writeText(diagnostic)
+        instrumentation.sendStatus(
+            0,
+            Bundle().apply { putString("nativeMediaLifecycleDiagnostic", "retained mode=$mode stage=$stage lifecycle=$lifecycle") },
+        )
+    }
 
     private suspend fun reportFailureState(scope: UploadScope) {
         val row = database.downloadInboxDao().get(scope.ownerId, scope.serverOrigin, "MEDIA_NATIVE_NOTE", noteId.toString())

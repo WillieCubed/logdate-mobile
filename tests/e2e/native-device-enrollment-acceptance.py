@@ -77,7 +77,12 @@ def probe(serial, stage, output):
     )
     H["private_file"](output, raw)
     if not H["instrumentation_passed"](raw):
-        raise RuntimeError(f"Enrollment {stage} failed; inspect {output}")
+        failure = RuntimeError(f"Enrollment {stage} failed; inspect {output}")
+        try:
+            capture_failure_diagnostics(serial, output.parent / "failure-diagnostics" / output.stem)
+        except Exception as diagnostic:
+            failure.add_note("Enrollment diagnostics also failed: " + type(diagnostic).__name__)
+        raise failure
 
 
 def retained_draft_probe(serial, stage, output):
@@ -134,7 +139,36 @@ def publish_control(path, content):
         os.replace(staged, path)
 
 
-def cleanup(process, radios):
+def capture_failure_diagnostics(serial, output, *, clock=time.monotonic):
+    """Read bounded private evidence through the existing owned-emulator route."""
+    deadline = clock() + 15
+    H["emulator_serial"](serial)
+    if H["adb"](serial, "shell", "getprop", "ro.kernel.qemu", timeout=3).strip() != b"1":
+        raise RuntimeError("Failure diagnostics require an owned emulator")
+    output.mkdir(mode=0o700, parents=True, exist_ok=True)
+    commands = {
+        "lastanr": "dumpsys -t 2 activity lastanr",
+        "window": "dumpsys -t 2 window",
+        "input": "dumpsys -t 2 input",
+        "meminfo": "dumpsys -t 2 meminfo",
+        "logcat-all": "logcat -b all -d -t 2000 -v threadtime",
+    }
+    report = {}
+    for label, command in commands.items():
+        remaining = deadline - clock()
+        if remaining <= 0:
+            report[label] = "budget exhausted"
+            continue
+        try:
+            raw = H["adb"](serial, "shell", command + " | head -c 65536", timeout=min(3, remaining))
+            H["private_file"](output / (label + ".txt"), raw[:65_536])
+            report[label] = "retained"
+        except Exception as error:
+            report[label] = type(error).__name__
+    H["private_file"](output / "capture.json", json.dumps(report).encode())
+
+
+def cleanup(process, radios, primary=None):
     failures = []
     try:
         if process is not None and process.poll() is None:
@@ -153,7 +187,10 @@ def cleanup(process, radios):
         except Exception:
             failures.append(serial + " radio restoration")
     if failures:
-        raise RuntimeError("Enrollment cleanup failed: " + ", ".join(failures))
+        if primary is None:
+            raise RuntimeError("Enrollment cleanup failed: " + ", ".join(failures))
+        for failure in failures:
+            primary.add_note("Enrollment cleanup also failed: " + failure)
 
 
 def registry_check(control, process, stage, identifiers, owner, proof=None):
@@ -248,7 +285,12 @@ def run_acceptance(options, control, process):
     if any(restarted[field] != destination[field] for field in ("owner", "device", "fingerprint")):
         raise RuntimeError("Process restart replaced destination identity")
     registry_check(control, process, "replay", expected, fixture["owner"], proof)
-    media = AUTOMATIC_MEDIA["run"](options.destination, control, process, options.output / "automatic-media", wait_for)
+    media = AUTOMATIC_MEDIA["run"](
+        options.destination, control, process, options.output / "automatic-media", wait_for,
+        failure_diagnostics=lambda serial, log, failure: capture_failure_diagnostics(
+            serial, options.output / "failure-diagnostics" / log.stem,
+        ),
+    )
     media.update(REAUTHENTICATION["run"](options.destination, control, process, options.output / "media-reauthentication", wait_for, publish_control))
     H["set_offline"](options.destination, True)
     current_draft_probe(options.destination, "prepare", options.output / "current-draft-prepare.log")
@@ -317,6 +359,7 @@ def main():
     control.mkdir(mode=0o700)
     radios = {}
     process = None
+    primary = None
     try:
         for serial in (options.source, options.destination):
             checked_emulator(serial)
@@ -328,8 +371,11 @@ def main():
                 cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
             )
         result = run_acceptance(options, control, process)
+    except BaseException as failure:
+        primary = failure
+        raise
     finally:
-        cleanup(process, radios)
+        cleanup(process, radios, primary=primary)
     H["private_file"](options.output / "acceptance.json", json.dumps(result, indent=2).encode() + b"\n")
     print("Native transfer retained the journal and registered distinct installations without duplicates", flush=True)
 

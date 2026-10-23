@@ -97,6 +97,23 @@ class NativeAutomaticMediaWorkerControllerTest(unittest.TestCase):
             self.assertEqual(["disable", "enable"], radio_actions)
             media["restore_environment"].assert_called_once()
 
+    def test_failed_oracle_survives_radio_cleanup_and_forwards_pre_cleanup_capture(self):
+        media = self.media_fixture()
+        primary = AssertionError("Lifecycle oracle failed")
+        media["instrument"].side_effect = primary
+        media["restore_environment"].side_effect = RuntimeError("Radio cleanup failed")
+        capture = Mock()
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(MODULE["run"].__globals__, MEDIA=media):
+            root = Path(temporary)
+            with self.assertRaises(AssertionError) as raised:
+                MODULE["run"]("emulator-5556", root, Mock(), root / "results", Mock(), failure_diagnostics=capture)
+            self.assertIs(primary, raised.exception)
+            self.assertTrue(any("cleanup" in note for note in primary.__notes__))
+            self.assertIs(capture, media["instrument"].call_args.kwargs["failure_diagnostics"])
+            self.assertTrue((root / "media-gate-release").is_file())
+            self.assertTrue((root / "media-upload-gate-release").is_file())
+            media["adb"].assert_any_call("emulator-5556", "shell", "svc", "data", "enable")
+
     def test_cellular_restoration_is_attempted_when_other_environment_cleanup_fails(self):
         for original in (b"0", b"1"):
             with self.subTest(original=original):

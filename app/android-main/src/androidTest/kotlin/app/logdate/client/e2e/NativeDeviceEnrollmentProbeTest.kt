@@ -21,9 +21,7 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.ensureLogDateApplicationStarted
-import app.logdate.client.networking.DiscoveryFailure
 import app.logdate.client.networking.ServerDiscoveryClient
-import app.logdate.client.networking.ServerDiscoveryException
 import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
@@ -269,18 +267,7 @@ class NativeDeviceEnrollmentProbeTest {
         koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
         val config = koin.get<LogDateConfigRepository>()
         config.updateBackendUrl(fixture.origin)
-        // Enabling the emulator radio returns before its host route is connected.
-        val descriptor =
-            withTimeout(30_000) {
-                while (true) {
-                    val result = koin.get<ServerDiscoveryClient>().discoverServer(fixture.origin)
-                    val failure = result.exceptionOrNull()
-                    if (failure == null) return@withTimeout result.getOrThrow()
-                    if (failure !is ServerDiscoveryException || failure.kind == DiscoveryFailure.UNREADABLE) throw failure
-                    delay(250)
-                }
-                error("Unreachable")
-            }
+        val descriptor = awaitNativeEnrollmentServer { koin.get<ServerDiscoveryClient>().discoverServer(fixture.origin) }
         assertEquals(fixture.origin, descriptor.serverOrigin)
         config.updateServerDescriptor(descriptor)
         koin.get<LogDateConfigDataSource>().persistCurrentConfiguration()

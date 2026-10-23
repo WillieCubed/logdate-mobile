@@ -102,7 +102,25 @@ def run_network_cases(serial, network, directory):
                    timeout=180)
 
 
-def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None, timeout=120):
+def instrument_failure_cleanup(serial, log, failure, failure_diagnostics):
+    if failure_diagnostics is not None:
+        try:
+            failure_diagnostics(serial, log, failure)
+        except Exception as error:
+            failure.add_note("Failure diagnostics could not be retained: " + type(error).__name__)
+    try:
+        safe_target(serial)
+    except Exception as error:
+        failure.add_note("Instrument cleanup ownership check failed: " + type(error).__name__)
+        return
+    for package in (PACKAGE, PACKAGE + ".test"):
+        try:
+            adb(serial, "shell", "am", "force-stop", package)
+        except Exception as error:
+            failure.add_note("Instrument force-stop cleanup failed: " + type(error).__name__)
+
+
+def instrument(serial, selector, log, extras=(), release_network=None, status_actions=None, timeout=120, failure_diagnostics=None):
     safe_target(serial)
     command = shlex.join(["am", "instrument", "-w", "-r", "-e", "class", selector, *extras, RUNNER])
     process = subprocess.Popen(managed_adb_command(serial, ["shell", command]), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -111,6 +129,7 @@ def instrument(serial, selector, log, extras=(), release_network=None, status_ac
     output = bytearray()
     released = False
     pending_actions = dict(status_actions or {})
+    primary = None
     try:
         log.write_bytes(b"")
         log.chmod(0o600)
@@ -125,22 +144,32 @@ def instrument(serial, selector, log, extras=(), release_network=None, status_ac
                 release_network()
                 released = True
         code = process.wait()
-    except BaseException:
-        safe_target(serial)
-        adb(serial, "shell", "am", "force-stop", PACKAGE)
-        adb(serial, "shell", "am", "force-stop", PACKAGE + ".test")
+        if code != 0 or not instrumentation_passed(output) or release_network and not released or pending_actions:
+            raise RuntimeError(f"Emulator acceptance failed; see {log}")
+    except BaseException as failure:
+        primary = failure
+        instrument_failure_cleanup(serial, log, failure, failure_diagnostics)
         raise
     finally:
-        timer.cancel()
-        if process.poll() is None:
-            process.kill()
-        log.write_bytes(output)
-        log.chmod(0o600)
-    if code != 0 or not instrumentation_passed(output) or release_network and not released or pending_actions:
-        safe_target(serial)
-        adb(serial, "shell", "am", "force-stop", PACKAGE)
-        adb(serial, "shell", "am", "force-stop", PACKAGE + ".test")
-        raise RuntimeError(f"Emulator acceptance failed; see {log}")
+        def stop_pending():
+            if process.poll() is None:
+                process.kill()
+
+        errors = []
+        for operation in (timer.cancel, stop_pending, lambda: log.write_bytes(output), lambda: log.chmod(0o600)):
+            try:
+                operation()
+            except Exception as error:
+                errors.append(error)
+        if errors:
+            if primary is None:
+                primary = errors[0]
+                instrument_failure_cleanup(serial, log, primary, None)
+                for error in errors[1:]:
+                    primary.add_note("Instrumentation finalization also failed: " + type(error).__name__)
+                raise primary
+            for error in errors:
+                primary.add_note("Instrumentation finalization also failed: " + type(error).__name__)
 
 
 def restore_environment(serial, network, original, saver, airplane, wifi, grants):
