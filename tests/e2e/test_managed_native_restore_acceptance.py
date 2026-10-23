@@ -13,6 +13,28 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_emulator_preflight_is_headless_and_retains_its_private_output(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            command = Mock(return_value=subprocess.CompletedProcess([], 0, b"emulator version", b"diagnostic"))
+            MODULE["verify_managed_emulator"](output / "sdk", output, command=command)
+            command.assert_called_once_with(str(output / "sdk/emulator/emulator"), "-no-window", "-version", check=False)
+            log = output / "emulator-preflight.log"
+            self.assertIn(b"emulator version", log.read_bytes())
+            self.assertIn(b"diagnostic", log.read_bytes())
+            self.assertEqual(0o600, log.stat().st_mode & 0o777)
+
+    def test_failed_emulator_preflight_preserves_bounded_loader_evidence_and_exit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            result = subprocess.CompletedProcess(["emulator"], 127, b"version", b"missing library\n" + b"x" * 20_000)
+            with self.assertRaises(subprocess.CalledProcessError) as failure:
+                MODULE["verify_managed_emulator"](output / "sdk", output, command=Mock(return_value=result))
+            self.assertEqual(127, failure.exception.returncode)
+            evidence = (output / "emulator-preflight.log").read_bytes()
+            self.assertIn(b"missing library", evidence)
+            self.assertLess(len(evidence), 33_000)
+
     def test_ci_runs_required_recovery_profiles_through_the_owned_transfer_controller(self):
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github/workflows/native-restore-acceptance.yml").read_text()

@@ -148,6 +148,14 @@ def command(*args, check=True, timeout=15):
     return subprocess.run(args, cwd=ROOT, check=check, capture_output=True, timeout=timeout)
 
 
+def verify_managed_emulator(sdk, output, *, command=command):
+    result = command(str(sdk / "emulator/emulator"), "-no-window", "-version", check=False)
+    log = output / "emulator-preflight.log"
+    log.write_bytes(b"stdout:\n" + result.stdout[:16_384] + b"\nstderr:\n" + result.stderr[:16_384])
+    log.chmod(0o600)
+    result.check_returncode()
+
+
 def discovery_identity(pid, *, process_identity=TARGET["process_identity"]):
     try:
         return process_identity(pid)
@@ -265,7 +273,7 @@ def run(options):
     if b"snapshot" not in capability.stdout + capability.stderr:
         raise RuntimeError("The installed emulator must support cold boots of managed instances")
     managed_sdk = EMULATOR["create_managed_sdk"](sdk, output / "managed-sdk", avd, nonce)
-    command(str(managed_sdk / "emulator/emulator"), "-version")
+    verify_managed_emulator(managed_sdk, output)
     env = managed_environment(managed_sdk, os.environ)
     env["LOGDATE_NATIVE_ACCEPTANCE_TIMEOUT_SECONDS"] = str(budget["native"])
     initial_processes = command("ps", "-axo", "pid,args").stdout.decode().splitlines()
