@@ -86,6 +86,7 @@ url=""
 declare -a header_files=("")
 declare -a literal_headers=("")
 declare -a forms=("")
+data_file_arg=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -117,7 +118,11 @@ while [[ $# -gt 0 ]]; do
             forms+=("$2")
             shift 2
             ;;
-        --data|--data-raw|--data-binary)
+        --data-binary)
+            [[ "$2" == @* ]] && data_file_arg="${2#@}"
+            shift 2
+            ;;
+        --data|--data-raw)
             shift 2
             ;;
         --silent|--show-error|--fail-with-body|--location)
@@ -181,6 +186,11 @@ fi
 
 path="${url#*://}"
 path="/${path#*/}"
+query=""
+if [[ "$path" == *\?* ]]; then
+    query="${path#*\?}"
+    path="${path%%\?*}"
+fi
 url_without_scheme="${url#*://}"
 request_origin="${url%%://*}://${url_without_scheme%%/*}"
 printf '%s %s serverless=%s health=%s authorization=%s\n' \
@@ -303,11 +313,95 @@ case "$path" in
             body='{"totalBytes":9223372036854775807,"usedBytes":0,"categories":[]}'
         elif [[ "$scenario" == "quota_wrong_free_tier" ]]; then
             body='{"totalBytes":500000000,"usedBytes":0,"categories":[]}'
-        elif [[ -f "${FAKE_MEDIA_STORE:?}" ]]; then
-            bytes="$(wc -c <"$FAKE_MEDIA_STORE" | tr -d ' ')"
-            body="{\"totalBytes\":1073741824,\"usedBytes\":$bytes,\"categories\":[]}"
         else
-            body='{"totalBytes":1073741824,"usedBytes":0,"categories":[]}'
+            bytes=0
+            [[ ! -f "${FAKE_MEDIA_STORE:?}" ]] || bytes=$((bytes + $(wc -c <"$FAKE_MEDIA_STORE" | tr -d ' ')))
+            [[ ! -f "${FAKE_SPACE_BLOB:?}" ]] || bytes=$((bytes + $(wc -c <"$FAKE_SPACE_BLOB" | tr -d ' ')))
+            body="{\"totalBytes\":1073741824,\"usedBytes\":$bytes,\"categories\":[]}"
+        fi
+        ;;
+    /xrpc/app.logdate.space.uploadBlob)
+        [[ "$authorization" == "1" ]] || { status="401"; body='{"error":"AuthenticationRequired"}'; }
+        if [[ "$status" == "200" ]]; then
+            [[ "$query" == "space=$(jq -rn --arg v "$FAKE_SPACE_URI" '$v | @uri')" ]] ||
+                { echo "uploadBlob addressed the wrong space: $query" >&2; exit 80; }
+            [[ -n "$data_file_arg" && -f "$data_file_arg" ]] || { echo "uploadBlob omitted its body" >&2; exit 91; }
+            if [[ "$scenario" == "space_blob_rejected" ]]; then
+                status="402"
+                body='{"error":"QuotaExceeded","message":"Out of room"}'
+            else
+                cp "$data_file_arg" "${FAKE_SPACE_BLOB:?}"
+                size="$(wc -c <"$FAKE_SPACE_BLOB" | tr -d ' ')"
+                body="{\"blob\":{\"\$type\":\"blob\",\"ref\":{\"\$link\":\"bafkreifakeblob\"},\"mimeType\":\"application/octet-stream\",\"size\":$size}}"
+            fi
+        fi
+        ;;
+    /xrpc/app.logdate.space.putRecord)
+        [[ "$authorization" == "1" ]] || { status="401"; body='{"error":"AuthenticationRequired"}'; }
+        if [[ "$status" == "200" ]]; then
+            [[ -n "$data_file_arg" && -f "$data_file_arg" ]] || { echo "putRecord omitted its body" >&2; exit 91; }
+            # The server accepts only a sealed envelope: a typed record, a 12-byte nonce, and a ciphertext
+            # whose padded payload is a size bucket, which for the smallest bucket is 528 bytes.
+            if ! jq -e --arg space "$FAKE_SPACE_URI" '
+                .space == $space and (.rkey | test("^[A-Za-z0-9._:~-]{1,512}$")) and
+                .record["$type"] == "app.logdate.crypto.sealed" and .record.version == 1 and
+                (.record.keyId | length > 0 and length <= 128) and
+                (.record.nonce["$bytes"] | length * 3 / 4 | floor) == 12 and
+                (.record.ciphertext["$bytes"] | length * 3 / 4 | floor) == 528 and
+                .blobs == ["bafkreifakeblob"]
+            ' "$data_file_arg" >/dev/null 2>&1; then
+                status="400"
+                body='{"error":"InvalidRecord","message":"Not an app.logdate.crypto.sealed record"}'
+            elif [[ "$scenario" == "space_record_rejected" ]]; then
+                status="500"
+                body="{\"error\":\"${FAKE_CHALLENGE_SECRET}\",\"token\":\"${FAKE_ACCESS_TOKEN}\"}"
+            else
+                cp "$data_file_arg" "${FAKE_SPACE_RECORD:?}"
+                body='{"cid":"bafyreifakerecord","seq":1}'
+            fi
+        fi
+        ;;
+    /xrpc/app.logdate.space.getRecord)
+        [[ "$authorization" == "1" ]] || { status="401"; body='{"error":"AuthenticationRequired"}'; }
+        if [[ "$status" == "200" ]]; then
+            [[ "$query" == "space=$(jq -rn --arg v "$FAKE_SPACE_URI" '$v | @uri')&rkey=deploy-smoke-record" ]] ||
+                { echo "getRecord asked for the wrong record: $query" >&2; exit 80; }
+            if [[ ! -f "${FAKE_SPACE_RECORD:?}" ]] ||
+                [[ -f "${FAKE_SPACE_DELETED:?}" && "$scenario" != "space_readable_after_delete" ]]; then
+                status="400"
+                body='{"error":"RecordNotFound","message":"Not found"}'
+            elif [[ "$scenario" == "space_record_changed" ]]; then
+                body="$(jq -c '{cid:"bafyreifakerecord",seq:1,value:(.record | del(."$type") | .keyId = "other-key")}' "$FAKE_SPACE_RECORD")"
+            else
+                body="$(jq -c '{cid:"bafyreifakerecord",seq:1,value:(.record | del(."$type"))}' "$FAKE_SPACE_RECORD")"
+            fi
+        fi
+        ;;
+    /xrpc/app.logdate.space.getBlob)
+        [[ "$authorization" == "1" ]] || { status="401"; body='{"error":"AuthenticationRequired"}'; }
+        if [[ "$status" == "200" ]]; then
+            if [[ "$query" != "space=$(jq -rn --arg v "$FAKE_SPACE_URI" '$v | @uri')&cid=bafkreifakeblob" || ! -f "${FAKE_SPACE_BLOB:?}" ]]; then
+                status="400"
+                body='{"error":"BlobNotFound","message":"Not found"}'
+            elif [[ "$scenario" == "space_blob_changed" ]]; then
+                body='changed-blob-bytes'
+            else
+                binary_file="$FAKE_SPACE_BLOB"
+            fi
+        fi
+        ;;
+    /xrpc/app.logdate.space.deleteRecord)
+        [[ "$authorization" == "1" ]] || { status="401"; body='{"error":"AuthenticationRequired"}'; }
+        if [[ "$status" == "200" ]]; then
+            jq -e --arg space "$FAKE_SPACE_URI" '.space == $space and .rkey == "deploy-smoke-record"' "$data_file_arg" >/dev/null ||
+                { echo "deleteRecord named the wrong record" >&2; exit 80; }
+            if [[ "$scenario" == "space_delete_failed" ]]; then
+                status="500"
+                body="{\"error\":\"${FAKE_CHALLENGE_SECRET}\",\"token\":\"${FAKE_ACCESS_TOKEN}\"}"
+            else
+                : >"${FAKE_SPACE_DELETED:?}"
+                body='{"seq":2}'
+            fi
         fi
         ;;
     /api/v1/media)
@@ -390,7 +484,14 @@ case "$path" in
         else
             identity_username="$(jq -r '.username // empty' "${FAKE_STATE_FILE:?}")"
             : >"${FAKE_IDENTITY_VERIFIED:?}"
-            body="{\"success\":true,\"data\":{\"account\":{\"id\":\"11111111-1111-4111-8111-111111111111\",\"username\":\"$identity_username\"},\"tokens\":{\"accessToken\":\"fresh-access\",\"refreshToken\":\"fresh-refresh\"}}}"
+            body="$(jq -nc \
+                --arg username "$identity_username" \
+                --arg mode "${FAKE_STORAGE_MODE-legacy}" \
+                --arg did "${FAKE_ACCOUNT_DID-did:plc:smokefake}" \
+                '{success:true,data:{account:({id:"11111111-1111-4111-8111-111111111111",username:$username}
+                    + (if $mode == "" then {} else {storageMode:$mode} end)
+                    + (if $did == "" then {} else {did:$did} end)),
+                  tokens:{accessToken:"fresh-access",refreshToken:"fresh-refresh"}}}')"
         fi
         ;;
     /api/v1/auth/logout)
@@ -677,6 +778,7 @@ reset_http_state() {
         "$tmp_dir/http/refresh-checkpoint-attempt" "$tmp_dir/http/account-checkpoint-attempt" \
         "$tmp_dir/http/refresh-intent-checkpoint-attempt" \
         "$tmp_dir/http/account-intent-checkpoint-attempt" \
+        "$tmp_dir/http/space-blob" "$tmp_dir/http/space-record" "$tmp_dir/http/space-deleted" \
         "$tmp_dir/http/legacy-passkey-log" "$tmp_dir/http/log.once" "$tmp_dir/http/log.sleeps"
 }
 
@@ -708,6 +810,12 @@ run_smoke() {
     FAKE_REFRESH_INTENT_CHECKPOINT_ATTEMPT="$tmp_dir/http/refresh-intent-checkpoint-attempt" \
     FAKE_ACCOUNT_INTENT_CHECKPOINT_ATTEMPT="$tmp_dir/http/account-intent-checkpoint-attempt" \
     FAKE_IDENTITY_VERIFIED="$tmp_dir/http/identity-verified" \
+    FAKE_SPACE_BLOB="$tmp_dir/http/space-blob" \
+    FAKE_SPACE_RECORD="$tmp_dir/http/space-record" \
+    FAKE_SPACE_DELETED="$tmp_dir/http/space-deleted" \
+    FAKE_SPACE_URI="at://did:plc:smokefake/space/app.logdate.space.personal/self" \
+    FAKE_STORAGE_MODE="${SMOKE_STORAGE_MODE-legacy}" \
+    FAKE_ACCOUNT_DID="${SMOKE_ACCOUNT_DID-did:plc:smokefake}" \
     FAKE_PRIVATE_TOKEN="$PRIVATE_TOKEN" \
     FAKE_HEALTH_TOKEN="$HEALTH_TOKEN" \
     FAKE_ACCESS_TOKEN="$ACCESS_TOKEN" \
@@ -1505,6 +1613,175 @@ legacy_logout_retry_output="$(run_smoke logout_failed_once "$CANONICAL_ORIGIN" v
 assert_contains "Durability verification and cleanup passed" "$legacy_logout_retry_output"
 assert_file_missing "$state_file"
 assert_not_contains "DELETE /api/v1/auth/me" "$(cat "$tmp_dir/http/log")"
+
+# An account in personalSpaceV1 storage mode is refused by the legacy media routes, so the proof
+# stores a sealed record and a blob through the personal space methods, reads them back after
+# the promotion, and deletes the record during cleanup.
+prepare_space_account() {
+    reset_http_state
+    rm -f "$state_file" "${state_file}.credential"
+    : >"$state_file"
+    chmod 600 "$state_file"
+    SMOKE_STORAGE_MODE=personalSpaceV1 run_smoke ok "$CANDIDATE_ORIGIN" prepare "$state_file" 1 "$invoker_token_file" >/dev/null
+}
+
+reset_http_state
+rm -f "$state_file" "${state_file}.credential"
+: >"$state_file"
+chmod 600 "$state_file"
+space_prepare_output="$(SMOKE_STORAGE_MODE=personalSpaceV1 run_smoke ok "$CANDIDATE_ORIGIN" prepare "$state_file" 1 "$invoker_token_file" 2>&1)"
+assert_contains "Durability prepare passed" "$space_prepare_output"
+assert_equals "personalSpaceV1" "$(jq -r '.storageMode' "$state_file")"
+assert_equals "deploy-smoke-record" "$(jq -r '.spaceRecordRkey' "$state_file")"
+assert_equals "at://did:plc:smokefake/space/app.logdate.space.personal/self" "$(jq -r '.spaceUri' "$state_file")"
+assert_equals "true" "$(jq -r '.spaceBlobSizeBytes > 0' "$state_file")"
+assert_equals "64" "$(jq -r '.spaceBlobSha256 | length' "$state_file")"
+assert_equals "null" "$(jq -r '.mediaId' "$state_file")"
+assert_equals "false" "$(jq -r '.cleanup.mediaDeleted' "$state_file")"
+assert_file_exists "$tmp_dir/http/space-blob"
+assert_file_exists "$tmp_dir/http/space-record"
+assert_not_contains "/api/v1/media" "$(cat "$tmp_dir/http/log")"
+assert_contains "POST /xrpc/app.logdate.space.uploadBlob serverless=1 health=0 authorization=1" "$(cat "$tmp_dir/http/log")"
+assert_contains "POST /xrpc/app.logdate.space.putRecord serverless=1 health=0 authorization=1" "$(cat "$tmp_dir/http/log")"
+assert_request_before "POST /xrpc/app.logdate.space.uploadBlob " "POST /xrpc/app.logdate.space.putRecord " "$tmp_dir/http/log"
+assert_request_before "POST /xrpc/app.logdate.space.putRecord " "GET /api/v1/quota " "$tmp_dir/http/log"
+assert_not_contains "$ACCESS_TOKEN" "$space_prepare_output"
+
+: >"$tmp_dir/http/log"
+space_verify_output="$(SMOKE_STORAGE_MODE=personalSpaceV1 run_smoke ok "$CANONICAL_ORIGIN" verify-and-cleanup "$state_file" 0 "$missing_invoker_file" 2>&1)"
+assert_contains "Durability verification and cleanup passed" "$space_verify_output"
+assert_file_missing "$state_file"
+assert_file_exists "$tmp_dir/http/space-deleted"
+assert_file_exists "$tmp_dir/http/account-deleted"
+assert_not_contains "/api/v1/media" "$(cat "$tmp_dir/http/log")"
+assert_contains "GET /xrpc/app.logdate.space.getBlob serverless=0 health=0 authorization=1" "$(cat "$tmp_dir/http/log")"
+assert_equals "2" "$(grep -c '^GET /xrpc/app.logdate.space.getRecord ' "$tmp_dir/http/log")"
+assert_request_before "GET /xrpc/app.logdate.space.getRecord " "POST /xrpc/app.logdate.space.deleteRecord " "$tmp_dir/http/log"
+assert_request_before "POST /xrpc/app.logdate.space.deleteRecord " "DELETE /api/v1/auth/me " "$tmp_dir/http/log"
+
+# Legacy accounts keep the media proof and never touch the personal space methods.
+reset_http_state
+rm -f "$state_file" "${state_file}.credential"
+: >"$state_file"
+chmod 600 "$state_file"
+legacy_mode_output="$(run_smoke ok "$CANDIDATE_ORIGIN" prepare "$state_file" 1 "$invoker_token_file" 2>&1)"
+assert_contains "Durability prepare passed" "$legacy_mode_output"
+assert_equals "legacy" "$(jq -r '.storageMode' "$state_file")"
+assert_not_contains "/xrpc/" "$(cat "$tmp_dir/http/log")"
+run_smoke ok "$CANONICAL_ORIGIN" verify-and-cleanup "$state_file" 0 "$missing_invoker_file" >/dev/null
+assert_not_contains "/xrpc/" "$(cat "$tmp_dir/http/log")"
+
+# A storage mode the proof does not cover, or none at all, fails with a message naming it, and the
+# disposable account is still removed.
+for mode_spec in \
+    "personalSpaceV2|account storageMode 'personalSpaceV2' is not covered by this smoke test" \
+    "|/auth/me did not report a storageMode for the account"; do
+    mode_value="${mode_spec%%|*}"
+    expected_error="${mode_spec#*|}"
+    reset_http_state
+    rm -f "$state_file" "${state_file}.credential"
+    : >"$state_file"
+    chmod 600 "$state_file"
+    set +e
+    unknown_mode_output="$(SMOKE_STORAGE_MODE="$mode_value" run_smoke ok "$CANDIDATE_ORIGIN" prepare "$state_file" 1 "$invoker_token_file" 2>&1)"
+    unknown_mode_status=$?
+    set -e
+    assert_exit_code 1 "$unknown_mode_status"
+    assert_contains "$expected_error" "$unknown_mode_output"
+    assert_file_exists "$tmp_dir/http/account-deleted"
+    assert_file_missing "$state_file"
+    assert_not_contains "/api/v1/media" "$(cat "$tmp_dir/http/log")"
+    assert_not_contains "/xrpc/" "$(cat "$tmp_dir/http/log")"
+done
+
+# Prepare failures in the personal space path name the step that failed and never print the
+# credential-shaped error bodies the server might return.
+for space_prepare_failure in \
+    "space_blob_rejected|ok|space blob upload did not return 200" \
+    "space_record_rejected|ok|space record write did not return 200" \
+    "ok|no_did|/auth/me did not report a DID"; do
+    scenario="${space_prepare_failure%%|*}"
+    remainder="${space_prepare_failure#*|}"
+    did_case="${remainder%%|*}"
+    expected_error="${remainder#*|}"
+    account_did="did:plc:smokefake"
+    [[ "$did_case" != "no_did" ]] || account_did=""
+    reset_http_state
+    rm -f "$state_file" "${state_file}.credential"
+    : >"$state_file"
+    chmod 600 "$state_file"
+    set +e
+    space_failure_output="$(SMOKE_STORAGE_MODE=personalSpaceV1 SMOKE_ACCOUNT_DID="$account_did" \
+        run_smoke "$scenario" "$CANDIDATE_ORIGIN" prepare "$state_file" 1 "$invoker_token_file" 2>&1)"
+    space_failure_status=$?
+    set -e
+    assert_exit_code 1 "$space_failure_status"
+    assert_contains "$expected_error" "$space_failure_output"
+    assert_not_contains "$ACCESS_TOKEN" "$space_failure_output"
+    assert_not_contains "$CHALLENGE_SECRET" "$space_failure_output"
+    assert_file_exists "$tmp_dir/http/account-deleted"
+    assert_file_missing "$state_file"
+done
+
+# After the promotion, a changed record, a changed blob, a record that cannot be deleted, a record
+# that stays readable, and an account that changed storage mode each fail the proof.
+for space_verify_failure in \
+    "space_record_changed|personalSpaceV1|prepared space record does not match what was written" \
+    "space_blob_changed|personalSpaceV1|downloaded space blob SHA-256 does not match prepared blob" \
+    "ok|legacy|account storageMode changed since prepare (prepared 'personalSpaceV1', now 'legacy')" \
+    "space_delete_failed|personalSpaceV1|space record deletion did not return 200" \
+    "space_readable_after_delete|personalSpaceV1|space record remained readable after deletion"; do
+    scenario="${space_verify_failure%%|*}"
+    remainder="${space_verify_failure#*|}"
+    verify_mode="${remainder%%|*}"
+    expected_error="${remainder#*|}"
+    prepare_space_account
+    set +e
+    space_verify_failure_output="$(SMOKE_STORAGE_MODE="$verify_mode" run_smoke "$scenario" "$CANONICAL_ORIGIN" verify-and-cleanup "$state_file" 0 "$missing_invoker_file" 2>&1)"
+    space_verify_failure_status=$?
+    set -e
+    assert_exit_code 1 "$space_verify_failure_status"
+    assert_contains "$expected_error" "$space_verify_failure_output"
+    assert_not_contains "$ACCESS_TOKEN" "$space_verify_failure_output"
+    assert_not_contains "$CHALLENGE_SECRET" "$space_verify_failure_output"
+    if [[ "$scenario" == "space_delete_failed" || "$scenario" == "space_readable_after_delete" ]]; then
+        assert_file_exists "$state_file"
+        assert_file_exists "${state_file}.credential"
+    else
+        assert_file_exists "$tmp_dir/http/space-deleted"
+        assert_file_exists "$tmp_dir/http/account-deleted"
+        assert_file_missing "$state_file"
+    fi
+done
+
+# Prepared state with no known storage mode, or without the proof its mode needs, is refused before
+# any request names the account.
+prepare_space_account
+jq -S 'del(.storageMode)' "$state_file" >"$tmp_dir/no-mode-state.json"
+chmod 600 "$tmp_dir/no-mode-state.json"
+mv "$tmp_dir/no-mode-state.json" "$state_file"
+set +e
+no_mode_state_output="$(SMOKE_STORAGE_MODE=personalSpaceV1 run_smoke ok "$CANONICAL_ORIGIN" verify-and-cleanup "$state_file" 0 "$missing_invoker_file" 2>&1)"
+no_mode_state_status=$?
+set -e
+assert_exit_code 1 "$no_mode_state_status"
+assert_contains "state file is missing a known prepared storage mode" "$no_mode_state_output"
+assert_file_exists "$state_file"
+assert_file_missing "$tmp_dir/http/account-deleted"
+
+prepare_space_account
+jq -S 'del(.spaceRecordCid)' "$state_file" >"$tmp_dir/no-proof-state.json"
+chmod 600 "$tmp_dir/no-proof-state.json"
+mv "$tmp_dir/no-proof-state.json" "$state_file"
+set +e
+no_proof_state_output="$(SMOKE_STORAGE_MODE=personalSpaceV1 run_smoke ok "$CANONICAL_ORIGIN" verify-and-cleanup "$state_file" 0 "$missing_invoker_file" 2>&1)"
+no_proof_state_status=$?
+set -e
+assert_exit_code 1 "$no_proof_state_status"
+assert_contains "state file is missing prepared personal space proof" "$no_proof_state_output"
+assert_file_exists "$state_file"
+assert_file_missing "$tmp_dir/http/account-deleted"
+rm -f "$state_file" "${state_file}.credential"
 
 # Every invocation removes its private working directory even on failure.
 assert_equals "0" "$(find "$tmp_dir/tmp" -maxdepth 1 -type d -name 'logdate-revision-smoke.*' | wc -l | tr -d ' ')"
