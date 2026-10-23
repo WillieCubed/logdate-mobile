@@ -121,6 +121,7 @@ internal object SyncCollectionDocs {
             )
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -253,6 +254,7 @@ internal object SyncCollectionDocs {
             )
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncError(HttpStatusCode.Conflict, SyncExamples.conflict)
             syncServerError()
         }
@@ -276,6 +278,7 @@ internal object SyncCollectionDocs {
             noContent("The entry is deleted (or already was).")
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -370,6 +373,7 @@ internal object SyncCollectionDocs {
             )
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -459,6 +463,7 @@ internal object SyncCollectionDocs {
             )
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncError(
                 HttpStatusCode.Conflict,
                 SyncExamples.conflict,
@@ -488,6 +493,7 @@ internal object SyncCollectionDocs {
             noContent("The journal is deleted (or already was).")
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }

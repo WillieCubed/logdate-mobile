@@ -13,8 +13,12 @@ import io.ktor.http.HttpStatusCode
 /** Response helpers and examples shared by the sync documentation objects. */
 internal fun ResponsesConfig.syncUnauthorized() = bearerUnauthorized(ErrorEnvelope.SYNC)
 
-/** The per-kind sync routes serve only accounts in legacy storage. */
-internal fun ResponsesConfig.syncStorageModeMismatch() = syncError(HttpStatusCode.Forbidden, SyncExamples.storageModeMismatch)
+/** The per-kind sync routes serve only accounts in legacy storage, and say so differently for one whose journal moved. */
+internal fun ResponsesConfig.syncStorageModeMismatch() =
+    syncError(HttpStatusCode.Forbidden, SyncExamples.storageModeMismatch, SyncExamples.formatUpgradeRequired)
+
+/** A legacy sync write while a device checks the journal before moving it. */
+internal fun ResponsesConfig.syncMigrationHold() = syncError(HttpStatusCode.ServiceUnavailable, SyncExamples.migrationInProgress)
 
 internal fun ResponsesConfig.syncServerError() = syncError(HttpStatusCode.InternalServerError, SyncExamples.serverMisconfigured)
 

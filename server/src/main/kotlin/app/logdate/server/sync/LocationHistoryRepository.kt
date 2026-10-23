@@ -60,6 +60,13 @@ class InMemoryLocationHistoryRepository : LocationHistoryRepository {
                 .take(changePageReadSize(limit))
         return locationHistoryPage(records, since, limit)
     }
+
+    /** Drops every record and version kept for [userId]. */
+    @Synchronized
+    fun forgetAccount(userId: UUID) {
+        users.remove(userId)
+        versions.remove(userId)
+    }
 }
 
 internal fun validateLocationHistoryBatch(records: List<LocationHistoryUpload>) {

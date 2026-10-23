@@ -45,3 +45,23 @@ groups:
         annotations:
           summary: "Sync tombstone purge failing"
           description: "Background tombstone purge has reported errors in the last 15 minutes."
+
+      - alert: LogDateLegacyCopyCleanupFailures
+        expr: |
+          sum(rate(logdate_sync_operation_error_total{operation="maintenance.legacy_copy_cleanup"}[1h])) > 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deleting moved journals' legacy copies is failing"
+          description: "The cleanup that deletes a journal's legacy copy 30 days after it moved into its personal space has failed for an hour. The copies stay until it succeeds."
+
+      - alert: LogDateSpaceMigrationServerErrors
+        expr: |
+          sum(rate(logdate_sync_operation_error_total{operation=~"space_migration.*"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Journal moves are hitting server errors"
+          description: "Calls that move journals into personal spaces have answered with server errors for 15 minutes. Devices stop and retry their moves, and no account switches while this lasts."

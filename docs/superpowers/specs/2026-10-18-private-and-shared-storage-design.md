@@ -249,8 +249,10 @@ runs on a device, one account at a time.
    record must match by content hash. On any mismatch it stops, reports a specific error and leaves
    the account on the legacy format.
 5. **Switchover.** The server marks the account's storage as `personalSpaceV1`. From then on, legacy
-   sync endpoints for that account answer `409` with `SYNC_FORMAT_UPGRADE_REQUIRED`, the same
-   pattern drafts already use. Older app versions show an update prompt instead of syncing.
+   sync endpoints for that account answer `403` with `SYNC_FORMAT_UPGRADE_REQUIRED`. It is not a
+   `409` like the draft upgrade error, because released apps settle a queued change that gets a
+   `409` as a conflict and stop sending it, while a `403` leaves it queued until the app is
+   updated. Older app versions show an update prompt instead of syncing.
 6. **Cleanup after 30 days,** the same as the tombstone window:
    - the legacy sync index and media records are deleted;
    - the account gets a fresh, empty public repository;

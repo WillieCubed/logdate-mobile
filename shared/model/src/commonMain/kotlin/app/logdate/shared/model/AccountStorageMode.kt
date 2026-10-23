@@ -61,4 +61,18 @@ object StorageModeErrorCodes {
      * account again from `/auth/me` and sync the way its `storageMode` says.
      */
     const val SYNC_STORAGE_MODE_MISMATCH = "SYNC_STORAGE_MODE_MISMATCH"
+
+    /**
+     * A legacy sync route was called for an account whose journal was moved into its personal space.
+     * The server answers `403`, which leaves an older app's queued changes queued. An app that can sync a personal space reads the account again from
+     * `/auth/me`; one that can't asks the person to update the app.
+     */
+    const val SYNC_FORMAT_UPGRADE_REQUIRED = "SYNC_FORMAT_UPGRADE_REQUIRED"
+
+    /**
+     * A legacy sync write arrived while a device is checking the account's journal before moving it
+     * into its personal space. The server answers `503` with `Retry-After`; nothing was stored, and
+     * the write succeeds when it is sent again later.
+     */
+    const val SYNC_MIGRATION_IN_PROGRESS = "SYNC_MIGRATION_IN_PROGRESS"
 }

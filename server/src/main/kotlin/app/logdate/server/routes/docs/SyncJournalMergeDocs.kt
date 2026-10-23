@@ -67,7 +67,8 @@ internal object SyncJournalMergeDocs {
                 ),
             )
             syncUnauthorized()
-            syncError(HttpStatusCode.Forbidden, mergeScopeDenied, SyncExamples.storageModeMismatch)
+            syncError(HttpStatusCode.Forbidden, mergeScopeDenied, SyncExamples.storageModeMismatch, SyncExamples.formatUpgradeRequired)
+            syncMigrationHold()
             syncServerError()
         }
     }

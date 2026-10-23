@@ -333,6 +333,13 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
         }
         return version
     }
+
+    /** Drops everything kept for [userId] and returns the repository its records were written to, if any. */
+    fun forgetAccount(userId: UUID): AtprotoDid? {
+        lastVersions.remove(userId)
+        metadata.remove(userId)
+        return states.remove(userId)?.repoDid
+    }
 }
 
 internal data class LogDateCollectionKey(

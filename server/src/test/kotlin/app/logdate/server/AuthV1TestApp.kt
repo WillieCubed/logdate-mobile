@@ -39,6 +39,7 @@ import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.migration.SpaceMigrationHolds
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
@@ -132,6 +133,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     spaceRateLimits: SpaceRateLimits = SpaceRateLimits(),
     spaceTransferLimits: TransferLimits = TransferLimits(),
     spaceEntitlementEnforcer: EntitlementEnforcer? = null,
+    spaceMigrationHolds: SpaceMigrationHolds = SpaceMigrationHolds.None,
 ): AuthV1TestEnvironment {
     val googleVerifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val verifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled)
@@ -278,6 +280,7 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                 rateLimits = spaceRateLimits,
                 transfers = TransferSlots(spaceTransferLimits),
                 maxBlobBytes = spaceMaxBlobBytes,
+                migrationHolds = spaceMigrationHolds,
             )
             route("/api/v1") {
                 authV1Routes(

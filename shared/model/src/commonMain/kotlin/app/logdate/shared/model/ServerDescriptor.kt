@@ -81,6 +81,14 @@ object ServerProtocolFeature {
      * those methods answer `501 MethodNotImplemented`, and clients must not keep a space here.
      */
     const val PERSONAL_SPACE_V1 = "personalSpaceV1"
+
+    /**
+     * The server moves an existing account's journal from legacy storage into its personal space
+     * through `/api/v1/space-migration`: it registers media the apps already encrypted as space
+     * files, holds legacy writes while a device checks its copy, and switches the account's storage
+     * mode once that check passes. Only offered together with [PERSONAL_SPACE_V1].
+     */
+    const val PERSONAL_SPACE_MIGRATION_V1 = "personalSpaceMigrationV1"
 }
 
 @Serializable

@@ -57,6 +57,12 @@ private val approvedNotices =
         SpacePurgeNotices.BLOBS_PURGED to "SERVER_SPACE_BLOBS_PURGED",
         SpacePurgeNotices.BLOB_DELETE_FAILED to "SERVER_SPACE_BLOB_DELETE_FAILED",
         SpacePurgeNotices.PURGE_FAILED to "SERVER_SPACE_PURGE_FAILED",
+        SpaceMigrationNotices.SWITCHED to "SERVER_SPACE_MIGRATION_SWITCHED",
+        SpaceMigrationNotices.SWITCHED_BACK to "SERVER_SPACE_MIGRATION_SWITCHED_BACK",
+        SpaceMigrationNotices.COPY_MISMATCH to "SERVER_SPACE_MIGRATION_COPY_MISMATCH",
+        SpaceMigrationNotices.CLEANUP_FAILED to "SERVER_LEGACY_COPY_CLEANUP_FAILED",
+        SpaceMigrationNotices.CLEANUP_SKIPPED to "SERVER_LEGACY_COPY_CLEANUP_SKIPPED",
+        SpaceMigrationNotices.CLEANUP_RUN_FAILED to "SERVER_LEGACY_COPY_CLEANUP_RUN_FAILED",
         IdentityNotices.HANDLE_RESOLUTION_FAILED to "SERVER_HANDLE_RESOLUTION_FAILED",
         IdentityNotices.BACKFILL_REFUSED_PUBLISHING to "SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING",
         IdentityNotices.BACKFILL_FAILED to "SERVER_IDENTITY_BACKFILL_FAILED",
@@ -85,6 +91,7 @@ private val approvedCountMessages =
     listOf(
         Regex("^Identity backfill dry run: \\d+ accounts need an identity$"),
         Regex("^Identity backfill complete: \\d+ provisioned, \\d+ skipped, \\d+ failed$"),
+        Regex("^Deleted the legacy copies of \\d+ moved journals$"),
     )
 
 private fun isApprovedCountMessage(message: String?): Boolean =
@@ -136,6 +143,19 @@ internal object KeyCustodyNotices {
 internal object DownloadUrlSigningNotices {
     const val MEDIA_SIGNING_FAILED = "Signing a media download URL failed; serving it through the server instead"
     const val BACKUP_SIGNING_FAILED = "Signing a backup download URL failed; serving it through the server instead"
+}
+
+/**
+ * Fixed log messages for moving journals into personal spaces. Each names an outcome an operator
+ * watches while accounts move, and none says which account it was.
+ */
+internal object SpaceMigrationNotices {
+    const val SWITCHED = "Space migration switched an account into its personal space"
+    const val SWITCHED_BACK = "Space migration switched an account back to legacy storage"
+    const val COPY_MISMATCH = "Space migration copied a legacy file whose stored bytes don't match"
+    const val CLEANUP_FAILED = "Deleting a moved journal's legacy copy failed; the next run tries again"
+    const val CLEANUP_SKIPPED = "A switched journal isn't in its personal space; its legacy copy stays"
+    const val CLEANUP_RUN_FAILED = "Deleting the legacy copies of moved journals failed"
 }
 
 /**

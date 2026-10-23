@@ -66,6 +66,7 @@ internal object SyncAssociationDocs {
             )
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -136,6 +137,7 @@ internal object SyncAssociationDocs {
             noContent("The link exists.")
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -159,6 +161,7 @@ internal object SyncAssociationDocs {
             noContent("The link is gone (or already was).")
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -185,6 +188,7 @@ internal object SyncAssociationDocs {
             noContent("The links are gone.")
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }

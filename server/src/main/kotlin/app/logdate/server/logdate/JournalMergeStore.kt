@@ -102,4 +102,9 @@ class InMemoryJournalMergeStore : JournalMergeStore {
             }
         }
     }
+
+    /** Drops every merge kept for [userId]. */
+    fun forgetAccount(userId: UUID) {
+        records.remove(userId)
+    }
 }

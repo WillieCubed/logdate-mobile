@@ -18,6 +18,7 @@ import app.logdate.server.routes.accountApiRoutes
 import app.logdate.server.routes.atprotoRoutes
 import app.logdate.server.routes.contentApiRoutes
 import app.logdate.server.routes.serverMetaRoutes
+import app.logdate.server.routes.spaceMigrationApiRoutes
 import app.logdate.server.sync.SyncMetricsRegistry
 import io.ktor.server.application.Application
 import io.ktor.server.engine.connector
@@ -97,4 +98,5 @@ fun Application.module(
     atprotoRoutes()
     accountApiRoutes()
     contentApiRoutes()
+    spaceMigrationApiRoutes()
 }

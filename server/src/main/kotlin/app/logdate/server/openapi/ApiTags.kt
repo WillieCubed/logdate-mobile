@@ -19,6 +19,7 @@ internal object ApiTags {
     const val MEDIA = "Media"
     const val BACKUPS = "Backups"
     const val SYNC_STATUS = "Sync status"
+    const val SPACE_MIGRATION = "Moving to a personal space"
     const val QUOTA = "Quota"
     const val TRANSCRIPTION = "Transcription"
     const val DIAGNOSTICS = "Diagnostics"
@@ -186,6 +187,18 @@ internal val apiTagGroups: List<ApiTagGroup> =
 
                     Uploads are limited to {{backup.upload}} per account and count against both the storage quota and
                     the plan's backup-count limit.
+                    """.trimIndent(),
+                ),
+                ApiTag(
+                    ApiTags.SPACE_MIGRATION,
+                    """
+                    An account created before personal spaces keeps its journal in legacy storage, the per-kind endpoints
+                    above. The server can't read the journal, so a device moves it: it uploads every record sealed into the
+                    account's personal space, has the server copy the media it already encrypted, holds legacy writes while
+                    it reads everything back and compares it with its own copy, and then switches the account. Until the
+                    switch nothing changes for legacy sync, and the legacy copy is kept for 30 days after it, during which the
+                    account can be switched back. Use these calls only when the server descriptor lists
+                    `personalSpaceMigrationV1`.
                     """.trimIndent(),
                 ),
                 ApiTag(
