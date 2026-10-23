@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import time
 import uuid
 
@@ -15,7 +16,23 @@ spec.loader.exec_module(h)
 TEST = "app.logdate.client.e2e.NativeRestoredSettingsE2ETest"
 EXTRAS = ["-e", "restorePermissionAcceptance", "true"]
 LOCATION = ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
-PERMISSIONS = h.PERMISSIONS + LOCATION + ["ACTIVITY_RECOGNITION"]
+PERMISSIONS = h.PERMISSIONS + LOCATION + ["ACTIVITY_RECOGNITION", "RECORD_AUDIO"]
+
+
+runtime_permission_grant = runpy.run_path(
+    str(Path(__file__).with_name("native-backup-acceptance.py"))
+)["runtime_permission_grant"]
+
+
+def verify_recording_permission(serial, output):
+    h.safe_target(serial)
+    package = h.adb(serial, "shell", "dumpsys", "package", h.PACKAGE).stdout.decode()
+    if runtime_permission_grant(package, "android.permission.RECORD_AUDIO"):
+        raise RuntimeError("Recording recovery requires denied destination microphone permission")
+    services = h.adb(serial, "shell", "dumpsys", "activity", "services", h.PACKAGE).stdout.decode()
+    if "AudioRecordingService" in services:
+        raise RuntimeError("Recording recovery restarted capture without microphone permission")
+    output.write_text(json.dumps({"microphoneGranted": False, "captureServiceAbsent": True}, indent=2) + "\n")
 
 
 def verify_shortcuts(serial, directory):
@@ -80,6 +97,7 @@ def run(args, serial):
         h.instrument(serial, notification_test + "blocked_channel_preserves_reminder_history", directory / "notifications-blocked-channel.log", extras=EXTRAS)
         recording_test = "app.logdate.client.e2e.CompletedRecordingRestartTest"
         fixture = str(uuid.uuid4())
+        verify_recording_permission(serial, directory / "recording-permission-before-restart.json")
         h.instrument(serial, recording_test, directory / "recording-before-restart.log",
                      extras=["-e", "recordingRecoveryMode", "seed", "-e", "recordingRecoveryFixture", fixture])
         h.safe_target(serial)
@@ -97,6 +115,7 @@ def run(args, serial):
         (directory / "recording-services-after-launch.log").write_text(services)
         if "AudioRecordingService" in services:
             raise RuntimeError("Foreground salvage restarted the recording service")
+        verify_recording_permission(serial, directory / "recording-permission-after-restart.json")
         h.instrument(serial, recording_test, directory / "recording-after-restart.log",
                      extras=["-e", "recordingRecoveryMode", "verify", "-e", "recordingRecoveryFixture", fixture])
         for method, name in [("widget settings survive launcher ID remapping", "widget-remap.log"),
