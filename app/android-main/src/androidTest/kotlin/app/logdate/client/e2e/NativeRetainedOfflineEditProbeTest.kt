@@ -34,7 +34,26 @@ class NativeRetainedOfflineEditProbeTest {
             ensureLogDateApplicationStarted(context.applicationContext as Application)
             val koin = GlobalContext.get()
             val journals = koin.get<JournalRepository>().allJournalsObserved.first()
-            assertEquals(2, journals.size, "Only the synthetic transfer fixture is eligible")
+            val expectedJournalIds =
+                setOf(
+                    Uuid.parse("00000000-0000-0000-0000-000000000001"),
+                    Uuid.parse("00000000-0000-0000-0000-000000000002"),
+                )
+            val archiveJournalIds =
+                InstrumentationRegistry
+                    .getArguments()
+                    .getString("nativeRetainedArchiveJournals")
+                    ?.let { value ->
+                        val ids = value.split(",").map(Uuid::parse)
+                        require(ids.size == 2 && ids.toSet().size == 2 && ids.none { it in expectedJournalIds })
+                        ids.toSet()
+                    }.orEmpty()
+            assertEquals(expectedJournalIds.size + archiveJournalIds.size, journals.size)
+            assertEquals(
+                expectedJournalIds + archiveJournalIds,
+                journals.map { it.id }.toSet(),
+                "Only the explicitly seeded transfer and archive fixtures are eligible",
+            )
             assertTrue(journals.any { it.title == "Native transfer journal" })
             val note =
                 assertNotNull(
