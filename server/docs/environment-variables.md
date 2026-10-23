@@ -621,6 +621,8 @@ with the change that makes them required.
   When enabled, the server advertises the `atprotoRecoveryKeysV1` protocol feature. When it is not
   set, the recovery-key endpoints answer `409 RECOVERY_KEYS_UNAVAILABLE`. Registering a key,
   replacing it and replacing the server's key each also need a fresh passkey confirmation.
+  A deployment sets it in the deployment contract's `env_vars` in either environment; the contract
+  renderer accepts only `true` or `false`.
 
 ### `ATPROTO_PLC_DIRECTORY_URL`
 - **Description**: The PLC directory to publish to and resolve `did:plc` identities from.
