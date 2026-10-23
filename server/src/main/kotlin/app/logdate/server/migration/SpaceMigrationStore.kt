@@ -6,6 +6,7 @@ import app.logdate.shared.model.sync.SpaceMigrationPhase
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.toKotlinUuid
@@ -38,6 +39,21 @@ data class SpaceMigration(
         changes: SpaceMigration.() -> SpaceMigration,
     ): SpaceMigration = changes().copy(updatedAt = at, version = version + 1)
 }
+
+/**
+ * The clock a move's timestamps come from. PostgreSQL keeps timestamps to the microsecond and rounds
+ * anything finer, while the JVM clock on Linux reads nanoseconds, so a move stamped with the raw clock
+ * would read back from the database different from what was written. Truncating here makes every
+ * store hold exactly the move it was given.
+ */
+internal class StoredPrecisionClock(
+    private val clock: Clock = Clock.System,
+) : Clock {
+    override fun now(): Instant = clock.now().atStoredPrecision()
+}
+
+/** This instant truncated to the microsecond, the finest precision PostgreSQL stores. */
+internal fun Instant.atStoredPrecision(): Instant = Instant.fromEpochSeconds(epochSeconds, nanosecondsOfSecond / 1_000 * 1_000)
 
 /**
  * Where each account's move into its personal space stands. Every change is a compare-and-set on
