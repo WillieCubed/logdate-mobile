@@ -11,12 +11,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import app.logdate.client.device.restore.NativeBackupStatus
 import app.logdate.client.domain.journals.MergeJournalsUseCase
 import app.logdate.client.repository.journals.JournalMergeOperation
+import app.logdate.client.sync.space.migration.JournalMoveState
+import app.logdate.client.sync.space.migration.JournalStorageMove
+import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
+import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
+import kotlinx.coroutines.launch
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_feedback_failed
@@ -46,8 +53,14 @@ fun SyncSettingsScreen(
     onRecoverJournalMerge: (JournalMergeOperation) -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
     mergeJournals: MergeJournalsUseCase = koinInject(),
+    journalStorage: JournalStorageMove = koinInject(),
+    appUpdates: AppUpdateController = koinInject(),
 ) {
+    val appUpdateState by appUpdates.uiState.collectAsState()
     val mergeIssues by remember(mergeJournals) { mergeJournals.observeIssues() }.collectAsState(emptyList())
+    val journalMove by journalStorage.state.collectAsState()
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(journalStorage) { journalStorage.refresh() }
     val uiState by viewModel.uiState.collectAsState()
     val nativeBackupStatus by viewModel.nativeBackupStatus.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -111,6 +124,15 @@ fun SyncSettingsScreen(
         onBack = onBack,
         mergeIssues = mergeIssues,
         onRecoverJournalMerge = onRecoverJournalMerge,
+        journalMove = journalMove,
+        onRetryJournalMove = { scope.launch { journalStorage.retry() } },
+        onSwitchJournalBack = { scope.launch { journalStorage.switchBack() } },
+        onUpdateApp =
+            if (appUpdateState.status == AppUpdateStatus.Unsupported) {
+                null
+            } else {
+                { scope.launch { appUpdates.checkForUpdates(AppUpdateCheckTrigger.Manual) } }
+            },
         syncStatus = uiState.syncStatus,
         cloudArchiveStatus = uiState.cloudArchiveStatus,
         nativeBackupStatus = nativeBackupStatus,
@@ -148,6 +170,10 @@ fun SyncSettingsContent(
     modifier: Modifier = Modifier,
     mergeIssues: List<JournalMergeOperation> = emptyList(),
     onRecoverJournalMerge: (JournalMergeOperation) -> Unit = {},
+    journalMove: JournalMoveState = JournalMoveState.NotOffered,
+    onRetryJournalMove: () -> Unit = {},
+    onSwitchJournalBack: () -> Unit = {},
+    onUpdateApp: (() -> Unit)? = null,
 ) {
     SettingsScaffold(
         title = stringResource(Res.string.sync_and_backup),
@@ -164,7 +190,19 @@ fun SyncSettingsContent(
                 onCreateAccount = onNavigateToCloudAccountCreation,
                 onSignIn = onNavigateToSignIn,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
+                onUpdateApp = onUpdateApp,
             )
+        }
+        if (isAuthenticated && journalMove != JournalMoveState.NotOffered) {
+            item {
+                JournalStorageSection(
+                    state = journalMove,
+                    onTryAgain = onRetryJournalMove,
+                    onSwitchBack = onSwitchJournalBack,
+                    onEnterRecoveryPhrase = onNavigateToRecoveryPhrase,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
         }
         if (nativeBackupStatus is NativeBackupStatus.Available) {
             item {

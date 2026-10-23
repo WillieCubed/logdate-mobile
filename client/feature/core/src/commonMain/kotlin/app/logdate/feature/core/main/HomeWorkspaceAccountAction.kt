@@ -27,6 +27,7 @@ import logdate.client.feature.core.generated.resources.journal_merge_recovery_st
 import logdate.client.feature.core.generated.resources.journal_merge_recovery_title
 import logdate.client.feature.core.generated.resources.settings
 import logdate.client.feature.core.generated.resources.sync_account_mobile_data
+import logdate.client.feature.core.generated.resources.sync_account_update_app
 import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_banner_manage
 import logdate.client.feature.core.generated.resources.sync_banner_review
@@ -44,6 +45,7 @@ fun HomeWorkspaceAccountAction(
     onSyncAction: (SyncAction) -> Unit,
     accountStatus: AccountSyncStatus? = null,
     hasMergeRecovery: Boolean = false,
+    canUpdateApp: Boolean = false,
 ) {
     val summary =
         if (hasMergeRecovery) {
@@ -67,7 +69,7 @@ fun HomeWorkspaceAccountAction(
                 },
             )
         }
-        sync.accountRecoveryAction()?.let { action ->
+        sync.accountRecoveryAction(canUpdateApp)?.let { action ->
             DropdownMenuItem(text = { Text(action.accountLabel()) }, onClick = {
                 dismiss()
                 onSyncAction(action)
@@ -104,9 +106,10 @@ fun HomeWorkspaceAccountAction(
     }
 }
 
-internal fun SyncPresentation.accountRecoveryAction(): SyncAction? =
+internal fun SyncPresentation.accountRecoveryAction(canUpdateApp: Boolean = false): SyncAction? =
     when (this) {
         SyncPresentation.AuthError -> SyncAction.SignIn
+        SyncPresentation.AccountStorageUnsupported -> SyncAction.UpdateApp.takeIf { canUpdateApp }
         SyncPresentation.NeedsRecovery -> null
         is SyncPresentation.StorageError -> null
         is SyncPresentation.ConflictError, is SyncPresentation.NetworkError -> null
@@ -136,6 +139,7 @@ private fun SyncAction.accountLabel(): String =
             SyncAction.SignIn -> Res.string.sync_feedback_sign_in_action
             SyncAction.ManageStorage -> Res.string.sync_banner_manage
             SyncAction.EnterRecoveryPhrase -> Res.string.sync_banner_enter_recovery_phrase
+            SyncAction.UpdateApp -> Res.string.sync_account_update_app
             else -> Res.string.sync_banner_review
         },
     )

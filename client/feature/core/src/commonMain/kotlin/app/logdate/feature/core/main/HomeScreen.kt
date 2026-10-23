@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -45,6 +46,9 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.journals.MergeJournalsUseCase
 import app.logdate.client.domain.timeline.Timeline
 import app.logdate.feature.core.settings.ui.watch.v2.WatchReadyOnPhoneCard
+import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
+import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentationViewModel
@@ -65,6 +69,7 @@ import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.workspace.WorkspaceDestination
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.action_create_journal
@@ -133,6 +138,9 @@ fun HomeScreen(
         }
     val snackbarHostState = remember { SnackbarHostState() }
     QuietSaveReturnEffect(snackbarHostState, onOpenDraft)
+    val appUpdates: AppUpdateController = koinInject()
+    val appUpdateState by appUpdates.uiState.collectAsStateWithLifecycle()
+    val updateScope = rememberCoroutineScope()
     val onSyncAction: (SyncAction) -> Unit = { action ->
         when (action) {
             SyncAction.UseMobileData -> syncPresentationViewModel.useMobileData()
@@ -142,6 +150,7 @@ fun HomeScreen(
             SyncAction.ReviewConflicts, SyncAction.ReviewIssues -> Unit
             SyncAction.OpenStatus -> onOpenSyncSettings()
             SyncAction.EnterRecoveryPhrase -> onOpenSyncSettings()
+            SyncAction.UpdateApp -> updateScope.launch { appUpdates.checkForUpdates(AppUpdateCheckTrigger.Manual) }
         }
     }
     val timelineStatusActions: @Composable RowScope.() -> Unit = {
@@ -191,6 +200,7 @@ fun HomeScreen(
                     onSyncAction,
                     accountSyncStatus.value,
                     hasMergeRecovery = mergeIssues.value.isNotEmpty(),
+                    canUpdateApp = appUpdateState.status != AppUpdateStatus.Unsupported,
                 )
             },
             status = {

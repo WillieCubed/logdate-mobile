@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="journal_storage_title">Journal storage</string>
+    <string name="journal_storage_upgrade_title">Upgrade to sealed storage</string>
+    <string name="journal_storage_upgrading_title">Upgrading to sealed storage</string>
+    <string name="journal_storage_waiting">Starts once this device finishes syncing. Sealed storage encrypts your whole journal with your identity key, so only your devices can read it.</string>
+    <string name="journal_storage_uploading">Sealing and uploading %1$d of %2$d items. Your journal keeps syncing as usual.</string>
+    <string name="journal_storage_checking">Checking the sealed copy against this device and the server before switching.</string>
+    <string name="journal_storage_sealed_title">Sealed storage</string>
+    <string name="journal_storage_sealed">Your whole journal is encrypted with your identity key, so only your devices can read it.</string>
+    <string name="journal_storage_switch_back">Switch back</string>
+    <string name="journal_storage_switch_back_row_title">Switch back to the previous storage</string>
+    <string name="journal_storage_switch_back_row">Available until %1$s, while the previous copy is kept.</string>
+    <string name="journal_storage_switching_back_title">Switching back</string>
+    <string name="journal_storage_switching_back">Downloading your sealed journal and returning it to the previous storage.</string>
+    <string name="journal_storage_previous_title">Previous storage</string>
+    <string name="journal_storage_previous">Your journal is back in the storage it used before the upgrade, and syncs the way it did.</string>
+    <string name="journal_storage_paused_title">Upgrade paused</string>
+    <string name="journal_storage_paused">%1$s Nothing changed, and your journal keeps syncing.</string>
+    <string name="journal_storage_enter_recovery_phrase">Enter recovery phrase</string>
+    <string name="journal_storage_switch_back_dialog_title">Switch back to the previous storage?</string>
+    <string name="journal_storage_switch_back_dialog_message">Your journal returns to the storage it used before the upgrade, which isn’t sealed. Changes made since the upgrade come with it, and your other devices switch back when they next sync.</string>
+    <plurals name="journal_storage_problem_missing_here">
+        <item quantity="one">%2$s: the server has %1$d this device doesn’t have yet. Sync this device, then try again.</item>
+        <item quantity="other">%2$s: the server has %1$d this device doesn’t have yet. Sync this device, then try again.</item>
+    </plurals>
+    <plurals name="journal_storage_problem_not_on_server">
+        <item quantity="one">%2$s: %1$d on this device hasn’t reached the server yet. Let this device finish syncing, then try again.</item>
+        <item quantity="other">%2$s: %1$d on this device haven’t reached the server yet. Let this device finish syncing, then try again.</item>
+    </plurals>
+    <plurals name="journal_storage_problem_copy_differs">
+        <item quantity="one">%2$s: the sealed copy of %1$d didn’t match this device’s, even after uploading it again. Try again later.</item>
+        <item quantity="other">%2$s: the sealed copies of %1$d didn’t match this device’s, even after uploading them again. Try again later.</item>
+    </plurals>
+    <plurals name="journal_storage_problem_media_unavailable">
+        <item quantity="one">%1$d media file isn’t on this device or the server. Sync the device that has it, then try again.</item>
+        <item quantity="other">%1$d media files aren’t on this device or the server. Sync the device that has them, then try again.</item>
+    </plurals>
+    <string name="journal_storage_problem_not_synced_here">%1$s: this device doesn’t sync these, so it can’t check them. Finish the upgrade on a device that does.</string>
+    <string name="journal_storage_problem_another_device">Another of your devices is upgrading your journal. This device switches when it finishes.</string>
+    <string name="journal_storage_problem_storage_full">Your cloud storage is full. Free up space, then try again.</string>
+    <string name="journal_storage_problem_identity_key">This device doesn’t have your identity key, so it can’t seal your journal. Enter your recovery phrase, then try again.</string>
+    <string name="journal_storage_problem_offline">The server couldn’t be reached. LogDate tries again automatically.</string>
+    <string name="journal_storage_problem_refused">The server didn’t accept the upgrade (%1$s). LogDate tries again automatically.</string>
+    <string name="journal_storage_problem_window_closed">The previous copy is no longer kept, so your journal can’t be switched back.</string>
+    <string name="storage_previews">Sealed storage previews</string>
+    <string name="storage_preview_personal_space_title">Personal space sync</string>
+    <string name="storage_preview_personal_space_description">Syncs accounts whose journals are stored in their sealed personal spaces.</string>
+    <string name="storage_preview_move_title">Upgrade existing journals</string>
+    <string name="storage_preview_move_description">Upgrades this account’s journal to sealed storage once this device has synced everything, on a server that offers the upgrade. Turns on personal space sync too.</string>
+    <string name="journal_data_entries">Entries</string>
+    <string name="journal_data_journals">Journals</string>
+    <string name="journal_data_memberships">Journal contents</string>
+    <string name="journal_data_drafts">Drafts</string>
+    <string name="journal_data_moments">Marked moments</string>
+    <string name="journal_data_location_history">Location history</string>
+    <string name="journal_data_media">Media files</string>
+</resources>
