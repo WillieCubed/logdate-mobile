@@ -5,6 +5,7 @@ import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.networking.DeviceLinkApiException
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.datalayer.v2.LinkBundle
@@ -109,7 +110,11 @@ class LinkedDeviceInstaller(
     override suspend fun bindingProblem(bundle: LinkBundle): LinkProblem? {
         val fields = CloudLinkFields.of(bundle) ?: return LinkProblem.INCOMPLETE_BUNDLE
         if (clock.now().toEpochMilliseconds() >= fields.codeExpiresAt) return LinkProblem.LINK_CODE_EXPIRED
-        if (owner.hasBoundOwner() && owner.getCanonicalOwnerId() != fields.accountId) return LinkProblem.BOUND_TO_ANOTHER_ACCOUNT
+        if (owner.hasBoundOwner() &&
+            !sameOwnerId(owner.getCanonicalOwnerId(), fields.accountId)
+        ) {
+            return LinkProblem.BOUND_TO_ANOTHER_ACCOUNT
+        }
         if (!identityKeys.canUseForAccount(fields.accountId)) return LinkProblem.BOUND_TO_ANOTHER_ACCOUNT
         if (!identityKeys.canInstallLinkedIdentityKey(fields.identityKey, fields.fingerprint)) return LinkProblem.KEY_CONFLICT
         if (!mediaKeys.canInstallAccountKey(fields.mediaKey)) return LinkProblem.KEY_CONFLICT
@@ -121,7 +126,7 @@ class LinkedDeviceInstaller(
             read()?.let { pending ->
                 resumePending(pending)?.let { outcome ->
                     if (outcome !is InstallOutcome.Installed ||
-                        (outcome.accountId == bundle.accountId && outcome.origin == bundle.serverOrigin?.trimEnd('/'))
+                        (sameOwnerId(outcome.accountId, bundle.accountId) && outcome.origin == bundle.serverOrigin?.trimEnd('/'))
                     ) {
                         return@withLock outcome
                     }
@@ -137,6 +142,7 @@ class LinkedDeviceInstaller(
                     descriptor = fields.descriptorJson,
                     oldOwner = owner.getCanonicalOwnerId(),
                     oldOrigin = config.getCurrentBackendUrl().trimEnd('/'),
+                    targetOwner = if (owner.hasBoundOwner()) owner.getCanonicalOwnerId() else fields.accountId,
                 )
             save(entry)
             installKeys(fields)?.let { problem -> return@withLock abandon(problem) }
@@ -165,7 +171,7 @@ class LinkedDeviceInstaller(
         }
         if (pending.step == InstallStep.KEYS_INSTALLED) {
             val session = sessions.read(pending.origin)
-            if (session?.accountId != pending.accountId) {
+            if (!sameOwnerId(session?.accountId, pending.accountId)) {
                 abandon(LinkProblem.INTERRUPTED)
                 return null
             }
@@ -177,12 +183,18 @@ class LinkedDeviceInstaller(
     }
 
     private suspend fun finish(entry: InstallJournal): InstallOutcome {
-        if (owner.hasBoundOwner() && owner.getCanonicalOwnerId() != entry.accountId) {
+        if (!sameOwnerId(entry.targetOwner, entry.accountId) ||
+            (owner.hasBoundOwner() && owner.getCanonicalOwnerId() != entry.targetOwner)
+        ) {
             return abandon(LinkProblem.BOUND_TO_ANOTHER_ACCOUNT)
         }
         if (!identityKeys.canUseForAccount(entry.accountId)) return abandon(LinkProblem.BOUND_TO_ANOTHER_ACCOUNT)
         val session = sessions.read(entry.origin)
-        if (session?.accountId != entry.accountId || session.accessToken.isBlank() || session.refreshToken.isBlank()) {
+        if (session == null ||
+            !sameOwnerId(session.accountId, entry.accountId) ||
+            session.accessToken.isBlank() ||
+            session.refreshToken.isBlank()
+        ) {
             return abandon(LinkProblem.SESSION_REVOKED)
         }
         val moved =
@@ -191,7 +203,7 @@ class LinkedDeviceInstaller(
             } else {
                 entry
             }
-        if (!owner.adoptRemoteOwnerIfUninitialized(moved.accountId)) {
+        if (!owner.adoptRemoteOwnerIfUninitialized(moved.targetOwner)) {
             return abandon(LinkProblem.BOUND_TO_ANOTHER_ACCOUNT)
         }
         config.updateBackendUrl(moved.origin)
@@ -205,7 +217,7 @@ class LinkedDeviceInstaller(
     private suspend fun moveRows(entry: InstallJournal): InstallJournal? {
         val leftBehind =
             try {
-                mover.move(OwnerScope(entry.oldOwner, entry.oldOrigin), OwnerScope(entry.accountId, entry.origin), deviceId())
+                mover.move(OwnerScope(entry.oldOwner, entry.oldOrigin), OwnerScope(entry.targetOwner, entry.origin), deviceId())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -241,7 +253,7 @@ class LinkedDeviceInstaller(
                 Napier.w("The phone's link code was not redeemed", error)
                 return Redeemed.Refused(problemFor(error))
             }
-        if (response.accountId != fields.accountId ||
+        if (!sameOwnerId(response.accountId, fields.accountId) ||
             response.tokens.accessToken.isBlank() ||
             response.tokens.refreshToken.isBlank()
         ) {
@@ -319,6 +331,7 @@ class LinkedDeviceInstaller(
         val oldOrigin: String,
         val leftBehind: Int = 0,
         val sessionId: String? = null,
+        val targetOwner: String = accountId,
     )
 
     private class CloudLinkFields(

@@ -13,6 +13,25 @@ class PrefixedKeyValueStorage(
 ) : KeyValueStorage {
     override suspend fun getString(key: String): String? = delegate.getString(prefix + key)
 
+    override suspend fun getStringsOrThrow(keys: Set<String>): Map<String, String?> {
+        val mapped = keys.associateWith { prefix + it }
+        val snapshot = delegate.getStringsOrThrow(mapped.values.toSet())
+        check(snapshot.keys == mapped.values.toSet()) { "Incomplete atomic string snapshot" }
+        return mapped.mapValues { (_, key) -> snapshot[key] }
+    }
+
+    override suspend fun updateStringsOrThrow(values: Map<String, String?>) =
+        delegate.updateStringsOrThrow(values.mapKeys { (key, _) -> prefix + key })
+
+    override suspend fun compareAndSetStringsOrThrow(
+        expected: Map<String, String?>,
+        values: Map<String, String?>,
+    ): Boolean =
+        delegate.compareAndSetStringsOrThrow(
+            expected.mapKeys { (key, _) -> prefix + key },
+            values.mapKeys { (key, _) -> prefix + key },
+        )
+
     override suspend fun getStringOrThrow(key: String): String? = delegate.getStringOrThrow(prefix + key)
 
     override suspend fun putStringOrThrow(

@@ -37,6 +37,19 @@ class AndroidIdentityKeyBackupStoreTest {
     private val store = AndroidIdentityKeyBackupStore(context)
 
     @Test
+    fun `media-only custody is distinct from unreadable root recovery material`() =
+        runTest {
+            val identity = MediaIdentityBackup(Base64.encode(ByteArray(32) { 2 }), ByteArray(32) { 8 })
+            store.writeMediaIdentity(identity)
+            assertTrue(store.hasBackup())
+            assertEquals(false, store.hasRootBackup())
+            val phrase = File(tempDir, "identity_recovery/phrase_backup")
+            phrase.writeText("")
+            assertNull(store.readPhrase())
+            assertTrue(store.hasRootBackup())
+        }
+
+    @Test
     fun `concurrent backup agents retain every media identity binding`() =
         runTest {
             val identities =

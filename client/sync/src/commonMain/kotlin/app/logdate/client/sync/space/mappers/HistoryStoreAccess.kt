@@ -15,7 +15,7 @@ data class HistoryScope(
 
 /** Which account and server the location history on this device belongs to right now; null while no account is signed in. */
 fun interface HistoryScopeProvider {
-    fun current(): HistoryScope?
+    suspend fun current(): HistoryScope?
 }
 
 /**
@@ -30,7 +30,7 @@ internal class HistoryStoreAccess(
     private val json = Json { ignoreUnknownKeys = true }
 
     /** The scope the records belong to, or a failure while no account is signed in. */
-    fun scope(): HistoryScope = scopes.current() ?: throw IllegalStateException("No account is signed in to own location history")
+    suspend fun scope(): HistoryScope = scopes.current() ?: throw IllegalStateException("No account is signed in to own location history")
 
     /** The id of this device. */
     fun device(): String = deviceId() ?: throw IllegalStateException("This device has no id yet")

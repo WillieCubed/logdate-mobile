@@ -32,6 +32,20 @@ interface KeyValueStorage {
     /** Read durable content without converting storage failures into an absent value. */
     suspend fun getStringOrThrow(key: String): String? = getString(key)
 
+    /** Read a consistent snapshot; implementations without atomic storage must refuse. */
+    suspend fun getStringsOrThrow(keys: Set<String>): Map<String, String?> =
+        throw UnsupportedOperationException("Atomic string snapshots are unavailable")
+
+    /** Commit all string updates or none; null values remove keys. Never fall back to separate writes. */
+    suspend fun updateStringsOrThrow(values: Map<String, String?>): Unit =
+        throw UnsupportedOperationException("Atomic string updates are unavailable")
+
+    /** Compare and update the requested fields in the same transaction; false never changes values. */
+    suspend fun compareAndSetStringsOrThrow(
+        expected: Map<String, String?>,
+        values: Map<String, String?>,
+    ): Boolean = throw UnsupportedOperationException("Atomic conditional string updates are unavailable")
+
     /** Read a safety decision without converting storage failure into a default. */
     suspend fun getBooleanOrThrow(
         key: String,

@@ -1,6 +1,8 @@
 package app.logdate.client.sync.location
 
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.networking.LocationHistoryApiClientContract
 import app.logdate.client.networking.LocationHistoryTransportException
 import app.logdate.client.repository.location.HistoryRecord
@@ -13,10 +15,12 @@ import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.space.SpaceSync
+import app.logdate.client.sync.space.mappers.HistoryScope
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.config.PinnedLogDateConfigRepository
 import app.logdate.shared.model.sync.LocationHistoryUpload
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 
 /** Each run pins its account and server; no page cursor advances until the entire page decrypts. */
 class LocationHistorySyncEngine(
@@ -28,7 +32,10 @@ class LocationHistorySyncEngine(
     private val enabled: suspend () -> Boolean,
     private val prepare: suspend (ownerId: String, origin: String) -> Boolean = { _, _ -> false },
     private val savedPlaceIds: suspend () -> List<String> = { emptyList() },
+    private val canonicalOwner: CanonicalOwnerProvider? = null,
 ) {
+    private val localScopes = canonicalOwner?.let { CanonicalHistoryScopeProvider(sessions, config, it) }
+
     /** The part of this engine that syncs through the personal space, for the manager that owns [space]. */
     internal fun forSpace(
         space: SpaceSync,
@@ -179,7 +186,9 @@ class LocationHistorySyncEngine(
         if (!enabled()) return SyncResult(success = true)
         return try {
             val namespace = captureNamespace(accessToken)
-            block(namespace, pinnedApi(namespace))
+            withContext(HistorySyncBinding(HistoryScope(namespace.owner, namespace.origin), namespace.session)) {
+                block(namespace, pinnedApi(namespace))
+            }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -197,29 +206,34 @@ class LocationHistorySyncEngine(
         }
     }
 
-    private fun captureNamespace(accessToken: String): Namespace {
+    private suspend fun captureNamespace(accessToken: String): Namespace {
         val session = requireNotNull(sessions.getSession())
         check(session.accessToken == accessToken)
-        return Namespace(session.accountId, config.getCurrentBackendUrl().trimEnd('/'))
+        val origin = config.getCurrentBackendUrl().trimEnd('/')
+        val local = localScopes?.let { requireNotNull(it.current()) { "The retained history owner is unavailable" } }
+        check(sessions.getSession() == session && config.getCurrentBackendUrl().trimEnd('/') == origin)
+        return Namespace(local?.owner ?: session.accountId, origin, session)
     }
 
-    private fun pinnedApi(namespace: Namespace): LocationHistoryApiClientContract {
+    private suspend fun pinnedApi(namespace: Namespace): LocationHistoryApiClientContract {
         ensureCurrent(namespace)
         return apiFactory(PinnedLogDateConfigRepository(namespace.origin, config.getCurrentServerDescriptor()))
     }
 
-    private fun ensureCurrent(namespace: Namespace) {
-        check(sessions.getSession()?.accountId == namespace.owner && config.getCurrentBackendUrl().trimEnd('/') == namespace.origin)
+    private suspend fun ensureCurrent(namespace: Namespace) {
+        check(sessions.getSession() == namespace.session && config.getCurrentBackendUrl().trimEnd('/') == namespace.origin)
+        localScopes?.let { check(it.current() == HistoryScope(namespace.owner, namespace.origin)) }
     }
 
     private data class Namespace(
         val owner: String,
         val origin: String,
+        val session: UserSession,
     ) {
         fun fieldId(
             id: String,
             type: String,
-        ): String = "location-history:$origin:$owner:$type:$id:v1"
+        ): String = "location-history:$origin:${session.accountId}:$type:$id:v1"
     }
 
     private companion object {

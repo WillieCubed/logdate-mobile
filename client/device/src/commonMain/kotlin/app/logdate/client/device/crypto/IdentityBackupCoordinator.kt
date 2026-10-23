@@ -1,5 +1,6 @@
 package app.logdate.client.device.crypto
 
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
@@ -22,12 +23,12 @@ internal class IdentityBackupCoordinator(
         val phrase = backup.readPhrase()
         if (account != null) {
             check(
-                account.accountId == accountId && account.key.contentEquals(key),
+                sameOwnerId(account.accountId, accountId) && account.key.contentEquals(key),
             ) { "The retained account identity conflicts with the key" }
         }
-        if (phrase != null) checkPhrase(phrase, key)
+        if (phrase != null) validatePhrase(phrase, key)
         if (account == null && phrase == null) {
-            check(!backup.hasBackup()) { "The retained identity backup needs recovery" }
+            check(!backup.hasRootBackup()) { "The retained identity backup needs recovery" }
         }
         return account to phrase
     }
@@ -70,7 +71,7 @@ internal class IdentityBackupCoordinator(
         accountId: String?,
     ) {
         val (account, retainedPhrase) = validateRoot(key, accountId)
-        if (phrase != null) checkPhrase(phrase, key)
+        if (phrase != null) validatePhrase(phrase, key)
         val media = storage.getBytes(MEDIA_KEY)
         val selected = validateMedia(key, media, account)
         if (account == null && retainedPhrase == null) {
@@ -87,7 +88,7 @@ internal class IdentityBackupCoordinator(
         }
     }
 
-    private suspend fun checkPhrase(
+    suspend fun validatePhrase(
         phrase: String,
         key: ByteArray,
     ) {

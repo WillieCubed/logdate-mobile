@@ -7,6 +7,7 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.addAccountIfCurrent
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.device.updateTokensIfCurrent
 import app.logdate.client.networking.PasskeyApiClientContract
 import app.logdate.client.permissions.GoogleSignInManager
@@ -64,7 +65,7 @@ internal class GoogleSignInCoordinator(
             }
 
             val data = createResult.getOrThrow()
-            if (data.account.id.toString() != canonicalOwnerId) {
+            if (!sameOwnerId(data.account.id.toString(), canonicalOwnerId)) {
                 return Result.failure(CanonicalOwnerMismatchException())
             }
             persistAuthenticatedSession(

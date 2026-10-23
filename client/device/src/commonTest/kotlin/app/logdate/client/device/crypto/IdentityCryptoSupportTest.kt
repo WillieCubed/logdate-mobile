@@ -139,6 +139,8 @@ class InMemoryIdentityKeyBackupStore : IdentityKeyBackupStore {
         media[identity.identityBinding] = identity
     }
 
+    override suspend fun hasRootBackup(): Boolean = phrase != null || account != null
+
     override suspend fun readAccountIdentity(): AccountIdentityBackup? = account
 
     override suspend fun writeAccountIdentity(identity: AccountIdentityBackup) {

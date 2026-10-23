@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.client.data.account.NativeRestoreAccountPolicy
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.device.restore.nativeRestoreDeliveryGate
 import app.logdate.client.device.storage.SecureSessionStorage
 import app.logdate.shared.model.CompleteAuthenticationData
@@ -70,7 +71,11 @@ internal class NativeAccountRecoveryAttempt(
                     }
                 val policy = NativeRestoreAccountPolicy(request.owner, request.binding, false)
                 val target = inbox.acceptedTarget(request)
-                if (!policy.accepts(session.accountId) || (target != null && target != session.accountId)) {
+                val durableOwner = request.owner.takeIf { request.binding == "true" } ?: target ?: session.accountId
+                if (!policy.accepts(session.accountId) ||
+                    !sameOwnerId(durableOwner, session.accountId) ||
+                    (target != null && target != durableOwner)
+                ) {
                     false
                 } else {
                     if (existing == null) markRenewal(session.accountId)
@@ -80,10 +85,10 @@ internal class NativeAccountRecoveryAttempt(
                             vault.installNativeRestoreSessionIfCurrent(guard, session, privacyEpoch, expectedEpoch) {
                                 var admitted = false
                                 preferences.edit { snapshot ->
-                                    if (current(snapshot) && inbox.acceptTarget(request, session.accountId)) {
-                                        snapshot[ownerKey] = session.accountId
+                                    if (current(snapshot) && inbox.acceptTarget(request, durableOwner)) {
+                                        snapshot[ownerKey] = durableOwner
                                         snapshot[boundKey] = "true"
-                                        snapshot[stampKey] = nativeAccountRecoveryCommitStamp(request, session.accountId)
+                                        snapshot[stampKey] = nativeAccountRecoveryCommitStamp(request, durableOwner)
                                         admitted = true
                                     }
                                 }

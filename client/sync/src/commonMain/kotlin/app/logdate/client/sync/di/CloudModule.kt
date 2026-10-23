@@ -6,6 +6,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.LocationHistoryApiClient
@@ -43,6 +44,7 @@ import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
 import app.logdate.client.sync.crypto.SyncPayloadCipher
+import app.logdate.client.sync.location.CanonicalHistoryScopeProvider
 import app.logdate.client.sync.location.LocationHistoryStager
 import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.EntityType
@@ -61,7 +63,6 @@ import app.logdate.client.sync.space.SpaceSwapStore
 import app.logdate.client.sync.space.SpaceSyncDependencies
 import app.logdate.client.sync.space.SpaceTransportGate
 import app.logdate.client.sync.space.XrpcSpaceDataHomes
-import app.logdate.client.sync.space.mappers.HistoryScope
 import app.logdate.client.sync.space.mappers.HistoryScopeProvider
 import app.logdate.client.sync.space.mappers.draftSpaceKind
 import app.logdate.client.sync.space.mappers.journalSpaceKind
@@ -115,9 +116,7 @@ val spaceSyncModule =
         single {
             val sessions = get<SessionStorage>()
             val config = get<LogDateConfigRepository>()
-            HistoryScopeProvider {
-                sessions.getSession()?.let { HistoryScope(it.accountId, config.getCurrentBackendUrl().trimEnd('/')) }
-            }
+            CanonicalHistoryScopeProvider(sessions, config, get<CanonicalOwnerProvider>()) as HistoryScopeProvider
         }
         single<SpaceKind<*>>(named("placeSpaceKind")) {
             placeSpaceKind(get(), get(), get<UserPlaceDao>(), deviceId = historyDeviceId())
@@ -246,6 +245,7 @@ val cloudModule =
                     stager.stage(owner, origin)
                 },
                 savedPlaceIds = { places.getAllPlaces().map { it.id } },
+                canonicalOwner = get(),
             )
         }
         single { MarkedMomentPayloadCodec(get()) }

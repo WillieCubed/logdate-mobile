@@ -89,6 +89,7 @@ data class LocationHour(
         if (other.deviceId != deviceId || other.hourStart != hourStart) {
             throw SpaceRecordMappingException("Only copies of the same device and hour merge")
         }
+        requireCompatibleHistoryOwners(this, other)
         return LocationHour(
             deviceId = deviceId,
             hourStart = hourStart,
@@ -196,8 +197,8 @@ data class LocationHour(
             val second = other.observation
             return when {
                 first == null || second == null -> HourSample(kept.id, at)
-                atRecordPrecision(first) == atRecordPrecision(second) -> kept.copy(at = at)
-                else -> maxOf(kept, other, compareBy({ atRecordPrecision(it.observation!!).toString() })).copy(at = at)
+                sameStoredLocationSample(first, second) -> kept.copy(at = at)
+                else -> maxOf(kept, other, compareBy({ atRecordPrecision(it.observation!!).copy(ownerId = "").toString() })).copy(at = at)
             }
         }
 
@@ -210,8 +211,8 @@ data class LocationHour(
             val second = other.activity
             return when {
                 first == null || second == null -> HourTransition(kept.id, at)
-                first == second -> kept.copy(at = at)
-                else -> maxOf(kept, other, compareBy({ it.activity.toString() })).copy(at = at)
+                first.copy(ownerId = second.ownerId) == second -> kept.copy(at = at)
+                else -> maxOf(kept, other, compareBy({ it.activity?.copy(ownerId = "").toString() })).copy(at = at)
             }
         }
     }

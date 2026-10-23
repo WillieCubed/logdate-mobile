@@ -4,6 +4,7 @@ import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.SessionAuthenticationSnapshot
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.identity.sameOwnerId
 import app.logdate.client.networking.PasskeyApiErrorCodes
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudRequestBinding
@@ -108,7 +109,7 @@ internal class SyncTokenRefresher(
     private fun UploadScope.matches(
         binding: CloudRequestBinding?,
         session: UserSession,
-    ): Boolean = binding != null && ownerId == session.accountId && serverOrigin == binding.location.origin
+    ): Boolean = binding != null && sameOwnerId(ownerId, session.accountId) && serverOrigin == binding.location.origin
 
     private suspend fun <R> runBound(
         binding: CloudRequestBinding?,
