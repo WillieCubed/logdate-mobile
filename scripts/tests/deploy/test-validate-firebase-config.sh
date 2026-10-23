@@ -58,7 +58,7 @@ assert_rejected() {
     shift
     local output
     if output=$("$@" 2>&1); then
-        printf 'Expected command to fail: %s\n' "$*" >&2
+        printf 'Expected rejection containing %q, but command succeeded.\n' "$expected_message" >&2
         exit 1
     fi
     if [[ "$output" != *"$expected_message"* ]]; then
@@ -156,6 +156,23 @@ write_ios_config \
 pass
 plutil -remove API_KEY "$ios_config"
 assert_rejected "missing API_KEY" "$VALIDATOR" ios "$ios_config"
+
+# Older plutil versions can write a missing-key diagnostic to stdout on failure.
+# Diagnostics must never satisfy a required Firebase configuration field.
+legacy_plutil="$TEMP_DIR/legacy-plutil"
+mkdir -p "$legacy_plutil"
+cat >"$legacy_plutil/plutil" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == "-extract" && "$2" == "API_KEY" ]]; then
+    printf 'Could not extract value, error: No value at that key path or invalid key path: API_KEY\n'
+    exit 1
+fi
+exec "$LOGDATE_TEST_REAL_PLUTIL" "$@"
+SH
+chmod +x "$legacy_plutil/plutil"
+assert_rejected "missing API_KEY" \
+    env PATH="$legacy_plutil:$PATH" LOGDATE_TEST_REAL_PLUTIL="$(command -v plutil)" \
+    "$VALIDATOR" ios "$ios_config"
 
 write_ios_config \
     "$ios_config" \
