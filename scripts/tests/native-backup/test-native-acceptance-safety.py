@@ -297,15 +297,20 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 (root / "native-modern-callback-cases.json").write_text(json.dumps(contract))
                 calls = []
                 commands = []
+                captures = []
+                def retain_lock_evidence(*args):
+                    captures.append(args)
                 def instrument(*args, **kwargs):
                     calls.append(args)
                 def adb(*args, **kwargs):
                     commands.append(args)
                     return b"1"
                 with patch.dict(post["run"].__globals__, {
-                    "instrument": instrument, "__file__": str(root / "native-post-transfer-acceptance.py"),
+                    "instrument": instrument, "retain_lock_evidence": retain_lock_evidence,
+                    "__file__": str(root / "native-post-transfer-acceptance.py"),
                 }), patch.dict(post["NATIVE"], {"adb": adb}):
                     post["run"]("emulator-5556", root / "output")
+                self.assertEqual([("emulator-5556", root / "output/restored-app-lock")], captures)
                 expected_count = sum(len(methods) for methods in contract.values())
                 callback_calls = [call for call in calls if call[3].name == "callbacks.log"]
                 self.assertEqual([
