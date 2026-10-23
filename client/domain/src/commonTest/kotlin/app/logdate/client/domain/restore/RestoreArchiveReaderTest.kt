@@ -6,6 +6,7 @@ import app.logdate.client.domain.export.archive.ArchiveManifest
 import app.logdate.client.domain.export.archive.ArchivePath
 import app.logdate.client.domain.export.archive.ArchiveRole
 import app.logdate.client.domain.export.archive.support.ArchiveSamples
+import okio.ByteString.Companion.encodeUtf8
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,6 +25,7 @@ class RestoreArchiveReaderTest {
                             path = journalsPath,
                             mediaType = "application/json",
                         ),
+                        ArchiveContent(ArchiveRole.CHECKSUMS, ArchivePath.of("SHA256SUMS"), "text/plain"),
                     ),
             )
         val manifestJson = ArchiveJson.document.encodeToString(ArchiveManifest.serializer(), manifest)
@@ -31,6 +33,8 @@ class RestoreArchiveReaderTest {
             mapOf(
                 "wrapped/manifest.json" to manifestJson,
                 "wrapped/${journalsPath.value}" to "{\"journals\":[]}",
+                "wrapped/SHA256SUMS" to "${manifestJson.encodeUtf8().sha256().hex()}  manifest.json\n" +
+                    "${"{\"journals\":[]}".encodeUtf8().sha256().hex()}  ${journalsPath.value}\n",
             )
 
         val archive = RestoreArchiveReader.read(files.keys, files::get)

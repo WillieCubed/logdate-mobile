@@ -3,12 +3,16 @@ package app.logdate.feature.core.restore
 import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import app.logdate.client.domain.restore.ArchiveMediaIntegrity
 import app.logdate.client.domain.restore.MediaImporter
+import app.logdate.client.domain.restore.copyArchiveMedia
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.isRecoveredOriginal
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import okio.sink
+import okio.source
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipFile
@@ -19,6 +23,7 @@ internal class AndroidArchiveMediaImporter(
     private val zipFile: ZipFile,
     private val root: String,
     private val references: StoredMediaReferences,
+    private val integrity: Map<String, ArchiveMediaIntegrity>?,
 ) : MediaImporter {
     override suspend fun isAvailable(reference: String): Boolean = mediaManager.isRecoveredOriginal(reference, references)
 
@@ -40,7 +45,7 @@ internal class AndroidArchiveMediaImporter(
         try {
             zipFile.getInputStream(entry).use { input ->
                 FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
+                    copyArchiveMedia(input.source(), output.sink(), normalizedPath, integrity)
                 }
             }
             val fromExtension = resolveMimeType(fileName)

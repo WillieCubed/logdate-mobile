@@ -6,40 +6,25 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
-import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportMetadata
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreResult
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
-import app.logdate.client.media.MediaManager
-import app.logdate.client.sync.diagnostics.DiagnosticSource
-import app.logdate.client.sync.metadata.UploadScope
-import app.logdate.feature.core.restore.ImportOptions
-import app.logdate.feature.core.restore.RestoreDiagnosticEvents
 import app.logdate.feature.core.restore.RestoreError
-import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreOutcome
-import app.logdate.feature.core.restore.RestoreProgressInfo
 import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
-import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.koin.core.context.loadKoinModules
-import org.koin.dsl.module
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
@@ -82,7 +67,7 @@ class RestoreWorkerTest {
     fun `worker fails when source uri missing`() =
         runTest {
             val recordingLauncher = RecordingRestoreLauncher()
-            setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
+            installRestoreWorkerTestBindings(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
 
             // No SOURCE_URI_KEY in input data — worker must fail immediately.
             val worker = TestListenableWorkerBuilder<RestoreWorker>(context).build()
@@ -132,7 +117,7 @@ class RestoreWorkerTest {
                     }
                 val recordingLauncher = RecordingRestoreLauncher()
                 val diagnosticEvents = RecordingRestoreDiagnostics()
-                setupKoin(mockUseCase, mockk(relaxed = true), recordingLauncher, diagnosticEvents)
+                installRestoreWorkerTestBindings(mockUseCase, mockk(relaxed = true), recordingLauncher, diagnosticEvents)
                 val operationId = Uuid.random().toString()
 
                 val worker =
@@ -180,7 +165,7 @@ class RestoreWorkerTest {
             try {
                 val recordingLauncher = RecordingRestoreLauncher()
                 val diagnosticEvents = RecordingRestoreDiagnostics()
-                setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher, diagnosticEvents)
+                installRestoreWorkerTestBindings(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher, diagnosticEvents)
 
                 val worker =
                     TestListenableWorkerBuilder<RestoreWorker>(context)
@@ -215,7 +200,7 @@ class RestoreWorkerTest {
             val useCase = mockk<RestoreUserDataUseCase>(relaxed = true)
             val launcher = RecordingRestoreLauncher()
             val diagnostics = RecordingRestoreDiagnostics()
-            setupKoin(useCase, mockk(relaxed = true), launcher, diagnostics)
+            installRestoreWorkerTestBindings(useCase, mockk(relaxed = true), launcher, diagnostics)
             val recoveryId = Uuid.random().toString()
             try {
                 val worker =
@@ -278,7 +263,7 @@ class RestoreWorkerTest {
                     .filter { it.name.startsWith("logdate_restore") }
                     .toSet()
             val recordingLauncher = RecordingRestoreLauncher()
-            setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
+            installRestoreWorkerTestBindings(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
             val worker =
                 TestListenableWorkerBuilder<RestoreWorker>(context)
                     .setInputData(
@@ -352,7 +337,7 @@ class RestoreWorkerTest {
                         }
                 }
             try {
-                setupKoin(useCase, mockk(relaxed = true), RecordingRestoreLauncher())
+                installRestoreWorkerTestBindings(useCase, mockk(relaxed = true), RecordingRestoreLauncher())
                 val worker =
                     TestListenableWorkerBuilder<RestoreWorker>(context)
                         .setInputData(
@@ -373,49 +358,6 @@ class RestoreWorkerTest {
                 archive.delete()
             }
         }
-
-    private fun setupKoin(
-        restoreUseCase: RestoreUserDataUseCase,
-        mediaManager: MediaManager,
-        restoreLauncher: RestoreLauncher,
-        diagnostics: RestoreDiagnosticEvents? = null,
-    ) {
-        val overrides =
-            module {
-                factory { restoreUseCase }
-                single<MediaManager> { mediaManager }
-                single<RestoreLauncher> { restoreLauncher }
-                single<app.logdate.client.device.identity.CanonicalOwnerProvider> {
-                    mockk { coEvery { getCanonicalOwnerId() } returns "synthetic-archive-worker" }
-                }
-                single<app.logdate.shared.config.LogDateConfigRepository> {
-                    mockk {
-                        every { backendUrl } returns MutableStateFlow("https://example.test")
-                        every { apiVersion } returns MutableStateFlow("v1")
-                        every { serverDescriptor } returns MutableStateFlow<app.logdate.shared.model.ServerDescriptor?>(null)
-                        every { getCurrentBackendUrl() } returns "https://example.test"
-                    }
-                }
-                single<SessionStorage> { mockk(relaxed = true) }
-                single<RestoreDiagnosticEvents> { diagnostics ?: RecordingRestoreDiagnostics() }
-            }
-        loadKoinModules(overrides)
-    }
-}
-
-private class RecordingRestoreDiagnostics : RestoreDiagnosticEvents {
-    val events = mutableListOf<SyncDiagnosticEvent>()
-    private val source = DiagnosticSource(UploadScope("account", "https://first.example"), "epoch")
-
-    override fun source(): DiagnosticSource = source
-
-    override fun record(
-        event: SyncDiagnosticEvent,
-        source: DiagnosticSource?,
-    ) {
-        assertTrue(source === this.source)
-        events += event
-    }
 }
 
 /**
@@ -449,29 +391,4 @@ private fun createMinimalArchive(
         }
     }
     return file
-}
-
-private class RecordingRestoreLauncher : RestoreLauncher {
-    val completedOutcomes = mutableListOf<RestoreOutcome>()
-
-    private val _restoreProgress = MutableStateFlow<RestoreProgressInfo>(RestoreProgressInfo.Idle)
-    override val restoreProgress: StateFlow<RestoreProgressInfo> = _restoreProgress.asStateFlow()
-
-    override fun startFileSelection() {}
-
-    override fun startRestore(options: ImportOptions) {}
-
-    override fun cancelRestore() {}
-
-    override fun setRestoreCompletionCallback(callback: (RestoreOutcome) -> Unit) {}
-
-    override fun setFileSelectedCallback(callback: (app.logdate.feature.core.restore.ArchiveFileInfo?) -> Unit) {}
-
-    override fun updateProgress(info: RestoreProgressInfo) {
-        _restoreProgress.value = info
-    }
-
-    override fun completeRestore(outcome: RestoreOutcome) {
-        completedOutcomes += outcome
-    }
 }

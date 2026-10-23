@@ -15,6 +15,7 @@ import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreTestDeviceIdProvider
 import app.logdate.client.domain.restore.RestoreTestOwnerProvider
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.domain.restore.sealArchiveIntegrityFixture
 import app.logdate.client.repository.journals.CaptureDevice
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -69,14 +70,10 @@ class CapturedOnArchiveCompatibilityTest : ArchiveExportFixture() {
     private suspend fun exportAndRestore(editNote: (JsonObject) -> JsonObject): RoundTripJournalNotesRepository {
         val archive = InMemoryArchiveContainer()
         useCase().export(options = ArchiveExportOptions(), container = archive).toList()
-        val bundle =
-            RestoreArchiveReader.read(archive.paths) { path ->
-                when {
-                    !archive.has(path) -> null
-                    path.endsWith(ArchiveLayout.NOTES.value) -> editNotes(archive.text(path), editNote)
-                    else -> archive.text(path)
-                }
-            }
+        val files = archive.paths.associateWith(archive::bytes).toMutableMap()
+        files[ArchiveLayout.NOTES.value] = editNotes(archive.text(ArchiveLayout.NOTES.value), editNote).encodeToByteArray()
+        sealArchiveIntegrityFixture(files)
+        val bundle = RestoreArchiveReader.readBytes(files.keys, files::get)
         val notes = RoundTripJournalNotesRepository()
         RestoreUserDataUseCase(
             RoundTripJournalRepository(),

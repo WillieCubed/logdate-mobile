@@ -33,31 +33,71 @@ object RestoreArchiveReader {
         return readText(v1Root + ExportFileStructure.METADATA_FILE)
     }
 
+    /** Compatibility for callers already holding exact UTF-8 documents; ZIP readers use [readBytes]. */
     fun read(
         entryNames: Iterable<String>,
         readText: (String) -> String?,
+    ): RestoreArchiveBundle = readBytes(entryNames) { readText(it)?.encodeToByteArray() }
+
+    /** Reads the original uncompressed entry bytes before decoding text. */
+    fun readBytes(
+        entryNames: Iterable<String>,
+        readEntry: (String) -> ByteArray?,
     ): RestoreArchiveBundle {
         val names = entryNames.toList()
+        require(names.filterNot { it.endsWith('/') }.distinct().size == names.count { !it.endsWith('/') }) {
+            "Repeated archive entry name"
+        }
         val v2Root = ArchiveRoot.find(names, ArchiveLayout.MANIFEST.value)
-        if (v2Root != null) return readV2(v2Root, readText)
+        if (v2Root != null) {
+            requireCanonicalV2EntryNames(names)
+            return readV2(v2Root, readEntry)
+        }
         val v1Root =
             ArchiveRoot.find(names, ExportFileStructure.METADATA_FILE)
                 ?: throw IllegalArgumentException("Archive has no LogDate manifest or metadata")
-        return readV1(v1Root, readText)
+        return readV1(v1Root) { readEntry(it)?.archiveText() }
+    }
+
+    private fun requireCanonicalV2EntryNames(names: List<String>) {
+        val identities = mutableSetOf<String>()
+        for (name in names) {
+            val identity = name.removeSuffix("/")
+            require(
+                identity.isNotEmpty() &&
+                    !identity.startsWith('/') &&
+                    '\\' !in identity &&
+                    identity.none { it.isISOControl() || it in ":*?\"<>|" } &&
+                    identity.split('/').all { it.isNotEmpty() && it != "." && it != ".." && !it.endsWith('.') && !it.endsWith(' ') },
+            ) {
+                "Noncanonical V2 archive entry name"
+            }
+            require(identities.add(identity)) { "Ambiguous V2 archive entry name" }
+        }
     }
 
     private fun readV2(
         root: String,
-        readText: (String) -> String?,
+        readEntry: (String) -> ByteArray?,
     ): RestoreArchiveBundle.V2 {
-        val manifestJson = required(readText, root + ArchiveLayout.MANIFEST.value)
+        val manifestBytes = requireNotNull(readEntry(root + ArchiveLayout.MANIFEST.value)) { "Missing archive manifest" }
+        val manifestJson = manifestBytes.archiveText()
+        ArchiveJsonKeyValidation.requireUnique(manifestJson)
         val manifest = ArchiveJson.document.decodeFromString(ArchiveManifest.serializer(), manifestJson)
-        val contents =
+        val rawContents =
             manifest.contents.associate { content ->
-                content.role to required(readText, root + content.path.value)
+                val bytes =
+                    readEntry(root + content.path.value)
+                        ?: if (content.role == ArchiveRole.CHECKSUMS) {
+                            throw IllegalArgumentException("Missing archive checksum manifest")
+                        } else {
+                            throw IllegalStateException("Missing required file: ${root + content.path.value}")
+                        }
+                content.role to bytes
             }
+        val integrity = ArchiveIntegrityAdmission.admit(manifestBytes, manifest, rawContents)
 
-        fun role(role: ArchiveRole): String? = contents[role]
+        fun role(role: ArchiveRole): String? = rawContents[role]?.archiveText()
         return RestoreArchiveBundle.V2(
             root,
             V2RestoreBundle(
@@ -69,6 +109,7 @@ object RestoreArchiveReader {
                 placesJson = role(ArchiveRole.PLACES),
                 locationHistoryJsonLines = role(ArchiveRole.LOCATION_HISTORY),
                 mediaInventoryJson = role(ArchiveRole.MEDIA_INVENTORY),
+                mediaIntegrity = integrity,
             ),
         )
     }

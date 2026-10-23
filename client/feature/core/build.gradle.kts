@@ -96,6 +96,7 @@ kotlin {
             implementation(libs.material3.adaptive.layout)
             implementation(libs.material3.adaptive.navigation)
             // External dependencies
+            implementation(libs.okio)
             implementation(libs.coil.compose)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))

@@ -208,6 +208,24 @@ shasum -a 256 -c SHA256SUMS
 It lists every file except itself. It shows that files are unchanged since the export, not who made
 them.
 
+Restore admits 2.x metadata through `RestoreArchiveReader.readBytes`, using the original
+uncompressed ZIP bytes. It verifies the manifest and each listed metadata document before accepting
+a recovery source or writing destination records. Checksum paths, content roles, inventory paths,
+JSON object keys, and ZIP entry names must be unambiguous. Included originals and previews must have
+matching inventory and checksum records. The text reader is a compatibility adapter for exact UTF-8
+documents; platform ZIP readers must use the byte reader.
+
+Media is verified when it is imported. `copyArchiveMedia` streams into private staging and checks the
+inventory's exact byte count and SHA-256 before the platform commits an original. Failed staging is
+removed. A damaged or absent original leaves the entry recoverable through the existing pending-media
+mechanism, with its expected digest retained. A usable local original remains available during repair.
+Legacy 1.x archives remain readable without inventing checksum guarantees they do not contain.
+
+Keep admission and persistence tests together: repack changed, parseable metadata with a valid ZIP
+CRC and stale SHA-256; mutate an original without changing its length; and include a verified control.
+Assert that rejected metadata creates no recovery record or destination writes, rejected media never
+reaches durable storage, and valid originals survive the production repository round trip.
+
 ## How the app builds an archive
 
 The code is in `client/domain/src/commonMain/kotlin/app/logdate/client/domain/export/archive/`.

@@ -1,9 +1,11 @@
 package app.logdate.feature.core.restore
 
+import app.logdate.client.domain.restore.ArchiveMediaIntegrity
 import app.logdate.client.domain.restore.ArchiveRecoveryMediaIndex
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.UnavailableMediaAsset
+import app.logdate.client.domain.restore.mediaIntegrity
 import io.github.aakira.napier.Napier
 import java.io.Closeable
 import java.security.MessageDigest
@@ -14,7 +16,7 @@ internal class RetainedArchiveMediaSources(
     store: ArchiveRecoveryStore,
     scope: ArchiveRecoveryScope,
     private val recoveryId: String,
-    createImporter: (ZipFile, String) -> MediaImporter,
+    createImporter: (ZipFile, String, Map<String, ArchiveMediaIntegrity>?) -> MediaImporter,
 ) : Closeable {
     private data class Source(
         val id: String,
@@ -35,10 +37,17 @@ internal class RetainedArchiveMediaSources(
             try {
                 val zip = ZipFile(file).also { opened = it }
                 val archive =
-                    RestoreArchiveReader.read(zip.entries().toList().map { it.name }) { name ->
-                        zip.getEntry(name)?.let { zip.getInputStream(it).bufferedReader().use { reader -> reader.readText() } }
+                    RestoreArchiveReader.readBytes(zip.entries().toList().map { it.name }) { name ->
+                        zip.getEntry(name)?.let { zip.getInputStream(it).use { input -> input.readBytes() } }
                     }
-                sources += Source(record.id, zip, archive.root, ArchiveRecoveryMediaIndex(archive), createImporter(zip, archive.root))
+                sources +=
+                    Source(
+                        record.id,
+                        zip,
+                        archive.root,
+                        ArchiveRecoveryMediaIndex(archive),
+                        createImporter(zip, archive.root, archive.mediaIntegrity),
+                    )
             } catch (error: Exception) {
                 opened?.close()
                 Napier.w("Retained archive could not be read; other recovery sources remain available")

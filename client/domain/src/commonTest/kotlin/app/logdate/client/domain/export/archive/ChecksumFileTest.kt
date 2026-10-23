@@ -59,6 +59,12 @@ class ChecksumFileTest {
     }
 
     @Test
+    fun `a repeated checksum path is refused even when both hashes agree`() {
+        assertNull(ChecksumFile.parse("$abcSha  data/notes.json\n$abcSha  data/notes.json\n"))
+        assertNull(ChecksumFile.parse("$abcSha  data/notes.json\n$emptySha  data/notes.json\n"))
+    }
+
+    @Test
     fun `hashing while writing reports the sha-256 and size and passes the bytes through`() {
         val ledger = HashLedger()
         val destination = Buffer()

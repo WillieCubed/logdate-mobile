@@ -1,13 +1,17 @@
 package app.logdate.feature.core.restore
 
-import app.logdate.client.domain.restore.MediaImporter
+import app.logdate.client.domain.restore.ArchiveMediaIntegrity
+import app.logdate.client.domain.restore.ArchiveZipReader
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.domain.restore.copyArchiveMedia
+import app.logdate.client.domain.restore.mediaIntegrity
 import app.logdate.client.media.MediaManager
-import app.logdate.client.media.MediaPayload
+import app.logdate.client.util.platformIODispatcher
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,18 +20,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import okio.buffer
-import okio.openZip
+import okio.use
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
 import platform.UIKit.UIDocumentPickerDelegateProtocol
 import platform.UIKit.UIDocumentPickerMode
 import platform.UIKit.UIDocumentPickerViewController
 import platform.UIKit.UIViewController
 import platform.darwin.NSObject
+import kotlin.uuid.Uuid
 
 /**
  * iOS-specific implementation for restoring LogDate ZIP exports.
@@ -119,6 +126,8 @@ class IosRestoreLauncher(
                     val summary = restoreFromZip(path, options)
                     _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Success(summary))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     Napier.e("iOS: Restore failed")
                     _restoreProgress.value = RestoreProgressInfo.Idle
@@ -165,9 +174,10 @@ class IosRestoreLauncher(
 
     private fun extractMetadata(path: String): String? =
         try {
-            val zipFileSystem = FileSystem.SYSTEM.openZip(path.toPath())
-            val entryNames = archiveEntryNames(zipFileSystem)
-            RestoreArchiveReader.previewJson(entryNames) { readOptionalEntry(zipFileSystem, it) }
+            FileSystem.SYSTEM.openReadOnly(path.toPath()).use { handle ->
+                val zip = ArchiveZipReader(handle)
+                RestoreArchiveReader.previewJson(zip.entryNames) { readOptionalEntry(zip, it)?.decodeToString() }
+            }
         } catch (e: Exception) {
             Napier.e("iOS: Failed to extract metadata")
             null
@@ -176,93 +186,82 @@ class IosRestoreLauncher(
     private suspend fun restoreFromZip(
         path: String,
         options: ImportOptions,
-    ): RestoreSummary {
-        updateProgress(RestoreStage.PREPARING.toProgressInfo())
-        updateProgress(RestoreStage.OPENING_ARCHIVE.toProgressInfo())
+    ): RestoreSummary =
+        withContext(platformIODispatcher) {
+            updateProgress(RestoreStage.PREPARING.toProgressInfo())
+            updateProgress(RestoreStage.OPENING_ARCHIVE.toProgressInfo())
 
-        val zipFileSystem = FileSystem.SYSTEM.openZip(path.toPath())
-        updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
-        val archive =
-            RestoreArchiveReader.read(archiveEntryNames(zipFileSystem)) { entryName ->
-                readOptionalEntry(zipFileSystem, entryName)
+            FileSystem.SYSTEM.openReadOnly(path.toPath()).use { handle ->
+                val zipFileSystem = ArchiveZipReader(handle)
+                updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
+                val archive =
+                    RestoreArchiveReader.readBytes(zipFileSystem.entryNames) { entryName ->
+                        readOptionalEntry(zipFileSystem, entryName)
+                    }
+                val root = archive.root
+
+                val mediaImporter =
+                    createArchiveMediaImporter(
+                        mediaManager = mediaManager,
+                        references = getKoin().get(),
+                        contains = { exportPath -> zipFileSystem.containsFile(root + exportPath.trimStart('/')) },
+                        importFile = { exportPath -> importMedia(zipFileSystem, root, exportPath, archive.mediaIntegrity) },
+                    )
+
+                val restoreOptions =
+                    RestoreOptions(
+                        includeDrafts = options.includeDrafts,
+                        includeMedia = options.includeMedia,
+                    )
+
+                val result =
+                    restoreUserDataUseCase.restore(
+                        archive = archive,
+                        options = restoreOptions,
+                        mediaImporter = mediaImporter,
+                        onProgress = { phase -> updateProgress(phase.toProgressInfo()) },
+                    )
+                result.toSummary(source = path.substringAfterLast('/'))
             }
-        val root = archive.root
-
-        val mediaImporter =
-            if (options.includeMedia) {
-                object : MediaImporter {
-                    override suspend fun importMedia(exportPath: String): String? =
-                        this@IosRestoreLauncher.importMedia(zipFileSystem, root, exportPath)
-                }
-            } else {
-                null
-            }
-
-        val restoreOptions =
-            RestoreOptions(
-                includeDrafts = options.includeDrafts,
-                includeMedia = options.includeMedia,
-            )
-
-        val result =
-            restoreUserDataUseCase.restore(
-                archive = archive,
-                options = restoreOptions,
-                mediaImporter = mediaImporter,
-                onProgress = { phase -> updateProgress(phase.toProgressInfo()) },
-            )
-        return result.toSummary(source = path.substringAfterLast('/'))
-    }
+        }
 
     private fun readOptionalEntry(
-        zipFileSystem: FileSystem,
+        zipFileSystem: ArchiveZipReader,
         entryName: String,
-    ): String? {
-        val entryPath = entryName.trimStart('/').toPath()
-        val metadata = zipFileSystem.metadataOrNull(entryPath) ?: return null
-        if (metadata.isDirectory) {
-            return null
-        }
-        return zipFileSystem.source(entryPath).buffer().readUtf8()
+    ): ByteArray? {
+        if (!zipFileSystem.containsFile(entryName)) return null
+        return zipFileSystem.source(entryName).buffer().use { it.readByteArray() }
     }
 
-    private fun archiveEntryNames(zipFileSystem: FileSystem): List<String> =
-        zipFileSystem
-            .listRecursively("/".toPath())
-            .filter { zipFileSystem.metadata(it).isRegularFile }
-            .map { it.toString().trimStart('/') }
-            .toList()
-
     private suspend fun importMedia(
-        zipFileSystem: FileSystem,
+        zipFileSystem: ArchiveZipReader,
         root: String,
         exportPath: String,
+        integrity: Map<String, ArchiveMediaIntegrity>?,
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
-        val entryPath = (root + normalizedPath).toPath()
-        val metadata = zipFileSystem.metadataOrNull(entryPath)
-        if (metadata == null) {
+        val entryPath = root + normalizedPath
+        if (!zipFileSystem.containsFile(entryPath)) {
             Napier.w("Restore attachment missing")
             return null
         }
-        if (metadata.isDirectory) {
-            Napier.w("Restore attachment is a directory")
-            return null
+        val temporary = (NSTemporaryDirectory() + "logdate-restore-media-${Uuid.random()}.partial").toPath()
+        return try {
+            zipFileSystem.source(entryPath).use { source ->
+                FileSystem.SYSTEM.sink(temporary, mustCreate = true).use { destination ->
+                    copyArchiveMedia(source, destination, normalizedPath, integrity)
+                }
+            }
+            mediaManager.saveMediaFromFile(temporary.toString(), normalizedPath.substringAfterLast('/'), "application/octet-stream")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.e("Restore attachment import failed")
+            null
+        } finally {
+            runCatching { FileSystem.SYSTEM.delete(temporary, mustExist = false) }
+                .onFailure { Napier.w("Could not remove temporary restore attachment") }
         }
-        return runCatching {
-            val bytes = zipFileSystem.source(entryPath).buffer().readByteArray()
-            val payload =
-                MediaPayload(
-                    fileName = normalizedPath.substringAfterLast('/'),
-                    mimeType = "application/octet-stream",
-                    sizeBytes = bytes.size.toLong(),
-                    data = bytes,
-                )
-            val savedPath = mediaManager.saveMedia(payload)
-            Napier.d("Restore attachment imported")
-            savedPath
-        }.onFailure { Napier.e("Restore attachment import failed") }
-            .getOrNull()
     }
 }
 

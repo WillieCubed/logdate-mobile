@@ -1,12 +1,14 @@
 package app.logdate.feature.core.restore
 
-import app.logdate.client.domain.restore.MediaImporter
+import app.logdate.client.domain.restore.ArchiveMediaIntegrity
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.domain.restore.copyArchiveMedia
+import app.logdate.client.domain.restore.mediaIntegrity
 import app.logdate.client.media.MediaManager
-import app.logdate.client.media.MediaPayload
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -15,12 +17,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okio.sink
+import okio.source
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.net.URLConnection
+import java.nio.file.Files
 import java.util.zip.ZipFile
 
 /**
@@ -113,6 +118,8 @@ class DesktopRestoreLauncher :
                     val summary = restoreFromZip(file, options)
                     _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Success(summary))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     Napier.e("Desktop: Restore failed")
                     _restoreProgress.value = RestoreProgressInfo.Idle
@@ -155,20 +162,18 @@ class DesktopRestoreLauncher :
 
             updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
             val archive =
-                RestoreArchiveReader.read(zipFile.entries().toList().map { it.name }) { entryName ->
+                RestoreArchiveReader.readBytes(zipFile.entries().toList().map { it.name }) { entryName ->
                     readOptionalEntry(zipFile, entryName)
                 }
             val root = archive.root
 
             val mediaImporter =
-                if (options.includeMedia) {
-                    object : MediaImporter {
-                        override suspend fun importMedia(exportPath: String): String? =
-                            this@DesktopRestoreLauncher.importMedia(zipFile, root, exportPath)
-                    }
-                } else {
-                    null
-                }
+                createArchiveMediaImporter(
+                    mediaManager = mediaManager,
+                    references = getKoin().get(),
+                    contains = { exportPath -> zipFile.getEntry(root + exportPath.trimStart('/'))?.isDirectory == false },
+                    importFile = { exportPath -> importMedia(zipFile, root, exportPath, archive.mediaIntegrity) },
+                )
 
             val restoreOptions =
                 RestoreOptions(
@@ -190,10 +195,10 @@ class DesktopRestoreLauncher :
     private fun readOptionalEntry(
         zipFile: ZipFile,
         entryName: String,
-    ): String? {
+    ): ByteArray? {
         val entry = zipFile.getEntry(entryName) ?: return null
         return zipFile.getInputStream(entry).use { input ->
-            input.readBytes().toString(Charsets.UTF_8)
+            input.readBytes()
         }
     }
 
@@ -201,6 +206,7 @@ class DesktopRestoreLauncher :
         zipFile: ZipFile,
         root: String,
         exportPath: String,
+        integrity: Map<String, ArchiveMediaIntegrity>?,
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
         val entry = zipFile.getEntry(root + normalizedPath)
@@ -212,21 +218,22 @@ class DesktopRestoreLauncher :
             Napier.w("Restore attachment is a directory")
             return null
         }
-        return runCatching {
-            val data = zipFile.getInputStream(entry).use { input -> input.readBytes() }
-            val fileName = normalizedPath.substringAfterLast('/')
-            val payload =
-                MediaPayload(
-                    fileName = fileName,
-                    mimeType = resolveMimeType(fileName),
-                    sizeBytes = data.size.toLong(),
-                    data = data,
-                )
-            val savedPath = mediaManager.saveMedia(payload)
-            Napier.d("Restore attachment imported")
-            savedPath
-        }.onFailure { Napier.e("Restore attachment import failed") }
-            .getOrNull()
+        val temporary = Files.createTempFile("logdate_restore_media_", ".partial").toFile()
+        return try {
+            zipFile.getInputStream(entry).use { input ->
+                temporary.outputStream().use { output ->
+                    copyArchiveMedia(input.source(), output.sink(), normalizedPath, integrity)
+                }
+            }
+            mediaManager.saveMediaFromFile(temporary.absolutePath, normalizedPath.substringAfterLast('/'), resolveMimeType(normalizedPath))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.e("Restore attachment import failed")
+            null
+        } finally {
+            temporary.delete()
+        }
     }
 
     private fun resolveMimeType(fileName: String): String = URLConnection.guessContentTypeFromName(fileName) ?: "application/octet-stream"

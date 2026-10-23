@@ -20,7 +20,7 @@ object ChecksumFile {
         for (line in text.lineSequence().filter { it.isNotEmpty() }) {
             val hash = line.substringBefore("  ", missingDelimiterValue = "")
             val path = line.substringAfter("  ", missingDelimiterValue = "")
-            if (!SHA256.matches(hash) || ArchivePath.parse(path) == null) return null
+            if (!SHA256.matches(hash) || ArchivePath.parse(path) == null || path in checksums) return null
             checksums[path] = hash
         }
         return checksums
