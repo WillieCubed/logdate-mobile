@@ -136,6 +136,89 @@ class ManagedNativeCustodyTest(unittest.TestCase):
         self.assertEqual(("/sdk/adb", "emulator-5558", "exec-out", "run-as", TARGET["DRIVER"], "cat", "/proc/321/stat"),
                          commands.call_args.args)
 
+    def test_driver_mismatch_reports_checked_target_and_observation_without_more_device_access(self):
+        qemu = {"birth": "qemu-birth", "command": f"/sdk/qemu-system-aarch64 @{AVD} -id first_GradleManagedDevice"}
+        gradle = {"birth": "gradle-birth", "command": "java GradleWrapperMain nonce-one"}
+        custody = {"nonce": "nonce-one", "adb": "/sdk/adb", "gradle": {"pid": 100, "identity": gradle},
+                   "targets": {"emulator-5558": {"pid": 101, "identity": qemu, "managedId": "first_GradleManagedDevice",
+                                                "avd": AVD, "driverPid": 321, "driverStartTicks": "50"}}}
+        function = TARGET["require_binding"]
+        for observed in (b"654", b"321 invalid", b"321 321"):
+            with self.subTest(observed=observed):
+                commands = Mock(return_value=observed)
+                with patch.dict(function.__globals__, {"process_identity": Mock(side_effect=[gradle, qemu]),
+                                                       "real_command": commands}):
+                    with self.assertRaises(RuntimeError) as raised:
+                        function(custody, "emulator-5558")
+                self.assertIn("emulator-5558", str(raised.exception))
+                self.assertIn("expected PID 321", str(raised.exception))
+                self.assertIn(str(observed.decode().split()), str(raised.exception))
+                self.assertEqual(1, commands.call_count)
+                self.assertEqual(("/sdk/adb", "emulator-5558", "shell", "pidof", TARGET["DRIVER"]), commands.call_args.args)
+
+    def test_ambiguous_driver_observation_stabilizes_only_within_original_budget(self):
+        import json
+        qemu = {"birth": "qemu-birth", "command": f"/sdk/qemu-system-aarch64 @{AVD} -id first_GradleManagedDevice"}
+        gradle = {"birth": "gradle-birth", "command": "java GradleWrapperMain nonce-one"}
+        binding = {"pid": 101, "identity": qemu, "managedId": "first_GradleManagedDevice",
+                   "avd": AVD, "driverPid": 321, "driverStartTicks": "50"}
+        custody = {"nonce": "nonce-one", "adb": "/sdk/adb", "gradle": {"pid": 100, "identity": gradle},
+                   "targets": {"emulator-5558": binding}}
+        receipt = json.dumps({"nonce": "nonce-one", "phase": "ready", "pid": 321, "startTicks": "50"}).encode()
+        stat = ("321 (process) " + " ".join(["0"] * 19 + ["50"])).encode()
+        cases = [
+            ("transient", [b"321 654", b"321", receipt, stat], 1, None, None, 4),
+            ("persistent", [b"321 654"] * 3, 5, None, "waiting driver", 3),
+            ("missing", [b"654"], 1, None, "waiting driver", 1),
+            ("late", [b"321", receipt, stat], 16, None, "budget", 1),
+            ("host-death", [b"321 654", b"321", receipt, stat], 1, "dead", "Gradle", 1),
+            ("qemu-death", [b"321 654", b"321", receipt, stat], 1, "qemu", "QEMU", 1),
+            ("host-late", [b"321 654", b"321", receipt, stat], 1, "late", "budget", 1),
+            ("reused", [b"321 654", b"321", receipt, stat.replace(b"50", b"51")], 1, None, "reused", 4),
+            ("stale", [b"321 654", b"321", receipt.replace(b"nonce-one", b"nonce-old"), stat], 1, None, "stale", 3),
+        ]
+        function = TARGET["require_binding"]
+        for name, outputs, duration, changed_host, error, count in cases:
+            with self.subTest(name=name):
+                now = [0.0]
+                outputs = iter(outputs)
+                events = []
+                def command(*args, **kwargs):
+                    events.append((args, kwargs))
+                    if args[2:4] == ("shell", "pidof"):
+                        now[0] += duration
+                    return next(outputs)
+                host_calls = []
+                def host(pid, **kwargs):
+                    host_calls.append(pid)
+                    if changed_host == "late" and len(host_calls) > 2:
+                        now[0] += 15
+                    if changed_host == "dead" and len(host_calls) > 2:
+                        return "dead"
+                    if changed_host == "qemu" and pid == 101 and len(host_calls) > 2:
+                        return "dead"
+                    return gradle if pid == 100 else qemu
+                hosts = Mock(side_effect=host)
+                with patch.dict(function.__globals__, process_identity=hosts, real_command=command), \
+                        patch.object(function.__globals__["time"], "monotonic", side_effect=lambda: now[0]), \
+                        patch.object(function.__globals__["time"], "sleep"):
+                    observed = None
+                    try:
+                        actual = function(custody, "emulator-5558")
+                    except RuntimeError as failure:
+                        observed = failure
+                    if error:
+                        self.assertIsNotNone(observed)
+                        self.assertIn(error, str(observed))
+                    else:
+                        self.assertIsNone(observed, str(observed))
+                        self.assertIs(binding, actual)
+                self.assertEqual(count, len(events))
+                if name == "transient":
+                    self.assertEqual(4, hosts.call_count)
+                    self.assertEqual([15, 14], [event[1]["timeout"] for event in events[:2]])
+                    self.assertTrue(all(call.kwargs.get("timeout", 10) <= 14 for call in hosts.call_args_list[2:]))
+
     def test_data_destructive_package_commands_are_rejected(self):
         for arguments in (["shell", "pm", "clear", "studio.hypertext.logdate.debug"],
                           ["shell", "cmd package uninstall studio.hypertext.logdate.debug"],
