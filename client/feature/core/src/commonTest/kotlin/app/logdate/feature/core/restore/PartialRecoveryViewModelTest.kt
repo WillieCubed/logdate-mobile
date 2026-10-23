@@ -115,14 +115,32 @@ class PartialRecoveryViewModelTest {
             assertEquals("recovery", launcher.recoveryId)
         }
 
+    @Test
+    fun `a failed resume keeps its request through dismissal and retries without new document selection`() =
+        runTest(dispatcher) {
+            val model = UserDataRestoreViewModel(launcher, PreviewArchiveUseCase())
+            launcher.completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED, "retained-recovery"))
+            assertEquals("retained-recovery", assertIs<RestoreState.Failed>(model.restoreState.value).recoveryId)
+            assertTrue(model.isSheetVisible.value)
+            model.dismissSheet()
+            assertFalse(model.isSheetVisible.value)
+            assertEquals("retained-recovery", assertIs<RestoreState.Failed>(model.restoreState.value).recoveryId)
+            model.retryRestore()
+            assertEquals("retained-recovery", launcher.recoveryId)
+            assertEquals(0, launcher.fileSelectionRequests)
+        }
+
     private class RecoveryLauncher : RestoreLauncher {
         var outcomeCallback: ((RestoreOutcome) -> Unit)? = null
         var fileCallback: ((ArchiveFileInfo?) -> Unit)? = null
         var recoveryCallback: ((RestoreSummary) -> Unit)? = null
         var recoveryId: String? = null
+        var fileSelectionRequests = 0
         override val restoreProgress = MutableStateFlow<RestoreProgressInfo>(RestoreProgressInfo.Idle)
 
-        override fun startFileSelection() = Unit
+        override fun startFileSelection() {
+            fileSelectionRequests++
+        }
 
         override fun selectArchiveForMediaRecovery(recoveryId: String) {
             this.recoveryId = recoveryId

@@ -249,13 +249,33 @@ class AndroidRestoreLauncher(
             enqueueJob?.cancel()
             enqueueJob =
                 launcherScope.launch {
-                    val resumed = ArchiveRecoveryLauncher(context, getKoin()).resume(recoveryId, ::commitRestoreWork)
+                    val operationContext = currentCoroutineContext()
+                    val resumed =
+                        try {
+                            ArchiveRecoveryLauncher(context, getKoin()).resume(recoveryId, ::commitRestoreWork)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            reportArchiveResumeFailure(
+                                operationContext,
+                                ::commitRestoreWork,
+                                pause = { context.archiveRecoveryStore().setPaused(recoveryId, true) },
+                                notifyFailure = {
+                                    completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED, recoveryId))
+                                },
+                            )
+                            return@launch
+                        }
                     if (resumed != null) {
-                        completionCallback?.invoke(RestoreOutcome.Success(resumed))
+                        commitArchiveResumeRequest(operationContext, ::commitRestoreWork) {
+                            completionCallback?.invoke(RestoreOutcome.Success(resumed))
+                        }
                     } else {
                         kotlinx.coroutines.withContext(Dispatchers.Main) {
-                            startFileSelection()
-                            selectedRecoveryId = recoveryId
+                            commitArchiveResumeRequest(operationContext, ::commitRestoreWork) {
+                                startFileSelection()
+                                selectedRecoveryId = recoveryId
+                            }
                         }
                     }
                 }
@@ -480,5 +500,35 @@ class AndroidRestoreLauncher(
 
     private companion object {
         const val COPY_BUFFER_BYTES = 64 * 1024
+    }
+}
+
+internal fun commitArchiveResumeRequest(
+    operationContext: kotlin.coroutines.CoroutineContext,
+    commit: (() -> Unit) -> Unit,
+    action: () -> Unit,
+) {
+    commit {
+        operationContext.ensureActive()
+        action()
+    }
+}
+
+internal fun reportArchiveResumeFailure(
+    operationContext: kotlin.coroutines.CoroutineContext,
+    commit: (() -> Unit) -> Unit,
+    pause: () -> Unit,
+    notifyFailure: () -> Unit,
+) {
+    commitArchiveResumeRequest(operationContext, commit) {
+        try {
+            pause()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            Napier.w("Could not retain the recovery pause")
+        }
+        Napier.w("Archive recovery remains available to retry")
+        notifyFailure()
     }
 }

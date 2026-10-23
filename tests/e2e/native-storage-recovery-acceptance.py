@@ -66,6 +66,24 @@ def run(args):
             adb(serial, "shell", "am", "force-stop", PACKAGE)
     finally:
         set_storage(serial, "reset", original)
+    cancellation_label = "cancellation-" + uuid.uuid4().hex
+    try:
+        set_storage(serial, "force-low", {"forced": "LOW", "level": "LOW"})
+        for mode in ["seed", "cancel-running", "paused", "resume-cancelled", "verify-cancelled"]:
+            instrument(
+                serial,
+                "app.logdate.client.e2e.ArchiveMediaRecoveryE2ETest#archiveRecoveryAcrossProcessRestart",
+                args.output / ("cancellation-" + mode + ".log"),
+                extras=["-e", "archiveRecoveryMode", mode, "-e", "archiveRecoveryFixtureLabel", cancellation_label,
+                        "-e", "archiveCancellationAcceptance", "true"],
+                status_actions={b"RESTORE_CANCELLATION_READY": lambda: set_storage(
+                    serial, "force-not-low", {"forced": "NORMAL", "level": "NORMAL"}
+                )} if mode == "cancel-running" else None,
+            )
+            safe_target(serial)
+            adb(serial, "shell", "am", "force-stop", PACKAGE)
+    finally:
+        set_storage(serial, "reset", original)
     for method in [
         "truncatedPreferenceDeliveryStaysPendingUntilACompleteRetry",
             "preparedPreferenceInputRepairsInterruptedDestinationOnRecreatedCompletion",
@@ -83,7 +101,8 @@ def run(args):
     receipt = {"serial": serial, "avd": avd, "acceptedSourceRetained": True,
                "waitedForPlatformStorage": True, "sameRequestSurvivedProcessDeath": True,
                "restoredAutomaticallyWhenStorageRecovered": True, "storageStateRestored": True,
-               "preferenceDeliveryRecoveryVerified": True}
+               "preferenceDeliveryRecoveryVerified": True, "realWorkerCancellationRetry": True,
+               "SAFSelectionExecuted": False, "controlledMediaSaveLatencyFixture": True, "controlledOriginalSaveFailureFixture": True}
     (args.output / "acceptance.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 
