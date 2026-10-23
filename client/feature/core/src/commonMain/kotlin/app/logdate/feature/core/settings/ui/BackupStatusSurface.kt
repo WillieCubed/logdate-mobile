@@ -15,7 +15,9 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.DataSaverOn
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,10 +38,13 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.backup_cloud_title
 import logdate.client.feature.core.generated.resources.sync_account_mobile_data
+import logdate.client.feature.core.generated.resources.sync_account_storage_unsupported_detail
+import logdate.client.feature.core.generated.resources.sync_account_update_app
 import logdate.client.feature.core.generated.resources.sync_heading_background
 import logdate.client.feature.core.generated.resources.sync_heading_failed
 import logdate.client.feature.core.generated.resources.sync_heading_offline
 import logdate.client.feature.core.generated.resources.sync_heading_storage
+import logdate.client.feature.core.generated.resources.sync_heading_update
 import logdate.client.feature.core.generated.resources.sync_heading_wifi
 import logdate.client.feature.core.generated.resources.sync_retry_automatic_detail
 import org.jetbrains.compose.resources.stringResource
@@ -50,6 +55,7 @@ internal fun BackupStatusItem(
     cloudArchiveStatus: CloudArchiveStatus,
     onSyncUsingMobileData: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onUpdateApp: (() -> Unit)? = null,
 ) {
     val status = backupStatus(syncStatus, cloudArchiveStatus)
     val title =
@@ -58,9 +64,10 @@ internal fun BackupStatusItem(
             AccountSyncStatus.OFFLINE -> Res.string.sync_heading_offline
             AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_heading_background
             AccountSyncStatus.STORAGE_FULL -> Res.string.sync_heading_storage
+            AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Res.string.sync_heading_update
             AccountSyncStatus.UNKNOWN, AccountSyncStatus.SERVER_UNAVAILABLE, AccountSyncStatus.CONNECTION_UNAVAILABLE,
             AccountSyncStatus.DEVICE_ACCESS_REQUIRED, AccountSyncStatus.CONFLICT, AccountSyncStatus.LOCAL_DATA_UNAVAILABLE,
-            AccountSyncStatus.MEDIA_TOO_LARGE, AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED,
+            AccountSyncStatus.MEDIA_TOO_LARGE,
             -> Res.string.sync_heading_failed
             else -> status.messageResource()
         }
@@ -90,6 +97,7 @@ internal fun BackupStatusItem(
                                 AccountSyncStatus.OFFLINE -> Icons.Rounded.CloudOff
                                 AccountSyncStatus.BACKGROUND_RESTRICTED -> Icons.Rounded.DataSaverOn
                                 AccountSyncStatus.WAITING -> Icons.Rounded.Schedule
+                                AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED -> Icons.Rounded.SystemUpdate
                                 else -> Icons.Rounded.CloudSync
                             }
                         Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(24.dp))
@@ -99,12 +107,11 @@ internal fun BackupStatusItem(
                     Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)
                     if (title != status.messageResource()) {
                         val detail =
-                            if (title ==
-                                Res.string.sync_heading_failed
-                            ) {
-                                Res.string.sync_retry_automatic_detail
-                            } else {
-                                status.messageResource()
+                            when {
+                                status == AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED ->
+                                    Res.string.sync_account_storage_unsupported_detail
+                                title == Res.string.sync_heading_failed -> Res.string.sync_retry_automatic_detail
+                                else -> status.messageResource()
                             }
                         Text(
                             stringResource(detail),
@@ -120,6 +127,13 @@ internal fun BackupStatusItem(
                     shape = MaterialTheme.shapes.large,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) { Text(stringResource(Res.string.sync_account_mobile_data)) }
+            }
+            if (status == AccountSyncStatus.ACCOUNT_STORAGE_UNSUPPORTED && onUpdateApp != null) {
+                Button(
+                    onClick = onUpdateApp,
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text(stringResource(Res.string.sync_account_update_app)) }
             }
         }
     }

@@ -115,4 +115,7 @@ sealed class SyncAction {
 
     /** Resolve [SyncPresentation.NeedsRecovery] by entering the recovery phrase again. */
     data object EnterRecoveryPhrase : SyncAction()
+
+    /** Resolve [SyncPresentation.AccountStorageUnsupported] by updating the app, where the app can update itself. */
+    data object UpdateApp : SyncAction()
 }

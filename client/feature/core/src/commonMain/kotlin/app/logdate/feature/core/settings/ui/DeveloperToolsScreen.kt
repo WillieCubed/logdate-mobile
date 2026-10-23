@@ -46,6 +46,7 @@ fun DeveloperToolsScreen(
             )
         },
         featurePreviewsContent = { FeaturePreviewsSection(store = featureFlags) },
+        storagePreviewsContent = { StoragePreviewsSection(store = featureFlags) },
     )
 }
 
@@ -60,11 +61,17 @@ fun DeveloperToolsContent(
     reportingContent: @Composable () -> Unit = {},
     locationContent: @Composable () -> Unit = {},
     featurePreviewsContent: (@Composable () -> Unit)? = null,
+    storagePreviewsContent: (@Composable () -> Unit)? = null,
 ) {
     SettingsScaffold(title = stringResource(Res.string.developer_tools), onBack = onBack) {
         if (featurePreviewsContent != null) {
             item {
                 Box(Modifier.padding(horizontal = Spacing.lg)) { featurePreviewsContent() }
+            }
+        }
+        if (storagePreviewsContent != null) {
+            item {
+                Box(Modifier.padding(horizontal = Spacing.lg)) { storagePreviewsContent() }
             }
         }
         item {

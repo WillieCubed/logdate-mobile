@@ -278,6 +278,7 @@
     <string name="sync_account_conflict">Sync could not merge an entry edited on another device. Both copies are saved.</string>
     <string name="sync_account_local_unavailable">Sync is incomplete: some local data is unavailable on this device.</string>
     <string name="sync_account_storage_unsupported">Sync paused: your journal is stored in a way this version of LogDate can’t sync. Update LogDate to keep syncing.</string>
+    <string name="sync_account_update_app">Update LogDate</string>
     <string name="sync_account_media_too_large">Sync is incomplete: an attachment exceeds the current upload limit.</string>
     <string name="sync_account_unknown">Sync could not finish. LogDate will try again automatically.</string>
     <string name="sync_account_disabled">Sync is turned off.</string>
@@ -285,6 +286,8 @@
     <string name="sync_heading_offline">Waiting for a connection</string>
     <string name="sync_heading_background">Background data is restricted</string>
     <string name="sync_heading_storage">Cloud storage is full</string>
+    <string name="sync_heading_update">Update LogDate to keep syncing</string>
+    <string name="sync_account_storage_unsupported_detail">Your journal is stored in a way this version can’t sync. Everything on this device stays here and syncs after the update.</string>
     <string name="sync_heading_failed">Sync couldn't finish</string>
     <string name="sync_retry_automatic_detail">LogDate will try again automatically.</string>
 </resources>
