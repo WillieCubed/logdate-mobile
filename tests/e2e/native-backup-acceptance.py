@@ -843,9 +843,19 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
 
 
 def verify_restarted_content(serial, output, metadata, identity):
-    result = adb(serial, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+    arguments = ["shell", "am", "instrument", "-w", "-r", "-e", "class",
                  "app.logdate.client.e2e.NativeRetainedOfflineEditProbeTest",
-                 "-e", "nativeRetainedEdit", "true", RUNNER)
+                 "-e", "nativeRetainedEdit", "true"]
+    if "archiveJournalIds" in metadata:
+        journals = metadata["archiveJournalIds"]
+        if not isinstance(journals, list) or len(journals) != 2 or not all(isinstance(value, str) for value in journals):
+            raise ValueError("Archive restart requires exactly two seeded journal IDs")
+        journals = [str(uuid.UUID(value)) for value in journals]
+        base = {"00000000-0000-0000-0000-000000000001", "00000000-0000-0000-0000-000000000002"}
+        if len(set(journals)) != 2 or base.intersection(journals):
+            raise ValueError("Archive restart journal IDs must be distinct from the transfer fixture")
+        arguments.extend(("-e", "nativeRetainedArchiveJournals", ",".join(journals)))
+    result = adb(serial, *arguments, RUNNER)
     log = output / "destination-retained-offline-edit.log"
     private_file(log, result)
     if not instrumentation_passed(result):
@@ -1110,6 +1120,8 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
             f"/data/user/0/{PACKAGE}/no_backup/archive-media-recovery-{archive_fixture_label}.json",
         )
         private_file(output / "archive-source-fixture.json", archive_fixture)
+        archive_state = json.loads(archive_fixture)
+        metadata["archiveJournalIds"] = [archive_state["journal"], archive_state["extraJournal"]]
     with data_only_source_session(source, output, exercise_data_only) as source_session_id:
         validate_source_integrity = lambda: probe(
             source,

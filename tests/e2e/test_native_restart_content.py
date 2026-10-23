@@ -13,6 +13,28 @@ SPEC.loader.exec_module(NATIVE)
 
 
 class RestartContentTest(unittest.TestCase):
+    def test_archive_restart_binds_only_the_two_seeded_journals(self):
+        journals = ["c25d0779-c687-42c0-a8c5-eca000b32bfd", "c27aeea0-fab4-4bf2-92e3-1a9cad352b9f"]
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            NATIVE, "adb", return_value=b"OK (1 test)\n"
+        ) as adb, patch.object(NATIVE, "probe"):
+            NATIVE.verify_restarted_content("emulator-5580", Path(temporary), {"archiveJournalIds": journals}, "phrase")
+        arguments = adb.call_args.args
+        self.assertIn("nativeRetainedArchiveJournals", arguments)
+        index = arguments.index("nativeRetainedArchiveJournals")
+        self.assertEqual(",".join(journals), arguments[index + 1])
+
+    def test_invalid_archive_journal_bindings_fail_before_device_access(self):
+        journal = "c25d0779-c687-42c0-a8c5-eca000b32bfd"
+        for journals in (None, journal, [journal], [journal] * 3, [journal, journal.upper()], [journal, "invalid"],
+                         [journal, "00000000-0000-0000-0000-000000000001"]):
+            with self.subTest(journals=journals), tempfile.TemporaryDirectory() as temporary, patch.object(
+                NATIVE, "adb", return_value=b"OK (1 test)\n"
+            ) as adb, patch.object(NATIVE, "probe"):
+                with self.assertRaises(ValueError):
+                    NATIVE.verify_restarted_content("emulator-5580", Path(temporary), {"archiveJournalIds": journals}, "phrase")
+                adb.assert_not_called()
+
     def test_read_only_assertion_precedes_any_mutating_verification(self):
         events = []
         with tempfile.TemporaryDirectory() as temporary, patch.object(
