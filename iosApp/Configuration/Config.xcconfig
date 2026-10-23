@@ -6,5 +6,5 @@
 #include? "Version.xcconfig"
 
 TEAM_ID = T95VDD3A4W
-BUNDLE_ID=studio.hypertext.LogDate
+BUNDLE_ID=studio.hypertext.apps.logdate
 APP_NAME=LogDate

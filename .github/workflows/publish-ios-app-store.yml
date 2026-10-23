@@ -43,6 +43,7 @@ jobs:
         uses: ./.github/actions/setup-firebase-configs
         with:
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+          ios-firebase-app-id: ${{ vars.LOGDATE_FIREBASE_IOS_APP_ID }}
           google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE }}
 
       - name: Resolve iOS version
@@ -59,7 +60,7 @@ jobs:
       - name: Render ExportOptions.plist with installed profile UUID
         run: |
           /usr/libexec/PlistBuddy \
-            -c "Set :provisioningProfiles:studio.hypertext.LogDate $LOGDATE_IOS_PROVISIONING_PROFILE_UUID" \
+            -c "Set :provisioningProfiles:studio.hypertext.apps.logdate $LOGDATE_IOS_PROVISIONING_PROFILE_UUID" \
             iosApp/Configuration/ExportOptions.plist
 
       - name: Set up JDK 17
@@ -139,6 +140,7 @@ jobs:
         uses: ./.github/actions/setup-firebase-configs
         with:
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+          ios-firebase-app-id: ${{ vars.LOGDATE_FIREBASE_IOS_APP_ID }}
           google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE }}
 
       - name: Resolve iOS version
@@ -155,7 +157,7 @@ jobs:
       - name: Render ExportOptions.plist with installed profile UUID
         run: |
           /usr/libexec/PlistBuddy \
-            -c "Set :provisioningProfiles:studio.hypertext.LogDate $LOGDATE_IOS_PROVISIONING_PROFILE_UUID" \
+            -c "Set :provisioningProfiles:studio.hypertext.apps.logdate $LOGDATE_IOS_PROVISIONING_PROFILE_UUID" \
             iosApp/Configuration/ExportOptions.plist
 
       - name: Set up JDK 17
@@ -210,7 +212,7 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
-          IOS_BUNDLE_ID: studio.hypertext.LogDate
+          IOS_BUNDLE_ID: studio.hypertext.apps.logdate
           MARKETING_VERSION: ${{ steps.version.outputs.marketing_version }}
           CURRENT_PROJECT_VERSION: ${{ steps.version.outputs.current_project_version }}
         run: ./scripts/submit-ios-for-review.sh

@@ -4,7 +4,7 @@ import UserNotifications
 import ComposeApp
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    private let syncTaskIdentifier = "studio.hypertext.LogDate.sync.refresh"
+    private let syncTaskIdentifier = "studio.hypertext.apps.logdate.sync.refresh"
 
     func application(
         _ application: UIApplication,

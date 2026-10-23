@@ -6,6 +6,8 @@ source "$(git rev-parse --show-toplevel)/scripts/tests/lib/assertions.sh"
 enter_repo_root
 
 readonly VALIDATOR="scripts/validate-firebase-config.sh"
+# Synthetic registration: the production value must come from Firebase.
+export LOGDATE_FIREBASE_IOS_APP_ID="1:216887423795:ios:0000000000000000000000"
 TEMP_DIR="$(mktemp -d)"
 readonly TEMP_DIR
 trap 'rm -rf "$TEMP_DIR"' EXIT
@@ -86,9 +88,9 @@ ios_config="$TEMP_DIR/GoogleService-Info.plist"
 write_ios_config \
     "$ios_config" \
     "logdate" \
-    "1:216887423795:ios:35aa0348aa4f6fcb8ec446" \
-    "studio.hypertext.LogDate"
-[[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "studio.hypertext.LogDate" ]] \
+    "1:216887423795:ios:0000000000000000000000" \
+    "studio.hypertext.apps.logdate"
+[[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "studio.hypertext.apps.logdate" ]] \
     || fail "expected initial iOS fixture bundle"
 pass
 "$VALIDATOR" ios "$ios_config"
@@ -137,22 +139,39 @@ assert_rejected "missing API key" "$VALIDATOR" android-release "$release_config"
 write_ios_config \
     "$ios_config" \
     "logdate" \
-    "1:216887423795:ios:35aa0348aa4f6fcb8ec446" \
+    "1:216887423795:ios:0000000000000000000000" \
     "co.reasonabletech.logdate"
 [[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "co.reasonabletech.logdate" ]] \
     || fail "expected rewritten iOS fixture to replace the bundle"
 pass
-assert_rejected "expected iOS bundle studio.hypertext.LogDate" "$VALIDATOR" ios "$ios_config"
+assert_rejected "expected iOS bundle studio.hypertext.apps.logdate" "$VALIDATOR" ios "$ios_config"
 
 write_ios_config \
     "$ios_config" \
     "logdate" \
-    "1:216887423795:ios:35aa0348aa4f6fcb8ec446" \
-    "studio.hypertext.LogDate"
-[[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "studio.hypertext.LogDate" ]] \
+    "1:216887423795:ios:0000000000000000000000" \
+    "studio.hypertext.apps.logdate"
+[[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "studio.hypertext.apps.logdate" ]] \
     || fail "expected rewritten iOS fixture to restore the bundle"
 pass
 plutil -remove API_KEY "$ios_config"
 assert_rejected "missing API_KEY" "$VALIDATOR" ios "$ios_config"
+
+write_ios_config \
+    "$ios_config" \
+    "logdate" \
+    "$LOGDATE_FIREBASE_IOS_APP_ID" \
+    "studio.hypertext.apps.logdate"
+assert_rejected "LOGDATE_FIREBASE_IOS_APP_ID is required" \
+    env -u LOGDATE_FIREBASE_IOS_APP_ID "$VALIDATOR" ios "$ios_config"
+assert_rejected "expected Firebase app" \
+    env LOGDATE_FIREBASE_IOS_APP_ID="1:216887423795:ios:1111111111111111111111" \
+    "$VALIDATOR" ios "$ios_config"
+
+# A legacy registration must not be relabelled with the new bundle ID.
+plutil -replace GOOGLE_APP_ID -string "1:216887423795:ios:35aa0348aa4f6fcb8ec446" "$ios_config"
+assert_rejected "retired iOS Firebase app" \
+    env LOGDATE_FIREBASE_IOS_APP_ID="1:216887423795:ios:35aa0348aa4f6fcb8ec446" \
+    "$VALIDATOR" ios "$ios_config"
 
 print_pass_summary "Firebase config validation"

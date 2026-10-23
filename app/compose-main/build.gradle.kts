@@ -44,6 +44,7 @@ kotlin {
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
+            binaryOption("bundleId", "studio.hypertext.apps.logdate.compose")
             isStatic = true
         }
     }
@@ -224,7 +225,7 @@ compose.desktop {
             }
 
             macOS {
-                bundleID = "app.logdate"
+                bundleID = "studio.hypertext.apps.logdate"
                 dockName = "LogDate"
                 appCategory = "public.app-category.lifestyle"
                 iconFile.set(project.file("packaging/LogDate.icns"))

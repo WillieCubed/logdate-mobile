@@ -55,13 +55,11 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>studio.hypertext.LogDate</string>
+			<string>studio.hypertext.apps.logdate</string>
 			<!--
-				Reverse-DNS `studio.hypertext.logdate` is the modern,
-				hijack-resistant scheme; `logdate` stays during the
-				transition window so older builds of LogDate Web (and
-				cached scheme links) keep working. Web side is tracked
-				in logdate-web/docs/deep-linking.md (item N-5).
+				Keep the existing return URL schemes for LogDate Web,
+				cached links, and OAuth callbacks. URL schemes are
+				independent of the application bundle identifier.
 			-->
 			<key>CFBundleURLSchemes</key>
 			<array>
@@ -74,7 +72,7 @@
 	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>studio.hypertext.LogDate.sync.refresh</string>
+		<string>studio.hypertext.apps.logdate.sync.refresh</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

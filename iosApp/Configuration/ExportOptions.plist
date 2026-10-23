@@ -26,7 +26,7 @@
 
     <key>provisioningProfiles</key>
     <dict>
-        <key>studio.hypertext.LogDate</key>
+        <key>studio.hypertext.apps.logdate</key>
         <string>__PROVISIONING_PROFILE__</string>
     </dict>
 
