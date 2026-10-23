@@ -2,6 +2,7 @@
 """Verify the production unique Cloud Restore request survives an Android app process restart."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -67,29 +68,89 @@ def probe(serial, mode, output):
         raise RuntimeError(f"Cloud restore work {mode} probe failed; inspect {output}")
 
 
-def radio_state(serial):
-    airplane = adb(serial, "shell", "settings", "get", "global", "airplane_mode_on").strip() == b"1"
-    wifi = adb(serial, "shell", "settings", "get", "global", "wifi_on").strip()
+def network_read_timeout(deadline):
+    if deadline is None:
+        return 180
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError("Owned emulator offline admission deadline expired")
+    return min(5, remaining)
+
+
+def radio_state(serial, deadline=None):
+    airplane = adb(serial, "shell", "settings", "get", "global", "airplane_mode_on",
+                   timeout=network_read_timeout(deadline)).strip() == b"1"
+    wifi = adb(serial, "shell", "settings", "get", "global", "wifi_on",
+               timeout=network_read_timeout(deadline)).strip()
     if wifi not in (b"0", b"1", b"2"):
         raise RuntimeError("Android Wi-Fi state could not be read")
     return airplane, wifi
 
 
-def set_offline(serial):
-    adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable")
-    adb(serial, "shell", "svc", "wifi", "disable")
+def set_offline(serial, output=None):
+    deadline = time.monotonic() + 10
+    connectivity, observed, default_network, failure = b"", None, None, None
+    try:
+        adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable",
+            timeout=network_read_timeout(deadline))
+        adb(serial, "shell", "svc", "wifi", "disable", timeout=network_read_timeout(deadline))
+        while True:
+            connectivity = adb(serial, "shell", "dumpsys", "connectivity", timeout=network_read_timeout(deadline))
+            defaults = [line.strip() for line in connectivity.splitlines()
+                        if line.lstrip().startswith(b"Active default network:")]
+            match = re.fullmatch(rb"Active default network:\s*(none|[0-9]+)", defaults[0]) if len(defaults) == 1 else None
+            if match is None:
+                raise RuntimeError("Android default network readback was missing or ambiguous")
+            default_network = match.group(1).decode()
+            observed = radio_state(serial, deadline=deadline)
+            remaining = network_read_timeout(deadline)
+            if observed == (True, b"0") and default_network == "none":
+                return
+            time.sleep(min(0.1, remaining))
+    except BaseException as error:
+        failure = error
+        raise
+    finally:
+        if output is not None:
+            try:
+                NATIVE["private_file"](output / "offline-connectivity.log", connectivity[:131072])
+                NATIVE["private_file"](output / "offline-radio.json", json.dumps({
+                    "airplane": observed[0] if observed else None,
+                    "wifi": observed[1].decode() if observed else None,
+                    "defaultNetwork": default_network, "admitted": failure is None,
+                    "failure": type(failure).__name__ if failure else None,
+                }).encode())
+            except Exception as diagnostic_error:
+                if failure is None:
+                    raise
+                failure.add_note(f"Offline diagnostics could not be retained: {type(diagnostic_error).__name__}")
 
 
 def restore_radio_state(serial, original):
     airplane, wifi = original
-    adb(serial, "shell", "cmd", "connectivity", "airplane-mode", "enable" if airplane else "disable")
-    adb(serial, "shell", "svc", "wifi", "disable" if wifi == b"0" else "enable")
+    failures = []
+    for label, arguments in (
+        ("airplane", ("shell", "cmd", "connectivity", "airplane-mode", "enable" if airplane else "disable")),
+        ("Wi-Fi", ("shell", "svc", "wifi", "disable" if wifi == b"0" else "enable")),
+    ):
+        try:
+            adb(serial, *arguments, timeout=5)
+        except Exception:
+            failures.append(label)
+    deadline = time.monotonic() + 5
+    observed = None
     for _ in range(20):
-        observed = radio_state(serial)
-        if observed == original:
-            return
-        time.sleep(0.25)
-    raise RuntimeError(f"Could not restore the emulator's original network state: expected {original!r}, observed {observed!r}")
+        if time.monotonic() >= deadline:
+            break
+        try:
+            observed = radio_state(serial, deadline=deadline)
+            if observed == original:
+                return
+        except Exception:
+            failures.append("readback")
+        time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+    raise RuntimeError(f"Could not restore the emulator's original network state: expected {original!r}, observed {observed!r}; "
+                       f"{', '.join(dict.fromkeys(failures)) or 'state mismatch'}")
 
 
 def require_empty_install(serial, allow_preinstalled_empty=False):
@@ -121,7 +182,7 @@ def main():
     adb(options.emulator, "install", "-r", "-t", str(options.test_apk.resolve()))
     original_radio = radio_state(options.emulator)
     try:
-        set_offline(options.emulator)
+        set_offline(options.emulator, options.output)
         probe(options.emulator, "account-transitions", options.output / "account-transitions.log")
         probe(options.emulator, "enqueue", options.output / "enqueue.log")
         adb(options.emulator, "shell", "am", "force-stop", PACKAGE)
