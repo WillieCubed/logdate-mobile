@@ -2,7 +2,8 @@
 
 This runbook covers the tasks an operator performs when existing journals move into personal
 spaces: turning moves on in staging, rehearsing a move with a realistic journal, watching moves
-while they run, switching an account back, and stopping moves. [Moving journals into personal
+while they run, switching an account back, stopping moves, and pausing the deletion of old data.
+[Moving journals into personal
 spaces](../explanation/journal-moves.md) explains how a move works, and the [journal moves
 reference](../reference/journal-moves.md) lists every setting, code, metric and log message these
 steps mention.
@@ -15,10 +16,10 @@ production account moves. Turning it on takes a server change and an app change.
 1. Confirm that the staging database has the migration that adds `space_migrations`
    (`V50__Add_space_migrations.sql`). The Deploy Server Staging workflow runs migrations before it
    deploys, so any staging deploy of a revision that contains it is enough.
-2. Staging already runs with `LOGDATE_PERSONAL_SPACE_ENABLED = "true"`. Add
-   `LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = "true"` next to it in `cloud_run_env` in
-   `infra/terraform/staging.tfvars` and in `infra/terraform/staging-contract-template.json`, and
-   deploy staging. The deployment contract renderer accepts the flag in every environment.
+2. Staging runs with `LOGDATE_PERSONAL_SPACE_ENABLED` and `LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED`
+   both `"true"` in `cloud_run_env` in `infra/terraform/staging.tfvars` and in
+   `infra/terraform/staging-contract-template.json`, which must agree. Deploying staging from a
+   revision with both turns moves on.
 3. Check that the server offers moves. Its description should list `personalSpaceMigrationV1`:
 
    ```bash
@@ -135,8 +136,20 @@ moves, devices that were uploading stop with a refusal and their accounts stay o
 any hold on legacy writes lapses within 30 minutes.
 
 Accounts that already switched stay in their personal spaces. Their devices keep syncing there, and
-the legacy routes keep telling older apps to update. Turning moves off also turns off switching back,
-because the switch-back call is part of the same feature, so switch back any account that needs it
-before you deploy the change. Their legacy copies are still deleted 30 days after each switch. To keep
-those copies longer while you investigate something, set `SYNC_TOMBSTONE_PURGE_ENABLED=false`, which
-pauses the whole maintenance loop, tombstone purges included, until you set it back.
+the legacy routes keep telling older apps to update. Turning moves off doesn't take away switching
+back: each of those accounts can still switch back from the Backup page until its legacy copy is
+deleted, 30 days after its switch.
+
+## Pause deleting old data
+
+Deleting a moved journal's legacy copy can't be undone, so it has its own switch. Set
+`LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED=false` and deploy, in `cloud_run_env` and the
+environment's contract template as with any server flag. The server logs
+`SERVER_LEGACY_COPY_CLEANUP_PAUSED` when maintenance starts, and every legacy copy stays where it
+is; tombstone and personal-space purges keep running. Pause it before investigating anything that
+might need an account's old data, such as a report that a switch lost something.
+
+Pausing the deletion doesn't extend the window for switching back, which still closes 30 days after
+each switch; it only keeps the data an operator might need to recover by hand. Set the flag back to
+`true`, or remove it, to resume. The next maintenance run then deletes every copy whose 30 days have
+passed.

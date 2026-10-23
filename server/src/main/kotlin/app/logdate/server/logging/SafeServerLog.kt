@@ -63,6 +63,7 @@ private val approvedNotices =
         SpaceMigrationNotices.CLEANUP_FAILED to "SERVER_LEGACY_COPY_CLEANUP_FAILED",
         SpaceMigrationNotices.CLEANUP_SKIPPED to "SERVER_LEGACY_COPY_CLEANUP_SKIPPED",
         SpaceMigrationNotices.CLEANUP_RUN_FAILED to "SERVER_LEGACY_COPY_CLEANUP_RUN_FAILED",
+        SpaceMigrationNotices.CLEANUP_PAUSED to "SERVER_LEGACY_COPY_CLEANUP_PAUSED",
         IdentityNotices.HANDLE_RESOLUTION_FAILED to "SERVER_HANDLE_RESOLUTION_FAILED",
         IdentityNotices.BACKFILL_REFUSED_PUBLISHING to "SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING",
         IdentityNotices.BACKFILL_FAILED to "SERVER_IDENTITY_BACKFILL_FAILED",
@@ -156,6 +157,7 @@ internal object SpaceMigrationNotices {
     const val CLEANUP_FAILED = "Deleting a moved journal's legacy copy failed; the next run tries again"
     const val CLEANUP_SKIPPED = "A switched journal isn't in its personal space; its legacy copy stays"
     const val CLEANUP_RUN_FAILED = "Deleting the legacy copies of moved journals failed"
+    const val CLEANUP_PAUSED = "Deleting the legacy copies of moved journals is paused"
 }
 
 /**

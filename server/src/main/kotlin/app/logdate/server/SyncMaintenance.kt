@@ -77,6 +77,8 @@ internal fun startSyncMaintenance(
     val enabled = readEnv("SYNC_TOMBSTONE_PURGE_ENABLED")?.toBooleanStrictOrNull() ?: true
     if (!enabled) return null
 
+    val oldDataCleanup = legacyCleanup?.takeIf { oldDataPurgeEnabled(readEnv) }
+    if (legacyCleanup != null && oldDataCleanup == null) Napier.w(SpaceMigrationNotices.CLEANUP_PAUSED)
     val intervalMinutes = readEnv("SYNC_TOMBSTONE_PURGE_INTERVAL_MINUTES")?.toLongOrNull() ?: 60L
     val retentionDays = readEnv("SYNC_TOMBSTONE_RETENTION_DAYS")?.toLongOrNull() ?: 30L
 
@@ -110,7 +112,7 @@ internal fun startSyncMaintenance(
                 )
             }
             if (spaceStore != null) purgeSpacesRecorded(spaceStore, blobStorage, metrics, retentionDays.days)
-            if (legacyCleanup != null) cleanUpMovedJournalsRecorded(legacyCleanup, metrics)
+            if (oldDataCleanup != null) cleanUpMovedJournalsRecorded(oldDataCleanup, metrics)
             delay(intervalMinutes.minutes)
         }
     }
@@ -156,6 +158,15 @@ internal suspend fun purgeSpaces(
     if (result.blobsDeleted > 0) Napier.i(SpacePurgeNotices.BLOBS_PURGED)
     return result
 }
+
+/** The setting that pauses deleting moved journals' legacy copies, without pausing the rest of maintenance. */
+internal const val OLD_DATA_PURGE_ENABLED = "LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED"
+
+/**
+ * Whether maintenance deletes moved journals' legacy copies. Unset means yes, so the 30-day cleanup
+ * runs; anything but `true` pauses it, because a mistyped value should keep data rather than delete it.
+ */
+internal fun oldDataPurgeEnabled(readEnv: (String) -> String?): Boolean = readEnv(OLD_DATA_PURGE_ENABLED)?.let { it == "true" } ?: true
 
 /**
  * Deletes the legacy copy of every journal that moved into its personal space more than 30 days ago,

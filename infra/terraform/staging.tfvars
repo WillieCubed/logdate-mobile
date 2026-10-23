@@ -34,21 +34,22 @@ cpu_idle            = true
 startup_cpu_boost   = true
 
 cloud_run_env = {
-  LOGDATE_ENV                            = "production"
-  LOGDATE_EXPECT_FIRST_PARTY             = "true"
-  LOGDATE_DEPLOYMENT_KIND                = "first_party"
-  LOGDATE_SERVER_DISPLAY_NAME            = "LogDate Cloud (Staging)"
-  LOGDATE_PUBLIC_ORIGIN                  = "https://cloud-staging.logdate.app"
-  ATPROTO_PDS_SERVICE_URL                = "https://cloud-staging.logdate.app"
-  ATPROTO_HANDLE_DOMAIN                  = "cloud-staging.logdate.app"
-  BILLING_PROVIDER                       = "play"
-  SERVER_ENCRYPTION_ENABLED              = "true"
-  SYNC_MEDIA_SIGNED_URLS                 = "true"
-  SYNC_MEDIA_SIGNED_URL_TTL_HOURS        = "1"
-  AUTO_MIGRATE                           = "false"
-  LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED = "true"
-  LOGDATE_PERSONAL_SPACE_ENABLED         = "true"
-  ATPROTO_RECOVERY_KEYS_ENABLED          = "true"
+  LOGDATE_ENV                              = "production"
+  LOGDATE_EXPECT_FIRST_PARTY               = "true"
+  LOGDATE_DEPLOYMENT_KIND                  = "first_party"
+  LOGDATE_SERVER_DISPLAY_NAME              = "LogDate Cloud (Staging)"
+  LOGDATE_PUBLIC_ORIGIN                    = "https://cloud-staging.logdate.app"
+  ATPROTO_PDS_SERVICE_URL                  = "https://cloud-staging.logdate.app"
+  ATPROTO_HANDLE_DOMAIN                    = "cloud-staging.logdate.app"
+  BILLING_PROVIDER                         = "play"
+  SERVER_ENCRYPTION_ENABLED                = "true"
+  SYNC_MEDIA_SIGNED_URLS                   = "true"
+  SYNC_MEDIA_SIGNED_URL_TTL_HOURS          = "1"
+  AUTO_MIGRATE                             = "false"
+  LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED   = "true"
+  LOGDATE_PERSONAL_SPACE_ENABLED           = "true"
+  LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = "true"
+  ATPROTO_RECOVERY_KEYS_ENABLED            = "true"
 }
 
 # Secret IDs are scoped to this project's Secret Manager namespace (separate

@@ -13,12 +13,14 @@ off by default.
 The server offers moves only when both `LOGDATE_PERSONAL_SPACE_ENABLED` and
 `LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED` are `true`. It then advertises the protocol feature
 `personalSpaceMigrationV1` in its server description and answers the `/api/v1/space-migration`
-calls; otherwise those calls answer `404 FEATURE_DISABLED`. Turning the migration switch off later
-doesn't undo anything: accounts that already moved keep their storage mode, the legacy routes keep
-answering them as moved, and their legacy copies are still deleted when their 30 days are up.
+calls; otherwise the calls that start or advance a move answer `404 FEATURE_DISABLED`. Turning the
+migration switch off later only stops new moves: accounts that already moved keep their storage mode,
+the legacy routes keep answering them as moved, and they can still switch back until their legacy
+copies are deleted 30 days after each switch. `LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED`, on
+by default, pauses that deletion when set to `false`, without pausing other maintenance.
 `LOGDATE_SPACE_MIGRATION_HOLD_GRACE_SECONDS` sets how long a hold on legacy writes must stand before
 a device may switch, 120 seconds by default. [Server environment
-variables](../../server/docs/environment-variables.md) describes all three settings.
+variables](../../server/docs/environment-variables.md) describes all four settings.
 
 The app moves a journal only when the feature flags `personal_space_enabled` and
 `personal_space_migration_enabled` are both on and the server advertises `personalSpaceMigrationV1`.
@@ -31,7 +33,8 @@ after one hour without a call from it, after which another device may take the m
 writes ends on its own 30 minutes after it starts. The legacy copy is kept for 30 days after the
 switch, and switching back is possible until then. The maintenance loop that deletes due copies runs
 with the tombstone purge, every `SYNC_TOMBSTONE_PURGE_INTERVAL_MINUTES`, and only when
-`SYNC_TOMBSTONE_PURGE_ENABLED` isn't `false`.
+`SYNC_TOMBSTONE_PURGE_ENABLED` isn't `false` and `LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED`
+isn't set to anything but `true`.
 
 On the device, a move that stops waits before trying again on its own. It tries again on the next
 sync when the device was offline or is missing items from the server, after one hour when another
@@ -128,6 +131,8 @@ of them names an account.
   didn't match what it read, and refused the copy.
 - `SERVER_LEGACY_COPY_CLEANUP_FAILED` means deleting one legacy copy failed; the next run tries it
   again. `SERVER_LEGACY_COPY_CLEANUP_RUN_FAILED` means a whole run failed.
+- `SERVER_LEGACY_COPY_CLEANUP_PAUSED` means `LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED` pauses
+  deleting legacy copies; maintenance logs it when it starts.
 - `SERVER_LEGACY_COPY_CLEANUP_SKIPPED` means a move was due for cleanup but its account isn't in its
   personal space, so its copy stays.
 - `Deleted the legacy copies of <n> moved journals` reports each run that deleted something.

@@ -296,7 +296,7 @@ internal fun Application.contentApiRoutes() {
     }
 }
 
-/** `/api/v1/space-migration`: moving existing journals into personal spaces, answered only while the server does that. */
+/** `/api/v1/space-migration`: moving existing journals into personal spaces, and switching moved ones back. */
 internal fun Application.spaceMigrationApiRoutes() {
     val accountRepository by inject<AccountRepository>()
     val tokenService by inject<TokenService>()
@@ -310,11 +310,12 @@ internal fun Application.spaceMigrationApiRoutes() {
         route("/api/v1") {
             spaceMigrationRoutes(
                 tokenService = tokenService,
-                service = migrationService.takeIf { descriptorConfig.movesJournalsToPersonalSpaces },
+                service = migrationService,
                 copier = mediaCopier,
                 accounts = accountRepository,
                 transfers = transfers,
                 metrics = syncMetrics,
+                newMoves = { descriptorConfig.movesJournalsToPersonalSpaces },
             )
         }
     }

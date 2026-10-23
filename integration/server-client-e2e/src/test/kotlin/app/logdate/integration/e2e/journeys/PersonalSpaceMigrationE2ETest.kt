@@ -25,6 +25,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.shared.model.StorageModeErrorCodes
 import app.logdate.shared.model.location.HistoryCorrection
 import app.logdate.shared.model.location.HistoryField
@@ -268,6 +269,35 @@ class PersonalSpaceMigrationE2ETest {
                 mover.manager.journalStorageMove.state.value,
                 "A switched-back journal doesn't move again on its own",
             )
+        }
+
+    @Test
+    fun `a moved journal switches back from another device after the server stops offering moves`() =
+        moveTest { account ->
+            writeJournal(account)
+            val mover = device(account)
+            mover.holdIdentityKey(account)
+            moveJournal(mover)
+            val withoutMoves =
+                descriptor.copy(protocolFeatures = descriptor.protocolFeatures - ServerProtocolFeature.PERSONAL_SPACE_MIGRATION_V1)
+
+            val laptop = device(account)
+            laptop.holdIdentityKey(account)
+            laptop.config.updateServerDescriptor(withoutMoves)
+            synced(laptop.manager.fullSync())
+            laptop.manager.journalStorageMove.refresh()
+            val moved = assertIs<JournalMoveState.Moved>(laptop.manager.journalStorageMove.state.value)
+            assertNotNull(moved.previousCopyKeptUntil, "Switching back stays offered while the legacy copy is kept")
+
+            laptop.manager.journalStorageMove.switchBack()
+
+            assertEquals(JournalMoveState.SwitchedBack, laptop.manager.journalStorageMove.state.value)
+            assertEquals(AccountStorageMode.LEGACY, storageMode(account))
+            assertEquals(SpaceMigrationPhase.REVERTED, migrationPhase(account))
+            val older = device(account, AppVersion.LEGACY_ONLY)
+            older.holdIdentityKey(account)
+            synced(older.manager.fullSync())
+            assertEquals(written(mover).size, written(older).size)
         }
 
     @Test

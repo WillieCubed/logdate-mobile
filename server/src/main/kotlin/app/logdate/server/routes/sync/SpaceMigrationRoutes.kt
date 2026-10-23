@@ -41,58 +41,62 @@ private const val COPY_BUSY_RETRY_AFTER_SECONDS = 30
 /**
  * `/api/v1/space-migration`: the calls a device makes to move its account's journal from legacy
  * storage into its personal space, and back while the legacy copy is kept. Every call needs a
- * full-access token, because each one acts on the whole account; a linked watch is refused. With
- * [service] null, as when the migration is turned off, every call answers `404 FEATURE_DISABLED`.
+ * full-access token, because each one acts on the whole account; a linked watch is refused.
+ *
+ * While [newMoves] is false, as when the migration is turned off, the calls that start or advance
+ * a move answer `404 FEATURE_DISABLED`. Switching back is part of the safety guarantee, so the
+ * status, the switch back, and the hold and inventory it needs keep working for an account that
+ * switched, until its legacy copy is gone.
  */
 internal fun Route.spaceMigrationRoutes(
     tokenService: TokenService?,
-    service: SpaceMigrationService?,
-    copier: LegacyMediaCopier?,
+    service: SpaceMigrationService,
+    copier: LegacyMediaCopier,
     accounts: AccountRepository,
     transfers: TransferSlots,
     metrics: SyncMetricsRegistry? = null,
+    newMoves: () -> Boolean = { true },
 ) {
     route("/space-migration") {
         get(SpaceMigrationDocs.status) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@get
-            call.respond(migrations.status(accountId))
+            val accountId = extractUserId(call, tokenService) ?: return@get
+            call.respond(service.status(accountId))
         }
         post("/begin", SpaceMigrationDocs.begin) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@post
+            val accountId = call.moveCaller(tokenService, newMoves) ?: return@post
             val request = call.migrationBody<SpaceMigrationRequest>() ?: return@post
-            call.respondOutcome(metrics.timed("space_migration.begin") { migrations.begin(accountId, request.migrationId) })
+            call.respondOutcome(metrics.timed("space_migration.begin") { service.begin(accountId, request.migrationId) })
         }
         post("/hold", SpaceMigrationDocs.hold) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@post
+            val accountId = call.moveOrSwitchBackCaller(tokenService, service, newMoves) ?: return@post
             val request = call.migrationBody<SpaceMigrationRequest>() ?: return@post
-            call.respondOutcome(migrations.hold(accountId, request.migrationId))
+            call.respondOutcome(service.hold(accountId, request.migrationId))
         }
         post("/release", SpaceMigrationDocs.release) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@post
+            val accountId = call.moveOrSwitchBackCaller(tokenService, service, newMoves) ?: return@post
             val request = call.migrationBody<SpaceMigrationRequest>() ?: return@post
-            call.respondOutcome(migrations.release(accountId, request.migrationId))
+            call.respondOutcome(service.release(accountId, request.migrationId))
         }
         get("/legacy-inventory", SpaceMigrationDocs.legacyInventory) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@get
-            call.respond(migrations.legacyInventory(accountId, call.request.queryParameters["ids"]))
+            val accountId = call.moveOrSwitchBackCaller(tokenService, service, newMoves) ?: return@get
+            call.respond(service.legacyInventory(accountId, call.request.queryParameters["ids"]))
         }
         post("/media/{mediaId}", SpaceMigrationDocs.registerMedia) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@post
+            val accountId = call.moveCaller(tokenService, newMoves) ?: return@post
             val request = call.migrationBody<SpaceMigrationRequest>() ?: return@post
-            val mediaCopier = copier ?: return@post call.respondDisabled()
-            metrics.timed(
-                "space_migration.media_copy",
-            ) { call.registerMedia(accountId, migrations, mediaCopier, accounts, transfers, request) }
+            metrics.timed("space_migration.media_copy") {
+                call.registerMedia(accountId, service, copier, accounts, transfers, request)
+            }
         }
         post("/switch", SpaceMigrationDocs.switch) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@post
+            val accountId = call.moveCaller(tokenService, newMoves) ?: return@post
             val request = call.migrationBody<SpaceMigrationSwitchRequest>() ?: return@post
-            call.respondOutcome(metrics.timed("space_migration.switch") { migrations.switch(accountId, request) })
+            call.respondOutcome(metrics.timed("space_migration.switch") { service.switch(accountId, request) })
         }
         post("/switch-back", SpaceMigrationDocs.switchBack) {
-            val (accountId, migrations) = call.migrationCaller(tokenService, service) ?: return@post
+            val accountId = extractUserId(call, tokenService) ?: return@post
             val request = call.migrationBody<SpaceMigrationSwitchBackRequest>() ?: return@post
-            call.respondOutcome(metrics.timed("space_migration.switch_back") { migrations.switchBack(accountId, request) })
+            call.respondOutcome(metrics.timed("space_migration.switch_back") { service.switchBack(accountId, request) })
         }
     }
 }
@@ -146,17 +150,30 @@ private suspend fun ApplicationCall.registerMedia(
     }
 }
 
-/** The caller's account and the migration service, or null after answering `401`, `403` or `404 FEATURE_DISABLED`. */
-private suspend fun ApplicationCall.migrationCaller(
+/** The caller's account for a call that starts or advances a move, or null after answering `401`, `403` or `404 FEATURE_DISABLED`. */
+private suspend fun ApplicationCall.moveCaller(
     tokenService: TokenService?,
-    service: SpaceMigrationService?,
-): Pair<UUID, SpaceMigrationService>? {
+    newMoves: () -> Boolean,
+): UUID? {
     val accountId = extractUserId(this, tokenService) ?: return null
-    if (service == null) {
-        respondDisabled()
-        return null
-    }
-    return accountId to service
+    if (newMoves()) return accountId
+    respondDisabled()
+    return null
+}
+
+/**
+ * The caller's account for a call that both a move and a switch back make. While new moves are off,
+ * only an account that switched may make it, because only its switch back still needs it.
+ */
+private suspend fun ApplicationCall.moveOrSwitchBackCaller(
+    tokenService: TokenService?,
+    service: SpaceMigrationService,
+    newMoves: () -> Boolean,
+): UUID? {
+    val accountId = extractUserId(this, tokenService) ?: return null
+    if (newMoves() || service.status(accountId).phase == SpaceMigrationPhase.SWITCHED) return accountId
+    respondDisabled()
+    return null
 }
 
 private suspend inline fun <reified T> ApplicationCall.migrationBody(): T? =
