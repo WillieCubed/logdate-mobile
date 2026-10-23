@@ -8,6 +8,11 @@ ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location("wear_smoke", ROOT / "scripts/wear-companion-smoke.py")
 smoke = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(smoke)
+FAKE_SPEC = importlib.util.spec_from_file_location("personal_space_fake", ROOT / "scripts/tests/lib/personal_space_fake.py")
+space_fake = importlib.util.module_from_spec(FAKE_SPEC)
+FAKE_SPEC.loader.exec_module(space_fake)
+ORIGIN = "https://cloud.example.test"
+ACCOUNT = "11111111-1111-4111-8111-111111111111"
 
 
 class WearSmokeTest(unittest.TestCase):
@@ -87,6 +92,64 @@ class WearSmokeTest(unittest.TestCase):
         self.probe.transport = lambda *_: (404, {}, "wear-request")
         with self.assertRaisesRegex(smoke.common.SmokeError, r"^Wear companion smoke GET /contents returned HTTP 404 \(request wear-request\)$"):
             self.probe.request("GET", "/contents?since=0&limit=100")
+
+
+class WearSpaceSmokeTest(unittest.TestCase):
+    def setUp(self):
+        self.server = space_fake.PersonalSpaceServer(ACCOUNT, "smoketest_fixture", ORIGIN)
+        self.state = {"accessToken": "phone-token", "canonicalOrigin": ORIGIN, "accountId": ACCOUNT,
+                      "username": "smoketest_fixture"}
+        self.probe = smoke.WearProbe(ORIGIN, self.state, self.server.request, None)
+
+    def prepared(self):
+        self.probe.verify_identity()
+        fixture = smoke.fixture(self.probe.storage_mode)
+        self.probe.prepare(fixture)
+        return fixture
+
+    def test_space_account_runs_the_watch_journey_without_calling_a_legacy_route(self):
+        fixture = self.prepared()
+        self.assertEqual("personalSpaceV1", fixture["storageMode"])
+        self.probe.finish(fixture)
+        self.assertEqual([], self.server.legacy_calls)
+        allowed = tuple("/api/v1" + path for path in space_fake.ACCOUNT_ROUTES + ("/auth/devices/link",))
+        for _method, url, _headers, _body in self.server.calls:
+            path = url.removeprefix(ORIGIN)
+            self.assertTrue(path.startswith("/xrpc/app.logdate.space.") or path.startswith(allowed), path)
+        watch_calls = [call for call in self.server.calls if call[2]["Authorization"] == "Bearer " + space_fake.WATCH_TOKEN]
+        self.assertTrue(any(call[1].endswith("putRecord") for call in watch_calls))
+        self.assertTrue(self.server.records[fixture["moment"]["rkey"]]["deleted"])
+        self.assertFalse(self.server.records[fixture["capture"]["rkey"]]["deleted"])
+        self.assertTrue(self.server.revoked)
+
+    def test_space_journey_fails_closed_on_each_broken_guarantee(self):
+        messages = {
+            "swap-ignored": r"putRecord returned HTTP 200",
+            "value": "Space record does not match what was written",
+            "tombstone": "tombstone",
+            "deleted-readable": r"getRecord returned HTTP 200",
+            "revocation-ignored": r"getRecord returned HTTP 200",
+            "refresh-ignored": r"token/refresh returned HTTP 200",
+        }
+        for corruption, message in messages.items():
+            with self.subTest(corruption=corruption):
+                self.setUp()
+                self.server.corruption = corruption
+                with self.assertRaisesRegex(smoke.common.SmokeError, message):
+                    self.probe.finish(self.prepared())
+
+    def test_unknown_mode_and_missing_protocol_fail_before_any_write(self):
+        cases = (({"mode": "personalSpaceV2"}, "not covered by this smoke test"),
+                 ({"mode": None}, "did not report a storageMode"),
+                 ({"features": ["personalSpaceV1"]}, "missing a Wear companion protocol"))
+        for overrides, message in cases:
+            with self.subTest(overrides=overrides):
+                self.setUp()
+                server = space_fake.PersonalSpaceServer(ACCOUNT, "smoketest_fixture", ORIGIN, **overrides)
+                probe = smoke.WearProbe(ORIGIN, self.state, server.request, None)
+                with self.assertRaisesRegex(smoke.common.SmokeError, message):
+                    probe.verify_identity()
+                self.assertFalse(any(call[0] != "GET" for call in server.calls))
 
 
 if __name__ == "__main__":
