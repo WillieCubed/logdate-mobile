@@ -15,6 +15,7 @@ import okio.HashingSink
 import okio.Source
 import okio.blackholeSink
 import okio.buffer
+import okio.use
 
 /**
  * Lossless, verified native wire content. Owner/key authorization and atomic database application are
@@ -42,7 +43,7 @@ internal class NativeArchive3Bundle private constructor(
         resources.forEach { (path, expected) ->
             require(scan(open(path), expected.bytes).first == expected) { "Native archive source changed" }
         }
-        resources.toSortedMap().forEach { (path, expected) ->
+        resources.entries.sortedBy { it.key }.forEach { (path, expected) ->
             container.entry(ArchivePath.of(path), compress = !path.startsWith("media/")) { sink ->
                 val hashing = HashingSink.sha256(sink)
                 open(path).use { source ->
