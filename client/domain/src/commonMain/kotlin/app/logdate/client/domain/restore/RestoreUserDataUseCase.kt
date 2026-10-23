@@ -112,6 +112,7 @@ class RestoreUserDataUseCase(
 
         val journalsPayload = json.decodeFromString<JournalsPayload>(bundle.journalsJson)
         val notesPayload = json.decodeFromString<NotesPayload>(bundle.notesJson)
+        notesPayload.notes.forEach { it.locationDetails?.validateForRestore() }
         val draftsPayload = json.decodeFromString<DraftsPayload>(bundle.draftsJson)
         val journalNotesPayload = json.decodeFromString<JournalNotesPayload>(bundle.journalNotesJson)
         val profilePayload = bundle.profileJson?.let { json.decodeFromString<ProfilePayload>(it) }

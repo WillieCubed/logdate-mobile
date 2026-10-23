@@ -36,11 +36,14 @@ data class ExportSchemaVersion(
         val V1_1 = ExportSchemaVersion(1, 1)
         val V1_2 = ExportSchemaVersion(1, 2)
 
-        /** The self-describing archive layout used by current exports. */
+        /** The initial self-describing archive layout. */
         val V2_0 = ExportSchemaVersion(2, 0)
 
+        /** Preserves legacy transcription and independent note coordinates and place identity. */
+        val V2_1 = ExportSchemaVersion(2, 1)
+
         /** The schema version written by the current app. */
-        val CURRENT = V2_0
+        val CURRENT = V2_1
 
         fun parse(value: String): ExportSchemaVersion {
             val parts = value.split(".")

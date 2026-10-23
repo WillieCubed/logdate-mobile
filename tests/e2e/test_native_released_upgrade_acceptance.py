@@ -11,8 +11,8 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("native-released-upgrade-ac
 
 
 class ReleasedUpgradeAcceptanceTest(unittest.TestCase):
-    def fixture(self, root):
-        document = {"baselineVersion": 205, "baselineSchema": 55, "candidateVersion": 207, "candidateSchema": 57}
+    def fixture(self, root, candidate_schema=57):
+        document = {"baselineVersion": 205, "baselineSchema": 55, "candidateVersion": 207, "candidateSchema": candidate_schema}
         for role in ("baselineApp", "baselineProbe", "candidateApp"):
             apk = root / (role + ".apk")
             apk.write_bytes(role.encode())
@@ -56,10 +56,30 @@ class ReleasedUpgradeAcceptanceTest(unittest.TestCase):
                 with self.assertRaises((ValueError, RuntimeError)):
                     MODULE["fixture_artifacts"](fixture, root)
 
+    def test_unsupported_candidate_schemas_fail_before_any_install(self):
+        for schema in (59, 56, 57.0, "58", True, None):
+            with self.subTest(schema=schema), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                fixture, _ = self.fixture(root, candidate_schema=schema)
+                options = SimpleNamespace(source="emulator-5556", destination="emulator-5558", seed_empty_source=True,
+                                          output=root / "results", fixture_environment=fixture)
+                globals_ = MODULE["run"].__globals__
+                with patch.dict(globals_, require_owned_pair=lambda *args: None), \
+                     patch.dict(MODULE["H"], radio_state=lambda *args: self.fail("Invalid schema reached device preparation")), \
+                     patch.dict(globals_, install=lambda *args: self.fail("Invalid schema reached installation")):
+                    with self.assertRaises(ValueError):
+                        MODULE["run"](options)
+
     def test_old_agent_backs_up_before_upgrade_and_preservation_precedes_mutating_oracles(self):
+        self.assert_upgrade_flow(57)
+
+    def test_schema58_uses_candidate_schema_for_every_preservation_probe_and_receipt(self):
+        self.assert_upgrade_flow(58)
+
+    def assert_upgrade_flow(self, candidate_schema):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
-            fixture, _ = self.fixture(root)
+            fixture, _ = self.fixture(root, candidate_schema=candidate_schema)
             candidate_probe = root / "probe.apk"
             candidate_probe.write_bytes(b"candidate-probe")
             events = []
@@ -84,7 +104,7 @@ class ReleasedUpgradeAcceptanceTest(unittest.TestCase):
 
             def stage(serial, name, version, schema, output):
                 events.append((serial, name))
-                self.assertEqual((205, 55) if name.startswith("baseline") else (207, 57), (version, schema))
+                self.assertEqual((205, 55) if name.startswith("baseline") else (207, candidate_schema), (version, schema))
 
             def installed(serial, app, probe):
                 events.append((serial, "install205" if app.name == "baselineApp.apk" else "install207"))
@@ -113,6 +133,11 @@ class ReleasedUpgradeAcceptanceTest(unittest.TestCase):
                 self.assertLess(events.index((serial, last_preserved)), events.index((serial, mutation)))
             self.assertEqual(2, events.count((options.destination, "native-restore")))
             self.assertTrue(result["releasedInstalledUpgrade"])
+            self.assertEqual(55, result["sourceSchema"])
+            self.assertEqual(candidate_schema, result["targetSchema"])
+            self.assertTrue(result["encryptedSchemaMigration"])
+            self.assertEqual(candidate_schema == 57, result["encryptedSchema55To57"])
+            self.assertEqual(result, json.loads((options.output / "acceptance.json").read_text()))
             self.assertFalse(result["googleProviderAccepted"])
             self.assertFalse(result["playSignedArtifact"])
 

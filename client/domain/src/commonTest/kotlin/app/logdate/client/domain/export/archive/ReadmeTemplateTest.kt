@@ -236,7 +236,7 @@ class ReadmeTemplateTest {
             read, and manifest.json lists each one with the schema that describes it. The
             Markdown files can be copied straight into a note-taking app.
 
-            This is LogDate export format 2.0.
+            This is LogDate export format 2.1.
             """.trimIndent() + "\n"
     }
 }

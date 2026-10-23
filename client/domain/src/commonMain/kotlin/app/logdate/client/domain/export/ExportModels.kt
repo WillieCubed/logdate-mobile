@@ -1,5 +1,6 @@
 package app.logdate.client.domain.export
 
+import app.logdate.client.domain.export.archive.ArchiveNoteLocation
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.profile.LogDateProfile
@@ -51,11 +52,13 @@ data class ExportNote(
     val capturedDuring: String? = null,
     val mediaPath: String? = null, // Path to media file
     val durationMs: Long? = null,
+    val transcription: String? = null,
     val transcript: TranscriptDocument? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val timeZone: String? = null,
     val location: ExportLocation? = null,
+    val locationDetails: ArchiveNoteLocation? = null,
     val tags: List<String> = emptyList(),
     val people: List<String> = emptyList(),
     val syncVersion: Long = 0,

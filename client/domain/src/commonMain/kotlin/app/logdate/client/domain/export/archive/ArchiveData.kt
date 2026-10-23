@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 /**
- * The records in a 2.0 archive's `data/` files.
+ * The records in a 2.x archive's `data/` files.
  *
  * These types describe the archive, not the app: they are written to and read from JSON on their own
  * and never expose a domain class, so a change inside the app cannot change the archive by accident.
@@ -57,8 +57,12 @@ data class ArchiveNote(
     val capturedDuring: String? = null,
     val media: ArchiveMediaRef? = null,
     val durationMs: Long? = null,
+    /** Original legacy text, independently of any structured recognition document. */
+    val transcription: String? = null,
     val transcript: TranscriptDocument? = null,
     val location: ArchiveLocation? = null,
+    /** Canonical source location in 2.1 and later; [location] remains a legacy display projection. */
+    val locationDetails: ArchiveNoteLocation? = null,
     /** The journals this note appears in. A note may be in several, or in none. */
     val journalIds: List<String> = emptyList(),
 )

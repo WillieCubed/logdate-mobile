@@ -14,7 +14,7 @@ import kotlin.time.Instant
 @Serializable
 data class ArchiveManifest(
     val format: String = FORMAT,
-    val schemaVersion: ExportSchemaVersion = ExportSchemaVersion.V2_0,
+    val schemaVersion: ExportSchemaVersion = ExportSchemaVersion.V2_1,
     val exportedAt: Instant,
     /** IANA id of the zone the export was made in, used to show local times when a note has none. */
     val exportTimeZone: String,

@@ -27,7 +27,7 @@ object ArchivePayloadValidator {
             throw UnsupportedExportVersionException(metadata.version)
         }
         json.decodeFromString<JournalsPayload>(bundle.journalsJson)
-        json.decodeFromString<NotesPayload>(bundle.notesJson)
+        json.decodeFromString<NotesPayload>(bundle.notesJson).notes.forEach { it.locationDetails?.validateForRestore() }
         json.decodeFromString<DraftsPayload>(bundle.draftsJson)
         json.decodeFromString<JournalNotesPayload>(bundle.journalNotesJson)
         bundle.profileJson?.let { json.decodeFromString<ProfilePayload>(it) }

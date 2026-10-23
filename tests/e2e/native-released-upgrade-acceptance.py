@@ -35,8 +35,9 @@ def fixture_artifacts(path, output):
     document = json.loads(path.read_text())
     if document.get("baselineVersion") != 205 or document.get("baselineSchema") != 55:
         raise ValueError("Select the reviewed released-version baseline")
-    if document.get("candidateVersion", 0) <= 205 or document.get("candidateSchema") != 57:
-        raise ValueError("The candidate must upgrade the released baseline")
+    candidate_schema = document.get("candidateSchema")
+    if document.get("candidateVersion", 0) <= 205 or type(candidate_schema) is not int or candidate_schema not in (57, 58):
+        raise ValueError("The candidate must upgrade the released baseline to schema 57 or 58")
     folder = output / "compatibility-apks"
     folder.mkdir(mode=0o700)
     artifacts = {}
@@ -135,10 +136,11 @@ def run(options):
         transport = output / "released-native-transport.tar"
         H["private_file"](transport, payload)
         candidate = fixture["candidateVersion"]
+        candidate_schema = fixture["candidateSchema"]
         install(source, artifacts["candidateApp"], options.test_apk)
-        probe(source, "upgrade", candidate, 57, output / "installed-upgrade.log")
+        probe(source, "upgrade", candidate, candidate_schema, output / "installed-upgrade.log")
         H["adb"](source, "shell", "am", "force-stop", H["PACKAGE"])
-        probe(source, "upgrade-restart", candidate, 57, output / "installed-upgrade-restart.log")
+        probe(source, "upgrade-restart", candidate, candidate_schema, output / "installed-upgrade-restart.log")
         install(destination, artifacts["candidateApp"], options.test_apk)
         H["adb"](destination, "push", str(transport), "/data/local/tmp/logdate-released-native-transport.tar")
         H["adb"](destination, "shell", "tar", "-C", H["TRANSPORT_FILES"], "-xf", "/data/local/tmp/logdate-released-native-transport.tar")
@@ -154,9 +156,9 @@ def run(options):
                 H["assert_snapshot_preserved"](before, H["package_file_snapshot"](destination), require_database=True)
         H["verify_restored_snapshot"](H["package_file_snapshot"](destination), source_files, credentials_only=False)
         write_destination_marker(destination, expectation)
-        probe(destination, "restore", candidate, 57, output / "released-backup-restore.log")
+        probe(destination, "restore", candidate, candidate_schema, output / "released-backup-restore.log")
         H["adb"](destination, "shell", "am", "force-stop", H["PACKAGE"])
-        probe(destination, "restore-restart", candidate, 57, output / "released-backup-restart.log")
+        probe(destination, "restore-restart", candidate, candidate_schema, output / "released-backup-restart.log")
         # These existing helpers create the offline edit; run them after preservation comparisons.
         H["probe"](source, "verify-in-place", output / "upgraded-source-originals-and-key.log", metadata, "account")
         H["probe"](destination, "verify", output / "restored-originals-and-key.log", metadata, "account")
@@ -164,7 +166,9 @@ def run(options):
         H["private_file"](output / "released-destination-launch.log", launch)
         H["wait_for_timeline"](destination, output, timeout_seconds=120, prefix="released-destination")
         result = {"releasedInstalledUpgrade": True, "releasedBackupNativeRestore": True,
-                  "encryptedSchema55To57": True, "journalKeysAndOwnerRetained": True,
+                  "sourceSchema": fixture["baselineSchema"], "targetSchema": candidate_schema,
+                  "encryptedSchemaMigration": True, "encryptedSchema55To57": candidate_schema == 57,
+                  "journalKeysAndOwnerRetained": True,
                   "timestampsDeletionAndOutboxRetained": True, "bothDraftStoresRetained": True,
                   "sourceDeviceRetained": True, "distinctStableReplacementDevice": True,
                   "pendingRecordingMetadataRetained": True, "temporaryRecordingBytesExcluded": True,

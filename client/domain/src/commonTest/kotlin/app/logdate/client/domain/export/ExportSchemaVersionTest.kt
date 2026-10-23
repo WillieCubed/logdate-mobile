@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class ExportSchemaVersionTest {
     @Test
     fun `current export schema is v2`() {
-        assertEquals(ExportSchemaVersion.V2_0, ExportSchemaVersion.CURRENT)
+        assertEquals(ExportSchemaVersion.V2_1, ExportSchemaVersion.CURRENT)
     }
 
     @Test

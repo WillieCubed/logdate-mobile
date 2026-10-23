@@ -52,6 +52,7 @@ internal class V2ArchiveRestoreTest : RestoreArchiveTestFixture() {
             val mediaPath = ArchivePath.of("media/photos/2026/photo.jpg")
             val manifest =
                 ArchiveManifest(
+                    schemaVersion = ExportSchemaVersion.V2_0,
                     exportedAt = now,
                     exportTimeZone = "America/Los_Angeles",
                     generator = ArchiveGenerator(version = "2.0.0"),

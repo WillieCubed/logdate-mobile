@@ -18,6 +18,7 @@ import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.feature.core.restore.ImportOptions
 import app.logdate.feature.core.restore.RestoreDiagnosticEvents
+import app.logdate.feature.core.restore.RestoreError
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreOutcome
 import app.logdate.feature.core.restore.RestoreProgressInfo
@@ -26,6 +27,7 @@ import app.logdate.shared.model.diagnostics.DiagnosticOutcome
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
 import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -204,6 +206,67 @@ class RestoreWorkerTest {
         }
 
     @Test
+    fun `invalid canonical location is rejected before recovery admission`() =
+        runTest {
+            val notes =
+                """{"notes":[{"id":"10000000-0000-0000-0000-000000000001","type":"text","content":"Keep source","createdAt":"1970-01-01T00:00:00Z","updatedAt":"1970-01-01T00:00:00Z","locationDetails":{"place":{"id":"not-a-uuid"}}}]}"""
+            val archive = createMinimalArchive(context, notesJson = notes)
+            val sourceBytes = archive.readBytes()
+            val useCase = mockk<RestoreUserDataUseCase>(relaxed = true)
+            val launcher = RecordingRestoreLauncher()
+            val diagnostics = RecordingRestoreDiagnostics()
+            setupKoin(useCase, mockk(relaxed = true), launcher, diagnostics)
+            val recoveryId = Uuid.random().toString()
+            try {
+                val worker =
+                    TestListenableWorkerBuilder<RestoreWorker>(context)
+                        .setInputData(
+                            androidx.work.workDataOf(
+                                RestoreWorker.SOURCE_URI_KEY to Uri.fromFile(archive).toString(),
+                                RestoreWorker.RECOVERY_ID_KEY to recoveryId,
+                            ),
+                        ).build()
+                val result = assertIs<ListenableWorker.Result.Failure>(worker.doWork())
+                assertEquals(RestoreError.INVALID_ARCHIVE.name, result.outputData.getString(RestoreWorker.ERROR_KEY))
+                assertEquals(
+                    RestoreError.INVALID_ARCHIVE,
+                    launcher.completedOutcomes
+                        .filterIsInstance<RestoreOutcome.Failure>()
+                        .single()
+                        .error,
+                )
+                assertFalse(context.filesDir.resolve("archive_recovery/records/$recoveryId.json").exists())
+                assertFalse(
+                    context.filesDir
+                        .resolve("archive_recovery/sources")
+                        .listFiles()
+                        .orEmpty()
+                        .any { it.name.startsWith(recoveryId) },
+                )
+                assertContentEquals(sourceBytes, archive.readBytes())
+                coVerify(exactly = 0) {
+                    useCase.restore(
+                        archive = any(),
+                        options = any(),
+                        mediaImporter = anyNullable(),
+                        onProgress = anyNullable(),
+                        onPendingMedia = anyNullable(),
+                        mediaRecoveryId = any(),
+                        expectedNoteScope = anyNullable(),
+                    )
+                }
+                assertTrue(
+                    diagnostics.events.any {
+                        it.outcome == DiagnosticOutcome.FAILED &&
+                            it.reason == app.logdate.shared.model.diagnostics.DiagnosticReason.CORRUPT_PAYLOAD
+                    },
+                )
+            } finally {
+                archive.delete()
+            }
+        }
+
+    @Test
     fun `invalid cloud archive is deleted before restore returns`() =
         runTest {
             val cloudArchive = File.createTempFile("cloud-restore-test", ".zip", context.noBackupFilesDir)
@@ -363,6 +426,7 @@ private class RecordingRestoreDiagnostics : RestoreDiagnosticEvents {
 private fun createMinimalArchive(
     context: Context,
     attachments: Map<String, ByteArray> = emptyMap(),
+    notesJson: String = """{"notes":[]}""",
 ): File {
     val file = File.createTempFile("restore_test_archive", ".zip", context.cacheDir)
     ZipOutputStream(FileOutputStream(file)).use { zip ->
@@ -370,7 +434,7 @@ private fun createMinimalArchive(
             ExportFileStructure.METADATA_FILE to
                 """{"version":"1.2","exportDate":"1970-01-01T00:00:00Z","userId":"test","deviceId":"test","appVersion":"1.0","stats":{"journalCount":1,"noteCount":2,"draftCount":0,"mediaCount":0}}""",
             ExportFileStructure.JOURNALS_FILE to """{"journals":[]}""",
-            ExportFileStructure.NOTES_FILE to """{"notes":[]}""",
+            ExportFileStructure.NOTES_FILE to notesJson,
             ExportFileStructure.JOURNAL_NOTES_FILE to """{"journal_notes":[]}""",
             ExportFileStructure.DRAFTS_FILE to """{"drafts":[]}""",
         ).forEach { (name, content) ->

@@ -20,7 +20,9 @@ import app.logdate.client.domain.export.archive.ArchiveMediaInventoryEntry
 import app.logdate.client.domain.export.archive.ArchiveMediaRef
 import app.logdate.client.domain.export.archive.ArchiveMediaStatus
 import app.logdate.client.domain.export.archive.ArchiveNote
+import app.logdate.client.domain.export.archive.ArchiveNoteCoordinates
 import app.logdate.client.domain.export.archive.ArchiveNoteFile
+import app.logdate.client.domain.export.archive.ArchiveNoteLocation
 import app.logdate.client.domain.export.archive.ArchiveNoteType
 import app.logdate.client.domain.export.archive.ArchiveOmission
 import app.logdate.client.domain.export.archive.ArchiveOmissionReason
@@ -28,11 +30,14 @@ import app.logdate.client.domain.export.archive.ArchiveOwner
 import app.logdate.client.domain.export.archive.ArchivePath
 import app.logdate.client.domain.export.archive.ArchivePlace
 import app.logdate.client.domain.export.archive.ArchivePlaceFile
+import app.logdate.client.domain.export.archive.ArchivePlaceReference
 import app.logdate.client.domain.export.archive.ArchiveProfile
 import app.logdate.client.domain.export.archive.ArchiveProfileFile
 import app.logdate.client.domain.export.archive.ArchiveRole
 import app.logdate.client.domain.export.archive.ArchiveScope
 import app.logdate.client.domain.export.archive.ArchiveTextFormat
+import app.logdate.client.repository.transcription.TranscriptDocument
+import app.logdate.client.repository.transcription.TranscriptSoundTag
 import kotlin.time.Instant
 
 /** One instance of every archive record with every optional field filled in. */
@@ -67,7 +72,19 @@ object ArchiveSamples {
             capturedOn = "watch",
             media = includedMedia,
             durationMs = 1_000,
+            transcription = "Original legacy text",
+            transcript =
+                TranscriptDocument.fromPlainText("Structured words").copy(
+                    soundTags = listOf(TranscriptSoundTag("rain", 500, 1_000, 0.9f)),
+                    createdAt = Instant.parse("2026-09-18T03:30:05.123456789Z"),
+                    updatedAt = Instant.parse("2026-09-18T03:30:06.987654321Z"),
+                ),
             location = location,
+            locationDetails =
+                ArchiveNoteLocation(
+                    coordinates = ArchiveNoteCoordinates(39.7392, -104.9903, 1609.3, 5.0),
+                    place = ArchivePlaceReference("5c4d3e2f-1a0b-4c9d-8e7f-6a5b4c3d2e1f", "Denver", 39.7, -104.9),
+                ),
             journalIds = listOf(JOURNAL_ID),
         )
 

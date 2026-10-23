@@ -8,10 +8,12 @@ import app.logdate.client.repository.transcription.TranscriptDocumentStatus
 import app.logdate.client.repository.transcription.TranscriptSegment
 import app.logdate.client.repository.transcription.TranscriptSoundTag
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
+import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.space.ENTRY_COLLECTION
 import app.logdate.client.sync.space.FakeDataHome
 import app.logdate.client.sync.space.SpaceDevice
+import app.logdate.client.sync.space.SpaceMediaReference
 import app.logdate.client.sync.space.TRANSCRIPT_COLLECTION
 import app.logdate.client.sync.space.open
 import app.logdate.client.sync.space.transcriptKey
@@ -114,6 +116,85 @@ class NoteSpaceKindTest {
 
             assertEquals(revised, (tablet.note(note.uid) as JournalNote.Audio).transcript)
         }
+
+    @Test
+    fun `same original remote caption update preserves local working text across reference metadata changes`() =
+        rawTextAfterRemoteUpdate(
+            mediaRef = { note -> SpaceMediaReference.parse(note.mediaRef)!!.copy(alt = "Updated alternative").format() },
+            durationMs = 4_000,
+            expectedText = "  Original working text.\nKeep spacing.  ",
+        )
+
+    @Test
+    fun `a hydrated original preserves local working text using its scoped remote mapping`() =
+        rawTextAfterRemoteUpdate(
+            mediaRef = { note -> SpaceMediaReference.parse(note.mediaRef)!!.copy(alt = "Updated alternative").format() },
+            durationMs = 4_000,
+            expectedText = "  Original working text.\nKeep spacing.  ",
+            hydrated = true,
+        )
+
+    @Test
+    fun `a different original does not inherit local working text`() =
+        rawTextAfterRemoteUpdate(mediaRef = { uploadedRef(it.uid, "dd", "audio/mp4") }, durationMs = 4_000, expectedText = "")
+
+    @Test
+    fun `same original duration correction preserves local working text`() =
+        rawTextAfterRemoteUpdate(
+            mediaRef = { it.mediaRef },
+            durationMs = 5_000,
+            expectedText = "  Original working text.\nKeep spacing.  ",
+        )
+
+    private fun rawTextAfterRemoteUpdate(
+        mediaRef: (JournalNote.Audio) -> String,
+        durationMs: Long,
+        expectedText: String,
+        hydrated: Boolean = false,
+    ) = runTest {
+        val home = FakeDataHome()
+        val phone = device(home)
+        val tablet = device(home)
+        val note = transcribedRecording()
+        phone.saveNote(note)
+        assertTrue(phone.manager.uploadPendingChanges().success)
+        assertTrue(tablet.manager.downloadRemoteChanges().success)
+        val local = tablet.note(note.uid) as JournalNote.Audio
+        val localReference = if (hydrated) "file:///retained/recording.m4a" else local.mediaRef
+        if (hydrated) {
+            tablet.mediaRefs.upsert(
+                MediaSyncRef(
+                    noteId = note.uid.toString(),
+                    localUri = localReference,
+                    remoteUrl = local.mediaRef,
+                    mediaId = note.uid.toString(),
+                    updatedAt = 1,
+                    ownerId = tablet.scope.ownerId,
+                    serverOrigin = tablet.scope.serverOrigin,
+                ),
+            )
+        }
+        tablet.notes.removeById(note.uid)
+        tablet.notes.create(local.copy(mediaRef = localReference, transcription = "  Original working text.\nKeep spacing.  "))
+        phone.saveNote(
+            note.copy(
+                caption = "Edited on another device",
+                mediaRef = mediaRef(note),
+                durationMs = durationMs,
+                lastUpdated =
+                    created + 2.hours,
+            ),
+            PendingOperation.UPDATE,
+        )
+        assertTrue(phone.manager.uploadPendingChanges().success)
+
+        val result = tablet.manager.downloadRemoteChanges()
+
+        assertTrue(result.success, result.errors.toString())
+        val updated = tablet.note(note.uid) as JournalNote.Audio
+        assertEquals("Edited on another device", updated.caption)
+        assertEquals(expectedText, updated.transcription)
+    }
 
     @Test
     fun `deleting a recording deletes its entry and its transcript from the space`() =

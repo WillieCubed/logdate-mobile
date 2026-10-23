@@ -10,6 +10,7 @@ import app.logdate.client.sync.space.SpaceMediaResolver
 import app.logdate.client.sync.space.SpacePart
 import app.logdate.client.sync.space.SpacePartChange
 import app.logdate.client.sync.space.canonicalRecordKey
+import app.logdate.client.sync.withLocalAudioWorkingText
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -46,7 +47,7 @@ fun noteSpaceKind(
         others = listOf(transcript),
     ) { changes, local ->
         val entryChange = changes.of(entry).lastOrNull() as? SpacePartChange.Written
-        val base = entryChange?.value ?: local ?: return@SpaceKind null
+        val base = (entryChange?.value ?: local ?: return@SpaceKind null).withLocalAudioWorkingText(local)
         if (base !is JournalNote.Audio) return@SpaceKind base
         when (val change = changes.of(transcript).lastOrNull()) {
             is SpacePartChange.Written -> base.copy(transcript = change.value.document)

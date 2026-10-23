@@ -49,4 +49,9 @@ data class AudioNoteEntity(
     override val capturedOn: String? = null,
     @ColumnInfo(name = "captured_during")
     override val capturedDuring: String? = null,
+    @ColumnInfo(name = "location_metadata")
+    override val locationMetadata: String? = null,
+    /** Original legacy text, kept independently of the structured transcript document. */
+    @ColumnInfo(defaultValue = "''")
+    val transcription: String = "",
 ) : GenericNoteData()

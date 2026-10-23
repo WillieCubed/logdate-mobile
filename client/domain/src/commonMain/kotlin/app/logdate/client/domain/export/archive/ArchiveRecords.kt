@@ -113,14 +113,21 @@ internal fun JournalNote.toArchiveNote(
         createdAtLocal = zone?.let { creationTimestamp.toRfc3339(it) },
         text = text,
         textFormat = ArchiveTextFormat.MARKDOWN.takeIf { text != null },
-        caption = caption.ifEmpty { null },
+        caption = caption.takeUnless { this is JournalNote.Text },
         photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
         capturedOn = capturedOn?.wireName,
         capturedDuring = capturedDuring?.wireName,
         media = mediaRefOrNull()?.let(media::refFor),
-        durationMs = (this as? JournalNote.Audio)?.durationMs,
+        durationMs =
+            when (this) {
+                is JournalNote.Audio -> durationMs
+                is JournalNote.Video -> durationMs
+                else -> null
+            },
+        transcription = (this as? JournalNote.Audio)?.transcription,
         transcript = (this as? JournalNote.Audio)?.transcript,
         location = location?.toArchiveLocation(),
+        locationDetails = location?.toArchiveNoteLocation(),
         journalIds = journalIds.map { it.toString() },
     )
 }
@@ -144,6 +151,15 @@ private fun NoteLocation.toArchiveLocation(): ArchiveLocation? {
         placeName = displayName,
     )
 }
+
+private fun NoteLocation.toArchiveNoteLocation() =
+    ArchiveNoteLocation(
+        coordinates =
+            coordinates?.let {
+                ArchiveNoteCoordinates(it.latitude, it.longitude, it.altitude, it.accuracy?.toShortDouble())
+            },
+        place = place?.let { ArchivePlaceReference(it.id.toString(), it.name, it.latitude, it.longitude) },
+    )
 
 internal fun EditorDraft.toArchiveDraft(media: MediaReferences) =
     ArchiveDraft(

@@ -1,5 +1,6 @@
 package app.logdate.client.data.notes
 
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import kotlin.uuid.Uuid
 
@@ -35,7 +36,11 @@ internal fun JournalNote.hasSamePersistedContent(other: JournalNote): Boolean {
         is JournalNote.Image ->
             other is JournalNote.Image && mediaRef == other.mediaRef && caption == other.caption && presentation == other.presentation
         is JournalNote.Audio ->
-            other is JournalNote.Audio && mediaRef == other.mediaRef && durationMs == other.durationMs && caption == other.caption
+            other is JournalNote.Audio &&
+                mediaRef == other.mediaRef &&
+                durationMs == other.durationMs &&
+                caption == other.caption &&
+                transcription == other.transcription
         is JournalNote.Video ->
             other is JournalNote.Video &&
                 mediaRef == other.mediaRef &&
@@ -49,3 +54,14 @@ private fun sameKnownDuration(
     first: Long?,
     second: Long?,
 ): Boolean = first == null || second == null || first == second
+
+internal fun JournalNote.withStoredMediaRef(mediaReferences: StoredMediaReferences): JournalNote =
+    when (this) {
+        is JournalNote.Image -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
+        is JournalNote.Audio -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
+        is JournalNote.Video -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
+        else -> this
+    }
+
+/** A legacy file path and its canonical stored spelling identify the same original. */
+internal fun StoredMediaReferences.spellingsOf(reference: String): Set<String> = setOf(reference, storedReference(reference))

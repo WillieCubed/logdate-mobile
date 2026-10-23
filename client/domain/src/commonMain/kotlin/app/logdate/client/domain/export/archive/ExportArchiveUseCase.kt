@@ -25,7 +25,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 
 /**
- * Builds a 2.0 export archive: a self-describing, checksummed copy of the person's data that needs
+ * Builds a 2.x export archive: a self-describing, checksummed copy of the person's data that needs
  * nothing but a file browser to make sense of.
  *
  * Everything is read and every media file is resolved first, so each file has its path and type.

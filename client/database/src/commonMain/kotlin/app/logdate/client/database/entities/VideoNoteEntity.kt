@@ -49,4 +49,6 @@ data class VideoNoteEntity(
     override val capturedOn: String? = null,
     @ColumnInfo(name = "captured_during")
     override val capturedDuring: String? = null,
+    @ColumnInfo(name = "location_metadata")
+    override val locationMetadata: String? = null,
 ) : GenericNoteData()

@@ -29,8 +29,8 @@ class RetainedDatabaseMigrationSafetyJvmTest {
 
     @Test fun `newer backup cannot be replaced with an empty journal`() =
         runTest {
-            seedCurrentJournal(version = 58)
-            assertRefusedAndRetained(58)
+            seedCurrentJournal(version = DATABASE_VERSION + 1)
+            assertRefusedAndRetained(DATABASE_VERSION + 1)
         }
 
     @Test fun `unknown older version metadata cannot erase retained records`() =
@@ -47,6 +47,8 @@ class RetainedDatabaseMigrationSafetyJvmTest {
                 56,
             )
         }
+
+    @Test fun `schema 57 migrates with content deletion state and outbox intact`() = runTest { assertSupportedMigration(57) }
 
     private suspend fun assertSupportedMigration(fromVersion: Int) {
         val helper =
@@ -85,19 +87,19 @@ class RetainedDatabaseMigrationSafetyJvmTest {
             database.close()
         }
         assertEquals(before, snapshot())
-        assertEquals(57L, version())
+        assertEquals(DATABASE_VERSION.toLong(), version())
     }
 
     @Test fun `only an explicitly disposable builder may recreate unsupported tables`() =
         runTest {
-            seedCurrentJournal(version = 58)
+            seedCurrentJournal(version = DATABASE_VERSION + 1)
             val database = getRoomDatabase(Room.databaseBuilder<LogDateDatabase>(file.toString()).fallbackToDestructiveMigration(true))
             try {
                 assertTrue(database.journalDao().getAll().isEmpty())
             } finally {
                 database.close()
             }
-            assertEquals(57L, version())
+            assertEquals(DATABASE_VERSION.toLong(), version())
         }
 
     private fun open() = getRoomDatabase(Room.databaseBuilder<LogDateDatabase>(file.toString()))
