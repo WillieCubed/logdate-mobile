@@ -29,8 +29,8 @@ internal class ArchiveMediaRecoveryEngine(
         val media = koin.get<MediaManager>()
         val cloud = koin.getOrNull<AutomaticMediaRecovery>()
         val reasons = mutableMapOf<String, DiagnosticReason>()
-        RetainedArchiveMediaSources(store, scope, record.id) { zip, root ->
-            AndroidArchiveMediaImporter(context, media, zip, root, koin.get())
+        RetainedArchiveMediaSources(store, scope, record.id) { zip, root, integrity ->
+            AndroidArchiveMediaImporter(context, media, zip, root, koin.get(), integrity)
         }.use { sources ->
             val pending = record.pending.map { it.copy(archivePath = sources.path(it)) }
             store.replacePending(record.id, pending)

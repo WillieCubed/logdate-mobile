@@ -13,6 +13,7 @@ import app.logdate.client.domain.restore.RecoveryMediaRole
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.domain.restore.mediaIntegrity
 import app.logdate.client.media.MediaManager
 import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
@@ -183,7 +184,7 @@ class RestoreWorker(
         emitProgress(RestoreStage.READING_CONTENTS, 20)
         val archive =
             try {
-                RestoreArchiveReader.read(zip.entries().toList().map { it.name }) { readOptionalEntry(zip, it) }.also {
+                RestoreArchiveReader.readBytes(zip.entries().toList().map { it.name }) { readOptionalEntry(zip, it) }.also {
                     app.logdate.client.domain.restore.ArchivePayloadValidator
                         .validate(it)
                 }
@@ -278,7 +279,15 @@ class RestoreWorker(
                         includeMedia = includeMedia,
                         preservePopulatedLocalProfile = preservePopulatedProfile || attempt.previous != null,
                     ),
-                mediaImporter = AndroidArchiveMediaImporter(context, mediaManager, zip, archive.root, getKoin().get()),
+                mediaImporter =
+                    AndroidArchiveMediaImporter(
+                        context,
+                        mediaManager,
+                        zip,
+                        archive.root,
+                        getKoin().get(),
+                        archive.mediaIntegrity,
+                    ),
                 onProgress = { phase ->
                     check(currentArchiveRecoveryScope(getKoin()) == attempt.scope) { "Archive recovery account changed" }
                     val info = phase.toProgressInfo()
@@ -402,10 +411,10 @@ class RestoreWorker(
     private fun readOptionalEntry(
         zipFile: ZipFile,
         entryName: String,
-    ): String? {
+    ): ByteArray? {
         val entry = zipFile.getEntry(entryName) ?: return null
         return zipFile.getInputStream(entry).use { input ->
-            input.bufferedReader(Charsets.UTF_8).readText()
+            input.readBytes()
         }
     }
 }

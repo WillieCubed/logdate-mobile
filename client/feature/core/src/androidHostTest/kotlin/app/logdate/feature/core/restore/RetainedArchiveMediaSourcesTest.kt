@@ -48,7 +48,7 @@ class RetainedArchiveMediaSourcesTest {
                     kind = "image",
                     expectedSha256 = checksum,
                 )
-            RetainedArchiveMediaSources(store, scope, current) { zip, prefix ->
+            RetainedArchiveMediaSources(store, scope, current) { zip, prefix, _ ->
                 object : MediaImporter {
                     override suspend fun importMedia(exportPath: String): String? = error("Indexing must not extract files")
 

@@ -53,6 +53,7 @@ data class V2RestoreBundle(
     val placesJson: String? = null,
     val locationHistoryJsonLines: String? = null,
     val mediaInventoryJson: String? = null,
+    val mediaIntegrity: Map<String, ArchiveMediaIntegrity>? = null,
 )
 
 internal data class AdaptedV2RestoreBundle(

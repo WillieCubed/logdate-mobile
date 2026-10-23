@@ -7,54 +7,26 @@ package app.logdate.client.media
 
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
-import app.logdate.client.media.storage.importFileIntoLibrary
 import app.logdate.client.media.storage.iosMediaFileResolver
 import io.github.aakira.napier.Napier
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import platform.AVFoundation.AVURLAsset
 import platform.CoreMedia.CMTimeGetSeconds
-import platform.Foundation.NSCachesDirectory
-import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSFileModificationDate
 import platform.Foundation.NSFileSize
 import platform.Foundation.NSNumber
 import platform.Foundation.NSURL
-import platform.Foundation.NSUserDomainMask
-import platform.Foundation.create
 import platform.Foundation.timeIntervalSince1970
 import platform.Foundation.writeToFile
-import platform.Photos.PHAccessLevelReadWrite
-import platform.Photos.PHAsset
-import platform.Photos.PHAssetMediaTypeAudio
-import platform.Photos.PHAssetMediaTypeImage
-import platform.Photos.PHAssetMediaTypeVideo
-import platform.Photos.PHAssetResource
-import platform.Photos.PHAssetResourceManager
-import platform.Photos.PHAssetResourceRequestOptions
-import platform.Photos.PHAssetResourceTypeFullSizePhoto
-import platform.Photos.PHAssetResourceTypeFullSizeVideo
-import platform.Photos.PHAssetResourceTypePairedVideo
-import platform.Photos.PHAssetResourceTypePhoto
-import platform.Photos.PHAssetResourceTypeVideo
-import platform.Photos.PHAuthorizationStatusAuthorized
-import platform.Photos.PHAuthorizationStatusLimited
-import platform.Photos.PHFetchOptions
-import platform.Photos.PHPhotoLibrary
-import platform.posix.memcpy
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
@@ -71,6 +43,7 @@ class IosMediaManager(
 ) : MediaManager,
     ConditionalMediaSaver {
     private val fileManager = NSFileManager.defaultManager
+    private val photoLibrary = IosPhotoLibrary(mediaFiles)
     private val mediaRootPath = mediaFiles.directory(MediaCollection.Library)
     private val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif")
     private val videoExtensions = setOf("mp4", "mov", "m4v")
@@ -82,8 +55,8 @@ class IosMediaManager(
                     uri.photoLibraryLocalIdentifier() ?: return@withContext error(
                         "Invalid photo library URI: $uri",
                     )
-                val asset = fetchPhotoLibraryAsset(localIdentifier)
-                return@withContext asset?.toPhotoLibraryMediaObject() ?: error("Unsupported or missing media at $uri")
+                val asset = photoLibrary.fetchPhotoLibraryAsset(localIdentifier)
+                return@withContext asset?.let { photoLibrary.mediaObject(it) } ?: error("Unsupported or missing media at $uri")
             }
 
             val path = resolvePath(uri)
@@ -110,7 +83,7 @@ class IosMediaManager(
     override suspend fun exists(mediaId: String): Boolean =
         withContext(Dispatchers.Default) {
             if (mediaId.isPhotoLibraryUri()) {
-                return@withContext fetchPhotoLibraryAsset(mediaId.photoLibraryLocalIdentifier()) != null
+                return@withContext photoLibrary.fetchPhotoLibraryAsset(mediaId.photoLibraryLocalIdentifier()) != null
             }
 
             val path = resolvePath(mediaId)
@@ -120,7 +93,7 @@ class IosMediaManager(
     override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> =
         withContext(Dispatchers.Default) {
             val media =
-                (listPhotoLibraryMedia(fetchLimit = MAX_RECENT_MEDIA) + listMediaObjects())
+                (photoLibrary.listPhotoLibraryMedia(fetchLimit = MAX_RECENT_MEDIA) + listMediaObjects())
                     .sortedByDescending { it.timestamp }
                     .take(MAX_RECENT_MEDIA)
             flowOf(media)
@@ -132,7 +105,7 @@ class IosMediaManager(
     ): Flow<List<MediaObject>> =
         withContext(Dispatchers.Default) {
             val media =
-                (listPhotoLibraryMedia() + listMediaObjects())
+                (photoLibrary.listPhotoLibraryMedia() + listMediaObjects())
                     .filter { it.timestamp >= start && it.timestamp < end }
             flowOf(media)
         }
@@ -141,7 +114,7 @@ class IosMediaManager(
         withContext(Dispatchers.Default) {
             if (uri.isPhotoLibraryUri()) {
                 val payload =
-                    runCatching { readPhotoLibraryPayload(uri.photoLibraryLocalIdentifier()) }
+                    runCatching { photoLibrary.readPhotoLibraryPayload(uri.photoLibraryLocalIdentifier()) }
                         .getOrElse { error ->
                             Napier.e("Failed to copy photo-library media into app storage", error)
                             return@withContext
@@ -175,7 +148,7 @@ class IosMediaManager(
     override suspend fun readMedia(uri: String): MediaPayload =
         withContext(Dispatchers.Default) {
             if (uri.isPhotoLibraryUri()) {
-                return@withContext readPhotoLibraryPayload(uri.photoLibraryLocalIdentifier())
+                return@withContext photoLibrary.readPhotoLibraryPayload(uri.photoLibraryLocalIdentifier())
             }
 
             val path = resolvePath(uri) ?: error("Invalid media URI: $uri")
@@ -216,9 +189,7 @@ class IosMediaManager(
             val fileName = "${Uuid.random()}-$sanitizedName"
             val path = buildMediaPath(fileName)
             val data = payload.data.toNSData()
-            if (!data.writeToFile(path, true)) {
-                Napier.e("Failed to write media payload to $path")
-            }
+            publishIosMediaFile(path) { data.writeToFile(path, true) }
             return@withContext "file://$path"
         }
 
@@ -245,7 +216,7 @@ class IosMediaManager(
             val sanitizedName = fileName.sanitizeForPath()
             val destFileName = "${Uuid.random()}-$sanitizedName"
             val destPath = buildMediaPath(destFileName)
-            fileManager.copyItemAtPath(sourceFilePath, destPath, error = null)
+            publishIosMediaFile(destPath) { fileManager.copyItemAtPath(sourceFilePath, destPath, error = null) }
             return@withContext NSURL.fileURLWithPath(destPath).absoluteString ?: "file://$destPath"
         }
 
@@ -264,69 +235,17 @@ class IosMediaManager(
         return uri
     }
 
-    /**
-     * A file URL for a photo the user picked, copied into the media library so the entry that
-     * stores it keeps it. The renderable cache is purgeable and not restored from a backup.
-     */
-    suspend fun resolvePhotoLibraryImageUri(localIdentifier: String): String? {
-        val asset = fetchPhotoLibraryAsset(localIdentifier) ?: return null
-        if (asset.mediaType != PHAssetMediaTypeImage) {
-            return null
-        }
-        return importAssetIntoLibrary(asset)
-    }
+    /** Copies a selected photo into the durable library; the renderable cache stays purgeable. */
+    suspend fun resolvePhotoLibraryImageUri(localIdentifier: String): String? = photoLibrary.resolvePhotoLibraryImageUri(localIdentifier)
 
-    /** Like [resolvePhotoLibraryImageUri] for a video, or the `ph://` URI when it cannot be copied. */
-    suspend fun resolvePhotoLibraryVideoUri(localIdentifier: String): String? {
-        val asset = fetchPhotoLibraryAsset(localIdentifier) ?: return null
-        if (asset.mediaType != PHAssetMediaTypeVideo) {
-            return null
-        }
-        return importAssetIntoLibrary(asset) ?: photoLibraryUri(localIdentifier)
-    }
+    /** Copies a selected video, or retains its Photos reference if it cannot be copied. */
+    suspend fun resolvePhotoLibraryVideoUri(localIdentifier: String): String? = photoLibrary.resolvePhotoLibraryVideoUri(localIdentifier)
 
-    private suspend fun importAssetIntoLibrary(asset: PHAsset): String? {
-        val resource = preferredAssetResource(asset) ?: return null
-        val exported = exportResourceToCacheFile(asset, resource)?.path ?: return null
-        val fileName = "${asset.localIdentifier.sanitizeForPath()}-${resource.originalFilename.sanitizeForPath()}"
-        return importIntoLibrary(exported, fileName)
-    }
-
-    /**
-     * Copies the file at [sourcePath] into the media library as [fileName] unless that name is
-     * already there, and returns the stored file's URL, or `null` when it could not be copied.
-     */
+    /** Keeps an existing library copy when importing the same named Photos original again. */
     internal fun importIntoLibrary(
         sourcePath: String,
         fileName: String,
-    ): String? =
-        importFileIntoLibrary(mediaFiles, sourcePath, fileName).also { imported ->
-            if (imported == null) Napier.e("Failed to copy $sourcePath into the media library")
-        }
-
-    private suspend fun listPhotoLibraryMedia(fetchLimit: Int? = null): List<MediaObject> {
-        if (!hasPhotoLibraryReadAccess()) {
-            return emptyList()
-        }
-
-        val options =
-            PHFetchOptions().apply {
-                sortDescriptors = listOf(platform.Foundation.NSSortDescriptor(key = "creationDate", ascending = false))
-                if (fetchLimit != null) {
-                    this.fetchLimit = fetchLimit.toULong()
-                }
-            }
-
-        val results = PHAsset.fetchAssetsWithOptions(options)
-        val count = results.count.toInt()
-
-        return buildList(capacity = count.coerceAtMost(fetchLimit ?: count)) {
-            for (index in 0 until count) {
-                val asset = results.objectAtIndex(index.toULong()) as? PHAsset ?: continue
-                asset.toPhotoLibraryMediaObject()?.let(::add)
-            }
-        }
-    }
+    ): String? = photoLibrary.importIntoLibrary(sourcePath, fileName)
 
     private fun listMediaObjects(): List<MediaObject> {
         ensureMediaDir()
@@ -334,50 +253,6 @@ class IosMediaManager(
         return files
             .filterIsInstance<String>()
             .mapNotNull { fileName -> toMediaObject("$mediaRootPath/$fileName") }
-    }
-
-    private fun fetchPhotoLibraryAsset(localIdentifier: String?): PHAsset? {
-        val identifier = localIdentifier?.takeIf { it.isNotBlank() } ?: return null
-        if (!hasPhotoLibraryReadAccess()) {
-            return null
-        }
-
-        val results = PHAsset.fetchAssetsWithLocalIdentifiers(listOf(identifier), null)
-        return results.firstObject as? PHAsset
-    }
-
-    private suspend fun PHAsset.toPhotoLibraryMediaObject(): MediaObject? {
-        val timestamp =
-            creationDate?.let { date ->
-                Instant.fromEpochMilliseconds((date.timeIntervalSince1970 * 1000).toLong())
-            } ?: Instant.fromEpochMilliseconds(0)
-
-        val resource = preferredAssetResource(this)
-        val fileName = resource?.originalFilename?.takeIf { it.isNotBlank() } ?: defaultPhotoLibraryFileName(this)
-
-        return when (mediaType) {
-            PHAssetMediaTypeImage -> {
-                val uri = resolveRenderableUri(this) ?: return null
-                MediaObject.Image(
-                    uri = uri,
-                    size = 0,
-                    name = fileName,
-                    timestamp = timestamp,
-                )
-            }
-            PHAssetMediaTypeVideo -> {
-                val uri = resolveRenderableUri(this) ?: photoLibraryUri(localIdentifier)
-                MediaObject.Video(
-                    name = fileName,
-                    uri = uri,
-                    size = 0,
-                    timestamp = timestamp,
-                    duration = (duration * 1000).toLong().milliseconds,
-                )
-            }
-            PHAssetMediaTypeAudio -> null
-            else -> null
-        }
     }
 
     private fun toMediaObject(path: String): MediaObject? {
@@ -412,95 +287,6 @@ class IosMediaManager(
         }
     }
 
-    private suspend fun readPhotoLibraryPayload(localIdentifier: String?): MediaPayload {
-        val asset = fetchPhotoLibraryAsset(localIdentifier) ?: error("Photo-library asset not found: $localIdentifier")
-        val resource = preferredAssetResource(asset) ?: error("Photo-library asset is missing a readable resource")
-        val data = readAssetResource(resource)
-        val fileName = resource.originalFilename.takeIf { it.isNotBlank() } ?: defaultPhotoLibraryFileName(asset)
-        val mimeType = resource.uniformTypeIdentifier.toMimeType()
-
-        return MediaPayload(
-            fileName = fileName,
-            mimeType = mimeType,
-            sizeBytes = data.length.toLong(),
-            data = data.toByteArray(),
-        )
-    }
-
-    private suspend fun resolveRenderableUri(asset: PHAsset): String? =
-        preferredAssetResource(asset)
-            ?.let { resource -> exportResourceToCacheFile(asset, resource) }
-            ?.absoluteString
-
-    private suspend fun exportResourceToCacheFile(
-        asset: PHAsset,
-        resource: PHAssetResource,
-    ): NSURL? {
-        val cacheDir = ensurePhotoLibraryCacheDir()
-        val fileName = "${asset.localIdentifier.sanitizeForPath()}-${resource.originalFilename.sanitizeForPath()}"
-        val path = "$cacheDir/$fileName"
-        if (fileManager.fileExistsAtPath(path)) {
-            return NSURL.fileURLWithPath(path)
-        }
-
-        val data = readAssetResource(resource)
-        if (!data.writeToFile(path, true)) {
-            Napier.e("Failed to write renderable photo-library cache file to $path")
-            return null
-        }
-        return NSURL.fileURLWithPath(path)
-    }
-
-    private suspend fun readAssetResource(resource: PHAssetResource): NSData =
-        suspendCancellableCoroutine { continuation ->
-            val chunks = mutableListOf<ByteArray>()
-            val options =
-                PHAssetResourceRequestOptions().apply {
-                    networkAccessAllowed = true
-                }
-
-            PHAssetResourceManager
-                .defaultManager()
-                .requestDataForAssetResource(
-                    resource = resource,
-                    options = options,
-                    dataReceivedHandler = { chunk ->
-                        chunk?.let { chunks += it.toByteArray() }
-                    },
-                    completionHandler = { error ->
-                        if (error != null) {
-                            if (continuation.isActive) {
-                                continuation.resumeWithException(
-                                    IllegalStateException(error.localizedDescription),
-                                )
-                            }
-                        } else if (continuation.isActive) {
-                            continuation.resume(chunks.flattenToNSData())
-                        }
-                    },
-                )
-        }
-
-    private fun preferredAssetResource(asset: PHAsset): PHAssetResource? {
-        val resources =
-            PHAssetResource
-                .assetResourcesForAsset(asset)
-                .filterIsInstance<PHAssetResource>()
-
-        return when (asset.mediaType) {
-            PHAssetMediaTypeImage ->
-                resources.firstOrNull { it.type == PHAssetResourceTypeFullSizePhoto }
-                    ?: resources.firstOrNull { it.type == PHAssetResourceTypePhoto }
-                    ?: resources.firstOrNull()
-            PHAssetMediaTypeVideo ->
-                resources.firstOrNull { it.type == PHAssetResourceTypeFullSizeVideo }
-                    ?: resources.firstOrNull { it.type == PHAssetResourceTypeVideo }
-                    ?: resources.firstOrNull { it.type == PHAssetResourceTypePairedVideo }
-                    ?: resources.firstOrNull()
-            else -> resources.firstOrNull()
-        }
-    }
-
     private fun resolveDuration(path: String): Duration {
         val url = NSURL.fileURLWithPath(path)
         val asset = AVURLAsset.URLAssetWithURL(url, null)
@@ -522,26 +308,6 @@ class IosMediaManager(
         )
     }
 
-    private fun ensurePhotoLibraryCacheDir(): String {
-        val url: NSURL? =
-            fileManager.URLForDirectory(
-                directory = NSCachesDirectory,
-                inDomain = NSUserDomainMask,
-                appropriateForURL = null,
-                create = true,
-                error = null,
-            )
-        val basePath = requireNotNull(url?.path)
-        val cachePath = "$basePath/$PHOTO_LIBRARY_CACHE_DIR_NAME"
-        fileManager.createDirectoryAtPath(
-            cachePath,
-            withIntermediateDirectories = true,
-            attributes = null,
-            error = null,
-        )
-        return cachePath
-    }
-
     private fun buildMediaPath(fileName: String): String = "$mediaRootPath/$fileName"
 
     private fun guessMimeType(fileName: String): String {
@@ -561,50 +327,10 @@ class IosMediaManager(
         }
     }
 
-    private fun ByteArray.toNSData(): NSData =
-        usePinned { pinned ->
-            NSData.create(bytes = pinned.addressOf(0), length = size.toULong())
-        }
-
-    private fun List<ByteArray>.flattenToNSData(): NSData {
-        if (isEmpty()) {
-            return ByteArray(0).toNSData()
-        }
-
-        val totalSize = sumOf { it.size }
-        val flattened = ByteArray(totalSize)
-        var offset = 0
-        for (chunk in this) {
-            chunk.copyInto(flattened, destinationOffset = offset)
-            offset += chunk.size
-        }
-        return flattened.toNSData()
-    }
-
-    private fun NSData.toByteArray(): ByteArray {
-        val length = this.length.toInt()
-        if (length == 0) {
-            return ByteArray(0)
-        }
-        val buffer = ByteArray(length)
-        buffer.usePinned { pinned ->
-            memcpy(pinned.addressOf(0), bytes, length.toULong())
-        }
-        return buffer
-    }
-
     private companion object {
         private const val MAX_RECENT_MEDIA = 50
         private const val PHOTO_LIBRARY_URI_PREFIX = "ph://"
-        private const val PHOTO_LIBRARY_CACHE_DIR_NAME = "photo-library-renderable"
     }
-
-    private fun hasPhotoLibraryReadAccess(): Boolean {
-        val status = PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite)
-        return status == PHAuthorizationStatusAuthorized || status == PHAuthorizationStatusLimited
-    }
-
-    private fun photoLibraryUri(localIdentifier: String): String = "$PHOTO_LIBRARY_URI_PREFIX$localIdentifier"
 
     private fun String.isPhotoLibraryUri(): Boolean = startsWith(PHOTO_LIBRARY_URI_PREFIX)
 
@@ -615,25 +341,4 @@ class IosMediaManager(
             .replace("/", "_")
             .replace("\\", "_")
             .replace(":", "_")
-
-    private fun defaultPhotoLibraryFileName(asset: PHAsset): String {
-        val baseName = asset.localIdentifier.sanitizeForPath()
-        return when (asset.mediaType) {
-            PHAssetMediaTypeImage -> "$baseName.jpg"
-            PHAssetMediaTypeVideo -> "$baseName.mov"
-            else -> baseName
-        }
-    }
-
-    private fun String.toMimeType(): String =
-        when (lowercase()) {
-            "public.jpeg", "public.jpg" -> "image/jpeg"
-            "public.png" -> "image/png"
-            "com.compuserve.gif" -> "image/gif"
-            "org.webmproject.webp" -> "image/webp"
-            "public.heic", "public.heif" -> "image/heic"
-            "com.apple.quicktime-movie" -> "video/quicktime"
-            "public.mpeg-4" -> "video/mp4"
-            else -> "application/octet-stream"
-        }
 }
