@@ -47,8 +47,8 @@ def restore_set_token(output):
     raise RuntimeError("Google D2D test transport did not expose a D2D restore set")
 
 
-def selected_transport(serial):
-    transports = HARNESS.adb(serial, "shell", "bmgr", "list", "transports").decode().splitlines()
+def selected_transport(serial, timeout=180):
+    transports = HARNESS.adb(serial, "shell", "bmgr", "list", "transports", timeout=timeout).decode().splitlines()
     return next((line.lstrip()[2:].strip() for line in transports if line.lstrip().startswith("* ")), None)
 
 
@@ -62,10 +62,59 @@ def require_empty_source(serial):
         raise RuntimeError("Use a fresh emulator for D2D acceptance; the installed app contains retained user data")
 
 
-def select_d2d_restore_transport(serial):
-    HARNESS.adb(serial, "shell", "bmgr", "transport", GMS_BACKUP_TRANSPORT, timeout=60)
-    if selected_transport(serial) != GMS_BACKUP_TRANSPORT:
+def restore_discovery_timeout(deadline):
+    remaining = deadline - HARNESS.time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError("Google D2D restore-set discovery exceeded its 60-second deadline")
+    return remaining
+
+
+def select_d2d_restore_transport(serial, deadline=None):
+    HARNESS.adb(serial, "shell", "bmgr", "transport", GMS_BACKUP_TRANSPORT,
+                timeout=60 if deadline is None else restore_discovery_timeout(deadline))
+    if selected_transport(serial, timeout=180 if deadline is None else restore_discovery_timeout(deadline)) != GMS_BACKUP_TRANSPORT:
         raise RuntimeError("Google backup transport was not selected for D2D test-mode restore")
+
+
+def wait_for_d2d_restore_set(serial, output):
+    deadline = HARNESS.time.monotonic() + 60
+    sets, last_failure, failure = b"", None, None
+    attempts, ready = 0, False
+    try:
+        select_d2d_restore_transport(serial, deadline=deadline)
+        while True:
+            try:
+                timeout = restore_discovery_timeout(deadline)
+            except RuntimeError as expired:
+                raise expired from last_failure
+            attempts += 1
+            try:
+                sets = HARNESS.adb(serial, "shell", "bmgr", "list", "sets", timeout=timeout)
+                restore_discovery_timeout(deadline)
+                token = restore_set_token(sets)
+            except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+                last_failure = error
+            else:
+                ready = True
+                return token
+            remaining = deadline - HARNESS.time.monotonic()
+            if remaining > 0:
+                HARNESS.time.sleep(min(1, remaining))
+    except BaseException as error:
+        failure = error
+        raise
+    finally:
+        try:
+            HARNESS.private_file(output / "d2d-restore-sets.log", sets)
+            HARNESS.private_file(output / "d2d-restore-readiness.json", json.dumps({
+                "ready": ready, "attempts": attempts,
+                "lastFailure": f"{type(last_failure).__name__}: {last_failure}" if last_failure else None,
+                "failure": f"{type(failure).__name__}: {failure}" if failure else None,
+            }).encode())
+        except Exception as diagnostic_error:
+            if failure is None:
+                raise
+            failure.add_note(f"D2D readiness diagnostics could not be retained: {type(diagnostic_error).__name__}")
 
 
 def select_d2d_transport(serial, attempts=30, output=None):
@@ -195,10 +244,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
         backup_d2d_source(serial, output)
 
         HARNESS.probe(serial, "post-backup-mutation", output / "post-backup-mutation.log")
-        select_d2d_restore_transport(serial)
-        sets = HARNESS.adb(serial, "shell", "bmgr", "list", "sets", timeout=60)
-        HARNESS.private_file(output / "d2d-restore-sets.log", sets)
-        token = restore_set_token(sets)
+        token = wait_for_d2d_restore_set(serial, output)
         HARNESS.adb(serial, "shell", "am", "force-stop", HARNESS.PACKAGE)
         restore = HARNESS.adb(serial, "shell", "bmgr", "restore", token, HARNESS.PACKAGE, timeout=180)
         HARNESS.private_file(output / "d2d-restore.log", restore)
