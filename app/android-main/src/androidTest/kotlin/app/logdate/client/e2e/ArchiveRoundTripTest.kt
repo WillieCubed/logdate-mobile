@@ -28,7 +28,14 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportProgress
+import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.export.archive.ArchiveExportOptions
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
+import app.logdate.client.domain.export.archive.ExportArchiveUseCase
+import app.logdate.client.domain.export.archive.MediaSourceOpener
+import app.logdate.client.domain.restore.RestoreArchiveBundle
+import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
@@ -38,6 +45,7 @@ import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.metadata.EntityType
@@ -45,6 +53,7 @@ import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.QueuedUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.feature.core.export.ZipStreamArchiveContainer
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.shared.model.EditorDraft
@@ -61,6 +70,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.test.runTest
+import okio.Source
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -78,6 +88,7 @@ import java.util.zip.ZipOutputStream
 import kotlin.math.min
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -395,6 +406,84 @@ class ArchiveRoundTripTest {
     }
 
     // ── Tests ────────────────────────────────────────────────────────────
+
+    @Test
+    fun portableArchiveMetadataSurvivesTheProductionRepositories() =
+        runTest {
+            val at = now()
+            val placeId = Uuid.random()
+            val journal = Journal(id = Uuid.random(), title = "Portable metadata", created = at, lastUpdated = at)
+            sourceJournalRepo.create(journal)
+            val location =
+                NoteLocation(
+                    NoteCoordinates(36.1699, -115.1398, 610.25, 3.5f),
+                    NotePlace(placeId, "Home", 36.17, -115.14),
+                )
+            val text = JournalNote.Text(creationTimestamp = at, lastUpdated = at, content = "Measured here", location = location)
+            val audio =
+                JournalNote.Audio(
+                    creationTimestamp = at,
+                    lastUpdated = at,
+                    mediaRef = "content://synthetic/audio",
+                    durationMs = 4_000,
+                    transcription = "  Original words.\nKeep spacing.  ",
+                )
+            val video =
+                JournalNote.Video(
+                    creationTimestamp = at,
+                    lastUpdated = at,
+                    mediaRef = "content://synthetic/video",
+                    durationMs = 12_345,
+                )
+            listOf(text, audio, video).forEach { sourceNotesRepo.create(it, journal.id) }
+            val exporter =
+                ExportArchiveUseCase(
+                    journalRepository = sourceJournalRepo,
+                    journalNotesRepository = sourceNotesRepo,
+                    profileRepository = StoredProfileRepository(),
+                    userPlacesRepository = InMemoryUserPlacesRepository(),
+                    locationHistoryRepository = InMemoryLocationHistoryRepository(),
+                    userStateRepository = InMemoryUserStateRepository(),
+                    appInfoProvider = FixedAppInfoProvider(),
+                    mediaSourceOpener =
+                        object : MediaSourceOpener {
+                            override suspend fun open(reference: String): Source? = null
+                        },
+                )
+            val file = File.createTempFile("portable-metadata-", ".zip", context.cacheDir)
+            try {
+                ZipOutputStream(FileOutputStream(file)).use { zip ->
+                    val progress =
+                        exporter
+                            .export(
+                                ArchiveExportOptions(),
+                                ZipStreamArchiveContainer(zip),
+                            ).last()
+                    assertIs<ArchiveExportProgress.Completed>(progress)
+                }
+                ZipFile(file).use { zip ->
+                    val bundle =
+                        RestoreArchiveReader.read(zip.entries().toList().map { it.name }) { name ->
+                            zip.getEntry(name)?.let { zip.getInputStream(it).bufferedReader().use { reader -> reader.readText() } }
+                        }
+                    val current = assertIs<RestoreArchiveBundle.V2>(bundle)
+                    val invalid = current.bundle.copy(notesJson = current.bundle.notesJson!!.replace(placeId.toString(), "not-a-uuid"))
+                    assertFailsWith<IllegalArgumentException> { restoreUseCase.restore(invalid) }
+                    assertNull(destJournalRepo.getJournalById(journal.id), "Invalid canonical data must not create the earlier journal")
+                    assertNull(destNotesRepo.getNoteById(text.uid))
+                    val result = restoreUseCase.restore(bundle)
+                    assertEquals(ExportSchemaVersion.V2_1, result.metadata.version)
+                    assertEquals(3, result.notesImported)
+                    assertEquals(2, result.unavailableMedia.size)
+                }
+                assertEquals(location, destNotesRepo.getNoteById(text.uid)?.location)
+                assertEquals(audio.transcription, assertIs<JournalNote.Audio>(destNotesRepo.getNoteById(audio.uid)).transcription)
+                assertEquals(video.durationMs, assertIs<JournalNote.Video>(destNotesRepo.getNoteById(video.uid)).durationMs)
+                assertEquals(3, destContentRepo.observeContentForJournal(journal.id).first().size)
+            } finally {
+                file.delete()
+            }
+        }
 
     @Test
     fun `archive all content types survive round trip`() =

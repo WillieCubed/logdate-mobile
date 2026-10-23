@@ -4,6 +4,7 @@ import json
 import re
 import runpy
 import tempfile
+import hashlib
 import unittest
 from unittest.mock import Mock
 import subprocess
@@ -106,6 +107,60 @@ class ManagedDriverControllerTest(unittest.TestCase):
             for app, probe in ((Path("relative.apk"), present), (present, Path(folder) / "missing.apk")):
                 with self.subTest(app=app, probe=probe), self.assertRaises(ValueError):
                     MODULE["pinned_install_arguments"](app, probe)
+
+    def upgrade_fixture(self, root):
+        document = dict(baselineVersion=205, baselineSchema=55, candidateVersion=208, candidateSchema=58)
+        for role in ("baselineApp", "baselineProbe", "candidateApp"):
+            artifact = root / (role + ".apk")
+            artifact.write_bytes(role.encode())
+            document[role] = dict(path=str(artifact), sha256=hashlib.sha256(artifact.read_bytes()).hexdigest())
+        fixture = root / "fixture.json"
+        fixture.write_text(json.dumps(document))
+        fixture.chmod(0o600)
+        return fixture, document
+
+    def test_upgrade_starts_with_released_apks_and_freezes_fixture_before_managed_boot(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture, document = self.upgrade_fixture(root)
+            candidate = Path(document["candidateApp"]["path"])
+            probe = root / "candidate-probe.apk"
+            probe.write_bytes(b"new probe")
+            output = root / "private"
+            output.mkdir()
+            app, initial_probe, frozen = MODULE["initial_installation"]("upgrade", candidate, probe, fixture, output)
+            self.assertEqual(b"baselineApp", app.read_bytes())
+            self.assertEqual(b"baselineProbe", initial_probe.read_bytes())
+            self.assertNotEqual(fixture, frozen)
+            saved = json.loads(frozen.read_text())
+            self.assertEqual(0o600, frozen.stat().st_mode & 0o777)
+            for role in ("baselineApp", "baselineProbe", "candidateApp"):
+                self.assertTrue(Path(saved[role]["path"]).is_relative_to(output))
+                self.assertEqual(document[role]["sha256"], saved[role]["sha256"])
+            Path(document["baselineApp"]["path"]).write_bytes(b"changed after launch preparation")
+            fixture.write_text("changed original fixture")
+            self.assertEqual(b"baselineApp", app.read_bytes())
+            self.assertEqual(58, json.loads(frozen.read_text())["candidateSchema"])
+
+    def test_upgrade_rejects_a_candidate_that_differs_from_its_fixture_before_boot(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fixture, _ = self.upgrade_fixture(root)
+            candidate = root / "wrong.apk"
+            candidate.write_bytes(b"wrong candidate")
+            output = root / "private"
+            output.mkdir()
+            with self.assertRaises(RuntimeError):
+                MODULE["initial_installation"]("upgrade", candidate, candidate, fixture, output)
+
+    def test_other_modes_keep_candidate_apks_without_reading_upgrade_fixture(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            candidate, probe = root / "candidate.apk", root / "probe.apk"
+            missing = root / "missing-fixture"
+            for mode in ("transfer", "widget", "network-policy"):
+                self.assertEqual((candidate, probe, missing), MODULE["initial_installation"](mode, candidate, probe, missing, root))
+            self.assertEqual([], list(root.iterdir()))
 
     def test_setup_process_can_disappear_before_initial_identity_capture(self):
         for failure in (subprocess.CalledProcessError(1, "ps"), RuntimeError("The owned process is no longer live")):

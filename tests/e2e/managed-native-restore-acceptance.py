@@ -113,6 +113,24 @@ def pinned_install_arguments(app, probe):
     return [f"-Plogdate.nativeAcceptanceAppApk={app}", f"-Plogdate.nativeAcceptanceProbeApk={probe}"]
 
 
+def initial_installation(mode, app, probe, fixture_environment, output):
+    """Start upgrades on the released APK and freeze their inputs before managed boot."""
+    if mode != "upgrade":
+        return app, probe, fixture_environment
+    compatibility = runpy.run_path(str(Path(__file__).with_name("native-released-upgrade-acceptance.py")))
+    document, artifacts = compatibility["fixture_artifacts"](fixture_environment, output)
+    if hashlib.sha256(app.read_bytes()).hexdigest() != document["candidateApp"]["sha256"]:
+        raise RuntimeError("The selected candidate differs from the released-upgrade fixture")
+    frozen_document = dict(document)
+    for role, artifact in artifacts.items():
+        frozen_document[role] = dict(path=str(artifact), sha256=document[role]["sha256"])
+    frozen = output / "released-upgrade-fixture.json"
+    descriptor = os.open(frozen, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w") as stream:
+        json.dump(frozen_document, stream)
+    return artifacts["baselineApp"], artifacts["baselineProbe"], frozen
+
+
 def validate_native_arguments(arguments):
     allowed = {"--exercise-quota", "--exercise-archive-recovery", "--exercise-missing-keys",
                "--exercise-missing-privacy", "--exercise-credentials-only", "--exercise-data-only",
@@ -232,7 +250,9 @@ def run(options):
         destination.chmod(0o400)
         pinned.append(destination)
     app, probe = pinned
-    hashes = [hashlib.sha256(apk.read_bytes()).hexdigest() for apk in pinned]
+    initial_app, initial_probe, frozen_fixture = initial_installation(
+        options.mode, app, probe, options.fixture_environment, output)
+    hashes = [hashlib.sha256(apk.read_bytes()).hexdigest() for apk in (initial_app, initial_probe)]
     architecture = "arm64-v8a" if platform.machine() == "arm64" else "x86_64"
     image = "google_apis_playstore" if options.mode == "d2d" else "google_apis"
     group = "nativeD2dPair" if options.mode == "d2d" else "nativeRestorePair"
@@ -251,7 +271,7 @@ def run(options):
     initial_processes = command("ps", "-axo", "pid,args").stdout.decode().splitlines()
     capacity = TARGET["managed_device_capacity"](initial_processes)
     args = ["./gradlew", f":tools:native-restore-driver:{group}GroupDebugAndroidTest",
-            *pinned_install_arguments(app, probe),
+            *pinned_install_arguments(initial_app, initial_probe),
             f"-Pandroid.testInstrumentationRunnerArguments.class={DRIVER_CASE}",
             "-Pandroid.testInstrumentationRunnerArguments.nativeManagedTransport=true",
             f"-Pandroid.testInstrumentationRunnerArguments.nativeManagedNonce={nonce}",
@@ -355,7 +375,7 @@ def run(options):
                     output / "managed-emulator-launches", targets, nonce, stations)
                 save(output / "managed-network-stations.json", station_identity)
             scenario_args = scenario_command(options.mode, source, destination, app, probe, output / "native-transfer", options.native_arguments,
-                                             classpath=options.classpath, fixture_environment=options.fixture_environment)
+                                             classpath=options.classpath, fixture_environment=frozen_fixture)
             with (output / "native-harness.log").open("wb") as harness_log:
                 subprocess.run(scenario_args, cwd=ROOT, env=env, stdout=harness_log, stderr=subprocess.STDOUT, check=True, timeout=budget["native"])
             for followup in options.after_transfer:

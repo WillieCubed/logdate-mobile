@@ -13,7 +13,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * The JSON Schemas (draft 2020-12) that describe the files in a 2.0 archive.
+ * The JSON Schemas (draft 2020-12) that describe the files in a 2.x archive.
  *
  * A copy of each is written into the archive under `schema/`, so a program can check a file without
  * network access or the app. They are deliberately permissive about extra keys, because a minor
@@ -161,9 +161,11 @@ object ArchiveSchemas {
                                 "capturedOn" to string(minLength = 1),
                                 "capturedDuring" to string(minLength = 1),
                                 "transcript" to transcript(),
+                                "transcription" to string(),
                                 "media" to ref("mediaRef"),
                                 "durationMs" to count(),
                                 "location" to ref("location"),
+                                "locationDetails" to noteLocationDetails(),
                                 "journalIds" to array(ref("uuid")),
                             )
                     ),
@@ -175,6 +177,18 @@ object ArchiveSchemas {
             "revision" to count(),
             "status" to enumOf(TranscriptDocumentStatus.serializer()),
             "language" to string(),
+            "createdAt" to ref("instant"),
+            "updatedAt" to ref("instant"),
+            "soundTags" to
+                array(
+                    obj(
+                        listOf("name", "startMs"),
+                        "name" to string(),
+                        "startMs" to count(),
+                        "durationMs" to count(),
+                        "confidence" to number(minimum = 0.0, maximum = 1.0),
+                    ),
+                ),
             "engine" to obj(listOf("name"), "name" to string(), "modelId" to string(), "version" to string()),
             "speakers" to array(obj(listOf("speakerId", "label"), "speakerId" to string(), "label" to string(), "colorToken" to string())),
             "segments" to
@@ -202,6 +216,36 @@ object ArchiveSchemas {
                                 ),
                             ),
                     ),
+                ),
+        )
+
+    private fun noteLocationDetails() =
+        obj(
+            emptyList(),
+            "coordinates" to
+                obj(
+                    listOf("latitude", "longitude"),
+                    "latitude" to number(minimum = -90.0, maximum = 90.0),
+                    "longitude" to number(minimum = -180.0, maximum = 180.0),
+                    "altitudeMeters" to number(minimum = null, maximum = null),
+                    "accuracyMeters" to number(minimum = 0.0, maximum = null),
+                ),
+            "place" to
+                JsonObject(
+                    obj(
+                        listOf("id"),
+                        "id" to ref("uuid"),
+                        "name" to string(),
+                        "latitude" to number(minimum = -90.0, maximum = 90.0),
+                        "longitude" to number(minimum = -180.0, maximum = 180.0),
+                    ) +
+                        (
+                            "dependentRequired" to
+                                buildJsonObject {
+                                    put("latitude", buildJsonArray { add(JsonPrimitive("longitude")) })
+                                    put("longitude", buildJsonArray { add(JsonPrimitive("latitude")) })
+                                }
+                        ),
                 ),
         )
 

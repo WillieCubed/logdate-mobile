@@ -38,10 +38,11 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
                     imageNote,
                     audioNote.copy(
                         caption = "A walk by the water",
+                        transcription = "  Original legacy words.\nKeep spacing.  ",
                         transcript = TranscriptDocument.fromPlainText("Spoken archived audio").copy(revision = 4),
                         capturedOn = CaptureDevice.WATCH,
                     ),
-                    videoNote,
+                    videoNote.copy(durationMs = 12_345L),
                 )
             val archive = InMemoryArchiveContainer()
             val progress =
@@ -87,7 +88,7 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
                         },
                 )
 
-            assertEquals(ExportSchemaVersion.V2_0, result.metadata.version)
+            assertEquals(ExportSchemaVersion.V2_1, result.metadata.version)
             assertEquals(2, result.journalsImported)
             assertEquals(4, result.notesImported)
             assertEquals(1, result.draftsImported)
@@ -111,6 +112,11 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
                 TranscriptDocument.fromPlainText("Spoken archived audio").copy(revision = 4),
                 (notes.getNoteById(audioNote.uid) as JournalNote.Audio).transcript,
             )
+            assertEquals(
+                "  Original legacy words.\nKeep spacing.  ",
+                (notes.getNoteById(audioNote.uid) as JournalNote.Audio).transcription,
+            )
+            assertEquals(12_345L, (notes.getNoteById(videoNote.uid) as JournalNote.Video).durationMs)
             assertEquals(CaptureDevice.WATCH, notes.getNoteById(audioNote.uid)?.capturedOn)
             assertNull(notes.getNoteById(textNote.uid)?.capturedOn)
             assertEquals(videoNote.uid.toString(), result.unavailableMedia.single().entityId)

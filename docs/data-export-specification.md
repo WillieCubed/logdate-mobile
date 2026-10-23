@@ -3,7 +3,7 @@
 An export is a single `.zip` file that contains a copy of what LogDate stores for a person. This document
 explains what is in it, how to read it, and how the app builds it. It describes two layouts:
 
-- **Format 2.0**, the current format written by Android, desktop, iOS and LogDate Cloud backups.
+- **Format 2.1**, the current format written by the shared export pipeline. Readers also accept 2.0.
 - **Format 1.x**, the legacy import-only layout. Restore continues to read versions 1.0 through 1.2.
 
 If you only want to open an export, read [Reading an archive](#reading-an-archive). If you are
@@ -11,7 +11,7 @@ changing what gets exported, read [Adding a new kind of data](#adding-a-new-kind
 
 ## What an export has to be
 
-An export is the person's data leaving the app, so it has to work without the app. Format 2.0 is
+An export is the person's data leaving the app, so it has to work without the app. Format 2.x is
 designed around these promises:
 
 | Promise | What it means in practice |
@@ -23,7 +23,7 @@ designed around these promises:
 | **Free of device internals** | No content URI, file path, original file name, sync counter or device id is ever written. A file is only ever referred to by its place inside the archive. |
 | **Verifiable** | `SHA256SUMS` lets anyone confirm that no file was damaged. |
 
-## Layout of a 2.0 archive
+## Layout of a 2.x archive
 
 All files sit at the top level of the zip. Readers should also accept an archive that was unzipped and
 zipped again inside one folder, as Finder and Explorer do; restore already does this for 1.x.
@@ -84,15 +84,15 @@ captured. Everything in `data/` is plain text that any editor opens, but it is w
    because a minor version only adds fields.
 4. Read `scope` before trusting the data to be everything. See [Completeness](#completeness).
 
-LogDate restore follows the same rule: it detects 2.0 through `manifest.json` and resolves every data
+LogDate restore follows the same rule: it detects 2.x through `manifest.json` and resolves every data
 file by its manifest role, so valid custom paths are supported. If there is no manifest, restore falls
 back to the 1.x `metadata.json` layout. Both formats may be at the ZIP root or inside one wrapper
 directory. Every manifest-listed data file must exist before restore starts writing to repositories.
 
 Restore currently applies journals, notes and their memberships, drafts, profile, saved places,
 location history and portable media references. Included media is copied through the platform media
-importer. A media record that was omitted or is unavailable is reported as a warning and its note or
-draft attachment is skipped; a source-device path is never retained as a fallback.
+importer. An omitted or unavailable original retains its note or draft attachment for later recovery;
+a source-device path is never retained as a fallback.
 
 ### Conventions in every data file
 
@@ -113,8 +113,8 @@ draft attachment is skipped; a source-device path is never retained as a fallbac
 `data/notes.json` contains `{"notes": [...]}`. Each note has an `id`, a `type` (`text`, `image`, `video` or
 `audio`), `createdAt` and `updatedAt`, and:
 
-- `text` and `textFormat` for text notes, `caption` for photos and videos, `durationMs` for audio.
-- `location`, when one was recorded.
+- `text` and `textFormat` for text notes, `caption` for media, and `durationMs` for audio or video.
+- `locationDetails`, when one was recorded; `location` retains the earlier display projection.
 - `journalIds`: the journals the note appears in. A note can be in several journals or in none, so
   membership lives on the note.
 - `media`: where the file is. See below.
@@ -126,6 +126,27 @@ draft attachment is skipped; a source-device path is never retained as a fallbac
 **Media.** `media.status` is `included` or `omitted`. An included file has a `path` and a `mediaType`.
 An omitted file has an `omittedReason` and no path, so nothing ever points at a file that is not
 there. `data/media.json` lists every included file with its size and SHA-256.
+
+**Transcripts.** `transcription` preserves legacy text exactly, independently of `transcript`.
+The structured document retains segments, words, speakers, recognition provenance, sound tags,
+and source creation/update instants. Importers must not manufacture a finalized document from
+legacy text or replace one representation with the other. A known empty media caption or raw audio
+transcription is encoded as an empty string; absence in an older archive remains unknown. Text notes
+do not acquire a media caption. Unknown video duration stays absent.
+
+**Locations.** In 2.1, `locationDetails.coordinates` retains the measured point and optional altitude
+and accuracy. Its independent `place` retains the semantic place UUID, optional name, and optional
+center. A known place ID needs neither a name nor coordinates; a center needs both coordinates.
+Importers use `locationDetails` when present. They must not substitute the place center for the
+measured point, mint a replacement place identity, or turn an unknown point into zero coordinates.
+The older `location` field is a display projection for 2.0 readers, which lack this distinction.
+
+Android persists the source location and legacy transcription in the note's database record. A place
+reference can survive before its matching saved-place record arrives. Ordinary local references
+continue to follow known place renames; archive imports retain known source name/center fields when
+the destination already has different metadata for the same UUID. Missing source fields may be
+filled from that matching place. Caption, transcript, and media-recovery updates retain this source
+preservation behavior, and neither path substitutes semantic coordinates for measured coordinates.
 
 Draft video blocks may also contain an optional `thumbnail` using the same media-reference shape.
 The original and preview have independent inclusion status and inventory entries. A readable preview
@@ -221,11 +242,12 @@ launcher deletes the partly written file.
 
 ### Current writing behavior
 
-Format 2.0 is the only format newly written. Android and desktop stream it into a ZIP. iOS stages
+Format 2.1 is the only format newly written. Android and desktop stream it into a ZIP. The shared iOS client stages
 entries in temporary files before assembling and sharing the ZIP, and removes staging data after
 success, cancellation or failure. LogDate Cloud uploads the same v2 ZIP bytes and stores the exact
 `manifest.json` extracted from that artifact. Cloud restore remains format-neutral, so downloaded
-1.x and 2.0 backups use the shared reader.
+1.x and 2.x backups use the shared reader. The separate native Apple client has its own importer;
+shared Kotlin validation does not establish native Apple acceptance.
 
 ## Adding a new kind of data
 
@@ -263,3 +285,29 @@ drafts are not included.
 checks that none reach the output, that every link resolves, that the checksums match the written
 bytes, and that cancellation stops the export. `ExportArchiveConformanceTest` validates every file in a
 real archive against the schema stored in that same archive.
+
+### Native importer fixtures
+
+`ArchiveInteropFixtureTest` runs the actual shared exporter with deterministic synthetic journals,
+shared note membership, nanosecond timestamps, independent coordinates/place identity, raw and
+structured transcription, sound tags, and nullable video metadata. It validates the resulting files
+against their embedded schemas and checks every checksum. Its PNG and four-second PCM WAV are valid
+files; its unavailable video is explicitly marked omitted. The fixture describes archive metadata
+compatibility, rather than a complete system migration.
+
+To give another platform the actual exported bytes, choose a new, absolute output directory whose
+parent exists, then run the test locally:
+
+```bash
+LOGDATE_ARCHIVE_INTEROP_OUTPUT=/absolute/path/to/new-fixture \
+  ./gradlew :client:domain:jvmTest \
+  --tests 'app.logdate.client.domain.export.archive.ArchiveInteropFixtureTest' --rerun-tasks
+```
+
+The test refuses an existing output directory. Keep the whole output together, resolve files by
+manifest role, and validate `SHA256SUMS` before consuming it. Native consumer tests should read these
+bytes, compare source metadata after database close/reopen, and retain unresolved attachments.
+Do not replace the exporter with hand-authored JSON or use success in a scalar fixture to enable
+system transfer. That route also requires complete supported categories, consistent snapshots,
+ownership and key custody, original-media publication, signed platform association, and device
+acceptance.

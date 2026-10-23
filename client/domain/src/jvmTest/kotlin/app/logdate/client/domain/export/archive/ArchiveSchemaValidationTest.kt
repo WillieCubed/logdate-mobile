@@ -1,5 +1,6 @@
 package app.logdate.client.domain.export.archive
 
+import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.archive.support.ArchiveSamples
 import com.networknt.schema.InputFormat
 import com.networknt.schema.SchemaRegistry
@@ -164,6 +165,29 @@ class ArchiveSchemaValidationTest {
     }
 
     @Test
+    fun `a semantic place can retain only its known identity`() {
+        val details = "\"locationDetails\":{\"place\":{\"id\":\"d7042fbb-485c-44f1-8f74-7083b7074394\"}},"
+        val note = validNote.replace("\"journalIds\"", details + "\"journalIds\"")
+
+        assertEquals(emptyList(), errors(ArchiveLayout.SCHEMA_NOTES, noteFile(note), strict = true))
+    }
+
+    @Test
+    fun `a semantic place cannot have half a center`() {
+        val details = "\"locationDetails\":{\"place\":{\"id\":\"d7042fbb-485c-44f1-8f74-7083b7074394\",\"latitude\":36.17}},"
+        val note = validNote.replace("\"journalIds\"", details + "\"journalIds\"")
+
+        assertTrue(errors(ArchiveLayout.SCHEMA_NOTES, noteFile(note)).isNotEmpty())
+    }
+
+    @Test
+    fun `the earlier 2 0 manifest remains readable`() {
+        val manifest = json(ArchiveManifest.serializer(), ArchiveSamples.manifest.copy(schemaVersion = ExportSchemaVersion.V2_0))
+
+        assertEquals(emptyList(), errors(ArchiveLayout.SCHEMA_MANIFEST, manifest))
+    }
+
+    @Test
     fun `a media inventory entry needs a sha-256 of the right length`() {
         val entry = """{"files":[{"path":"media/a.jpg","mediaType":"image/jpeg","bytes":1,"sha256":"abc"}]}"""
 
@@ -172,7 +196,7 @@ class ArchiveSchemaValidationTest {
 
     @Test
     fun `a manifest from the 1 x line is not a 2 x manifest`() {
-        val manifest = json(ArchiveManifest.serializer(), ArchiveSamples.manifest).replace("\"2.0\"", "\"1.2\"")
+        val manifest = json(ArchiveManifest.serializer(), ArchiveSamples.manifest.copy(schemaVersion = ExportSchemaVersion.V1_2))
 
         assertTrue(errors(ArchiveLayout.SCHEMA_MANIFEST, manifest).isNotEmpty())
     }

@@ -116,26 +116,15 @@ class OfflineFirstJournalNotesRepository(
      */
     override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
         if (paths.isEmpty()) return emptySet()
-        val spellings = paths.associateWith(::spellingsOf)
+        val spellings = paths.associateWith(mediaReferences::spellingsOf)
         val referenced = queries.notesReferencingMediaPaths(spellings.values.flatten().toSet())
         return paths.filterTo(mutableSetOf()) { path -> spellings.getValue(path).any(referenced::contains) }
     }
 
-    /** [reference] as written and as LogDate stores it, which differ for a legacy file path. */
-    private fun spellingsOf(reference: String): Set<String> = setOf(reference, mediaReferences.storedReference(reference))
-
-    private fun JournalNote.withStoredMediaRef(): JournalNote =
-        when (this) {
-            is JournalNote.Image -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
-            is JournalNote.Audio -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
-            is JournalNote.Video -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
-            else -> this
-        }
-
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
 
     override suspend fun create(note: JournalNote): Uuid {
-        val storedNote = note.withStoredMediaRef()
+        val storedNote = note.withStoredMediaRef(mediaReferences)
         val pendingMediaIndex = buildPendingMediaIndex(storedNote)
         val noteId =
             transactionManager.withTransaction {
@@ -157,20 +146,25 @@ class OfflineFirstJournalNotesRepository(
         pendingMediaIndex: PendingMediaIndex?,
     ): Uuid {
         getNoteById(note.uid)?.let { existing ->
-            check(existing.withStoredMediaRef().hasSamePersistedContent(note)) {
+            check(existing.withStoredMediaRef(mediaReferences).hasSamePersistedContent(note)) {
                 "This note already exists with different content. Keep your changes in a draft or save them as a new entry."
             }
             return existing.uid
         }
+        val linkedPlaceId =
+            note.location
+                ?.place
+                ?.id
+                ?.let { notePlaceResolver.get(it)?.id }
         val noteId =
             when (note) {
                 is JournalNote.Text -> {
-                    textNoteDao.addNote(note.toEntity())
+                    textNoteDao.addNote(note.toEntity(linkedPlaceId))
                     note.uid
                 }
 
                 is JournalNote.Image -> {
-                    imageNoteDao.addNote(note.toEntity())
+                    imageNoteDao.addNote(note.toEntity(linkedPlaceId))
                     if (note.caption.isNotEmpty()) {
                         mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
                     }
@@ -178,14 +172,14 @@ class OfflineFirstJournalNotesRepository(
                 }
 
                 is JournalNote.Audio -> {
-                    audioNoteDao.addNote(note.toEntity())
+                    audioNoteDao.addNote(note.toEntity(linkedPlaceId))
                     mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
                     note.persistTranscript(transcriptionRepository)
                     note.uid
                 }
 
                 is JournalNote.Video -> {
-                    videoNoteDao.addNote(note.withDurationFrom(pendingMediaIndex).toEntity())
+                    videoNoteDao.addNote(note.withDurationFrom(pendingMediaIndex).toEntity(linkedPlaceId))
                     if (note.caption.isNotEmpty()) {
                         mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
                     }
@@ -269,7 +263,7 @@ class OfflineFirstJournalNotesRepository(
         val manager = mediaManager ?: return
 
         val remainingReferences =
-            spellingsOf(contentUri).sumOf { spelling ->
+            mediaReferences.spellingsOf(contentUri).sumOf { spelling ->
                 imageNoteDao.countByContentUri(spelling) +
                     videoNoteDao.countByContentUri(spelling) +
                     audioNoteDao.countByContentUri(spelling)
@@ -370,7 +364,7 @@ class OfflineFirstJournalNotesRepository(
         note: JournalNote,
         journalId: Uuid,
     ) {
-        val storedNote = note.withStoredMediaRef()
+        val storedNote = note.withStoredMediaRef(mediaReferences)
         val pendingMediaIndex = buildPendingMediaIndex(storedNote)
         transactionManager.withTransaction {
             createNoteRecord(
@@ -422,6 +416,7 @@ class OfflineFirstJournalNotesRepository(
             ::triggerContentSync,
             ::indexAvailableRecoveryMedia,
             recoveryReceipts,
+            notePlaceResolver,
         )
     }
 

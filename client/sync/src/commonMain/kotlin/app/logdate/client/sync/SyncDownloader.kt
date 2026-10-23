@@ -312,7 +312,7 @@ internal class SyncDownloader(
                     sameCreateBaseFields = ::sameAudioCreateBaseFields,
                     acknowledgeUpload = ::acknowledgeNoteCreate,
                     // A note joined from personal-space records is the whole note, transcript included.
-                    hydrate = if (spaceRead != null) { _, note -> note } else ::hydrateNote,
+                    hydrate = if (spaceRead != null) { _, note -> preserveWorkingText(note) } else ::hydrateNote,
                     applyCreate = ::createNote,
                     // Notes have no update-in-place sync path -- a replacement is always applied as
                     // remove-then-recreate, matching how a fresh download from the server is applied.
@@ -383,17 +383,25 @@ internal class SyncDownloader(
     }
 
     private suspend fun preserveTranscript(replacement: JournalNote): JournalNote {
-        val existing = journalNotesRepository.getNoteById(replacement.uid)
-        return if (existing is JournalNote.Audio &&
-            replacement is JournalNote.Audio &&
-            replacement.transcript == null &&
-            remoteMediaRef(existing) == replacement.mediaRef &&
-            existing.durationMs == replacement.durationMs
+        if (replacement !is JournalNote.Audio) return replacement
+        val existing = journalNotesRepository.getNoteById(replacement.uid) as? JournalNote.Audio ?: return replacement
+        val sourceReference = remoteMediaRef(existing)
+        val accepted = replacement.withLocalAudioWorkingText(existing, sourceReference)
+        return if (accepted is JournalNote.Audio &&
+            accepted.transcript == null &&
+            sourceReference == accepted.mediaRef &&
+            existing.durationMs == accepted.durationMs
         ) {
-            replacement.copy(transcript = existing.transcript)
+            accepted.copy(transcript = existing.transcript)
         } else {
-            replacement
+            accepted
         }
+    }
+
+    private suspend fun preserveWorkingText(replacement: JournalNote): JournalNote {
+        if (replacement !is JournalNote.Audio) return replacement
+        val existing = journalNotesRepository.getNoteById(replacement.uid) as? JournalNote.Audio ?: return replacement
+        return replacement.withLocalAudioWorkingText(existing, remoteMediaRef(existing))
     }
 
     private fun sameJournalFields(
@@ -467,74 +475,5 @@ internal class SyncDownloader(
          * cheap to serve again.
          */
         const val SYNC_PAGE_SIZE = 25
-    }
-}
-
-private fun Instant.wirePrecision(): Instant = Instant.fromEpochMilliseconds(toEpochMilliseconds())
-
-private fun JournalNote.withVersion(version: Long): JournalNote =
-    when (this) {
-        is JournalNote.Text -> copy(syncVersion = version)
-        is JournalNote.Image -> copy(syncVersion = version)
-        is JournalNote.Video -> copy(syncVersion = version)
-        is JournalNote.Audio -> copy(syncVersion = version)
-    }
-
-/**
- * Compare only the fields the content contract sends, after resolving cached media. The capture time
- * zone, device and activity are left out: a server that predates them returns none, and none of them
- * changes after capture.
- */
-private fun JournalNote.uploadedFields(
-    version: Long,
-    ref: String?,
-): JournalNote {
-    val created = creationTimestamp.wirePrecision()
-    val updated = lastUpdated.wirePrecision()
-    val uploadedLocation = location?.takeIf { it.hasLocation }
-    return when (this) {
-        is JournalNote.Text ->
-            copy(
-                syncVersion = version,
-                creationTimestamp = created,
-                lastUpdated = updated,
-                location = uploadedLocation,
-                timeZoneId = null,
-                capturedOn = null,
-                capturedDuring = null,
-            )
-        is JournalNote.Image ->
-            copy(
-                syncVersion = version,
-                creationTimestamp = created,
-                lastUpdated = updated,
-                mediaRef = ref.orEmpty(),
-                location = uploadedLocation,
-                timeZoneId = null,
-                capturedOn = null,
-                capturedDuring = null,
-            )
-        is JournalNote.Video ->
-            copy(
-                syncVersion = version,
-                creationTimestamp = created,
-                lastUpdated = updated,
-                mediaRef = ref.orEmpty(),
-                location = uploadedLocation,
-                timeZoneId = null,
-                capturedOn = null,
-                capturedDuring = null,
-            )
-        is JournalNote.Audio ->
-            copy(
-                syncVersion = version,
-                creationTimestamp = created,
-                lastUpdated = updated,
-                mediaRef = ref.orEmpty(),
-                location = uploadedLocation,
-                timeZoneId = null,
-                capturedOn = null,
-                capturedDuring = null,
-            )
     }
 }

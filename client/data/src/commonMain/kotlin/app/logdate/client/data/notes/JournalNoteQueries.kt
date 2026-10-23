@@ -143,7 +143,7 @@ internal class JournalNoteQueries(
         notePlaceResolver
             .observeAll()
             .combine(audioNoteDao.getRecentNotes(limit)) { placeLookup, entities ->
-                entities.map { it.toModel(it.placeId?.let(placeLookup::get)) }
+                entities.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) }
             }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
                 val captionMap = captions.associate { it.noteId to it.caption }
                 notes.map { note -> note.copy(caption = captionMap[note.uid] ?: note.caption) }
@@ -218,13 +218,13 @@ internal class JournalNoteQueries(
         // Try each note type DAO until we find the note
         run {
             textNoteDao.findNoteOneOff(noteId)?.let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
+                note.toModel(note.referencedPlaceId()?.let { placeId -> notePlaceResolver.get(placeId) })
             }
         }?.let { return it }
         run {
             val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
             imageNoteDao.findNoteOneOff(noteId)?.let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
+                note.toModel(note.referencedPlaceId()?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
             }
         }?.let { return it }
         run {
@@ -232,7 +232,7 @@ internal class JournalNoteQueries(
             audioNoteDao.findNoteOneOff(noteId)?.let { note ->
                 note
                     .toModel(
-                        note.placeId?.let { placeId ->
+                        note.referencedPlaceId()?.let { placeId ->
                             notePlaceResolver.get(placeId)
                         },
                         caption,
@@ -242,7 +242,7 @@ internal class JournalNoteQueries(
         run {
             val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
             videoNoteDao.findNoteOneOff(noteId)?.let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
+                note.toModel(note.referencedPlaceId()?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
             }
         }?.let { return it }
         return null
@@ -275,9 +275,9 @@ internal class JournalNoteQueries(
         val videoNotes: List<VideoNoteEntity>,
     ) {
         fun toNotes(placeLookup: Map<Uuid, NotePlace>): List<JournalNote> =
-            textNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
-                imageNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
-                audioNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
-                videoNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) }
+            textNotes.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) } +
+                imageNotes.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) } +
+                audioNotes.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) } +
+                videoNotes.map { it.toModel(it.referencedPlaceId()?.let(placeLookup::get)) }
     }
 }

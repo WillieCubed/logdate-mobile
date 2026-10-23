@@ -1,6 +1,7 @@
 package app.logdate.client.domain.restore
 
 import app.logdate.client.domain.export.ExportNote
+import app.logdate.client.domain.export.archive.ArchiveNoteLocation
 import app.logdate.client.repository.journals.CaptureActivity
 import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
@@ -16,7 +17,7 @@ internal fun ExportNote.toJournalNote(
     id: Uuid,
     mediaResolution: MediaResolution,
 ): JournalNote? {
-    val location = location?.toNoteLocation()
+    val location = locationDetails?.toNoteLocation() ?: location?.toNoteLocation()
     val resolvedMediaRef =
         mediaResolution.uri ?: mediaPath?.takeIf { mediaResolution.allowSourceFallback && it.isNotBlank() }
     val note =
@@ -53,6 +54,7 @@ internal fun ExportNote.toJournalNote(
                     timeZoneId = timeZone,
                     syncVersion = syncVersion,
                     location = location,
+                    durationMs = durationMs,
                 )
             "audio" ->
                 JournalNote.Audio(
@@ -61,6 +63,7 @@ internal fun ExportNote.toJournalNote(
                     lastUpdated = updatedAt,
                     mediaRef = resolvedMediaRef ?: return null,
                     durationMs = this.durationMs ?: 0,
+                    transcription = transcription.orEmpty(),
                     transcript = transcript,
                     caption = caption.orEmpty(),
                     timeZoneId = timeZone,
@@ -71,6 +74,13 @@ internal fun ExportNote.toJournalNote(
         } ?: return null
     return note.withCapturedOn(CaptureDevice.fromWireName(capturedOn)).withCapturedDuring(CaptureActivity.fromWireName(capturedDuring))
 }
+
+private fun ArchiveNoteLocation.toNoteLocation() =
+    NoteLocation(
+        coordinates =
+            coordinates?.let { NoteCoordinates(it.latitude, it.longitude, it.altitudeMeters, it.accuracyMeters?.toFloat()) },
+        place = place?.let { NotePlace(Uuid.parse(it.id), it.name, it.latitude, it.longitude) },
+    )
 
 private fun app.logdate.client.domain.export.ExportLocation.toNoteLocation(): NoteLocation {
     val coords =

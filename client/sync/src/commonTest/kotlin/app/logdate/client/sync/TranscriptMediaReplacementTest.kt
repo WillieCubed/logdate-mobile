@@ -50,6 +50,7 @@ class TranscriptMediaReplacementTest {
                 lastUpdated = Instant.fromEpochMilliseconds(2),
                 syncVersion = 40,
                 transcript = document,
+                transcription = "  Original working text.\nKeep spacing.  ",
             )
         val notes = FakeJournalNotesRepository().apply { create(original) }
         val refs =
@@ -94,6 +95,7 @@ class TranscriptMediaReplacementTest {
 
         val downloaded = notes.getNoteById(original.uid) as JournalNote.Audio
         assertEquals(if (preserve) document else null, downloaded.transcript)
+        assertEquals(if (preserve) original.transcription else "", downloaded.transcription)
         assertEquals(duration, downloaded.durationMs)
         assertEquals(remoteRef, refs.get(original.uid)?.remoteUrl)
         assertEquals("file:///tmp/$fileName", downloaded.mediaRef)

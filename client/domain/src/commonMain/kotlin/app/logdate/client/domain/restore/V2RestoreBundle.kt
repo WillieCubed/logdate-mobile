@@ -159,6 +159,7 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                         note.type == ArchiveNoteType.TEXT
                     },
                 durationMs = note.durationMs,
+                transcription = note.transcription,
                 transcript = note.transcript,
                 createdAt = note.createdAt,
                 updatedAt = note.updatedAt,
@@ -166,6 +167,7 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                 capturedOn = note.capturedOn,
                 capturedDuring = note.capturedDuring,
                 location = note.location?.toExportLocation(),
+                locationDetails = note.locationDetails,
             )
         }
     val relations = notes.flatMap { note -> note.journalIds.map { ExportJournalNoteRelation(it, note.id, note.createdAt) } }

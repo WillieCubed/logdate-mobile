@@ -159,6 +159,57 @@ class TranscriptCreateRecoveryTest {
         }
 
     @Test
+    fun `lost create response acknowledges raw working text without a false conflict`() =
+        runTest {
+            val original = audio().copy(transcription = "  Working text.\nKeep spacing.  ")
+            val backing = FakeJournalNotesRepository().apply { create(original) }
+            val notes = metadataOnlyRepository(backing)
+            val metadata = identityMetadata()
+            metadata.enqueuePending(original.uid.toString(), EntityType.NOTE, PendingOperation.CREATE)
+            val api =
+                FakeCloudApiClient().apply {
+                    getContentChangesResponse =
+                        Result.success(
+                            ContentChangesResponse(
+                                listOf(
+                                    ContentChange(
+                                        original.uid.toString(),
+                                        "AUDIO",
+                                        mediaUri = original.mediaRef,
+                                        durationMs = original.durationMs,
+                                        caption = original.caption,
+                                        createdAt = original.creationTimestamp.toEpochMilliseconds(),
+                                        lastUpdated = original.lastUpdated.toEpochMilliseconds(),
+                                        serverVersion = 42,
+                                    ),
+                                ),
+                                emptyList(),
+                                42,
+                            ),
+                        )
+                }
+            val manager =
+                testDefaultSyncManager(
+                    cloudContentDataSource = DefaultCloudContentDataSource(api),
+                    cloudMediaDataSource = DefaultCloudMediaDataSource(api),
+                    journalNotesRepository = notes,
+                    syncMetadataService = metadata,
+                    syncScope = backgroundScope,
+                )
+
+            assertTrue(manager.downloadRemoteChanges().success)
+
+            val stored = notes.getNoteById(original.uid) as JournalNote.Audio
+            assertEquals(original.transcription, stored.transcription)
+            assertEquals(42L, stored.syncVersion)
+            assertTrue(metadata.getPendingUploads(EntityType.NOTE).isEmpty())
+            assertEquals(0, manager.getSyncStatus().conflictCount)
+            assertFalse("downloadMedia" in api.methodCalls)
+            assertTrue(api.uploadContentCalls.isEmpty())
+            assertTrue(api.updateContentCalls.isEmpty())
+        }
+
+    @Test
     fun `lost create reconciliation retains real caption and newer remote transcript conflicts`() =
         runTest {
             for (differentCaption in listOf(true, false)) {

@@ -30,7 +30,7 @@ class PreviewArchiveUseCaseTest {
 
         val preview = useCase.preview(manifestJson)
 
-        assertEquals(ExportSchemaVersion.V2_0, preview.version)
+        assertEquals(ExportSchemaVersion.V2_1, preview.version)
         assertEquals(ArchiveSamples.manifest.exportedAt, preview.exportDate)
         assertEquals("1.2.3", preview.appVersion)
         assertEquals(1, preview.stats.journalCount)

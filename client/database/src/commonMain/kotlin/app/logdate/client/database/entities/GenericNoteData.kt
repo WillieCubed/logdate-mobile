@@ -29,6 +29,9 @@ abstract class GenericNoteData {
     abstract val locationAccuracy: Float?
     abstract val placeId: Uuid?
 
+    /** Canonical note-local location, independent of whether the linked place exists here. */
+    abstract val locationMetadata: String?
+
     /**
      * IANA id of the time zone the device was in when the note was captured, or null when it was
      * not recorded. Stored as written and not validated: an id newer than this device's tz data

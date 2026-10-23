@@ -5,6 +5,7 @@ import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.MediaCaptionDao
 import app.logdate.client.database.dao.TextNoteDao
 import app.logdate.client.database.dao.VideoNoteDao
+import app.logdate.client.database.entities.GenericNoteData
 import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.JournalMergeScope
@@ -33,15 +34,8 @@ internal class JournalNoteRecoveryPersistence(
     private val changed: () -> Unit,
     private val indexAvailableMedia: suspend (JournalNote) -> Unit,
     private val receipts: app.logdate.client.data.journals.ArchiveRecoveryReceipts,
+    private val notePlaceResolver: NotePlaceResolver,
 ) {
-    private fun JournalNote.withStoredMediaRef(): JournalNote =
-        when (this) {
-            is JournalNote.Image -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
-            is JournalNote.Audio -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
-            is JournalNote.Video -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
-            else -> this
-        }
-
     suspend fun compareAndSet(
         expected: JournalNote?,
         replacement: JournalNote,
@@ -75,29 +69,11 @@ internal class JournalNoteRecoveryPersistence(
                     recordDecision(scope, recoveryId, replacement.uid)
                     return@withTransaction false
                 }
-                val note = replacement.withStoredMediaRef()
+                val note = replacement.withStoredMediaRef(mediaReferences)
                 if (expected == null) {
-                    createFromSync(note)
+                    createFromSync(note, preserveSourcePlace = true)
                 } else {
-                    val count =
-                        when (note) {
-                            is JournalNote.Text -> textNoteDao.updateForRestore(note.toEntity())
-                            is JournalNote.Image -> imageNoteDao.updateForRestore(note.toEntity())
-                            is JournalNote.Audio -> audioNoteDao.updateForRestore(note.toEntity())
-                            is JournalNote.Video -> videoNoteDao.updateForRestore(note.toEntity())
-                        }
-                    check(count == 1) { "Note changed during archive recovery" }
-                    when (note) {
-                        is JournalNote.Text -> Unit
-                        is JournalNote.Image -> mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
-                        is JournalNote.Video -> mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
-                        is JournalNote.Audio -> {
-                            val previous = (expected as JournalNote.Audio).mediaRef
-                            if (previous != note.mediaRef) transcriptionRepository?.rebindMediaReference(note.uid, previous, note.mediaRef)
-                            mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
-                            note.persistTranscript(transcriptionRepository)
-                        }
-                    }
+                    updateForRestore(expected, note)
                 }
                 indexAvailableMedia(note)
                 recordDecision(scope, recoveryId, note.uid)
@@ -105,6 +81,53 @@ internal class JournalNoteRecoveryPersistence(
             }
         if (saved) changed()
         return saved
+    }
+
+    private suspend fun updateForRestore(
+        expected: JournalNote,
+        note: JournalNote,
+    ) {
+        val sourceLocation = if (expected.location == note.location) storedNoteRecord(note) else null
+        val linkedPlaceId =
+            if (sourceLocation != null) {
+                sourceLocation.placeId
+            } else {
+                note.location
+                    ?.place
+                    ?.id
+                    ?.let { notePlaceResolver.get(it)?.id }
+            }
+        val count =
+            when (note) {
+                is JournalNote.Text ->
+                    textNoteDao.updateForRestore(
+                        note.toEntity(linkedPlaceId, preserveSourcePlace = true, sourceLocation = sourceLocation),
+                    )
+                is JournalNote.Image ->
+                    imageNoteDao.updateForRestore(
+                        note.toEntity(linkedPlaceId, preserveSourcePlace = true, sourceLocation = sourceLocation),
+                    )
+                is JournalNote.Audio ->
+                    audioNoteDao.updateForRestore(
+                        note.toEntity(linkedPlaceId, preserveSourcePlace = true, sourceLocation = sourceLocation),
+                    )
+                is JournalNote.Video ->
+                    videoNoteDao.updateForRestore(
+                        note.toEntity(linkedPlaceId, preserveSourcePlace = true, sourceLocation = sourceLocation),
+                    )
+            }
+        check(count == 1) { "Note changed during archive recovery" }
+        when (note) {
+            is JournalNote.Text -> Unit
+            is JournalNote.Image -> mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+            is JournalNote.Video -> mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+            is JournalNote.Audio -> {
+                val previous = (expected as JournalNote.Audio).mediaRef
+                if (previous != note.mediaRef) transcriptionRepository?.rebindMediaReference(note.uid, previous, note.mediaRef)
+                mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+                note.persistTranscript(transcriptionRepository)
+            }
+        }
     }
 
     private suspend fun recordDecision(
@@ -116,21 +139,40 @@ internal class JournalNoteRecoveryPersistence(
         check(currentScope() == scope) { "Note recovery account changed" }
     }
 
-    suspend fun createFromSync(note: JournalNote) {
-        when (val storedNote = note.withStoredMediaRef()) {
-            is JournalNote.Text -> textNoteDao.addNote(storedNote.toEntity())
-            is JournalNote.Image -> {
-                imageNoteDao.addNote(storedNote.toEntity())
-                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
-            }
-            is JournalNote.Audio -> {
-                audioNoteDao.addNote(storedNote.toEntity())
-                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
-                storedNote.persistTranscript(transcriptionRepository)
-            }
-            is JournalNote.Video -> {
-                videoNoteDao.addNote(storedNote.toEntity())
-                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
+    private suspend fun storedNoteRecord(note: JournalNote): GenericNoteData? =
+        when (note) {
+            is JournalNote.Text -> textNoteDao.findNoteOneOff(note.uid)
+            is JournalNote.Image -> imageNoteDao.findNoteOneOff(note.uid)
+            is JournalNote.Video -> videoNoteDao.findNoteOneOff(note.uid)
+            is JournalNote.Audio -> audioNoteDao.findNoteOneOff(note.uid)
+        }
+
+    suspend fun createFromSync(
+        note: JournalNote,
+        preserveSourcePlace: Boolean = false,
+    ) {
+        transactionManager.withTransaction {
+            val storedNote = note.withStoredMediaRef(mediaReferences)
+            val linkedPlaceId =
+                storedNote.location
+                    ?.place
+                    ?.id
+                    ?.let { notePlaceResolver.get(it)?.id }
+            when (storedNote) {
+                is JournalNote.Text -> textNoteDao.addNote(storedNote.toEntity(linkedPlaceId, preserveSourcePlace))
+                is JournalNote.Image -> {
+                    imageNoteDao.addNote(storedNote.toEntity(linkedPlaceId, preserveSourcePlace))
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
+                }
+                is JournalNote.Audio -> {
+                    audioNoteDao.addNote(storedNote.toEntity(linkedPlaceId, preserveSourcePlace))
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
+                    storedNote.persistTranscript(transcriptionRepository)
+                }
+                is JournalNote.Video -> {
+                    videoNoteDao.addNote(storedNote.toEntity(linkedPlaceId, preserveSourcePlace))
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
+                }
             }
         }
     }

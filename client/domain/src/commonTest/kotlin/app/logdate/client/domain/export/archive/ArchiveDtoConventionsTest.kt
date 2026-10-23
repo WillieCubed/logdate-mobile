@@ -124,7 +124,7 @@ class ArchiveDtoConventionsTest {
     fun `the schema version is written as a major dot minor string`() {
         val manifest = samples.getValue("manifest") as JsonObject
 
-        assertEquals("2.0", (manifest.getValue("schemaVersion") as JsonPrimitive).content)
+        assertEquals("2.1", (manifest.getValue("schemaVersion") as JsonPrimitive).content)
     }
 
     @Test
