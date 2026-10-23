@@ -116,20 +116,27 @@ class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
             def transfer(*args, **kwargs):
                 events.append("native-transfer")
                 (args[4] / "source-fixture.json").write_text(json.dumps(source))
+            def automatic_media(serial, control, process, media_output, wait_for, *, failure_diagnostics):
+                events.append("automatic-media")
+                self.assertTrue(callable(failure_diagnostics))
+                failure_diagnostics(serial, media_output / "metered-recover.log", RuntimeError("fixture failure"))
+                return {"automaticOriginalMediaRecovery": True}
             options = SimpleNamespace(source="emulator-5578", destination="emulator-5580", output=output,
                                       app_apk=Path("app.apk"), test_apk=Path("test.apk"))
             with patch.object(MODULE, "wait_for"), patch.object(MODULE, "checked_emulator"), \
                     patch.object(MODULE, "private_fixture"), \
+                    patch.object(MODULE, "capture_failure_diagnostics") as diagnostics, \
                     patch.object(MODULE, "current_draft_probe", create=True, side_effect=lambda serial, stage, *args: events.append("current-draft-" + stage)), \
                     patch.object(MODULE, "retained_draft_probe", side_effect=lambda serial, stage, *args: events.append("editor-draft-" + stage)), patch.object(MODULE, "registry_check"), \
                     patch.object(MODULE, "receipt", side_effect=[source, destination, destination]), \
                     patch.object(MODULE, "probe", side_effect=lambda serial, stage, *args: events.append(stage)), \
-                    patch.dict(MODULE.AUTOMATIC_MEDIA, run=lambda *args: events.append("automatic-media") or {"automaticOriginalMediaRecovery": True}), \
+                    patch.dict(MODULE.AUTOMATIC_MEDIA, run=automatic_media), \
                     patch.dict(MODULE.REAUTHENTICATION, run=lambda *args: events.append("media-reauthentication") or {"realPasskeyRepositoryResumesSameMediaOperation": True}), \
                     patch.dict(MODULE.H, prepare=Mock(), probe=Mock(),
                                adb=lambda serial, *args: events.append((serial, args)) or b"", transfer=transfer,
                                set_offline=lambda serial, offline: events.append((serial, offline))):
                 MODULE.run_acceptance(options, control, Mock(wait=Mock(return_value=0)))
+            diagnostics.assert_called_once_with(options.destination, output / "failure-diagnostics" / "metered-recover")
             self.assertEqual(["current-draft-prepare", "current-draft-quarantine", "current-draft-complete", "current-draft-reopened", "current-draft-base-prepare", "current-draft-base-complete"],
                              [event for event in events if isinstance(event, str) and event.startswith("current-draft-")])
             self.assertLess(events.index("current-draft-prepare"), events.index("current-draft-quarantine"))
