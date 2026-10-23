@@ -1617,6 +1617,15 @@ assert_not_contains "DELETE /api/v1/auth/me" "$(cat "$tmp_dir/http/log")"
 # An account in personalSpaceV1 storage mode is refused by the legacy media routes, so the proof
 # stores a sealed record and a blob through the personal space methods, reads them back after
 # the promotion, and deletes the record during cleanup.
+# The legacy data routes the server refuses to an account in personalSpaceV1 storage mode.
+assert_no_legacy_sync_calls() {
+    local log_file="$1"
+    local legacy
+    legacy="$(grep -E '^[A-Z]+ /api/v1/(ops/sync|contents|journals|associations|drafts|media|moments|location-history|backups)' "$log_file" || true)"
+    [[ -z "$legacy" ]] || fail "a personal space account called legacy routes: $legacy"
+    pass
+}
+
 prepare_space_account() {
     reset_http_state
     rm -f "$state_file" "${state_file}.credential"
@@ -1641,6 +1650,7 @@ assert_equals "false" "$(jq -r '.cleanup.mediaDeleted' "$state_file")"
 assert_file_exists "$tmp_dir/http/space-blob"
 assert_file_exists "$tmp_dir/http/space-record"
 assert_not_contains "/api/v1/media" "$(cat "$tmp_dir/http/log")"
+assert_no_legacy_sync_calls "$tmp_dir/http/log"
 assert_contains "POST /xrpc/app.logdate.space.uploadBlob serverless=1 health=0 authorization=1" "$(cat "$tmp_dir/http/log")"
 assert_contains "POST /xrpc/app.logdate.space.putRecord serverless=1 health=0 authorization=1" "$(cat "$tmp_dir/http/log")"
 assert_request_before "POST /xrpc/app.logdate.space.uploadBlob " "POST /xrpc/app.logdate.space.putRecord " "$tmp_dir/http/log"
@@ -1654,6 +1664,7 @@ assert_file_missing "$state_file"
 assert_file_exists "$tmp_dir/http/space-deleted"
 assert_file_exists "$tmp_dir/http/account-deleted"
 assert_not_contains "/api/v1/media" "$(cat "$tmp_dir/http/log")"
+assert_no_legacy_sync_calls "$tmp_dir/http/log"
 assert_contains "GET /xrpc/app.logdate.space.getBlob serverless=0 health=0 authorization=1" "$(cat "$tmp_dir/http/log")"
 assert_equals "2" "$(grep -c '^GET /xrpc/app.logdate.space.getRecord ' "$tmp_dir/http/log")"
 assert_request_before "GET /xrpc/app.logdate.space.getRecord " "POST /xrpc/app.logdate.space.deleteRecord " "$tmp_dir/http/log"

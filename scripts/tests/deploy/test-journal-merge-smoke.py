@@ -16,6 +16,9 @@ ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location("journal_merge_smoke", ROOT / "scripts/journal-merge-smoke.py")
 smoke = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(smoke)
+FAKE_SPEC = importlib.util.spec_from_file_location("personal_space_fake", ROOT / "scripts/tests/lib/personal_space_fake.py")
+space_fake = importlib.util.module_from_spec(FAKE_SPEC)
+FAKE_SPEC.loader.exec_module(space_fake)
 CANDIDATE = "https://candidate.example.test"
 ORIGIN = "https://cloud.example.test"
 WEBAUTHN_ORIGIN = "https://app.example.test"
@@ -41,7 +44,7 @@ class JournalServer:
         if path == "/server/info":
             return 200, {"success": True, "data": {"serverOrigin": ORIGIN, "protocolFeatures": self.features}}
         if path == "/auth/me":
-            return 200, {"success": True, "data": {"account": {"id": self.account, "username": "smoketest_fixture"}}}
+            return 200, {"success": True, "data": {"account": {"id": self.account, "username": "smoketest_fixture", "storageMode": "legacy"}}}
         if path.startswith("/journals/") and path.endswith("/merge"):
             source = path.split("/")[2]
             destination = body["destinationId"]
@@ -256,6 +259,68 @@ class JournalMergeSmokeTest(unittest.TestCase):
         self.assertEqual(2, len([call for call in self.server.calls if call[0] == "PUT"]))
         self.assertEqual(3, len([call for call in self.server.calls if call[1].endswith("/merge")]))
         self.assertEqual(prepared["accountId"], json.loads(self.state_file.read_text())["accountId"])
+        self.assertEqual("legacy", prepared["journalMergeSmoke"]["storageMode"])
+        self.assertFalse(any("/xrpc/" in call[1] for call in self.server.calls))
+
+    def space_server(self, **overrides):
+        server = space_fake.PersonalSpaceServer(ACCOUNT, "smoketest_fixture", ORIGIN, **overrides)
+        self.server = server
+        return server
+
+    def test_space_account_merges_through_its_personal_space_and_never_calls_legacy_routes(self):
+        server = self.space_server()
+        self.probe()
+        prepared = json.loads(self.state_file.read_text())["journalMergeSmoke"]
+        self.assertEqual("personalSpaceV1", prepared["storageMode"])
+        self.assertIn("mergedCid", prepared)
+        self.probe("verify")
+        self.assertEqual([], server.legacy_calls)
+        allowed = tuple("/api/v1" + path for path in space_fake.ACCOUNT_ROUTES)
+        for _method, url, _headers, _body in server.calls:
+            path = url.removeprefix(CANDIDATE).removeprefix(ORIGIN)
+            self.assertTrue(path.startswith("/xrpc/app.logdate.space.") or path.startswith(allowed), path)
+        source, destination = prepared["source"]["rkey"], prepared["destination"]["rkey"]
+        self.assertTrue(server.records[source]["deleted"])
+        self.assertEqual(prepared["mergedCid"], server.records[destination]["cid"])
+        writes = [call for call in server.calls if call[1].endswith("putRecord")]
+        self.assertEqual(6, len(writes))
+
+    def test_space_merge_fails_closed_on_each_broken_guarantee(self):
+        messages = {
+            "swap-ignored": r"POST /app.logdate.space.putRecord returned HTTP 200",
+            "value": "Space record does not match what was written",
+            "tombstone": "tombstone is missing",
+            "deleted-readable": r"GET /app.logdate.space.getRecord returned HTTP 200",
+        }
+        for corruption, message in messages.items():
+            with self.subTest(corruption=corruption):
+                self.state.pop("journalMergeSmoke", None)
+                self.write_state()
+                self.space_server().corruption = corruption
+                with self.assertRaisesRegex(smoke.SmokeError, message):
+                    self.probe()
+
+    def test_unknown_or_missing_storage_mode_and_missing_did_fail_before_any_write(self):
+        cases = (
+            ({"mode": "personalSpaceV2"}, "storageMode 'personalSpaceV2' is not covered by this smoke test"),
+            ({"mode": None}, "did not report a storageMode"),
+            ({"did": None}, "did not report a DID"),
+            ({"features": ["deviceLinkingV1"]}, "does not advertise personalSpaceV1"),
+        )
+        for overrides, message in cases:
+            with self.subTest(overrides=overrides):
+                server = self.space_server(**overrides)
+                with self.assertRaisesRegex(smoke.SmokeError, message):
+                    self.probe()
+                self.assertFalse(any(call[0] != "GET" for call in server.calls))
+                self.assertEqual([], server.legacy_calls)
+
+    def test_a_changed_storage_mode_fails_the_promoted_proof(self):
+        self.space_server()
+        self.probe()
+        self.server = JournalServer()
+        with self.assertRaisesRegex(smoke.SmokeError, "storageMode changed since prepare"):
+            self.probe("verify")
 
     def test_missing_capability_fails_before_any_fixture_write(self):
         self.server.features = []

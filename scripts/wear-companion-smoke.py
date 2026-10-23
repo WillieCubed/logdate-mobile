@@ -17,13 +17,14 @@ class WearProbe(common.Probe):
     def verify_identity(self):
         super().verify_identity()
         descriptor = self.request("GET", "/server/info")["data"]
-        required = {"deviceLinkingV1", "conditionalCreateV1", "momentsV1"}
+        required = {"deviceLinkingV1", "personalSpaceV1"} if self.space else {"deviceLinkingV1", "conditionalCreateV1", "momentsV1"}
         if not required.issubset(descriptor.get("protocolFeatures", [])):
             raise common.SmokeError("Deployed server is missing a Wear companion protocol")
 
     def as_watch(self, fixture):
         watch = WearProbe(self.base, self.state, self.transport, None)
         watch.headers = dict(self.headers)
+        watch.storage_mode, watch.did = self.storage_mode, self.did
         watch.headers["Authorization"] = "Bearer " + fixture["watchToken"]
         return watch
 
@@ -37,6 +38,8 @@ class WearProbe(common.Probe):
                        watchRefreshToken=linked["tokens"]["refreshToken"])
         watch = self.as_watch(fixture)
         watch.request("POST", "/auth/devices/link", statuses=(403,))
+        if self.space:
+            return self.prepare_space_records(fixture, watch)
         watch.headers["If-None-Match"] = "*"
         watch.request("PUT", "/contents/" + fixture["capture"]["id"] + "?ifAbsent=true", fixture["capture"], (201,))
         watch.request("PUT", "/contents/" + fixture["capture"]["id"] + "?ifAbsent=true", fixture["capture"], (412,))
@@ -46,7 +49,52 @@ class WearProbe(common.Probe):
         watch.headers.pop("If-None-Match")
         self.verify_records(fixture)
 
+    def prepare_space_records(self, fixture, watch):
+        for key in ("capture", "moment"):
+            record = fixture[key]
+            record["cid"] = watch.put_record(record["rkey"], record["record"], create_only=True)["cid"]
+            watch.put_refused(record["rkey"], record["record"], create_only=True)
+            watch.require_record(record["rkey"], record["record"], record["cid"])
+        self.verify_records(fixture)
+
+    def verify_space_records(self, fixture):
+        ops = self.list_ops()
+        for key in ("capture", "moment"):
+            record = fixture[key]
+            self.require_record(record["rkey"], record["record"], record["cid"])
+            if record["rkey"] not in ops or ops[record["rkey"]].get("deleted"):
+                raise common.SmokeError("Watch record is missing from its durable space change feed")
+        devices = self.request("GET", "/auth/devices")["devices"]
+        if not any(item.get("id") == fixture["sessionId"] for item in devices):
+            raise common.SmokeError("Linked watch session was not retained")
+
+    def finish_space(self, fixture):
+        self.verify_space_records(fixture)
+        watch = self.as_watch(fixture)
+        moment, caption = fixture["moment"], fixture["caption"]
+        updated = self.put_record(moment["rkey"], caption, swap_cid=moment["cid"])["cid"]
+        for reader in (self, watch):
+            reader.require_record(moment["rkey"], caption, updated)
+        self.put_refused(moment["rkey"], caption, swap_cid=moment["cid"])
+        self.delete_record(moment["rkey"], swap_cid=updated)
+        watch.require_missing(moment["rkey"])
+        tombstone = self.list_ops().get(moment["rkey"])
+        if not tombstone or not tombstone.get("deleted"):
+            raise common.SmokeError("Moment deletion is missing its space tombstone")
+        self.revoke_watch(fixture, watch, lambda reader: reader.get_record(fixture["capture"]["rkey"], statuses=(401,)))
+        self.get_record(fixture["capture"]["rkey"])
+
+    def revoke_watch(self, fixture, watch, watch_is_refused):
+        self.request("DELETE", "/auth/devices/" + fixture["sessionId"], statuses=(204,))
+        remaining = self.request("GET", "/auth/devices")["devices"]
+        if any(item.get("id") == fixture["sessionId"] for item in remaining):
+            raise common.SmokeError("Revoked watch remained in the linked device list")
+        watch_is_refused(watch)
+        watch.request("POST", "/auth/token/refresh", {"refreshToken": fixture["watchRefreshToken"]}, (401,))
+
     def verify_records(self, fixture):
+        if self.space:
+            return self.verify_space_records(fixture)
         for collection, key, payload in (("contents", "capture", "content"), ("moments", "moment", "payload")):
             expected = fixture[key]
             actual = self.request("GET", "/" + collection + "/" + expected["id"])
@@ -60,6 +108,8 @@ class WearProbe(common.Probe):
             raise common.SmokeError("Linked watch session was not retained")
 
     def finish(self, fixture):
+        if self.space:
+            return self.finish_space(fixture)
         self.verify_records(fixture)
         watch = self.as_watch(fixture)
         moment = self.request("GET", "/moments/" + fixture["moment"]["id"])
@@ -78,18 +128,21 @@ class WearProbe(common.Probe):
         deleted = self.request("GET", "/moments?since=0&limit=100").get("deletions", [])
         if not any(item.get("id") == moment["id"] for item in deleted):
             raise common.SmokeError("Moment deletion is missing its sync tombstone")
-        self.request("DELETE", "/auth/devices/" + fixture["sessionId"], statuses=(204,))
-        remaining = self.request("GET", "/auth/devices")["devices"]
-        if any(item.get("id") == fixture["sessionId"] for item in remaining):
-            raise common.SmokeError("Revoked watch remained in the linked device list")
-        watch.request("GET", "/contents/" + fixture["capture"]["id"], statuses=(401,))
-        watch.request("POST", "/auth/token/refresh", {"refreshToken": fixture["watchRefreshToken"]}, (401,))
+        self.revoke_watch(fixture, watch, lambda reader: reader.request(
+            "GET", "/contents/" + fixture["capture"]["id"], statuses=(401,)))
         self.request("GET", "/contents/" + fixture["capture"]["id"])
 
 
-def fixture():
+def fixture(storage_mode="legacy"):
+    if storage_mode == "personalSpaceV1":
+        suffix = uuid.uuid4().hex[:12]
+        return {"storageMode": storage_mode,
+                "capture": {"rkey": "deploy-watch-capture-" + suffix, "record": common.sealed_record()},
+                "moment": {"rkey": "deploy-watch-moment-" + suffix, "record": common.sealed_record()},
+                "caption": common.sealed_record()}
     now = int(time.time() * 1000)
-    return {"capture": {"id": str(uuid.uuid4()), "type": "TEXT", "content": "LDSE2:deployment-capture",
+    return {"storageMode": storage_mode,
+            "capture": {"id": str(uuid.uuid4()), "type": "TEXT", "content": "LDSE2:deployment-capture",
                         "mediaUri": None, "createdAt": now, "lastUpdated": now, "deviceId": "deployment-watch"},
             "moment": {"id": str(uuid.uuid4()), "capturedAt": now, "lastUpdated": now,
                        "payload": "LDSE2:deployment-mark", "deviceId": "deployment-watch", "schema": 1}}
@@ -104,7 +157,7 @@ def run(base, state_file, phase, private_token_file=None, transport=None):
     if phase == "prepare":
         if saved is not None:
             raise common.SmokeError("Wear fixture was already prepared")
-        saved = fixture()
+        saved = fixture(probe.storage_mode)
         state["wearCompanionSmoke"] = saved
         common.write_state(state_file, state)
         try:
@@ -114,6 +167,7 @@ def run(base, state_file, phase, private_token_file=None, transport=None):
     else:
         if saved is None or "watchToken" not in saved:
             raise common.SmokeError("Wear fixture was not prepared on the candidate")
+        common.require_prepared_mode(saved, probe)
         probe.finish(saved)
         saved.pop("watchToken")
         saved.pop("watchRefreshToken")
