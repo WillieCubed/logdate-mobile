@@ -35,7 +35,40 @@ accounts, including a bad publish and its recovery.
 Publishing makes every account a public identity, so confirm each of these on production on the day
 you start. If any one fails, stop and fix it first.
 
-1. Confirm that handle resolution works. Check your own handle against the production server, and
+1. Confirm that private reads require sign-in. The repository read endpoints must refuse a request
+   that carries no session, for an account that has entries. Each of these four requests must
+   answer `401`:
+
+   ```bash
+   curl -i "https://cloud.logdate.app/xrpc/com.atproto.sync.getRepo?did=<your DID>"
+   curl -i "https://cloud.logdate.app/xrpc/com.atproto.repo.listRecords?repo=<your handle>&collection=app.logdate.entry"
+   curl -i "https://cloud.logdate.app/xrpc/com.atproto.repo.getRecord?repo=<your handle>&collection=app.logdate.entry&rkey=<a record key>"
+   curl -i "https://cloud.logdate.app/xrpc/com.atproto.sync.getBlob?did=<your DID>&cid=<a blob CID>"
+   ```
+
+2. Confirm that signing keys and sessions have their own secrets. Account signing keys are
+   encrypted with `ATPROTO_SIGNING_KEY_KEK` and hosted sessions are signed with
+   `ATPROTO_SESSION_SECRET`, and the server refuses to start in production when either is missing
+   or equal to `JWT_SECRET`. Check that both are bound to their own Secret Manager secrets at exact
+   versions, and that the running revision started with them:
+
+   ```bash
+   grep -n 'ATPROTO_SIGNING_KEY_KEK\|ATPROTO_SESSION_SECRET\|JWT_SECRET' infra/terraform/production.tfvars
+   gcloud run services describe <service> --region <region> --project <project> \
+       --format='value(status.conditions[0].status)'
+   ```
+
+   Expect each of the two to name its own `secret_id`, a different one from `JWT_SECRET`'s, and
+   expect the service condition to read `True`.
+
+3. Confirm that the OAuth signing key persists. Note the `kid` that production serves, deploy or
+   restart a revision, and expect the same `kid` afterwards:
+
+   ```bash
+   curl -s https://cloud.logdate.app/oauth/jwks | jq -r '.keys[].kid'
+   ```
+
+4. Confirm that handle resolution works. Check your own handle against the production server, and
    expect every line to be `[PASS]`, with only the DID document check allowed to fail while publishing
    is still off:
 
@@ -49,9 +82,9 @@ you start. If any one fails, stop and fix it first.
    curl "https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=<your handle>"
    ```
 
-2. Confirm that people can hold their own recovery key. The server's descriptor must list
+5. Confirm that people can hold their own recovery key. The server's descriptor must list
    `atprotoRecoveryKeysV1`, which means the server was started with `ATPROTO_RECOVERY_KEYS_ENABLED`
-   set to `true`:
+   set to `true` in the deployment contract's `env_vars`:
 
    ```bash
    curl https://cloud.logdate.app/api/v1/info
@@ -61,7 +94,7 @@ you start. If any one fails, stop and fix it first.
    the identity's rotation keys. If LogDate's key is listed first, LogDate can overrule the person,
    and the safeguard is not met.
 
-3. Confirm that sign-in is passkey-only. Both of these requests must be refused on production, even
+6. Confirm that sign-in is passkey-only. Both of these requests must be refused on production, even
    for an account that once had a password:
 
    ```bash
@@ -71,7 +104,7 @@ you start. If any one fails, stop and fix it first.
        -H 'content-type: application/json' -d '{"handle":"<new handle>","password":"x"}'
    ```
 
-4. Confirm that public repository commits follow the specification. Run the repository tests, which
+7. Confirm that public repository commits follow the specification. Run the repository tests, which
    export repositories and verify them with the pinned reference `@atproto/repo` library, on the
    commit that production runs:
 
@@ -82,7 +115,7 @@ you start. If any one fails, stop and fix it first.
    Then download a test account's repository from production and verify it with
    `tools/atproto-repo-verify/verify.mjs` against the signing key in the account's DID document.
 
-5. Confirm that PLC operations are valid. The rehearsal sends real operations to the reference
+8. Confirm that PLC operations are valid. The rehearsal sends real operations to the reference
    directory, which refuses any with a bad signature or the wrong signing key, so a passing
    rehearsal on the deployed commit is the check. Run the server's identity tests as well:
 

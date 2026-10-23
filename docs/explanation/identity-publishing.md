@@ -55,10 +55,25 @@ type the directory it is writing to, and why a run stops at its first failure by
 
 Publishing makes every account a public identity, and an identity in the public directory invites
 other services to read the account's public repository, to resolve its handle, and to trust the
-operations that control it. LogDate therefore wants five safeguards confirmed on production before
+operations that control it. LogDate therefore wants eight safeguards confirmed on production before
 it turns publishing on.
 
-Handle resolution has to work first. Another app trusts a handle only when the domain points at the
+Private data has to stay private. Publishing invites other services to read an account's public
+repository, so the endpoints that return repositories, records and blobs must still refuse a request
+without a session. LogDate's journal entries are stored in that repository, and a missing check would
+turn an account's identity into a way to read its journal.
+
+Signing keys and sessions need secrets of their own. Each account's signing key is what proves its
+operations and commits, and it is encrypted with a key-encryption key that is separate from the secret
+that signs ordinary sessions. If those secrets were the same, one leaked secret would let someone sign
+sessions and decrypt every account's key, and the server therefore refuses to start in production
+unless they differ.
+
+The OAuth signing key has to survive restarts. Other AT Protocol apps fetch the key that verifies
+LogDate's access tokens, and a key that changed at every restart would make every token those apps
+hold fail at once.
+
+Handle resolution has to work as well. Another app trusts a handle only when the domain points at the
 DID and the DID points back at the domain, so once an identity is public, a handle that does not
 resolve shows as unverified in every other app. The
 [handle resolution explanation](handle-resolution.md) describes both halves.
