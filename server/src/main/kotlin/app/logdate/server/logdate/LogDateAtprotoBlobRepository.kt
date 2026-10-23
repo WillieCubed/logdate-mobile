@@ -58,4 +58,12 @@ class InMemoryLogDateAtprotoBlobRepository : LogDateAtprotoBlobRepository {
     ): LogDateAtprotoBlob? = rowsForUser(userId)[cid]
 
     private fun rowsForUser(userId: UUID): ConcurrentHashMap<String, LogDateAtprotoBlob> = rows.getOrPut(userId) { ConcurrentHashMap() }
+
+    /** Where the bytes of every blob kept for [userId] are stored. */
+    fun storagePaths(userId: UUID): List<String> = rows[userId]?.values?.map { it.storagePath }.orEmpty()
+
+    /** Drops every blob record kept for [userId]. */
+    fun forgetAccount(userId: UUID) {
+        rows.remove(userId)
+    }
 }

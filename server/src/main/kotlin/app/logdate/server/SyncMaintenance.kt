@@ -2,7 +2,9 @@ package app.logdate.server
 
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
+import app.logdate.server.logging.SpaceMigrationNotices
 import app.logdate.server.logging.SpacePurgeNotices
+import app.logdate.server.migration.LegacyCopyCleanup
 import app.logdate.server.space.SpacePurgeResult
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -35,6 +37,7 @@ internal fun Application.installSyncMaintenance(isDatabaseAvailable: Boolean) {
     val syncMetrics by inject<SyncMetricsRegistry>()
     val spaceStore by inject<SpaceStore>()
     val blobStorage by inject<LogDateBlobStorage>()
+    val legacyCleanup by inject<LegacyCopyCleanup>()
 
     val maintenanceReadEnv: (String) -> String? =
         if (isDatabaseAvailable) {
@@ -49,6 +52,7 @@ internal fun Application.installSyncMaintenance(isDatabaseAvailable: Boolean) {
             readEnv = maintenanceReadEnv,
             spaceStore = spaceStore,
             blobStorage = blobStorage,
+            legacyCleanup = legacyCleanup,
         )
     monitor.subscribe(ApplicationStopped) {
         maintenanceJob?.cancel()
@@ -68,6 +72,7 @@ internal fun startSyncMaintenance(
     readEnv: (String) -> String?,
     spaceStore: SpaceStore? = null,
     blobStorage: LogDateBlobStorage? = null,
+    legacyCleanup: LegacyCopyCleanup? = null,
 ): Job? {
     val enabled = readEnv("SYNC_TOMBSTONE_PURGE_ENABLED")?.toBooleanStrictOrNull() ?: true
     if (!enabled) return null
@@ -105,6 +110,7 @@ internal fun startSyncMaintenance(
                 )
             }
             if (spaceStore != null) purgeSpacesRecorded(spaceStore, blobStorage, metrics, retentionDays.days)
+            if (legacyCleanup != null) cleanUpMovedJournalsRecorded(legacyCleanup, metrics)
             delay(intervalMinutes.minutes)
         }
     }
@@ -149,4 +155,27 @@ internal suspend fun purgeSpaces(
         }
     if (result.blobsDeleted > 0) Napier.i(SpacePurgeNotices.BLOBS_PURGED)
     return result
+}
+
+/**
+ * Deletes the legacy copy of every journal that moved into its personal space more than 30 days ago,
+ * and records the run as `maintenance.legacy_copy_cleanup`. A run that couldn't delete every copy it
+ * started on counts as a failure; the next run tries those again.
+ */
+internal suspend fun cleanUpMovedJournalsRecorded(
+    cleanup: LegacyCopyCleanup,
+    metrics: SyncMetricsRegistry,
+) {
+    val start = System.currentTimeMillis()
+    var success = false
+    try {
+        val result = cleanup.runOnce()
+        if (result.erased > 0) Napier.i("Deleted the legacy copies of ${result.erased} moved journals")
+        success = result.failed == 0
+    } catch (e: Exception) {
+        if (e is CancellationException) throw e
+        Napier.e(SpaceMigrationNotices.CLEANUP_RUN_FAILED, e)
+    } finally {
+        metrics.recordOperation("maintenance.legacy_copy_cleanup", System.currentTimeMillis() - start, success)
+    }
 }

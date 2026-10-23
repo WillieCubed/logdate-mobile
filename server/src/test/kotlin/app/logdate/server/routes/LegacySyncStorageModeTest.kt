@@ -46,13 +46,22 @@ class LegacySyncStorageModeTest {
     private val legacy = UUID.randomUUID()
     private val space = UUID.randomUUID()
     private val unknown = UUID.randomUUID()
+    private val moved = UUID.randomUUID()
+    private val moving = UUID.randomUUID()
     private val modes =
-        AccountStorageModes { id ->
-            mapOf(
-                legacy to AccountStorageMode.LEGACY,
-                space to AccountStorageMode.PERSONAL_SPACE_V1,
-                unknown to AccountStorageMode.UNRECOGNIZED,
-            )[id]
+        object : AccountStorageModes {
+            override suspend fun of(accountId: UUID): AccountStorageMode? =
+                mapOf(
+                    legacy to AccountStorageMode.LEGACY,
+                    space to AccountStorageMode.PERSONAL_SPACE_V1,
+                    unknown to AccountStorageMode.UNRECOGNIZED,
+                    moved to AccountStorageMode.PERSONAL_SPACE_V1,
+                    moving to AccountStorageMode.LEGACY,
+                )[accountId]
+
+            override suspend fun movedByMigration(accountId: UUID): Boolean = accountId == moved
+
+            override suspend fun legacyWritesHeld(accountId: UUID): Boolean = accountId == moving
         }
 
     @Test
@@ -64,6 +73,33 @@ class LegacySyncStorageModeTest {
                 everyLegacyRoute(account).forEach { (route, response) ->
                     assertEquals(HttpStatusCode.Forbidden, response.status, "$route for $account")
                     assertEquals(StorageModeErrorCodes.SYNC_STORAGE_MODE_MISMATCH, response.code(), "$route for $account")
+                }
+            }
+        }
+
+    @Test
+    fun `an account whose journal moved gets the upgrade error on every per-kind sync route`() =
+        testApplication {
+            configureSyncTestApp(tokenService = tokenService, storageModes = modes)
+
+            everyLegacyRoute(moved).forEach { (route, response) ->
+                assertEquals(HttpStatusCode.Forbidden, response.status, route)
+                assertEquals(StorageModeErrorCodes.SYNC_FORMAT_UPGRADE_REQUIRED, response.code(), route)
+            }
+        }
+
+    @Test
+    fun `writes wait while a device checks the journal before moving it and reads still work`() =
+        testApplication {
+            configureSyncTestApp(tokenService = tokenService, storageModes = modes)
+
+            everyLegacyRoute(moving).forEach { (route, response) ->
+                if (route.startsWith("GET ")) {
+                    assertNotEquals(HttpStatusCode.ServiceUnavailable, response.status, route)
+                } else {
+                    assertEquals(HttpStatusCode.ServiceUnavailable, response.status, route)
+                    assertEquals(StorageModeErrorCodes.SYNC_MIGRATION_IN_PROGRESS, response.code(), route)
+                    assertEquals("60", response.headers[HttpHeaders.RetryAfter], route)
                 }
             }
         }

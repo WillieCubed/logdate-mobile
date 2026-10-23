@@ -52,6 +52,15 @@ nothing is read or written. An app that sees this code reads `/auth/me` again an
 mode says. An account in `personalSpaceV1` keeps that mode when `LOGDATE_PERSONAL_SPACE_ENABLED` is
 turned off.
 
+An account whose journal a device moved from legacy storage into its personal space gets
+`403 SYNC_FORMAT_UPGRADE_REQUIRED` instead, so an app that predates personal spaces can ask the
+person to update. It is a `403` rather than a `409` because released apps treat a `409` on an upload
+as a conflict and stop sending the change, while a `403` leaves it queued until the app is updated.
+While a device checks the journal just before the switch, legacy writes answer
+`503 SYNC_MIGRATION_IN_PROGRESS` with `Retry-After`, and reads keep working. The
+[journal moves reference](../../docs/reference/journal-moves.md) lists the calls a moving device
+makes.
+
 ## Linked Watch Removal
 
 A removed or expired watch session is refused with `401 DEVICE_SESSION_REVOKED`. Each server instance

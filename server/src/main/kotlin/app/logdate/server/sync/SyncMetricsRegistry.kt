@@ -122,6 +122,11 @@ class SyncMetricsRegistry {
                 "sync.backups.purge",
                 "maintenance.tombstone_purge",
                 "maintenance.space_purge",
+                "maintenance.legacy_copy_cleanup",
+                "space_migration.begin",
+                "space_migration.media_copy",
+                "space_migration.switch",
+                "space_migration.switch_back",
             )
     }
 }

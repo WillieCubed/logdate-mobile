@@ -206,6 +206,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         }
         single<SpaceStore> { if (isDatabaseAvailable) PostgreSQLSpaceStore() else InMemorySpaceStore() }
         single { TransferSlots() }
+        spaceMigrationDefinitions(isDatabaseAvailable)
         single { GoogleVcJwksCache() }
         single {
             DigitalCredentialVerifier(

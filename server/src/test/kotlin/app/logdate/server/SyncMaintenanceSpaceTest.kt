@@ -5,6 +5,7 @@ import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.logdate.asLogDateCollectionsRepository
+import app.logdate.server.logging.SpaceMigrationNotices
 import app.logdate.server.logging.SpacePurgeNotices
 import app.logdate.server.logging.safeServerMessage
 import app.logdate.server.space.InMemorySpaceStore
@@ -227,5 +228,21 @@ class SyncMaintenanceSpaceTest {
         ).forEach { (message, code) ->
             assertEquals(code, safeServerMessage(LogLevel.ERROR, tag = null, message = message))
         }
+    }
+
+    @Test
+    fun `journal move outcomes keep their own codes in production logs`() {
+        mapOf(
+            SpaceMigrationNotices.SWITCHED to "SERVER_SPACE_MIGRATION_SWITCHED",
+            SpaceMigrationNotices.SWITCHED_BACK to "SERVER_SPACE_MIGRATION_SWITCHED_BACK",
+            SpaceMigrationNotices.COPY_MISMATCH to "SERVER_SPACE_MIGRATION_COPY_MISMATCH",
+            SpaceMigrationNotices.CLEANUP_FAILED to "SERVER_LEGACY_COPY_CLEANUP_FAILED",
+            SpaceMigrationNotices.CLEANUP_SKIPPED to "SERVER_LEGACY_COPY_CLEANUP_SKIPPED",
+            SpaceMigrationNotices.CLEANUP_RUN_FAILED to "SERVER_LEGACY_COPY_CLEANUP_RUN_FAILED",
+        ).forEach { (message, code) ->
+            assertEquals(code, safeServerMessage(LogLevel.ERROR, tag = null, message = message))
+        }
+        val counted = "Deleted the legacy copies of 12 moved journals"
+        assertEquals(counted, safeServerMessage(LogLevel.INFO, tag = null, message = counted))
     }
 }

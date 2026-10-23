@@ -30,6 +30,9 @@ import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateMomentsRepository
 import app.logdate.server.logdate.ResourceRouteRepository
+import app.logdate.server.migration.LegacyMediaCopier
+import app.logdate.server.migration.SpaceMigrationHolds
+import app.logdate.server.migration.SpaceMigrationService
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthConfig
@@ -44,6 +47,7 @@ import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.passkeys.WebAuthnPasskeyStepUp
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.routes.sync.locationHistoryRoutes
+import app.logdate.server.routes.sync.spaceMigrationRoutes
 import app.logdate.server.space.SpaceStore
 import app.logdate.server.sync.LocationHistoryRepository
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -138,6 +142,7 @@ private fun Application.personalSpaceRoutes() {
     val blobStorage by inject<LogDateBlobStorage>()
     val entitlementEnforcer by inject<EntitlementEnforcer>()
     val transfers by inject<TransferSlots>()
+    val migrationHolds by inject<SpaceMigrationHolds>()
 
     routing {
         spaceXrpcRoutes(
@@ -147,6 +152,7 @@ private fun Application.personalSpaceRoutes() {
             auth = LogDateAccountAuth(accessTokenVerifier, accountRepository, atprotoIdentityService),
             entitlementEnforcer = entitlementEnforcer,
             transfers = transfers,
+            migrationHolds = migrationHolds,
         )
     }
 }
@@ -250,10 +256,12 @@ internal fun Application.contentApiRoutes() {
     val momentsRepository by inject<LogDateMomentsRepository>()
     val syncRateLimiter = SlidingWindowRateLimiter()
     val transfers by inject<TransferSlots>()
+    val migrationHolds by inject<SpaceMigrationHolds>()
+    val storageModes = accountRepository.storageModes(migrationHolds)
 
     routing {
         route("/api/v1") {
-            locationHistoryRoutes(tokenService, locationHistoryRepository, accountRepository.storageModes())
+            locationHistoryRoutes(tokenService, locationHistoryRepository, storageModes)
             syncRoutes(
                 tokenService = tokenService,
                 mediaStorage = blobStorage,
@@ -266,7 +274,7 @@ internal fun Application.contentApiRoutes() {
                 diagnosticReportService = diagnosticReportService(diagnosticReportAvailability, diagnosticReportStore),
                 accessTokenVerifier = accessTokenVerifier,
                 momentsRepository = momentsRepository,
-                storageModes = accountRepository.storageModes(),
+                storageModes = storageModes,
                 transfers = transfers,
             )
             quotaRoutes(
@@ -283,6 +291,30 @@ internal fun Application.contentApiRoutes() {
                 tokenService = tokenService,
                 entitlementService = entitlementService,
                 sessionProvider = cloudTranscriptionSessionProviderFromEnvironment(httpClient),
+            )
+        }
+    }
+}
+
+/** `/api/v1/space-migration`: moving existing journals into personal spaces, answered only while the server does that. */
+internal fun Application.spaceMigrationApiRoutes() {
+    val accountRepository by inject<AccountRepository>()
+    val tokenService by inject<TokenService>()
+    val syncMetrics by inject<SyncMetricsRegistry>()
+    val transfers by inject<TransferSlots>()
+    val descriptorConfig by inject<ServerDescriptorConfig>()
+    val migrationService by inject<SpaceMigrationService>()
+    val mediaCopier by inject<LegacyMediaCopier>()
+
+    routing {
+        route("/api/v1") {
+            spaceMigrationRoutes(
+                tokenService = tokenService,
+                service = migrationService.takeIf { descriptorConfig.movesJournalsToPersonalSpaces },
+                copier = mediaCopier,
+                accounts = accountRepository,
+                transfers = transfers,
+                metrics = syncMetrics,
             )
         }
     }

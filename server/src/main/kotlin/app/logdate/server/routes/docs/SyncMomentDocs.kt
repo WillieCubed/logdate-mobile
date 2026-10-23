@@ -122,6 +122,7 @@ internal object SyncMomentDocs {
             )
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -208,6 +209,7 @@ internal object SyncMomentDocs {
             syncError(HttpStatusCode.Conflict, SyncExamples.conflict)
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }
@@ -227,6 +229,7 @@ internal object SyncMomentDocs {
             noContent("The moment is deleted.")
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncServerError()
         }
     }

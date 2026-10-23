@@ -32,12 +32,15 @@ import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.JournalChange
 import io.github.aakira.napier.Napier
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.header
+import io.ktor.server.request.httpMethod
 import io.ktor.server.request.receiveMultipart
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.utils.io.readRemaining
 import kotlinx.coroutines.Dispatchers
@@ -322,21 +325,43 @@ internal suspend fun extractFullAccessUserId(
 }
 
 /**
- * [accountId] when its data is kept in legacy storage, which the per-kind sync routes serve. Any other
- * storage mode, including one this server doesn't recognize, answers `403 SYNC_STORAGE_MODE_MISMATCH`,
- * so a device with a stale or wrong idea of the account's mode can't split its data between two
- * stores; it reads `/auth/me` again instead. Without [storageModes] every account passes.
+ * [accountId] when its data is kept in legacy storage, which the per-kind sync routes serve.
+ *
+ * - An account whose journal was moved into its personal space answers `403 SYNC_FORMAT_UPGRADE_REQUIRED`:
+ *   an app that predates the move asks the person to update, and a newer one reads `/auth/me` again.
+ *   It isn't a `409`, because released apps settle a queued change that gets a `409` as a conflict
+ *   and stop sending it; a `403` leaves the change queued until the app is updated.
+ * - Any other storage mode, including one this server doesn't recognize, answers
+ *   `403 SYNC_STORAGE_MODE_MISMATCH`, so a device with a stale or wrong idea of the account's mode
+ *   can't split its data between two stores; it reads `/auth/me` again instead.
+ * - While a device checks the journal before moving it, a write answers
+ *   `503 SYNC_MIGRATION_IN_PROGRESS` with `Retry-After`; the app keeps it queued and sends it later.
+ *   Reads still work.
+ *
+ * Without [storageModes] every account passes.
  */
 internal suspend fun ApplicationCall.requireLegacyStorage(
     accountId: UUID,
     storageModes: AccountStorageModes?,
 ): UUID? {
     val mode = storageModes?.of(accountId) ?: return accountId
-    if (mode == AccountStorageMode.LEGACY) return accountId
+    if (mode == AccountStorageMode.LEGACY) {
+        if (request.httpMethod == HttpMethod.Get || !storageModes.legacyWritesHeld(accountId)) return accountId
+        response.header(HttpHeaders.RetryAfter, MIGRATION_HOLD_RETRY_AFTER_SECONDS.toString())
+        return rejectAccess(HttpStatusCode.ServiceUnavailable, StorageModeErrorCodes.SYNC_MIGRATION_IN_PROGRESS, MIGRATION_HOLD_MESSAGE)
+    }
+    if (mode == AccountStorageMode.PERSONAL_SPACE_V1 && storageModes.movedByMigration(accountId)) {
+        return rejectAccess(HttpStatusCode.Forbidden, StorageModeErrorCodes.SYNC_FORMAT_UPGRADE_REQUIRED, FORMAT_UPGRADE_MESSAGE)
+    }
     return rejectAccess(HttpStatusCode.Forbidden, StorageModeErrorCodes.SYNC_STORAGE_MODE_MISMATCH, STORAGE_MODE_MISMATCH_MESSAGE)
 }
 
 private const val STORAGE_MODE_MISMATCH_MESSAGE = "This account's data isn't kept in legacy sync storage; read the account again"
+private const val FORMAT_UPGRADE_MESSAGE = "This account's journal moved to a newer sync format; update the app to keep syncing"
+private const val MIGRATION_HOLD_MESSAGE = "This account's journal is being moved; send this change again later"
+
+/** How long an app waits before sending a held write again. */
+private const val MIGRATION_HOLD_RETRY_AFTER_SECONDS = 60
 
 private suspend fun ApplicationCall.rejectAccess(
     status: HttpStatusCode,

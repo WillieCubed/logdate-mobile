@@ -31,6 +31,22 @@ internal object SyncExamples {
             "This account's data isn't kept in legacy sync storage; read the account again",
         )
 
+    val formatUpgradeRequired =
+        ErrorCase(
+            StorageModeErrorCodes.SYNC_FORMAT_UPGRADE_REQUIRED,
+            "The account's journal was moved into its personal space. Nothing was read or written. An app that can sync a " +
+                "personal space reads the account again from `/auth/me`; one that can't asks the person to update it.",
+            "This account's journal moved to a newer sync format; update the app to keep syncing",
+        )
+
+    val migrationInProgress =
+        ErrorCase(
+            StorageModeErrorCodes.SYNC_MIGRATION_IN_PROGRESS,
+            "A device is checking the account's journal before moving it into its personal space. Nothing was written. " +
+                "Keep the change queued and send it again after `Retry-After` seconds.",
+            "This account's journal is being moved; send this change again later",
+        )
+
     val serverMisconfigured =
         ErrorCase(
             "SERVER_MISCONFIGURED",

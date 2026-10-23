@@ -158,6 +158,12 @@ class InMemoryLogDateMediaRepository : LogDateMediaRepository {
             }
         }
     }
+
+    /** Drops every media record kept for [userId], deleted ones included. */
+    fun forgetAccount(userId: UUID) {
+        versions.remove(userId)
+        rows.remove(userId)
+    }
 }
 
 private data class StoredLogDateMedia(

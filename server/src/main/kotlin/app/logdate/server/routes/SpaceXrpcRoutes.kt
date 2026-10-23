@@ -10,6 +10,8 @@ import app.logdate.server.auth.Account
 import app.logdate.server.database.toJavaUUID
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.logdate.LogDateBlobStorage
+import app.logdate.server.migration.SpaceMigrationHolds
+import app.logdate.server.migration.SpaceWriteRefusal
 import app.logdate.server.ratelimit.FixedWindowRateLimiter
 import app.logdate.server.routes.docs.XrpcSpaceDocs
 import app.logdate.server.space.MAX_SPACE_CHANGES_LIMIT
@@ -30,6 +32,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.request.receiveChannel
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
@@ -62,6 +65,10 @@ private const val MAX_CID_LENGTH = 255
 private const val RECORD_NOT_FOUND = "RecordNotFound"
 internal const val BLOB_NOT_FOUND = "BlobNotFound"
 private const val CURSOR_TOO_OLD = "CursorTooOld"
+private const val ACCOUNT_STORAGE_CHANGED = "AccountStorageChanged"
+
+/** How long a device waits before sending a held space write again. */
+private const val SPACE_HOLD_RETRY_AFTER_SECONDS = 60
 
 private val spaceJson = Json { ignoreUnknownKeys = true }
 
@@ -101,6 +108,10 @@ internal data class SpaceDeleteRecordInput(
  * or blob upload that would take the account past its storage quota answers `402 QuotaExceeded`; the
  * store checks it in the same transaction as the write. Blob transfers past this instance's
  * [transfers] answer `503 ServerBusy` with `Retry-After`, without spending a budget.
+ *
+ * While a device downloads the space to switch the account back to legacy storage, writes answer
+ * `503 ServerBusy` with `Retry-After`; once the account is back on legacy storage, a write from a
+ * device that hasn't noticed answers `409 AccountStorageChanged` (see [migrationHolds]).
  */
 fun Route.spaceXrpcRoutes(
     enabled: Boolean,
@@ -112,10 +123,11 @@ fun Route.spaceXrpcRoutes(
     rateLimits: SpaceRateLimits = SpaceRateLimits(),
     transfers: TransferSlots = TransferSlots(),
     maxBlobBytes: Long = MAX_SPACE_BLOB_BYTES,
+    migrationHolds: SpaceMigrationHolds = SpaceMigrationHolds.None,
 ) {
     val records = store?.takeIf { enabled }
     val blobs = records?.let { recordStore -> blobStorage?.let { SpaceObjects(recordStore, it, transfers) } }
-    val gate = SpaceGate(auth, rateLimiter, rateLimits)
+    val gate = SpaceGate(auth, rateLimiter, rateLimits, migrationHolds)
     route("/xrpc") {
         putRecord(records, gate, entitlementEnforcer)
         deleteRecord(records, gate)
@@ -131,6 +143,7 @@ internal class SpaceGate(
     private val auth: LogDateAccountAuth,
     private val limiter: FixedWindowRateLimiter,
     private val limits: SpaceRateLimits,
+    private val holds: SpaceMigrationHolds = SpaceMigrationHolds.None,
 ) {
     /**
      * The calling account and [service], or null after answering: `401` without a valid LogDate access
@@ -160,6 +173,33 @@ internal class SpaceGate(
         return account to service
     }
 
+    /**
+     * Whether [account] may write to its personal space now, or answers why not and returns false:
+     * `503` while its writes are held to switch it back, `409` once it is back on legacy storage.
+     */
+    @OptIn(ExperimentalUuidApi::class)
+    suspend fun writable(
+        call: ApplicationCall,
+        account: Account,
+    ): Boolean {
+        when (holds.spaceWriteRefusal(account.id.toJavaUUID(), account.storageMode)) {
+            null -> return true
+            SpaceWriteRefusal.Held -> {
+                call.response.header(HttpHeaders.RetryAfter, SPACE_HOLD_RETRY_AFTER_SECONDS.toString())
+                call.respond(
+                    HttpStatusCode.ServiceUnavailable,
+                    PdsErrorResponse(SERVER_BUSY, "This journal is being switched back; send this change again later"),
+                )
+            }
+            SpaceWriteRefusal.StorageChanged ->
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    PdsErrorResponse(ACCOUNT_STORAGE_CHANGED, "This account's journal is no longer kept in its personal space"),
+                )
+        }
+        return false
+    }
+
     /** Counts one request against [account]'s [budget], or answers `429` and returns false. */
     @OptIn(ExperimentalUuidApi::class)
     suspend fun spend(
@@ -177,6 +217,7 @@ private fun Route.putRecord(
 ) {
     post("/app.logdate.space.putRecord", XrpcSpaceDocs.putRecord) {
         val (account, store) = gate.admit(call, records, SpaceBudget.RECORD_WRITES) ?: return@post
+        if (!gate.writable(call, account)) return@post
         val bytes =
             call.receiveBytesUpTo(MAX_SPACE_RECORD_REQUEST_BYTES)
                 ?: return@post call.respond(HttpStatusCode.PayloadTooLarge, PdsErrorResponse("RecordTooLarge", "The record is too large"))
@@ -226,6 +267,7 @@ private fun Route.deleteRecord(
 ) {
     post("/app.logdate.space.deleteRecord", XrpcSpaceDocs.deleteRecord) {
         val (account, store) = gate.admit(call, records, SpaceBudget.RECORD_WRITES) ?: return@post
+        if (!gate.writable(call, account)) return@post
         val bytes =
             call.receiveBytesUpTo(MAX_SPACE_DELETE_REQUEST_BYTES)
                 ?: return@post call.respond(HttpStatusCode.PayloadTooLarge, PdsErrorResponse("RecordTooLarge", "The request is too large"))

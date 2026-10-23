@@ -56,6 +56,7 @@ internal object LocationHistoryDocs {
             ok("The accepted records with their account-scoped server versions.", LocationHistoryBatchResponse(listOf(deletedRecord)))
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             syncError(
                 HttpStatusCode.BadRequest,
                 ErrorCase("VALIDATION_ERROR", "The JSON or record fields are invalid.", "Invalid location history batch"),

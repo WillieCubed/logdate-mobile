@@ -56,6 +56,7 @@ internal fun Route.uploadBlob(
 ) {
     post("/app.logdate.space.uploadBlob", XrpcSpaceDocs.uploadBlob) {
         val (account, objects) = gate.authorize(call, blobs) ?: return@post
+        if (!gate.writable(call, account)) return@post
         val space = call.ownSpace(call.request.queryParameters["space"], account, BLOB_NOT_FOUND) ?: return@post
         val declared =
             call.request.headers[HttpHeaders.ContentLength]

@@ -16,7 +16,7 @@ import studio.hypertext.atproto.pds.PdsErrorResponse
 
 private const val RATE_LIMIT_EXCEEDED = "RateLimitExceeded"
 private const val QUOTA_EXCEEDED = "QuotaExceeded"
-private const val SERVER_BUSY = "ServerBusy"
+internal const val SERVER_BUSY = "ServerBusy"
 
 /** The error a space upload without a `Content-Length` header answers. */
 internal const val LENGTH_REQUIRED = "LengthRequired"

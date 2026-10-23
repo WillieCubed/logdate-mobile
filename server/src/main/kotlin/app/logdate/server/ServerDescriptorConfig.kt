@@ -12,6 +12,11 @@ data class ServerDescriptorConfig(
     val deploymentKind: DeploymentKind = DeploymentKind.SELF_HOSTED,
     val encryptedAccountKeysEnabled: Boolean = false,
     val personalSpaceEnabled: Boolean = false,
+    /**
+     * Whether existing accounts can move their journals into their personal spaces through
+     * `/api/v1/space-migration`. It takes effect only together with [personalSpaceEnabled].
+     */
+    val personalSpaceMigrationEnabled: Boolean = false,
     val displayName: String = defaultDisplayName(DeploymentKind.SELF_HOSTED),
     val privacyPolicyUrl: String? = null,
     val termsOfServiceUrl: String? = null,
@@ -23,6 +28,10 @@ data class ServerDescriptorConfig(
      */
     val newAccountStorageMode: AccountStorageMode
         get() = if (personalSpaceEnabled) AccountStorageMode.PERSONAL_SPACE_V1 else AccountStorageMode.LEGACY
+
+    /** Whether this server moves existing journals into personal spaces: both flags are on. */
+    val movesJournalsToPersonalSpaces: Boolean
+        get() = personalSpaceEnabled && personalSpaceMigrationEnabled
 
     fun toDescriptor(
         identityConfig: AtprotoIdentityConfig,
@@ -71,6 +80,9 @@ data class ServerDescriptorConfig(
                     if (personalSpaceEnabled) {
                         add(ServerProtocolFeature.PERSONAL_SPACE_V1)
                     }
+                    if (movesJournalsToPersonalSpaces) {
+                        add(ServerProtocolFeature.PERSONAL_SPACE_MIGRATION_V1)
+                    }
                     if (identityConfig.publishesPlcOperations) {
                         add(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1)
                     }
@@ -91,6 +103,7 @@ data class ServerDescriptorConfig(
             termsOfServiceUrl: String? = System.getenv("LOGDATE_TERMS_OF_SERVICE_URL"),
             encryptedAccountKeysEnabled: Boolean = System.getenv("LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED") == "true",
             personalSpaceEnabled: Boolean = System.getenv("LOGDATE_PERSONAL_SPACE_ENABLED") == "true",
+            personalSpaceMigrationEnabled: Boolean = System.getenv("LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED") == "true",
         ): ServerDescriptorConfig {
             val resolvedDeploymentKind =
                 when (deploymentKind?.trim()?.lowercase()) {
@@ -102,6 +115,7 @@ data class ServerDescriptorConfig(
                 deploymentKind = resolvedDeploymentKind,
                 encryptedAccountKeysEnabled = encryptedAccountKeysEnabled,
                 personalSpaceEnabled = personalSpaceEnabled,
+                personalSpaceMigrationEnabled = personalSpaceMigrationEnabled,
                 displayName =
                     displayName
                         ?.trim()

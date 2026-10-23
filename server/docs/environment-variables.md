@@ -508,6 +508,28 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Records and files in a personal space share the account's one storage quota with media and backups, and `GET /api/v1/quota` includes them. The server keeps one running total per account for each kind of data (space, media and backups), so a quota check reads a single row however much the account stores, and checks every record write and file upload against the quota in the same database transaction that stores it, so requests sent at once can't together pass it. A record write that would go past the quota answers `402 QuotaExceeded`; replacing a record with one no larger and deleting a record never are. A file upload first holds room for its `Content-Length`, alongside any other uploads in progress, and answers `402 QuotaExceeded` before receiving anything when that room isn't free. With `BILLING_PROVIDER` unset, accounts have no quota.
   - An upload must send a `Content-Length` header, or it answers `411 LengthRequired`. The server streams the body to object storage as it arrives, hashing it on the way, and only records the file once storage holds exactly the bytes it hashed, so nothing is written to the instance's disk or memory beyond a 2 MiB write buffer and a 64 KiB chunk for each upload. Each instance runs up to 8 uploads and 16 downloads at once, sized for the 512 MiB instances LogDate Cloud uses: with a heap of about 384 MiB, those 24 transfers take about 50 MiB. Further transfers answer `503 ServerBusy` with a `Retry-After` header and cost the account none of its request budget. A transfer whose client sends or accepts nothing for 20 seconds is ended (`408 UploadStalled` for uploads) and its place freed. Room held for an upload that never finishes is released 2 minutes after it was taken, which is the request timeout plus a margin.
 
+### `LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED`
+- **Description**: Lets existing accounts move their journals from legacy storage into their personal spaces through the `/api/v1/space-migration` calls, which a LogDate device makes once it has synced everything.
+- **Type**: Boolean (only the exact value `true` enables it)
+- **Default**: `false`
+- **Example**: `LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED=true`
+- **Required**: No
+- **Notes**:
+  - It takes effect only together with `LOGDATE_PERSONAL_SPACE_ENABLED`. With both on, the server adds `personalSpaceMigrationV1` to its server description; otherwise every move call answers `404 FEATURE_DISABLED`.
+  - Leave it off until the database migration that adds `space_migrations` (`V50__Add_space_migrations.sql`) is deployed everywhere.
+  - Turning it off stops new moves and switching back, but doesn't undo a move. Accounts that switched stay in their personal spaces, the legacy sync routes keep answering them with `403 SYNC_FORMAT_UPGRADE_REQUIRED`, and their legacy copies are still deleted 30 days after each switch by the maintenance loop that `SYNC_TOMBSTONE_PURGE_ENABLED` controls.
+  - The [journal moves runbook](../../docs/runbook/journal-moves.md) describes rehearsing moves in staging and operating them.
+
+### `LOGDATE_SPACE_MIGRATION_HOLD_GRACE_SECONDS`
+- **Description**: How long a hold on an account's legacy writes must stand before a device may switch the account into its personal space, so that every write that started before the hold has finished.
+- **Type**: Integer seconds, zero or more
+- **Default**: `120`
+- **Example**: `LOGDATE_SPACE_MIGRATION_HOLD_GRACE_SECONDS=120`
+- **Required**: No
+- **Notes**:
+  - Keep it longer than the longest request the server can run. Cloud Run ends a request after 60 seconds on LogDate Cloud, so the default leaves a minute of margin.
+  - The server-client end-to-end tests set it to `0` so a move doesn't wait two minutes; never set `0` on a deployed server, because a write that passed its storage check just before the hold could then land after the device checked legacy storage.
+
 ### `LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED`
 - **Description**: Turns on the browser authorization page. When another AT Protocol app sends a person to `/oauth/authorize`, they see which app is asking and approve it by signing in with their LogDate passkey. Without it, only the LogDate apps can approve OAuth requests, so accounts without a password can't use their identity in other apps.
 - **Type**: Boolean (only the exact value `true` enables it)

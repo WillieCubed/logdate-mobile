@@ -151,6 +151,7 @@ internal object SyncStorageDocs {
             )
             syncUnauthorized()
             syncStorageModeMismatch()
+            syncMigrationHold()
             quotaExceeded()
             rateLimited(MEDIA_UPLOAD_RATE_LIMIT, ErrorEnvelope.SYNC)
             syncError(
@@ -256,7 +257,7 @@ internal object SyncStorageDocs {
                 ),
                 SyncExamples.serverMisconfigured,
             )
-            syncError(HttpStatusCode.ServiceUnavailable, storageUnavailable)
+            syncError(HttpStatusCode.ServiceUnavailable, storageUnavailable, SyncExamples.migrationInProgress)
         }
     }
 
