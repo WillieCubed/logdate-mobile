@@ -1235,6 +1235,23 @@ jq '.env_vars.ATPROTO_RECOVERY_KEYS_ENABLED = "yes"' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-recovery-keys.json"
 expect_failure invalid-recovery-keys staging "$RELEASE_SHA" invalid-recovery-keys.json \
     "ATPROTO_RECOVERY_KEYS_ENABLED must be true or false"
+# Passkey sign-in for other AT Protocol apps is an opt-in for every environment, preserved verbatim.
+for environment in staging production; do
+    for enabled in true false; do
+        jq --arg enabled "$enabled" '.env_vars.LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED = $enabled' \
+            "$FIXTURE_DIR/$environment-source.json" >"$FIXTURE_DIR/passkey-oauth-$environment-$enabled.json"
+        output="$TMP_DIR/passkey-oauth-$environment-$enabled.out.json"
+        if ! run_renderer "$environment" "$RELEASE_SHA" "passkey-oauth-$environment-$enabled.json" "$output" "$LOG_DIR/passkey-oauth-$environment-$enabled.err"; then
+            cat "$LOG_DIR/passkey-oauth-$environment-$enabled.err" >&2
+            fail "passkey sign-in opt-in could not be rendered for $environment"
+        fi
+        assert_equals "$enabled" "$(jq -r '.env_vars.LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED' "$output")"
+    done
+done
+jq '.env_vars.LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED = "yes"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-passkey-oauth.json"
+expect_failure invalid-passkey-oauth staging "$RELEASE_SHA" invalid-passkey-oauth.json \
+    "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED must be true or false"
 # Identity publishing is a production-only opt-in, preserved verbatim.
 for enabled in true false; do
     jq --arg enabled "$enabled" '.env_vars.ATPROTO_PLC_PUBLISH_ENABLED = $enabled' \

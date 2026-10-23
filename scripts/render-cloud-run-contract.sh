@@ -621,6 +621,7 @@ try:
         "LOGDATE_PERSONAL_SPACE_ENABLED",
         "ATPROTO_PLC_PUBLISH_ENABLED",
         "ATPROTO_RECOVERY_KEYS_ENABLED",
+        "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED",
     }
     allowed_env_keys = required_env_keys | optional_flag_keys
     unexpected_env = set(env_vars) - allowed_env_keys
