@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import java.io.File
 
@@ -49,7 +50,7 @@ val phoneWatchWindowModule =
     module {
         single { PhoneMediaServer(get(), get(), get<MediaFileResolver>()::filePath) }
         single { PhoneMediaEndpoint(get(), Wearable.getChannelClient(androidContext())) }
-        single { WindowManifestStore(get()) }
+        single { WindowManifestStore(get(named("installationWatchStorage"))) }
         single { PhoneWindowMoments(get(), get()) }
         single {
             val support = get<PhoneMomentSupport>()

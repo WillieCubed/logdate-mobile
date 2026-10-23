@@ -811,9 +811,11 @@ def restore_radio_state(serial, original):
     raise RuntimeError(f"Could not restore emulator radio state: {detail}")
 
 
-def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False, source_session_id=None):
+def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False, source_session_id=None, installation_trust=False):
     arguments = ["shell", "am", "instrument", "-w", "-r", "-e", "class", PROBE,
                  "-e", "nativeBackupMode", mode, "-e", "nativeIdentityMode", identity]
+    if mode == "seed" and installation_trust is True:
+        arguments.extend(("-e", "nativeInstallationTrustFixture", "true"))
     if metadata:
         for name, key in (("sourceOwner", "owner"), ("sourceDevice", "device"), ("sourceFingerprint", "fingerprint"), ("sourceMediaNonce", "mediaNonce"), ("sourceMediaCiphertext", "mediaCiphertext")):
             value = metadata.get(key)
@@ -824,6 +826,8 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
             arguments.extend(("-e", name, value))
         if metadata.get("recordingTransferFixture"):
             arguments.extend(("-e", "sourceRecordingTransferFixture", "true"))
+        if metadata.get("installationTrustFixture") is True:
+            arguments.extend(("-e", "sourceInstallationTrustFixture", "true"))
     if mode == "source-backup-integrity":
         arguments.extend(("-e", "sourceHasSession", "true" if source_has_session else "false"))
     if source_session_id is not None:
@@ -1234,6 +1238,11 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         return
     print("Verifying original media, identity, drafts, and offline editing", flush=True)
     verify_mode = "data-only" if exercise_data_only else "verify"
+    if exercise_duplicate_restore and metadata.get("installationTrustFixture") is True:
+        # Establish only installation trust before the final full database delivery.
+        # The ordinary editing probe must run afterward, before the read-only restart oracle.
+        probe(destination, "verify-restored", output / "destination-before-trust-replay.log", metadata, identity)
+        replay_destination_trust(destination, output, metadata, identity, system_widgets=exercise_system_widgets)
     probe(destination, verify_mode, output / f"destination-{verify_mode}.log", metadata, identity)
     original_radio = radio_state(destination)
     try:
@@ -1261,6 +1270,17 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     finally:
         restore_radio_state(destination, original_radio)
     print("Native transport and offline restart checks passed", flush=True)
+
+
+def replay_destination_trust(serial, output, metadata, identity, *, system_widgets=False):
+    adb(serial, "shell", "am", "force-stop", PACKAGE)
+    replay = restore_transport(serial, system_widgets=system_widgets)
+    private_file(output / "native-restore-after-negotiation.log", replay)
+    if b"restoreFinished: 0" not in replay:
+        raise RuntimeError("Android did not complete the post-negotiation native restore")
+    if system_widgets:
+        capture_widget_restore_delivery(serial, output / "widget-delivery-after-negotiation")
+    probe(serial, "verify-restored", output / "destination-trust-after-replay.log", metadata, identity)
 
 
 def verify_quota(source, output):

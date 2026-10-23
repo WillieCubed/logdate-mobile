@@ -10,12 +10,30 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PhoneWatchLinkStoreTest {
     private val store = PhoneWatchLinkStore(MemoryKeyValueStorage(), MemoryPairKeyVault())
     private val target = LinkTarget("watch", "Watch")
     private val pair = LinkPlan(LinkMode.PAIR)
     private val cloud = LinkPlan(LinkMode.CLOUD, "new-account")
+
+    @Test
+    fun `portable forget choices survive while link metadata stays local`() =
+        runTest {
+            val local = MemoryKeyValueStorage()
+            val portable = MemoryKeyValueStorage()
+            val keys = MemoryPairKeyVault()
+            val links = PhoneWatchLinkStore(local, keys, portable)
+            links.recordSuccess(target, pair, ByteArray(32), 100, 100, linkId = "destination")
+            portable.putString("phone.watch_links.v1", "source metadata")
+            assertEquals("destination", links.get(target.nodeId)?.linkId)
+            links.forget(target.nodeId)
+            assertTrue(portable.getBooleanOrThrow("watch.removed.${target.nodeId}"))
+            assertFalse(local.getBooleanOrThrow("watch.removed.${target.nodeId}"))
+            assertNull(keys.get(target.nodeId))
+            assertNull(links.get(target.nodeId))
+        }
 
     @Test
     fun `a fresh exchange replaces link identity and a failed changed plan cannot retain it`() =

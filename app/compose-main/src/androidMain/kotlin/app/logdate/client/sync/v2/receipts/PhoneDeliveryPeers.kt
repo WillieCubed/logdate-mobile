@@ -55,7 +55,7 @@ class PhoneDeliveryPeers(
         val bound = sessions.getOriginBoundSession()
         val session = sessions.getSession()
         val backend = config.getCurrentBackendUrl()
-        val record = links.get(watchNode) ?: return null
+        val record = links.getForReconciliation(watchNode) ?: return null
         if (record.nodeId != watchNode || record.linkedAt == null || record.failure != null) return null
         val localNode = localNodeId() ?: return null
         val context =
@@ -83,7 +83,7 @@ class PhoneDeliveryPeers(
             sessions.getOriginBoundSession() != bound ||
             sessions.getSession() != session ||
             config.getCurrentBackendUrl() != backend ||
-            links.get(watchNode) != record
+            links.getForReconciliation(watchNode) != record
         ) {
             return null
         }

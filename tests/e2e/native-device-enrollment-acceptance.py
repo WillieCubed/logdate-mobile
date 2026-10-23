@@ -231,6 +231,11 @@ def fixture_environment(path):
     return configuration
 
 
+def require_installation_trust_fixture(metadata):
+    if metadata.get("installationTrustFixture") is not True:
+        raise RuntimeError("Native transfer did not exercise installation trust")
+
+
 def run_acceptance(options, control, process):
     wait_for(control / "ready", process)
     fixture = json.loads((control / "fixture.json").read_text())
@@ -242,7 +247,7 @@ def run_acceptance(options, control, process):
         H["adb"](options.source, "install", "-r", "-t", str(apk))
     private_fixture(options.source, fixture)
     probe(options.source, "source-prepare", options.output / "source-prepare.log")
-    H["probe"](options.source, "seed", options.output / "source-seed.log", identity="account")
+    H["probe"](options.source, "seed", options.output / "source-seed.log", identity="account", installation_trust=True)
     retained_draft_probe(options.source, "seed", options.output / "source-editor-draft.log")
     probe(options.source, "source-enroll", options.output / "source-enroll.log")
     retained_draft_probe(options.source, "upload", options.output / "source-editor-original-upload.log")
@@ -259,6 +264,7 @@ def run_acceptance(options, control, process):
         seed_source=False, exercise_duplicate_restore=True,
     )
     metadata = json.loads((native / "source-fixture.json").read_text())
+    require_installation_trust_fixture(metadata)
     if any(metadata[field] != source[field] for field in ("owner", "device", "fingerprint")):
         raise RuntimeError("The native source identity changed before backup")
     # The no-backup credential file must be absent until after native journal verification.

@@ -125,6 +125,9 @@ class NativeBackupTransferProbeTest {
             }
             if (mode == "source-backup-integrity") {
                 val arguments = InstrumentationRegistry.getArguments()
+                if (arguments.getString("sourceInstallationTrustFixture") == "true") {
+                    NativeInstallationTrustFixture(koin).verifySource(requireNotNull(arguments.getString("sourceDevice")))
+                }
                 val identity = koin.get<IdentityKeyManager>()
                 val crypto = koin.get<CryptoManager>()
                 assertEquals(
@@ -302,6 +305,8 @@ class NativeBackupTransferProbeTest {
                         "cloud media payload".encodeToByteArray(),
                     )
                 fixture.seed(context)
+                val installationTrust = InstrumentationRegistry.getArguments().getString("nativeInstallationTrustFixture") == "true"
+                if (installationTrust) NativeInstallationTrustFixture(koin).seed()
                 koin.get<UserStateRepository>().setIsOnboardingComplete(true)
                 val metadata =
                     JSONObject()
@@ -317,6 +322,7 @@ class NativeBackupTransferProbeTest {
                         .put("mediaNonce", Base64.encode(mediaNonce))
                         .put("mediaCiphertext", Base64.encode(mediaCiphertext))
                         .put("recordingTransferFixture", true)
+                        .put("installationTrustFixture", installationTrust)
                 File(instrumentation.targetContext.noBackupFilesDir, "native-backup-fixture.json").writeText(metadata.toString())
                 if (legacyAccount) {
                     assertFalse(
@@ -343,6 +349,11 @@ class NativeBackupTransferProbeTest {
                         restoredDevice,
                         "A fresh target must have a distinct installation ID",
                     )
+                }
+                if (arguments.getString("sourceInstallationTrustFixture") == "true") {
+                    val trust = NativeInstallationTrustFixture(koin)
+                    val sourceDevice = requireNotNull(arguments.getString("sourceDevice"))
+                    if (mode == "verify-in-place") trust.verifySource(sourceDevice) else trust.verifyDestination(sourceDevice)
                 }
                 assertEquals(
                     arguments.getString("sourceFingerprint"),

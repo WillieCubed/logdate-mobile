@@ -1,12 +1,14 @@
 package app.logdate.di
 
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
+import app.logdate.client.device.restore.createAndroidInstallationWatchStorage
 import app.logdate.client.domain.activity.ActivityTracker
 import app.logdate.client.domain.activity.toSnapshot
 import app.logdate.client.domain.reminders.LearnedReminderHours
@@ -80,6 +82,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.koin.android.ext.koin.androidContext
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import java.io.File
 import kotlin.time.Clock
@@ -141,7 +144,10 @@ val phoneWatchSyncV2Module =
             )
         }
         single<PairKeyVault> { SecureStoragePairKeyVault(get(), prefix = "phone.watch_link.pair_key.") }
-        single { PhoneWatchLinkStore(storage = get(), pairKeys = get()) }
+        single<KeyValueStorage>(named("installationWatchStorage")) {
+            createAndroidInstallationWatchStorage(androidContext())
+        }
+        single { PhoneWatchLinkStore(storage = get(named("installationWatchStorage")), pairKeys = get(), choices = get()) }
         single { PhoneLinkExchange(BouncyCastleLinkHandshake()) }
         single<LinkRequester> { MessageClientLinkRequester(Wearable.getMessageClient(androidContext())) }
         single<LinkTargets> { CapabilityLinkTargets(Wearable.getCapabilityClient(androidContext())) }

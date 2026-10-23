@@ -102,6 +102,12 @@ class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "attribution"):
                     MODULE.registry_check(control, Mock(), "destination", {"source", "replacement"}, "owner", proof)
 
+    def test_enrollment_requires_explicit_native_trust_coverage(self):
+        MODULE.require_installation_trust_fixture({"installationTrustFixture": True})
+        for flag in (None, False, "true", 1):
+            with self.subTest(flag=flag), self.assertRaisesRegex(RuntimeError, "installation trust"):
+                MODULE.require_installation_trust_fixture({"installationTrustFixture": flag})
+
     def test_destination_is_online_before_normal_startup_sync_is_observed(self):
         events = []
         with tempfile.TemporaryDirectory() as folder:
@@ -109,7 +115,7 @@ class NativeDeviceEnrollmentSafetyTest(unittest.TestCase):
             control = output / "server-control"
             control.mkdir()
             (control / "fixture.json").write_text(json.dumps({"owner": "owner"}))
-            source = {"owner": "owner", "device": "source", "fingerprint": "same",
+            source = {"owner": "owner", "device": "source", "fingerprint": "same", "installationTrustFixture": True,
                       "proof": {"historicalCreatedAt": 1, "draftCreatedAt": 2}}
             destination = {**source, "device": "replacement", "automaticSyncObserved": True,
                            "syncWorkIds": ["owned-work"], "proof": {**source["proof"], "offlineCreatedAt": 3}}
