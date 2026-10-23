@@ -9,6 +9,7 @@
   "env_vars": {
     "ATPROTO_HANDLE_DOMAIN": "cloud-staging.logdate.app",
     "ATPROTO_PDS_SERVICE_URL": "https://cloud-staging.logdate.app",
+    "ATPROTO_RECOVERY_KEYS_ENABLED": "true",
     "AUTO_MIGRATE": "false",
     "BILLING_PROVIDER": "play",
     "GCS_BUCKET_NAME": "logdate-media-staging",
@@ -17,6 +18,8 @@
     "LOGDATE_DEPLOYMENT_KIND": "first_party",
     "LOGDATE_ENV": "production",
     "LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED": "true",
+    "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED": "true",
+    "LOGDATE_PERSONAL_SPACE_ENABLED": "true",
     "LOGDATE_EXPECT_FIRST_PARTY": "true",
     "LOGDATE_PUBLIC_ORIGIN": "https://cloud-staging.logdate.app",
     "LOGDATE_SERVER_DISPLAY_NAME": "LogDate Cloud (Staging)",

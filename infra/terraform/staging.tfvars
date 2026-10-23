@@ -47,6 +47,9 @@ cloud_run_env = {
   SYNC_MEDIA_SIGNED_URL_TTL_HOURS        = "1"
   AUTO_MIGRATE                           = "false"
   LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED = "true"
+  LOGDATE_PERSONAL_SPACE_ENABLED         = "true"
+  LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED  = "true"
+  ATPROTO_RECOVERY_KEYS_ENABLED          = "true"
 }
 
 # Secret IDs are scoped to this project's Secret Manager namespace (separate
