@@ -611,8 +611,8 @@ class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
         sleep.assert_called_once()
         self.assertEqual(
             [
-                call("emulator-5554", "shell", "cmd", "connectivity", "airplane-mode", "disable"),
-                call("emulator-5554", "shell", "svc", "wifi", "enable"),
+                call("emulator-5554", "shell", "cmd", "connectivity", "airplane-mode", "disable", timeout=5),
+                call("emulator-5554", "shell", "svc", "wifi", "enable", timeout=5),
             ],
             adb.call_args_list,
         )
