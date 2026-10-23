@@ -8,6 +8,7 @@ import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.logdate.LogDateCollectionKind
 import app.logdate.server.logdate.LogDateMedia
 import app.logdate.server.migration.SpaceMigration
+import app.logdate.server.migration.StoredPrecisionClock
 import app.logdate.server.migration.randomPlcDid
 import app.logdate.server.migration.sealed
 import app.logdate.server.space.SpaceRecordWrite
@@ -33,6 +34,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 
 /** Runs against the local test PostgreSQL only: the move's compare-and-set, and deleting a legacy copy. */
 class SpaceMigrationPostgresTest {
@@ -40,7 +42,9 @@ class SpaceMigrationPostgresTest {
     fun `a switch moves the storage mode and the move together or not at all`() =
         withAccount { account, _ ->
             val store = PostgreSQLSpaceMigrationStore()
-            val now = Clock.System.now()
+            // The server's clock on Linux reads nanoseconds, which PostgreSQL would round away.
+            val linuxClock = FixedClock(Instant.fromEpochSeconds(Clock.System.now().epochSeconds, 123_456_789))
+            val now = StoredPrecisionClock(linuxClock).now()
             val begun = SpaceMigration(account, "move-1", SpaceMigrationPhase.UPLOADING, now, now)
             assertTrue(store.replace(null, begun))
             assertFalse(store.replace(null, begun), "A second first write is refused")
@@ -101,6 +105,12 @@ class SpaceMigrationPostgresTest {
             assertNull(storage.getBlob(path))
             assertEquals(1L, count("SELECT count(*) FROM space_records WHERE account_id = '$account' AND NOT deleted"))
         }
+
+    private class FixedClock(
+        private val at: Instant,
+    ) : Clock {
+        override fun now(): Instant = at
+    }
 
     private fun media(
         account: UUID,

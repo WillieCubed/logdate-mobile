@@ -21,7 +21,7 @@ sealed interface SpaceWriteRefusal {
 class SpaceMigrationHolds(
     private val store: SpaceMigrationStore?,
     private val config: SpaceMigrationConfig,
-    private val clock: Clock = Clock.System,
+    private val clock: Clock = StoredPrecisionClock(),
 ) {
     /** Whether legacy writes for [accountId] wait while a device checks its copy before the switch. */
     suspend fun legacyWritesHeld(accountId: UUID): Boolean {

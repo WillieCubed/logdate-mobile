@@ -46,7 +46,7 @@ internal class SpaceMigrationService(
     private val spaces: SpaceStore,
     private val inventory: LegacyInventoryReader,
     private val config: SpaceMigrationConfig,
-    private val clock: Clock = Clock.System,
+    private val clock: Clock = StoredPrecisionClock(),
 ) {
     suspend fun status(accountId: UUID): SpaceMigrationStatus = store.get(accountId).toStatus()
 

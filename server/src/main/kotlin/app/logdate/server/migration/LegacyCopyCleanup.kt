@@ -47,7 +47,7 @@ class LegacyCopyCleanup(
     private val accounts: AccountRepository,
     private val eraser: LegacyJournalEraser,
     private val config: SpaceMigrationConfig,
-    private val clock: Clock = Clock.System,
+    private val clock: Clock = StoredPrecisionClock(),
 ) {
     suspend fun runOnce(now: Instant = clock.now()): LegacyCleanupResult {
         var erased = 0
