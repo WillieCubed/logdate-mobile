@@ -15,7 +15,7 @@
 #   APP_STORE_CONNECT_API_KEY_ID      e.g. ABC1234567
 #   APP_STORE_CONNECT_API_ISSUER_ID   UUID
 #   APP_STORE_CONNECT_API_KEY_P8      raw .p8 file content
-#   IOS_BUNDLE_ID                     e.g. studio.hypertext.LogDate
+#   IOS_BUNDLE_ID                     e.g. studio.hypertext.apps.logdate
 #   MARKETING_VERSION                 e.g. 1.2.3
 #   CURRENT_PROJECT_VERSION           e.g. 5023482  (the buildNumber)
 #

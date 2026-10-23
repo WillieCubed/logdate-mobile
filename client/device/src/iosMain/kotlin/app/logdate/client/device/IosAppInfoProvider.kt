@@ -21,7 +21,7 @@ class IosAppInfoProvider : AppInfoProvider {
 
             val versionCode = buildNumberString.toIntOrNull() ?: 0
 
-            val packageName = bundle.bundleIdentifier ?: "app.logdate.ios"
+            val packageName = bundle.bundleIdentifier ?: "studio.hypertext.apps.logdate"
 
             return AppInfo(
                 versionName = versionName,

@@ -214,7 +214,7 @@ def main() -> None:
     key_id = env("APP_STORE_CONNECT_API_KEY_ID")
     issuer_id = env("APP_STORE_CONNECT_API_ISSUER_ID")
     p8_content = env("APP_STORE_CONNECT_API_KEY_P8")
-    bundle_id = env("IOS_BUNDLE_ID", default="studio.hypertext.LogDate")
+    bundle_id = env("IOS_BUNDLE_ID", default="studio.hypertext.apps.logdate")
     marketing_version = env("MARKETING_VERSION")
     build_number = env("CURRENT_PROJECT_VERSION")
     timeout_seconds = int(env("SUBMIT_TIMEOUT_SECONDS", required=False, default="1200"))

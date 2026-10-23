@@ -32,6 +32,13 @@ run one command.
 | `LOGDATE_CI_GOOGLE_MAPS_API_KEY` | `logdate-dev` Maps SDK for Android key restricted to `studio.hypertext.logdate.debug` and the exact dedicated CI debug certificate. | When the CI signing identity changes. |
 | `LOGDATE_GOOGLE_MAPS_API_KEY_RELEASE` | Dedicated release-project Android key restricted to `studio.hypertext.logdate` and the applicable release signing certificates, Places API, and Maps SDK for Android. | When the upload or Play signing key changes. |
 
+The iOS plist must come from the production Firebase registration for
+`studio.hypertext.apps.logdate`. Set the repository variable
+`LOGDATE_FIREBASE_IOS_APP_ID` to that registration's `GOOGLE_APP_ID`, and export the
+same variable locally before validating or uploading the plist. Do not edit an
+earlier registration's bundle field to reuse it. See the [Apple provider and data
+continuity requirements](../reference/ios-build-setup.md#provider-registration-and-existing-installations).
+
 ### Google ID-token audiences and Android OAuth clients
 
 The build workflows pass the web/server OAuth client ID separately from
@@ -192,8 +199,8 @@ before expiry to avoid surprises.
 
 1. https://developer.apple.com/account/resources/profiles → +
    → **App Store Connect** → Continue.
-2. Pick the **App ID** for `studio.hypertext.LogDate` (create it if
-   missing under **Identifiers**; bundle ID `studio.hypertext.LogDate`,
+2. Pick the **App ID** for `studio.hypertext.apps.logdate` (create it if
+   missing under **Identifiers**; bundle ID `studio.hypertext.apps.logdate`,
    capabilities: HealthKit, Associated Domains, Push Notifications).
 3. Pick the distribution certificate you exported above.
 4. Name the profile something stable, e.g. `LogDate App Store

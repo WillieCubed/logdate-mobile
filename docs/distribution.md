@@ -38,6 +38,11 @@ Run the following commands at the root of the project to build the app for each 
 
 #### macOS
 
+The packaged app uses `studio.hypertext.apps.logdate`, matching LogDate iOS and
+the native Apple implementation. These are alternative implementations of the
+same app. See [Apple identity and data continuity](reference/ios-build-setup.md#provider-registration-and-existing-installations)
+before replacing an existing installation or configuring signed distribution.
+
 ```shell
 ./gradlew :app:compose-main:packageDmg
 ```

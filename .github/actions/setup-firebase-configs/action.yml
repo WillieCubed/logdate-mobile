@@ -34,6 +34,9 @@ inputs:
       Optional — iOS build degrades gracefully without it
       (iOSApp.swift nil-guards FirebaseApp.configure).
     required: false
+  ios-firebase-app-id:
+    description: Registered Firebase app ID for studio.hypertext.apps.logdate; required with the iOS plist.
+    required: false
 
 runs:
   using: composite
@@ -92,6 +95,7 @@ runs:
       shell: bash
       env:
         PLIST_B64: ${{ inputs.ios-google-service-info-plist-base64 }}
+        LOGDATE_FIREBASE_IOS_APP_ID: ${{ inputs.ios-firebase-app-id }}
       run: |
         set -euo pipefail
         target="iosApp/iosApp/Firebase/GoogleService-Info-Release.plist"

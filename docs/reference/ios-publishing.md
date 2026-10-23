@@ -23,6 +23,13 @@ The Compose Multiplatform iOS framework wiring lives in
 [`app/compose-main/build.gradle.kts`](../../app/compose-main/build.gradle.kts);
 the Xcode project lives in [`iosApp/`](../../iosApp/).
 
+All Apple app distribution uses `studio.hypertext.apps.logdate` under team
+`T95VDD3A4W`. Complete the [provider registration and existing-installation
+requirements](ios-build-setup.md#provider-registration-and-existing-installations)
+before enabling publishing. Signing profiles, Firebase registration, App Store
+Connect, associated domains, and configured authentication providers must agree
+with the source identifier.
+
 ## Required Secrets
 
 | Purpose | Secret name | Required for | Notes |
@@ -38,6 +45,11 @@ the Xcode project lives in [`iosApp/`](../../iosApp/).
 The workflow materializes the keychain, provisioning profile, and Firebase
 plist at runtime. The keychain is per-job and lives in `$RUNNER_TEMP`, which
 GitHub deletes when the job ends.
+
+Set the repository variable `LOGDATE_FIREBASE_IOS_APP_ID` to the `GOOGLE_APP_ID`
+of the Firebase iOS registration for `studio.hypertext.apps.logdate`. The composite
+action requires it whenever an iOS plist is supplied. Export the same variable
+locally before uploading the plist with `scripts/sync-firebase-configs.sh ios`.
 
 ## Safety Switch
 
@@ -169,7 +181,7 @@ path. Sequence:
 
 1. Mint an ES256 JWT for the App Store Connect API (20-minute lifetime,
    refreshed per HTTP call).
-2. Look up the app by bundle ID (`studio.hypertext.LogDate`).
+2. Look up the app by bundle ID (`studio.hypertext.apps.logdate`).
 3. Find the build matching `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION`.
 4. Wait for Apple's processing pipeline to mark the build `VALID` (typically
    5–10 minutes after upload).

@@ -917,7 +917,7 @@ test encryption and direct-transfer flags. Google credential delivery and setup 
 the corresponding providers and a dedicated test account. Cross-platform transfer requires a
 matching Android/iOS format and receiving implementation before configuration can be enabled.
 The receiving implementation is the native app in `logdate-apple`, bundle
-`studio.hypertext.logdateapp`, team `T95VDD3A4W`. An iOS application target and AppMigrationKit
+`studio.hypertext.apps.logdate`, team `T95VDD3A4W`. An iOS application target and AppMigrationKit
 extension are required, together with the App Store Connect OS data transfer mapping.
 AppMigrationKit does not run in the macOS application.
 

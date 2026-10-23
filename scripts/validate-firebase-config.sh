@@ -8,7 +8,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # Not readonly: environment_value sources files that assign ANDROID_PACKAGE too.
 ANDROID_PACKAGE="$(environment_value production ANDROID_PACKAGE)"
 ANDROID_PACKAGE_DEBUG="$(environment_value staging ANDROID_DEBUG_PACKAGE)"
-readonly IOS_BUNDLE="studio.hypertext.LogDate"
+readonly IOS_BUNDLE="studio.hypertext.apps.logdate"
 
 die() {
     printf 'ERROR: %s\n' "$*" >&2
@@ -71,6 +71,12 @@ plist_value() {
 validate_ios() {
     local path="$1"
     local project bundle app_id api_key
+    local expected_app_id="${LOGDATE_FIREBASE_IOS_APP_ID:-}"
+
+    [[ -n "$expected_app_id" ]] \
+        || die "LOGDATE_FIREBASE_IOS_APP_ID is required; use the Firebase registration for $IOS_BUNDLE."
+    [[ "$expected_app_id" != "1:216887423795:ios:35aa0348aa4f6fcb8ec446" ]] \
+        || die "LOGDATE_FIREBASE_IOS_APP_ID points to the retired iOS Firebase app; register $IOS_BUNDLE first."
 
     plutil -lint "$path" >/dev/null 2>&1 || die "$path is not a valid plist."
     project="$(plist_value "$path" PROJECT_ID)"
@@ -82,8 +88,8 @@ validate_ios() {
         || die "$path expected project logdate, found ${project:-<missing>}."
     [[ "$bundle" == "$IOS_BUNDLE" ]] \
         || die "$path expected iOS bundle $IOS_BUNDLE, found ${bundle:-<missing>}."
-    [[ "$app_id" == "1:216887423795:ios:35aa0348aa4f6fcb8ec446" ]] \
-        || die "$path expected Firebase app 1:216887423795:ios:35aa0348aa4f6fcb8ec446."
+    [[ "$app_id" == "$expected_app_id" ]] \
+        || die "$path expected Firebase app $expected_app_id."
     [[ -n "$api_key" ]] || die "$path is missing API_KEY."
 }
 
