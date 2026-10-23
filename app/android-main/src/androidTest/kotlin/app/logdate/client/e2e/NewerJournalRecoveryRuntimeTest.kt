@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -83,50 +84,73 @@ class NewerJournalRecoveryRuntimeTest {
             assertTrue(detector.isNativeRestoreDeliveryComplete())
             val device = UiDevice.getInstance(instrumentation)
             ActivityScenario.launch(MainActivity::class.java).use {
-                assertTrue(device.wait(Until.hasObject(By.text("Update LogDate")), 30_000), "Normal startup must offer an app update")
-                assertTrue(device.hasObject(By.textContains("newer version of LogDate")))
-                assertFalse(device.hasObject(By.text("Try again")), "A missing app update cannot be repaired by retrying startup")
-                assertFalse(device.hasObject(By.text("Private retained note")))
-                val state =
-                    GlobalContext
-                        .get()
-                        .get<DatabaseStartupMonitor>()
-                        .state.value
-                assertTrue(state is DatabaseStartupState.RecoveryRequired, "An unsupported journal must never become Ready")
-                assertEquals(before, snapshot(file, key))
-                assertTrue(portable.contentEquals(File(context.filesDir, "db_recovery/passphrase_backup").readBytes()))
-                assertNull(
-                    storage.getString("db_encryption_key"),
-                    "A refused journal cannot confirm a replacement key",
-                )
-                assertTrue(backup.read()!!.contentEquals(key))
-                val output =
-                    requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")) {
-                        "Run with a Gradle Managed Device to retain acceptance artifacts"
-                    }
-                val evidence = File(output, "newer-journal-recovery").apply { mkdirs() }
-                assertTrue(device.takeScreenshot(File(evidence, "update-required.png")))
-                val urls = mutableListOf<String>()
-                val monitor =
-                    object : Instrumentation.ActivityMonitor() {
-                        override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
-                            if (intent.action != Intent.ACTION_VIEW) return null
-                            urls += intent.dataString.orEmpty()
-                            return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
-                        }
-                    }
-                instrumentation.addMonitor(monitor)
+                val deadline = SystemClock.uptimeMillis() + 30_000
                 try {
-                    device.findObject(By.text("Update LogDate")).click()
-                    instrumentation.waitForIdleSync()
-                    assertEquals(listOf("market://details?id=${context.packageName}"), urls)
+                    assertTrue(device.wait(Until.hasObject(By.text("Update LogDate")), 30_000), "Normal startup must offer an app update")
+                    val remaining = deadline - SystemClock.uptimeMillis()
+                    assertTrue(
+                        remaining > 0 && device.wait(Until.hasObject(By.textContains("newer version of LogDate")), remaining),
+                        "Normal startup must explain why the journal requires an update",
+                    )
+                    assertFalse(device.hasObject(By.text("Try again")), "A missing app update cannot be repaired by retrying startup")
+                    assertFalse(device.hasObject(By.text("Private retained note")))
+                    val state =
+                        GlobalContext
+                            .get()
+                            .get<DatabaseStartupMonitor>()
+                            .state.value
+                    assertTrue(state is DatabaseStartupState.RecoveryRequired, "An unsupported journal must never become Ready")
                     assertEquals(before, snapshot(file, key))
-                } finally {
-                    instrumentation.removeMonitor(monitor)
+                    assertTrue(portable.contentEquals(File(context.filesDir, "db_recovery/passphrase_backup").readBytes()))
+                    assertNull(
+                        storage.getString("db_encryption_key"),
+                        "A refused journal cannot confirm a replacement key",
+                    )
+                    assertTrue(backup.read()!!.contentEquals(key))
+                    val output =
+                        requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")) {
+                            "Run with a Gradle Managed Device to retain acceptance artifacts"
+                        }
+                    val evidence = File(output, "newer-journal-recovery").apply { mkdirs() }
+                    assertTrue(device.takeScreenshot(File(evidence, "update-required.png")))
+                    val urls = mutableListOf<String>()
+                    val monitor =
+                        object : Instrumentation.ActivityMonitor() {
+                            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                                if (intent.action != Intent.ACTION_VIEW) return null
+                                urls += intent.dataString.orEmpty()
+                                return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+                            }
+                        }
+                    instrumentation.addMonitor(monitor)
+                    try {
+                        device.findObject(By.text("Update LogDate")).click()
+                        instrumentation.waitForIdleSync()
+                        assertEquals(listOf("market://details?id=${context.packageName}"), urls)
+                        assertEquals(before, snapshot(file, key))
+                    } finally {
+                        instrumentation.removeMonitor(monitor)
+                    }
+                    File(evidence, "acceptance.json").writeText(
+                        """{"encryptedJournalRetained":true,"deletionAndOutboxRetained":true,"portableKeyRetained":true,"normalStartup":true,"googleProviderAccepted":false}""",
+                    )
+                } catch (failure: AssertionError) {
+                    runCatching {
+                        val output =
+                            requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")) {
+                                "Run with a Gradle Managed Device to retain acceptance artifacts"
+                            }
+                        val evidence = File(output, "newer-journal-recovery").apply { mkdirs() }
+                        File(evidence, "startup-failure-state.txt").writeText(
+                            "databaseStartupState=${GlobalContext.get().get<DatabaseStartupMonitor>().state.value}\n" +
+                                "foregroundPackage=${device.currentPackageName}\n" +
+                                "screenOn=${device.isScreenOn}\n",
+                        )
+                        device.dumpWindowHierarchy(File(evidence, "startup-failure.xml"))
+                        check(device.takeScreenshot(File(evidence, "startup-failure.png")))
+                    }.exceptionOrNull()?.let(failure::addSuppressed)
+                    throw failure
                 }
-                File(evidence, "acceptance.json").writeText(
-                    """{"encryptedJournalRetained":true,"deletionAndOutboxRetained":true,"portableKeyRetained":true,"normalStartup":true,"googleProviderAccepted":false}""",
-                )
             }
         }
 
