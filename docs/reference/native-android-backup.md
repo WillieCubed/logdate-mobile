@@ -936,6 +936,10 @@ on a fresh destination because they intentionally alter the transported fixture.
 synthetic app data and do not establish Google Restore Credentials or setup-transfer provider
 acceptance.
 
+The missing-key probe rejects replacement identity and media keys, including newly written portable
+backups, after failed startup and Activity recreation. Credentials-only delivery must remain
+`CONTENT_MISSING` even after the empty destination database opens.
+
 ### Released-version upgrade and native restore
 
 `native-released-upgrade-acceptance.py` verifies two histories in one fresh managed pair: an
@@ -1184,7 +1188,9 @@ from every app-owned accessibility window, including content descriptions.
 
 The harness requires a fresh evidence directory, an installed Android NDK, and an ARM64 API 34 image
 with TalkBack and `su` support. Its input driver selects only a newly started, expected Gradle Managed
-Device, validates the per-run receipt before every gesture, and runs a small NDK-built input helper
+Device and validates its private launch receipt, console port, and live Gradle/QEMU birth identities
+before every device command. Template boots are ignored until the current fixture is ready. Each run
+uses a fresh Gradle daemon and SDK configuration, and runs a small NDK-built input helper
 that writes native kernel touch events with bounded gesture timing. Shell `input` and direct
 recovery-node activation are not substitutes for this check. System Back/Home events use current
 uptime timestamps; zero-timestamp key events are stale and may be dropped by Android.

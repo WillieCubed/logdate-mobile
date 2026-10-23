@@ -168,6 +168,67 @@ class AppViewModelTest {
         }
 
     @Test
+    fun `successful account recovery does not import over an intact transferred journal`() =
+        runTest {
+            var imports = 0
+            var resolutions = 0
+            val repository =
+                FakePasskeyAccountRepository(Result.success(LogDateAccount(username = "fixture", displayName = "Fixture account")))
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = true)),
+                    FakeBiometricGatekeeper(),
+                    FakeNetworkAvailabilityMonitor(true),
+                    FakeSessionStorage(),
+                    TryRestoreSignInUseCase(repository),
+                    onCloudRestoreSignIn = { imports++ },
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore(recoverMissingContent = false, onAccountResolved = { resolutions++ })
+            advanceUntilIdle()
+
+            assertEquals(1, repository.restoreSignInAttempts)
+            assertEquals(1, resolutions)
+            assertEquals(0, imports)
+
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals(1, repository.restoreSignInAttempts)
+            assertEquals(1, resolutions)
+            assertEquals(0, imports)
+        }
+
+    @Test
+    fun `existing account access does not import over an intact transferred journal`() =
+        runTest {
+            var imports = 0
+            var resolutions = 0
+            val repository = FakePasskeyAccountRepository()
+            val viewModel =
+                AppViewModel(
+                    FakeUserStateRepository(UserData(isOnboarded = true)),
+                    FakeBiometricGatekeeper(),
+                    FakeNetworkAvailabilityMonitor(true),
+                    FakeSessionStorage(hasValidSession = true),
+                    TryRestoreSignInUseCase(repository),
+                    onCloudRestoreSignIn = { imports++ },
+                )
+
+            viewModel.tryRestoreSignInAfterCloudRestore(recoverMissingContent = false, onAccountResolved = { resolutions++ })
+            advanceUntilIdle()
+
+            assertEquals(0, repository.restoreSignInAttempts)
+            assertEquals(1, resolutions)
+            assertEquals(0, imports)
+
+            viewModel.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals(0, repository.restoreSignInAttempts)
+            assertEquals(1, resolutions)
+            assertEquals(0, imports)
+        }
+
+    @Test
     fun `missing content recovery resumes when account access already exists`() =
         runTest {
             var imports = 0

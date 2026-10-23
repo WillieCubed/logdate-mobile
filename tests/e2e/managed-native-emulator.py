@@ -47,10 +47,13 @@ def create_managed_sdk(sdk, destination, expected_avd, nonce):
     for item in (sdk / "emulator").iterdir():
         if item.name != "emulator":
             (emulator / item.name).symlink_to(item, target_is_directory=item.is_dir())
+    android_tmp = destination.with_name(destination.name + "-android-tmp")
+    android_tmp.mkdir(mode=0o700)
     config = destination / "managed-launch.json"
     with config.open("x") as output:
         json.dump({"original": str(sdk / "emulator" / "emulator"), "avd": expected_avd,
-                   "nonce": nonce, "receipts": str(destination.parent / "managed-emulator-launches")}, output)
+                   "nonce": nonce, "receipts": str(destination.parent / "managed-emulator-launches"),
+                   "androidTmp": str(android_tmp.resolve(strict=True))}, output)
     config.chmod(0o600)
     shim = emulator / "emulator"
     shim.write_text("#!/bin/sh\nexec " + shlex.join([sys.executable, str(Path(__file__).resolve()), str(config), "--"]) + ' "$@"\n')
@@ -113,10 +116,17 @@ def managed_processes_stopped(gradle, invocations, observed_pids, process_lines,
 
 def main(config_path, arguments):
     config = json.loads(Path(config_path).read_text())
+    android_tmp = Path(config["androidTmp"])
+    if not android_tmp.is_absolute() or android_tmp.is_symlink() or not android_tmp.is_dir():
+        raise ValueError("The managed emulator requires its private temporary directory")
+    android_tmp = android_tmp.resolve(strict=True)
+    environment = os.environ.copy()
+    environment["ANDROID_TMP"] = str(android_tmp)
     invocations = Path(config["receipts"]).parent / "managed-emulator-invocations"
     invocations.mkdir(mode=0o700, exist_ok=True)
     with open(invocations / f"{os.getpid()}-{time.monotonic_ns()}.json", "x", opener=lambda name, flags: os.open(name, flags, 0o600)) as receipt:
-        json.dump({"nonce": config["nonce"], "arguments": arguments, "launcherPid": os.getpid()}, receipt)
+        json.dump({"nonce": config["nonce"], "arguments": arguments, "launcherPid": os.getpid(),
+                   "androidTmp": str(android_tmp)}, receipt)
     selected = managed_launch_arguments(arguments, config["avd"], config["nonce"])
     if "-read-only" in arguments and "-id" in arguments and "-check-snapshot-loadable" not in arguments:
         managed_id = arguments[arguments.index("-id") + 1]
@@ -124,8 +134,8 @@ def main(config_path, arguments):
         directory.mkdir(mode=0o700, exist_ok=True)
         with open(directory / f"{managed_id}.json", "x", opener=lambda name, flags: os.open(name, flags, 0o600)) as receipt:
             json.dump({"nonce": config["nonce"], "managedId": managed_id, "avd": config["avd"],
-                       "launcherPid": os.getpid(), "coldBoot": True}, receipt)
-    os.execv(config["original"], [config["original"], *selected])
+                       "launcherPid": os.getpid(), "coldBoot": True, "androidTmp": str(android_tmp)}, receipt)
+    os.execve(config["original"], [config["original"], *selected], environment)
 
 
 if __name__ == "__main__":

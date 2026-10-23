@@ -13,6 +13,7 @@ import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.audio.AndroidRecordingServiceController
@@ -111,6 +112,11 @@ internal suspend fun verifyMissingRecoveryKeys(
         assertTrue(device.wait(Until.hasObject(By.text("Finish restoring your journal")), 15_000))
     }
     assertNull(koin.get<SecureStorage>().getString("db_encryption_key"), "Startup persisted a replacement database key")
+    assertFalse(koin.get<IdentityKeyManager>().hasIdentityKey(), "Failed startup created a replacement journal identity")
+    assertNull(koin.get<SecureStorage>().getString("media_payload_key_v1"), "Failed startup created a replacement media key")
+    assertFalse(passphraseBackup.hasBackup(), "Failed startup created portable database recovery material")
+    assertFalse(identityBackup.hasRootBackup(), "Failed startup created portable identity recovery material")
+    assertFalse(identityBackup.hasMediaBackup(), "Failed startup created portable media recovery material")
     assertTrue(databaseFile.isFile, "Recovery handling deleted the retained encrypted journal")
     assertContentEquals(
         originalDatabaseDigest,

@@ -226,6 +226,11 @@ class NativeBackupTransferProbeTest {
                     },
                     "Credentials-only restore must not recreate the source's unfinished draft",
                 )
+                assertEquals(
+                    PostRestoreType.CONTENT_MISSING,
+                    PostRestoreDetector(context).detect(isOnboarded = true),
+                    "Restored credentials cannot mark missing journal content as recovered",
+                )
                 return@runBlocking
             }
             val fixture = NativeJournalFixture(koin.get(), koin.get(), koin.get(), koin.get(), koin.get())
