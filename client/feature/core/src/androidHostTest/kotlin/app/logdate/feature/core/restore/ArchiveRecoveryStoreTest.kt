@@ -13,6 +13,136 @@ import kotlin.uuid.Uuid
 
 class ArchiveRecoveryStoreTest {
     @Test
+    fun `paused applied metadata resumes its retained pending media after restart`() {
+        val root = Files.createTempDirectory("archive-paused-media-resume-").toFile()
+        try {
+            val scope = ArchiveRecoveryScope("owner", "https://example.test")
+            val store = ArchiveRecoveryStore(root.resolve("recovery"), root.resolve("cache"))
+            val id = Uuid.random().toString()
+            val source = root.resolve("source.zip").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            store.begin(id, scope, source, ImportOptions(), "Archive")
+            store.recordPending(
+                id,
+                UnavailableMediaAsset(Uuid.random().toString(), reference = "missing", reason = UnavailableMediaReason.IMPORT_FAILED),
+            )
+            store.finish(
+                id,
+                RestoreSummary(
+                    "Archive",
+                    journalsImported = 0,
+                    notesImported = 1,
+                    draftsImported = 1,
+                    journalLinksImported = 0,
+                    mediaImported = 1,
+                    unavailableOriginals = 1,
+                ),
+            )
+            store.setPaused(id, true)
+            val restarted = ArchiveRecoveryStore(root.resolve("recovery"), root.resolve("cache"))
+            val retained = requireNotNull(restarted.read(id))
+            assertTrue(retained.metadataApplied)
+            assertTrue(retained.pausedByUser)
+            assertFalse(requireNotNull(retained.summary).recoveringMedia)
+            assertTrue(retained.canResumeFromRetainedSource(scope, restarted.source(id).isFile))
+            assertContentEquals(source.readBytes(), restarted.source(id).readBytes())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `interrupted resume never clears pause before its recovery checkpoint survives restart`() {
+        for (failure in listOf("checkpoint", "unpause")) {
+            val root = Files.createTempDirectory("archive-resume-$failure-").toFile()
+            try {
+                val directory = root.resolve("recovery")
+                val staging = root.resolve("cache")
+                val store = ArchiveRecoveryStore(directory, staging)
+                val id = Uuid.random().toString()
+                val source = root.resolve("source.zip").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+                store.begin(id, ArchiveRecoveryScope("owner", "https://example.test"), source, ImportOptions(), "Archive")
+                store.recordPending(
+                    id,
+                    UnavailableMediaAsset(Uuid.random().toString(), reference = "missing", reason = UnavailableMediaReason.IMPORT_FAILED),
+                )
+                store.finish(
+                    id,
+                    RestoreSummary(
+                        "Archive",
+                        journalsImported = 0,
+                        notesImported = 1,
+                        draftsImported = 1,
+                        journalLinksImported = 0,
+                        mediaImported = 1,
+                        unavailableOriginals = 1,
+                    ),
+                )
+                store.setPaused(id, true)
+                val marker = directory.resolve("records/$id.paused")
+                if (failure == "checkpoint") {
+                    check(staging.delete())
+                    staging.writeText("Staging temporarily unavailable")
+                } else {
+                    check(marker.delete())
+                    check(marker.mkdir())
+                    marker.resolve("unavailable").writeText("Pause removal interrupted")
+                }
+                assertFailsWith<Exception> { store.prepareResumeCheckpoint(id) }
+                val restarted = ArchiveRecoveryStore(directory, staging)
+                val pending = requireNotNull(restarted.read(id))
+                assertTrue(pending.pausedByUser)
+                assertEquals(failure == "unpause", requireNotNull(pending.summary).recoveringMedia)
+                assertContentEquals(source.readBytes(), restarted.source(id).readBytes())
+                if (failure == "checkpoint") {
+                    check(staging.delete())
+                    check(staging.mkdir())
+                } else {
+                    check(marker.resolve("unavailable").delete())
+                    check(marker.delete())
+                    marker.writeBytes(byteArrayOf(1))
+                }
+                restarted.prepareResumeCheckpoint(id)
+                val resumed = requireNotNull(ArchiveRecoveryStore(directory, staging).read(id))
+                assertFalse(resumed.pausedByUser)
+                assertTrue(requireNotNull(resumed.summary).recoveringMedia)
+                assertEquals(pending.pending, resumed.pending)
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
+    fun `retained resume rejects unavailable and finished recovery without blocking pending metadata`() {
+        val scope = ArchiveRecoveryScope("owner", "https://example.test")
+        val pending = UnavailableMediaAsset(Uuid.random().toString(), reference = "missing", reason = UnavailableMediaReason.IMPORT_FAILED)
+        val record =
+            ArchiveRecoveryRecord(
+                Uuid.random().toString(),
+                scope,
+                ImportOptions(),
+                "Archive",
+                pending = listOf(pending),
+                metadataApplied = true,
+            )
+        assertTrue(record.canResumeFromRetainedSource(scope, sourceAvailable = true))
+        assertFalse(record.canResumeFromRetainedSource(scope.copy(ownerId = "another-owner"), true))
+        assertFalse(record.canResumeFromRetainedSource(scope.copy(serverOrigin = "https://other.test"), true))
+        assertFalse(record.canResumeFromRetainedSource(scope, sourceAvailable = false))
+        assertFalse(record.copy(requiresSource = true).canResumeFromRetainedSource(scope, true))
+        assertFalse(record.copy(pending = emptyList()).canResumeFromRetainedSource(scope, true))
+        assertFalse(record.copy(options = ImportOptions(includeMedia = false)).canResumeFromRetainedSource(scope, true))
+        assertTrue(
+            record
+                .copy(
+                    metadataApplied = false,
+                    pending = emptyList(),
+                    options = ImportOptions(includeMedia = false),
+                ).canResumeFromRetainedSource(scope, true),
+        )
+    }
+
+    @Test
     fun `replacement of unreadable metadata remains pending after process death`() {
         val root = Files.createTempDirectory("archive-metadata-replay-").toFile()
         try {

@@ -62,17 +62,11 @@ internal class ArchiveRecoveryLauncher(
     ): RestoreSummary? {
         val store = context.archiveRecoveryStore()
         val record = store.read(id) ?: return null
-        if (record.scope != currentArchiveRecoveryScope(koin) ||
-            record.metadataApplied ||
-            record.requiresSource ||
-            !store.source(id).isFile
-        ) {
-            return null
-        }
+        if (!record.canResumeFromRetainedSource(currentArchiveRecoveryScope(koin), store.source(id).isFile)) return null
         val operationContext = currentCoroutineContext()
         commit {
             operationContext.ensureActive()
-            store.setPaused(id, false)
+            store.prepareResumeCheckpoint(id)
             ArchiveRecoveryScheduler.enqueue(context, requireNotNull(store.read(id)), ExistingWorkPolicy.REPLACE)
         }
         return requireNotNull(store.read(id)).recoverySummary()
@@ -107,12 +101,29 @@ internal class ArchiveRecoveryLauncher(
         complete(
             RestoreOutcome.Success(
                 record.recoverySummary(
-                    store.source(record.id).isFile && record.pausedByUser && !record.requiresSource,
+                    record.pausedByUser && record.canResumeFromRetainedSource(scope, store.source(record.id).isFile),
                 ),
             ),
         )
     }
 }
+
+internal fun ArchiveRecoveryStore.prepareResumeCheckpoint(id: String) {
+    val resumed = requireNotNull(read(id))
+    if (resumed.metadataApplied) {
+        updateProgress(id, resumed.pending, resumed.recoverySummary().copy(recoveringMedia = true))
+    }
+    setPaused(id, false)
+}
+
+internal fun ArchiveRecoveryRecord.canResumeFromRetainedSource(
+    scope: ArchiveRecoveryScope,
+    sourceAvailable: Boolean,
+): Boolean =
+    this.scope == scope &&
+        sourceAvailable &&
+        !requiresSource &&
+        (!metadataApplied || options.includeMedia && pending.isNotEmpty())
 
 internal fun ArchiveRecoveryRecord.recoverySummary(canResume: Boolean = false): RestoreSummary =
     (

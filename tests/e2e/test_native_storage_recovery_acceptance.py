@@ -58,7 +58,7 @@ class StorageAcceptanceTest(unittest.TestCase):
                 raise RuntimeError("Instrumentation failed")
             if status_actions:
                 self.assertEqual(["LOW", "LOW"], state)
-                status_actions[b"RESTORE_STORAGE_WAITING"]()
+                next(iter(status_actions.values()))()
 
         with tempfile.TemporaryDirectory() as directory:
             args = types.SimpleNamespace(emulator="emulator-5580", app_apk=Path("app.apk"),
@@ -81,6 +81,7 @@ class StorageAcceptanceTest(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual([
             "seed", "enqueue", "waiting", "resume",
+            "seed", "cancel-running", "paused", "resume-cancelled", "verify-cancelled",
             "truncatedPreferenceDeliveryStaysPendingUntilACompleteRetry",
             "preparedPreferenceInputRepairsInterruptedDestinationOnRecreatedCompletion",
             "preparedPreferenceReplaySurvivesAnotherReceiptFailureWithoutRedelivery",
@@ -93,6 +94,23 @@ class StorageAcceptanceTest(unittest.TestCase):
             "unfinishedHistoricalSnapshotCannotCapturePreferencesFromAnotherDelivery",
         ], stages)
         self.assertTrue(receipt["preferenceDeliveryRecoveryVerified"])
+
+    def test_cancellation_requires_each_real_worker_stage_and_restart(self):
+        _, commands, stages, receipt, error = self.exercise()
+        self.assertIsNone(error)
+        self.assertEqual(["seed", "cancel-running", "paused", "resume-cancelled", "verify-cancelled"], stages[4:9])
+        self.assertTrue(receipt["realWorkerCancellationRetry"])
+        self.assertFalse(receipt["SAFSelectionExecuted"])
+        self.assertEqual(9, sum(command == ("shell", "am", "force-stop", acceptance.PACKAGE) for command in commands))
+
+    def test_failed_cancellation_stage_never_publishes_acceptance(self):
+        for mode in ["cancel-running", "paused", "resume-cancelled", "verify-cancelled"]:
+            with self.subTest(mode=mode):
+                state, _, stages, receipt, error = self.exercise(failure=mode)
+                self.assertEqual(["UNKNOWN", "NORMAL"], state)
+                self.assertEqual(mode, stages[-1])
+                self.assertFalse(receipt)
+                self.assertIsNotNone(error)
 
     def test_any_failed_preference_case_prevents_a_success_receipt(self):
         for method in [
