@@ -46,10 +46,11 @@ class SyncMaintenanceOldDataPurgeTest {
 
             val job = maintenance(fixture, readEnv = { null }, swept = CompletableDeferred())
             try {
+                // The cleanup marks the move cleaned before it erases the copy, so wait for the erase too.
                 withTimeout(5_000) {
-                    while (fixture.service.status(account).phase != SpaceMigrationPhase.CLEANED) delay(25)
+                    while (fixture.legacyCount(account, LegacyRecordKinds.ENTRIES) != 0) delay(25)
                 }
-                assertEquals(0, fixture.legacyCount(account, LegacyRecordKinds.ENTRIES))
+                assertEquals(SpaceMigrationPhase.CLEANED, fixture.service.status(account).phase)
             } finally {
                 job.cancel()
                 job.join()
