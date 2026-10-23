@@ -30,9 +30,15 @@ class NativeInstrumentationResultTest(unittest.TestCase):
             process.wait.return_value = 0
             process.poll.return_value = 0
             with patch.object(module, "safe_target"), patch.object(module, "adb"), patch.object(
-                module.subprocess, "Popen", return_value=process
-            ):
-                module.instrument("emulator-5554", "Example#test", log, **kwargs)
+                module, "managed_adb_command", return_value=["owned-adb"]
+            ) as command, patch.object(module.subprocess, "Popen", return_value=process) as start:
+                try:
+                    module.instrument("emulator-5554", "Example#test", log, **kwargs)
+                finally:
+                    command.assert_called_once()
+                    self.assertEqual("emulator-5554", command.call_args.args[0])
+                    start.assert_called_once_with(["owned-adb"], stdout=module.subprocess.PIPE,
+                                                  stderr=module.subprocess.STDOUT)
         else:
             with patch.object(module, "adb", return_value=output):
                 getattr(module, method)("emulator-5554", "verify", log)
@@ -99,8 +105,11 @@ class NativeInstrumentationResultTest(unittest.TestCase):
             process.wait.return_value = 0
             process.poll.return_value = 0
             with patch.object(MEDIA, "safe_target"), patch.object(MEDIA, "adb"), \
-                    patch.object(MEDIA.subprocess, "Popen", return_value=process):
+                    patch.object(MEDIA, "managed_adb_command", return_value=["owned-adb"]), \
+                    patch.object(MEDIA.subprocess, "Popen", return_value=process) as start:
                 MEDIA.instrument("emulator-5554", "Example#test", log)
+                start.assert_called_once_with(["owned-adb"], stdout=MEDIA.subprocess.PIPE,
+                                              stderr=MEDIA.subprocess.STDOUT)
 
     def test_network_and_permission_acknowledgements_are_still_required(self):
         for kwargs in (
