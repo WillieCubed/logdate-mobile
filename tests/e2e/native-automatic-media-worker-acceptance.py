@@ -7,7 +7,7 @@ import uuid
 MEDIA = runpy.run_path(str(Path(__file__).with_name("native-missing-media-acceptance.py")))
 
 
-def run(serial, control, server, output, wait_for):
+def run(serial, control, server, output, wait_for, failure_diagnostics=None):
     MEDIA["safe_target"](serial)
     output.mkdir(mode=0o700)
     network = "AndroidWifi"
@@ -55,8 +55,10 @@ def run(serial, control, server, output, wait_for):
             output / f"{mode}-{stage}.log",
             extras=extras, release_network=handoff if nonce is not None else None,
             status_actions=actions, timeout=300 if nonce is not None else 180,
+            failure_diagnostics=failure_diagnostics,
         )
 
+    primary = None
     try:
         # Metering AndroidWifi cannot exercise policy changes while cellular is the default.
         MEDIA["adb"](serial, "shell", "svc", "data", "disable")
@@ -83,6 +85,7 @@ def run(serial, control, server, output, wait_for):
             b"RESTORE_MEDIA_UPLOAD_POLICY_LIFTED": lambda: (control / "media-upload-gate-release").write_bytes(b"release"),
         })
     except BaseException as failure:
+        primary = failure
         for label, arguments in (("wifi", ("cmd", "wifi", "status")), ("connectivity", ("dumpsys", "connectivity"))):
             try:
                 snapshot = MEDIA["adb"](serial, "shell", *arguments).stdout
@@ -93,15 +96,27 @@ def run(serial, control, server, output, wait_for):
                 failure.add_note(f"Could not retain managed {label} diagnostics: {type(error).__name__}")
         raise
     finally:
+        errors = []
+        for operation in (
+            lambda: (control / "media-gate-release").write_bytes(b"release"),
+            lambda: (control / "media-upload-gate-release").write_bytes(b"release"),
+            lambda: MEDIA["restore_environment"](serial, network, original, saver, airplane, wifi, {}),
+            lambda: MEDIA["adb"](serial, "shell", "svc", "data", "enable" if cellular == b"1" else "disable"),
+        ):
+            try:
+                operation()
+            except Exception as error:
+                errors.append(error)
         try:
-            # Always release an armed test-server request, including failed app probes.
-            (control / "media-gate-release").write_bytes(b"release")
-            (control / "media-upload-gate-release").write_bytes(b"release")
-            MEDIA["restore_environment"](serial, network, original, saver, airplane, wifi, {})
-        finally:
-            MEDIA["adb"](serial, "shell", "svc", "data", "enable" if cellular == b"1" else "disable")
             actual = MEDIA["adb"](serial, "shell", "settings", "get", "global", "mobile_data").stdout.strip()
             if actual != cellular:
                 raise RuntimeError("The owned fixture's cellular setting was not restored")
+        except Exception as error:
+            errors.append(error)
+        if errors:
+            if primary is None:
+                raise errors[0]
+            for error in errors:
+                primary.add_note("Automatic media cleanup also failed: " + type(error).__name__)
     return {"automaticOriginalMediaRecovery": True, "mediaInboxOperationRetainedAcrossRestart": True,
             "deferredOriginalUploadResumesAfterPolicyLiftDuringWorker": True}
