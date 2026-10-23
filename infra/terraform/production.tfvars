@@ -85,6 +85,7 @@ cloud_run_env = {
   SYNC_MEDIA_SIGNED_URLS          = "true"
   SYNC_MEDIA_SIGNED_URL_TTL_HOURS = "1"
   AUTO_MIGRATE                    = "false"
+  ATPROTO_RECOVERY_KEYS_ENABLED   = "true"
 }
 
 cloud_run_secret_env = {
