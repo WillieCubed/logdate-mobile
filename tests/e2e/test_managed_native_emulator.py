@@ -154,6 +154,24 @@ class ManagedEmulatorLaunchTest(unittest.TestCase):
         self.assertFalse(stopped(process, [], {400}, ["400 qemu-system-aarch64"], Path("/private/sdk")))
         self.assertTrue(stopped(process, [invocation], {400}, ["500 unrelated-emulator"], Path("/private/sdk")))
 
+    def test_headless_preflight_query_preserves_arguments_without_claiming_a_device(self):
+        with tempfile.TemporaryDirectory(prefix="managed sdk ") as folder:
+            root = Path(folder)
+            sdk = root / "original"
+            (sdk / "emulator").mkdir(parents=True)
+            original = sdk / "emulator/emulator"
+            original.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+            original.chmod(0o700)
+            facade = MODULE["create_managed_sdk"](sdk, root / "private-sdk", AVD, NONCE)
+            result = subprocess.run([str(facade / "emulator/emulator"), "-no-window", "-version"],
+                                    capture_output=True, text=True, timeout=5)
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual(["-no-window", "-version"], result.stdout.splitlines())
+            invocations = list((root / "managed-emulator-invocations").glob("*.json"))
+            self.assertEqual(1, len(invocations))
+            self.assertEqual(NONCE, json.loads(invocations[0].read_text())["nonce"])
+            self.assertFalse((root / "managed-emulator-launches").exists())
+
     def test_executable_adapter_records_the_launch_and_preserves_quoted_arguments(self):
         with tempfile.TemporaryDirectory(prefix="managed sdk ") as folder:
             root = Path(folder)

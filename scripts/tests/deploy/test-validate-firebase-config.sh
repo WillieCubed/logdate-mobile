@@ -6,7 +6,8 @@ source "$(git rev-parse --show-toplevel)/scripts/tests/lib/assertions.sh"
 enter_repo_root
 
 readonly VALIDATOR="scripts/validate-firebase-config.sh"
-readonly TEMP_DIR="$(mktemp -d)"
+TEMP_DIR="$(mktemp -d)"
+readonly TEMP_DIR
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
 write_android_config() {
@@ -42,6 +43,7 @@ add_debug_client() {
 
 write_ios_config() {
     local path="$1" project_id="$2" app_id="$3" bundle_id="$4"
+    rm -f "$path"
     plutil -create xml1 "$path"
     plutil -insert PROJECT_ID -string "$project_id" "$path"
     plutil -insert GOOGLE_APP_ID -string "$app_id" "$path"
@@ -86,6 +88,9 @@ write_ios_config \
     "logdate" \
     "1:216887423795:ios:35aa0348aa4f6fcb8ec446" \
     "studio.hypertext.LogDate"
+[[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "studio.hypertext.LogDate" ]] \
+    || fail "expected initial iOS fixture bundle"
+pass
 "$VALIDATOR" ios "$ios_config"
 
 write_android_config \
@@ -134,6 +139,9 @@ write_ios_config \
     "logdate" \
     "1:216887423795:ios:35aa0348aa4f6fcb8ec446" \
     "co.reasonabletech.logdate"
+[[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "co.reasonabletech.logdate" ]] \
+    || fail "expected rewritten iOS fixture to replace the bundle"
+pass
 assert_rejected "expected iOS bundle studio.hypertext.LogDate" "$VALIDATOR" ios "$ios_config"
 
 write_ios_config \
@@ -141,6 +149,9 @@ write_ios_config \
     "logdate" \
     "1:216887423795:ios:35aa0348aa4f6fcb8ec446" \
     "studio.hypertext.LogDate"
+[[ "$(plutil -extract BUNDLE_ID raw -o - "$ios_config")" == "studio.hypertext.LogDate" ]] \
+    || fail "expected rewritten iOS fixture to restore the bundle"
+pass
 plutil -remove API_KEY "$ios_config"
 assert_rejected "missing API_KEY" "$VALIDATOR" ios "$ios_config"
 
