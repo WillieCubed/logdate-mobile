@@ -407,9 +407,25 @@ internal class FailingJournals(
     }
 }
 
-/** Which uploaded file each note's media is, kept in memory. */
+/** Which uploaded file each note's media and each draft block's or cover's file is, kept in memory. */
 internal class InMemoryMediaRefs : MediaSyncRefStore {
     private val refs = mutableMapOf<String, MediaSyncRef>()
+    private val assets = mutableMapOf<Triple<Uuid, Uuid, String>, MediaSyncRef>()
+
+    override suspend fun getDraftAsset(
+        draftId: Uuid,
+        blockId: Uuid,
+        kind: String,
+    ): MediaSyncRef? = assets[Triple(draftId, blockId, kind)]
+
+    override suspend fun upsertDraftAsset(
+        draftId: Uuid,
+        blockId: Uuid,
+        kind: String,
+        ref: MediaSyncRef,
+    ) {
+        assets[Triple(draftId, blockId, kind)] = ref
+    }
 
     override suspend fun get(noteId: Uuid): MediaSyncRef? = refs[noteId.toString()]
 

@@ -43,6 +43,9 @@ import app.logdate.client.sync.moments.createMomentDownloader
 import app.logdate.client.sync.moments.createMomentUploader
 import app.logdate.client.sync.space.SpaceSync
 import app.logdate.client.sync.space.SpaceSyncDependencies
+import app.logdate.client.sync.space.migration.JournalStorageMove
+import app.logdate.client.sync.space.migration.SpaceJournalMigration
+import app.logdate.client.sync.space.migration.SpaceMigrationDependencies
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.CloudQuotaManager
@@ -65,15 +68,15 @@ class DefaultSyncManager(
     private val cloudContentDataSource: CloudContentDataSource,
     private val cloudJournalDataSource: CloudJournalDataSource,
     private val cloudAssociationDataSource: CloudAssociationDataSource,
-    private val cloudMediaDataSource: CloudMediaDataSource,
+    internal val cloudMediaDataSource: CloudMediaDataSource,
     private val cloudDraftDataSource: CloudDraftDataSource,
     private val cloudAccountRepository: CloudAccountRepository,
     private val sessionStorage: SessionStorage,
-    private val mediaManager: MediaManager,
-    private val mediaSyncRefStore: MediaSyncRefStore,
-    private val journalRepository: JournalRepository,
-    private val journalNotesRepository: JournalNotesRepository,
-    private val journalContentRepository: JournalContentRepository,
+    internal val mediaManager: MediaManager,
+    internal val mediaSyncRefStore: MediaSyncRefStore,
+    internal val journalRepository: JournalRepository,
+    internal val journalNotesRepository: JournalNotesRepository,
+    internal val journalContentRepository: JournalContentRepository,
     private val journalConflictResolver: ConflictResolver<Journal>,
     private val noteConflictResolver: ConflictResolver<JournalNote>,
     private val conflictStore: SyncConflictStore,
@@ -96,7 +99,7 @@ class DefaultSyncManager(
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
     private val lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
-    private val firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+    internal val firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
     /**
      * Wired on every platform; optional so tests that never exercise identity provisioning can
      * omit it. Without it, [IdentityKeyProvisioner.provision] cannot check whether the account already has
@@ -111,13 +114,13 @@ class DefaultSyncManager(
     private val supportsRichDrafts: () -> Boolean = { false },
     internal val diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
     internal val diagnosticSource: () -> app.logdate.client.sync.diagnostics.DiagnosticSource? = { null },
-    private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
+    internal val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
     /** Told when the server revokes this device's session; a linked watch erases itself on it. */
     private val deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
     /** How this device syncs; a linked watch uses [SyncProfile.LinkedWatch]. */
     internal val profile: SyncProfile = SyncProfile.Standard,
     private val createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
-    private val momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
+    internal val momentSyncConfig: app.logdate.client.sync.moments.MomentSyncConfig? = null,
     internal val deviceEnrollment: suspend () -> Unit = {},
     /**
      * Where the account `/auth/me` describes is saved when sync starts. Wired on every platform;
@@ -127,6 +130,10 @@ class DefaultSyncManager(
     /** Syncs registered kinds through the account's personal space when its gate is open; null keeps every kind on its own endpoints. */
     spaceSync: SpaceSyncDependencies? = null,
     private val entryDraftRecovery: app.logdate.client.repository.journals.EntryDraftRecoveryRepository? = null,
+    /** Moves an existing journal from legacy storage into its personal space; null never moves one. */
+    spaceMigration: SpaceMigrationDependencies? = null,
+    /** Which store this device last synced each account through, to notice when the account moves. */
+    internal val syncRouteStore: SyncRouteStore = InMemorySyncRouteStore(),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -428,6 +435,8 @@ class DefaultSyncManager(
             diagnostics = { event, source -> diagnostics?.record(event, source?.scope, source?.epoch) },
         )
 
+    internal val spaceSyncDependencies: SpaceSyncDependencies? = spaceSync
+
     internal val space =
         spaceSync?.let {
             SpaceSync(it, tokenRefresher, syncMetadataService, retryCoordinator, downloadInbox, statusPublisher::recordProgress)
@@ -475,6 +484,12 @@ class DefaultSyncManager(
             space,
             profile.uploadsUpdates,
         )
+
+    /** This device's move of the signed-in account's journal into its personal space, or null when it never moves one. */
+    internal val journalMove: SpaceJournalMigration? by lazy { spaceMigration?.let { createJournalMove(it) } }
+
+    /** What the person can see and do about moving their journal into its personal space. */
+    val journalStorageMove: JournalStorageMove get() = journalMove ?: JournalStorageMove.Off
 
     internal val uploader =
         SyncUploader(

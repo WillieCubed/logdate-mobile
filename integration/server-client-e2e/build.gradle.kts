@@ -81,6 +81,9 @@ val personalSpaceTest by tasks.registering(Test::class) {
             .output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
     environment("LOGDATE_PERSONAL_SPACE_ENABLED", "true")
+    // The move tests move existing accounts, and don't wait out the two minutes a hold stands on LogDate Cloud.
+    environment("LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED", "true")
+    environment("LOGDATE_SPACE_MIGRATION_HOLD_GRACE_SECONDS", "0")
     filter { includeTestsMatching("*PersonalSpace*E2ETest") }
 }
 

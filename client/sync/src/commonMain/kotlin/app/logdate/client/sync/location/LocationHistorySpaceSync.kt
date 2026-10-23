@@ -1,6 +1,5 @@
 package app.logdate.client.sync.location
 
-import app.logdate.client.repository.location.HistoryRecord
 import app.logdate.client.repository.location.HistoryRecordStore
 import app.logdate.client.sync.RemoteOutcome
 import app.logdate.client.sync.SyncError
@@ -12,19 +11,14 @@ import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.space.SpaceKind
-import app.logdate.client.sync.space.SpaceRecordMappingException
 import app.logdate.client.sync.space.SpaceStagedRecords
 import app.logdate.client.sync.space.SpaceSync
 import app.logdate.client.sync.space.mappers.HistoryKindRecords
-import app.logdate.client.sync.space.mappers.LocationHour
-import app.logdate.client.sync.space.mappers.PlaceEntryLinkRecordMapper
 import app.logdate.client.sync.space.mappers.StoredLocationParts
 import app.logdate.client.sync.space.spaceErrorType
 import app.logdate.client.sync.space.spaceFetchError
-import app.logdate.shared.model.location.HistoryPayload
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 
 /** The kinds of location history, in the order they upload: places before the visits and corrections that name them. */
@@ -57,8 +51,6 @@ internal class LocationHistorySpaceSync(
     private val uploadsUpdates: Boolean,
     private val savedPlaceIds: suspend () -> List<String>,
 ) {
-    private val json = Json { ignoreUnknownKeys = true }
-
     /** Whether location history syncs through the personal space right now. */
     suspend fun isActive(): Boolean = space.activeKind(EntityType.LOCATION_SAMPLES) != null
 
@@ -102,14 +94,21 @@ internal class LocationHistorySpaceSync(
         val hours = linkedSetOf<Pair<String, Instant>>()
         var unroutable = 0
         for (record in waiting) {
-            when (val route = routeOf(record)) {
-                is Route.Hour -> hours += route.device to route.hourStart
-                is Route.Item ->
+            when (val route = HistoryRecordRoutes.routeOf(record)) {
+                is HistoryRoute.Hour -> hours += route.device to route.hourStart
+                is HistoryRoute.Item ->
                     items[route.type to route.id] =
                         if (items[route.type to route.id] == PendingOperation.DELETE) PendingOperation.DELETE else route.operation
-                Route.NothingToUpload -> store.acknowledge(owner, origin, record.id, record.deviceVersion, maxOf(1, record.serverVersion))
-                Route.NotSyncedHere -> Unit
-                Route.Unroutable -> unroutable++
+                HistoryRoute.NothingToUpload ->
+                    store.acknowledge(
+                        owner,
+                        origin,
+                        record.id,
+                        record.deviceVersion,
+                        maxOf(1, record.serverVersion),
+                    )
+                HistoryRoute.NotSyncedHere -> Unit
+                HistoryRoute.Unroutable -> unroutable++
             }
         }
         val samples = space.activeKind(EntityType.LOCATION_SAMPLES)?.local as? StoredLocationParts
@@ -141,77 +140,6 @@ internal class LocationHistorySpaceSync(
         }
         return Queued(hasMore = waiting.size == WAITING_PER_PASS)
     }
-
-    private sealed interface Route {
-        /** A sample or activity change, which belongs to a part of the hour it happened in. */
-        class Hour(
-            val device: String,
-            val hourStart: Instant,
-        ) : Route
-
-        class Item(
-            val type: EntityType,
-            val id: String,
-            val operation: PendingOperation,
-        ) : Route
-
-        /** A record the space has no copy of and can't be told about, such as a deleted record whose time was never known. */
-        data object NothingToUpload : Route
-
-        /** A kind of record that only the location history endpoints carry. */
-        data object NotSyncedHere : Route
-
-        /** A record that no record key can name. */
-        data object Unroutable : Route
-    }
-
-    private fun routeOf(record: HistoryRecord): Route {
-        val operation = if (record.deleted) PendingOperation.DELETE else PendingOperation.UPDATE
-        return when (record.recordType) {
-            "observation", "activity" -> {
-                val at = record.observedAtMillis ?: payloadTime(record) ?: return Route.NothingToUpload
-                try {
-                    val hour = LocationHour.hourOf(Instant.fromEpochMilliseconds(at))
-                    LocationHour.itemId(record.deviceId, hour)
-                    Route.Hour(record.deviceId, hour)
-                } catch (_: SpaceRecordMappingException) {
-                    Route.Unroutable
-                }
-            }
-            "place" -> Route.Item(EntityType.PLACE, record.id, operation)
-            "manual" -> Route.Item(EntityType.PLACE_VISIT, record.id, operation)
-            "correction" -> Route.Item(EntityType.PLACE_CORRECTION, record.id, operation)
-            "journey" -> Route.Item(EntityType.PLACE_JOURNEY, record.id, operation)
-            "memory-link" -> linkRoute(record, operation)
-            else -> Route.NotSyncedHere
-        }
-    }
-
-    private fun linkRoute(
-        record: HistoryRecord,
-        operation: PendingOperation,
-    ): Route {
-        val link = payloadOf(record)?.let { (it as? HistoryPayload.MemoryLink)?.value } ?: return Route.NothingToUpload
-        return try {
-            Route.Item(
-                EntityType.PLACE_ENTRY_LINK,
-                PlaceEntryLinkRecordMapper.keyOf(link.noteId, link.targetEvidenceId).lowercase(),
-                operation,
-            )
-        } catch (_: SpaceRecordMappingException) {
-            Route.Unroutable
-        }
-    }
-
-    private fun payloadOf(record: HistoryRecord): HistoryPayload? =
-        record.payload?.let { runCatching { json.decodeFromString(HistoryPayload.serializer(), it) }.getOrNull() }
-
-    private fun payloadTime(record: HistoryRecord): Long? =
-        when (val payload = payloadOf(record)) {
-            is HistoryPayload.Observation -> payload.value.timestamp.toEpochMilliseconds()
-            is HistoryPayload.Activity -> payload.value.timestamp.toEpochMilliseconds()
-            else -> null
-        }
 
     /** Applies the location history the personal space changed, one item at a time so one failure leaves the rest applied. */
     suspend fun download(): SyncResult {

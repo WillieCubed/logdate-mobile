@@ -20,6 +20,10 @@ interface MarkedMomentDao {
     @Query("SELECT * FROM marked_moments WHERE state = :state AND deletedAt IS NULL ORDER BY capturedAt DESC")
     fun observeByState(state: String): Flow<List<MarkedMomentEntity>>
 
+    /** The ids of every mark that isn't deleted, whatever its state. */
+    @Query("SELECT id FROM marked_moments WHERE deletedAt IS NULL")
+    suspend fun liveIds(): List<Uuid>
+
     @Query("SELECT * FROM marked_moments WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC")
     fun observeDeleted(): Flow<List<MarkedMomentEntity>>
 

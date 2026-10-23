@@ -7,6 +7,7 @@ import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.sync.AndroidSyncManager
 import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.DefaultSyncManager
+import app.logdate.client.sync.KeyValueSyncRouteStore
 import app.logdate.client.sync.RecoverIdentityUseCase
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncManager
@@ -27,6 +28,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.migration.di.migrationCoreModule
 import app.logdate.client.sync.migration.di.migrationModule
+import app.logdate.client.sync.space.migration.JournalStorageMove
 import app.logdate.shared.config.LogDateConfigRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -54,6 +56,7 @@ actual val syncModule: Module =
             val database = get<LogDateDatabase>()
             RoomSyncTransactionManager(database)
         }
+        single<JournalStorageMove> { get<DefaultSyncManager>().journalStorageMove }
         single<DefaultSyncManager> {
             DefaultSyncManager(
                 cloudContentDataSource = get(),
@@ -101,6 +104,8 @@ actual val syncModule: Module =
                 locationHistorySyncEngine = get(),
                 createCollisionPolicy = getOrNull<CreateCollisionPolicy>() ?: CreateCollisionPolicy.None,
                 spaceSync = get(),
+                spaceMigration = get(),
+                syncRouteStore = KeyValueSyncRouteStore(get()),
                 deviceEnrollment = {
                     check(get<DefaultDeviceManager>().registerWithCloud().getOrThrow()) {
                         "Device registration was not accepted"

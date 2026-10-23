@@ -86,6 +86,30 @@ notes mapping also has to queue it from staged space records.
 that refreshes the session, rate limiting keeps the server's `Retry-After`, a full quota is
 `STORAGE_QUOTA_EXCEEDED`, and a failure before any response is a retried network error.
 
+### Moving an existing journal
+
+An account created before personal spaces starts on legacy storage, and one of its devices moves the
+journal into the personal space. The code lives in `space/migration`, and
+[Moving journals into personal spaces](../../docs/explanation/journal-moves.md) explains the whole
+move. `SpaceJournalMigration` runs it after every complete sync, once the `PERSONAL_SPACE` and
+`PERSONAL_SPACE_MIGRATION` feature flags are on, the server advertises `personalSpaceMigrationV1`,
+and this device has downloaded everything and has nothing waiting to upload.
+
+The move reuses the space kinds above: `SpaceMigrationUpload` builds each record with the same
+`SpaceKind.outgoingRecords` the uploader uses and writes it unconditionally, saving a
+`SpaceMigrationCheckpoint` every 25 records so a later run resumes. `MigrationMediaPreparer` gives
+each media file a space reference through `SyncMediaTransfer`, but writes the new references to the
+checkpoint store through `MigrationMediaRefs` rather than to the real `MediaSyncRefStore`, because
+other devices still read legacy references until the switch. `SpaceMigrationRun` then reads the
+space back (`SpaceMigrationReadBackCheck`, `SpaceMigrationMediaCheck`), compares legacy storage with
+this device (`LegacyComparison`) while the server holds legacy writes, and asks the server to switch
+with a proof of both. After the switch, `settleAfterSwitch` adopts the moved media references and
+`rebaseForRoute` resets the sync versions kept for the other store.
+
+`JournalStorageMove` is what the app sees: a `JournalMoveState` for Settings, and `retry` and
+`switchBack` for the person's actions. Every stop carries a `JournalMoveProblem` that names the kind
+of data and what fixes it, and nothing about legacy sync changes until the server has switched.
+
 ## Key Components
 
 ### Core Sync

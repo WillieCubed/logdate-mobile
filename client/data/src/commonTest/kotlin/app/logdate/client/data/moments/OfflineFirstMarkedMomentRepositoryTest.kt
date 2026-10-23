@@ -395,6 +395,8 @@ class OfflineFirstMarkedMomentRepositoryTest {
 
         override suspend fun getById(id: Uuid): MarkedMomentEntity? = rows.firstOrNull { it.id == id }
 
+        override suspend fun liveIds(): List<Uuid> = rows.filter { it.deletedAt == null }.map { it.id }
+
         override fun observeDeleted() = flowOf(rows.filter { it.deletedAt != null })
 
         override fun observeByState(state: String): Flow<List<MarkedMomentEntity>> =

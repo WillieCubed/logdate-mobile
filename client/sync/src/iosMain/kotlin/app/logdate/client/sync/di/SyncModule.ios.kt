@@ -4,6 +4,7 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.ForegroundSyncManager
+import app.logdate.client.sync.KeyValueSyncRouteStore
 import app.logdate.client.sync.RecoverIdentityUseCase
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncManager
@@ -23,6 +24,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.migration.di.migrationCoreModule
 import app.logdate.client.sync.migration.di.migrationModule
+import app.logdate.client.sync.space.migration.JournalStorageMove
 import app.logdate.shared.config.LogDateConfigRepository
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
@@ -47,6 +49,7 @@ actual val syncModule: Module =
         single<SyncTransactionManager> {
             RoomSyncTransactionManager(get<LogDateDatabase>())
         }
+        single<JournalStorageMove> { get<DefaultSyncManager>().journalStorageMove }
         single<DefaultSyncManager> {
             DefaultSyncManager(
                 cloudContentDataSource = get(),
@@ -92,6 +95,8 @@ actual val syncModule: Module =
                 unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
                 locationHistorySyncEngine = get(),
                 spaceSync = get(),
+                spaceMigration = get(),
+                syncRouteStore = KeyValueSyncRouteStore(get()),
             )
         }
         single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get(), get()) }
