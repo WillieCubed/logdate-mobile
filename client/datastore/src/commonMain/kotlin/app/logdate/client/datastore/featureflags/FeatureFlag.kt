@@ -125,6 +125,16 @@ enum class FeatureFlag(
     PERSONAL_SPACE(key = "personal_space_enabled", defaultEnabled = false),
 
     /**
+     * Move an existing journal from the per-kind sync endpoints into the account's sealed personal
+     * space, from this device, once it has synced everything; and show the move in Data settings.
+     *
+     * Off by default while the move is rehearsed. It takes effect only together with
+     * [PERSONAL_SPACE], since a moved journal syncs through its personal space, and only on a server
+     * that offers the move.
+     */
+    PERSONAL_SPACE_MIGRATION(key = "personal_space_migration_enabled", defaultEnabled = false),
+
+    /**
      * A recovery key the person holds for their identity, derived from their recovery phrase and
      * ranked above the server's key. Account shows it only when the connected server supports it.
      *

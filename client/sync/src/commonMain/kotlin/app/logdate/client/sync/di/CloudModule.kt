@@ -75,10 +75,16 @@ import app.logdate.client.sync.space.mappers.placeEntryLinkSpaceKind
 import app.logdate.client.sync.space.mappers.placeJourneySpaceKind
 import app.logdate.client.sync.space.mappers.placeSpaceKind
 import app.logdate.client.sync.space.mappers.placeVisitSpaceKind
+import app.logdate.client.sync.space.migration.HttpSpaceMigrationApi
+import app.logdate.client.sync.space.migration.KeyValueSpaceMigrationCheckpoints
+import app.logdate.client.sync.space.migration.SpaceMigrationApi
+import app.logdate.client.sync.space.migration.SpaceMigrationCheckpoints
+import app.logdate.client.sync.space.migration.SpaceMigrationDependencies
 import app.logdate.client.sync.space.spaceLocation
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.ServerProtocolFeature
+import kotlinx.coroutines.flow.first
 import org.koin.core.qualifier.named
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
@@ -155,6 +161,28 @@ val spaceSyncModule =
                     config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_V1) == true
                 },
                 storageMode = get<ServerAccountStorageMode>()::currentMode,
+            )
+        }
+        single<SpaceMigrationApi> {
+            val config = get<LogDateConfigRepository>()
+            HttpSpaceMigrationApi(get<io.ktor.client.HttpClient>()) { config.apiBaseUrl.first() }
+        }
+        single<SpaceMigrationCheckpoints> { KeyValueSpaceMigrationCheckpoints(get()) }
+        single {
+            val flags = get<FeatureFlagStore>()
+            val config = get<LogDateConfigRepository>()
+            val moments = get<LogDateDatabase>().markedMomentDao()
+            SpaceMigrationDependencies(
+                api = get(),
+                checkpoints = get(),
+                enabledInThisBuild = {
+                    flags.isEnabled(FeatureFlag.PERSONAL_SPACE_MIGRATION) && flags.isEnabled(FeatureFlag.PERSONAL_SPACE)
+                },
+                serverOffersMove = {
+                    config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.PERSONAL_SPACE_MIGRATION_V1) == true
+                },
+                spaceMedia = get<SpaceMediaDataSource>(),
+                liveMomentIds = { moments.liveIds().map { it.toString() } },
             )
         }
         single {
@@ -271,12 +299,13 @@ val cloudModule =
         single { MediaPayloadKeyProvider(get(), get(), get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         includes(spaceSyncModule)
+        single { SpaceMediaDataSource(get(), get(), spaceLocation(get(), get<SpaceSyncDependencies>().accountDid)) }
         single<CloudMediaDataSource> {
             val registry = get<SpaceRecordRegistry>()
             val gate = get<SpaceTransportGate>()
             SpaceRoutingMediaDataSource(
                 legacy = DefaultCloudMediaDataSource(get(), get()),
-                space = SpaceMediaDataSource(get(), get(), spaceLocation(get(), get<SpaceSyncDependencies>().accountDid)),
+                space = get<SpaceMediaDataSource>(),
                 uploadsToSpace = { registry.forEntityType(EntityType.NOTE) != null && gate.route() == SpaceRoute.Space },
             )
         }

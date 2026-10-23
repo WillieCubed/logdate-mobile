@@ -94,6 +94,9 @@ internal class SpaceSync(
         return kind.takeIf { dependencies.gate.route() == SpaceRoute.Space }
     }
 
+    /** Where this device syncs the signed-in account now. */
+    suspend fun route(): SpaceRoute = dependencies.gate.route()
+
     /** Why nothing may sync for the signed-in account, when its storage mode rules out both transports. */
     suspend fun blocked(): SpaceRoute.Blocked? = dependencies.gate.route() as? SpaceRoute.Blocked
 

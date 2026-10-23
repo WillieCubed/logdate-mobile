@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.diagnostics.SyncRunDiagnostics
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.shared.model.diagnostics.DiagnosticPhase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -305,6 +306,9 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
             if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
             val accountErrors = refreshAccountForSync()
             if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            val routeErrors = prepareRouteForSync(selected, accountErrors.isEmpty())
+            if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
+            if (routeErrors.isNotEmpty()) return@recovery SyncResult(success = false, errors = routeErrors, hasMorePending = true)
             if (profile.sweepsOnFirstSync) uploader.enqueueEverythingOnFirstSync()
             val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
             if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
@@ -313,13 +317,7 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
             val draftResult = run.phase(DiagnosticPhase.RECOVERY) { syncDrafts() }
             if (!tokenRefresher.isFullSyncScopeCurrent()) return@recovery SyncResult(success = false, hasMorePending = true)
 
-            try {
-                ensureDeviceEnrolled()
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (failure: Exception) {
-                Napier.w("Couldn't enroll this account device", failure)
-            }
+            enrollDeviceIfPossible()
 
             val errors = accountErrors + downloadResult.errors + uploadResult.errors + draftResult.errors
             // Each phase updates the shared last error. A successful upload must not erase a failed
@@ -345,6 +343,7 @@ internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
                         draftResult.hasMorePending ||
                         (recovery?.retryable ?: 0) > 0,
             ).let { result ->
+                if (result.success && !result.hasMorePending) journalMove?.runIfDue()
                 result.copy(
                     recoveredMediaScope =
                         selected.takeIf {
@@ -379,4 +378,39 @@ internal suspend fun DefaultSyncManager.refreshAccountForSync(): List<SyncError>
             cause = failure,
         ),
     )
+}
+
+/**
+ * Before anything syncs: finishes switching a journal back to legacy storage if the app stopped part
+ * way, so legacy downloads never replace changes still waiting to be queued, then notices when the
+ * account changed stores since this device last synced it. Skipped when the account couldn't be read,
+ * since its storage mode isn't known then. Nothing syncs when this fails, because syncing before the
+ * device has adjusted to the account's store could replace newer changes.
+ */
+private suspend fun DefaultSyncManager.prepareRouteForSync(
+    selected: UploadScope?,
+    accountRead: Boolean,
+): List<SyncError> {
+    if (selected == null || !accountRead) return emptyList()
+    return try {
+        journalMove?.finishSwitchBackIfNeeded()
+        rebaseForRoute(selected)
+        emptyList()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Napier.e("Preparing this device for the account's storage failed", error)
+        listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Preparing this device for the account's storage failed: ${error.message}", error))
+    }
+}
+
+/** Enrolls this device with the account when it isn't yet; a failure is logged and the next sync tries again. */
+private suspend fun DefaultSyncManager.enrollDeviceIfPossible() {
+    try {
+        ensureDeviceEnrolled()
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (failure: Exception) {
+        Napier.w("Couldn't enroll this account device", failure)
+    }
 }

@@ -100,14 +100,6 @@ internal class SpaceUploader(
             retryable = true,
         )
 
-    /** One record to write: which record type, its key, and its content. */
-    private class Outgoing(
-        val collection: String,
-        val rkey: String,
-        val record: JsonObject,
-        val blobs: List<String>,
-    )
-
     /** The records the space holds for an item, and the item they make, when it still has its main record. */
     private class Remote<T>(
         val item: T?,
@@ -212,7 +204,7 @@ internal class SpaceUploader(
         }
 
         /** The versions this device last saw of every record the item has or can have. */
-        private suspend fun knownStates(outgoing: List<Outgoing>?): Map<RecordKey, SpaceRecordState> {
+        private suspend fun knownStates(outgoing: List<SpaceOutgoing>?): Map<RecordKey, SpaceRecordState> {
             val keys = kind.parts.flatMap { part -> part.rkeysOf(entityId).map { RecordKey(part.collection, canonicalRecordKey(it)) } }
             val all = keys + outgoing.orEmpty().map { RecordKey(it.collection, it.rkey) }
             return all.distinct().mapNotNull { key -> swapStore.get(access.scope, key.collection, key.rkey)?.let { key to it } }.toMap()
@@ -222,9 +214,9 @@ internal class SpaceUploader(
          * Every record [item] is stored as, checked against its schema, or null once the entry is
          * failed: retried when the item can map later as it is, set aside when it can't.
          */
-        private suspend fun recordsFor(item: T): List<Outgoing>? =
+        private suspend fun recordsFor(item: T): List<SpaceOutgoing>? =
             try {
-                kind.parts.flatMap { part -> outgoing(part, item) }
+                kind.outgoingRecords(item, validator)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: SpaceRecordMappingException) {
@@ -239,34 +231,13 @@ internal class SpaceUploader(
                 null
             }
 
-        private fun <P> outgoing(
-            part: SpacePart<T, P>,
-            item: T,
-        ): List<Outgoing> {
-            val values = part.recordsOf(item)
-            if (part === kind.main && values.size != 1) {
-                throw SpaceRecordMappingException("${part.collection}: an item must have exactly one main record, not ${values.size}")
-            }
-            return values.map { value ->
-                val rkey = canonicalRecordKey(part.mapper.rkeyOf(value))
-                val record = part.mapper.toRecord(value)
-                val problems = validator.validateRecord(Nsid.require(part.collection), record).issues
-                if (problems.isNotEmpty()) {
-                    // Paths only: an issue's message can quote the record's contents.
-                    val paths = problems.joinToString { it.path.ifEmpty { "(record)" } }
-                    throw SpaceRecordInvalidException("The ${part.collection} record this device built fails its schema at $paths")
-                }
-                Outgoing(part.collection, rkey, record, part.mapper.blobCidsOf(value))
-            }
-        }
-
         /**
          * Writes every record over the version in [bases] and deletes the records [bases] holds that
          * the item no longer has. Its main record goes first, so another device never sees the
          * item's other records before the item.
          */
         private suspend fun writeAll(
-            records: List<Outgoing>,
+            records: List<SpaceOutgoing>,
             bases: Map<RecordKey, SpaceRecordState>,
         ): Attempt {
             var seq = 0L

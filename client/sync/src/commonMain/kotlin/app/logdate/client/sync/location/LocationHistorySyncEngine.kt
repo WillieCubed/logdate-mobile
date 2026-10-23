@@ -163,6 +163,59 @@ class LocationHistorySyncEngine(
 
     suspend fun isEnabled(): Boolean = enabled()
 
+    /**
+     * Every location history record this device keeps for the signed-in account, deleted ones
+     * included, and the saved places, for moving the journal into its personal space. Null while
+     * location history doesn't sync on this device.
+     */
+    internal suspend fun recordsForMove(): MovedHistory? {
+        if (!enabled()) return null
+        val session = sessions.getSession() ?: return null
+        val namespace = captureNamespace(session.accessToken)
+        return MovedHistory(
+            HistoryScope(namespace.owner, namespace.origin),
+            store.records(namespace.owner, namespace.origin),
+            savedPlaceIds(),
+        )
+    }
+
+    /**
+     * Gives every record this device keeps the version legacy storage holds it at, or 0 when legacy
+     * storage doesn't have it, after the account moved back to legacy storage. Legacy storage refuses a
+     * write whose expected version isn't the one it holds, and the personal space numbered versions
+     * differently.
+     */
+    internal suspend fun adoptLegacyVersions(accessToken: String): SyncResult =
+        runPhase(accessToken) { namespace, api ->
+            val versions = mutableMapOf<String, Long>()
+            var cursor = 0L
+            do {
+                ensureCurrent(namespace)
+                val page = api.changes(accessToken, cursor, PAGE_SIZE)
+                page.records.forEach { versions[it.id] = it.serverVersion }
+                check(!page.hasMore || page.nextCursor > cursor)
+                cursor = page.nextCursor
+            } while (page.hasMore)
+            val adjusted =
+                store.records(namespace.owner, namespace.origin).mapNotNull { record ->
+                    val version = versions[record.id] ?: 0L
+                    record.takeIf { it.serverVersion != version }?.copy(serverVersion = version)
+                }
+            if (adjusted.isNotEmpty()) store.putBatch(namespace.owner, namespace.origin, adjusted)
+            SyncResult(success = true)
+        }
+
+    /**
+     * Queues every record this device keeps, deletions included, for the location history endpoints
+     * again, after the journal was switched back to legacy storage.
+     */
+    internal suspend fun requeueForLegacy() {
+        val moved = recordsForMove() ?: return
+        if (moved.records.isEmpty()) return
+        val requeued = moved.records.map { it.copy(deviceVersion = it.deviceVersion + 1, dirty = true) }
+        store.putBatch(moved.scope.owner, moved.scope.origin, requeued)
+    }
+
     /** Checked before minting an identity key on a fresh device, including location-only accounts. */
     suspend fun hasRemoteRecords(accessToken: String): Boolean {
         val namespace = captureNamespace(accessToken)
@@ -241,3 +294,10 @@ class LocationHistorySyncEngine(
         const val MAX_PAGES_PER_RUN = 10
     }
 }
+
+/** The location history a device keeps for one account, as the move into a personal space reads it. */
+internal class MovedHistory(
+    val scope: HistoryScope,
+    val records: List<HistoryRecord>,
+    val savedPlaceIds: List<String>,
+)

@@ -98,6 +98,17 @@ internal class StoredLocationParts(
             item.activities.maxOfOrNull { it.timestamp } ?: item.hourStart,
         )
 
+    /** The ids of every part of the hour starting at [hour] on [device]. */
+    suspend fun partIds(
+        device: String,
+        hour: Instant,
+    ): List<String> =
+        read(device, hour)
+            .hour
+            ?.parts()
+            .orEmpty()
+            .map { it.id }
+
     /** The ids of the parts of the hour starting at [hour] on [device] that hold a record waiting to upload. */
     suspend fun partsWaiting(
         device: String,

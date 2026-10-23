@@ -50,6 +50,11 @@ class WatchMomentIngestorTest {
 
             override suspend fun getById(id: Uuid) = rows.value[id]
 
+            override suspend fun liveIds() =
+                rows.value.values
+                    .filter { it.deletedAt == null }
+                    .map { it.id }
+
             override fun observeDeleted() = rows.map { it.values.filter { row -> row.deletedAt != null } }
 
             override fun observeByState(state: String) =
