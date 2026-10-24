@@ -248,6 +248,9 @@ jobs:
 
   scripts:
     name: Script tests
+    permissions:
+      contents: read
+      packages: read
     # The scripts target developer Macs and use macOS tools (plutil, BSD stat). The
     # pinned commit formatters the hook tests prepare ship only Apple Silicon builds
     # for macOS, so this runs on the Apple Silicon image.
@@ -263,6 +266,8 @@ jobs:
         uses: hashicorp/setup-terraform@v4.0.1
 
       - name: Install script test dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
         run: ./run setup --only test-deps --non-interactive
 
       - name: Lint setup scripts
