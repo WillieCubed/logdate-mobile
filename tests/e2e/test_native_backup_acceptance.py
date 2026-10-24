@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import importlib.util
 import io
 from pathlib import Path
@@ -88,6 +89,27 @@ class DataOnlySourceSessionTest(unittest.TestCase):
 
 
 class RestoreSnapshotValidationTest(unittest.TestCase):
+    def test_backup_accepts_checkpointed_database_only_after_logical_probe(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        before = {"databases/logdate": {"bytes": 4096, "sha256": "before"}}
+        after = {"databases/logdate": {"bytes": 741376, "sha256": "after"}}
+        calls = []
+
+        def adb(serial, *arguments, **kwargs):
+            if arguments[:3] == ("shell", "am", "start"):
+                return b"Status: ok"
+            if arguments[:3] == ("shell", "bmgr", "backupnow"):
+                return f"Package {harness.PACKAGE} with result: Success".encode()
+            return b""
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(harness, "adb", side_effect=adb), patch.object(
+            harness, "enable_backup"
+        ), patch.object(harness, "package_file_snapshot", side_effect=[before, after]), patch.object(
+            harness, "private_file"
+        ):
+            harness.backup_source("emulator-5554", Path(directory) / "backup.log", verify_after_backup=lambda: calls.append("logical"))
+        self.assertEqual(["logical"], calls)
+
     def test_datastore_atomic_write_staging_is_not_an_accepted_preferences_change(self):
         retained = {
             "databases/logdate": {"sha256": "journal"},
@@ -156,6 +178,23 @@ class RestoreSnapshotValidationTest(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "snapshot changed durable data: files/datastore/logdate.preferences_pb"):
             NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(before, after)
+
+    def test_verified_checkpoint_allows_only_the_live_database_bytes_to_change(self):
+        before = {
+            "databases/logdate": {"bytes": 4096, "sha256": "live-before-checkpoint"},
+            "files/db_recovery/passphrase_backup": {"bytes": 32, "sha256": "key"},
+        }
+        checkpointed = {**before, "databases/logdate": {"bytes": 741376, "sha256": "live-after-checkpoint"}}
+        with self.assertRaisesRegex(RuntimeError, "databases/logdate"):
+            NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(before, checkpointed)
+        NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(
+            before, checkpointed, ignored_paths={"databases/logdate"}
+        )
+        changed_key = {**checkpointed, "files/db_recovery/passphrase_backup": {"bytes": 32, "sha256": "different"}}
+        with self.assertRaisesRegex(RuntimeError, "files/db_recovery/passphrase_backup"):
+            NATIVE_BACKUP_ACCEPTANCE.assert_snapshot_preserved(
+                before, changed_key, ignored_paths={"databases/logdate"}
+            )
 
     def test_credentials_only_snapshot_accepts_absent_database_and_media(self):
         restored = {
@@ -671,6 +710,73 @@ class PartialNativeTransportTest(unittest.TestCase):
         return output.getvalue()
 
 
+class PinnedNativeTransferArchiveTest(unittest.TestCase):
+    def test_selected_database_hash_is_taken_from_transport_snapshot(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}/f/"
+        nested = PartialNativeTransportTest.make_tar(
+            [(prefix + "native_journal_transfer/current/database/logdate", b"selected encrypted journal"),
+             (prefix + "db_recovery/unrelated", b"unrelated")]
+        )
+        outer = PartialNativeTransportTest.make_tar([(f"1/_full/{harness.PACKAGE}", nested)])
+
+        selected = harness.selected_database_snapshot(outer)
+
+        self.assertEqual(len(b"selected encrypted journal"), selected["bytes"])
+        self.assertEqual(
+            hashlib.sha256(b"selected encrypted journal").hexdigest(), selected["sha256"]
+        )
+
+    def test_selected_database_hash_rejects_missing_snapshot(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        nested = PartialNativeTransportTest.make_tar(
+            [(f"apps/{harness.PACKAGE}/f/db_recovery/unrelated", b"unrelated")]
+        )
+        outer = PartialNativeTransportTest.make_tar([(f"1/_full/{harness.PACKAGE}", nested)])
+
+        with self.assertRaisesRegex(RuntimeError, "selected journal database"):
+            harness.selected_database_snapshot(outer)
+
+    def test_missing_key_fixture_removes_selected_database_key_and_identity_keys_only(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}/f/"
+        selected_key = prefix + "native_journal_transfer/current/files/db_recovery/passphrase_backup"
+        identity_key = prefix + "identity_recovery/phrase_backup"
+        media_key = prefix + "identity_recovery/media_key_backup"
+        retained = {
+            prefix + "native_journal_transfer/current/database/logdate": b"selected journal",
+            prefix + "native_journal_transfer/current/files/logdate.preferences_pb": b"selected preferences",
+            prefix + "media/objects/photo.png": b"original",
+            prefix + "db_recovery/unrelated": b"unrelated",
+        }
+        nested = PartialNativeTransportTest.make_tar(
+            [(selected_key, b"database key"), (identity_key, b"identity key"), (media_key, b"media key"), *retained.items()]
+        )
+        outer = PartialNativeTransportTest.make_tar([(f"1/_full/{harness.PACKAGE}", nested)])
+
+        filtered = harness.without_portable_recovery_keys(outer)
+
+        with tarfile.open(fileobj=io.BytesIO(filtered), mode="r:") as transport:
+            full = transport.extractfile(f"1/_full/{harness.PACKAGE}")
+            self.assertIsNotNone(full)
+            with tarfile.open(fileobj=full, mode="r:") as app_backup:
+                names = {member.name for member in app_backup.getmembers()}
+                self.assertTrue({selected_key, identity_key, media_key}.isdisjoint(names))
+                self.assertEqual(retained, {name: app_backup.extractfile(name).read() for name in retained})
+
+    def test_missing_key_fixture_rejects_an_archive_without_the_selected_key(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}/f/"
+        nested = PartialNativeTransportTest.make_tar(
+            [(prefix + "db_recovery/passphrase_backup", b"stale live key"),
+             (prefix + "identity_recovery/phrase_backup", b"identity key")]
+        )
+        outer = PartialNativeTransportTest.make_tar([(f"1/_full/{harness.PACKAGE}", nested)])
+
+        with self.assertRaisesRegex(RuntimeError, "expected portable key"):
+            harness.without_portable_recovery_keys(outer)
+
+
 class MissingPrivacyBackupFilterTest(unittest.TestCase):
     def test_requires_package_rejection_and_current_backup_agent_privacy_failure(self):
         harness = NATIVE_BACKUP_ACCEPTANCE
@@ -739,6 +845,50 @@ class MissingPrivacyBackupFilterTest(unittest.TestCase):
 
 
 class CredentialsOnlyBackupFilterTest(unittest.TestCase):
+    def test_credentials_only_emits_one_recovery_directory_when_source_orders_it_after_selected_key(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}"
+        full_backup = self.make_tar([
+            (prefix + "/_manifest", b"manifest"),
+            (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
+            (prefix + "/f/db_recovery/", b""),
+            (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
+            (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
+            (prefix + "/f/logdate.preferences_pb", harness.length_delimited_field(
+                1, self.preference_entry("identity.canonical_owner_id", "native-test-owner")
+            )),
+        ])
+
+        filtered = harness.credentials_only_from_full_backup(full_backup)
+
+        with tarfile.open(fileobj=io.BytesIO(filtered), mode="r:") as archive:
+            directories = [member for member in archive.getmembers() if member.isdir() and member.name.rstrip("/") == prefix + "/f/db_recovery"]
+        self.assertEqual(1, len(directories))
+
+    def test_credentials_only_outer_transport_retains_android_metadata(self):
+        harness = NATIVE_BACKUP_ACCEPTANCE
+        prefix = f"apps/{harness.PACKAGE}"
+        full_backup = self.make_tar([
+            (prefix + "/_manifest", b"manifest"),
+            (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
+            (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
+            (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
+            (prefix + "/f/logdate.preferences_pb", harness.length_delimited_field(
+                1, self.preference_entry("identity.canonical_owner_id", "native-test-owner")
+            )),
+            (prefix + "/f/native_journal_transfer/current/database/logdate", b"selected journal"),
+        ])
+        outer = self.make_tar([(f"1/_full/{harness.PACKAGE}", full_backup), ("1/@pm@", b"metadata")])
+
+        filtered = harness.credentials_only(outer)
+
+        with tarfile.open(fileobj=io.BytesIO(filtered), mode="r:") as transport:
+            self.assertEqual(b"metadata", transport.extractfile("1/@pm@").read())
+            with tarfile.open(fileobj=io.BytesIO(transport.extractfile(f"1/_full/{harness.PACKAGE}").read()), mode="r:") as app_backup:
+                names = {member.name for member in app_backup.getmembers()}
+                self.assertIn(prefix + "/f/db_recovery/passphrase_backup", names)
+                self.assertNotIn(prefix + "/f/native_journal_transfer/current/database/logdate", names)
+
     def test_preserves_android_manifest_directories_and_only_portable_credentials(self):
         package = NATIVE_BACKUP_ACCEPTANCE.PACKAGE
         prefix = f"apps/{package}"
@@ -748,7 +898,8 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
             (prefix + "/f/db_recovery/", b""),
             (prefix + "/f/identity_recovery/", b""),
             (prefix + "/f/media/", b""),
-            (prefix + "/f/db_recovery/passphrase_backup", b"db-key"),
+            (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
+            (prefix + "/f/native_journal_transfer/current/database/logdate", b"selected journal"),
             (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
             (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
             (
@@ -772,10 +923,14 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         with tarfile.open(fileobj=io.BytesIO(filtered), mode="r:") as archive:
             members = {member.name: member for member in archive.getmembers()}
             preferences_data = archive.extractfile(prefix + "/f/logdate.preferences_pb").read()
+            database_key = archive.extractfile(prefix + "/f/db_recovery/passphrase_backup").read()
         self.assertIn(prefix + "/_manifest", members)
         self.assertTrue(members[prefix + "/f/db_recovery"].isdir())
         self.assertTrue(members[prefix + "/f/identity_recovery"].isdir())
         self.assertIn(prefix + "/f/db_recovery/passphrase_backup", members)
+        self.assertEqual(b"db-key", database_key)
+        self.assertNotIn(prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", members)
+        self.assertNotIn(prefix + "/f/native_journal_transfer/current/database/logdate", members)
         self.assertIn(prefix + "/f/identity_recovery/phrase_backup", members)
         self.assertIn(prefix + "/f/identity_recovery/media_key_backup", members)
         self.assertIn(prefix + "/f/logdate.preferences_pb", members)
@@ -793,7 +948,7 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         prefix = f"apps/{package}"
         backup = self.make_tar(
             [
-                (prefix + "/f/db_recovery/passphrase_backup", b"db-key"),
+                (prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"db-key"),
                 (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
                 (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
                 (
@@ -807,6 +962,22 @@ class CredentialsOnlyBackupFilterTest(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(RuntimeError, "missing Android's app backup manifest"):
+            NATIVE_BACKUP_ACCEPTANCE.credentials_only_from_full_backup(backup)
+
+    def test_rejects_credentials_only_archive_without_selected_database_key(self):
+        package = NATIVE_BACKUP_ACCEPTANCE.PACKAGE
+        prefix = f"apps/{package}"
+        backup = self.make_tar([
+            (prefix + "/_manifest", b"manifest"),
+            (prefix + "/f/db_recovery/passphrase_backup", b"excluded stale live key"),
+            (prefix + "/f/identity_recovery/phrase_backup", b"identity-key"),
+            (prefix + "/f/identity_recovery/media_key_backup", b"media-key"),
+            (prefix + "/f/logdate.preferences_pb", NATIVE_BACKUP_ACCEPTANCE.length_delimited_field(
+                1, self.preference_entry("identity.canonical_owner_id", "native-test-owner")
+            )),
+        ])
+
+        with self.assertRaisesRegex(RuntimeError, "portable recovery keys"):
             NATIVE_BACKUP_ACCEPTANCE.credentials_only_from_full_backup(backup)
 
     @staticmethod

@@ -6,6 +6,7 @@ cover phrase-derived and account-unlocked encryption identities.
 """
 
 import argparse
+import copy
 from contextlib import contextmanager
 import base64
 import hashlib
@@ -376,7 +377,10 @@ def backup_source(serial, output, *, verify_after_backup=None):
     assert_snapshot_preserved(
         before,
         after,
-        ignored_paths={"shared_prefs/logdate_secure_storage.xml"} if verify_after_backup is not None else (),
+        # SQLCipher may checkpoint the live WAL while the agent selects an encrypted database
+        # snapshot. The post-backup probe verifies the source journal and original media logically.
+        ignored_paths={"shared_prefs/logdate_secure_storage.xml", "databases/logdate"}
+        if verify_after_backup is not None else (),
     )
     return backup, before
 
@@ -473,11 +477,30 @@ def rewrite_native_full_backup(payload, transform):
     return payload[:item.offset] + bytes(header) + filtered_full_backup + padding + payload[old_payload_end:]
 
 
+def selected_database_snapshot(payload):
+    """Hash the journal file selected by the backup agent, not the live WAL database."""
+    full_backup_name = f"1/_full/{PACKAGE}"
+    selected_database = f"apps/{PACKAGE}/f/native_journal_transfer/current/database/logdate"
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as transport:
+        full_backup_item = next((item for item in transport.getmembers() if item.name == full_backup_name and item.isfile()), None)
+        full_backup = transport.extractfile(full_backup_item) if full_backup_item else None
+        if full_backup is None:
+            raise RuntimeError("native transport did not contain the LogDate full backup")
+        with tarfile.open(fileobj=io.BytesIO(full_backup.read()), mode="r:") as app_backup:
+            database_item = next((item for item in app_backup.getmembers() if item.name == selected_database and item.isfile()), None)
+            database = app_backup.extractfile(database_item) if database_item else None
+            if database is None:
+                raise RuntimeError("native transport did not contain the selected journal database")
+            contents = database.read()
+    return {"bytes": len(contents), "sha256": hashlib.sha256(contents).hexdigest()}
+
+
 def credentials_only_from_full_backup(payload):
-    """Keep recovery keys and canonical owner while excluding all journal/media content."""
+    """Model a partial delivery of portable credentials without journal content."""
     app_prefix = f"apps/{PACKAGE}"
     prefix = app_prefix + "/f/"
     database_key = prefix + "db_recovery/passphrase_backup"
+    selected_key = prefix + "native_journal_transfer/current/files/db_recovery/passphrase_backup"
     owner_preferences = prefix + "logdate.preferences_pb"
     manifest = app_prefix + "/_manifest"
     identity_keys = {
@@ -485,36 +508,57 @@ def credentials_only_from_full_backup(payload):
         prefix + "identity_recovery/account_key_backup",
         prefix + "identity_recovery/media_key_backup",
     }
-    allowed = {database_key, owner_preferences, *identity_keys}
-    found = set()
-    manifest_found = False
-    replacements = {}
+    retained = {manifest, owner_preferences, *identity_keys}
+    retained_directories = {
+        app_prefix + "/f",
+        prefix + "db_recovery",
+        prefix + "identity_recovery",
+    }
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:") as source:
-        for item in source.getmembers():
-            if item.name == manifest:
-                manifest_found = True
-                continue
-            if item.isdir() and item.name.startswith(app_prefix + "/"):
-                continue
-            if item.name in allowed:
-                found.add(item.name)
-                if item.name == owner_preferences:
-                    preferences = source.extractfile(item)
-                    if preferences is None:
-                        raise RuntimeError("credentials-only fixture is missing owner preferences")
-                    replacements[item.name] = canonical_preferences(
-                        preferences.read(),
-                        allowed_names={"identity.canonical_owner_id", "identity.canonical_owner_bound"},
-                    )
-    has_identity_key = bool(found.intersection(identity_keys - {prefix + "identity_recovery/media_key_backup"}))
-    required = {database_key, prefix + "identity_recovery/media_key_backup"}
-    if not manifest_found:
-        raise RuntimeError("credentials-only fixture is missing Android's app backup manifest")
-    if not required.issubset(found) or not has_identity_key or owner_preferences not in replacements:
-        raise RuntimeError("credentials-only fixture is missing required portable recovery keys")
-    if not replacements[owner_preferences]:
-        raise RuntimeError("credentials-only fixture is missing the canonical journal owner")
-    return rewrite_app_backup(payload, allowed | {manifest}, replacements)
+        members = source.getmembers()
+        files = {item.name: item for item in members if item.isfile()}
+        if manifest not in files:
+            raise RuntimeError("credentials-only fixture is missing Android's app backup manifest")
+        has_identity_key = any(path in files for path in identity_keys - {prefix + "identity_recovery/media_key_backup"})
+        if selected_key not in files or prefix + "identity_recovery/media_key_backup" not in files or not has_identity_key:
+            raise RuntimeError("credentials-only fixture is missing required portable recovery keys")
+        preferences_item = files.get(owner_preferences)
+        preferences = source.extractfile(preferences_item) if preferences_item else None
+        if preferences is None:
+            raise RuntimeError("credentials-only fixture is missing required portable recovery keys")
+        owner = canonical_preferences(
+            preferences.read(),
+            allowed_names={"identity.canonical_owner_id", "identity.canonical_owner_bound"},
+        )
+        if not owner:
+            raise RuntimeError("credentials-only fixture is missing the canonical journal owner")
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode="w:", format=tarfile.USTAR_FORMAT) as filtered:
+            emitted_directories = set()
+            for item in members:
+                if item.isdir() and item.name.rstrip("/") in retained_directories and item.name.rstrip("/") not in emitted_directories:
+                    filtered.addfile(copy.copy(item))
+                    emitted_directories.add(item.name.rstrip("/"))
+                elif item.name == selected_key:
+                    if prefix + "db_recovery" not in emitted_directories:
+                        directory = tarfile.TarInfo(prefix + "db_recovery/")
+                        directory.type = tarfile.DIRTYPE
+                        directory.mode = 0o700
+                        filtered.addfile(directory)
+                        emitted_directories.add(prefix + "db_recovery")
+                    renamed = copy.copy(item)
+                    renamed.name = database_key
+                    renamed.pax_headers = {}
+                    filtered.addfile(renamed, source.extractfile(item))
+                elif item.name in retained:
+                    retained_item = copy.copy(item)
+                    retained_item.pax_headers = {}
+                    if item.name == owner_preferences:
+                        retained_item.size = len(owner)
+                        filtered.addfile(retained_item, io.BytesIO(owner))
+                    else:
+                        filtered.addfile(retained_item, source.extractfile(item))
+    return output.getvalue()
 
 
 def rewrite_app_backup(payload, allowed_paths, replacements=None):
@@ -551,7 +595,7 @@ def without_portable_recovery_keys_from_full_backup(payload):
     """Remove only this app's portable keys from Android's full-backup tar."""
     found_database_key = False
     found_identity_key = False
-    database_key = f"apps/{PACKAGE}/f/db_recovery/passphrase_backup"
+    database_key = f"apps/{PACKAGE}/f/native_journal_transfer/current/files/db_recovery/passphrase_backup"
     identity_keys = {
         f"apps/{PACKAGE}/f/identity_recovery/phrase_backup",
         f"apps/{PACKAGE}/f/identity_recovery/account_key_backup",
@@ -1143,6 +1187,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         )
     payload = adb(source, "exec-out", "tar", "-C", TRANSPORT_FILES, "-cf", "-", "1")
     original_payload = payload
+    selected_source_files = {**source_files, "databases/logdate": selected_database_snapshot(original_payload)}
     missing_media_path = None
     if exercise_missing_keys:
         payload = without_portable_recovery_keys(payload)
@@ -1187,7 +1232,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     restored_files = package_file_snapshot(destination)
     private_file(output / "source-files-before-backup.json", json.dumps(source_files, indent=2).encode())
     private_file(output / "destination-files-after-restore.json", json.dumps(restored_files, indent=2).encode())
-    verify_restored_snapshot(restored_files, source_files, credentials_only=exercise_credentials_only)
+    verify_restored_snapshot(restored_files, selected_source_files, credentials_only=exercise_credentials_only)
     print("Launching the restored app through its normal startup path", flush=True)
     launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
     private_file(output / "destination-first-launch.log", launch)
@@ -1212,7 +1257,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         private_file(output / "native-restore-complete.log", repaired)
         if b"restoreFinished: 0" not in repaired:
             raise RuntimeError("Android did not finish delivering the original privacy policy")
-        verify_restored_snapshot(package_file_snapshot(destination), source_files, credentials_only=False)
+        verify_restored_snapshot(package_file_snapshot(destination), selected_source_files, credentials_only=False)
         privacy_probe(destination, "resolved", output / "destination-privacy-resolved.log")
         print("Original native preferences restored journal access without replacing its key", flush=True)
         return
