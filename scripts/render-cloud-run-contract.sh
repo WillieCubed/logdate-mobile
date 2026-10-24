@@ -623,9 +623,14 @@ try:
         "LOGDATE_PERSONAL_SPACE_OLD_DATA_PURGE_ENABLED",
         "ATPROTO_PLC_PUBLISH_ENABLED",
         "ATPROTO_RECOVERY_KEYS_ENABLED",
+        "ATPROTO_FIREHOSE_ENABLED",
         "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED",
     }
-    allowed_env_keys = required_env_keys | optional_flag_keys
+    # Optional settings that carry a value rather than a switch.
+    optional_value_keys = {
+        "ATPROTO_RELAY_HOSTS",
+    }
+    allowed_env_keys = required_env_keys | optional_flag_keys | optional_value_keys
     unexpected_env = set(env_vars) - allowed_env_keys
     if unexpected_env:
         fail("environment contract contains unexpected keys")
@@ -637,6 +642,23 @@ try:
     # (docs/runbook/identity-publishing.md).
     if environment != "production" and env_vars.get("ATPROTO_PLC_PUBLISH_ENABLED") == "true":
         fail("only production may publish identities to the PLC directory")
+    # Relays are asked to follow the server's public repositories. Staging accounts are test accounts, so
+    # only production names relays, and only while the event stream that relays follow is switched on.
+    if "ATPROTO_RELAY_HOSTS" in env_vars:
+        relay_hosts = env_vars["ATPROTO_RELAY_HOSTS"]
+        if not isinstance(relay_hosts, str):
+            fail("ATPROTO_RELAY_HOSTS must be a comma-separated list of hostnames")
+        if environment != "production":
+            fail("only production may ask relays to crawl the server")
+        if env_vars.get("ATPROTO_FIREHOSE_ENABLED") != "true":
+            fail("ATPROTO_RELAY_HOSTS needs ATPROTO_FIREHOSE_ENABLED to be true")
+        relay_label = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+        relay_pattern = rf"{relay_label}(?:\.{relay_label})+"
+        listed_relays = relay_hosts.split(",")
+        if relay_hosts == "" or len(listed_relays) != len(set(listed_relays)) or any(
+            len(relay) > 253 or not re.fullmatch(relay_pattern, relay) for relay in listed_relays
+        ):
+            fail("ATPROTO_RELAY_HOSTS must be a comma-separated list of distinct lowercase hostnames without spaces, schemes or paths")
     for key in sorted(required_env_keys):
         if key not in env_vars:
             fail(f"required environment variable {key} is missing")

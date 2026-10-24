@@ -1252,6 +1252,46 @@ jq '.env_vars.LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED = "yes"' \
     "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-passkey-oauth.json"
 expect_failure invalid-passkey-oauth staging "$RELEASE_SHA" invalid-passkey-oauth.json \
     "LOGDATE_OAUTH_PASSKEY_SIGN_IN_ENABLED must be true or false"
+# The public repository event stream is an opt-in for every environment, preserved verbatim.
+for environment in staging production; do
+    for enabled in true false; do
+        jq --arg enabled "$enabled" '.env_vars.ATPROTO_FIREHOSE_ENABLED = $enabled' \
+            "$FIXTURE_DIR/$environment-source.json" >"$FIXTURE_DIR/firehose-$environment-$enabled.json"
+        output="$TMP_DIR/firehose-$environment-$enabled.out.json"
+        if ! run_renderer "$environment" "$RELEASE_SHA" "firehose-$environment-$enabled.json" "$output" "$LOG_DIR/firehose-$environment-$enabled.err"; then
+            cat "$LOG_DIR/firehose-$environment-$enabled.err" >&2
+            fail "event stream opt-in could not be rendered for $environment"
+        fi
+        assert_equals "$enabled" "$(jq -r '.env_vars.ATPROTO_FIREHOSE_ENABLED' "$output")"
+    done
+done
+jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "yes"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-firehose.json"
+expect_failure invalid-firehose staging "$RELEASE_SHA" invalid-firehose.json \
+    "ATPROTO_FIREHOSE_ENABLED must be true or false"
+# Relays are named only in production, only with the stream on, and only as plain hostnames.
+jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "true" | .env_vars.ATPROTO_RELAY_HOSTS = "relay1.example.com,relay2.example.net"' \
+    "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/relay-hosts.json"
+output="$TMP_DIR/relay-hosts.out.json"
+if ! run_renderer production "$RELEASE_SHA" "relay-hosts.json" "$output" "$LOG_DIR/relay-hosts.err"; then
+    cat "$LOG_DIR/relay-hosts.err" >&2
+    fail "relay hosts could not be rendered for production"
+fi
+assert_equals "relay1.example.com,relay2.example.net" "$(jq -r '.env_vars.ATPROTO_RELAY_HOSTS' "$output")"
+jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "true" | .env_vars.ATPROTO_RELAY_HOSTS = "relay.example.com"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/staging-relay-hosts.json"
+expect_failure staging-relay-hosts staging "$RELEASE_SHA" staging-relay-hosts.json \
+    "only production may ask relays to crawl the server"
+jq '.env_vars.ATPROTO_FIREHOSE_ENABLED = "false" | .env_vars.ATPROTO_RELAY_HOSTS = "relay.example.com"' \
+    "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/relay-hosts-stream-off.json"
+expect_failure relay-hosts-stream-off production "$RELEASE_SHA" relay-hosts-stream-off.json \
+    "ATPROTO_RELAY_HOSTS needs ATPROTO_FIREHOSE_ENABLED to be true"
+for invalid in "" "https://relay.example.com" "relay.example.com/path" "relay.example.com, relay2.example.com" "Relay.Example.com" "relay" "relay.example.com,relay.example.com" "relay.example.com:443"; do
+    jq --arg hosts "$invalid" '.env_vars.ATPROTO_FIREHOSE_ENABLED = "true" | .env_vars.ATPROTO_RELAY_HOSTS = $hosts' \
+        "$FIXTURE_DIR/production-source.json" >"$FIXTURE_DIR/invalid-relay-hosts.json"
+    expect_failure invalid-relay-hosts production "$RELEASE_SHA" invalid-relay-hosts.json \
+        "ATPROTO_RELAY_HOSTS must be a comma-separated list of distinct lowercase hostnames"
+done
 # Moving existing journals into personal spaces is an opt-in for every environment, preserved verbatim.
 for environment in staging production; do
     for enabled in true false; do
