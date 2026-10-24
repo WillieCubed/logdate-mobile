@@ -1,0 +1,350 @@
+package app.logdate.client.data.restore
+
+import android.content.Context
+import app.logdate.client.datastore.createAndroidMainDataStore
+import app.logdate.client.device.restore.NATIVE_JOURNAL_TRANSFER_PREFIX
+import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
+import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
+import app.logdate.client.device.restore.NativeIncomingJournal
+import app.logdate.client.device.restore.NativeJournalMediaInventory
+import app.logdate.client.device.restore.NativeJournalReplayCustody
+import app.logdate.client.device.restore.NativeJournalSourceReceipt
+import app.logdate.client.device.restore.verifyNativeJournalMediaInventory
+import app.logdate.client.device.restore.verifyNativeJournalSourceReceipt
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
+
+/** Retains exact source scope and auxiliary hashes after a staged database cohort is merged. */
+class NativeJournalStagedSourceIndex(
+    private val context: Context,
+) {
+    data class Record(
+        val receipt: NativeJournalSourceReceipt,
+        val mediaInventory: NativeJournalMediaInventory?,
+        val pathSha256: Map<String, String>,
+        val stagedAuxiliaryPhysicalPaths: Map<String, Set<String>>,
+        val sourceCorePhysicalPaths: Map<String, Set<String>>,
+    )
+
+    @Serializable
+    private data class Metadata(
+        val receiptSha256: String,
+        val pathSha256: Map<String, String>,
+        val stagedAuxiliaryPhysicalPaths: Map<String, Set<String>> = emptyMap(),
+        val sourceCorePhysicalPaths: Map<String, Set<String>> = emptyMap(),
+    )
+
+    private val root = File(context.noBackupFilesDir, "native-journal-staged-sources")
+
+    /** The worker may retain an unstaged custody source; only auxiliaries in its receipt cohort are associated. */
+    fun remember(files: Map<String, File>) {
+        val payloads = NativeJournalReplayCustody(context).sealedPayloads()
+        val receiptPayload =
+            payloads.single {
+                it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + NATIVE_SOURCE_RECEIPT_PATH &&
+                    it.file.canonicalFile == files.getValue(NATIVE_SOURCE_RECEIPT_PATH).canonicalFile
+            }
+        val receiptCohort = cohortId(receiptPayload.file)
+        var missingCore = false
+        val selected =
+            files
+                .mapNotNull { (path, file) ->
+                    val expected = nativeSnapshotChecksum(file)
+                    val matching =
+                        payloads.singleOrNull {
+                            it.complete &&
+                                it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
+                                cohortId(it.file) == receiptCohort &&
+                                nativeSnapshotChecksum(it.file) == expected
+                        }
+                    if (path !in AUXILIARY_PATHS && matching == null) missingCore = true
+                    matching?.let { path to it.file }
+                }.toMap()
+        if (missingCore) {
+            check(hasRemembered(nativeSnapshotChecksum(receiptPayload.file))) { "Source callback is outside its receipt cohort" }
+            return
+        }
+        remember(selected, selected.mapValues { receiptCohort })
+    }
+
+    fun remember(
+        files: Map<String, File>,
+        cohortIds: Map<String, String>,
+    ) {
+        check(files.keys == cohortIds.keys)
+        val receiptFile = files.getValue(NATIVE_SOURCE_RECEIPT_PATH)
+        val receipt =
+            verifyNativeJournalSourceReceipt(
+                receiptFile,
+                files.getValue("files/logdate.preferences_pb"),
+                files.filterKeys { it.startsWith("database/") },
+            )
+        receipt.mediaInventorySha256?.let { expected ->
+            files[NATIVE_MEDIA_INVENTORY_PATH]?.let { verifyNativeJournalMediaInventory(it, expected) }
+        }
+        val hashes = files.mapValues { nativeSnapshotChecksum(it.value) }
+        val custody = NativeJournalReplayCustody(context)
+        val physicalPaths =
+            files.keys.associateWith { path ->
+                setOf(
+                    custody
+                        .sealedPayloadsInCohort(cohortIds.getValue(path))
+                        .single { payload ->
+                            payload.complete &&
+                                payload.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
+                                nativeSnapshotChecksum(payload.file) == hashes.getValue(path)
+                        }.file.canonicalPath,
+                )
+            }
+        val metadata =
+            Metadata(
+                nativeSnapshotChecksum(receiptFile),
+                hashes,
+                physicalPaths.filterKeys { it in AUXILIARY_PATHS },
+                physicalPaths.filterKeys { it !in AUXILIARY_PATHS },
+            )
+        val destination = File(root, metadata.receiptSha256)
+        if (destination.exists()) {
+            val existingRecord = read(destination)
+            val existing = existingRecord.pathSha256
+            check(existing.filterKeys { it !in AUXILIARY_PATHS } == metadata.pathSha256.filterKeys { it !in AUXILIARY_PATHS })
+            val compatibleAuxiliary =
+                metadata.pathSha256.filter { (path, hash) -> path in AUXILIARY_PATHS && (existing[path] == null || existing[path] == hash) }
+            val combined =
+                (existingRecord.stagedAuxiliaryPhysicalPaths.keys + compatibleAuxiliary.keys).associateWith { path ->
+                    val paths =
+                        existingRecord.stagedAuxiliaryPhysicalPaths[path]
+                            .orEmpty()
+                            .filter { File(it).exists() }
+                            .toSet() +
+                            metadata.stagedAuxiliaryPhysicalPaths[path]
+                                .orEmpty()
+                                .takeIf { path in compatibleAuxiliary }
+                                .orEmpty()
+                    check(paths.size <= 16)
+                    paths
+                }
+            val combinedCore =
+                (existingRecord.sourceCorePhysicalPaths.keys + metadata.sourceCorePhysicalPaths.keys).associateWith { path ->
+                    val paths =
+                        existingRecord.sourceCorePhysicalPaths[path]
+                            .orEmpty()
+                            .filter { File(it).exists() }
+                            .toSet() +
+                            metadata.sourceCorePhysicalPaths[path].orEmpty()
+                    check(paths.size <= 16)
+                    paths
+                }
+            val updated = Metadata(metadata.receiptSha256, existing + compatibleAuxiliary, combined, combinedCore)
+            existing[NATIVE_MEDIA_INVENTORY_PATH]?.let { check(it == receipt.mediaInventorySha256) }
+            val temporary = File(destination, ".metadata.part")
+            write(temporary, Json.encodeToString(Metadata.serializer(), updated))
+            Files.move(
+                temporary.toPath(),
+                File(destination, "metadata.json").toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+            sync(destination)
+            files[NATIVE_MEDIA_INVENTORY_PATH]?.let { retainMediaInventory(metadata.receiptSha256, it) }
+            return
+        }
+        check(root.mkdirs() || root.isDirectory)
+        val temporary = Files.createTempDirectory(root.toPath(), ".staged-").toFile()
+        try {
+            copy(receiptFile, File(temporary, "receipt.json"))
+            files[NATIVE_MEDIA_INVENTORY_PATH]?.let { copy(it, File(temporary, "media-inventory.json")) }
+            check(nativeSnapshotChecksum(File(temporary, "receipt.json")) == metadata.receiptSha256)
+            receipt.mediaInventorySha256?.let { expected ->
+                File(temporary, "media-inventory.json").takeIf(File::exists)?.let { verifyNativeJournalMediaInventory(it, expected) }
+            }
+            write(File(temporary, "metadata.json"), Json.encodeToString(Metadata.serializer(), metadata))
+            sync(temporary)
+            Files.move(temporary.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            sync(root)
+        } finally {
+            if (temporary.exists()) check(temporary.deleteRecursively())
+        }
+    }
+
+    /** This marker is written only after durable database merge coverage is proven. */
+    fun admitAfterMerged(receiptSha256: String) {
+        val directory = directory(receiptSha256)
+        read(directory)
+        val marker = File(directory, "admitted")
+        if (!marker.exists()) {
+            val temporary = File(directory, ".admitted.part")
+            write(temporary, receiptSha256)
+            Files.move(temporary.toPath(), marker.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            sync(directory)
+        }
+        check(marker.readText() == receiptSha256)
+    }
+
+    fun admittedSources(): Map<String, Record> =
+        root
+            .listFiles()
+            .orEmpty()
+            .filter { it.isDirectory && it.name.matches(SHA256) && File(it, "admitted").exists() }
+            .associate { directory ->
+                check(File(directory, "admitted").readText() == directory.name)
+                directory.name to read(directory)
+            }
+
+    fun admittedMediaInventories(): List<NativeJournalMediaInventory> = admittedSources().values.mapNotNull(Record::mediaInventory)
+
+    /** A Backup settings retry is local only when the retained callback and current account scope still agree. */
+    fun isRecoverableAuxiliary(payload: NativeIncomingJournal.Payload): Boolean =
+        runCatching {
+            runBlocking {
+                val preferences = createAndroidMainDataStore(context).data.first()
+                val current = RetainedJournalSourceScope.from(preferences) ?: return@runBlocking false
+                admittedSources().any { (receipt, record) ->
+                    val source =
+                        normalizeBackendOrigin(record.receipt.backendOrigin)?.let { origin ->
+                            RetainedJournalSourceScope(
+                                record.receipt.canonicalOwnerId,
+                                record.receipt.canonicalOwnerBound == "true",
+                                origin,
+                            )
+                        }
+                    source?.matchesCurrent(current) == true && verifiedAuxiliary(receipt, listOf(payload)).isNotEmpty()
+                }
+            }
+        }.getOrDefault(false)
+
+    fun hasRemembered(receiptSha256: String): Boolean =
+        directory(receiptSha256).takeIf(File::exists)?.let {
+            read(it)
+            true
+        } == true
+
+    /** A v3 inventory may arrive in a later framework callback than its core journal. */
+    fun retainMediaInventory(
+        receiptSha256: String,
+        file: File,
+    ) {
+        val directory = directory(receiptSha256)
+        val expected = checkNotNull(read(directory).receipt.mediaInventorySha256)
+        verifyNativeJournalMediaInventory(file, expected)
+        val destination = File(directory, "media-inventory.json")
+        if (destination.exists()) {
+            verifyNativeJournalMediaInventory(destination, expected)
+            return
+        }
+        val temporary = File(directory, ".media-inventory.part")
+        copy(file, temporary)
+        verifyNativeJournalMediaInventory(temporary, expected)
+        Files.move(temporary.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        sync(directory)
+    }
+
+    /** A caller still proves source-session scope and durable use before retiring these exact callbacks. */
+    fun verifiedAuxiliary(
+        receiptSha256: String,
+        payloads: Iterable<NativeIncomingJournal.Payload>,
+    ): Map<String, File> {
+        val admitted = admittedSources()[receiptSha256] ?: return emptyMap()
+        val hashes = admitted.pathSha256
+        return payloads
+            .filter { payload ->
+                payload.complete &&
+                    (payload.path.startsWith(NATIVE_JOURNAL_TRANSFER_PREFIX) || payload.path in RAW_AUXILIARY_PATHS) &&
+                    payload.path.removePrefix(NATIVE_JOURNAL_TRANSFER_PREFIX) in AUXILIARY_PATHS
+            }.mapNotNull { payload ->
+                val path = payload.path.removePrefix(NATIVE_JOURNAL_TRANSFER_PREFIX)
+                val expected =
+                    if (path == NATIVE_MEDIA_INVENTORY_PATH) admitted.receipt.mediaInventorySha256 else hashes[path]
+                val bound =
+                    if (path == NATIVE_MEDIA_INVENTORY_PATH && path !in admitted.stagedAuxiliaryPhysicalPaths) {
+                        admitted.mediaInventory != null
+                    } else {
+                        payload.file.canonicalPath in admitted.stagedAuxiliaryPhysicalPaths[path].orEmpty()
+                    }
+                if (bound && expected == nativeSnapshotChecksum(payload.file)) payload.file.canonicalPath to payload.file else null
+            }.toMap()
+    }
+
+    private fun read(directory: File): Record {
+        check(directory.name.matches(SHA256) && Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS))
+        val metadataFile = File(directory, "metadata.json")
+        check(metadataFile.length() in 1..16_384)
+        val metadata = Json.decodeFromString<Metadata>(metadataFile.readText())
+        check(metadata.receiptSha256 == directory.name && metadata.pathSha256.values.all { it.matches(SHA256) })
+        val receiptFile = File(directory, "receipt.json")
+        check(nativeSnapshotChecksum(receiptFile) == directory.name)
+        check(metadata.pathSha256[NATIVE_SOURCE_RECEIPT_PATH] == directory.name)
+        check(receiptFile.length() in 1..8192)
+        val receipt = Json.decodeFromString<NativeJournalSourceReceipt>(receiptFile.readText())
+        val mediaInventory =
+            receipt.mediaInventorySha256?.let { hash ->
+                check(metadata.pathSha256[NATIVE_MEDIA_INVENTORY_PATH] == null || metadata.pathSha256[NATIVE_MEDIA_INVENTORY_PATH] == hash)
+                File(directory, "media-inventory.json").takeIf(File::exists)?.let { verifyNativeJournalMediaInventory(it, hash) }
+            }
+        if (receipt.mediaInventorySha256 == null) check(!File(directory, "media-inventory.json").exists())
+        return Record(receipt, mediaInventory, metadata.pathSha256, metadata.stagedAuxiliaryPhysicalPaths, metadata.sourceCorePhysicalPaths)
+    }
+
+    private fun directory(receiptSha256: String): File {
+        check(receiptSha256.matches(SHA256))
+        return File(root, receiptSha256)
+    }
+
+    private fun cohortId(file: File): String =
+        checkNotNull(file.parentFile?.parentFile?.parentFile)
+            .name
+            .also {
+                check(
+                    kotlin.uuid.Uuid
+                        .parse(it)
+                        .toString() == it,
+                )
+            }
+
+    private fun copy(
+        source: File,
+        destination: File,
+    ) {
+        check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS))
+        source.inputStream().use { input ->
+            FileOutputStream(destination).use { output ->
+                input.copyTo(output)
+                output.fd.sync()
+            }
+        }
+    }
+
+    private fun write(
+        destination: File,
+        value: String,
+    ) {
+        FileOutputStream(destination).use {
+            it.write(value.encodeToByteArray())
+            it.fd.sync()
+        }
+    }
+
+    private fun sync(directory: File) = FileChannel.open(directory.toPath(), StandardOpenOption.READ).use { it.force(true) }
+
+    private companion object {
+        val SHA256 = Regex("[a-f0-9]{64}")
+        val AUXILIARY_PATHS =
+            setOf(
+                "files/db_recovery/passphrase_backup",
+                "files/db_recovery/working_passphrase_backup",
+                NATIVE_MEDIA_INVENTORY_PATH,
+                "sender_owner",
+            )
+        val RAW_AUXILIARY_PATHS =
+            setOf("files/db_recovery/passphrase_backup", "files/db_recovery/working_passphrase_backup", NATIVE_MEDIA_INVENTORY_PATH)
+    }
+}

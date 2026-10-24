@@ -44,7 +44,7 @@ def retain_terminal_results(process, results, output, started_ns):
 
 def acceptance_receipt(mode, native_arguments, followups):
     return {"managedDeviceLifecycleAccepted": True, "outerDrivers": 2, "mode": mode,
-            "managedNativeTransport": mode not in {"work-restart", "network-policy"},
+            "managedNativeTransport": mode not in {"work-restart", "network-policy", "late-media"},
             "crossDeviceTransferAccepted": mode in {"transfer", "publication", "enrollment", "upgrade", "widget"},
             "nativeArguments": native_arguments, "followups": followups,
             "googleRestoreProviderAccepted": False}
@@ -74,12 +74,13 @@ def followup_command(name, destination, app, probe, output):
 
 def scenario_command(mode, source, destination, app, probe, output, arguments, *, classpath=None, fixture_environment=None):
     validate_native_arguments(arguments)
-    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget"} or (mode != "transfer" and arguments):
+    if mode not in {"transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget", "late-media"} or (mode != "transfer" and arguments):
         raise ValueError("Only transfer mode accepts native scenario arguments")
     filenames = {"transfer": "native-backup-acceptance.py", "publication": "native-publication-acceptance.py",
                  "work-restart": "native-restore-work-restart-acceptance.py", "d2d": "native-d2d-acceptance.py",
                  "enrollment": "native-device-enrollment-acceptance.py", "upgrade": "native-released-upgrade-acceptance.py",
-                 "network-policy": "native-missing-media-acceptance.py", "widget": "native-widget-transfer-acceptance.py"}
+                 "network-policy": "native-missing-media-acceptance.py", "widget": "native-widget-transfer-acceptance.py",
+                 "late-media": "native-late-media-acceptance.py"}
     command = [sys.executable, str(ROOT / "tests/e2e" / filenames[mode])]
     if mode in {"work-restart", "d2d", "network-policy"}:
         command += ["--emulator", source]
@@ -449,7 +450,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--sdk", type=Path, default=Path(os.environ.get("ANDROID_HOME", str(Path.home() / "Library/Android/sdk"))))
     parser.add_argument("--after-transfer", action="append", choices=sorted(FOLLOWUPS), default=[])
-    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget"), default="transfer")
+    parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget", "late-media"), default="transfer")
     parser.add_argument("--classpath", type=Path)
     parser.add_argument("--fixture-environment", type=Path)
     options, native_arguments = parser.parse_known_args()

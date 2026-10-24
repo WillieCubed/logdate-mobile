@@ -88,6 +88,14 @@ Play image and the guide's single-device transport simulation. `--mode enrollmen
 requires `--classpath` and a private `--fixture-environment` for the isolated server.
 Neither mode establishes Google credential delivery or setup-wizard acceptance.
 
+`--mode late-media` uses the same owned managed pair for a focused completed-transfer
+callback test. On the destination, the seed probe leaves an original image in replay
+custody without a database source. The controller stops the app, then the verify probe
+starts a new process, waits for the persisted reconciliation job, decodes the recovered
+image offline, and checks a second pass leaves the note unchanged. Both selected probes
+must report one passed test; an assumption skip or a fresh device between phases fails
+acceptance. This synthetic callback test does not claim a Google transport or setup flow.
+
 The `contracts` follow-up keeps the retained-key failure, two-process key persistence,
 entry editing, journal lock, and legacy callback checks on a populated restored app.
 CI runs independent scenarios on fresh managed generations and retains the existing

@@ -41,13 +41,16 @@
         <include domain="file" path="db_recovery/"/>
         <include domain="file" path="identity_recovery/"/>
         <include domain="file" path="retained_journals/"/>
+        <include domain="file" path="native_journal_transfer/current/"/>
         <include domain="file" path="archive_recovery/sources/"/>
         <include domain="file" path="media/"/>
         <include domain="file" path="user_media/"/>
         <include domain="file" path="audio_notes/"/>
-        <include domain="database" path="logdate"/>
-        <include domain="database" path="logdate-wal"/>
-        <include domain="database" path="logdate-shm"/>
+        <exclude domain="database" path="logdate"/>
+        <exclude domain="database" path="logdate-wal"/>
+        <exclude domain="database" path="logdate-shm"/>
+        <exclude domain="file" path="db_recovery/passphrase_backup"/>
+        <exclude domain="file" path="db_recovery/working_passphrase_backup"/>
         <exclude domain="file" path="media/staging/"/>
         <exclude domain="file" path="audio_notes/staging/"/>
         <exclude domain="file" path="db_recovery/passphrase_backup.part"/>

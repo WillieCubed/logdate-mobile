@@ -104,7 +104,7 @@ class DataSettingsViewModel(
     private val configRepository: LogDateConfigRepository,
     private val dataIntegrityService: DataIntegrityService,
     private val cloudArchiveStatusSource: CloudArchiveStatusSource = UnavailableCloudArchiveStatusSource,
-    nativeBackupStatusSource: NativeBackupStatusSource = UnsupportedNativeBackupStatusSource,
+    private val nativeBackupStatusSource: NativeBackupStatusSource = UnsupportedNativeBackupStatusSource,
 ) : ViewModel() {
     val nativeBackupStatus: StateFlow<NativeBackupStatus> =
         nativeBackupStatusSource.observe().stateIn(
@@ -112,6 +112,9 @@ class DataSettingsViewModel(
             SharingStarted.WhileSubscribed(5_000),
             NativeBackupStatus.Unsupported,
         )
+
+    fun retryNativeRecovery() = nativeBackupStatusSource.retryRecovery()
+
     private val _integrityState = MutableStateFlow(IntegrityState())
     val integrityState: StateFlow<IntegrityState> = _integrityState.asStateFlow()
 

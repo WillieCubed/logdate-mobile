@@ -60,6 +60,7 @@ fun DataSettingsContent(
     syncStatus: app.logdate.client.sync.SyncStatus? = null,
     cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
     nativeBackupStatus: NativeBackupStatus = NativeBackupStatus.Unsupported,
+    onRetryNativeRecovery: () -> Unit = {},
     isAuthenticated: Boolean = false,
     onSyncNow: () -> Unit = {},
     onSyncUsingMobileData: () -> Unit = {},
@@ -128,7 +129,12 @@ fun DataSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                NativeBackupSettingsSection(nativeBackupStatus, Modifier.padding(horizontal = Spacing.lg))
+                NativeBackupSettingsSection(
+                    nativeBackupStatus,
+                    Modifier.padding(horizontal = Spacing.lg),
+                    onRetryRecovery = onRetryNativeRecovery,
+                    onOpenArchive = onShowRestoreSheet,
+                )
                 SyncSettingsSection(
                     syncStatus = syncStatus,
                     cloudArchiveStatus = cloudArchiveStatus,
@@ -167,7 +173,12 @@ fun DataSettingsContent(
 
                 if (nativeBackupStatus is NativeBackupStatus.Available) {
                     item {
-                        NativeBackupSettingsSection(nativeBackupStatus, Modifier.padding(horizontal = Spacing.lg))
+                        NativeBackupSettingsSection(
+                            nativeBackupStatus,
+                            Modifier.padding(horizontal = Spacing.lg),
+                            onRetryRecovery = onRetryNativeRecovery,
+                            onOpenArchive = onShowRestoreSheet,
+                        )
                     }
                 }
                 item {

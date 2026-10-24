@@ -2,6 +2,7 @@ package app.logdate.feature.core.di
 
 import android.app.Activity
 import app.logdate.client.data.account.RestoreCredentialCleanupScheduler
+import app.logdate.client.data.restore.NativeJournalStagedSourceIndex
 import app.logdate.client.device.crypto.AndroidDeviceTransferSealer
 import app.logdate.client.device.crypto.DeviceTransferSealer
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -241,7 +242,18 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
-                nativeBackupStatusSource = AndroidNativeBackupStatusSource(androidContext()),
+                nativeBackupStatusSource =
+                    AndroidNativeBackupStatusSource(
+                        androidContext(),
+                        retryRecoveryAction = {
+                            app.logdate.client.data.restore
+                                .scheduleRetainedJournalReconciliation(androidContext())
+                        },
+                        stagedMediaInventories = { NativeJournalStagedSourceIndex(androidContext()).admittedMediaInventories() },
+                        isRecoverableStagedAuxiliary = { payload ->
+                            NativeJournalStagedSourceIndex(androidContext()).isRecoverableAuxiliary(payload)
+                        },
+                    ),
             )
         }
         viewModel { UserDataExportViewModel(get(), get()) }

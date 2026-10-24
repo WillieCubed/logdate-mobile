@@ -15,6 +15,7 @@ import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import app.logdate.client.device.restore.NativeBackupQuotaFailure
 import app.logdate.client.device.restore.NativeBackupStatus
+import app.logdate.client.device.restore.NativeRestoreCustodyStatus
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,7 +59,8 @@ class NativeBackupSettingsTest {
                             quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 B", formattedUsed = "0 B"),
                             isQuotaAvailable = false,
                             snackbarHostState = SnackbarHostState(),
-                            nativeBackupStatus = NativeBackupStatus.Available(NativeBackupQuotaFailure(30_000_000, 25_000_000)),
+                            nativeBackupStatus =
+                                NativeBackupStatus.Available(NativeBackupQuotaFailure(30_000_000, 25_000_000)),
                             onExportArchive = { exports++ },
                         )
                     }
@@ -122,13 +124,17 @@ class NativeBackupSettingsTest {
                         quotaUsage = StorageQuotaUi(100, 0, 0f, formattedTotal = "100 B", formattedUsed = "0 B"),
                         isQuotaAvailable = false,
                         snackbarHostState = SnackbarHostState(),
-                        nativeBackupStatus = NativeBackupStatus.Available(NativeBackupQuotaFailure(30_000_000, 25_000_000)),
+                        nativeBackupStatus =
+                            NativeBackupStatus.Available(NativeBackupQuotaFailure(30_000_000, 25_000_000)),
                         onExportArchive = { exports++ },
                     )
                 }
             }
             onNodeWithText("Android backup").assertExists()
-            onNodeWithText("An Android backup exceeded its size limit. Export an archive to save a copy.", substring = true).assertExists()
+            onNodeWithText(
+                "An Android backup exceeded its size limit. Export an archive to save a copy.",
+                substring = true,
+            ).assertExists()
             onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Export archive"))
             onNodeWithText("Export archive").performClick()
             assertEquals(1, exports)
@@ -142,5 +148,38 @@ class NativeBackupSettingsTest {
         runDesktopComposeUiTest {
             setContent { NativeBackupSettingsSection(NativeBackupStatus.Unsupported) }
             onNodeWithText("Android backup").assertDoesNotExist()
+        }
+
+    @Test
+    fun pendingNativeRecoveryOffersRetryWithoutExposingStorageErrors() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            var retries = 0
+            setContent {
+                LogDateTheme {
+                    NativeBackupSettingsSection(
+                        NativeBackupStatus.Available(custodyStatus = NativeRestoreCustodyStatus.RECOVERING),
+                        onRetryRecovery = { retries++ },
+                    )
+                }
+            }
+            onNodeWithText("Finishing device transfer").performClick()
+            assertEquals(1, retries)
+            onNodeWithText("Pending native source custody", substring = true).assertDoesNotExist()
+        }
+
+    @Test
+    fun incompleteNativeTransferOpensExistingArchiveRecovery() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            var archiveVisits = 0
+            setContent {
+                LogDateTheme {
+                    NativeBackupSettingsSection(
+                        NativeBackupStatus.Available(custodyStatus = NativeRestoreCustodyStatus.NEEDS_TRANSFER),
+                        onOpenArchive = { archiveVisits++ },
+                    )
+                }
+            }
+            onNodeWithText("Recover missing files").performClick()
+            assertEquals(1, archiveVisits)
         }
 }

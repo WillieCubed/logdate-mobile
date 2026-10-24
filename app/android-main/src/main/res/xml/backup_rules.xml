@@ -32,6 +32,7 @@
              requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="archive_recovery/records/" requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="retained_journals/" requireFlags="deviceToDeviceTransfer"/>
+    <include domain="file" path="native_journal_transfer/current/" requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="archive_recovery/sources/" requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="datastore/"
              requireFlags="deviceToDeviceTransfer"/>

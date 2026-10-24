@@ -1,14 +1,15 @@
 package app.logdate.client.data.restore
 
 import app.logdate.client.device.restore.NativeIncomingJournal
+import app.logdate.client.device.restore.nativeJournalLogicalPath
 import java.io.File
 
 /** Each verified complete revision stays separate; these inputs never authorize a DB/WAL cohort. */
 internal fun retainedIndependentIncomingCandidates(verified: Iterable<NativeIncomingJournal.Payload>): List<Map<String, File>> =
     verified
         .filter { payload ->
-            payload.complete && (payload.path in KEY_PATHS || isCanonicalMediaPath(payload.path))
-        }.map { payload -> mapOf(payload.path to payload.file) }
+            payload.complete && (nativeJournalLogicalPath(payload.path) in KEY_PATHS || isCanonicalMediaPath(payload.path))
+        }.map { payload -> mapOf(nativeJournalLogicalPath(payload.path) to payload.file) }
 
 private fun isCanonicalMediaPath(path: String): Boolean {
     if (!path.startsWith("files/media/")) return false

@@ -1,6 +1,5 @@
 package app.logdate.client.data.restore
 
-import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.DraftRecoveryScope
@@ -10,9 +9,6 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.security.MessageDigest
 import kotlin.uuid.Uuid
@@ -144,23 +140,8 @@ internal class RetainedJournalDatabaseMerger(
         return sourceScope.matchesDraftRecoveryScope(current, scope)
     }
 
-    internal suspend fun sourceScopeMatchesCurrent(current: RetainedJournalSourceScope): Boolean {
-        if (sourceScope.matchesCurrent(current)) return true
-        if (sourceScope.bound || !current.bound || sourceScope.ownerId.isNullOrBlank() || current.ownerId.isNullOrBlank()) return false
-        val raw = activePreferences.data.first()[stringPreferencesKey(HISTORY_OWNER_ADOPTION_RECEIPT)] ?: return false
-        val receipt = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return false
-        val oldOwner = receipt["oldOwner"]?.jsonPrimitive?.contentOrNull ?: return false
-        val newOwner = receipt["newOwner"]?.jsonPrimitive?.contentOrNull ?: return false
-        val origin = receipt["origin"]?.jsonPrimitive?.contentOrNull ?: return false
-        val device = receipt["device"]?.jsonPrimitive?.contentOrNull ?: return false
-        return device.isNotBlank() &&
-            app.logdate.client.device.identity
-                .sameOwnerId(oldOwner, sourceScope.ownerId) &&
-            app.logdate.client.device.identity
-                .sameOwnerId(newOwner, current.ownerId) &&
-            normalizeBackendOrigin(origin) == sourceScope.backendOrigin &&
-            sourceScope.backendOrigin == current.backendOrigin
-    }
+    internal suspend fun sourceScopeMatchesCurrent(current: RetainedJournalSourceScope): Boolean =
+        sourceScope.matchesCurrentOrAdopted(current, activePreferences.data.first())
 
     internal suspend fun currentSourceScope(): RetainedJournalSourceScope? {
         val repositoryScope = journals.getJournalRecoveryScope() ?: return null
@@ -193,10 +174,6 @@ internal class RetainedJournalDatabaseMerger(
         type: String,
         sourceId: String,
     ): String = "$generationId\u0000$type\u0000$sourceId"
-
-    private companion object {
-        const val HISTORY_OWNER_ADOPTION_RECEIPT = "identity.completed_history_owner_adoption.v1"
-    }
 
     internal fun recoveryId(): String = "retained:$generationId"
 

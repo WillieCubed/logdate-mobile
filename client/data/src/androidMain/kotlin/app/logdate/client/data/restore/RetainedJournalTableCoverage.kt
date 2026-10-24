@@ -25,6 +25,7 @@ internal object RetainedJournalTableCoverage {
             "user_devices",
             "room_master_table",
             "android_metadata",
+            "native_journal_source_scope",
         )
 
     /** Known user/business data is deliberately retained until a typed handler is implemented. */

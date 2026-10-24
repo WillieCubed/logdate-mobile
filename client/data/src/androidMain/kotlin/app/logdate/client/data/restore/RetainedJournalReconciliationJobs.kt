@@ -11,6 +11,7 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.openRetainedDatabaseCopy
 import app.logdate.client.database.readRetainedDatabasePassphrases
 import app.logdate.client.datastore.createAndroidMainDataStore
+import app.logdate.client.device.restore.NativeJournalReplayCustody
 import app.logdate.client.device.restore.RetainedJournalWorkspace
 import app.logdate.client.device.restore.admitNativeContent
 import app.logdate.client.device.restore.nativeRestoreDeliveryGate
@@ -32,6 +33,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.koin.core.context.GlobalContext
 import java.io.File
 import java.nio.file.Files
@@ -62,7 +67,9 @@ fun scheduleRetainedJournalReconciliation(context: Context): Boolean =
 fun resumeRetainedJournalReconciliation(context: Context) {
     if (!context.getSystemService(UserManager::class.java).isUserUnlocked) return
     val workspace = retainedJournalWorkspace(context)
-    if (runCatching { workspace.current()?.phase == RetainedJournalWorkspace.Phase.WORKING }.getOrDefault(false)) {
+    if (runCatching { workspace.current()?.phase == RetainedJournalWorkspace.Phase.WORKING }.getOrDefault(false) ||
+        NativeJournalReplayCustody(context).hasInputs()
+    ) {
         scheduleRetainedJournalReconciliation(context)
     }
 }
@@ -127,7 +134,7 @@ class RetainedJournalReconciliationJobService : JobService() {
                     retainedJournalWorkspace(this)
                         .current()
                         ?.takeIf { it.phase == RetainedJournalWorkspace.Phase.WORKING }
-                if (expectedSession == null) {
+                if (expectedSession == null && !NativeJournalReplayCustody(this).hasInputs()) {
                     null
                 } else {
                     // Database creation itself takes the native delivery gate. Resolve the complete
@@ -138,14 +145,18 @@ class RetainedJournalReconciliationJobService : JobService() {
                     // Complete admission before holding that gate for the source merge.
                     admitNativeContent(File(filesDir, "media"))
                     val journals = koin.get<JournalRepository>()
+                    val config = koin.get<app.logdate.shared.config.LogDateConfigRepository>()
                     Repositories(
                         database = database,
-                        expectedSessionId = expectedSession.id,
+                        expectedSessionId = expectedSession?.id,
                         expectedScope = checkNotNull(journals.getJournalRecoveryScope()),
                         journals = journals,
                         notes = koin.get<JournalNotesRepository>(),
                         content = koin.get<JournalContentRepository>(),
                         media = koin.get<MediaManager>(),
+                        entryDrafts = koin.get<app.logdate.client.repository.journals.EntryDraftRecoveryRepository>(),
+                        mediaReferences = koin.get<app.logdate.client.media.storage.StoredMediaReferences>(),
+                        backendOrigin = { config.backendUrl.value },
                     )
                 }
             },
@@ -156,8 +167,9 @@ class RetainedJournalReconciliationJobService : JobService() {
     private suspend fun reconcileLocked(repositories: Repositories): Boolean {
         if (!getSystemService(UserManager::class.java).isUserUnlocked) return true
         val workspace = retainedJournalWorkspace(this)
-        val session = workspace.current()?.takeIf { it.phase == RetainedJournalWorkspace.Phase.WORKING } ?: return false
-        check(session.id == repositories.expectedSessionId) { "Retained workspace changed while opening the working database" }
+        val session = workspace.current()
+        check(session == null || session.phase == RetainedJournalWorkspace.Phase.WORKING)
+        check(session?.id == repositories.expectedSessionId) { "Retained workspace changed while opening the working database" }
         check(
             repositories.journals.getJournalRecoveryScope() == repositories.expectedScope &&
                 repositories.notes.getNoteRecoveryScope() == repositories.expectedScope,
@@ -165,22 +177,33 @@ class RetainedJournalReconciliationJobService : JobService() {
         check(repositories.database.isOpen) { "Working database closed before reconciliation" }
         // The native gate excludes active callbacks. A previous process may have left a cohort
         // pending; seal and verify its retained bytes before admitting any independent candidates.
-        workspace.finishIncomingDelivery()
-        val independentIncoming = retainedIndependentIncomingCandidates(workspace.incomingPayloads().values.flatten())
-        val originalSources = workspace.retainedSources()
-        val incomingSources = workspace.coherentIncomingPayloads().mapValues { (_, payloads) -> payloads.mapValues { it.value.file } }
+        if (session != null) workspace.finishIncomingDelivery()
+        val incomingPayloads =
+            (if (session != null) workspace.incomingPayloads().values.flatten() else emptyList()) +
+                NativeJournalReplayCustody(this).sealedPayloads()
+        val independentIncoming = retainedIndependentIncomingCandidates(incomingPayloads)
+        val originalSources = if (session != null) workspace.retainedSources() else emptyMap()
+        val incomingSources =
+            app.logdate.client.device.restore
+                .verifiedNativeJournalSources(incomingPayloads)
         check(originalSources.keys.intersect(incomingSources.keys).isEmpty()) { "Incoming and retained generation IDs overlap" }
-        check(session.id in originalSources) { "Active retained generation is missing from its anchored source inventory" }
+        if (session !=
+            null
+        ) {
+            check(session.id in originalSources) { "Active retained generation is missing from its anchored source inventory" }
+        }
         val allSources = originalSources + incomingSources
-        if (allSources.isEmpty()) return false
+        if (allSources.isEmpty()) return repairIndependentMedia(independentIncoming, repositories, sourcesCovered = true)
         val candidateFiles = (allSources.values + independentIncoming).flatMap(::databaseKeyFiles).distinctBy { it.canonicalPath }
         val mediaSources = allSources.values.toList() + independentIncoming
         val activePreferences = createAndroidMainDataStore(this)
         val scratchRoot = File(noBackupFilesDir, "retained-journal-merge-scratch")
         clearAbandonedDatabaseCopies(scratchRoot)
         var mediaPending = false
+        var allSourcesCovered = true
         for ((generation, files) in allSources) {
-            if (reconcileGeneration(
+            val outcome =
+                reconcileGeneration(
                     generation,
                     files,
                     candidateFiles,
@@ -191,14 +214,75 @@ class RetainedJournalReconciliationJobService : JobService() {
                     session,
                     repositories,
                 )
-            ) {
-                mediaPending = true
-            }
+            if (outcome.mediaPending) mediaPending = true
+            allSourcesCovered = allSourcesCovered && outcome.coverageComplete
         }
         // Deterministic gaps remain in immutable custody. A later completed backup delivery or an
         // explicit user retry schedules another pass; the job must not hot-loop an unchanged source.
         if (mediaPending) Napier.i("Retained journal remains available while source media is pending")
-        return false
+        refreshStagedNativeMediaInventories(this)
+        retireStagedNativeAuxiliary(this, repositories.expectedScope, createAndroidMainDataStore(this), allSourcesCovered)
+        return repairIndependentMedia(independentIncoming, repositories, allSourcesCovered)
+    }
+
+    private suspend fun repairIndependentMedia(
+        candidates: List<Map<String, File>>,
+        repositories: Repositories,
+        sourcesCovered: Boolean,
+    ): Boolean {
+        refreshStagedNativeMediaInventories(this)
+        retireStagedNativeAuxiliary(this, repositories.expectedScope, createAndroidMainDataStore(this), sourcesCovered)
+        if (candidates.none { files ->
+                files.keys.any { path ->
+                    listOf("files/media/", "files/user_media/", "files/audio_notes/").any(path::startsWith)
+                }
+            }
+        ) {
+            return false
+        }
+        val job = kotlinx.coroutines.currentCoroutineContext()[Job]
+        val authority =
+            app.logdate.client.device.restore
+                .NativeJournalRestoreAuthority(this)
+        val proofs =
+            NativeJournalStagedSourceIndex(this)
+                .admittedSources()
+                .mapValues { (_, record) ->
+                    record.receipt to record.mediaInventory
+                }.toMutableMap()
+        authority.completedReceipt()?.let { receipt ->
+            authority.completedSourceReceipt()?.let { source -> proofs[receipt] = source to authority.completedMediaInventory() }
+        }
+        var retry = false
+        for ((receipt, proof) in proofs) {
+            val result =
+                repairNativeLateMedia(
+                    candidates,
+                    NativeLateMediaRepositories(
+                        repositories.journals,
+                        repositories.notes,
+                        repositories.entryDrafts,
+                        createAndroidMainDataStore(this),
+                        repositories.media,
+                        repositories.mediaReferences,
+                    ),
+                    NativeJournalReplayCustody(this),
+                    repositories.expectedScope,
+                    completedSource = proof.first,
+                    completedInventory = proof.second,
+                    sourceReceiptSha256 = receipt,
+                    packageName = packageName,
+                    legacyReceiptsRoot = File(noBackupFilesDir, "native-legacy-media-imports"),
+                    isDeliveryCurrent = {
+                        job?.isActive != false &&
+                            repositories.database.isOpen &&
+                            normalizeBackendOrigin(repositories.backendOrigin()) ==
+                            normalizeBackendOrigin(repositories.expectedScope.serverOrigin)
+                    },
+                )
+            retry = retry || result.retry
+        }
+        return retry
     }
 
     private suspend fun reconcileGeneration(
@@ -209,9 +293,9 @@ class RetainedJournalReconciliationJobService : JobService() {
         activePreferences: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>,
         scratchRoot: File,
         workspace: RetainedJournalWorkspace,
-        session: RetainedJournalWorkspace.Session,
+        session: RetainedJournalWorkspace.Session?,
         repositories: Repositories,
-    ): Boolean {
+    ): NativeSourceOutcome {
         Uuid.parse(generation)
         val databaseFiles =
             files
@@ -219,29 +303,48 @@ class RetainedJournalReconciliationJobService : JobService() {
                     path.removePrefix("database/").takeIf { path.startsWith("database/") && it in DATABASE_FILES }?.let { it to file }
                 }.toMap()
         if ("logdate" !in databaseFiles) {
-            return false
+            return NativeSourceOutcome(false, false)
         }
         val preferenceFile = files["files/logdate.preferences_pb"]
         if (preferenceFile == null) {
-            return false
+            return NativeSourceOutcome(false, false)
         }
         val sourceScope =
             files["source_scope.json"]?.let { anchor ->
-                readRetainedJournalSourceScope(preferenceFile, anchor, scratchRoot)
+                readRetainedJournalSourceScope(preferenceFile, anchor, scratchRoot, databaseFiles.mapKeys { "database/${it.key}" })
             }
         if (sourceScope == null) {
-            return false
+            return NativeSourceOutcome(false, false)
         }
         val opened = openRetainedSource(databaseFiles, candidateFiles, scratchRoot)
         if (opened == null) {
-            return false
+            return NativeSourceOutcome(false, false)
         }
-        opened.use {
+        opened.copy.use {
+            if (files["source_scope.json"]?.readText()?.let {
+                    Json
+                        .parseToJsonElement(it)
+                        .jsonObject["version"]
+                        ?.jsonPrimitive
+                        ?.intOrNull
+                } in setOf(2, 3)
+            ) {
+                check(
+                    app.logdate.client.database
+                        .readNativeJournalSnapshotScope(opened.copy.database) ==
+                        app.logdate.client.database.NativeJournalSnapshotScope(
+                            checkNotNull(sourceScope.ownerId),
+                            sourceScope.bound,
+                            sourceScope.backendOrigin,
+                            nativeSnapshotChecksum(preferenceFile),
+                        ),
+                ) { "Encrypted source scope does not match native preferences" }
+            }
             val merger =
                 RetainedJournalDatabaseMerger(
                     generation,
                     files,
-                    opened.database,
+                    opened.copy.database,
                     sourceScope,
                     activePreferences,
                     repositories.journals,
@@ -253,42 +356,84 @@ class RetainedJournalReconciliationJobService : JobService() {
                     additionalMediaSources = additionalMediaSources,
                     ensureSourceSessionCurrent = {
                         val current = workspace.current()
-                        check(current?.id == session.id && current.phase == RetainedJournalWorkspace.Phase.WORKING) {
+                        check(current?.id == session?.id && (current == null || current.phase == RetainedJournalWorkspace.Phase.WORKING)) {
                             "Retained journal workspace changed during reconciliation"
                         }
                     },
                 )
             val result = merger.merge()
-            return result.mediaPending > 0
+            if (result.coverageComplete) {
+                val custody = NativeJournalReplayCustody(this)
+                app.logdate.client.device.restore.verifiedNativeJournalSources(custody.sealedPayloads())[generation]?.let { accepted ->
+                    val receipt = nativeSnapshotChecksum(accepted.getValue("source_scope.json"))
+                    val stagedIndex = NativeJournalStagedSourceIndex(this)
+                    val sourceFiles =
+                        accepted
+                            .mapKeys { (path, _) ->
+                                if (path == "source_scope.json") {
+                                    app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
+                                } else {
+                                    path
+                                }
+                            }.toMutableMap()
+                    custody
+                        .sealedPayloads()
+                        .firstOrNull { payload ->
+                            payload.file.canonicalFile == opened.keyFile.canonicalFile
+                        }?.let { key ->
+                            sourceFiles[key.path.removePrefix(app.logdate.client.device.restore.NATIVE_JOURNAL_TRANSFER_PREFIX)] =
+                                key.file
+                        }
+                    stagedIndex.remember(sourceFiles)
+                    stagedIndex.admitAfterMerged(receipt)
+                    custody.acknowledgeMergedSource(
+                        receipt,
+                        accepted,
+                        stagedIndex.admittedSources().getValue(receipt).sourceCorePhysicalPaths,
+                    )
+                }
+            }
+            return NativeSourceOutcome(result.mediaPending > 0, result.coverageComplete)
         }
     }
+
+    private data class NativeSourceOutcome(
+        val mediaPending: Boolean,
+        val coverageComplete: Boolean,
+    )
+
+    private data class OpenedSource(
+        val copy: app.logdate.client.database.RetainedDatabaseCopy,
+        val keyFile: File,
+    )
 
     private fun openRetainedSource(
         databaseFiles: Map<String, File>,
         candidateFiles: List<File>,
         scratchRoot: File,
-    ): app.logdate.client.database.RetainedDatabaseCopy? {
-        var opened: app.logdate.client.database.RetainedDatabaseCopy? = null
-        for (candidateChunk in candidateFiles.chunked(MAX_KEY_CANDIDATES)) {
-            val passphrases = readRetainedDatabasePassphrases(candidateChunk)
+    ): OpenedSource? {
+        for (candidate in candidateFiles) {
+            val passphrases = readRetainedDatabasePassphrases(listOf(candidate))
             try {
-                opened = openRetainedDatabaseCopy(this, databaseFiles, passphrases, scratchRoot)
+                openRetainedDatabaseCopy(this, databaseFiles, passphrases, scratchRoot)?.let { return OpenedSource(it, candidate) }
             } finally {
                 passphrases.forEach { it.fill(0) }
             }
-            if (opened != null) break
         }
-        return opened
+        return null
     }
 
     private data class Repositories(
         val database: LogDateDatabase,
-        val expectedSessionId: String,
+        val expectedSessionId: String?,
         val expectedScope: JournalMergeScope,
         val journals: JournalRepository,
         val notes: JournalNotesRepository,
         val content: JournalContentRepository,
         val media: MediaManager,
+        val entryDrafts: app.logdate.client.repository.journals.EntryDraftRecoveryRepository,
+        val mediaReferences: app.logdate.client.media.storage.StoredMediaReferences,
+        val backendOrigin: () -> String,
     )
 
     private fun databaseKeyFiles(files: Map<String, File>): List<File> =

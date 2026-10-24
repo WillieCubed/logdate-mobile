@@ -52,7 +52,7 @@ internal class RetainedManagedMediaSource(
         if (canonical.parentFile != parent || canonical.name != file.name) return null
         if (digest != null && !matchesDigest(canonical, digest)) return null
         val originalName = relative.substringAfterLast('/')
-        val mime = mimeType(originalName) ?: return null
+        val mime = retainedMediaMimeType(originalName) ?: return null
         return Asset(canonical, originalName, mime)
     }
 
@@ -96,26 +96,6 @@ internal class RetainedManagedMediaSource(
             MediaCollection.Library -> "media/$path"
             MediaCollection.Recordings -> "audio_notes/$path"
         }
-
-    private fun mimeType(name: String): String? =
-        when (name.substringAfterLast('.', "").lowercase()) {
-            "jpg", "jpeg" -> "image/jpeg"
-            "png" -> "image/png"
-            "heic" -> "image/heic"
-            "heif" -> "image/heif"
-            "webp" -> "image/webp"
-            "gif" -> "image/gif"
-            "mp4" -> "video/mp4"
-            "mov" -> "video/quicktime"
-            "webm" -> "video/webm"
-            "m4a" -> "audio/mp4"
-            "mp3" -> "audio/mpeg"
-            "wav" -> "audio/wav"
-            "ogg", "opus" -> "audio/ogg"
-            "flac" -> "audio/flac"
-            "aac" -> "audio/aac"
-            else -> null
-        }
 }
 
 /** Cross-generation recovery needs a content digest; legacy path equality conveys no authority. */
@@ -138,3 +118,40 @@ internal suspend fun verifiedCanonicalMediaReference(
 }
 
 private val RETAINED_CANONICAL_OBJECT = Regex("objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})\\.[^/.]+", RegexOption.IGNORE_CASE)
+
+internal fun retainedMediaMimeType(name: String): String? =
+    when (name.substringAfterLast('.', "").lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "heic" -> "image/heic"
+        "heics" -> "image/heic-sequence"
+        "heif" -> "image/heif"
+        "heifs" -> "image/heif-sequence"
+        "avif" -> "image/avif"
+        "bmp" -> "image/bmp"
+        "webp" -> "image/webp"
+        "gif" -> "image/gif"
+        "mp4" -> "video/mp4"
+        "mpg" -> "video/mpeg"
+        "ogv" -> "video/ogg"
+        "mov" -> "video/quicktime"
+        "webm" -> "video/webm"
+        // The canonical file extension is shared by audio and video. Either media type
+        // preserves the content-addressed path; the original bytes remain unchanged.
+        "3gp" -> "video/3gpp"
+        "3g2" -> "video/3gpp2"
+        "mkv" -> "video/x-matroska"
+        "avi" -> "video/x-msvideo"
+        "wmv" -> "video/x-ms-wmv"
+        "m4a" -> "audio/mp4"
+        "mp3" -> "audio/mpeg"
+        "wav" -> "audio/wav"
+        "ogg" -> "audio/ogg"
+        "opus" -> "audio/opus"
+        "amr" -> "audio/amr"
+        "mid" -> "audio/midi"
+        "weba" -> "audio/webm"
+        "flac" -> "audio/flac"
+        "aac" -> "audio/aac"
+        else -> null
+    }

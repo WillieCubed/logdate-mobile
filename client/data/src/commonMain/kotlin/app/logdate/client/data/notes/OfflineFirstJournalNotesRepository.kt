@@ -13,6 +13,7 @@ import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -205,6 +206,11 @@ class OfflineFirstJournalNotesRepository(
     }
 
     private suspend fun buildPendingMediaIndex(note: JournalNote): PendingMediaIndex? {
+        if ((note is JournalNote.Image && UnavailableMediaReferences.isUnavailable(note.mediaRef)) ||
+            (note is JournalNote.Video && UnavailableMediaReferences.isUnavailable(note.mediaRef))
+        ) {
+            return null
+        }
         val manager = mediaManager ?: return null
         indexedMediaRepository ?: return null
 
