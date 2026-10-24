@@ -94,7 +94,7 @@ internal object NativeArchive3SchemaValidation {
         schema: JsonObject,
         root: JsonObject,
     ) {
-        schema["required"]?.jsonArray?.forEach { require(it.string() in value) { "Missing native archive field" } }
+        schema["required"]?.jsonArray?.forEach { require(it.string() in value) { "Missing native archive field: ${it.string()}" } }
         val properties = schema["properties"]?.jsonObject.orEmpty()
         if (schema["additionalProperties"] ==
             JsonPrimitive(false)

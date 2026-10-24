@@ -26,6 +26,9 @@ internal class NativeArchive3Bundle private constructor(
     val journals: List<NativeArchive3JournalRecord>,
     val notes: JsonArray,
     val drafts: JsonArray,
+    val places: JsonArray,
+    val profile: JsonObject?,
+    val locationSamples: List<JsonObject>,
     val manifestSha256: String,
     val checksumsSha256: String,
 ) {
@@ -82,6 +85,7 @@ internal class NativeArchive3Bundle private constructor(
             NativeArchive3Schemas.documents.keys
                 .map { "schema/$it.schema.json" }
                 .toSet()
+        private val optional = setOf("data/places.json", "data/profile.json", "data/location-history.jsonl")
 
         fun read(
             names: Iterable<String>,
@@ -100,10 +104,35 @@ internal class NativeArchive3Bundle private constructor(
             val notes = decodeArray("notes", "notes", documents)
             val drafts = decodeArray("drafts", "drafts", documents)
             val media = decodeArray("media", "files", documents)
+            val places =
+                documents["data/places.json"]?.let {
+                    NativeArchive3SchemaValidation
+                        .document(
+                            "places",
+                            it.strictText(),
+                        ).getValue("places")
+                        .jsonArray
+                }
+                    ?: JsonArray(emptyList())
+            val profile =
+                documents["data/profile.json"]?.let {
+                    NativeArchive3SchemaValidation.document("profile", it.strictText()).getValue("profile").jsonObject
+                }
+            val locationSamples =
+                documents["data/location-history.jsonl"]?.strictText()?.let { text ->
+                    require(text.endsWith("\n"))
+                    text.dropLast(1).split('\n').map { NativeArchive3SchemaValidation.document("location-sample", it) }
+                } ?: emptyList()
             validateRecords(journals, notes, drafts, media, resources)
-            validateCounts(manifest, journals.size, notes.size, drafts.size, media.size)
+            validateCounts(manifest, journals.size, notes.size, drafts.size, media.size, places.size, locationSamples.size, profile != null)
             val mediaPaths = media.map { it.jsonObject.getValue("path").string() }.toSet()
-            require(paths.toSet() == fixed + schemas + mediaPaths) { "Undeclared native archive resource" }
+            val declaredOptional =
+                buildSet {
+                    if (places.isNotEmpty()) add("data/places.json")
+                    if (profile != null) add("data/profile.json")
+                    if (locationSamples.isNotEmpty()) add("data/location-history.jsonl")
+                }
+            require(paths.toSet() == fixed + schemas + mediaPaths + declaredOptional) { "Undeclared native archive resource" }
             schemas.forEach { path ->
                 // Descriptive schemas are data only, but must be well-formed JSON objects.
                 require(Json.parseToJsonElement(documents.getValue(path).strictText()) is JsonObject)
@@ -113,6 +142,9 @@ internal class NativeArchive3Bundle private constructor(
                 journals,
                 notes,
                 drafts,
+                places,
+                profile,
+                locationSamples,
                 resources.getValue("manifest.json").sha256,
                 checksumData.first.sha256,
             )
@@ -126,7 +158,7 @@ internal class NativeArchive3Bundle private constructor(
             }
             paths.forEach { requireNotNull(ArchivePath.parse(it)) { "Unsafe native archive path" } }
             require(paths.containsAll(fixed + schemas)) { "Incomplete native archive" }
-            require(paths.all { it in fixed || it in schemas || it.startsWith("media/") }) { "Unknown native resource" }
+            require(paths.all { it in fixed || it in schemas || it in optional || it.startsWith("media/") }) { "Unknown native resource" }
             return paths
         }
 
@@ -206,6 +238,9 @@ internal class NativeArchive3Bundle private constructor(
             notes: Int,
             drafts: Int,
             media: Int,
+            places: Int,
+            locationSamples: Int,
+            hasProfile: Boolean,
         ) {
             val counts = manifest.getValue("counts").jsonObject
             mapOf(
@@ -213,33 +248,59 @@ internal class NativeArchive3Bundle private constructor(
                 "notes" to notes,
                 "drafts" to drafts,
                 "media" to media,
-                "places" to 0,
-                "locationSamples" to 0,
+                "places" to places,
+                "locationSamples" to locationSamples,
             ).forEach { (key, size) ->
                 require(counts.getValue(key).jsonPrimitive.longOrNull == size.toLong()) { "Native archive record count mismatch" }
             }
-            require(counts["hasProfile"] == JsonPrimitive(false))
+            require(counts["hasProfile"] == JsonPrimitive(hasProfile))
         }
 
         private fun validateContents(manifest: JsonObject) {
             val contents = manifest.getValue("contents").jsonArray.map { it.jsonObject }
             val expected =
-                mapOf(
-                    "readme" to "README.txt",
-                    "journals" to "data/journals.json",
-                    "notes" to "data/notes.json",
-                    "drafts" to "data/drafts.json",
-                    "mediaInventory" to "data/media.json",
-                    "checksums" to "SHA256SUMS",
-                )
+                buildMap {
+                    putAll(
+                        mapOf(
+                            "readme" to "README.txt",
+                            "journals" to "data/journals.json",
+                            "notes" to "data/notes.json",
+                            "drafts" to "data/drafts.json",
+                            "mediaInventory" to "data/media.json",
+                            "checksums" to "SHA256SUMS",
+                        ),
+                    )
+                    if (manifest
+                            .getValue("counts")
+                            .jsonObject
+                            .getValue("places")
+                            .jsonPrimitive.longOrNull !=
+                        0L
+                    ) {
+                        put("places", "data/places.json")
+                    }
+                    if (manifest.getValue("counts").jsonObject.getValue("hasProfile") ==
+                        JsonPrimitive(true)
+                    ) {
+                        put("profile", "data/profile.json")
+                    }
+                    if (manifest
+                            .getValue("counts")
+                            .jsonObject
+                            .getValue("locationSamples")
+                            .jsonPrimitive.longOrNull !=
+                        0L
+                    ) {
+                        put("locationHistory", "data/location-history.jsonl")
+                    }
+                }
             require(contents.size == expected.size && contents.map { it.getValue("role").string() }.toSet() == expected.keys)
             contents.forEach { item ->
                 val path = item.getValue("path").string()
                 require(expected[item.getValue("role").string()] == path)
                 if (path.startsWith("data/")) {
-                    require(
-                        item["schema"]?.string() == "schema/${path.substringAfterLast('/').substringBefore('.')}.schema.json",
-                    )
+                    val schema = if (path.endsWith(".jsonl")) "location-sample" else path.substringAfterLast('/').substringBefore('.')
+                    require(item["schema"]?.string() == "schema/$schema.schema.json")
                 }
             }
         }

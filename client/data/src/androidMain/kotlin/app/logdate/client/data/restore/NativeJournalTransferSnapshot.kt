@@ -1,8 +1,15 @@
 package app.logdate.client.data.restore
 
 import android.content.Context
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import app.logdate.client.data.journals.toModel
+import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
+import app.logdate.client.data.notes.DatabaseNotePlaceResolver
+import app.logdate.client.data.notes.JournalNoteQueries
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
+import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
+import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.NativeJournalSnapshotScope
 import app.logdate.client.database.captureNativeJournalDatabaseSnapshot
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
@@ -12,10 +19,12 @@ import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.database.protectDatabaseFile
 import app.logdate.client.database.readNativeJournalSnapshotMediaReferences
 import app.logdate.client.database.verifyNativeJournalDatabaseSnapshot
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
 import app.logdate.client.device.restore.NativeJournalMediaInventory
+import app.logdate.client.device.restore.NativeJournalSourceReceipt
 import app.logdate.client.device.restore.NativeJournalTransferOwnership
 import app.logdate.client.device.restore.retainedJournalPassphraseFile
 import app.logdate.client.device.restore.retainedJournalWorkingKeyName
@@ -24,9 +33,23 @@ import app.logdate.client.device.restore.verifyNativeJournalSourceReceipt
 import app.logdate.client.device.restore.writeNativeJournalMediaInventory
 import app.logdate.client.device.restore.writeNativeJournalSourceReceipt
 import app.logdate.client.device.storage.createAndroidSecureStorage
+import app.logdate.client.domain.export.archive.StagingDirectoryArchiveContainer
+import app.logdate.client.domain.restore.archive3.NativeArchive3Original
+import app.logdate.client.domain.restore.archive3.NativeArchive3SnapshotInput
+import app.logdate.client.domain.restore.archive3.NativeArchive3SnapshotWriter
+import app.logdate.client.repository.journals.mediaRefOrNull
+import app.logdate.shared.model.Place
+import app.logdate.shared.model.profile.LogDateProfile
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import okio.Path.Companion.toPath
+import okio.source
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -36,6 +59,7 @@ import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import kotlin.io.encoding.Base64
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /** Owns exactly one callback-created immutable subtree, never a restored or abandoned subtree. */
@@ -178,6 +202,113 @@ internal class NativeJournalTransferSnapshot(
         }
         checkEntryDraftFileUnchanged()
         checkPinnedPreferencesUnchanged()
+    }
+
+    /** Produces an admitted major-3 directory from the callback's already fenced native snapshot. */
+    suspend fun writeArchive3(container: StagingDirectoryArchiveContainer) {
+        check(prepared && !noDatabaseSource)
+        val files = checkNotNull(validateNativeJournalTransfer(context))
+        val databaseFile = checkNotNull(files["database/logdate"])
+        val preferencesFile = checkNotNull(files["files/logdate.preferences_pb"])
+        val keyFile = listOf("passphrase_backup", "working_passphrase_backup").mapNotNull { files["files/db_recovery/$it"] }.single()
+        val passphrase = Base64.decode(keyFile.readText().trim())
+        val databaseKey = passphrase.copyOf()
+        val preferenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        var openedDatabase: LogDateDatabase? = null
+        try {
+            val pinnedPreferences =
+                PreferenceDataStoreFactory.createWithPath(scope = preferenceScope, produceFile = { preferencesFile.path.toPath() })
+            val database = getRoomDatabase(getDatabaseBuilder(context, databaseKey, databaseFile), driver = null)
+            openedDatabase = database
+            val unsupported = NativeArchive3SourceCensus.inspect(database.openHelper.readableDatabase).toMutableSet()
+            val prefs = pinnedPreferences.data.first()
+            unsupported += NativeArchive3SourceCensus.unsupportedPreferences(prefs)
+            val entryDrafts = AndroidLocalEntryDraftStore(context).getAllDrafts()
+            if (entryDrafts.isNotEmpty()) unsupported += "entryDrafts"
+            val receipt = Json.decodeFromString<NativeJournalSourceReceipt>(checkNotNull(files[NATIVE_SOURCE_RECEIPT_PATH]).readText())
+            val drafts =
+                NativeArchive3EditorDrafts.read(
+                    prefs,
+                    receipt.canonicalOwnerId,
+                    receipt.canonicalOwnerBound == "true",
+                    receipt.backendOrigin,
+                )
+            val journals = database.journalDao().getAll()
+            if (journals.any { it.deletedAt != null || it.coverImageUri != null }) unsupported += "journalCoversOrDeletion"
+            val queries =
+                JournalNoteQueries(
+                    database.textNoteDao(),
+                    database.imageNoteDao(),
+                    database.audioNoteDao(),
+                    database.videoNoteDao(),
+                    database.journalContentDao(),
+                    database.mediaCaptionDao(),
+                    DatabaseNotePlaceResolver(database.placeDao()),
+                    null,
+                )
+            val notes = queries.allNotesObserved.first()
+            val links = queries.getAllJournalNoteLinks().groupBy({ it.second }, { it.first })
+            val userData = LogdatePreferencesDataSource(pinnedPreferences).userData.first()
+            if (userData.profilePhotoUri != null) unsupported += "profilePhoto"
+            val profile =
+                LogDateProfile(
+                    displayName = userData.displayName,
+                    birthday = userData.birthday.takeIf { it != kotlin.time.Instant.DISTANT_PAST },
+                    bio = userData.bio,
+                    originalBio = userData.originalBio,
+                    createdAt = userData.profileCreatedAt,
+                    lastUpdatedAt = userData.profileLastUpdatedAt,
+                )
+            val places = OfflineFirstUserPlacesRepository(database.userPlaceDao()).getAllPlaces().filterIsInstance<Place.UserDefined>()
+            val location = OfflineFirstLocationHistoryRepository(database.locationHistoryDao()).getAllLocationHistory()
+            val mediaByPath = selectedMedia.associateBy { it.path }
+            val originalReferences = (notes.mapNotNull { it.mediaRefOrNull() } + drafts.flatMap { it.lateMediaReferences() }).distinct()
+            val originals =
+                originalReferences.map { reference ->
+                    val paths = nativeTransferMediaPaths(setOf(reference), context.packageName, context.filesDir)
+                    check(paths.size == 1)
+                    val entry = checkNotNull(mediaByPath[paths.single()]) { "Native original was not pinned" }
+                    val file = File(context.filesDir, entry.path.removePrefix("files/"))
+                    NativeArchive3Original(reference, entry.size, entry.sha256) {
+                        verifySelectedMediaFile(file, entry)
+                        file.source()
+                    }
+                }
+            val marker = File(context.noBackupFilesDir, "native-journal-sender-owner")
+            val markerHash = nativeSnapshotChecksum(marker)
+
+            fun validate() {
+                checkPinnedPreferencesUnchanged()
+                checkEntryDraftFileUnchanged()
+                requirePinnedNativeTransferFile(marker, markerHash)
+                check(current.isDirectory && databaseFile.exists())
+            }
+            NativeArchive3SnapshotWriter.write(
+                NativeArchive3SnapshotInput(
+                    exportedAt = Clock.System.now().toString(),
+                    journals = journals.map { it.toModel() },
+                    notes = notes,
+                    journalIdsByNote = links,
+                    drafts = drafts,
+                    profile = profile,
+                    places = places,
+                    locationHistory = location,
+                    originals = originals,
+                    unsupportedPopulatedCategories = unsupported,
+                    validateContext = ::validate,
+                ),
+                container,
+            )
+            checkNotNull(validateNativeJournalTransfer(context))
+        } catch (failure: Throwable) {
+            runCatching { container.discard() }
+            throw failure
+        } finally {
+            openedDatabase?.close()
+            preferenceScope.cancel()
+            databaseKey.fill(0)
+            passphrase.fill(0)
+        }
     }
 
     private fun checkPinnedPreferencesUnchanged() {
