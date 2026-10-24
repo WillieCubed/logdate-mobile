@@ -15,11 +15,15 @@ import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
+import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.client.repository.journals.PendingMediaType
 import app.logdate.client.repository.media.ExifMetadata
 import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
@@ -65,6 +69,8 @@ class OfflineFirstJournalNotesRepositoryTest {
     private lateinit var indexedMediaRepository: FakeIndexedMediaRepository
     private lateinit var mediaManager: FakeMediaManager
     private lateinit var repository: OfflineFirstJournalNotesRepository
+    private var draftSnapshots = emptyList<EntryDraft>()
+    private var coverUris = emptyList<String?>()
 
     @BeforeTest
     fun setup() {
@@ -78,6 +84,8 @@ class OfflineFirstJournalNotesRepositoryTest {
         syncMetadataService = FakeSyncMetadataService()
         indexedMediaRepository = FakeIndexedMediaRepository()
         mediaManager = FakeMediaManager()
+        draftSnapshots = emptyList()
+        coverUris = emptyList()
 
         repository = createRepository()
     }
@@ -624,6 +632,34 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
+    fun `notesReferencingMediaPaths recognizes a legacy spelling of the same owned file`() =
+        runTest {
+            val legacy = "file:/data/user/0/studio.hypertext.logdate/files/audio_notes/shared.m4a"
+            val owned = "logdate-media://recordings/shared.m4a"
+            repository = createRepository(mediaReferences = StoredMediaReferences { if (it == legacy) owned else it })
+            imageNoteDao.addNote(createTestImageNote().copy(mediaRef = legacy).toEntity())
+
+            assertEquals(setOf(owned), repository.notesReferencingMediaPaths(setOf(owned)))
+        }
+
+    @Test
+    fun `removing one note retains a file still named by a legacy note URI`() =
+        runTest {
+            val legacy = "file:/data/user/0/studio.hypertext.logdate/files/media/shared.jpg"
+            val owned = "logdate-media://library/shared.jpg"
+            repository = createRepository(mediaReferences = StoredMediaReferences { if (it == legacy) owned else it })
+            val deleted = createTestImageNote().copy(mediaRef = owned)
+            val retained = createTestImageNote().copy(uid = Uuid.random(), mediaRef = legacy)
+            imageNoteDao.addNote(deleted.toEntity())
+            imageNoteDao.addNote(retained.toEntity())
+
+            repository.remove(deleted)
+
+            assertTrue(mediaManager.deletedOwnedMedia.isEmpty())
+            assertEquals(legacy, imageNoteDao.findNoteOneOff(retained.uid)?.contentUri)
+        }
+
+    @Test
     fun `remove from journal removes note journal link`() =
         runTest {
             val journal = createTestJournal()
@@ -734,6 +770,123 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
+    fun `removing a note preserves media referenced by an editor draft`() =
+        runTest {
+            val note = createTestImageNote()
+            imageNoteDao.addNote(note.toEntity())
+            draftSnapshots =
+                listOf(
+                    EntryDraft(
+                        id = Uuid.random(),
+                        notes = listOf(note.copy(uid = Uuid.random())),
+                        createdAt = Clock.System.now(),
+                        updatedAt = Clock.System.now(),
+                    ),
+                )
+
+            repository.remove(note)
+
+            assertTrue(mediaManager.deletedOwnedMedia.isEmpty())
+        }
+
+    @Test
+    fun `removing a note preserves a shared original in a draft video`() =
+        runTest {
+            val note = createTestImageNote()
+            imageNoteDao.addNote(note.toEntity())
+            draftSnapshots =
+                listOf(
+                    EntryDraft(
+                        id = Uuid.random(),
+                        notes =
+                            listOf(
+                                JournalNote.Video(
+                                    mediaRef = note.mediaRef,
+                                    creationTimestamp = Clock.System.now(),
+                                    lastUpdated = Clock.System.now(),
+                                ),
+                            ),
+                        createdAt = Clock.System.now(),
+                        updatedAt = Clock.System.now(),
+                    ),
+                )
+
+            repository.remove(note)
+
+            assertTrue(mediaManager.deletedOwnedMedia.isEmpty())
+        }
+
+    @Test
+    fun `removing a note preserves media referenced by a journal cover`() =
+        runTest {
+            val note = createTestImageNote()
+            imageNoteDao.addNote(note.toEntity())
+            coverUris = listOf(note.mediaRef)
+
+            repository.remove(note)
+
+            assertTrue(mediaManager.deletedOwnedMedia.isEmpty())
+        }
+
+    @Test
+    fun `removing a note preserves a recording checkpoint in an editor draft`() =
+        runTest {
+            val note = createTestImageNote()
+            imageNoteDao.addNote(note.toEntity())
+            draftSnapshots =
+                listOf(
+                    EntryDraft(
+                        id = Uuid.random(),
+                        notes = emptyList(),
+                        createdAt = Clock.System.now(),
+                        updatedAt = Clock.System.now(),
+                        pendingMedia =
+                            listOf(
+                                PendingMediaRecord(
+                                    blockId = Uuid.random(),
+                                    mediaType = PendingMediaType.AUDIO,
+                                    createdAt = Clock.System.now(),
+                                    fallbackFilePath = note.mediaRef,
+                                ),
+                            ),
+                    ),
+                )
+
+            repository.remove(note)
+
+            assertTrue(mediaManager.deletedOwnedMedia.isEmpty())
+        }
+
+    @Test
+    fun `removing a note preserves an active recording path in an editor draft`() =
+        runTest {
+            val note = createTestImageNote()
+            imageNoteDao.addNote(note.toEntity())
+            draftSnapshots =
+                listOf(
+                    EntryDraft(
+                        id = Uuid.random(),
+                        notes = emptyList(),
+                        createdAt = Clock.System.now(),
+                        updatedAt = Clock.System.now(),
+                        pendingMedia =
+                            listOf(
+                                PendingMediaRecord(
+                                    blockId = Uuid.random(),
+                                    mediaType = PendingMediaType.AUDIO,
+                                    createdAt = Clock.System.now(),
+                                    filePath = note.mediaRef,
+                                ),
+                            ),
+                    ),
+                )
+
+            repository.remove(note)
+
+            assertTrue(mediaManager.deletedOwnedMedia.isEmpty())
+        }
+
+    @Test
     fun `removing a text note deletes no media`() =
         runTest {
             val repository = createRepository()
@@ -773,6 +926,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         notePlaceResolver: NotePlaceResolver = EmptyNotePlaceResolver,
         imageNoteDao: ImageNoteDao = this.imageNoteDao,
         transactionManager: SyncTransactionManager = PassthroughTransactionManager,
+        mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
     ) = OfflineFirstJournalNotesRepository(
         textNoteDao = textNoteDao,
         imageNoteDao = imageNoteDao,
@@ -787,6 +941,9 @@ class OfflineFirstJournalNotesRepositoryTest {
         transactionManager = transactionManager,
         syncManagerProvider = { syncManager },
         syncMetadataService = syncMetadataService,
+        draftSnapshots = { draftSnapshots },
+        journalCoverUris = { coverUris },
+        mediaReferences = mediaReferences,
     )
 
     private class FakeNotePlaceResolver(

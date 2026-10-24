@@ -1,32 +1,17 @@
 package app.logdate.client.media
 
 import app.logdate.client.media.storage.MediaFileResolver
-import io.github.aakira.napier.Napier
-import java.io.File
 
 /**
  * Android filesystem-backed [MediaCleaner].
  *
- * Accepts `logdate-media://` references, `file:` URIs and absolute paths. Other URI
- * schemes (e.g. `content://`) are no-ops because they refer to assets owned by the
- * system media store, which the editor must not delete.
+ * A draft's stale reference check cannot establish exclusive ownership across notes, covers,
+ * other drafts, and concurrent writes. Keep persisted files until reference-aware garbage
+ * collection can safely reclaim them.
  */
+@Suppress("UNUSED_PARAMETER")
 class AndroidMediaCleaner(
-    private val mediaFiles: MediaFileResolver,
+    mediaFiles: MediaFileResolver,
 ) : MediaCleaner {
-    override suspend fun delete(path: String) {
-        val absolutePath = mediaFiles.filePath(path)
-        if (absolutePath == null) {
-            Napier.d("MediaCleaner: ignoring non-filesystem path: $path")
-            return
-        }
-        try {
-            val file = File(absolutePath)
-            if (file.exists() && !file.delete()) {
-                Napier.w("MediaCleaner: failed to delete $absolutePath")
-            }
-        } catch (e: SecurityException) {
-            Napier.w("MediaCleaner: security exception deleting $absolutePath: ${e.message}")
-        }
-    }
+    override suspend fun delete(path: String) = Unit
 }

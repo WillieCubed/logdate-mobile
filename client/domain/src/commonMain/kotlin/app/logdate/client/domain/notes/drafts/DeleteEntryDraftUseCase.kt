@@ -2,6 +2,7 @@ package app.logdate.client.domain.notes.drafts
 
 import app.logdate.client.media.MediaCleaner
 import app.logdate.client.media.NoOpMediaCleaner
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -14,26 +15,16 @@ import kotlin.uuid.Uuid
 /**
  * Use case for deleting entry drafts.
  *
- * Before removing the draft from storage, every media file referenced by the
- * draft (Ready audio/image/video mediaRefs in [EntryDraft.notes] and pending
- * recordings in [EntryDraft.pendingMedia]) is deleted via [mediaCleaner] --
- * *unless* a permanent note still references that same path. This stops orphan
- * files from accumulating under `filesDir/audio_notes/` after a discard, without
- * being able to destroy a recording a permanent note now depends on: a save flow
- * that calls this discard path right after publishing (the exact mistake that
- * once deleted months of real recordings — see [deleteAfterPublish]) now finds
- * nothing left to delete for that path instead of deleting it out from under the
- * new note.
- *
- * Read-only entries that happen to be loaded into the editor are NOT affected:
- * the use case only deletes the draft — its associated [JournalNote.Audio],
- * [JournalNote.Image], and [JournalNote.Video] records were created at autosave
- * time, never copied from a persisted entry.
+ * Removes a draft before considering cleanup of media it referenced. A media path can also
+ * belong to a permanent note, another draft, or a journal cover; those references retain it.
+ * The platform cleaner decides whether a remaining path is exclusively disposable.
  */
 class DeleteEntryDraftUseCase(
     private val entryDraftRepository: EntryDraftRepository,
     private val journalNotesRepository: JournalNotesRepository,
     private val mediaCleaner: MediaCleaner = NoOpMediaCleaner,
+    private val journalCoverUris: suspend () -> List<String?>? = { null },
+    private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
 ) {
     /**
      * Deletes the draft with the given ID.
@@ -41,21 +32,41 @@ class DeleteEntryDraftUseCase(
      * @param draftId The ID of the draft to delete
      */
     suspend operator fun invoke(draftId: Uuid) {
-        try {
-            val draft = entryDraftRepository.getDraft(draftId).first().getOrNull()
-            if (draft != null) {
-                val ownedPaths = draft.collectMediaPaths()
-                val stillPublished = journalNotesRepository.notesReferencingMediaPaths(ownedPaths.toSet())
-                mediaCleaner.deleteAll(ownedPaths - stillPublished)
+        val draft =
+            try {
+                entryDraftRepository.getDraft(draftId).first().getOrNull()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Napier.w("Could not read draft media before deletion", error)
+                null
             }
+        entryDraftRepository.deleteDraft(draftId)
+        if (draft == null) return
+
+        try {
+            val candidates = draft.collectMediaPaths().distinct()
+            if (candidates.isEmpty()) return
+            val remainingDrafts = entryDraftRepository.getDrafts().first().filterNot { it.id == draftId }
+            val covers = journalCoverUris() ?: return
+            val candidateSpellings = candidates.associateWith(mediaReferences::storedReference)
+            val stillPublished = journalNotesRepository.notesReferencingMediaPaths((candidates + candidateSpellings.values).toSet())
+            val publishedReferences = stillPublished.map(mediaReferences::storedReference).toSet()
+            val otherReferences =
+                (remainingDrafts.flatMap(EntryDraft::collectMediaPaths) + covers.filterNotNull())
+                    .map(mediaReferences::storedReference)
+                    .toSet()
+            mediaCleaner.deleteAll(
+                candidates.filter { path ->
+                    val stored = candidateSpellings.getValue(path)
+                    stored !in publishedReferences && stored !in otherReferences
+                },
+            )
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (e: Exception) {
-            // Cleanup is best-effort — a failure here must not block deletion of
-            // the draft itself, since the draft is the user-visible entity.
             Napier.w("Failed to clean up media for draft $draftId: ${e.message}")
         }
-        entryDraftRepository.deleteDraft(draftId)
     }
 
     /**
@@ -71,10 +82,8 @@ class DeleteEntryDraftUseCase(
 }
 
 /**
- * Collects every filesystem path the draft owns. Pending media may have a null
- * [app.logdate.client.repository.journals.PendingMediaRecord.filePath]; those
- * entries are skipped because there is nothing to delete.
+ * Collects all paths the draft names, including the fallback recording checkpoint.
  */
 private fun EntryDraft.collectMediaPaths(): List<String> =
     notes.mapNotNull { note -> note.mediaRefOrNull() } +
-        pendingMedia.mapNotNull { it.filePath }
+        pendingMedia.flatMap { pending -> listOfNotNull(pending.filePath, pending.fallbackFilePath) }

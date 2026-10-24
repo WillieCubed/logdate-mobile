@@ -115,8 +115,11 @@ import app.logdate.client.domain.watch.WatchPreferencesRepository
 import app.logdate.client.intelligence.availability.RewindAIAvailability
 import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.events.EventNamingExtractor
+import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.peer.state.PeerRole
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -167,7 +170,16 @@ val domainModule: Module =
         factory { CleanupExpiredDraftsUseCase(get()) }
         factory { CreateEntryDraftUseCase(get()) }
         factory { DeleteAllDraftsUseCase(get()) }
-        factory { DeleteEntryDraftUseCase(get(), get(), get()) }
+        factory {
+            val journals = get<JournalRepository>()
+            DeleteEntryDraftUseCase(
+                get(),
+                get(),
+                get(),
+                journalCoverUris = { journals.allJournalsObserved.first().map { it.coverImageUri } },
+                mediaReferences = get<StoredMediaReferences>(),
+            )
+        }
         factory { FetchEntryDraftUseCase(get()) }
         factory { FetchMostRecentDraftUseCase(get()) }
         factory { GetAllDraftsUseCase(get()) }

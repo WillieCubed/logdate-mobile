@@ -14,6 +14,7 @@ import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
+import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -30,6 +31,7 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -60,6 +62,8 @@ class OfflineFirstJournalNotesRepository(
     private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
     private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
     private val currentRecoveryScope: suspend () -> app.logdate.client.repository.journals.JournalMergeScope? = { null },
+    private val draftSnapshots: suspend () -> List<EntryDraft>? = { null },
+    private val journalCoverUris: suspend () -> List<String?>? = { null },
 ) : JournalNotesRepository,
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
@@ -118,9 +122,13 @@ class OfflineFirstJournalNotesRepository(
      */
     override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
         if (paths.isEmpty()) return emptySet()
-        val spellings = paths.associateWith(mediaReferences::spellingsOf)
-        val referenced = queries.notesReferencingMediaPaths(spellings.values.flatten().toSet())
-        return paths.filterTo(mutableSetOf()) { path -> spellings.getValue(path).any(referenced::contains) }
+        val referenced =
+            queries.allNotesObserved
+                .first()
+                .mapNotNull(JournalNote::mediaRefOrNull)
+                .map(mediaReferences::storedReference)
+                .toSet()
+        return paths.filterTo(mutableSetOf()) { path -> mediaReferences.storedReference(path) in referenced }
     }
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
@@ -261,21 +269,40 @@ class OfflineFirstJournalNotesRepository(
         }
     }
 
-    /**
-     * Deletes owned media only after the last note reference, including legacy path spellings,
-     * is gone. [MediaManager.deleteOwnedMedia] preserves files from the user's own library.
-     */
+    /** Deletes owned media only when notes, editor drafts, and journal covers no longer name it. */
     private suspend fun deleteMediaIfUnreferenced(contentUri: String?) {
         if (contentUri.isNullOrEmpty()) return
         val manager = mediaManager ?: return
 
-        val remainingReferences =
-            mediaReferences.spellingsOf(contentUri).sumOf { spelling ->
-                imageNoteDao.countByContentUri(spelling) +
-                    videoNoteDao.countByContentUri(spelling) +
-                    audioNoteDao.countByContentUri(spelling)
+        val spellings = mediaReferences.spellingsOf(contentUri)
+        val stillPublished =
+            try {
+                notesReferencingMediaPaths(setOf(contentUri)).isNotEmpty()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Napier.w("Could not verify note media references before deletion", error)
+                return
             }
-        if (remainingReferences > 0) return
+        if (stillPublished) return
+
+        val otherReferences =
+            try {
+                val drafts = draftSnapshots() ?: return
+                val covers = journalCoverUris() ?: return
+                drafts.flatMap { draft ->
+                    draft.notes.mapNotNull(JournalNote::mediaRefOrNull) +
+                        draft.pendingMedia.flatMap { pending ->
+                            listOfNotNull(pending.filePath, pending.fallbackFilePath)
+                        }
+                } + covers.filterNotNull()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Napier.w("Could not verify other media references before deletion", error)
+                return
+            }
+        if (otherReferences.any { reference -> mediaReferences.spellingsOf(reference).any(spellings::contains) }) return
 
         runCatching { manager.deleteOwnedMedia(contentUri) }
             .onFailure { Napier.w("Could not remove media for a deleted note", it) }

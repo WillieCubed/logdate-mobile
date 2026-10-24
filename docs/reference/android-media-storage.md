@@ -13,9 +13,19 @@ device's photo library. Entries name these files with portable `logdate-media://
 - **Voice recordings** are written to `filesDir/audio_notes` and stored as `logdate-media://recordings/<file>`.
 - **Unsupported media types** are not stored; the manager refuses them rather than writing a file nothing can open.
 
-Files are only deleted through `deleteOwnedMedia`, which removes a file inside the content-addressed store and
-nothing else, so a photo that came from the user's own library is never touched. Callers delete a file only
-after checking that no other entry still references it, comparing references in their stored form.
+A URI returned by a managed import is not an exclusive deletion right: an identical original may
+already be used by another entry, editor draft, or journal cover. If an import aborts, discard its
+unique staging file but retain the canonical object. Explicit note deletion checks the remaining
+notes, drafts (including pending recordings), and covers. Draft removal deletes its record before
+considering cleanup. On Android, neither note deletion nor draft cleanup physically unlinks
+persisted photos, videos, or recordings: another writer can claim the same file during a reference
+check. A future collector needs a durable, serialized reference lifecycle before erasing bytes.
+The user's original photo-library items are never deletion candidates.
+
+Locally retained objects from aborted imports and deleted notes can accumulate until that collector
+exists. The current broad Android device-transfer media inclusion can copy deleted private content;
+it needs a referenced-media transfer snapshot before release. Cloud backup excludes original media.
+Do not promise physical erasure, bounded local retention, or transfer size based only on live entries.
 
 ## The device photo library
 

@@ -7,7 +7,6 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AndroidMediaCleanerTest {
@@ -20,7 +19,7 @@ class AndroidMediaCleanerTest {
     }
 
     @Test
-    fun `deletes a file named by media reference, file URI or path`() =
+    fun `retains persisted media under every path spelling`() =
         runTest {
             val byReference = file("audio_notes/a b.m4a")
             val byUri = file("media/c.jpg")
@@ -30,7 +29,7 @@ class AndroidMediaCleanerTest {
             cleaner.delete(byUri.toURI().toString())
             cleaner.delete(byPath.path)
 
-            assertFalse(byReference.exists() || byUri.exists() || byPath.exists())
+            assertTrue(byReference.exists() && byUri.exists() && byPath.exists())
         }
 
     @Test
@@ -44,5 +43,37 @@ class AndroidMediaCleanerTest {
             assertTrue(kept.exists())
         }
 
-    private fun file(name: String): File = File(filesDir, name).apply { parentFile.mkdirs() }.also { it.writeText("bytes") }
+    @Test
+    fun `never deletes a canonical object whose content may be shared`() =
+        runTest {
+            val digest = "ab".repeat(32)
+            val shared = file("media/objects/sha256/ab/$digest.png")
+
+            cleaner.delete(shared.toURI().toString())
+            cleaner.delete("logdate-media://library/objects/sha256/ab/$digest.png")
+
+            assertTrue(shared.exists())
+        }
+
+    @Test
+    fun `refuses an external file and an app path linked to it`() =
+        runTest {
+            val outside = Files.createTempFile("logdate-external-media-", ".jpg").toFile()
+            try {
+                outside.writeText("private bytes")
+                val link = File(filesDir, "media/external-link.jpg")
+                requireNotNull(link.parentFile).mkdirs()
+                Files.createSymbolicLink(link.toPath(), outside.toPath())
+
+                cleaner.delete(outside.toURI().toString())
+                cleaner.delete(link.toURI().toString())
+
+                assertTrue(outside.exists())
+                assertTrue(link.exists())
+            } finally {
+                outside.delete()
+            }
+        }
+
+    private fun file(name: String): File = File(filesDir, name).apply { requireNotNull(parentFile).mkdirs() }.also { it.writeText("bytes") }
 }

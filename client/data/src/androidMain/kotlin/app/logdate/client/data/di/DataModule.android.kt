@@ -192,6 +192,8 @@ actual val dataModule: Module =
                 syncMetadataService = get(),
                 transcriptionRepository = get(),
                 mediaReferences = get(),
+                draftSnapshots = { get<EntryDraftRecoveryRepository>().getDraftSnapshotsForRecovery() },
+                journalCoverUris = { get<app.logdate.client.database.dao.JournalDao>().getAll().map { it.coverImageUri } },
                 currentRecoveryScope = {
                     app.logdate.client.repository.journals.JournalMergeScope(
                         get<app.logdate.client.device.identity.CanonicalOwnerProvider>().getCanonicalOwnerId(),

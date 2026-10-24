@@ -74,16 +74,20 @@ class PortableMediaReferencesE2ETest {
         }
 
     @Test
-    fun mediaManagerDeletesWhatItSavedByReference() =
+    fun mediaManagerRetainsCanonicalObjectAfterDeleteRequest() =
         runBlocking {
             val saved = mediaManager.saveMedia(MediaPayload("saved.jpg", "image/jpeg", jpeg.size.toLong(), jpeg))
             val reference = mediaFiles.storedReference(saved)
-            assertTrue(reference.startsWith("logdate-media://library/objects/sha256/"), reference)
-            assertTrue(mediaManager.exists(reference))
+            try {
+                assertTrue(reference.startsWith("logdate-media://library/objects/sha256/"), reference)
+                assertTrue(mediaManager.exists(reference))
 
-            assertTrue(mediaManager.deleteOwnedMedia(reference))
-
-            assertFalse(mediaManager.exists(reference))
+                assertFalse(mediaManager.deleteOwnedMedia(reference))
+                assertTrue(mediaManager.exists(reference))
+            } finally {
+                // The synthetic fixture has no journal owner; production never uses this shortcut.
+                mediaFiles.filePath(reference)?.let(::File)?.delete()
+            }
         }
 
     @Test

@@ -101,6 +101,7 @@ import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.config.configModule
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -173,6 +174,8 @@ actual val dataModule: Module =
                 syncMetadataService = get(),
                 transcriptionRepository = get(),
                 mediaReferences = get(),
+                draftSnapshots = { get<EntryDraftRepository>().getDrafts().first() },
+                journalCoverUris = { get<app.logdate.client.database.dao.JournalDao>().getAll().map { it.coverImageUri } },
                 currentRecoveryScope = {
                     app.logdate.client.repository.journals.JournalMergeScope(
                         get<app.logdate.client.device.identity.CanonicalOwnerProvider>().getCanonicalOwnerId(),

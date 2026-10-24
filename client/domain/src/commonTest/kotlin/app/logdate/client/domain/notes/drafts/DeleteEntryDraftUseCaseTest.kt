@@ -1,6 +1,7 @@
 package app.logdate.client.domain.notes.drafts
 
 import app.logdate.client.media.MediaCleaner
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -35,17 +36,24 @@ class DeleteEntryDraftUseCaseTest {
     private lateinit var useCase: DeleteEntryDraftUseCase
 
     private lateinit var mediaCleaner: RecordingMediaCleaner
+    private var coverUris = emptyList<String?>()
+    private val operations = mutableListOf<String>()
 
     @BeforeTest
     fun setUp() {
         mockRepository = MockEntryDraftRepository()
         notesRepository = FakeJournalNotesRepository()
         mediaCleaner = RecordingMediaCleaner()
+        coverUris = emptyList()
+        operations.clear()
+        mockRepository.onDelete = { operations += "draft" }
+        mediaCleaner.onDelete = { operations += "media" }
         useCase =
             DeleteEntryDraftUseCase(
                 entryDraftRepository = mockRepository,
                 journalNotesRepository = notesRepository,
                 mediaCleaner = mediaCleaner,
+                journalCoverUris = { coverUris },
             )
     }
 
@@ -84,7 +92,7 @@ class DeleteEntryDraftUseCaseTest {
         }
 
     @Test
-    fun `invoke deletes audio mediaRefs and pendingMedia paths before removing draft`() =
+    fun `invoke removes the draft before cleaning unreferenced audio paths`() =
         runTest {
             val now = Clock.System.now()
             val draftId = Uuid.random()
@@ -132,6 +140,118 @@ class DeleteEntryDraftUseCaseTest {
 
             assertEquals(setOf(readyAudioPath, pendingPath), mediaCleaner.deletedPaths.toSet())
             assertEquals(listOf(draftId), mockRepository.deletedDraftIds)
+            assertEquals(listOf("draft", "media", "media"), operations)
+        }
+
+    @Test
+    fun `invoke preserves media referenced by another editor draft`() =
+        runTest {
+            val now = Clock.System.now()
+            val sharedPath = "file:///audio_notes/shared.m4a"
+            val discarded =
+                EntryDraft(
+                    id = Uuid.random(),
+                    notes = listOf(JournalNote.Audio(mediaRef = sharedPath, creationTimestamp = now, lastUpdated = now)),
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            val retained = discarded.copy(id = Uuid.random())
+            mockRepository.seedDraft(discarded)
+            mockRepository.seedDraft(retained)
+
+            useCase(discarded.id)
+
+            assertEquals(listOf(discarded.id), mockRepository.deletedDraftIds)
+            assertFalse(sharedPath in mediaCleaner.deletedPaths)
+        }
+
+    @Test
+    fun `invoke preserves media when a permanent note uses its portable spelling`() =
+        runTest {
+            val now = Clock.System.now()
+            val rawPath = "file:///audio_notes/shared-alias.m4a"
+            val portable = "logdate-media://recordings/shared-alias.m4a"
+            val draft =
+                EntryDraft(
+                    id = Uuid.random(),
+                    notes = listOf(JournalNote.Audio(mediaRef = rawPath, creationTimestamp = now, lastUpdated = now)),
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            mockRepository.seedDraft(draft)
+            notesRepository.seed(JournalNote.Audio(mediaRef = portable, creationTimestamp = now, lastUpdated = now))
+            val useCase =
+                DeleteEntryDraftUseCase(
+                    mockRepository,
+                    notesRepository,
+                    mediaCleaner,
+                    journalCoverUris = { emptyList() },
+                    mediaReferences = StoredMediaReferences { if (it == rawPath) portable else it },
+                )
+
+            useCase(draft.id)
+
+            assertFalse(rawPath in mediaCleaner.deletedPaths)
+        }
+
+    @Test
+    fun `invoke removes a draft without media cleanup when its content cannot be read`() =
+        runTest {
+            val draftId = Uuid.random()
+            mockRepository.shouldThrowOnRead = true
+
+            useCase(draftId)
+
+            assertEquals(listOf(draftId), mockRepository.deletedDraftIds)
+            assertTrue(mediaCleaner.deletedPaths.isEmpty())
+        }
+
+    @Test
+    fun `invoke preserves media referenced by a journal cover`() =
+        runTest {
+            val now = Clock.System.now()
+            val sharedPath = "file:///media/cover.jpg"
+            val draft =
+                EntryDraft(
+                    id = Uuid.random(),
+                    notes = listOf(JournalNote.Image(mediaRef = sharedPath, creationTimestamp = now, lastUpdated = now)),
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            mockRepository.seedDraft(draft)
+            coverUris = listOf(sharedPath)
+
+            useCase(draft.id)
+
+            assertEquals(listOf(draft.id), mockRepository.deletedDraftIds)
+            assertFalse(sharedPath in mediaCleaner.deletedPaths)
+        }
+
+    @Test
+    fun `invoke checks fallback recording path before cleanup`() =
+        runTest {
+            val now = Clock.System.now()
+            val draft =
+                EntryDraft(
+                    id = Uuid.random(),
+                    notes = emptyList(),
+                    createdAt = now,
+                    updatedAt = now,
+                    pendingMedia =
+                        listOf(
+                            PendingMediaRecord(
+                                blockId = Uuid.random(),
+                                mediaType = PendingMediaType.AUDIO,
+                                createdAt = now,
+                                fallbackFilePath = "file:///audio_notes/fallback.m4a",
+                            ),
+                        ),
+                )
+            mockRepository.seedDraft(draft)
+
+            useCase(draft.id)
+
+            assertEquals(listOf("file:///audio_notes/fallback.m4a"), mediaCleaner.deletedPaths)
         }
 
     @Test
@@ -192,12 +312,8 @@ class DeleteEntryDraftUseCaseTest {
         }
 
     @Test
-    fun `invoke propagates CancellationException instead of swallowing it`() =
+    fun `invoke propagates cleanup cancellation after removing the draft`() =
         runTest {
-            // A CancellationException thrown by a collaborator inside the guarded try block
-            // (mediaCleaner.delete, in this case) must propagate out of invoke() so structured
-            // concurrency is respected -- not get caught by `catch (e: Exception)`, logged as a
-            // generic failure, and then fall through to deleting the draft record anyway.
             val now = Clock.System.now()
             val draftId = Uuid.random()
             val path = "file:///audio_notes/cancelled.m4a"
@@ -223,10 +339,8 @@ class DeleteEntryDraftUseCaseTest {
                 useCase(draftId)
             }
 
-            assertTrue(
-                mockRepository.deletedDraftIds.isEmpty(),
-                "a cancelled coroutine must not continue on to delete the draft record",
-            )
+            assertEquals(listOf(draftId), mockRepository.deletedDraftIds)
+            assertTrue(mediaCleaner.deletedPaths.isEmpty())
         }
 
     @Test
@@ -384,6 +498,8 @@ class DeleteEntryDraftUseCaseTest {
     private class MockEntryDraftRepository : EntryDraftRepository {
         val deletedDraftIds = mutableListOf<Uuid>()
         var shouldThrowException = false
+        var shouldThrowOnRead = false
+        var onDelete: () -> Unit = {}
         private val seeded = mutableMapOf<Uuid, EntryDraft>()
 
         fun seedDraft(draft: EntryDraft) {
@@ -400,11 +516,14 @@ class DeleteEntryDraftUseCaseTest {
                 throw Exception("Repository error")
             }
             deletedDraftIds.add(uid)
+            seeded.remove(uid)
+            onDelete()
         }
 
         override fun getDrafts(): Flow<List<EntryDraft>> = flowOf(seeded.values.toList())
 
         override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> {
+            if (shouldThrowOnRead) throw IllegalStateException("draft storage is unreadable")
             val draft = seeded[uid]
             return if (draft != null) {
                 flowOf(Result.success(draft))
@@ -504,11 +623,13 @@ class DeleteEntryDraftUseCaseTest {
         val deletedPaths = mutableListOf<String>()
         var shouldThrow = false
         var cancellationToThrow: CancellationException? = null
+        var onDelete: () -> Unit = {}
 
         override suspend fun delete(path: String) {
             cancellationToThrow?.let { throw it }
             if (shouldThrow) throw IllegalStateException("simulated cleaner failure")
             deletedPaths.add(path)
+            onDelete()
         }
     }
 }
