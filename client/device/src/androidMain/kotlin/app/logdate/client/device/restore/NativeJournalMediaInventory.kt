@@ -32,6 +32,7 @@ data class NativeJournalMediaInventory(
 fun writeNativeJournalMediaInventory(
     destination: File,
     filesDir: File,
+    selectedPaths: Set<String>? = null,
 ) {
     val files = mutableListOf<NativeJournalMediaInventory.Entry>()
     val base = filesDir.toPath()
@@ -47,7 +48,8 @@ fun writeNativeJournalMediaInventory(
                 ): FileVisitResult {
                     if (!attributes.isRegularFile || attributes.size() < 0) return FileVisitResult.CONTINUE
                     val path = "files/" + base.relativize(file).toString().replace(File.separatorChar, '/')
-                    if (!validNativeMediaInventoryPath(path)) return FileVisitResult.CONTINUE
+                    if (!validNativeMediaInventoryPath(path, allowStaging = selectedPaths != null)) return FileVisitResult.CONTINUE
+                    if (selectedPaths != null && path !in selectedPaths) return FileVisitResult.CONTINUE
                     val hash = retainedJournalChecksum(file.toFile())
                     val after = Files.readAttributes(file, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
                     if (!after.isRegularFile ||
@@ -56,7 +58,7 @@ fun writeNativeJournalMediaInventory(
                     ) {
                         return FileVisitResult.CONTINUE
                     }
-                    if (path.startsWith("files/media/") && retainedCanonicalMediaDigest(path) != hash) {
+                    if (path.startsWith("files/media/objects/sha256/") && retainedCanonicalMediaDigest(path) != hash) {
                         return FileVisitResult.CONTINUE
                     }
                     files += NativeJournalMediaInventory.Entry(path, attributes.size(), hash)
@@ -88,15 +90,18 @@ fun verifyNativeJournalMediaInventory(
     check(inventory.files.size <= MAX_INVENTORY_ENTRIES)
     var previous = ""
     inventory.files.forEach { entry ->
-        check(validNativeMediaInventoryPath(entry.path) && entry.path > previous)
+        check(validNativeMediaInventoryPath(entry.path, allowStaging = true) && entry.path > previous)
         check(entry.size >= 0 && entry.sha256.matches(SHA256))
-        if (entry.path.startsWith("files/media/")) check(retainedCanonicalMediaDigest(entry.path) == entry.sha256)
+        if (entry.path.startsWith("files/media/objects/sha256/")) check(retainedCanonicalMediaDigest(entry.path) == entry.sha256)
         previous = entry.path
     }
     return inventory
 }
 
-private fun validNativeMediaInventoryPath(path: String): Boolean {
+private fun validNativeMediaInventoryPath(
+    path: String,
+    allowStaging: Boolean = false,
+): Boolean {
     val relative = path.removePrefix("files/")
     if (relative == path || MEDIA_ROOTS.none { relative.startsWith("$it/") }) return false
     val parts = relative.split('/')
@@ -107,8 +112,8 @@ private fun validNativeMediaInventoryPath(path: String): Boolean {
     ) {
         return false
     }
-    if (relative.startsWith("audio_notes/staging/") || relative.startsWith("media/staging/")) return false
-    return !relative.startsWith("media/") || retainedCanonicalMediaDigest(path) != null
+    if (!allowStaging && (relative.startsWith("audio_notes/staging/") || relative.startsWith("media/staging/"))) return false
+    return !relative.startsWith("media/objects/sha256/") || retainedCanonicalMediaDigest(path) != null
 }
 
 private fun retainedCanonicalMediaDigest(path: String): String? {
@@ -117,7 +122,7 @@ private fun retainedCanonicalMediaDigest(path: String): String? {
 }
 
 const val NATIVE_MEDIA_INVENTORY_PATH = "files/db_recovery/native_media_inventory.json"
-private val MEDIA_ROOTS = listOf("media/objects/sha256", "user_media", "audio_notes")
+private val MEDIA_ROOTS = listOf("media", "user_media", "audio_notes")
 private val CANONICAL_MEDIA =
     Regex("files/media/objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})(?:\\.retained-[1-9][0-9]*)?\\.[^/.]+", RegexOption.IGNORE_CASE)
 private val SHA256 = Regex("[a-f0-9]{64}")

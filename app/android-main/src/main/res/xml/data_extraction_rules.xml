@@ -12,9 +12,9 @@
      LogDate Cloud, or a user-created archive.
 
    Device-to-device transfer:
-     Includes committed media, but omits temporary camera-capture output from
-     its explicit include list. It also excludes Keystore-bound ciphertext,
-     installation state, incomplete media staging, and cloned background jobs.
+     The backup agent emits only originals referenced by its pinned journal and
+     draft snapshot. XML excludes media roots from the default traversal. Keystore-bound ciphertext,
+     installation state, and cloned background jobs remain excluded.
 -->
 <data-extraction-rules>
     <cloud-backup disableIfNoEncryptionCapabilities="true">
@@ -43,9 +43,6 @@
         <include domain="file" path="retained_journals/"/>
         <include domain="file" path="native_journal_transfer/current/"/>
         <include domain="file" path="archive_recovery/sources/"/>
-        <include domain="file" path="media/"/>
-        <include domain="file" path="user_media/"/>
-        <include domain="file" path="audio_notes/"/>
         <exclude domain="database" path="logdate"/>
         <exclude domain="database" path="logdate-wal"/>
         <exclude domain="database" path="logdate-shm"/>

@@ -14,6 +14,40 @@ class NativeLegacyLateMediaCandidatesTest {
     private val packageName = "studio.hypertext.logdate.debug"
 
     @Test
+    fun `pending recording staging is admitted only with its authenticated inventory entry`() =
+        fixture { root ->
+            val pending = payload(root, "files/audio_notes/staging/pending.m4a", "recording")
+            val reference = "file:///data/user/0/$packageName/files/audio_notes/staging/pending.m4a"
+
+            assertEquals(
+                listOf(pending.path),
+                selectNativeLegacyLateMediaCandidates(listOf(pending), setOf(reference), packageName, inventory(pending))
+                    .map { it.logicalPath },
+            )
+            assertTrue(
+                selectNativeLegacyLateMediaCandidates(listOf(pending), setOf(reference), packageName, inventory())
+                    .isEmpty(),
+            )
+        }
+
+    @Test
+    fun `draft library staging is admitted only with its authenticated inventory entry`() =
+        fixture { root ->
+            val pending = payload(root, "files/media/staging/draft.jpg", "image")
+            val reference = "logdate-media://library/staging/draft.jpg"
+
+            assertEquals(
+                listOf(pending.path),
+                selectNativeLegacyLateMediaCandidates(listOf(pending), setOf(reference), packageName, inventory(pending))
+                    .map { it.logicalPath },
+            )
+            assertTrue(
+                selectNativeLegacyLateMediaCandidates(listOf(pending), setOf(reference), packageName, inventory())
+                    .isEmpty(),
+            )
+        }
+
+    @Test
     fun `selects only complete legacy bytes named by current references`() =
         fixture { root ->
             val image = payload(root, "files/user_media/older image.png", "image")

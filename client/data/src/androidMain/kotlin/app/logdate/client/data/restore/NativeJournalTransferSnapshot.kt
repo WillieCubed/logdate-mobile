@@ -2,20 +2,25 @@ package app.logdate.client.data.restore
 
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
+import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.database.NativeJournalSnapshotScope
 import app.logdate.client.database.captureNativeJournalDatabaseSnapshot
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import app.logdate.client.database.readNativeJournalSnapshotMediaReferences
 import app.logdate.client.database.verifyNativeJournalDatabaseSnapshot
 import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
+import app.logdate.client.device.restore.NativeJournalMediaInventory
 import app.logdate.client.device.restore.NativeJournalTransferOwnership
 import app.logdate.client.device.restore.retainedJournalPassphraseFile
 import app.logdate.client.device.restore.retainedJournalWorkingKeyName
+import app.logdate.client.device.restore.verifyNativeJournalMediaInventory
 import app.logdate.client.device.restore.verifyNativeJournalSourceReceipt
 import app.logdate.client.device.restore.writeNativeJournalMediaInventory
 import app.logdate.client.device.restore.writeNativeJournalSourceReceipt
 import app.logdate.client.device.storage.createAndroidSecureStorage
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.File
@@ -23,6 +28,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.channels.FileChannel
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import kotlin.io.encoding.Base64
@@ -36,10 +42,27 @@ internal class NativeJournalTransferSnapshot(
     private val current = File(root, "current")
     private val ownership = NativeJournalTransferOwnership(File(context.noBackupFilesDir, "native-journal-sender-owner"), current)
     private var prepared = false
+    private var selectedMedia: List<NativeJournalMediaInventory.Entry> = emptyList()
+    private var entryDraftFileChecksum: String? = null
+    private var preferencesChecksum: String? = null
 
     fun prepare() {
+        selectedMedia = emptyList()
+        entryDraftFileChecksum = null
+        preferencesChecksum = null
         if (!context.getDatabasePath("logdate").exists()) {
             check(!current.exists()) { "The retained native journal must remain available for recovery" }
+            val preferences = runBlocking { createAndroidMainDataStore(context).data.first() }
+            val drafts = runBlocking { AndroidLocalEntryDraftStore(context).getAllDrafts() }
+            check(
+                nativeTransferMediaPaths(
+                    nativeTransferDraftMediaReferences(preferences, drafts),
+                    context.packageName,
+                    context.filesDir,
+                ).none { path ->
+                    File(context.filesDir, path.removePrefix("files/")).exists()
+                },
+            ) { "Media-bearing drafts require a native journal snapshot" }
             return
         }
         ownership.discardOwned()
@@ -50,22 +73,47 @@ internal class NativeJournalTransferSnapshot(
         val target = File(staging, "database/logdate").apply { check(checkNotNull(parentFile).mkdirs()) }
         val keys = sourceKeyCandidates()
         try {
-            val preferences = exportWithAcceptedKey(staging, target, keys)
+            val (preferences, acceptedKey) = exportWithAcceptedKey(staging, target, keys)
+            val entryDraftFile = File(context.filesDir, "datastore/entry_drafts.preferences_pb")
+            val beforeDrafts = entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
+            val entryDrafts = runBlocking { AndroidLocalEntryDraftStore(context).getAllDrafts() }
+            check(beforeDrafts == entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)) {
+                "Entry drafts changed during native media selection"
+            }
+            val references =
+                readNativeJournalSnapshotMediaReferences(target, acceptedKey) +
+                    nativeTransferDraftMediaReferences(preferences, entryDrafts)
+            val selectedPaths = nativeTransferMediaPaths(references, context.packageName, context.filesDir)
             val mediaInventory = File(staging, NATIVE_MEDIA_INVENTORY_PATH)
-            writeNativeJournalMediaInventory(mediaInventory, context.filesDir)
+            writeNativeJournalMediaInventory(mediaInventory, context.filesDir, selectedPaths)
+            val inventory = verifyNativeJournalMediaInventory(mediaInventory, nativeSnapshotChecksum(mediaInventory))
+            selectedPaths.forEach { path ->
+                val source = File(context.filesDir, path.removePrefix("files/"))
+                if (Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                    check(inventory.entry(path) != null) { "Referenced native original could not be captured" }
+                }
+            }
             val receipt = File(staging, NATIVE_SOURCE_RECEIPT_PATH)
+            val pinnedPreferences = File(staging, "files/logdate.preferences_pb")
             writeNativeJournalSourceReceipt(
                 receipt,
                 preferences,
-                File(staging, "files/logdate.preferences_pb"),
+                pinnedPreferences,
                 mapOf("database/logdate" to target),
                 mediaInventory = mediaInventory,
             )
+            val selectedPreferencesChecksum = nativeSnapshotChecksum(pinnedPreferences)
+            requirePinnedNativeTransferFile(File(context.filesDir, "logdate.preferences_pb"), selectedPreferencesChecksum)
             staging.walkBottomUp().filter(File::isDirectory).forEach(::syncDirectory)
             ownership.record(staging)
             Files.move(staging.toPath(), current.toPath(), StandardCopyOption.ATOMIC_MOVE)
             syncDirectory(root)
             prepared = true
+            selectedMedia = inventory.files
+            entryDraftFileChecksum = entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
+            preferencesChecksum = selectedPreferencesChecksum
+            check(entryDraftFileChecksum == beforeDrafts) { "Entry drafts changed during native media selection" }
+            checkPreferencesFileUnchanged()
         } finally {
             keys.forEach { it.fill(0) }
             if (staging.exists()) ownership.discardOwned()
@@ -73,50 +121,82 @@ internal class NativeJournalTransferSnapshot(
     }
 
     fun finish() {
-        if (!prepared) return
-        ownership.discardOwned()
+        if (prepared) ownership.discardOwned()
         prepared = false
+        selectedMedia = emptyList()
+        entryDraftFileChecksum = null
+        preferencesChecksum = null
+    }
+
+    fun backupSelectedMedia(emit: (File) -> Unit) {
+        if (!prepared) return
+        checkPreferencesFileUnchanged()
+        checkEntryDraftFileUnchanged()
+        selectedMedia.forEach { entry ->
+            val file = File(context.filesDir, entry.path.removePrefix("files/"))
+            verifySelectedMediaFile(file, entry)
+            emit(file)
+            verifySelectedMediaFile(file, entry)
+        }
+        checkEntryDraftFileUnchanged()
+        checkPreferencesFileUnchanged()
+    }
+
+    private fun checkPreferencesFileUnchanged() {
+        requirePinnedNativeTransferFile(File(context.filesDir, "logdate.preferences_pb"), checkNotNull(preferencesChecksum))
+    }
+
+    private fun checkEntryDraftFileUnchanged() {
+        val file = File(context.filesDir, "datastore/entry_drafts.preferences_pb")
+        check(file.takeIf(File::exists)?.let(::nativeSnapshotChecksum) == entryDraftFileChecksum) {
+            "Entry drafts changed during native transfer"
+        }
     }
 
     private fun exportWithAcceptedKey(
         staging: File,
         target: File,
         keys: List<ByteArray>,
-    ): Preferences {
+    ): Pair<Preferences, ByteArray> {
         var failure: Exception? = null
         for (key in keys) {
             try {
-                return captureNativeJournalDatabaseSnapshot(context.getDatabasePath("logdate"), key, target) { writeScope ->
-                    val transactionThread = Thread.currentThread()
-                    // SQL -> DataStore is the same order used by scoped journal/draft writes.
-                    // The synchronous callback keeps the SQLite transaction on its owner thread.
-                    runBlocking {
-                        withTimeout(15_000) {
-                            createAndroidMainDataStore(context).updateData { snapshot ->
-                                check(Thread.currentThread() === transactionThread) { "Native SQL transaction changed thread" }
-                                val scope =
-                                    checkNotNull(
-                                        RetainedJournalSourceScope.from(
-                                            snapshot,
-                                            app.logdate.shared.config.DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL,
+                val preferences =
+                    captureNativeJournalDatabaseSnapshot(context.getDatabasePath("logdate"), key, target) { writeScope ->
+                        val transactionThread = Thread.currentThread()
+                        // SQL -> DataStore is the same order used by scoped journal/draft writes.
+                        // The synchronous callback keeps the SQLite transaction on its owner thread.
+                        runBlocking {
+                            withTimeout(15_000) {
+                                createAndroidMainDataStore(context).updateData { snapshot ->
+                                    check(Thread.currentThread() === transactionThread) { "Native SQL transaction changed thread" }
+                                    val scope =
+                                        checkNotNull(
+                                            RetainedJournalSourceScope.from(
+                                                snapshot,
+                                                app.logdate.shared.config.DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL,
+                                            ),
+                                        )
+                                    copyDurably(
+                                        File(context.filesDir, "logdate.preferences_pb"),
+                                        File(staging, "files/logdate.preferences_pb"),
+                                    )
+                                    writeScope(
+                                        NativeJournalSnapshotScope(
+                                            checkNotNull(scope.ownerId),
+                                            scope.bound,
+                                            scope.backendOrigin,
+                                            nativeSnapshotChecksum(File(staging, "files/logdate.preferences_pb")),
                                         ),
                                     )
-                                copyDurably(File(context.filesDir, "logdate.preferences_pb"), File(staging, "files/logdate.preferences_pb"))
-                                writeScope(
-                                    NativeJournalSnapshotScope(
-                                        checkNotNull(scope.ownerId),
-                                        scope.bound,
-                                        scope.backendOrigin,
-                                        nativeSnapshotChecksum(File(staging, "files/logdate.preferences_pb")),
-                                    ),
-                                )
-                                val portable = File(staging, "files/db_recovery/${retainedJournalPassphraseFile(context).name}")
-                                writeDurably(portable, Base64.encode(key).encodeToByteArray())
-                                snapshot
+                                    val portable = File(staging, "files/db_recovery/${retainedJournalPassphraseFile(context).name}")
+                                    writeDurably(portable, Base64.encode(key).encodeToByteArray())
+                                    snapshot
+                                }
                             }
                         }
                     }
-                }
+                return preferences to key
             } catch (error: Exception) {
                 failure = error
                 listOf("", "-wal", "-shm", "-journal").forEach { File(target.path + it).delete() }
@@ -180,6 +260,24 @@ private fun copyDurably(
             output.fd.sync()
         }
     }
+}
+
+private fun verifySelectedMediaFile(
+    file: File,
+    entry: NativeJournalMediaInventory.Entry,
+) {
+    check(Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS))
+    check(file.length() == entry.size && nativeSnapshotChecksum(file) == entry.sha256) {
+        "Native original changed during device transfer"
+    }
+}
+
+internal fun requirePinnedNativeTransferFile(
+    file: File,
+    pinnedSha256: String,
+) {
+    check(Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS))
+    check(nativeSnapshotChecksum(file) == pinnedSha256) { "Native transfer source changed after snapshot selection" }
 }
 
 private fun writeDurably(

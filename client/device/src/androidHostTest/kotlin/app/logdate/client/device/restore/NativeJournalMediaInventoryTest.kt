@@ -13,6 +13,45 @@ import kotlin.test.assertTrue
 
 class NativeJournalMediaInventoryTest {
     @Test
+    fun `transfer inventory contains referenced canonical originals but omits orphaned originals`() =
+        fixture { root ->
+            val files = File(root, "files")
+            val keptBytes = "referenced".encodeToByteArray()
+            val orphanBytes = "deleted".encodeToByteArray()
+            val keptHash = sha256(keptBytes)
+            val orphanHash = sha256(orphanBytes)
+            val kept = "files/media/objects/sha256/${keptHash.take(2)}/$keptHash.jpg"
+            val orphan = "files/media/objects/sha256/${orphanHash.take(2)}/$orphanHash.jpg"
+            val keptLegacy = "files/user_media/kept.jpg"
+            val orphanLegacy = "files/user_media/deleted.jpg"
+            val keptRecording = "files/audio_notes/kept.m4a"
+            val orphanRecording = "files/audio_notes/deleted.m4a"
+            val pendingRecording = "files/audio_notes/staging/pending.m4a"
+            val orphanPending = "files/audio_notes/staging/orphan.m4a"
+            write(files, kept.removePrefix("files/"), keptBytes)
+            write(files, orphan.removePrefix("files/"), orphanBytes)
+            write(files, keptLegacy.removePrefix("files/"), keptBytes)
+            write(files, orphanLegacy.removePrefix("files/"), orphanBytes)
+            write(files, keptRecording.removePrefix("files/"), keptBytes)
+            write(files, orphanRecording.removePrefix("files/"), orphanBytes)
+            write(files, pendingRecording.removePrefix("files/"), keptBytes)
+            write(files, orphanPending.removePrefix("files/"), orphanBytes)
+            val inventoryFile = File(root, NATIVE_MEDIA_INVENTORY_PATH)
+
+            writeNativeJournalMediaInventory(inventoryFile, files, setOf(kept, keptLegacy, keptRecording, pendingRecording))
+
+            val inventory = verifyNativeJournalMediaInventory(inventoryFile, sha256(inventoryFile.readBytes()))
+            assertEquals(listOf(keptRecording, pendingRecording, kept, keptLegacy).sorted(), inventory.files.map { it.path })
+            assertNull(inventory.entry(orphan))
+            assertNull(inventory.entry(orphanLegacy))
+            assertNull(inventory.entry(orphanRecording))
+            assertNull(inventory.entry(orphanPending))
+            val expectedHash = sha256(inventoryFile.readBytes())
+            inventoryFile.writeText(inventoryFile.readText().replace("staging/pending.m4a", "staging/orphan.m4a"))
+            assertFailsWith<IllegalStateException> { verifyNativeJournalMediaInventory(inventoryFile, expectedHash) }
+        }
+
+    @Test
     fun `inventory authenticates canonical and legacy originals without staging or symlinks`() =
         fixture { root ->
             val files = File(root, "files")
