@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Button
@@ -18,26 +19,27 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.platform.plainTextClipEntry
 import app.logdate.ui.theme.Spacing
+import kotlinx.coroutines.launch
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.recovery_phrase_copy
 import logdate.client.feature.core.generated.resources.recovery_phrase_enter
 import logdate.client.feature.core.generated.resources.recovery_phrase_hide
 import logdate.client.feature.core.generated.resources.recovery_phrase_intro
@@ -46,14 +48,13 @@ import logdate.client.feature.core.generated.resources.recovery_phrase_missing_t
 import logdate.client.feature.core.generated.resources.recovery_phrase_not_confirmed
 import logdate.client.feature.core.generated.resources.recovery_phrase_prompt_subtitle
 import logdate.client.feature.core.generated.resources.recovery_phrase_prompt_title
+import logdate.client.feature.core.generated.resources.recovery_phrase_saved_action
 import logdate.client.feature.core.generated.resources.recovery_phrase_show
 import logdate.client.feature.core.generated.resources.recovery_phrase_title
 import logdate.client.feature.core.generated.resources.recovery_phrase_unreadable
 import logdate.client.feature.core.generated.resources.recovery_phrase_verified
-import logdate.client.feature.core.generated.resources.recovery_phrase_verify_action
 import logdate.client.feature.core.generated.resources.recovery_phrase_verify_failed
-import logdate.client.feature.core.generated.resources.recovery_phrase_verify_label
-import logdate.client.feature.core.generated.resources.recovery_phrase_verify_prompt
+import logdate.client.feature.core.generated.resources.recovery_phrase_write_down
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -85,7 +86,7 @@ fun RecoveryPhraseScreen(
         onReveal = { viewModel.reveal(prompt) },
         onHide = viewModel::hide,
         onEnterPhrase = onEnterPhrase,
-        onVerify = viewModel::verify,
+        onConfirmSaved = viewModel::confirmSaved,
         accountRecovery = accountRecovery,
         onFinishAccountRecovery = viewModel::finishAccountRecoverySetup,
         onRetryAccountRecovery = viewModel::checkAccountRecovery,
@@ -99,19 +100,11 @@ fun RecoveryPhraseContent(
     onReveal: () -> Unit,
     onHide: () -> Unit,
     onEnterPhrase: () -> Unit,
-    onVerify: (String) -> Unit = {},
+    onConfirmSaved: () -> Unit = {},
     accountRecovery: AccountRecoveryUiState? = null,
     onFinishAccountRecovery: () -> Unit = {},
     onRetryAccountRecovery: () -> Unit = {},
 ) {
-    var isReentering by remember { mutableStateOf(false) }
-    var enteredPhrase by remember { mutableStateOf("") }
-    LaunchedEffect(state) {
-        if (state !is RecoveryPhraseUiState.Revealed) {
-            isReentering = false
-            enteredPhrase = ""
-        }
-    }
     SettingsScaffold(title = stringResource(Res.string.recovery_phrase_title), onBack = onBack) {
         item {
             Column(
@@ -180,25 +173,15 @@ fun RecoveryPhraseContent(
 
                     is RecoveryPhraseUiState.Revealed -> {
                         Intro()
-                        if (isReentering) {
-                            Text(stringResource(Res.string.recovery_phrase_verify_prompt))
-                            OutlinedTextField(
-                                value = enteredPhrase,
-                                onValueChange = { enteredPhrase = it },
-                                label = { Text(stringResource(Res.string.recovery_phrase_verify_label)) },
-                                visualTransformation = PasswordVisualTransformation(),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Button(
-                                onClick = { onVerify(enteredPhrase) },
-                                enabled = enteredPhrase.isNotBlank(),
-                            ) { Text(stringResource(Res.string.recovery_phrase_verify_action)) }
-                        } else {
-                            PhraseGrid(state.words)
-                            Button(onClick = {
-                                enteredPhrase = ""
-                                isReentering = true
-                            }) { Text(stringResource(Res.string.recovery_phrase_verify_action)) }
+                        PhraseGrid(state.words)
+                        if (!state.confirmed) {
+                            Text(stringResource(Res.string.recovery_phrase_write_down), style = MaterialTheme.typography.bodyMedium)
+                            Button(onClick = onConfirmSaved, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(Res.string.recovery_phrase_saved_action))
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            CopyPhraseButton(state.words)
                             OutlinedButton(onClick = onHide) {
                                 Icon(Icons.Outlined.VisibilityOff, contentDescription = null)
                                 Text(stringResource(Res.string.recovery_phrase_hide), modifier = Modifier.padding(start = Spacing.sm))
@@ -208,6 +191,16 @@ fun RecoveryPhraseContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CopyPhraseButton(words: List<String>) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    OutlinedButton(onClick = { scope.launch { clipboard.setClipEntry(plainTextClipEntry(words.joinToString(" "), sensitive = true)) } }) {
+        Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+        Text(stringResource(Res.string.recovery_phrase_copy), modifier = Modifier.padding(start = Spacing.sm))
     }
 }
 

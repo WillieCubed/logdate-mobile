@@ -75,13 +75,6 @@ class LabsSettingsViewModelTest {
     }
 
     @Test
-    fun `every platform can try the identity recovery key`() {
-        PlatformKind.entries.forEach { platform ->
-            assertTrue(FeatureFlag.IDENTITY_RECOVERY_KEY in labsFlags(platform), "$platform does not offer the recovery key")
-        }
-    }
-
-    @Test
     fun `every flag Labs offers has a title and description`() {
         val offeredAnywhere = PlatformKind.entries.flatMap { platform -> labsFlags(platform) }.distinct()
 

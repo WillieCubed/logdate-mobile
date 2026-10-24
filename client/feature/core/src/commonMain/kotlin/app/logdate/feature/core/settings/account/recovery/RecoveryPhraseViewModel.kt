@@ -33,6 +33,8 @@ sealed interface RecoveryPhraseUiState {
 
     data class Revealed(
         val words: List<String>,
+        /** The person already proved they saved these words, so showing them asks for nothing more. */
+        val confirmed: Boolean = false,
     ) : RecoveryPhraseUiState
 
     /** This device has no phrase, so synced entries from elsewhere can't be read until it's entered. */
@@ -94,18 +96,13 @@ class RecoveryPhraseViewModel(
     private val onVerified: () -> Unit = {},
     private val recovery: AccountRecovery? = null,
 ) : ViewModel() {
-    fun verify(phraseInput: String) {
-        if (_state.value !is RecoveryPhraseUiState.Revealed) return
-        val words =
-            phraseInput
-                .trim()
-                .lowercase()
-                .split(Regex("\\s+"))
-                .filter(String::isNotBlank)
+    /** Records that the person saved the shown phrase, which turns on backup and account recovery. */
+    fun confirmSaved() {
+        val revealed = _state.value as? RecoveryPhraseUiState.Revealed ?: return
         _state.value = RecoveryPhraseUiState.Verifying
         viewModelScope.launch {
             _state.value =
-                runCatching { confirmPhrase(words) }
+                runCatching { confirmPhrase(revealed.words) }
                     .fold(
                         onSuccess = { verified ->
                             if (verified) {
@@ -262,7 +259,10 @@ class RecoveryPhraseViewModel(
     private suspend fun readPhrase(): RecoveryPhraseUiState =
         runCatching { loadPhrase() }
             .fold(
-                onSuccess = { words -> words?.let { RecoveryPhraseUiState.Revealed(it) } ?: RecoveryPhraseUiState.NotOnThisDevice },
+                onSuccess = { words ->
+                    words?.let { RecoveryPhraseUiState.Revealed(it, confirmed = runCatching { isPhraseVerified() }.getOrDefault(false)) }
+                        ?: RecoveryPhraseUiState.NotOnThisDevice
+                },
                 onFailure = { error ->
                     Napier.e("Could not read the recovery phrase", error)
                     RecoveryPhraseUiState.Failed(RevealFailure.UNREADABLE)
