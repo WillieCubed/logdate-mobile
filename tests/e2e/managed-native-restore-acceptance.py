@@ -56,6 +56,245 @@ def retain_terminal_results(process, results, output, started_ns):
     return retained
 
 
+def stop_owned_setup_guest(
+    pid, candidate, identity, output, adb, *, execute, process_identity
+):
+    """Stop only an attested setup endpoint, never a guessed console or reused PID."""
+
+    def listeners():
+        return execute(
+            "lsof",
+            "-nP",
+            "-a",
+            "-p",
+            str(pid),
+            "-iTCP",
+            "-sTCP:LISTEN",
+            "-Fn",
+            check=False,
+        ).stdout.decode()
+
+    port = console_port(listeners())
+    if port is None:
+        raise RuntimeError("Setup guest has no unique owned console port")
+    serial = f"emulator-{port}"
+    reported = (
+        execute(adb, "-s", serial, "emu", "avd", "name").stdout.decode().splitlines()
+    )
+    if (
+        not reported
+        or reported[0] != candidate["avd"]
+        or execute(
+            adb, "-s", serial, "shell", "getprop", "ro.kernel.qemu"
+        ).stdout.strip()
+        != b"1"
+    ):
+        raise RuntimeError("Setup endpoint does not match the owned emulator")
+    evidence = {"pid": pid, **candidate, "identity": identity, "serial": serial}
+    save(output / f"setup-guest-{pid}.json", evidence)
+    if process_identity(pid) != identity or console_port(listeners()) != port:
+        raise RuntimeError(
+            "Setup guest identity or port changed before graceful termination"
+        )
+    execute(adb, "-s", serial, "emu", "kill")
+    return evidence
+
+
+def prepare_managed_setup(
+    pair_arguments,
+    device_name,
+    environment,
+    output,
+    nonce,
+    managed_sdk,
+    budget,
+    *,
+    expected_avd=None,
+    popen=subprocess.Popen,
+    execute=None,
+    process_identity=TARGET["process_identity"],
+    pause=time.sleep,
+    clock=time.monotonic,
+):
+    """Finish GMD snapshot validation and its guests before requesting two test shards."""
+    execute = execute or command
+    arguments = [
+        pair_arguments[0],
+        f":tools:native-restore-driver:{device_name}Setup",
+        *pair_arguments[2:],
+    ]
+    primary = None
+    with (output / "setup.log").open("wb") as log:
+        process = popen(
+            arguments, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT
+        )
+        identity = None
+        try:
+            identity = (
+                discovery_identity(process.pid, process_identity=process_identity)
+                if process.poll() is None
+                else None
+            )
+            save(
+                output / "setup-process.json",
+                {
+                    "nonce": nonce,
+                    "pid": process.pid,
+                    "identity": identity,
+                    "arguments": arguments,
+                },
+            )
+            status = process.wait(timeout=budget["boot"])
+            if status != 0:
+                raise subprocess.CalledProcessError(status, arguments)
+        except BaseException as failure:
+            primary = failure
+        deadline = clock() + budget["teardown"]
+        try:
+            if process.poll() is None:
+                current = discovery_identity(
+                    process.pid, process_identity=process_identity
+                )
+                if (
+                    identity is None
+                    or current != identity
+                    or nonce not in identity["command"]
+                ):
+                    raise RuntimeError(
+                        "Setup Gradle identity changed; the live process was not terminated"
+                    )
+                save(
+                    output / "setup-gradle-stop.json",
+                    {"nonce": nonce, "pid": process.pid, "identity": identity},
+                )
+                if process_identity(process.pid) != identity:
+                    raise RuntimeError("Setup Gradle PID was reused before termination")
+                process.terminate()
+                process.wait(timeout=max(0.1, deadline - clock()))
+            stopped = set()
+            while True:
+                invocations = [
+                    json.loads(path.read_text())
+                    for path in (output / "managed-emulator-invocations").glob("*.json")
+                ]
+                if any(invocation.get("nonce") != nonce for invocation in invocations):
+                    raise RuntimeError(
+                        "The setup invocation does not belong to this private generation"
+                    )
+                listing = execute("ps", "-axo", "pid,args", check=False)
+                lines = (
+                    listing.stdout.decode().splitlines()
+                    if listing.returncode == 0
+                    else None
+                )
+                if EMULATOR["managed_processes_stopped"](
+                    process, invocations, set(), lines, managed_sdk
+                ):
+                    save(
+                        output
+                        / (
+                            "setup-teardown.json"
+                            if primary is None
+                            else "setup-cleanup.json"
+                        ),
+                        {
+                            "nonce": nonce,
+                            "setupExit": process.poll(),
+                            "allOwnedSetupProcessesStopped": True,
+                            "launcherPids": [v["launcherPid"] for v in invocations],
+                        },
+                    )
+                    break
+                if lines is not None and expected_avd is not None:
+                    candidates = TARGET["managed_candidates"](
+                        lines, set(), expected_avd
+                    )
+                    for invocation in invocations:
+                        pid, original = (
+                            invocation["launcherPid"],
+                            invocation["arguments"],
+                        )
+                        candidate = candidates.get(pid)
+                        if (
+                            pid in stopped
+                            or candidate is None
+                            or original.count("-id") != 1
+                        ):
+                            continue
+                        position = original.index("-id") + 1
+                        if (
+                            position >= len(original)
+                            or original[position] != candidate["managedId"]
+                            or f"@{expected_avd}" not in original
+                        ):
+                            continue
+                        current = discovery_identity(
+                            pid, process_identity=process_identity
+                        )
+                        if (
+                            current is None
+                            or TARGET["managed_candidates"](
+                                [f"{pid} {current['command']}"], set(), expected_avd
+                            ).get(pid)
+                            != candidate
+                        ):
+                            continue
+                        stop_owned_setup_guest(
+                            pid,
+                            {**candidate, "nonce": nonce},
+                            current,
+                            output,
+                            str(managed_sdk / "platform-tools/adb"),
+                            execute=execute,
+                            process_identity=process_identity,
+                        )
+                        stopped.add(pid)
+                if clock() >= deadline:
+                    raise RuntimeError(
+                        "Owned managed setup processes are still live; the pair was not started"
+                    )
+                pause(0.2)
+        except BaseException as cleanup_failure:
+            if primary is None:
+                primary = cleanup_failure
+            else:
+                add_failure_note(
+                    primary,
+                    "Owned setup cleanup failed: " + type(cleanup_failure).__name__,
+                )
+        finally:
+            try:
+                save(
+                    output / "setup-final.json",
+                    {
+                        "nonce": nonce,
+                        "pid": process.pid,
+                        "identity": identity,
+                        "exit": process.poll(),
+                        "failure": type(primary).__name__ if primary else None,
+                        "failureMessage": str(primary) if primary else None,
+                    },
+                )
+            except Exception as evidence_failure:
+                if primary is None:
+                    primary = evidence_failure
+                else:
+                    add_failure_note(
+                        primary,
+                        "Could not retain setup termination evidence: "
+                        + type(evidence_failure).__name__,
+                    )
+        if primary is not None:
+            raise primary
+        # AGP's Setup task is intentionally never up-to-date. It already ran and
+        # its exact owned guests are now gone; exclude only that completed task.
+        return [
+            *pair_arguments,
+            "-x",
+            f":tools:native-restore-driver:{device_name}Setup",
+        ]
+
+
 def acceptance_receipt(mode, native_arguments, followups):
     cloud_selection = mode == "transfer" and any(
         choice in native_arguments
@@ -727,6 +966,21 @@ def run_managed_pair(
         "--no-configuration-cache",
         "--max-workers=2",
         "--console=plain",
+    ]
+    args = prepare_managed_setup(
+        args, device_name, env, output, nonce, managed_sdk, budget, expected_avd=avd
+    )
+    # Setup validation uses the same launcher shape as test guests. Require its
+    # teardown before taking the discovery baseline; never ignore a third live guest.
+    initial_processes = command("ps", "-axo", "pid,args").stdout.decode().splitlines()
+    capacity = TARGET["managed_device_capacity"](initial_processes)
+    args = [
+        f"-Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices={capacity}"
+        if argument.startswith(
+            "-Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices="
+        )
+        else argument
+        for argument in args
     ]
     existing = {
         int(line.split(None, 1)[0])

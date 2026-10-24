@@ -508,6 +508,363 @@ class ManagedDriverControllerTest(unittest.TestCase):
                 )
             self.assertEqual([], list(root.iterdir()))
 
+    def test_setup_teardown_precedes_the_pair_and_keeps_foreign_processes_untouched(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            receipts = output / "managed-emulator-invocations"
+            receipts.mkdir()
+            (receipts / "launch.json").write_text(
+                json.dumps(
+                    {
+                        "nonce": "owned",
+                        "launcherPid": 41,
+                        "arguments": ["-id", "validation_GradleManagedDevice"],
+                    }
+                )
+            )
+            process = Mock(pid=30)
+            process.wait.return_value = 0
+            process.poll.return_value = 0
+            launch = Mock(return_value=process)
+            execute = Mock(
+                side_effect=[
+                    subprocess.CompletedProcess(
+                        [],
+                        0,
+                        b"41 /sdk/qemu-system-x86_64 -id validation_GradleManagedDevice\n99 foreign-emulator",
+                    ),
+                    subprocess.CompletedProcess([], 0, b"99 foreign-emulator"),
+                ]
+            )
+            pause = Mock()
+            pair = MODULE["prepare_managed_setup"](
+                [
+                    "./gradlew",
+                    ":tools:native-restore-driver:nativeRestorePairGroupDebugAndroidTest",
+                    "--no-daemon",
+                ],
+                "restorePairApi34",
+                {},
+                output,
+                "owned",
+                output / "managed-sdk",
+                {"boot": 600, "teardown": 120},
+                popen=launch,
+                execute=execute,
+                pause=pause,
+            )
+            self.assertEqual(
+                ":tools:native-restore-driver:restorePairApi34Setup",
+                launch.call_args.args[0][1],
+            )
+            self.assertNotIn(
+                "GroupDebugAndroidTest", " ".join(launch.call_args.args[0])
+            )
+            process.wait.assert_called_once_with(timeout=600)
+            self.assertEqual(
+                ["-x", ":tools:native-restore-driver:restorePairApi34Setup"], pair[-2:]
+            )
+            self.assertIn(
+                ":tools:native-restore-driver:nativeRestorePairGroupDebugAndroidTest",
+                pair,
+            )
+            self.assertEqual(1, pair.count("-x"))
+            self.assertEqual(2, execute.call_count)
+            pause.assert_called_once()
+            process.terminate.assert_not_called()
+            process.kill.assert_not_called()
+            receipt = json.loads((output / "setup-teardown.json").read_text())
+            self.assertTrue(receipt["allOwnedSetupProcessesStopped"])
+            self.assertEqual(
+                0o600, (output / "setup-teardown.json").stat().st_mode & 0o777
+            )
+
+    def test_setup_failure_or_live_validation_guest_blocks_pair_start(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            process = Mock(pid=30)
+            process.wait.return_value = process.poll.return_value = 1
+            with self.assertRaises(subprocess.CalledProcessError):
+                MODULE["prepare_managed_setup"](
+                    ["./gradlew", "pair"],
+                    "restorePairApi34",
+                    {},
+                    output,
+                    "owned",
+                    output / "sdk",
+                    {"boot": 600, "teardown": 0},
+                    popen=Mock(return_value=process),
+                )
+            self.assertFalse((output / "setup-teardown.json").exists())
+            process.wait.return_value = 0
+            process.poll.return_value = 0
+            execute = Mock(
+                return_value=subprocess.CompletedProcess(
+                    [], 0, b"40 /private/sdk/emulator --still-live"
+                )
+            )
+            with self.assertRaisesRegex(RuntimeError, "setup.*still live"):
+                MODULE["prepare_managed_setup"](
+                    ["./gradlew", "pair"],
+                    "restorePairApi34",
+                    {},
+                    output,
+                    "owned",
+                    Path("/private/sdk"),
+                    {"boot": 600, "teardown": 0},
+                    popen=Mock(return_value=process),
+                    execute=execute,
+                )
+            self.assertFalse((output / "setup-teardown.json").exists())
+            process.terminate.assert_not_called()
+            process.kill.assert_not_called()
+
+    def test_setup_wait_never_adopts_an_unreadable_or_foreign_generation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            process = Mock(pid=30)
+            process.wait.return_value = process.poll.return_value = 0
+            execute = Mock(return_value=subprocess.CompletedProcess([], 1, b""))
+            with self.assertRaisesRegex(RuntimeError, "setup processes are still live"):
+                MODULE["prepare_managed_setup"](
+                    ["./gradlew", "pair"],
+                    "restorePairApi34",
+                    {},
+                    output,
+                    "owned",
+                    output / "sdk",
+                    {"boot": 600, "teardown": 0},
+                    popen=Mock(return_value=process),
+                    execute=execute,
+                )
+            receipts = output / "managed-emulator-invocations"
+            receipts.mkdir()
+            (receipts / "foreign.json").write_text(
+                json.dumps(
+                    {
+                        "nonce": "foreign",
+                        "launcherPid": 41,
+                        "arguments": [],
+                    }
+                )
+            )
+            with self.assertRaisesRegex(RuntimeError, "private generation"):
+                MODULE["prepare_managed_setup"](
+                    ["./gradlew", "pair"],
+                    "restorePairApi34",
+                    {},
+                    output,
+                    "owned",
+                    output / "sdk",
+                    {"boot": 600, "teardown": 0},
+                    popen=Mock(return_value=process),
+                    execute=execute,
+                )
+            self.assertFalse((output / "setup-teardown.json").exists())
+            process.terminate.assert_not_called()
+            process.kill.assert_not_called()
+
+    def test_completed_setup_gracefully_stops_only_its_attested_validation_guest(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder)
+            receipts = output / "managed-emulator-invocations"
+            receipts.mkdir()
+            (receipts / "41.json").write_text(
+                json.dumps(
+                    {
+                        "nonce": "owned",
+                        "launcherPid": 41,
+                        "arguments": [
+                            "@owned_avd",
+                            "-id",
+                            "validation_GradleManagedDevice",
+                        ],
+                    }
+                )
+            )
+            identity = {
+                "birth": "original",
+                "command": "/sdk/qemu-system-x86_64 @owned_avd -id validation_GradleManagedDevice",
+            }
+            process = Mock(pid=30)
+            process.wait.return_value = process.poll.return_value = 0
+            scans = 0
+
+            def execute(*arguments, **keywords):
+                nonlocal scans
+                if arguments[0] == "ps":
+                    scans += 1
+                    data = (
+                        f"41 {identity['command']}\n99 foreign-emulator"
+                        if scans == 1
+                        else "99 foreign-emulator"
+                    ).encode()
+                elif arguments[0] == "lsof":
+                    data = b"n127.0.0.1:5554\n"
+                elif arguments[-3:] == ("emu", "avd", "name"):
+                    data = b"owned_avd\nOK"
+                elif arguments[-2:] == ("getprop", "ro.kernel.qemu"):
+                    data = b"1"
+                else:
+                    self.assertEqual(
+                        ("-s", "emulator-5554", "emu", "kill"), arguments[-4:]
+                    )
+                    data = b"OK"
+                return subprocess.CompletedProcess([], 0, data)
+
+            command = Mock(side_effect=execute)
+            pair = MODULE["prepare_managed_setup"](
+                ["./gradlew", "pair"],
+                "restorePairApi34",
+                {},
+                output,
+                "owned",
+                output / "sdk",
+                {"boot": 600, "teardown": 120},
+                expected_avd="owned_avd",
+                popen=Mock(return_value=process),
+                execute=command,
+                process_identity=Mock(return_value=identity),
+                pause=Mock(),
+            )
+            self.assertEqual(2, scans)
+            self.assertEqual(
+                1, sum(call.args[-1] == "kill" for call in command.call_args_list)
+            )
+            proof = json.loads((output / "setup-guest-41.json").read_text())
+            self.assertEqual(identity, proof["identity"])
+            self.assertEqual("owned", proof["nonce"])
+            self.assertEqual("emulator-5554", proof["serial"])
+            self.assertEqual("-x", pair[-2])
+            self.assertTrue(
+                json.loads((output / "setup-teardown.json").read_text())[
+                    "allOwnedSetupProcessesStopped"
+                ]
+            )
+
+    def test_setup_cleanup_requires_same_pid_birth_command_avd_and_console_port(self):
+        identity = {
+            "birth": "original",
+            "command": "/sdk/qemu-system-x86_64 @owned -id validation_GradleManagedDevice",
+        }
+        candidate = {
+            "avd": "owned",
+            "managedId": "validation_GradleManagedDevice",
+            "nonce": "private",
+        }
+        for mutation in (None, "identity", "port", "avd", "not-qemu", "ambiguous-port"):
+            with (
+                self.subTest(mutation=mutation),
+                tempfile.TemporaryDirectory() as folder,
+            ):
+                output = Path(folder)
+                listens = 0
+
+                def execute(*arguments, **keywords):
+                    nonlocal listens
+                    if arguments[0] == "lsof":
+                        listens += 1
+                        data = b"n127.0.0.1:5554\n"
+                        if mutation == "port" and listens == 2:
+                            data = b"n127.0.0.1:5556\n"
+                        if mutation == "ambiguous-port":
+                            data += b"n127.0.0.1:5556\n"
+                    elif arguments[-3:] == ("emu", "avd", "name"):
+                        data = b"foreign\nOK" if mutation == "avd" else b"owned\nOK"
+                    elif arguments[-2:] == ("getprop", "ro.kernel.qemu"):
+                        data = b"0" if mutation == "not-qemu" else b"1"
+                    else:
+                        self.assertEqual(
+                            ("/sdk/adb", "-s", "emulator-5554", "emu", "kill"),
+                            arguments,
+                        )
+                        self.assertTrue((output / "setup-guest-41.json").is_file())
+                        data = b"OK"
+                    return subprocess.CompletedProcess([], 0, data)
+
+                command = Mock(side_effect=execute)
+                current = (
+                    {**identity, "birth": "reused"}
+                    if mutation == "identity"
+                    else identity
+                )
+                if mutation is None:
+                    MODULE["stop_owned_setup_guest"](
+                        41,
+                        candidate,
+                        identity,
+                        output,
+                        "/sdk/adb",
+                        execute=command,
+                        process_identity=Mock(return_value=current),
+                    )
+                    self.assertEqual("kill", command.call_args.args[-1])
+                else:
+                    with self.assertRaises(RuntimeError):
+                        MODULE["stop_owned_setup_guest"](
+                            41,
+                            candidate,
+                            identity,
+                            output,
+                            "/sdk/adb",
+                            execute=command,
+                            process_identity=Mock(return_value=current),
+                        )
+                    self.assertFalse(
+                        any(call.args[-1] == "kill" for call in command.call_args_list)
+                    )
+
+    def test_setup_timeout_stops_only_matching_owned_gradle_and_preserves_original_error(
+        self,
+    ):
+        for reused in (False, True):
+            with self.subTest(reused=reused), tempfile.TemporaryDirectory() as folder:
+                process = Mock(pid=30)
+                state = {"exit": None}
+                failure = subprocess.TimeoutExpired("own-setup", 600)
+                process.poll.side_effect = lambda: state["exit"]
+
+                def wait(**keywords):
+                    if state["exit"] is None:
+                        raise failure
+                    return state["exit"]
+
+                process.wait.side_effect = wait
+                process.terminate.side_effect = lambda: state.update(exit=0)
+                identity = {
+                    "birth": "original",
+                    "command": "gradle -PnativeManagedNonce=owned",
+                }
+                changed = (
+                    {"birth": "foreign", "command": "foreign-gradle"}
+                    if reused
+                    else identity
+                )
+                identities = Mock(side_effect=[identity, changed, changed])
+                with self.assertRaises(subprocess.TimeoutExpired) as caught:
+                    MODULE["prepare_managed_setup"](
+                        ["./gradlew", "pair"],
+                        "restorePairApi34",
+                        {},
+                        Path(folder),
+                        "owned",
+                        Path(folder) / "sdk",
+                        {"boot": 600, "teardown": 0},
+                        popen=Mock(return_value=process),
+                        execute=Mock(
+                            return_value=subprocess.CompletedProcess([], 0, b"")
+                        ),
+                        process_identity=identities,
+                    )
+                self.assertIs(failure, caught.exception)
+                self.assertEqual(0 if reused else 1, process.terminate.call_count)
+                process.kill.assert_not_called()
+                evidence = json.loads((Path(folder) / "setup-final.json").read_text())
+                self.assertEqual(identity, evidence["identity"])
+                self.assertEqual("TimeoutExpired", evidence["failure"])
+
     def test_expired_process_snapshot_cannot_inflate_the_live_pair(self):
         avd = "owned_avd"
         candidates = {
