@@ -714,9 +714,11 @@ when choosing what each emulator run proves. Cloud backup can be exercised on on
 comprehensive device-to-device transfer uses a source device and a separate, fresh target.
 
 The two-emulator `native-backup-acceptance.py` scenario calls Android's Backup Manager on the
-source and target with the encrypted local transport. It verifies real native callbacks, selected
-files, and destination recovery across two app installations. That transport run does not prove
-Google's D2D transport or the setup wizard.
+source and target with the encrypted local transport. Transfer scenarios select Android's
+device-transfer rules; the credentials-only scenario selects cloud-backup rules, requiring the
+live journal recovery key while excluding selected transfer bundles and original media. The
+harness verifies native callbacks, selected files, and destination recovery across two app
+installations. LocalTransport does not prove Google's provider delivery or the setup wizard.
 
 `native-d2d-acceptance.py` follows the guide's repeatable single-device GMS `D2dTransport` test-mode
 flow on an API 31+ Google Play emulator. It backs up a synthetic journal, changes its title and a
@@ -913,8 +915,8 @@ provider-issued replacement sessions, or enrollment key rotation. Account/device
 stores installation metadata; peer authentication keys have their own fresh-handshake checks.
 
 The local transport exercises file selection, native callbacks, and application recovery using
-test encryption and direct-transfer flags. Google credential delivery and setup transfer require
-the corresponding providers and a dedicated test account. Cross-platform transfer requires a
+test encryption with the rules for each scenario. Google credential delivery and setup transfer
+require the corresponding providers and a dedicated test account. Cross-platform transfer requires a
 matching Android/iOS format and receiving implementation before configuration can be enabled.
 The receiving implementation is the native app in `logdate-apple`, bundle
 `studio.hypertext.apps.logdate`, team `T95VDD3A4W`. An iOS application target and AppMigrationKit
@@ -922,9 +924,9 @@ extension are required, together with the App Store Connect OS data transfer map
 AppMigrationKit does not run in the macOS application.
 
 The two-emulator harness also supports `--exercise-data-only` to prove a signed-in synthetic source
-restores journal and media while leaving the destination signed out, `--exercise-credentials-only`
-to prove portable recovery
-keys arrive without journal or media data, `--exercise-missing-keys` to retain encrypted journal
+restores journal and media while leaving the destination signed out. `--exercise-credentials-only`
+models a partial encrypted cloud delivery in which portable recovery keys arrive without journal or
+media data. `--exercise-missing-keys` retains encrypted journal
 data without replacing unreadable keys, `--exercise-partial-media` to omit one original while
 checking the remaining media and recoverable source reference, and `--exercise-duplicate-restore`
 to replay Android restore before app launch and compare durable state. `--exercise-missing-privacy`
