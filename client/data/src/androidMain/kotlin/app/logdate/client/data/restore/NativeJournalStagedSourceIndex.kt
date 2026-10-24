@@ -91,6 +91,20 @@ class NativeJournalStagedSourceIndex(
         receipt.mediaInventorySha256?.let { expected ->
             files[NATIVE_MEDIA_INVENTORY_PATH]?.let { verifyNativeJournalMediaInventory(it, expected) }
         }
+        val metadata = metadataFor(files, cohortIds, receiptFile)
+        val destination = File(root, metadata.receiptSha256)
+        if (destination.exists()) {
+            updateExisting(destination, metadata, receipt.mediaInventorySha256, files[NATIVE_MEDIA_INVENTORY_PATH])
+        } else {
+            createNew(destination, metadata, receiptFile, receipt.mediaInventorySha256, files[NATIVE_MEDIA_INVENTORY_PATH])
+        }
+    }
+
+    private fun metadataFor(
+        files: Map<String, File>,
+        cohortIds: Map<String, String>,
+        receiptFile: File,
+    ): Metadata {
         val hashes = files.mapValues { nativeSnapshotChecksum(it.value) }
         val custody = NativeJournalReplayCustody(context)
         val physicalPaths =
@@ -105,66 +119,78 @@ class NativeJournalStagedSourceIndex(
                         }.file.canonicalPath,
                 )
             }
-        val metadata =
-            Metadata(
-                nativeSnapshotChecksum(receiptFile),
-                hashes,
-                physicalPaths.filterKeys { it in AUXILIARY_PATHS },
-                physicalPaths.filterKeys { it !in AUXILIARY_PATHS },
-            )
-        val destination = File(root, metadata.receiptSha256)
-        if (destination.exists()) {
-            val existingRecord = read(destination)
-            val existing = existingRecord.pathSha256
-            check(existing.filterKeys { it !in AUXILIARY_PATHS } == metadata.pathSha256.filterKeys { it !in AUXILIARY_PATHS })
-            val compatibleAuxiliary =
-                metadata.pathSha256.filter { (path, hash) -> path in AUXILIARY_PATHS && (existing[path] == null || existing[path] == hash) }
-            val combined =
-                (existingRecord.stagedAuxiliaryPhysicalPaths.keys + compatibleAuxiliary.keys).associateWith { path ->
-                    val paths =
-                        existingRecord.stagedAuxiliaryPhysicalPaths[path]
+        return Metadata(
+            nativeSnapshotChecksum(receiptFile),
+            hashes,
+            physicalPaths.filterKeys { it in AUXILIARY_PATHS },
+            physicalPaths.filterKeys { it !in AUXILIARY_PATHS },
+        )
+    }
+
+    private fun updateExisting(
+        destination: File,
+        metadata: Metadata,
+        expectedInventoryHash: String?,
+        inventoryFile: File?,
+    ) {
+        val existingRecord = read(destination)
+        val existing = existingRecord.pathSha256
+        check(existing.filterKeys { it !in AUXILIARY_PATHS } == metadata.pathSha256.filterKeys { it !in AUXILIARY_PATHS })
+        val compatibleAuxiliary =
+            metadata.pathSha256.filter { (path, hash) -> path in AUXILIARY_PATHS && (existing[path] == null || existing[path] == hash) }
+        val combined =
+            (existingRecord.stagedAuxiliaryPhysicalPaths.keys + compatibleAuxiliary.keys).associateWith { path ->
+                val paths =
+                    existingRecord.stagedAuxiliaryPhysicalPaths[path]
+                        .orEmpty()
+                        .filter { File(it).exists() }
+                        .toSet() +
+                        metadata.stagedAuxiliaryPhysicalPaths[path]
                             .orEmpty()
-                            .filter { File(it).exists() }
-                            .toSet() +
-                            metadata.stagedAuxiliaryPhysicalPaths[path]
-                                .orEmpty()
-                                .takeIf { path in compatibleAuxiliary }
-                                .orEmpty()
-                    check(paths.size <= 16)
-                    paths
-                }
-            val combinedCore =
-                (existingRecord.sourceCorePhysicalPaths.keys + metadata.sourceCorePhysicalPaths.keys).associateWith { path ->
-                    val paths =
-                        existingRecord.sourceCorePhysicalPaths[path]
+                            .takeIf { path in compatibleAuxiliary }
                             .orEmpty()
-                            .filter { File(it).exists() }
-                            .toSet() +
-                            metadata.sourceCorePhysicalPaths[path].orEmpty()
-                    check(paths.size <= 16)
-                    paths
-                }
-            val updated = Metadata(metadata.receiptSha256, existing + compatibleAuxiliary, combined, combinedCore)
-            existing[NATIVE_MEDIA_INVENTORY_PATH]?.let { check(it == receipt.mediaInventorySha256) }
-            val temporary = File(destination, ".metadata.part")
-            write(temporary, Json.encodeToString(Metadata.serializer(), updated))
-            Files.move(
-                temporary.toPath(),
-                File(destination, "metadata.json").toPath(),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING,
-            )
-            sync(destination)
-            files[NATIVE_MEDIA_INVENTORY_PATH]?.let { retainMediaInventory(metadata.receiptSha256, it) }
-            return
-        }
+                check(paths.size <= 16)
+                paths
+            }
+        val combinedCore =
+            (existingRecord.sourceCorePhysicalPaths.keys + metadata.sourceCorePhysicalPaths.keys).associateWith { path ->
+                val paths =
+                    existingRecord.sourceCorePhysicalPaths[path]
+                        .orEmpty()
+                        .filter { File(it).exists() }
+                        .toSet() +
+                        metadata.sourceCorePhysicalPaths[path].orEmpty()
+                check(paths.size <= 16)
+                paths
+            }
+        val updated = Metadata(metadata.receiptSha256, existing + compatibleAuxiliary, combined, combinedCore)
+        existing[NATIVE_MEDIA_INVENTORY_PATH]?.let { check(it == expectedInventoryHash) }
+        val temporary = File(destination, ".metadata.part")
+        write(temporary, Json.encodeToString(Metadata.serializer(), updated))
+        Files.move(
+            temporary.toPath(),
+            File(destination, "metadata.json").toPath(),
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING,
+        )
+        sync(destination)
+        inventoryFile?.let { retainMediaInventory(metadata.receiptSha256, it) }
+    }
+
+    private fun createNew(
+        destination: File,
+        metadata: Metadata,
+        receiptFile: File,
+        expectedInventoryHash: String?,
+        inventoryFile: File?,
+    ) {
         check(root.mkdirs() || root.isDirectory)
         val temporary = Files.createTempDirectory(root.toPath(), ".staged-").toFile()
         try {
             copy(receiptFile, File(temporary, "receipt.json"))
-            files[NATIVE_MEDIA_INVENTORY_PATH]?.let { copy(it, File(temporary, "media-inventory.json")) }
+            inventoryFile?.let { copy(it, File(temporary, "media-inventory.json")) }
             check(nativeSnapshotChecksum(File(temporary, "receipt.json")) == metadata.receiptSha256)
-            receipt.mediaInventorySha256?.let { expected ->
+            expectedInventoryHash?.let { expected ->
                 File(temporary, "media-inventory.json").takeIf(File::exists)?.let { verifyNativeJournalMediaInventory(it, expected) }
             }
             write(File(temporary, "metadata.json"), Json.encodeToString(Metadata.serializer(), metadata))

@@ -159,37 +159,41 @@ open class NativeBackupAgent : BackupAgent() {
                 finishStagedNativeJournalTransfer()
                 return
             }
-            if (journalInstalled) {
-                PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered = true)
-                PostRestoreDetector(this).markNativePrivacyPayloadReceived()
-            }
-            super.onRestoreFinished()
-            val finalDelivery = restoredPreferences().recordFinalDelivery(retainedPreferenceNames)
-            retainOptionalPreferences { finish(retainedPreferenceNames, finalDelivery) }
-            val detector = PostRestoreDetector(this)
-            val preferences = createAndroidMainDataStore(this)
-            val admission = detector.reserveAccountRecoveryForCompletion()
-            runBlocking(Dispatchers.IO) {
-                withTimeout(15_000) { retainAccountRecoveryBeforeCompletion(preferences, admission) }
-            }
-            detector.recordRestoreCompletedUnderDeliveryLock()
-            finishNativeJournalTransferRestore()
-            synchronized(callbackLock) { restoreCompletionRecorded = true }
-            try {
-                runBlocking(Dispatchers.IO) {
-                    withTimeoutOrNull(15_000) {
-                        retainAccountRecovery(preferences, freshDelivery = true)
-                        prepareRestoredInstallationState(preferences)
-                        restoreAccount(preferences)
-                    }
-                }
-            } catch (_: Exception) {
-                Napier.w("Background native account recovery remains pending")
-            }
+            completeFreshNativeRestore(journalInstalled)
         } finally {
             nativeRestoreSession.finish()
             incomingRestoreSession.finish()
             AndroidNativeRestoreDeliveryGate.endRestore()
+        }
+    }
+
+    private fun completeFreshNativeRestore(journalInstalled: Boolean) {
+        if (journalInstalled) {
+            PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered = true)
+            PostRestoreDetector(this).markNativePrivacyPayloadReceived()
+        }
+        super.onRestoreFinished()
+        val finalDelivery = restoredPreferences().recordFinalDelivery(retainedPreferenceNames)
+        retainOptionalPreferences { finish(retainedPreferenceNames, finalDelivery) }
+        val detector = PostRestoreDetector(this)
+        val preferences = createAndroidMainDataStore(this)
+        val admission = detector.reserveAccountRecoveryForCompletion()
+        runBlocking(Dispatchers.IO) {
+            withTimeout(15_000) { retainAccountRecoveryBeforeCompletion(preferences, admission) }
+        }
+        detector.recordRestoreCompletedUnderDeliveryLock()
+        finishNativeJournalTransferRestore()
+        synchronized(callbackLock) { restoreCompletionRecorded = true }
+        try {
+            runBlocking(Dispatchers.IO) {
+                withTimeoutOrNull(15_000) {
+                    retainAccountRecovery(preferences, freshDelivery = true)
+                    prepareRestoredInstallationState(preferences)
+                    restoreAccount(preferences)
+                }
+            }
+        } catch (_: Exception) {
+            Napier.w("Background native account recovery remains pending")
         }
     }
 
@@ -272,53 +276,63 @@ open class NativeBackupAgent : BackupAgent() {
                     return@synchronized
                 }
                 beginNativeRestoreSessionOnce()
-                val authority = NativeJournalRestoreAuthority(this)
-                if (authority.requiresCustodyForIncoming()) {
-                    if (fileType == TYPE_DIRECTORY) return@synchronized
-                    if (fileType != TYPE_FILE) throw IOException("Native incoming delivery must contain regular files")
-                    ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
-                        completedReplay.capture(retainedNativeDestination(this, destination), size, input)
-                    }
-                    scheduleRetainedJournalReconciliationSafely()
-                    return@synchronized
-                }
-                val frameworkDatabase =
-                    listOf("logdate", "logdate-wal", "logdate-shm", "logdate-journal")
-                        .any { destination.canonicalFile == getDatabasePath(it).canonicalFile }
-                if (frameworkDatabase) {
-                    check(fileType == TYPE_FILE) { "Native database delivery must be a regular file" }
-                    authority.requireFrameworkDatabaseWrite(destination)
-                }
-                val transferRoot = File(filesDir, "native_journal_transfer").canonicalFile.toPath()
-                if (destination.canonicalFile.toPath().startsWith(transferRoot)) {
-                    NativeJournalRestoreAuthority(this).requireSnapshot()
-                }
-                val preferenceDelivered =
-                    restoredPreferences().restore(
-                        destination,
-                        retainedPreferenceNames,
-                        size,
-                        { readNativePreferencePayload(data, size) },
-                        { bytes -> restoreNativePreferencePayload(this, bytes) { restore(it, destination) } },
-                        { drainDuplicatePreference(data, size) },
-                    )
-                if (!preferenceDelivered && destination.canonicalFile == File(filesDir, "logdate.preferences_pb").canonicalFile) {
-                    restoreMainPreferences(this, data, size) { descriptor -> restore(descriptor, destination) }
-                    PostRestoreDetector(this).markNativePrivacyPayloadReceived()
-                } else if (!preferenceDelivered) {
-                    restore(data, destination)
-                }
-                if (frameworkDatabase) authority.recordFrameworkDatabaseWrite(destination)
-                authority.recordFrameworkPortableState()
-                retainOptionalPreferences { capture(destination, retainedPreferenceNames) }
-                val databaseDelivered =
-                    runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
-                        .getOrDefault(false)
-                PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered)
+                restoreNativeFileWithCurrentAuthority(destination, data, size, fileType, restore)
             }
         } finally {
             AndroidNativeRestoreDeliveryGate.endRestoreCallback()
         }
+    }
+
+    private fun restoreNativeFileWithCurrentAuthority(
+        destination: File,
+        data: ParcelFileDescriptor,
+        size: Long,
+        fileType: Int,
+        restore: (ParcelFileDescriptor, File) -> Unit,
+    ) {
+        val authority = NativeJournalRestoreAuthority(this)
+        if (authority.requiresCustodyForIncoming()) {
+            if (fileType == TYPE_DIRECTORY) return
+            if (fileType != TYPE_FILE) throw IOException("Native incoming delivery must contain regular files")
+            ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                completedReplay.capture(retainedNativeDestination(this, destination), size, input)
+            }
+            scheduleRetainedJournalReconciliationSafely()
+            return
+        }
+        val frameworkDatabase =
+            listOf("logdate", "logdate-wal", "logdate-shm", "logdate-journal")
+                .any { destination.canonicalFile == getDatabasePath(it).canonicalFile }
+        if (frameworkDatabase) {
+            check(fileType == TYPE_FILE) { "Native database delivery must be a regular file" }
+            authority.requireFrameworkDatabaseWrite(destination)
+        }
+        val transferRoot = File(filesDir, "native_journal_transfer").canonicalFile.toPath()
+        if (destination.canonicalFile.toPath().startsWith(transferRoot)) {
+            NativeJournalRestoreAuthority(this).requireSnapshot()
+        }
+        val preferenceDelivered =
+            restoredPreferences().restore(
+                destination,
+                retainedPreferenceNames,
+                size,
+                { readNativePreferencePayload(data, size) },
+                { bytes -> restoreNativePreferencePayload(this, bytes) { restore(it, destination) } },
+                { drainDuplicatePreference(data, size) },
+            )
+        if (!preferenceDelivered && destination.canonicalFile == File(filesDir, "logdate.preferences_pb").canonicalFile) {
+            restoreMainPreferences(this, data, size) { descriptor -> restore(descriptor, destination) }
+            PostRestoreDetector(this).markNativePrivacyPayloadReceived()
+        } else if (!preferenceDelivered) {
+            restore(data, destination)
+        }
+        if (frameworkDatabase) authority.recordFrameworkDatabaseWrite(destination)
+        authority.recordFrameworkPortableState()
+        retainOptionalPreferences { capture(destination, retainedPreferenceNames) }
+        val databaseDelivered =
+            runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
+                .getOrDefault(false)
+        PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered)
     }
 
     private fun restoredPreferences() = NativeRestoredPreferenceFiles(this, ::replayPreference)

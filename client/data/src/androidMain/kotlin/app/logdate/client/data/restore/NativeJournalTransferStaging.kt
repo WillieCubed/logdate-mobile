@@ -66,54 +66,81 @@ internal class NativeJournalTransferStaging(
     }
 
     private fun resume(intent: Intent) {
-        var activeIntent = intent
         val consumed = File(current.parentFile, ".${intent.receipt}.staged")
         val original = if (current.exists()) current else consumed
-        if (original.exists() && activeIntent.replacedCohorts.isNotEmpty()) {
-            activeIntent.replacedCohorts.forEach { (path, oldIds) ->
+        var activeIntent = retireInterrupted(intent, original)
+        for ((path, hash) in intent.files) {
+            activeIntent = captureMissing(activeIntent, original, path, hash)
+        }
+        verifyAndRemember(intent, activeIntent, original)
+        retireReplaced(intent, activeIntent)
+        consumeOriginal(intent, consumed)
+    }
+
+    private fun retireInterrupted(
+        intent: Intent,
+        original: File,
+    ): Intent {
+        if (original.exists() && intent.replacedCohorts.isNotEmpty()) {
+            intent.replacedCohorts.forEach { (path, oldIds) ->
                 val source = File(original, path)
                 oldIds.forEach { old ->
-                    custody.retireInterruptedStagedCohort(old, path, source, activeIntent.files.getValue(path))
+                    custody.retireInterruptedStagedCohort(old, path, source, intent.files.getValue(path))
                 }
             }
-            activeIntent = activeIntent.copy(replacedCohorts = emptyMap())
+            return intent.copy(replacedCohorts = emptyMap()).also(::writeIntent)
+        }
+        return intent
+    }
+
+    private fun captureMissing(
+        intent: Intent,
+        original: File,
+        path: String,
+        hash: String,
+    ): Intent {
+        var activeIntent = intent
+        var cohort = activeIntent.cohorts.getValue(path)
+        val pending = custody.isPendingCohort(cohort)
+        val existing = if (pending) emptyList() else custody.sealedPayloadsInCohort(cohort)
+        if (existing.any {
+                it.complete &&
+                    it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
+                    nativeSnapshotChecksum(it.file) == hash
+            }
+        ) {
+            return activeIntent
+        }
+        if (pending || custody.hasCohort(cohort)) {
+            val replacement = Uuid.random().toString()
+            activeIntent =
+                activeIntent.copy(
+                    cohorts = activeIntent.cohorts + (path to replacement),
+                    replacedCohorts =
+                        activeIntent.replacedCohorts +
+                            (path to (activeIntent.replacedCohorts[path].orEmpty() + cohort)),
+                )
             writeIntent(activeIntent)
-        }
-        for ((path, hash) in intent.files) {
-            var cohort = activeIntent.cohorts.getValue(path)
-            val pending = custody.isPendingCohort(cohort)
-            val existing = if (pending) emptyList() else custody.sealedPayloadsInCohort(cohort)
-            if (existing.any {
-                    it.complete &&
-                        it.path == NATIVE_JOURNAL_TRANSFER_PREFIX + path &&
-                        nativeSnapshotChecksum(it.file) == hash
-                }
-            ) {
-                continue
-            }
-            if (pending || custody.hasCohort(cohort)) {
-                val replacement = Uuid.random().toString()
-                activeIntent =
-                    activeIntent.copy(
-                        cohorts = activeIntent.cohorts + (path to replacement),
-                        replacedCohorts =
-                            activeIntent.replacedCohorts +
-                                (path to (activeIntent.replacedCohorts[path].orEmpty() + cohort)),
-                    )
+            if (original.exists()) {
+                custody.retireInterruptedStagedCohort(cohort, path, File(original, path), hash)
+                activeIntent = activeIntent.copy(replacedCohorts = activeIntent.replacedCohorts - path)
                 writeIntent(activeIntent)
-                if (original.exists()) {
-                    custody.retireInterruptedStagedCohort(cohort, path, File(original, path), hash)
-                    activeIntent = activeIntent.copy(replacedCohorts = activeIntent.replacedCohorts - path)
-                    writeIntent(activeIntent)
-                }
-                cohort = replacement
             }
-            val source = File(original, path)
-            check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) && nativeSnapshotChecksum(source) == hash)
-            source.inputStream().use {
-                custody.captureInCohort(cohort, NATIVE_JOURNAL_TRANSFER_PREFIX + path, source.length(), it)
-            }
+            cohort = replacement
         }
+        val source = File(original, path)
+        check(Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS) && nativeSnapshotChecksum(source) == hash)
+        source.inputStream().use {
+            custody.captureInCohort(cohort, NATIVE_JOURNAL_TRANSFER_PREFIX + path, source.length(), it)
+        }
+        return activeIntent
+    }
+
+    private fun verifyAndRemember(
+        intent: Intent,
+        activeIntent: Intent,
+        original: File,
+    ) {
         val payloads = custody.sealedPayloads()
         check(
             intent.files.all { (path, hash) ->
@@ -132,6 +159,12 @@ internal class NativeJournalTransferStaging(
         } else {
             check(stagedSources.hasRemembered(intent.receipt))
         }
+    }
+
+    private fun retireReplaced(
+        intent: Intent,
+        activeIntent: Intent,
+    ) {
         activeIntent.replacedCohorts.forEach { (path, oldIds) ->
             val replacement = activeIntent.cohorts.getValue(path)
             val verified =
@@ -145,9 +178,14 @@ internal class NativeJournalTransferStaging(
             }
         }
         if (activeIntent.replacedCohorts.isNotEmpty()) {
-            activeIntent = activeIntent.copy(replacedCohorts = emptyMap())
-            writeIntent(activeIntent)
+            writeIntent(activeIntent.copy(replacedCohorts = emptyMap()))
         }
+    }
+
+    private fun consumeOriginal(
+        intent: Intent,
+        consumed: File,
+    ) {
         if (current.exists()) {
             val files =
                 current.walkTopDown().filter(File::isFile).associate {
