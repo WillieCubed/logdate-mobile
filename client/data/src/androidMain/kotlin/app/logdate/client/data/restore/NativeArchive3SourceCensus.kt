@@ -27,6 +27,10 @@ internal object NativeArchive3SourceCensus {
             "native_journal_source_scope",
             "search_index_metadata",
             "media_exif_metadata",
+            "indexed_media_images",
+            "indexed_media_videos",
+            "storage_metadata",
+            "user_devices",
         )
 
     fun unsupportedPopulatedTables(rows: Map<String, Long>): Set<String> =

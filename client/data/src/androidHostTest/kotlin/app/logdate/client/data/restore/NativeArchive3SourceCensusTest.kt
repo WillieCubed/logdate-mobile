@@ -25,9 +25,23 @@ class NativeArchive3SourceCensusTest {
                 "storage_metadata" to 1L,
             )
         assertEquals(
-            setOf("transcriptions", "audio_tags", "people", "unknown_future_table", "indexed_media", "storage_metadata"),
+            setOf("transcriptions", "audio_tags", "people", "unknown_future_table", "indexed_media"),
             NativeArchive3SourceCensus.unsupportedPopulatedTables(rows),
         )
+    }
+
+    @Test
+    fun `device indexes and installation bookkeeping do not block journal transfer`() {
+        val rows =
+            mapOf(
+                "journals" to 2L,
+                "indexed_media_images" to 90L,
+                "indexed_media_videos" to 12L,
+                "storage_metadata" to 3L,
+                "user_devices" to 2L,
+                "journal_notes" to 1L,
+            )
+        assertEquals(setOf("journal_notes"), NativeArchive3SourceCensus.unsupportedPopulatedTables(rows))
     }
 
     @Test
