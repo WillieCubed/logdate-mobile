@@ -2,30 +2,23 @@
 
 package app.logdate.feature.core.export
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportStats
-import app.logdate.feature.core.common.DataStatsGrid
+import app.logdate.feature.core.common.DataTransferArchiveSummary
+import app.logdate.feature.core.common.DataTransferResultHeader
 import app.logdate.feature.core.common.OperationFailureCard
+import app.logdate.feature.core.common.dataTransferCountsSummary
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.action_browse
 import logdate.client.feature.core.generated.resources.export_complete_description
-import logdate.client.feature.core.generated.resources.export_complete_stats_summary
 import logdate.client.feature.core.generated.resources.export_complete_title
 import logdate.client.feature.core.generated.resources.export_failed_title
 import logdate.client.ui.generated.resources.common_done
@@ -36,88 +29,33 @@ import logdate.client.ui.generated.resources.Res as UiRes
  * Confirmation card shown after an export archive is saved.
  *
  * The saved archive name is intentionally rendered as first-class content so
- * users can verify the file they just created before opening or dismissing it.
+ * users can verify the file they just created before dismissing it.
  */
 @Composable
 internal fun ExportSuccessCard(
     fileName: String,
     stats: ExportStats?,
-    onBrowse: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Icon(
-            painter = PlatformIcons.checkCircle(),
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary,
+        DataTransferResultHeader(
+            title = stringResource(Res.string.export_complete_title),
+            description = stringResource(Res.string.export_complete_description),
+            icon = PlatformIcons.checkCircle(),
+            iconTint = MaterialTheme.colorScheme.primary,
         )
-
-        Spacer(modifier = Modifier.height(Spacing.md))
-
-        Text(
-            text = stringResource(Res.string.export_complete_title),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
+        DataTransferArchiveSummary(
+            fileName = fileName,
+            fileDetails = null,
+            countsSummary =
+                stats?.let { dataTransferCountsSummary(it.journalCount, it.noteCount, it.draftCount, it.mediaCount) },
         )
-
-        Spacer(modifier = Modifier.height(Spacing.sm))
-
-        Text(
-            text = stringResource(Res.string.export_complete_description),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.md))
-
-        Text(
-            text = fileName,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center,
-        )
-
-        stats?.let {
-            Spacer(modifier = Modifier.height(Spacing.sm))
-
-            Text(
-                text =
-                    stringResource(
-                        Res.string.export_complete_stats_summary,
-                        it.journalCount,
-                        it.noteCount,
-                        it.draftCount,
-                        it.mediaCount,
-                    ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(modifier = Modifier.height(Spacing.lg))
-
-            DataStatsGrid(
-                journalCount = it.journalCount,
-                noteCount = it.noteCount,
-                draftCount = it.draftCount,
-                mediaCount = it.mediaCount,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.xl))
 
         Button(
-            onClick = onBrowse,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(Res.string.action_browse))
-        }
-        TextButton(
             onClick = onDismiss,
             modifier = Modifier.fillMaxWidth(),
         ) {

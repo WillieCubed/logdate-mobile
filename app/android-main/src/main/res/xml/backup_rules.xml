@@ -31,6 +31,7 @@
     <include domain="file" path="logdate.preferences_pb"
              requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="archive_recovery/records/" requireFlags="deviceToDeviceTransfer"/>
+    <include domain="file" path="retained_journals/" requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="archive_recovery/sources/" requireFlags="deviceToDeviceTransfer"/>
     <include domain="file" path="datastore/"
              requireFlags="deviceToDeviceTransfer"/>
@@ -53,6 +54,7 @@
     <exclude domain="file" path="media/staging/"/>
     <exclude domain="file" path="audio_notes/staging/"/>
     <exclude domain="file" path="db_recovery/passphrase_backup.part"/>
+    <exclude domain="file" path="db_recovery/working_passphrase_backup.part"/>
     <exclude domain="file" path="identity_recovery/phrase_backup.part"/>
     <exclude domain="file" path="identity_recovery/account_key_backup.part"/>
     <exclude domain="file" path="identity_recovery/media_key_backup.part"/>

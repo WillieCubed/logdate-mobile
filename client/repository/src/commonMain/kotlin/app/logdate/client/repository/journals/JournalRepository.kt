@@ -33,6 +33,15 @@ interface JournalRepository {
         return true
     }
 
+    /** Automatic retained-source replay preserves deletions of the original source ID, even when remapped. */
+    suspend fun compareAndSetJournalForRetainedRestore(
+        sourceId: Uuid,
+        expected: Journal?,
+        replacement: Journal,
+        scope: JournalMergeScope? = null,
+        recoveryId: String? = null,
+    ): Boolean = false
+
     suspend fun resolveJournalId(journalId: Uuid): Uuid = journalId
 
     suspend fun previewMerge(
@@ -154,6 +163,16 @@ interface JournalRepository {
         }
         return true
     }
+
+    /** Replays retained data without reversing a settled local deletion of [sourceId]. */
+    suspend fun compareAndSetDraftForRetainedRestore(
+        sourceId: Uuid,
+        targetId: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope? = null,
+        recoveryId: String? = null,
+    ): Boolean = false
 
     /**
      * Deletes a draft

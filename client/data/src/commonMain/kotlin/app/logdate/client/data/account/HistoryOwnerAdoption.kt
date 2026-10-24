@@ -1,5 +1,6 @@
 package app.logdate.client.data.account
 
+import app.logdate.client.data.journals.DraftDeletionOwnerAdoption
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.sameOwnerId
@@ -55,9 +56,17 @@ class HistoryOwnerAdoption(
                     check(storage.getString(JOURNAL_KEY) == Json.encodeToString(it)) { "Could not persist history adoption" }
                 }
             moveRows(journal.oldOwner, journal.newOwner, journal.origin, journal.device)
-            check(owner.adoptRemoteOwnerIfUninitialized(journal.newOwner)) { "Could not bind the adopted history owner" }
-            storage.putString(RECEIPT_KEY, Json.encodeToString(journal))
-            check(storage.getString(RECEIPT_KEY) == Json.encodeToString(journal)) { "Could not persist history adoption receipt" }
+            DraftDeletionOwnerAdoption(storage).transfer(
+                journal.oldOwner,
+                journal.newOwner,
+                journal.origin,
+                JOURNAL_KEY,
+                Json.encodeToString(journal),
+            ) {
+                check(owner.adoptRemoteOwnerIfUninitialized(journal.newOwner)) { "Could not bind the adopted history owner" }
+                storage.putString(RECEIPT_KEY, Json.encodeToString(journal))
+                check(storage.getString(RECEIPT_KEY) == Json.encodeToString(journal)) { "Could not persist history adoption receipt" }
+            }
             storage.remove(JOURNAL_KEY)
             true
         }
@@ -76,6 +85,13 @@ class HistoryOwnerAdoption(
                 return
             }
             moveRows(receipt.oldOwner, receipt.newOwner, receipt.origin, receipt.device)
+            DraftDeletionOwnerAdoption(storage).transfer(
+                receipt.oldOwner,
+                receipt.newOwner,
+                receipt.origin,
+                RECEIPT_KEY,
+                Json.encodeToString(receipt),
+            ) {}
         }
     }
 

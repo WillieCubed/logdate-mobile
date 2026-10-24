@@ -8,6 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -74,6 +75,44 @@ internal class ApplicationStartup(
         attempt.start()
     }
 
+    /** Retention is explicit and runs only after the failed initializer has released its handles. */
+    @Synchronized
+    fun recoverRetainedJournal(prepare: suspend () -> Unit) {
+        if (state.value !is ApplicationStartupState.Failed) return
+        val previous = job
+        mutableState.value = ApplicationStartupState.Loading
+        val attempt =
+            scope.launch(start = CoroutineStart.LAZY) {
+                previous?.join()
+                try {
+                    prepare()
+                    initialize()
+                    mutableState.value = ApplicationStartupState.Ready
+                    startDeviceWork?.let { start ->
+                        scope.launch {
+                            try {
+                                start()
+                            } catch (
+                                cancelled: CancellationException,
+                            ) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                Napier.w("Device-owned work remains available to retry")
+                            }
+                        }
+                    }
+                } catch (
+                    cancelled: CancellationException,
+                ) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    mutableState.value = ApplicationStartupState.Failed(error)
+                }
+            }
+        job = attempt
+        attempt.start()
+    }
+
     @Synchronized
     private fun retryWhenFinished(previous: Job) {
         if (retryAfter !== previous) return
@@ -83,3 +122,39 @@ internal class ApplicationStartup(
 
     suspend fun awaitReady(): Boolean = state.first { it !is ApplicationStartupState.Loading } is ApplicationStartupState.Ready
 }
+
+/** Keeps a native restore completion token pending until startup reaches a terminal state. */
+internal fun observeNativeRestoreDeliveryCompletions(
+    scope: CoroutineScope,
+    completions: StateFlow<Long>,
+    startup: ApplicationStartup,
+    reconcile: suspend () -> Unit,
+): Job =
+    scope.launch {
+        var lastCompletion = 0L
+        var completionPending = false
+        combine(completions, startup.state) { count, state -> count to state }
+            .collect { (count, state) ->
+                if (count > lastCompletion) {
+                    lastCompletion = count
+                    completionPending = true
+                }
+                if (!completionPending || state == ApplicationStartupState.Loading) return@collect
+                completionPending = false
+                when (state) {
+                    ApplicationStartupState.Ready -> reconcile()
+                    is ApplicationStartupState.Failed -> {
+                        if (applicationStartupFailureMessage(state.cause) in
+                            setOf(
+                                ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY,
+                                ApplicationStartupFailureMessage.PRIVACY_METADATA_RECOVERY,
+                                ApplicationStartupFailureMessage.NATIVE_RESTORE_PENDING,
+                            )
+                        ) {
+                            startup.start()
+                        }
+                    }
+                    ApplicationStartupState.Loading -> Unit
+                }
+            }
+    }

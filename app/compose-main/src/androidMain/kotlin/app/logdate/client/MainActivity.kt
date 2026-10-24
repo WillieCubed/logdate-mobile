@@ -31,6 +31,7 @@ import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
+import app.logdate.client.device.restore.retainedJournalWorkspace
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.launch.LaunchBootstrapState
@@ -61,6 +62,7 @@ import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.export.CloudBackupScheduler
 import app.logdate.feature.core.isAppUnlocked
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
+import app.logdate.feature.core.settings.navigation.DataSettingsRoute
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.navigation.LogDateNavDisplay
@@ -194,7 +196,14 @@ class MainActivity : FragmentActivity() {
         // A recreated activity receives the launch intent again; resolving it a second time
         // would overwrite the Navigation 3 back stack restored across rotation.
         if (savedInstanceState == null) {
-            pendingNavKey = resolveMainActivityNavKey(intent)
+            pendingNavKey =
+                if (retainedJournalWorkspace(this).current() != null &&
+                    postRestoreDetector.pendingContentRecoveryId() != null
+                ) {
+                    DataSettingsRoute
+                } else {
+                    resolveMainActivityNavKey(intent)
+                }
         }
 
         setContent {

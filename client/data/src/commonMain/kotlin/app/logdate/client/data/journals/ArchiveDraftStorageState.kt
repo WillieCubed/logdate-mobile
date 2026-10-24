@@ -10,11 +10,13 @@ import kotlinx.serialization.json.Json
 internal data class ArchiveDraftStorageState(
     val drafts: List<EditorDraft> = emptyList(),
     val appliedRecoveries: Set<String> = emptySet(),
+    val localDeletionIds: Set<String> = emptySet(),
     val custodyCopies: List<DraftCustodyCopy> = emptyList(),
     val pendingMutations: List<DraftMutationReceipt> = emptyList(),
 ) {
     fun encode(json: Json): String =
         if (appliedRecoveries.isEmpty() &&
+            localDeletionIds.isEmpty() &&
             custodyCopies.isEmpty() &&
             pendingMutations.isEmpty()
         ) {

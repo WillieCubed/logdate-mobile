@@ -63,6 +63,17 @@ class OfflineFirstJournalRepository(
 
     private val syncDebouncer = SyncDebouncer(scope = externalScope) { syncManagerProvider().syncJournals() }
     private val draftSyncDebouncer = SyncDebouncer(scope = externalScope) { syncManagerProvider().syncDrafts() }
+    private val syncMutations by lazy {
+        JournalSyncMutations(
+            journalDao,
+            dispatcher,
+            database,
+            mergeTransactionManager,
+            recoveryReceipts,
+            currentScope,
+            ::resolve,
+        )
+    }
 
     override val allJournalsObserved: Flow<List<Journal>>
         get() =
@@ -105,6 +116,17 @@ class OfflineFirstJournalRepository(
         recoveryId: String?,
     ): Boolean = withContext(dispatcher) { localMutations.restore(expected, replacement, scope, recoveryId) }
 
+    override suspend fun compareAndSetJournalForRetainedRestore(
+        sourceId: Uuid,
+        expected: Journal?,
+        replacement: Journal,
+        scope: JournalMergeScope?,
+        recoveryId: String?,
+    ): Boolean =
+        withContext(dispatcher) {
+            localMutations.restore(expected, replacement, scope, recoveryId, retainedSource = true, sourceId = sourceId)
+        }
+
     private suspend fun <T> withJournalTransaction(block: suspend () -> T): T =
         if (database == null) block() else transactionManager.withTransaction(block)
 
@@ -138,6 +160,25 @@ class OfflineFirstJournalRepository(
         recoveryId: String?,
     ): Boolean = withContext(dispatcher) { draftPersistence.compareAndSet(id, expected, replacement, recoveryScope, enqueue, recoveryId) }
 
+    override suspend fun compareAndSetDraftForRetainedRestore(
+        sourceId: Uuid,
+        targetId: Uuid,
+        expected: EditorDraft?,
+        replacement: EditorDraft?,
+        recoveryScope: DraftRecoveryScope?,
+        recoveryId: String?,
+    ): Boolean =
+        withContext(dispatcher) {
+            draftPersistence.compareAndSet(
+                targetId,
+                expected,
+                replacement,
+                recoveryScope,
+                recoveryId = recoveryId,
+                retainedSourceId = sourceId,
+            )
+        }
+
     override suspend fun getLatestDraft(): EditorDraft? =
         withContext(dispatcher) { draftRepository.getLatestDraft()?.let { resolveDraft(it) } }
 
@@ -159,36 +200,11 @@ class OfflineFirstJournalRepository(
 
     override suspend fun deleteDraftFromSync(id: Uuid) = withContext(dispatcher) { draftRepository.deleteDraft(id) }
 
-    override suspend fun createFromSync(journal: Journal) =
-        withContext(dispatcher) {
-            withJournalTransaction {
-                if (resolveJournalId(journal.id) == journal.id) journalDao.update(journal.toEntity())
-            }
-        }
+    override suspend fun createFromSync(journal: Journal) = syncMutations.createFromSync(journal)
 
-    override suspend fun updateFromSync(journal: Journal) =
-        withContext(dispatcher) {
-            withJournalTransaction {
-                if (resolveJournalId(journal.id) == journal.id) journalDao.update(journal.toEntity())
-            }
-        }
+    override suspend fun updateFromSync(journal: Journal) = syncMutations.updateFromSync(journal)
 
-    override suspend fun deleteFromSync(journalId: Uuid) =
-        withContext(dispatcher) {
-            withJournalTransaction {
-                if (database != null) {
-                    val scope = currentScope()
-                    merges
-                        .all(scope.ownerId, scope.serverOrigin)
-                        .filter { it.pending && resolve(scope, it.destinationId) == journalId }
-                        .forEach { row ->
-                            val retained = recoveryContents(scope, row)
-                            merges.put(row.copy(recoveryContentIds = Json.encodeToString(retained.map { it.toString() })))
-                        }
-                }
-                journalDao.delete(journalId)
-            }
-        }
+    override suspend fun deleteFromSync(journalId: Uuid) = syncMutations.deleteFromSync(journalId)
 
     override suspend fun updateSyncMetadata(
         journalId: Uuid,
@@ -238,7 +254,7 @@ class OfflineFirstJournalRepository(
             transfer(scope, row.sourceId, row.destinationId, queueLinks = false)
             merges.put(row)
             queue(row)
-            suppressSourceOutbox(scope, row.sourceId)
+            syncMutations.suppressSourceOutbox(scope, row.sourceId)
             journalDao.delete(row.sourceId)
             check(currentScope() == scope) { "Journal merge scope changed" }
             JournalMergeResult.Merged(row.toOperation())
@@ -313,7 +329,7 @@ class OfflineFirstJournalRepository(
             if (journalDao.getJournalById(destination) != null) {
                 transfer(scope, sourceId, destination, queueLinks = true, extraContentIds = retained)
                 if (!row.pending) merges.put(row.copy(recoveryContentIds = "[]"))
-                suppressSourceOutbox(scope, sourceId)
+                syncMutations.suppressSourceOutbox(scope, sourceId)
                 journalDao.delete(sourceId)
             }
             check(currentScope() == scope) { "Journal merge scope changed" }
@@ -343,17 +359,6 @@ class OfflineFirstJournalRepository(
         }
     }
 
-    private suspend fun suppressSourceOutbox(
-        scope: JournalMergeScope,
-        sourceId: Uuid,
-    ) {
-        outbox.deletePending(scope.ownerId, scope.serverOrigin, "JOURNAL", sourceId.toString())
-        outbox
-            .getPendingByType(scope.ownerId, scope.serverOrigin, "ASSOCIATION")
-            .filter { AssociationPendingKey.fromPendingId(it.entityId)?.journalId == sourceId }
-            .forEach { outbox.deletePending(scope.ownerId, scope.serverOrigin, "ASSOCIATION", it.entityId) }
-    }
-
     private suspend fun settle(pending: PendingUploadEntity) =
         outbox.deletePendingIfCurrent(pending.ownerId, pending.serverOrigin, pending.entityType, pending.entityId, pending.operationId)
 
@@ -362,17 +367,7 @@ class OfflineFirstJournalRepository(
     private suspend fun recoveryContents(
         scope: JournalMergeScope,
         row: JournalMergeEntity,
-    ): Set<Uuid> {
-        val target = resolve(scope, row.destinationId)
-        val pending =
-            outbox
-                .getPendingByType(scope.ownerId, scope.serverOrigin, "ASSOCIATION")
-                .filter { it.operation == "CREATE" }
-                .mapNotNull { AssociationPendingKey.fromPendingId(it.entityId) }
-                .filter { it.journalId == target }
-                .map { it.contentId }
-        return row.toOperation().contentIds + Json.decodeFromString<List<String>>(row.recoveryContentIds).map(Uuid::parse) + pending
-    }
+    ) = syncMutations.recoveryContents(scope, row)
 
     override suspend fun getJournalMerge(operationId: Uuid): JournalMergeOperation? {
         val scope = currentScope()

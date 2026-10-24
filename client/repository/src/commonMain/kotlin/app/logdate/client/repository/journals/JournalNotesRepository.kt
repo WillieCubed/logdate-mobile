@@ -186,6 +186,15 @@ interface JournalNotesRepository {
         return true
     }
 
+    /** Automatic retained-source replay never reverses a settled local deletion. */
+    suspend fun compareAndSetNoteForRetainedRestore(
+        sourceId: Uuid,
+        expected: JournalNote?,
+        replacement: JournalNote,
+        scope: JournalMergeScope? = null,
+        recoveryId: String? = null,
+    ): Boolean = false
+
     /**
      * Deletes a note.
      */

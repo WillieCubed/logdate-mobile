@@ -61,7 +61,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -98,7 +97,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -132,7 +130,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -165,7 +162,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -202,7 +198,6 @@ class ExportFlowE2ETest {
                 onCancelExport = { cancelCalled = true },
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -247,7 +242,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -266,50 +260,8 @@ class ExportFlowE2ETest {
         composeRule.onNodeWithText("Export complete").assertIsDisplayed()
         composeRule.onNodeWithText("logdate_export.zip").assertIsDisplayed()
         composeRule.onNodeWithText("3 journals, 42 notes, 5 drafts, 10 media files").assertIsDisplayed()
-        composeRule.onNodeWithText("Open").assertIsDisplayed()
+        composeRule.onNodeWithText("Open").assertDoesNotExist()
         composeRule.onNodeWithText("Done").assertIsDisplayed()
-    }
-
-    @Test
-    fun `completed state open button triggers browse export`() {
-        var sharedPath: String? = null
-
-        composeRule.setContent {
-            DataSettingsContent(
-                onBack = {},
-                quotaUsage = defaultQuota,
-                isQuotaAvailable = true,
-                exportState =
-                    ExportState.Completed(
-                        path = "content://downloads/export.zip",
-                        fileName = "export.zip",
-                    ),
-                onShowExportOptions = {},
-                onUpdateExportOptions = {},
-                onConfirmExport = {},
-                onCancelExport = {},
-                onRetryExport = {},
-                onDismissExport = {},
-                onBrowseExport = { sharedPath = it },
-                onShowRestoreSheet = {},
-                onSelectRestoreFile = {},
-                onUpdateImportOptions = {},
-                onConfirmImport = {},
-                onCancelRestore = {},
-                onRetryRestore = {},
-                onDismissRestore = {},
-                restoreState = RestoreState.Idle,
-                integrityState = IntegrityState(),
-                onRunIntegrityCheck = {},
-                onRepairIntegrity = {},
-                snackbarHostState = SnackbarHostState(),
-            )
-        }
-
-        composeRule.onNodeWithText("Open").performClick()
-        assert(sharedPath == "content://downloads/export.zip") {
-            "Expected share with path content://downloads/export.zip, got $sharedPath"
-        }
     }
 
     @Test
@@ -332,7 +284,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = { dismissCalled = true },
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -371,7 +322,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -412,7 +362,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -450,7 +399,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = { retryCalled = true },
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -486,7 +434,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = { dismissCalled = true },
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -520,7 +467,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -554,7 +500,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -593,7 +538,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -645,7 +589,6 @@ class ExportFlowE2ETest {
                 },
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -688,7 +631,6 @@ class ExportFlowE2ETest {
                 },
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -728,7 +670,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = { state = ExportState.Idle },
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},
@@ -770,7 +711,6 @@ class ExportFlowE2ETest {
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = { state = ExportState.Idle },
-                onBrowseExport = {},
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
                 onUpdateImportOptions = {},

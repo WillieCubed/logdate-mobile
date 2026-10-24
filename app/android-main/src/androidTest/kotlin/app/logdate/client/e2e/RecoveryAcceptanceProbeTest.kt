@@ -1,17 +1,21 @@
 package app.logdate.client.e2e
 
+import android.app.Application
 import android.graphics.BitmapFactory
-import android.media.MediaPlayer
 import android.os.Build
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import app.logdate.client.MainActivity
 import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.models.DeviceInfo
+import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.networking.ServerDiscoveryClient
@@ -37,13 +41,9 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -68,6 +68,15 @@ class RecoveryAcceptanceProbeTest {
                 "recovery acceptance can run only on an Android emulator"
             }
             val fixture = readFixture()
+            ensureLogDateApplicationStarted(instrumentation.targetContext.applicationContext as Application)
+            if (mode == "create") {
+                ActivityScenario.launch(MainActivity::class.java).use {
+                    withTimeout(30_000) {
+                        val detector = PostRestoreDetector(instrumentation.targetContext)
+                        while (detector.shouldValidatePrivacyMetadata()) delay(100)
+                    }
+                }
+            }
             val koin = GlobalContext.get()
             val config = koin.get<LogDateConfigRepository>()
             koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
@@ -378,42 +387,10 @@ class RecoveryAcceptanceProbeTest {
             assertNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size), "offline image could not be decoded")
         }
         for (ref in listOf(audio.mediaRef, richDraftAudio)) {
-            playOfflineMedia(media.readMedia(ref).data, ".wav")
+            playRecoveryOfflineMedia(media.readMedia(ref).data, ".wav")
         }
         for (ref in listOf(video.mediaRef, richDraftVideo, draftVideo)) {
-            playOfflineMedia(media.readMedia(ref).data, ".mp4")
-        }
-    }
-
-    private fun playOfflineMedia(
-        bytes: ByteArray,
-        extension: String,
-    ) {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val source = File.createTempFile("recovery-playback-", extension, context.cacheDir)
-        try {
-            source.outputStream().use { it.write(bytes) }
-            val player = MediaPlayer()
-            try {
-                val completed = CountDownLatch(1)
-                val failed = AtomicBoolean(false)
-                player.setOnCompletionListener { completed.countDown() }
-                player.setOnErrorListener { _, _, _ ->
-                    failed.set(true)
-                    completed.countDown()
-                    true
-                }
-                player.setDataSource(source.absolutePath)
-                player.prepare()
-                assertTrue(player.duration > 0, "offline media has no playable duration")
-                player.start()
-                assertTrue(completed.await(20, TimeUnit.SECONDS), "offline media playback did not complete")
-                assertFalse(failed.get(), "offline media decoder reported an error")
-            } finally {
-                player.release()
-            }
-        } finally {
-            source.delete()
+            playRecoveryOfflineMedia(media.readMedia(ref).data, ".mp4")
         }
     }
 

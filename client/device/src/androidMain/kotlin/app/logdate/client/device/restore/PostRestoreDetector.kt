@@ -203,6 +203,15 @@ class PostRestoreDetector(
             true
         }
 
+    /** An explicitly retained locked journal is not restored merely because a working DB opens. */
+    fun recordRetainedJournalRecovery(id: String) =
+        synchronized(lock) {
+            Uuid.parse(id)
+            writeAtomically(pendingRestoreFile(), "$CONTENT_MISSING:$id")
+            writeAtomically(accountRecoveryFile(), id)
+            deleteIfPresent(accountResolvedFile())
+        }
+
     fun pendingContentRecoveryId(): String? =
         synchronized(lock) {
             val record = readDelivery() ?: return@synchronized null

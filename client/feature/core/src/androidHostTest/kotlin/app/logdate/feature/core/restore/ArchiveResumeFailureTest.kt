@@ -128,4 +128,49 @@ class ArchiveResumeFailureTest {
         )
         assertEquals(1, callbacks)
     }
+
+    @Test
+    fun `an enqueue failure cannot notify a request that cancelled it before the commit lock`() {
+        val operation = Job()
+        var failures = 0
+        assertFailsWith<CancellationException> {
+            commitArchiveResumeRequest(
+                operation,
+                commit = { action ->
+                    operation.cancel()
+                    action()
+                },
+                action = { failures++ },
+            )
+        }
+        assertEquals(0, failures)
+    }
+
+    @Test
+    fun `a cancelled reconnect cannot begin old work or enqueue and complete retained work`() {
+        val operation = Job()
+        var activeWork = "newer-work"
+        var enqueues = 0
+        var completions = 0
+        val beginOld: () -> Unit = { activeWork = "old-work" }
+        val enqueueAndComplete: () -> Unit = {
+            enqueues++
+            completions++
+        }
+        for (action in listOf(beginOld, enqueueAndComplete)) {
+            assertFailsWith<CancellationException> {
+                commitArchiveResumeRequest(
+                    operation,
+                    commit = { guarded ->
+                        operation.cancel()
+                        guarded()
+                    },
+                    action = action,
+                )
+            }
+        }
+        assertEquals("newer-work", activeWork)
+        assertEquals(0, enqueues)
+        assertEquals(0, completions)
+    }
 }

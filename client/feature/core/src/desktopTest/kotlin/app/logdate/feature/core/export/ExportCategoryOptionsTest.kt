@@ -34,6 +34,18 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalTestApi::class)
 class ExportCategoryOptionsTest {
     @Test
+    fun normalPhoneDateChoicesKeepTheirUnits() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            setContent {
+                LogDateTheme {
+                    ExportConfigContent(ExportOptions(), null, {}, {}, {})
+                }
+            }
+            onNodeWithText("Last 30 days").assertIsDisplayed()
+            onNodeWithText("Last 90 days").assertIsDisplayed()
+        }
+
+    @Test
     fun exportCategoryCountsUseSingularPluralAndZeroDescriptions() =
         runDesktopComposeUiTest(width = 411, height = 1400) {
             setContent {
@@ -109,6 +121,33 @@ class ExportCategoryOptionsTest {
         }
 
     @Test
+    fun largeTextDateChoicesRemainReadableAndSelectable() =
+        runDesktopComposeUiTest(width = 411, height = 900) {
+            var options by mutableStateOf(ExportOptions())
+            setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 2f)) {
+                    LogDateTheme {
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            ExportConfigContent(
+                                options = options,
+                                counts = ExportCounts(1, 2, 3, 4),
+                                onOptionsChanged = { options = it },
+                                onConfirm = {},
+                                onDismiss = {},
+                            )
+                        }
+                    }
+                }
+            }
+            onNodeWithText("Last year").performScrollTo().assertIsDisplayed().performClick()
+            runOnIdle { assertEquals(ExportDateRange.LastYear, options.dateRange) }
+            onNode(hasText("Media") and isToggleable()).performScrollTo().assertIsDisplayed()
+            onNodeWithText("Cancel").performScrollTo().assertIsDisplayed()
+            onNodeWithText("Export").performScrollTo().assertIsDisplayed()
+        }
+
+    @Test
     fun exportConfirmationRemainsReachableInCompactLandscapeAtLargeText() =
         runDesktopComposeUiTest(width = 640, height = 320) {
             var confirmations = 0
@@ -123,7 +162,6 @@ class ExportCategoryOptionsTest {
                             onCancel = {},
                             onRetry = {},
                             onDismiss = {},
-                            onBrowse = {},
                         )
                     }
                 }

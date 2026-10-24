@@ -63,6 +63,8 @@ internal class DraftCustodyStore(
                         }
                 val destination = read(destinationKey)
                 val copy = destination.custodyCopies.find { it.matches(sourceKey, draft) }
+                val mappedId = copy?.destinationId ?: draft.id.toString()
+                if (draft.id.toString() in destination.localDeletionIds || mappedId in destination.localDeletionIds) continue
                 val explicit = destination.pendingMutations.any { it.entityId == copy?.destinationId }
                 if (!explicit && (proof || copy != null)) transfer(scope, destinationKey, sourceKey, draft, uploadScope)
             }
@@ -79,6 +81,8 @@ internal class DraftCustodyStore(
         requireCurrent(scope)
         val destination = read(destinationKey)
         val receipt = destination.custodyCopies.find { it.matches(sourceKey, draft) }
+        val mappedId = receipt?.destinationId ?: draft.id.toString()
+        if (draft.id.toString() in destination.localDeletionIds || mappedId in destination.localDeletionIds) return
         val existing = destination.drafts.find { it.id == draft.id }
         val id =
             receipt?.destinationId?.let(Uuid::parse)
@@ -154,15 +158,22 @@ internal class DraftCustodyStore(
                 }
                 val existing = result.find { it.id == draft.id }
                 val alias = source.custodyCopies.find { it.matches(key, draft) }
-                val id =
-                    alias?.destinationId?.let(Uuid::parse)
-                        ?: if (existing != null && existing != draft) Uuid.random() else draft.id
-                if (id != draft.id && alias == null) {
-                    source = source.copy(custodyCopies = source.custodyCopies + copyReceipt(key, draft, id))
+                val mappedId = alias?.destinationId?.let(Uuid::parse) ?: draft.id
+                if (draft.id.toString() in destination.localDeletionIds || mappedId.toString() in destination.localDeletionIds) continue
+                val visibleId =
+                    if (alias != null) {
+                        mappedId
+                    } else if (existing != null && existing != draft) {
+                        Uuid.random()
+                    } else {
+                        draft.id
+                    }
+                if (visibleId != draft.id && alias == null) {
+                    source = source.copy(custodyCopies = source.custodyCopies + copyReceipt(key, draft, visibleId))
                     write(key, source)
                     requireCurrent(scope)
                 }
-                if (result.none { it.id == id }) result.add(draft.copy(id = id))
+                if (result.none { it.id == visibleId }) result.add(draft.copy(id = visibleId))
             }
         }
         return result

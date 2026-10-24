@@ -15,13 +15,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -29,8 +30,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.ArchivePreview
+import app.logdate.feature.core.common.DataTransferArchiveSummary
+import app.logdate.feature.core.common.DataTransferIntroduction
+import app.logdate.feature.core.common.archiveDetails
+import app.logdate.feature.core.common.dataTransferCountsSummary
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.platform.PlatformIcons
@@ -78,6 +82,7 @@ internal fun RestoreBottomSheet(
 
     PlatformSheet(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = BottomSheetDefaults.SheetMaxWidth),
         sheetState = sheetState,
     ) {
         Column(
@@ -157,17 +162,9 @@ private fun RestoreConfirmContent(
     buttonsEnabled: Boolean = true,
 ) {
     Column {
-        Text(
-            text = stringResource(Res.string.import_backup),
-            style = MaterialTheme.typography.titleMedium,
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.sm))
-
-        Text(
-            text = stringResource(Res.string.restore_confirm_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        DataTransferIntroduction(
+            title = stringResource(Res.string.import_backup),
+            description = stringResource(Res.string.restore_confirm_description),
         )
 
         Spacer(modifier = Modifier.height(Spacing.lg))
@@ -184,7 +181,7 @@ private fun RestoreConfirmContent(
             )
             Text(
                 text = stringResource(Res.string.restore_merge_info),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -223,48 +220,24 @@ internal fun RestorePreviewContent(
     onDismiss: () -> Unit,
 ) {
     Column {
-        Text(
-            text = stringResource(Res.string.import_backup),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Spacer(modifier = Modifier.height(Spacing.xs))
-        Text(
-            text = stringResource(Res.string.restore_preview_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        DataTransferIntroduction(
+            title = stringResource(Res.string.import_backup),
+            description = stringResource(Res.string.restore_preview_description),
         )
 
         Spacer(modifier = Modifier.height(Spacing.lg))
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
-            Column(modifier = Modifier.padding(Spacing.md)) {
-                Text(
-                    text = fileName,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                val details =
-                    buildList {
-                        add("Exported ${preview.exportDate.toReadableDateShort()}")
-                        if (preview.appVersion.isNotBlank()) {
-                            add("v${preview.appVersion}")
-                        }
-                    }.joinToString(" \u00B7 ")
-                Text(
-                    text = details,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.lg))
-
-        PreviewStatsGrid(stats = preview.stats)
+        DataTransferArchiveSummary(
+            fileName = fileName,
+            fileDetails = archiveDetails(preview.exportDate.toReadableDateShort(), preview.appVersion),
+            countsSummary =
+                dataTransferCountsSummary(
+                    preview.stats.journalCount,
+                    preview.stats.noteCount,
+                    preview.stats.draftCount,
+                    preview.stats.mediaCount,
+                ),
+        )
 
         Spacer(modifier = Modifier.height(Spacing.lg))
 
@@ -313,7 +286,7 @@ internal fun RestorePreviewContent(
             )
             Text(
                 text = stringResource(Res.string.restore_merge_info),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -336,20 +309,6 @@ internal fun RestorePreviewContent(
             }
         }
     }
-}
-
-@Composable
-private fun PreviewStatsGrid(
-    stats: ExportStats,
-    modifier: Modifier = Modifier,
-) {
-    app.logdate.feature.core.common.DataStatsGrid(
-        journalCount = stats.journalCount,
-        noteCount = stats.noteCount,
-        draftCount = stats.draftCount,
-        mediaCount = stats.mediaCount,
-        modifier = modifier,
-    )
 }
 
 @Composable

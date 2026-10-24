@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,8 +16,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,8 +32,12 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.text.asString
+import app.logdate.feature.core.common.DataTransferIntroduction
+import app.logdate.ui.common.SettingsChoiceItem
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.platform.PlatformSheet
@@ -73,12 +80,12 @@ internal fun ExportBottomSheet(
     onCancel: () -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
-    onBrowse: (String) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     PlatformSheet(
         onDismissRequest = onDismiss,
+        modifier = Modifier.widthIn(max = BottomSheetDefaults.SheetMaxWidth),
         sheetState = sheetState,
     ) {
         Column(
@@ -127,7 +134,6 @@ internal fun ExportBottomSheet(
                         ExportSuccessCard(
                             fileName = state.fileName,
                             stats = state.stats,
-                            onBrowse = { onBrowse(state.path) },
                             onDismiss = onDismiss,
                         )
                     }
@@ -160,15 +166,9 @@ internal fun ExportConfigContent(
     buttonsEnabled: Boolean = true,
 ) {
     Column {
-        Text(
-            text = stringResource(Res.string.export_options_title),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Spacer(modifier = Modifier.height(Spacing.xs))
-        Text(
-            text = stringResource(Res.string.export_options_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        DataTransferIntroduction(
+            title = stringResource(Res.string.export_options_title),
+            description = stringResource(Res.string.export_options_description),
         )
 
         Spacer(modifier = Modifier.height(Spacing.lg))
@@ -257,34 +257,49 @@ private fun DateRangeSelector(
             stringResource(Res.string.export_date_range_last_year) to ExportDateRange.LastYear,
         )
 
-    Column(modifier = Modifier.animateContentSize()) {
-        Text(
-            text = stringResource(Res.string.export_date_range_label),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(Spacing.sm))
-
-        DateRangeButtonGroup(
-            options = options,
-            selectedRange = dateRange,
-            onDateRangeChanged = onDateRangeChanged,
-            enabled = enabled,
-        )
-
-        val hintText =
-            when (dateRange) {
-                is ExportDateRange.AllTime -> stringResource(Res.string.export_date_range_all_time_hint)
-                is ExportDateRange.Custom -> null
-                else -> stringResource(Res.string.export_date_range_filtered_hint)
+    BoxWithConstraints {
+        val expandedChoices = maxWidth < 420.dp || LocalDensity.current.fontScale >= 1.2f
+        Column(modifier = Modifier.animateContentSize()) {
+            if (expandedChoices) {
+                SettingsSection(title = stringResource(Res.string.export_date_range_label)) {
+                    options.forEach { (label, range) ->
+                        SettingsChoiceItem(
+                            title = label,
+                            selected = dateRange == range,
+                            onClick = { onDateRangeChanged(range) },
+                            enabled = enabled,
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = stringResource(Res.string.export_date_range_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(Spacing.sm))
+                DateRangeButtonGroup(
+                    options = options,
+                    selectedRange = dateRange,
+                    onDateRangeChanged = onDateRangeChanged,
+                    enabled = enabled,
+                )
             }
-        if (hintText != null) {
-            Spacer(modifier = Modifier.height(Spacing.xs))
-            Text(
-                text = hintText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+
+            val hintText =
+                when (dateRange) {
+                    is ExportDateRange.AllTime -> stringResource(Res.string.export_date_range_all_time_hint)
+                    is ExportDateRange.Custom -> null
+                    else -> stringResource(Res.string.export_date_range_filtered_hint)
+                }
+            if (hintText != null) {
+                Spacer(modifier = Modifier.height(Spacing.xs))
+                Text(
+                    text = hintText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -29,7 +29,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 @OptIn(ExperimentalEncodingApi::class)
 class PassphraseBackupStore(
-    private val context: Context,
+    context: Context,
+    private val backupPath: () -> File = { File(context.filesDir, "db_recovery/passphrase_backup") },
 ) {
     fun hasBackup(): Boolean = synchronized(backupLock) { backupFile().exists() || pendingFile().exists() }
 
@@ -94,12 +95,11 @@ class PassphraseBackupStore(
         }
     }
 
-    private fun backupFile(): File = File(context.filesDir, BACKUP_PATH)
+    private fun backupFile(): File = backupPath()
 
-    private fun pendingFile(): File = File(context.filesDir, "$BACKUP_PATH.part")
+    private fun pendingFile(): File = File("${backupPath().absolutePath}.part")
 
     private companion object {
-        const val BACKUP_PATH = "db_recovery/passphrase_backup"
         val backupLock = Any()
     }
 }

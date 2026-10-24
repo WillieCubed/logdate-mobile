@@ -21,7 +21,8 @@ internal object PartialDraftStorageRecovery {
                     }.getOrNull()
                 }.distinctBy { it.id }
         val receipts = array(value, "appliedRecoveries").mapNotNull { runCatching { json.decodeFromString<String>(it) }.getOrNull() }
-        return ArchiveDraftStorageState(drafts, receipts.toSet())
+        val deleted = array(value, "localDeletionIds").mapNotNull { runCatching { json.decodeFromString<String>(it) }.getOrNull() }
+        return ArchiveDraftStorageState(drafts, receipts.toSet(), deleted.toSet())
     }
 
     private fun array(

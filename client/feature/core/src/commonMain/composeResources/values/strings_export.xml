@@ -26,6 +26,7 @@
     <string name="export_complete_title">Export complete</string>
     <string name="export_complete_description">Your data has been saved.</string>
     <string name="export_complete_stats_summary">%1$d journals, %2$d notes, %3$d drafts, %4$d media files</string>
+    <string name="data_transfer_counts_summary">%1$s: %2$d · %3$s: %4$d · %5$s: %6$d · %7$s: %8$d</string>
     <string name="export_failed_title">Export failed</string>
     <string name="waiting_for_export_destination">Choose where to save your export…</string>
     <string name="action_browse">Open</string>
@@ -108,4 +109,7 @@
     <string name="restore_unreadable_description">Choose another archive copy to recover them. Your edits are kept.</string>
     <string name="restore_missing_originals">Missing originals: %1$d</string>
     <string name="restore_missing_previews">Missing previews: %1$d</string>
+    <string name="restore_archive_exported_date">Exported %1$s</string>
+    <string name="restore_archive_version">Version %1$s</string>
+    <string name="restore_archive_metadata_pair">%1$s · %2$s</string>
 </resources>

@@ -81,6 +81,21 @@ class OfflineFirstJournalContentRepository(
         journalId: Uuid,
         scope: JournalMergeScope?,
         recoveryId: String?,
+    ): Boolean = addContentToJournalForRecovery(contentId, journalId, scope, recoveryId, retainedSource = false)
+
+    override suspend fun addContentToJournalForRetainedRestore(
+        contentId: Uuid,
+        journalId: Uuid,
+        scope: JournalMergeScope?,
+        recoveryId: String?,
+    ): Boolean = addContentToJournalForRecovery(contentId, journalId, scope, recoveryId, retainedSource = true)
+
+    private suspend fun addContentToJournalForRecovery(
+        contentId: Uuid,
+        journalId: Uuid,
+        scope: JournalMergeScope?,
+        recoveryId: String?,
+        retainedSource: Boolean,
     ): Boolean =
         transactionManager.withTransaction {
             check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership recovery account changed" }
@@ -95,6 +110,19 @@ class OfflineFirstJournalContentRepository(
             }
             val key = AssociationPendingKey(destination, contentId).toPendingId()
             val receiptKey = AssociationPendingKey(journalId, contentId).toPendingId()
+            if (retainedSource &&
+                scope != null &&
+                (
+                    recoveryReceipts.containsLocalDeletion(scope, LocalDeletionType.NOTE, contentId.toString()) ||
+                        recoveryReceipts.containsLocalDeletion(scope, LocalDeletionType.JOURNAL, journalId.toString()) ||
+                        recoveryReceipts.containsLocalDeletion(scope, LocalDeletionType.JOURNAL, destination.toString()) ||
+                        recoveryReceipts.containsLocalDeletion(scope, LocalDeletionType.ASSOCIATION, receiptKey) ||
+                        recoveryReceipts.containsLocalDeletion(scope, LocalDeletionType.ASSOCIATION, key)
+                )
+            ) {
+                if (recoveryId != null) recoveryReceipts.record(scope, "ASSOCIATION", recoveryId, receiptKey)
+                return@withTransaction false
+            }
             if (scope != null &&
                 recoveryId != null &&
                 recoveryReceipts.contains(scope, "ASSOCIATION", recoveryId, receiptKey)
@@ -109,6 +137,9 @@ class OfflineFirstJournalContentRepository(
                 )
             ) {
                 return@withTransaction false
+            }
+            if (!retainedSource && scope != null) {
+                recoveryReceipts.clearLocalDeletion(scope, LocalDeletionType.ASSOCIATION, receiptKey)
             }
             journalContentDao.addContentToJournal(JournalContentEntityLink(destination, contentId))
             if (scope != null && recoveryId != null) recoveryReceipts.record(scope, "ASSOCIATION", recoveryId, receiptKey)
@@ -125,6 +156,7 @@ class OfflineFirstJournalContentRepository(
             if (uniqueContentIds.isEmpty()) return@withContext 0
 
             transactionManager.withTransaction {
+                val scope = journalNotesRepository.getNoteRecoveryScope()
                 val destination = journalRepository.resolveJournalId(journalId)
                 val newContentIds =
                     uniqueContentIds.filterNot { contentId ->
@@ -132,6 +164,13 @@ class OfflineFirstJournalContentRepository(
                     }
 
                 newContentIds.forEach { contentId ->
+                    if (scope != null) {
+                        recoveryReceipts.clearLocalDeletion(
+                            scope,
+                            LocalDeletionType.ASSOCIATION,
+                            AssociationPendingKey(journalId, contentId).toPendingId(),
+                        )
+                    }
                     journalContentDao.addContentToJournal(JournalContentEntityLink(destination, contentId))
                 }
                 newContentIds.forEach { contentId ->
@@ -141,6 +180,7 @@ class OfflineFirstJournalContentRepository(
                         operation = PendingOperation.CREATE,
                     )
                 }
+                check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership creation account changed" }
                 newContentIds.size
             }
         }
@@ -149,14 +189,18 @@ class OfflineFirstJournalContentRepository(
         contentId: Uuid,
         journalId: Uuid,
     ) = withContext(dispatcher) {
-        if (journalRepository.resolveJournalId(journalId) != journalId) return@withContext
-        journalContentDao.removeContentFromJournal(journalId, contentId)
-
-        syncMetadataService.enqueuePending(
-            entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
-            entityType = EntityType.ASSOCIATION,
-            operation = PendingOperation.DELETE,
-        )
+        val removed =
+            transactionManager.withTransaction {
+                if (journalRepository.resolveJournalId(journalId) != journalId) return@withTransaction false
+                val scope = journalNotesRepository.getNoteRecoveryScope()
+                val key = AssociationPendingKey(journalId, contentId).toPendingId()
+                if (scope != null) recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.ASSOCIATION, key)
+                journalContentDao.removeContentFromJournal(journalId, contentId)
+                syncMetadataService.enqueuePending(key, EntityType.ASSOCIATION, PendingOperation.DELETE)
+                check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership deletion account changed" }
+                true
+            }
+        if (!removed) return@withContext
 
         Unit
     }
@@ -172,18 +216,17 @@ class OfflineFirstJournalContentRepository(
 
     override suspend fun removeContentFromAllJournals(contentId: Uuid) =
         withContext(dispatcher) {
-            val journalIds = journalContentDao.getJournalsForContent(contentId).first()
-
-            journalIds.forEach { journalId ->
-                syncMetadataService.enqueuePending(
-                    entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
-                    entityType = EntityType.ASSOCIATION,
-                    operation = PendingOperation.DELETE,
-                )
+            transactionManager.withTransaction {
+                val scope = journalNotesRepository.getNoteRecoveryScope()
+                val journalIds = journalContentDao.getJournalsForContent(contentId).first()
+                journalIds.forEach { journalId ->
+                    val key = AssociationPendingKey(journalId, contentId).toPendingId()
+                    if (scope != null) recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.ASSOCIATION, key)
+                    syncMetadataService.enqueuePending(key, EntityType.ASSOCIATION, PendingOperation.DELETE)
+                }
+                journalContentDao.removeContentFromAllJournals(contentId)
+                check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership deletion account changed" }
             }
-
-            // Remove from the journal content links table using Uuid
-            journalContentDao.removeContentFromAllJournals(contentId)
         }
 
     override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> {
@@ -205,14 +248,28 @@ class OfflineFirstJournalContentRepository(
         journalId: Uuid,
     ) = withContext(dispatcher) {
         transactionManager.withTransaction {
+            val scope = journalNotesRepository.getNoteRecoveryScope()
             val destination = journalRepository.resolveJournalId(journalId)
             journalContentDao.addContentToJournal(JournalContentEntityLink(destination, contentId))
+            if (scope != null) {
+                recoveryReceipts.clearLocalDeletion(
+                    scope,
+                    LocalDeletionType.ASSOCIATION,
+                    AssociationPendingKey(journalId, contentId).toPendingId(),
+                )
+                recoveryReceipts.clearLocalDeletion(
+                    scope,
+                    LocalDeletionType.ASSOCIATION,
+                    AssociationPendingKey(destination, contentId).toPendingId(),
+                )
+            }
             if (destination != journalId) {
                 syncMetadataService.enqueueCreateIfAbsent(
                     AssociationPendingKey(destination, contentId).toPendingId(),
                     EntityType.ASSOCIATION,
                 )
             }
+            check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership sync account changed" }
         }
     }
 
@@ -220,8 +277,14 @@ class OfflineFirstJournalContentRepository(
         contentId: Uuid,
         journalId: Uuid,
     ) = withContext(dispatcher) {
-        if (journalRepository.resolveJournalId(journalId) == journalId) {
-            journalContentDao.removeContentFromJournal(journalId, contentId)
+        transactionManager.withTransaction {
+            if (journalRepository.resolveJournalId(journalId) == journalId) {
+                val scope = journalNotesRepository.getNoteRecoveryScope()
+                val key = AssociationPendingKey(journalId, contentId).toPendingId()
+                if (scope != null) recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.ASSOCIATION, key)
+                journalContentDao.removeContentFromJournal(journalId, contentId)
+                check(journalNotesRepository.getNoteRecoveryScope() == scope) { "Membership deletion account changed" }
+            }
         }
     }
 }

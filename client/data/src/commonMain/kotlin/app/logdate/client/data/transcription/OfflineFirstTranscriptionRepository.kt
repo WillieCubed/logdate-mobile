@@ -50,6 +50,7 @@ class OfflineFirstTranscriptionRepository(
     private val transactionManager: SyncTransactionManager? = null,
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val recoveryDeletions: TranscriptRecoveryDeletions = TranscriptRecoveryDeletions.None,
 ) : TranscriptionRepository {
     private val mutex = Mutex()
     private var automaticJob: Job? = null
@@ -68,6 +69,7 @@ class OfflineFirstTranscriptionRepository(
                         notes to transcripts.associateBy { it.noteId }
                     }.collect { (notes, transcripts) ->
                         for (note in notes) {
+                            if (recoveryDeletions.contains(note.uid)) continue
                             if (note.deletedAt != null ||
                                 note.contentUri.isBlank() ||
                                 note.contentUri.startsWith("http")
@@ -115,16 +117,22 @@ class OfflineFirstTranscriptionRepository(
         transcriptionDao.observeAllTranscriptions().map { rows -> rows.map { it.toTranscriptionData() } }
 
     override suspend fun requestTranscription(noteId: Uuid): Boolean =
-        requestTranscription(noteId, resumeActive = false, priority = TranscriptionPriority.FOREGROUND)
+        requestTranscription(noteId, resumeActive = false, priority = TranscriptionPriority.FOREGROUND, explicitRequest = true)
 
     private suspend fun requestTranscription(
         noteId: Uuid,
         resumeActive: Boolean,
         priority: TranscriptionPriority,
+        explicitRequest: Boolean = false,
     ): Boolean =
         safely {
             mutate {
                 val note = audioNoteDao.getNoteOneOff(noteId)
+                if (explicitRequest) {
+                    recoveryDeletions.clear(noteId)
+                } else if (recoveryDeletions.contains(noteId)) {
+                    return@mutate false
+                }
                 if (note.deletedAt != null || UnavailableMediaReferences.isUnavailable(note.contentUri)) return@mutate false
                 val existing = transcriptionDao.getTranscriptionByNoteId(noteId)
                 if (existing?.matchesMedia(note) == true && existing.hasValidFinalDocument()) return@mutate true
@@ -201,6 +209,7 @@ class OfflineFirstTranscriptionRepository(
         audioUri: String,
     ): TranscriptionWorkToken? =
         mutate {
+            if (recoveryDeletions.contains(noteId)) return@mutate null
             val note =
                 try {
                     audioNoteDao.getNoteOneOff(noteId)
@@ -395,6 +404,7 @@ class OfflineFirstTranscriptionRepository(
         safely {
             mutate {
                 transcriptionManager.cancelTranscription(noteId)
+                recoveryDeletions.record(noteId)
                 transcriptionDao.deleteSegmentsByNoteId(noteId)
                 transcriptionDao.deleteTranscriptionByNoteId(noteId) > 0
             }

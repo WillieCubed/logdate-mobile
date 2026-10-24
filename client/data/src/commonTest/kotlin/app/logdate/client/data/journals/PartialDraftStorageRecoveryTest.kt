@@ -27,4 +27,10 @@ class PartialDraftStorageRecoveryTest {
         assertEquals(listOf(draft), salvaged.drafts)
         assertEquals(setOf("receipt"), salvaged.appliedRecoveries)
     }
+
+    @Test
+    fun `settled draft deletion receipts survive partial storage salvage`() {
+        val damaged = "{\"drafts\":[],\"localDeletionIds\":[\"deleted-id\"],"
+        assertEquals(setOf("deleted-id"), PartialDraftStorageRecovery.recover(Json, damaged).localDeletionIds)
+    }
 }

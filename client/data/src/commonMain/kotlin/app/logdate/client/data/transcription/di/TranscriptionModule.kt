@@ -19,6 +19,9 @@ val transcriptionModule =
                 syncMetadataService = get(),
                 transactionManager = get(),
                 syncManagerProvider = { get() },
+                recoveryDeletions =
+                    app.logdate.client.data.transcription
+                        .ScopedTranscriptRecoveryDeletions(get(), get(), get()),
             )
         }
     }

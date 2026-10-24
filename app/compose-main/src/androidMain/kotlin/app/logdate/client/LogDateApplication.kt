@@ -15,11 +15,13 @@ import app.logdate.client.data.account.RestoreCredentialLifecycle
 import app.logdate.client.data.notes.NativeMediaQuarantine
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.restore.resumeNativeAccountRecovery
+import app.logdate.client.data.restore.resumeRetainedJournalReconciliation
 import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.nativeRestoreDeliveryCompletions
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.domain.reminders.ReminderSignalObserver
 import app.logdate.client.events.EventInferenceScheduler
@@ -29,6 +31,7 @@ import app.logdate.client.feature.widgets.resumeWidgetLifecycle
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.launch.ApplicationStartup
 import app.logdate.client.launch.awaitAndroidUserUnlock
+import app.logdate.client.launch.observeNativeRestoreDeliveryCompletions
 import app.logdate.client.launch.recoverCompletedRecordingFiles
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
@@ -133,6 +136,9 @@ class LogdateApplication :
     override fun onCreate() {
         super.onCreate()
         if (isWidgetIngressProcess(packageName)) return
+        observeNativeRestoreDeliveryCompletions(startupScope, nativeRestoreDeliveryCompletions(), startup) {
+            resumeRetainedJournalReconciliation(this@LogdateApplication)
+        }
         startupScope.launch(Dispatchers.Main.immediate) {
             awaitAndroidUserUnlock()
             initializeUnlockedApplication()
@@ -156,6 +162,7 @@ class LogdateApplication :
         initializeKoin()
         dependenciesInitialized = true
         startupScope.launch { resumeNativeAccountRecovery(this@LogdateApplication) }
+        startupScope.launch { resumeRetainedJournalReconciliation(this@LogdateApplication) }
         runCatching { resumeWidgetLifecycle(this) }.onFailure { Napier.w("Widget lifecycle recovery remains pending", it) }
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
     }
@@ -358,38 +365,44 @@ internal object ApplicationStartupCoordinator {
                 .getOrPut(application) {
                     setResourceReaderAndroidContext(application.applicationContext)
                     val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-                    ApplicationStartup(
-                        startupScope,
-                        startDeviceWork = { AndroidApplicationRuntime(application, GlobalContext.get()).start() },
-                    ) {
-                        try {
-                            application.awaitAndroidUserUnlock()
-                            withContext(Dispatchers.Main.immediate) {
-                                if (GlobalContext.getOrNull() == null) {
-                                    val isDebuggable = (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                                    Napier.base(LogcatAntilog(isDebuggable = isDebuggable))
-                                    Napier.base(CrashlyticsAntilog())
-                                    application.initializeKoin()
+                    val startup =
+                        ApplicationStartup(
+                            startupScope,
+                            startDeviceWork = { AndroidApplicationRuntime(application, GlobalContext.get()).start() },
+                        ) {
+                            try {
+                                application.awaitAndroidUserUnlock()
+                                withContext(Dispatchers.Main.immediate) {
+                                    if (GlobalContext.getOrNull() == null) {
+                                        val isDebuggable = (application.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                                        Napier.base(LogcatAntilog(isDebuggable = isDebuggable))
+                                        Napier.base(CrashlyticsAntilog())
+                                        application.initializeKoin()
+                                    }
                                 }
+                                resumeNativeAccountRecovery(application)
+                                resumeRetainedJournalReconciliation(application)
+                                recoverCompletedRecordingFiles(application.filesDir)
+                                val koin = GlobalContext.get()
+                                koin.get<LogDateDatabase>()
+                                val detector = PostRestoreDetector(application)
+                                awaitNativeMediaQuarantine(
+                                    detector::pendingMediaQuarantineId,
+                                    koin.get<NativeMediaQuarantine>()::run,
+                                    detector::acknowledgeMediaQuarantine,
+                                    { NativeMediaQuarantineScheduler.enqueue(application, it) },
+                                )
+                                koin.get<AndroidPlatformSearchIndexManager>()
+                                Napier.i("Encrypted storage ready", tag = APP_STARTUP_TAG)
+                            } catch (error: Exception) {
+                                Napier.e("Application storage initialization failed", error, tag = APP_STARTUP_TAG)
+                                throw error
                             }
-                            resumeNativeAccountRecovery(application)
-                            recoverCompletedRecordingFiles(application.filesDir)
-                            val koin = GlobalContext.get()
-                            koin.get<LogDateDatabase>()
-                            val detector = PostRestoreDetector(application)
-                            awaitNativeMediaQuarantine(
-                                detector::pendingMediaQuarantineId,
-                                koin.get<NativeMediaQuarantine>()::run,
-                                detector::acknowledgeMediaQuarantine,
-                                { NativeMediaQuarantineScheduler.enqueue(application, it) },
-                            )
-                            koin.get<AndroidPlatformSearchIndexManager>()
-                            Napier.i("Encrypted storage ready", tag = APP_STARTUP_TAG)
-                        } catch (error: Exception) {
-                            Napier.e("Application storage initialization failed", error, tag = APP_STARTUP_TAG)
-                            throw error
                         }
+                    observeNativeRestoreDeliveryCompletions(startupScope, nativeRestoreDeliveryCompletions(), startup) {
+                        resumeRetainedJournalReconciliation(application)
                     }
+                    startup
                 }.also(::startApplicationRuntime)
         }
     }

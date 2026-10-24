@@ -24,12 +24,15 @@ import app.logdate.client.ApplicationStartupCoordinator
 import app.logdate.client.database.NativeRestoreInProgressException
 import app.logdate.client.database.NewerDatabaseVersionException
 import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
+import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.device.restore.NativeRestorePrivacyMetadataRequiredException
+import app.logdate.client.device.restore.retainedJournalWorkspace
 import app.logdate.client.restore.NativeMediaQuarantinePendingException
 import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.theme.LogDateTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.koin.core.context.GlobalContext
 import studio.hypertext.logdate.R
 
 /** Attaches a responsive loading surface before resolving any storage-backed dependency. */
@@ -59,17 +62,27 @@ internal fun FragmentActivity.whenApplicationReady(onReady: () -> Unit) {
                             )
                         },
                         confirmButton = {
-                            val updateRequired = message == ApplicationStartupFailureMessage.UPDATE_REQUIRED
-                            TextButton(onClick = { if (updateRequired) openJournalAppUpdate() else startup.start() }) {
-                                Text(
-                                    stringResource(
-                                        if (updateRequired) {
-                                            R.string.database_update_required_action
-                                        } else {
-                                            R.string.application_startup_retry
-                                        },
-                                    ),
-                                )
+                            if (message == ApplicationStartupFailureMessage.DATABASE_KEY_RECOVERY) {
+                                TextButton(onClick = {
+                                    startup.recoverRetainedJournal {
+                                        GlobalContext.get().get<NativeRestoreDeliveryGate>().withLock {
+                                            retainedJournalWorkspace(applicationContext).prepare()
+                                        }
+                                    }
+                                }) { Text(stringResource(R.string.database_key_recovery_backup_action)) }
+                            } else {
+                                val updateRequired = message == ApplicationStartupFailureMessage.UPDATE_REQUIRED
+                                TextButton(onClick = { if (updateRequired) openJournalAppUpdate() else startup.start() }) {
+                                    Text(
+                                        stringResource(
+                                            if (updateRequired) {
+                                                R.string.database_update_required_action
+                                            } else {
+                                                R.string.application_startup_retry
+                                            },
+                                        ),
+                                    )
+                                }
                             }
                         },
                     )

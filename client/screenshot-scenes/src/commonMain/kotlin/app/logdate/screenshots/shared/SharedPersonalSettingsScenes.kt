@@ -258,7 +258,6 @@ internal val personalSettingsScenes: List<SharedScreenshotSceneSpec> =
                 onCancelExport = {},
                 onRetryExport = {},
                 onDismissExport = {},
-                onBrowseExport = {},
                 restoreState = RestoreState.Idle,
                 onShowRestoreSheet = {},
                 onSelectRestoreFile = {},
