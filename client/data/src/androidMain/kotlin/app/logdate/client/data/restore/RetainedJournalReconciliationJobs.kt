@@ -321,79 +321,120 @@ class RetainedJournalReconciliationJobService : JobService() {
             return NativeSourceOutcome(false, false)
         }
         opened.copy.use {
-            if (files["source_scope.json"]?.readText()?.let {
-                    Json
-                        .parseToJsonElement(it)
-                        .jsonObject["version"]
-                        ?.jsonPrimitive
-                        ?.intOrNull
-                } in setOf(2, 3)
-            ) {
-                check(
-                    app.logdate.client.database
-                        .readNativeJournalSnapshotScope(opened.copy.database) ==
-                        app.logdate.client.database.NativeJournalSnapshotScope(
-                            checkNotNull(sourceScope.ownerId),
-                            sourceScope.bound,
-                            sourceScope.backendOrigin,
-                            nativeSnapshotChecksum(preferenceFile),
-                        ),
-                ) { "Encrypted source scope does not match native preferences" }
-            }
+            verifyEncryptedScope(files, opened, sourceScope, preferenceFile)
             val merger =
-                RetainedJournalDatabaseMerger(
+                mergerFor(
                     generation,
                     files,
-                    opened.copy.database,
+                    opened,
                     sourceScope,
                     activePreferences,
-                    repositories.journals,
-                    repositories.notes,
-                    repositories.content,
-                    repositories.media,
-                    RetainedJournalMergeCheckpointStore(File(noBackupFilesDir, "retained-journal-merges/$generation")),
                     scratchRoot,
-                    additionalMediaSources = additionalMediaSources,
-                    ensureSourceSessionCurrent = {
-                        val current = workspace.current()
-                        check(current?.id == session?.id && (current == null || current.phase == RetainedJournalWorkspace.Phase.WORKING)) {
-                            "Retained journal workspace changed during reconciliation"
-                        }
-                    },
+                    additionalMediaSources,
+                    workspace,
+                    session,
+                    repositories,
                 )
             val result = merger.merge()
             if (result.coverageComplete) {
-                val custody = NativeJournalReplayCustody(this)
-                app.logdate.client.device.restore.verifiedNativeJournalSources(custody.sealedPayloads())[generation]?.let { accepted ->
-                    val receipt = nativeSnapshotChecksum(accepted.getValue("source_scope.json"))
-                    val stagedIndex = NativeJournalStagedSourceIndex(this)
-                    val sourceFiles =
-                        accepted
-                            .mapKeys { (path, _) ->
-                                if (path == "source_scope.json") {
-                                    app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
-                                } else {
-                                    path
-                                }
-                            }.toMutableMap()
-                    custody
-                        .sealedPayloads()
-                        .firstOrNull { payload ->
-                            payload.file.canonicalFile == opened.keyFile.canonicalFile
-                        }?.let { key ->
-                            sourceFiles[key.path.removePrefix(app.logdate.client.device.restore.NATIVE_JOURNAL_TRANSFER_PREFIX)] =
-                                key.file
-                        }
-                    stagedIndex.remember(sourceFiles)
-                    stagedIndex.admitAfterMerged(receipt)
-                    custody.acknowledgeMergedSource(
-                        receipt,
-                        accepted,
-                        stagedIndex.admittedSources().getValue(receipt).sourceCorePhysicalPaths,
-                    )
-                }
+                admitMergedSource(generation, opened.keyFile)
             }
             return NativeSourceOutcome(result.mediaPending > 0, result.coverageComplete)
+        }
+    }
+
+    private fun mergerFor(
+        generation: String,
+        files: Map<String, File>,
+        opened: OpenedSource,
+        sourceScope: RetainedJournalSourceScope,
+        activePreferences: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>,
+        scratchRoot: File,
+        additionalMediaSources: List<Map<String, File>>,
+        workspace: RetainedJournalWorkspace,
+        session: RetainedJournalWorkspace.Session?,
+        repositories: Repositories,
+    ): RetainedJournalDatabaseMerger =
+        RetainedJournalDatabaseMerger(
+            generation,
+            files,
+            opened.copy.database,
+            sourceScope,
+            activePreferences,
+            repositories.journals,
+            repositories.notes,
+            repositories.content,
+            repositories.media,
+            RetainedJournalMergeCheckpointStore(File(noBackupFilesDir, "retained-journal-merges/$generation")),
+            scratchRoot,
+            additionalMediaSources = additionalMediaSources,
+            ensureSourceSessionCurrent = {
+                val current = workspace.current()
+                check(current?.id == session?.id && (current == null || current.phase == RetainedJournalWorkspace.Phase.WORKING)) {
+                    "Retained journal workspace changed during reconciliation"
+                }
+            },
+        )
+
+    private fun verifyEncryptedScope(
+        files: Map<String, File>,
+        opened: OpenedSource,
+        sourceScope: RetainedJournalSourceScope,
+        preferenceFile: File,
+    ) {
+        if (files["source_scope.json"]?.readText()?.let {
+                Json
+                    .parseToJsonElement(it)
+                    .jsonObject["version"]
+                    ?.jsonPrimitive
+                    ?.intOrNull
+            } in setOf(2, 3)
+        ) {
+            check(
+                app.logdate.client.database
+                    .readNativeJournalSnapshotScope(opened.copy.database) ==
+                    app.logdate.client.database.NativeJournalSnapshotScope(
+                        checkNotNull(sourceScope.ownerId),
+                        sourceScope.bound,
+                        sourceScope.backendOrigin,
+                        nativeSnapshotChecksum(preferenceFile),
+                    ),
+            ) { "Encrypted source scope does not match native preferences" }
+        }
+    }
+
+    private fun admitMergedSource(
+        generation: String,
+        keyFile: File,
+    ) {
+        val custody = NativeJournalReplayCustody(this)
+        app.logdate.client.device.restore.verifiedNativeJournalSources(custody.sealedPayloads())[generation]?.let { accepted ->
+            val receipt = nativeSnapshotChecksum(accepted.getValue("source_scope.json"))
+            val stagedIndex = NativeJournalStagedSourceIndex(this)
+            val sourceFiles =
+                accepted
+                    .mapKeys { (path, _) ->
+                        if (path == "source_scope.json") {
+                            app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
+                        } else {
+                            path
+                        }
+                    }.toMutableMap()
+            custody
+                .sealedPayloads()
+                .firstOrNull { payload ->
+                    payload.file.canonicalFile == keyFile.canonicalFile
+                }?.let { key ->
+                    sourceFiles[key.path.removePrefix(app.logdate.client.device.restore.NATIVE_JOURNAL_TRANSFER_PREFIX)] =
+                        key.file
+                }
+            stagedIndex.remember(sourceFiles)
+            stagedIndex.admitAfterMerged(receipt)
+            custody.acknowledgeMergedSource(
+                receipt,
+                accepted,
+                stagedIndex.admittedSources().getValue(receipt).sourceCorePhysicalPaths,
+            )
         }
     }
 
