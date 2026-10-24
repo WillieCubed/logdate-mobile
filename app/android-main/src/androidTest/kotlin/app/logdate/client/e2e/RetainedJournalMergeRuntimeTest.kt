@@ -219,8 +219,8 @@ class RetainedJournalMergeRuntimeTest {
                 check(activeMedia.delete()) {
                     "Remove only the working canonical media file to force retained-source import"
                 }
+                assertTrue(!activeMedia.exists(), "The working original must be absent before retained-source import")
                 RetainedTranscriptionFixtureSupport.removeWorkingOriginal(state, source)
-                RetainedJournalMergeFixtureSupport.removeEmptyDirectories(File(context.filesDir, "media"))
 
                 val journals = koin.get<JournalRepository>()
                 val notes = koin.get<JournalNotesRepository>()

@@ -40,15 +40,6 @@ internal object RetainedJournalMergeFixtureSupport {
         check(context.packageName.endsWith(".debug")) { "Synthetic debug application required" }
     }
 
-    fun removeEmptyDirectories(root: File) {
-        if (!root.exists()) return
-        root.walkBottomUp().filter(File::isDirectory).forEach { directory ->
-            check(directory.listFiles().isNullOrEmpty()) { "Expected the active media directory to be empty" }
-            check(directory.delete()) { "Could not remove empty working media directory" }
-        }
-        check(!root.exists()) { "The now-empty active media root should be removed for admission testing" }
-    }
-
     fun captureJournalScreen(
         context: Context,
         instrumentation: android.app.Instrumentation,
