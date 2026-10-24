@@ -17,9 +17,9 @@ class InvalidPublicRecordException(
  * Checks a record against its lexicon before it is written to the public repository.
  *
  * LogDate's own schemas (the profile and the sharing key) come from the lexicons built into the
- * server. The Standard.site schemas for publications and documents are copies kept under
- * `lexicons/site/standard/` in the server's resources, with the `com.atproto.repo.strongRef` they
- * refer to. Update them from the upstream publication when Standard.site changes a schema.
+ * server. The Standard.site schemas for publications and documents, and the `com.atproto` schemas
+ * they refer to, are copies kept under `lexicons/` in the server's resources, resolved from their
+ * authorities; the README there says how and when.
  *
  * A collection with no schema here, one that was opened to apps, is accepted as it is, the way a
  * reference PDS treats a record whose lexicon it does not know. Every collection LogDate publishes
@@ -55,6 +55,7 @@ class PublicRecordValidator(
         private val bundledSchemas =
             listOf(
                 "com/atproto/repo/strongRef.json",
+                "com/atproto/label/defs.json",
                 "site/standard/publication.json",
                 "site/standard/document.json",
                 "site/standard/theme/basic.json",
