@@ -75,6 +75,7 @@ open class NativeBackupAgent : BackupAgent() {
                     this@NativeBackupAgent,
                     deviceTransfer = data.transportFlags and FLAG_DEVICE_TO_DEVICE_TRANSFER != 0,
                 )
+                if (data.transportFlags and FLAG_DEVICE_TO_DEVICE_TRANSFER == 0) requireCloudJournalRecoverability()
                 try {
                     runBlocking {
                         IdentityKeyManager(
@@ -403,6 +404,10 @@ open class NativeBackupAgent : BackupAgent() {
     }
 
     protected open fun scheduleRetainedJournalReconciliation() = Unit
+
+    /** Concrete agents must validate their encrypted journal before replacing a cloud backup. */
+    protected open fun requireCloudJournalRecoverability(): Unit =
+        throw IOException("Native cloud backup has no journal recovery validator")
 
     protected open fun prepareNativeJournalTransferBackup() = Unit
 

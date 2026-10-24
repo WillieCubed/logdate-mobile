@@ -20,6 +20,7 @@ import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.restore.PostRestoreDetector
+import app.logdate.client.device.restore.retainedJournalWorkspace
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiLoadedState
@@ -78,7 +79,9 @@ internal class StartupRecoveryTalkBackScenario(
                 }
                 scenario = ActivityScenario.launch(MainActivity::class.java)
                 val startup = applicationStartupState()
-                await { startup.value?.javaClass?.simpleName == "Failed" && appWindowHas("encryption key") }
+                await { startup.value?.javaClass?.simpleName == "Failed" && appWindowHas("Finish restoring your journal") }
+                assertTrue(appWindowHas("Try again"), "A late key must be retryable without moving the journal")
+                assertTrue(appWindowHas("Recover from backup"), "A failed transfer must retain its backup recovery path")
                 scenario.onActivity { assertEquals(fontScale, it.resources.configuration.fontScale) }
                 assertLockedContentHidden()
                 val initialFailure = startup.value
@@ -92,6 +95,7 @@ internal class StartupRecoveryTalkBackScenario(
                 )
                 assertFalse(backup.hasBackup(), "A missing key cannot be replaced with a new one")
                 assertNull(storage.getString("db_encryption_key"))
+                assertNull(retainedJournalWorkspace(context).current(), "Retry must not detach a protected journal")
                 verifyJournal(file, key)
 
                 // Simulate Android delivering the original portable key after the first attempt.
@@ -99,6 +103,7 @@ internal class StartupRecoveryTalkBackScenario(
                 driveAction("late-key", "Try again") { startup.value?.javaClass?.simpleName == "Ready" }
                 assertTrue(koin.get<DatabaseStartupMonitor>().state.value is DatabaseStartupState.Ready)
                 assertTrue(backup.read()!!.contentEquals(key), "Recovery must retain the original key")
+                assertNull(retainedJournalWorkspace(context).current(), "A late key must open the original journal in place")
                 verifyJournal(file, key)
                 await { automation.rootInActiveWindow?.packageName?.toString() == "com.android.settings" }
                 systemKey(KeyEvent.KEYCODE_BACK)

@@ -231,7 +231,7 @@ private fun verifyEncryptedDatabase(
     openAndPingEncryptedDatabase(encryptedFile, passphrase, hook = null)
 }
 
-private fun canOpenEncryptedDatabaseWithCurrentSettings(
+internal fun canOpenEncryptedDatabaseWithCurrentSettings(
     encryptedFile: File,
     passphrase: ByteArray,
 ): Boolean {
@@ -248,7 +248,7 @@ private fun canOpenEncryptedDatabaseWithCurrentSettings(
         }.isSuccess
 }
 
-private fun canOpenEncryptedDatabaseWithLegacySettings(
+internal fun canOpenEncryptedDatabaseWithLegacySettings(
     encryptedFile: File,
     passphrase: ByteArray,
 ): Boolean {
@@ -314,7 +314,7 @@ private fun findLatestPlaintextBackup(dbFile: File): File? {
         ?.maxByOrNull { file -> file.lastModified() }
 }
 
-private fun createLegacySqlCipherHook(): SQLiteDatabaseHook =
+internal fun createLegacySqlCipherHook(): SQLiteDatabaseHook =
     object : SQLiteDatabaseHook {
         override fun preKey(database: SQLiteConnection) {
             val cancellationSignal = CancellationSignal()
@@ -469,7 +469,7 @@ fun openRetainedDatabaseCopy(
     return null
 }
 
-private fun requireRetainedDatabaseIntegrity(database: SQLCipherDatabase) {
+internal fun requireRetainedDatabaseIntegrity(database: SQLCipherDatabase) {
     database.rawQuery("PRAGMA integrity_check", emptyArray<String>()).use { cursor ->
         check(cursor.moveToFirst() && cursor.getString(0) == "ok" && !cursor.moveToNext())
     }
