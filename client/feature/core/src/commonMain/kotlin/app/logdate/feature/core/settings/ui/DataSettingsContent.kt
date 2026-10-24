@@ -3,6 +3,7 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -69,100 +70,26 @@ fun DataSettingsContent(
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
-    if (isExportSheetVisible) {
-        ExportBottomSheet(
-            exportState = exportState,
-            onOptionsChanged = onUpdateExportOptions,
-            onConfirm = onConfirmExport,
-            onCancel = onCancelExport,
-            onRetry = onRetryExport,
-            onDismiss = onDismissExport,
-        )
-    }
-
-    if (isRestoreSheetVisible) {
-        RestoreBottomSheet(
-            restoreState = restoreState,
-            onSelectFile = onSelectRestoreFile,
-            onUpdateOptions = onUpdateImportOptions,
-            onConfirmImport = onConfirmImport,
-            onCancel = onCancelRestore,
-            onRetry = onRetryRestore,
-            onDismiss = onDismissRestore,
-        )
-    }
-
-    FoldableBookLayout(
-        modifier = Modifier.fillMaxSize(),
-        minPaneWidth = 320.dp,
-        startPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                if (isAuthenticated && isQuotaAvailable) {
-                    QuotaUsageBlock(
-                        quotaUsage = quotaUsage,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
-
-                SettingsSection(
-                    title = stringResource(Res.string.data_management),
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
+    Box(Modifier.fillMaxSize()) {
+        FoldableBookLayout(
+            modifier = Modifier.fillMaxSize(),
+            minPaneWidth = 320.dp,
+            startPane = {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(vertical = Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
-                    ExportDataItem(onShowExportOptions = onShowExportOptions)
-                    ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
-                }
-            }
-        },
-        endPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                NativeBackupSettingsSection(
-                    nativeBackupStatus,
-                    Modifier.padding(horizontal = Spacing.lg),
-                    onRetryRecovery = onRetryNativeRecovery,
-                    onOpenArchive = onShowRestoreSheet,
-                )
-                SyncSettingsSection(
-                    syncStatus = syncStatus,
-                    cloudArchiveStatus = cloudArchiveStatus,
-                    onSyncUsingMobileData = onSyncUsingMobileData,
-                    isAuthenticated = isAuthenticated,
-                    onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
-                    onNavigateToSignIn = onNavigateToSignIn,
-                    onEnterRecoveryPhrase = onNavigateToRecoveryPhrase,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-            }
-        },
-        standardContent = {
-            SettingsScaffold(
-                title = stringResource(Res.string.data_and_storage),
-                onBack = onBack,
-                snackbarHostState = snackbarHostState,
-            ) {
-                if (isAuthenticated && isQuotaAvailable) {
-                    item {
+                    if (isAuthenticated && isQuotaAvailable) {
                         QuotaUsageBlock(
                             quotaUsage = quotaUsage,
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
-                }
 
-                item {
                     SettingsSection(
                         title = stringResource(Res.string.data_management),
                         modifier = Modifier.padding(horizontal = Spacing.lg),
@@ -171,18 +98,22 @@ fun DataSettingsContent(
                         ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
                     }
                 }
-
-                if (nativeBackupStatus is NativeBackupStatus.Available) {
-                    item {
-                        NativeBackupSettingsSection(
-                            nativeBackupStatus,
-                            Modifier.padding(horizontal = Spacing.lg),
-                            onRetryRecovery = onRetryNativeRecovery,
-                            onOpenArchive = onShowRestoreSheet,
-                        )
-                    }
-                }
-                item {
+            },
+            endPane = {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(vertical = Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                ) {
+                    NativeBackupSettingsSection(
+                        nativeBackupStatus,
+                        Modifier.padding(horizontal = Spacing.lg),
+                        onRetryRecovery = onRetryNativeRecovery,
+                        onOpenArchive = onShowRestoreSheet,
+                    )
                     SyncSettingsSection(
                         syncStatus = syncStatus,
                         cloudArchiveStatus = cloudArchiveStatus,
@@ -194,9 +125,81 @@ fun DataSettingsContent(
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
-            }
-        },
-    )
+            },
+            standardContent = {
+                SettingsScaffold(
+                    title = stringResource(Res.string.data_and_storage),
+                    onBack = onBack,
+                    snackbarHostState = snackbarHostState,
+                ) {
+                    if (isAuthenticated && isQuotaAvailable) {
+                        item {
+                            QuotaUsageBlock(
+                                quotaUsage = quotaUsage,
+                                modifier = Modifier.padding(horizontal = Spacing.lg),
+                            )
+                        }
+                    }
+
+                    item {
+                        SettingsSection(
+                            title = stringResource(Res.string.data_management),
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        ) {
+                            ExportDataItem(onShowExportOptions = onShowExportOptions)
+                            ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
+                        }
+                    }
+
+                    if (nativeBackupStatus is NativeBackupStatus.Available) {
+                        item {
+                            NativeBackupSettingsSection(
+                                nativeBackupStatus,
+                                Modifier.padding(horizontal = Spacing.lg),
+                                onRetryRecovery = onRetryNativeRecovery,
+                                onOpenArchive = onShowRestoreSheet,
+                            )
+                        }
+                    }
+                    item {
+                        SyncSettingsSection(
+                            syncStatus = syncStatus,
+                            cloudArchiveStatus = cloudArchiveStatus,
+                            onSyncUsingMobileData = onSyncUsingMobileData,
+                            isAuthenticated = isAuthenticated,
+                            onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
+                            onNavigateToSignIn = onNavigateToSignIn,
+                            onEnterRecoveryPhrase = onNavigateToRecoveryPhrase,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                }
+            },
+        )
+
+        if (isExportSheetVisible) {
+            ExportBottomSheet(
+                exportState = exportState,
+                onOptionsChanged = onUpdateExportOptions,
+                onConfirm = onConfirmExport,
+                onCancel = onCancelExport,
+                onRetry = onRetryExport,
+                onDismiss = onDismissExport,
+            )
+        }
+
+        if (isRestoreSheetVisible) {
+            RestoreBottomSheet(
+                restoreState = restoreState,
+                onSelectFile = onSelectRestoreFile,
+                onUpdateOptions = onUpdateImportOptions,
+                onConfirmImport = onConfirmImport,
+                onCancel = onCancelRestore,
+                onRetry = onRetryRestore,
+                onDismiss = onDismissRestore,
+            )
+        }
+    }
 }
 
 @Preview
