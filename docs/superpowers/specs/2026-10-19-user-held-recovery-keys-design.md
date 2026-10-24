@@ -216,7 +216,7 @@ change is not available yet and, when it is, works only within 72 hours.
 
 **Server.** `ATPROTO_RECOVERY_KEYS_ENABLED` is off by default. The server supports recovery keys only
 when it hosts `did:plc` identities and this flag is on; turning on PLC publishing does not turn them
-on. When it does, it advertises the protocol feature `atprotoRecoveryKeysV1` in `/api/v1/info`.
+on. When it does, it advertises the protocol feature `atprotoRecoveryKeysV1` in `/api/v1/server/info`.
 When it does not, the recovery-key endpoints answer `409 RECOVERY_KEYS_UNAVAILABLE`, before any
 step-up is spent.
 
