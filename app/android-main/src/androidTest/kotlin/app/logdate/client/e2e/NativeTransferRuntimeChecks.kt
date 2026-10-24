@@ -11,6 +11,7 @@ import app.logdate.client.MainActivity
 import app.logdate.client.database.DatabaseStartupMonitor
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.encryption.DatabaseKeyRecoveryRequiredException
 import app.logdate.client.database.encryption.PassphraseBackupStore
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
@@ -21,7 +22,6 @@ import app.logdate.client.ensureLogDateApplicationStarted
 import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingSessionOptions
-import app.logdate.client.repository.journals.JournalRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -138,17 +138,27 @@ internal suspend fun verifyRejectedMissingRecoveryKeys(
         detector.detect(isOnboarded = true),
         "An incomplete native journal must remain eligible for content recovery",
     )
-    assertFalse(PassphraseBackupStore(context).hasBackup(), "The rejected transfer retained a portable journal key")
+    val passphraseBackup = PassphraseBackupStore(context)
+    assertFalse(passphraseBackup.hasBackup(), "The rejected transfer retained a portable journal key")
     val identityBackup = AndroidIdentityKeyBackupStore(context)
     assertFalse(identityBackup.hasRootBackup(), "The rejected transfer retained an identity recovery key")
     assertFalse(identityBackup.hasMediaBackup(), "The rejected transfer retained a media recovery key")
-    val database = koin.get<LogDateDatabase>()
-    assertTrue(database.journalDao().getAll().isEmpty(), "The rejected transfer exposed source journals")
-    assertTrue(database.textNoteDao().getAll().isEmpty(), "The rejected transfer exposed source notes")
-    assertTrue(database.imageNoteDao().getAll().isEmpty(), "The rejected transfer exposed source images")
-    assertTrue(database.videoNoteDao().getAll().isEmpty(), "The rejected transfer exposed source videos")
-    assertTrue(database.audioNoteDao().getAll().isEmpty(), "The rejected transfer exposed source audio")
-    assertTrue(koin.get<JournalRepository>().getAllDrafts().isEmpty(), "The rejected transfer exposed source drafts")
+    assertFalse(context.getDatabasePath("logdate").exists(), "The rejected transfer installed a journal database")
+    val startupFailure =
+        assertFailsWith<Exception>("A missing original key must not create a replacement journal") {
+            koin.get<LogDateDatabase>()
+        }
+    assertTrue(
+        generateSequence<Throwable>(startupFailure) { it.cause }.any { it is DatabaseKeyRecoveryRequiredException },
+        "Database startup failed for a reason other than the missing original key",
+    )
+    assertFalse(context.getDatabasePath("logdate").exists(), "Failed startup created a replacement journal database")
+    assertNotNull(
+        koin.get<DatabaseStartupMonitor>().state.value as? DatabaseStartupState.RecoveryRequired,
+        "Database startup must pause for the original key",
+    )
+    assertNull(koin.get<SecureStorage>().getString("db_encryption_key"), "Startup created a replacement database key")
+    assertFalse(passphraseBackup.hasBackup(), "Startup created portable recovery material")
     ActivityScenario.launch(MainActivity::class.java).use { activity ->
         activity.recreate()
     }
@@ -157,6 +167,9 @@ internal suspend fun verifyRejectedMissingRecoveryKeys(
         detector.detect(isOnboarded = true),
         "A restart must not acknowledge an incomplete native journal",
     )
+    assertFalse(context.getDatabasePath("logdate").exists(), "A restart created a replacement journal database")
+    assertNull(koin.get<SecureStorage>().getString("db_encryption_key"), "A restart created a replacement database key")
+    assertFalse(passphraseBackup.hasBackup(), "A restart created portable recovery material")
 }
 
 internal enum class RecordingTransferExpectation {
