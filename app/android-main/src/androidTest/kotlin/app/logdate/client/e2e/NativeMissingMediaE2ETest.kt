@@ -61,6 +61,7 @@ import org.junit.runners.MethodSorters
 import org.koin.core.context.GlobalContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URI
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -270,6 +271,8 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
             val payload = MediaPayload("integrity-original.png", "image/png", png.size.toLong(), png)
             val local = media.saveMedia(payload)
             val target = File(requireNotNull(androidMediaFileResolver(context).filePath(local))).canonicalFile
+            val originalBytes = target.readBytes()
+            assertContentEquals(png, originalBytes)
             val objects = File(context.filesDir, "media/objects/sha256").canonicalFile
             require(target.path.startsWith(objects.path + File.separator))
             val corruptions =
@@ -292,15 +295,25 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
                     val recovered =
                         assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", local, local, scope))
                     assertEquals(1, downloads)
-                    assertEquals(local, recovered.reference)
+                    assertTrue(recovered.reference != local, "Recovery must preserve the existing corrupt path")
+                    val replacement = File(URI(recovered.reference))
+                    assertEquals(target.parentFile, replacement.parentFile)
+                    assertTrue(replacement.name.startsWith("${target.name.substringBefore('.')}.retained-"))
+                    assertContentEquals(corrupted, target.readBytes())
                     assertContentEquals(png, media.readMedia(recovered.reference).data)
                     assertTrue(media.isRecoveredOriginal(recovered.reference, references))
-                    assertEquals(local, requireNotNull(refs.getScoped(id, scope)).localUri)
-                    assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", local, local, scope))
+                    assertEquals(recovered.reference, requireNotNull(refs.getScoped(id, scope)).localUri)
+                    assertEquals(
+                        recovered,
+                        assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", local, local, scope)),
+                    )
                     assertEquals(1, downloads, "The repaired object must be reused on retry")
                 }
             } finally {
-                media.saveMedia(payload)
+                FileOutputStream(target).use {
+                    it.write(originalBytes)
+                    it.fd.sync()
+                }
             }
         }
 
