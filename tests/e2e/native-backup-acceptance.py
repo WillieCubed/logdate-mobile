@@ -903,7 +903,19 @@ def restore_radio_state(serial, original):
     raise RuntimeError(f"Could not restore emulator radio state: {detail}")
 
 
-def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_path=None, source_has_session=False, source_session_id=None, installation_trust=False, recording_transport="cloud"):
+def probe(
+    serial,
+    mode,
+    output,
+    metadata=None,
+    identity="phrase",
+    missing_media_path=None,
+    source_has_session=False,
+    source_session_id=None,
+    installation_trust=False,
+    recording_transport="cloud",
+    pending_camera_draft=False,
+):
     arguments = ["shell", "am", "instrument", "-w", "-r", "-e", "class", PROBE,
                  "-e", "nativeBackupMode", mode, "-e", "nativeIdentityMode", identity]
     if mode == "seed" and installation_trust is True:
@@ -925,6 +937,8 @@ def probe(serial, mode, output, metadata=None, identity="phrase", missing_media_
             arguments.extend(("-e", "sourceInstallationTrustFixture", "true"))
     if mode == "source-backup-integrity":
         arguments.extend(("-e", "sourceHasSession", "true" if source_has_session else "false"))
+    if pending_camera_draft:
+        arguments.extend(("-e", "pendingCameraDraftFixture", "true"))
     if source_session_id is not None:
         arguments.extend(("-e", "sourceSessionId", source_session_id))
     if missing_media_path:
@@ -1060,12 +1074,23 @@ def archive_probe(serial, mode, output, fixture=None, fixture_label="transfer"):
         raise RuntimeError(f"archive {mode} probe failed; inspect {output}")
 
 
-def prepare_source(serial, app_apk, test_apk, output, identity, seed_source=True, snapshot_source=False):
+def prepare_source(
+    serial,
+    app_apk,
+    test_apk,
+    output,
+    identity,
+    seed_source=True,
+    snapshot_source=False,
+    pending_camera_draft=False,
+):
     if seed_source:
         print("Seeding a synthetic source journal", flush=True)
         adb(serial, "install", "-r", "-t", str(app_apk))
         adb(serial, "install", "-r", "-t", str(test_apk))
-        probe(serial, "seed", output / "source-seed.log", identity=identity)
+        probe(serial, "seed", output / "source-seed.log", identity=identity, pending_camera_draft=pending_camera_draft)
+        if pending_camera_draft:
+            probe(serial, "pending-camera-source", output / "source-pending-camera.log")
         recording_policy_probe(serial, output / "source-recording-policy.log")
     else:
         if snapshot_source:
@@ -1192,7 +1217,8 @@ def capture_widget_restore_delivery(serial, output):
 def transfer(source, destination, app_apk, test_apk, output, identity, exercise_archive_recovery=False,
              exercise_missing_keys=False, exercise_credentials_only=False, seed_source=True, snapshot_source=False,
              exercise_duplicate_restore=False, exercise_partial_media=False, exercise_data_only=False,
-             exercise_missing_privacy=False, exercise_system_widgets=False, exercise_cloud_backup=False):
+             exercise_missing_privacy=False, exercise_system_widgets=False, exercise_cloud_backup=False,
+             exercise_pending_camera_draft=False):
     prepare_source(
         source,
         app_apk,
@@ -1201,6 +1227,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         identity,
         seed_source,
         snapshot_source,
+        exercise_pending_camera_draft,
     )
     # The backup agent's file-based restore mode is a manifest contract. Update a resumed fixture
     # without clearing its synthetic content so the source actually writes that format.
@@ -1210,7 +1237,7 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     metadata = json.loads(raw_metadata)
     if exercise_cloud_backup and metadata.get("recordingTransferFixture") is not True:
         raise RuntimeError("Full cloud recovery requires the complete synthetic recording and media fixture")
-    exercise_duplicate_restore = exercise_duplicate_restore or exercise_cloud_backup
+    exercise_duplicate_restore = exercise_duplicate_restore or exercise_cloud_backup or exercise_pending_camera_draft
     archive_fixture = None
     archive_fixture_label = "transfer-" + uuid.uuid4().hex
     if exercise_archive_recovery:
@@ -1274,6 +1301,19 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     if exercise_system_widgets:
         capture_widget_restore_delivery(destination, output / "widget-delivery-initial")
     if exercise_duplicate_restore:
+        if exercise_pending_camera_draft:
+            print("Starting the restored app so retained journal reconciliation can finish before replay", flush=True)
+            launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
+            private_file(output / "destination-pre-replay-launch.log", launch)
+            adb(destination, "install", "-r", "-t", str(test_apk))
+            probe(
+                destination,
+                "verify",
+                output / "destination-pre-replay-camera-probe.log",
+                metadata,
+                identity,
+                pending_camera_draft=True,
+            )
         before_replay = package_file_snapshot(destination)
         replay = restore_transport(destination, system_widgets=exercise_system_widgets)
         private_file(output / "native-restore-replay.log", replay)
@@ -1353,7 +1393,8 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         # The ordinary editing probe must run afterward, before the read-only restart oracle.
         probe(destination, "verify-restored", output / "destination-before-trust-replay.log", metadata, identity)
         replay_destination_trust(destination, output, metadata, identity, system_widgets=exercise_system_widgets)
-    probe(destination, verify_mode, output / f"destination-{verify_mode}.log", metadata, identity)
+    probe(destination, verify_mode, output / f"destination-{verify_mode}.log", metadata, identity,
+          pending_camera_draft=exercise_pending_camera_draft)
     original_radio = radio_state(destination)
     try:
         adb(destination, "shell", "am", "force-stop", PACKAGE)
@@ -1439,6 +1480,7 @@ def main():
     parser.add_argument("--exercise-data-only", action="store_true", help="verify journal and media restore without an account session")
     parser.add_argument("--exercise-duplicate-restore", action="store_true", help="replay native restore before app launch and verify idempotent durable state")
     parser.add_argument("--exercise-partial-media", action="store_true", help="omit one original from native transport and verify recovery state")
+    parser.add_argument("--exercise-pending-camera-draft", action="store_true", help="transfer and replay a pending camera draft with its selected original")
     parser.add_argument("--resume-seeded-source", action="store_true", help="resume from a retained synthetic source fixture without clearing or reseeding app data")
     parser.add_argument("--snapshot-existing-source", action="store_true", help="record a synthetic source's existing restore fixture without replacing journal data")
     parser.add_argument("--seed-empty-source", action="store_true", help="seed an installed emulator only when it contains no journal database or media files")
@@ -1471,6 +1513,7 @@ def main():
         exercise_data_only=options.exercise_data_only,
         exercise_missing_privacy=options.exercise_missing_privacy,
         exercise_cloud_backup=options.exercise_cloud_backup,
+        exercise_pending_camera_draft=options.exercise_pending_camera_draft,
     )
     if options.exercise_quota:
         verify_quota(options.source, options.output.resolve())
@@ -1486,6 +1529,7 @@ def validate_options(options, parser):
         options.exercise_archive_recovery,
         options.exercise_partial_media,
         options.exercise_missing_privacy,
+        options.exercise_pending_camera_draft,
     ]
     if sum(filtered_scenarios) > 1:
         parser.error("choose one restore recovery scenario per destination fixture")
@@ -1502,6 +1546,10 @@ def validate_options(options, parser):
         parser.error("snapshotting an existing source requires a recovery acceptance scenario")
     if options.snapshot_existing_source and options.exercise_archive_recovery:
         parser.error("snapshotting an existing source cannot run archive seeding because it mutates the source journal")
+    if options.resume_seeded_source and options.exercise_pending_camera_draft:
+        parser.error("pending camera acceptance requires a freshly seeded source fixture")
+    if options.snapshot_existing_source and options.exercise_pending_camera_draft:
+        parser.error("pending camera acceptance requires a freshly seeded source fixture")
     if options.snapshot_existing_source and options.identity == "legacy-account":
         parser.error("legacy-account is a source seeding mode and cannot snapshot an existing source")
     if options.exercise_data_only and options.exercise_credentials_only:

@@ -122,10 +122,27 @@ def managed_environment(sdk, inherited, package):
                 LOGDATE_NATIVE_ACCEPTANCE_PACKAGE=package)
 
 
+def managed_boot_deadline(current_deadline, qemu_observed_at, boot_budget):
+    return current_deadline if current_deadline is not None else qemu_observed_at + boot_budget
+
+
 def pinned_install_arguments(app, probe):
     if any(not path.is_absolute() or not path.is_file() for path in (app, probe)):
         raise ValueError("Managed installation requires both existing absolute pinned APK paths")
     return [f"-Plogdate.nativeAcceptanceAppApk={app}", f"-Plogdate.nativeAcceptanceProbeApk={probe}"]
+
+
+def candidate_apk_paths(app_override, probe_override, root):
+    if (app_override is None) != (probe_override is None):
+        raise ValueError("Provide both pinned candidate APK paths or neither")
+    if app_override is None:
+        return (
+            root / "app/android-main/build/outputs/apk/debug/android-main-debug.apk",
+            root / "app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk",
+        )
+    if any(not path.is_absolute() or not path.is_file() for path in (app_override, probe_override)):
+        raise ValueError("Pinned candidate APKs must be existing absolute files")
+    return app_override.resolve(), probe_override.resolve()
 
 
 def initial_installation(mode, app, probe, fixture_environment, output):
@@ -149,7 +166,7 @@ def initial_installation(mode, app, probe, fixture_environment, output):
 def validate_native_arguments(arguments):
     allowed = {"--exercise-quota", "--exercise-archive-recovery", "--exercise-missing-keys",
                "--exercise-missing-privacy", "--exercise-credentials-only", "--exercise-cloud-backup", "--exercise-data-only",
-               "--exercise-duplicate-restore", "--exercise-partial-media"}
+               "--exercise-duplicate-restore", "--exercise-partial-media", "--exercise-pending-camera-draft"}
     remaining = iter(arguments)
     for argument in remaining:
         if argument == "--identity":
@@ -328,9 +345,10 @@ def run_managed_pair(options, *, recovery_assets=None, fixture_control=None, exp
     sdk = options.sdk.resolve()
     adb = str(sdk / "platform-tools/adb")
     package = os.environ.get("LOGDATE_NATIVE_ACCEPTANCE_PACKAGE", "studio.hypertext.logdate.debug")
-    assemble_candidate_apks(output, package, recovery_assets=recovery_assets, sdk=sdk)
-    app = ROOT / "app/android-main/build/outputs/apk/debug/android-main-debug.apk"
-    probe = ROOT / "app/android-main/build/outputs/apk/androidTest/debug/android-main-debug-androidTest.apk"
+    app, probe = candidate_apk_paths(options.candidate_app_apk, options.candidate_test_apk, ROOT)
+    if options.candidate_app_apk is None:
+        assemble_candidate_apks(output, package, recovery_assets=recovery_assets, sdk=sdk)
+        app, probe = candidate_apk_paths(options.candidate_app_apk, options.candidate_test_apk, ROOT)
     for apk in (app, probe):
         if not apk.is_file():
             raise RuntimeError("Candidate build did not produce LogDate and probe APKs")
@@ -399,12 +417,10 @@ def run_managed_pair(options, *, recovery_assets=None, fixture_control=None, exp
         primary = None
         observed_managed_pids = set()
         try:
-            deadline = time.monotonic() + budget["boot"]
+            deadline = None
             while len(custody["targets"]) < 2:
                 if process.poll() is not None:
                     raise RuntimeError("The managed pair stopped before both drivers were ready; inspect gradle.log")
-                if time.monotonic() > deadline:
-                    raise RuntimeError("The managed pair is still owned by the recorded Gradle handle; boot observation expired")
                 identity = TARGET["process_identity"](process.pid)
                 if nonce not in identity["command"]:
                     time.sleep(.2)
@@ -414,6 +430,10 @@ def run_managed_pair(options, *, recovery_assets=None, fixture_control=None, exp
                 candidates = TARGET["managed_candidates"](processes, existing, avd)
                 candidates = EMULATOR["owned_managed_candidates"](
                     output / "managed-emulator-launches", candidates, nonce)
+                if candidates:
+                    deadline = managed_boot_deadline(deadline, time.monotonic(), budget["boot"])
+                if deadline is not None and time.monotonic() > deadline:
+                    raise RuntimeError("The managed pair is still owned by the recorded Gradle handle; boot observation expired")
                 observed_managed_pids.update(candidates)
                 if len(candidates) > 2:
                     raise RuntimeError("More than two new managed devices; custody is ambiguous")
@@ -572,6 +592,8 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=("transfer", "publication", "work-restart", "d2d", "enrollment", "upgrade", "network-policy", "widget", "late-media", "manual-account"), default="transfer")
     parser.add_argument("--classpath", type=Path)
     parser.add_argument("--fixture-environment", type=Path)
+    parser.add_argument("--candidate-app-apk", type=Path)
+    parser.add_argument("--candidate-test-apk", type=Path)
     options, native_arguments = parser.parse_known_args()
     if native_arguments[:1] == ["--"]:
         native_arguments = native_arguments[1:]

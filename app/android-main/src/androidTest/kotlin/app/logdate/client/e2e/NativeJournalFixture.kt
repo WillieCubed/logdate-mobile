@@ -3,6 +3,7 @@ package app.logdate.client.e2e
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import androidx.test.platform.app.InstrumentationRegistry
+import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.identity.CanonicalOwnerProvider
@@ -10,10 +11,13 @@ import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.storage.UnavailableMediaReferences
+import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.client.repository.journals.PendingMediaType
 import app.logdate.client.sync.AutomaticMediaRecovery
 import app.logdate.client.sync.AutomaticMediaRecoveryResult
 import app.logdate.client.sync.metadata.EntityType
@@ -110,7 +114,10 @@ internal class NativeJournalFixture(
         }
     }
 
-    suspend fun seed(context: android.content.Context) {
+    suspend fun seed(
+        context: android.content.Context,
+        includePendingCameraDraft: Boolean = false,
+    ) {
         assertNull(journals.getJournalById(id(1)), "fixture already exists; use fresh emulator data")
         journals.create(Journal(id = id(1), title = "Native transfer journal"))
         journals.create(Journal(id = id(2), title = "Second transferred journal"))
@@ -142,6 +149,42 @@ internal class NativeJournalFixture(
                 selectedJournalIds = listOf(id(1), id(2)),
             ),
         )
+        if (includePendingCameraDraft) {
+            val capture = File(context.filesDir, "camera-captures/pending-camera-transfer.jpg")
+            check(capture.parentFile?.mkdirs() == true || capture.parentFile?.isDirectory == true)
+            check(capture.createNewFile()) { "Pending camera acceptance original already exists" }
+            capture.writeBytes("pending camera original".encodeToByteArray())
+            val videoCapture = File(context.filesDir, "camera-captures/pending-camera-transfer.mp4")
+            check(videoCapture.createNewFile()) { "Pending camera video acceptance original already exists" }
+            videoCapture.writeBytes("pending camera video original".encodeToByteArray())
+            AndroidLocalEntryDraftStore(context).saveDraft(
+                EntryDraft(
+                    id = id(20),
+                    notes = emptyList(),
+                    createdAt = now,
+                    updatedAt = now,
+                    pendingMedia =
+                        listOf(
+                            PendingMediaRecord(
+                                blockId = id(21),
+                                mediaType = PendingMediaType.CAMERA_PHOTO,
+                                createdAt = now,
+                                filePath = capture.absolutePath,
+                                position = 0,
+                                caption = "Pending camera transfer",
+                            ),
+                            PendingMediaRecord(
+                                blockId = id(22),
+                                mediaType = PendingMediaType.CAMERA_VIDEO,
+                                createdAt = now,
+                                filePath = videoCapture.absolutePath,
+                                position = 1,
+                                caption = "Pending camera video transfer",
+                            ),
+                        ),
+                ),
+            )
+        }
     }
 
     private fun seedRecordingTransferFixture(context: android.content.Context) {

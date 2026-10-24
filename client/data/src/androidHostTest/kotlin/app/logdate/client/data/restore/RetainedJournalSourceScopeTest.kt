@@ -25,7 +25,46 @@ import kotlin.test.assertTrue
 
 class RetainedJournalSourceScopeTest {
     @Test
-    fun `writer produced v2 receipt admits only its decoded exact source preferences`(): Unit =
+    fun `legacy v2 receipt still admits its exact source preferences`(): Unit =
+        runBlocking {
+            val root =
+                kotlin.io.path
+                    .createTempDirectory("native-v2-scope-")
+                    .toFile()
+            val job = SupervisorJob()
+            try {
+                val prefs = File(root, "logdate.preferences_pb")
+                val snapshot =
+                    PreferenceDataStoreFactory
+                        .create(scope = CoroutineScope(job + Dispatchers.IO), produceFile = { prefs })
+                        .updateData {
+                            mutablePreferencesOf(
+                                stringPreferencesKey("identity.canonical_owner_id") to "347c6231-19f4-49fa-bd1d-58ed34b9be03",
+                                stringPreferencesKey("identity.canonical_owner_bound") to "true",
+                                stringPreferencesKey("backend_url") to "https://cloud.example",
+                            )
+                        }
+                val database = File(root, "logdate").apply { writeText("immutable encrypted DB fixture") }
+                val receipt = File(root, "native_source_scope.json")
+                writeNativeJournalSourceReceipt(receipt, snapshot, prefs, mapOf("database/logdate" to database))
+                val admitted =
+                    requireNotNull(
+                        readRetainedJournalSourceScope(
+                            prefs,
+                            receipt,
+                            File(root, "scratch").apply { mkdirs() },
+                            mapOf("database/logdate" to database),
+                        ),
+                    )
+                assertEquals("347c6231-19f4-49fa-bd1d-58ed34b9be03", admitted.ownerId)
+            } finally {
+                job.cancelAndJoin()
+                check(root.deleteRecursively())
+            }
+        }
+
+    @Test
+    fun `writer produced v4 receipt admits only its decoded exact source preferences`(): Unit =
         runBlocking {
             val root =
                 kotlin.io.path
@@ -44,8 +83,15 @@ class RetainedJournalSourceScopeTest {
                         )
                     }
                 val database = File(root, "logdate").apply { writeText("immutable encrypted DB fixture") }
+                val drafts = File(root, "entry_drafts.preferences_pb").apply { writeText("immutable drafts fixture") }
                 val receipt = File(root, "native_source_scope.json")
-                writeNativeJournalSourceReceipt(receipt, snapshot, prefs, mapOf("database/logdate" to database))
+                writeNativeJournalSourceReceipt(
+                    receipt,
+                    snapshot,
+                    prefs,
+                    mapOf("database/logdate" to database),
+                    entryDraftsFile = drafts,
+                )
                 val scratch = File(root, "scratch").apply { mkdirs() }
 
                 val admitted =

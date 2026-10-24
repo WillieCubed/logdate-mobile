@@ -16,6 +16,14 @@ MODULE = runpy.run_path(str(Path(__file__).with_name("managed-native-restore-acc
 
 
 class ManagedDriverControllerTest(unittest.TestCase):
+    def test_managed_pair_boot_budget_starts_with_first_owned_qemu_not_gradle(self):
+        deadline = None
+        first_qemu_observed_at = 900.0
+        deadline = MODULE["managed_boot_deadline"](deadline, first_qemu_observed_at, 600.0)
+        self.assertEqual(1500.0, deadline)
+        deadline = MODULE["managed_boot_deadline"](deadline, 1_200.0, 600.0)
+        self.assertEqual(1500.0, deadline, "Later QEMU observations must not reset the boot budget")
+
     def test_manual_account_uses_a_fresh_pair_and_focused_private_fixture(self):
         command = MODULE["scenario_command"](
             "manual-account", "emulator-5556", "emulator-5558", Path("/pinned/app.apk"),
@@ -460,6 +468,30 @@ class ManagedDriverControllerTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     MODULE["validate_native_arguments"](arguments)
         MODULE["validate_native_arguments"](["--identity", "account", "--exercise-partial-media", "--exercise-quota"])
+
+    def test_pending_camera_probe_is_a_transfer_scenario_argument(self):
+        arguments = ["--exercise-pending-camera-draft"]
+        MODULE["validate_native_arguments"](arguments)
+        command = MODULE["scenario_command"](
+            "transfer", "emulator-5556", "emulator-5558", Path("/pinned/app.apk"),
+            Path("/pinned/probe.apk"), Path("/private/results"), arguments,
+        )
+        self.assertTrue(command[1].endswith("native-backup-acceptance.py"))
+        self.assertIn("--seed-empty-source", command)
+        self.assertEqual("--exercise-pending-camera-draft", command[-1])
+
+    def test_pinned_candidate_pair_can_skip_rebuilding_the_application(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = root / "app.apk"
+            probe = root / "probe.apk"
+            app.touch()
+            probe.touch()
+            self.assertEqual((app.resolve(), probe.resolve()), MODULE["candidate_apk_paths"](app, probe, root))
+            with self.assertRaisesRegex(ValueError, "both pinned candidate APK paths"):
+                MODULE["candidate_apk_paths"](app, None, root)
+            with self.assertRaisesRegex(ValueError, "existing absolute files"):
+                MODULE["candidate_apk_paths"](Path("relative.apk"), probe, root)
 
     def test_durably_saves_private_custody_before_device_commands(self):
         with tempfile.TemporaryDirectory() as temporary:
