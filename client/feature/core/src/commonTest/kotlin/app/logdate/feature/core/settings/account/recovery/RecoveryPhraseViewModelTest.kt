@@ -170,7 +170,7 @@ class RecoveryPhraseViewModelTest {
         }
 
     @Test
-    fun `a confirmed phrase says whether it can move the account, without asking for a passkey`() =
+    fun `a confirmed phrase says whether it can move the account without asking for a passkey`() =
         runTest {
             val ready = viewModel(confirmed = true, recovery = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.READY))
             val unfinished = FakeAccountRecovery(offered = true, status = AccountRecoveryStatus.NEEDS_SETUP)
