@@ -2,11 +2,15 @@ package app.logdate.client.domain.restore.archive3
 
 import app.logdate.client.domain.export.archive.ArchiveContainer
 import app.logdate.client.domain.export.archive.ArchivePath
+import app.logdate.client.domain.export.archive.StagingDirectoryArchiveContainer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import okio.Buffer
 import okio.ByteString.Companion.toByteString
+import okio.FileSystem
+import okio.Path.Companion.toPath
 import okio.Sink
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -21,6 +25,28 @@ class NativeArchive3BundleTest {
         bundle.write({ path -> Buffer().write(files.getValue(path)) }, container { path, bytes -> emitted[path] = bytes })
         assertEquals(files.keys, emitted.keys)
         files.forEach { (path, bytes) -> assertContentEquals(bytes, emitted[path], path) }
+    }
+
+    @Test
+    fun `validated bundle stages a receiver-compatible directory`() {
+        val files = populatedFixture()
+        val parent = Files.createTempDirectory("logdate-native-archive3-directory").toFile()
+        try {
+            val root = parent.resolve("archive").absolutePath.toPath()
+            read(files).write(
+                { path -> Buffer().write(files.getValue(path)) },
+                StagingDirectoryArchiveContainer(FileSystem.SYSTEM, root),
+            )
+            val staged =
+                NativeArchive3Bundle.read(
+                    files.keys,
+                    { path -> FileSystem.SYSTEM.source(root / path) },
+                )
+            assertEquals(read(files).manifestSha256, staged.manifestSha256)
+            assertEquals(read(files).checksumsSha256, staged.checksumsSha256)
+        } finally {
+            parent.deleteRecursively()
+        }
     }
 
     @Test

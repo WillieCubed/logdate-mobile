@@ -1,0 +1,95 @@
+package app.logdate.client.data.restore
+
+import androidx.datastore.preferences.core.Preferences
+import androidx.sqlite.db.SupportSQLiteDatabase
+
+/** A conservative inventory of user rows before claiming a complete Android-to-Apple export. */
+internal object NativeArchive3SourceCensus {
+    // Source columns were reviewed against the exported Room 58 schema before claiming complete scope.
+    private const val REVIEWED_ROOM_IDENTITY = "d8b23ded9a1a82c49e39b8df9ef25e35"
+    private val represented =
+        setOf(
+            "journals",
+            "text_notes",
+            "image_notes",
+            "audio_notes",
+            "video_notes",
+            "journal_content_links",
+            "media_captions",
+            "user_places",
+            "location_logs",
+        )
+    private val regenerable =
+        setOf(
+            "room_master_table",
+            "android_metadata",
+            "sqlite_sequence",
+            "native_journal_source_scope",
+            "search_index_metadata",
+            "media_exif_metadata",
+        )
+
+    fun unsupportedPopulatedTables(rows: Map<String, Long>): Set<String> =
+        rows
+            .filter { (name, count) -> count > 0 && name !in represented && name !in regenerable }
+            .keys
+
+    fun inspect(database: SupportSQLiteDatabase): Set<String> {
+        database.query("SELECT identity_hash FROM room_master_table WHERE id = 42").use { identity ->
+            check(identity.moveToFirst() && reviewedRoomIdentity(identity.getString(0))) {
+                "Native source schema has not been reviewed for complete transfer"
+            }
+        }
+        val rows = mutableMapOf<String, Long>()
+        database.query("SELECT name FROM sqlite_master WHERE type = 'table'").use { tables ->
+            while (tables.moveToNext()) {
+                val name = tables.getString(0)
+                check(name.matches(Regex("[A-Za-z_][A-Za-z_0-9]*"))) { "Unrecognized native source table" }
+                database.query("SELECT COUNT(*) FROM \"$name\"").use { count ->
+                    check(count.moveToFirst())
+                    rows[name] = count.getLong(0)
+                }
+            }
+        }
+        return unsupportedPopulatedTables(rows)
+    }
+
+    fun reviewedRoomIdentity(identity: String?): Boolean = identity == REVIEWED_ROOM_IDENTITY
+
+    /** Only profile fields are currently represented in the Apple auxiliary payload. */
+    fun unsupportedPreferences(preferences: Preferences): Set<String> {
+        val profile =
+            setOf(
+                "display_name",
+                "birthday",
+                "bio",
+                "original_bio",
+                "profile_created_at",
+                "profile_last_updated_at",
+                "profile_photo_uri",
+            )
+        val operational =
+            setOf(
+                "backend_url",
+                "is_onboarded",
+                "onboarded_timestamp",
+                "backfilled_account_ids",
+                "entry_drafts",
+                "identity.canonical_owner_id",
+                "identity.canonical_owner_bound",
+                "identity.completed_history_owner_adoption.v1",
+                "identity.native_restore_commit",
+                "identity.pending_history_owner_adoption.v1",
+            )
+        return preferences.asMap().keys.map(Preferences.Key<*>::name).filterTo(mutableSetOf()) { name ->
+            name !in profile &&
+                name !in operational &&
+                !name.startsWith("editor_drafts") &&
+                !name.matches(
+                    Regex(
+                        "sync_(first_enqueue_done_|inflight_|last_error_|legacy_audit_v1_|local_backfill_v[12]_|media_ref_|resume_build_v1_|retry_|route_v1_|association_backfill_v1_).*",
+                    ),
+                )
+        }
+    }
+}
