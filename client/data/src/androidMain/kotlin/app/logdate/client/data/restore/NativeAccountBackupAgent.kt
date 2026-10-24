@@ -8,6 +8,7 @@ import app.logdate.client.database.requirePortableCloudBackupKey
 import app.logdate.client.device.restore.NativeBackupAgent
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.media.storage.AndroidMediaClaimFence
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -16,6 +17,13 @@ import java.io.File
 class NativeAccountBackupAgent : NativeBackupAgent() {
     private val journalTransfer by lazy { NativeJournalTransferSnapshot(this) }
     private val journalRestore by lazy { NativeJournalTransferRestore(this, ::restoreNativeJournalPreferences) }
+
+    override fun onCreate() {
+        discardAbandonedForProviderStart {
+            NativeIosTransferSender(this, journalTransfer).discardAbandoned()
+        }
+        super.onCreate()
+    }
 
     override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
 
@@ -34,6 +42,16 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
                 journalTransfer.backupSelectedMedia { fullBackupFile(it, data) }
             }
         }
+
+    override fun backupNativeIosTransfer(data: FullBackupDataOutput) {
+        runBlocking {
+            AndroidMediaClaimFence(noBackupFilesDir).withClaim {
+                NativeIosTransferSender(this@NativeAccountBackupAgent, journalTransfer).send(data.transportFlags) { file ->
+                    fullBackupFile(file, data)
+                }
+            }
+        }
+    }
 
     override fun finishNativeJournalTransferBackup() =
         runBlocking { AndroidMediaClaimFence(noBackupFilesDir).withClaim { journalTransfer.finish() } }
@@ -102,3 +120,13 @@ class NativeAccountBackupAgent : NativeBackupAgent() {
         }
     }
 }
+
+/** A stale iOS export must not prevent ordinary Android provider callbacks from starting. */
+internal fun discardAbandonedForProviderStart(cleanup: () -> Unit): Boolean =
+    try {
+        cleanup()
+        true
+    } catch (error: Exception) {
+        Napier.w("Native iOS transfer cleanup remains pending", error)
+        false
+    }

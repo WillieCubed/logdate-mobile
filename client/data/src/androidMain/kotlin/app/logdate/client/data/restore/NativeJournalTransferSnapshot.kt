@@ -1,6 +1,7 @@
 package app.logdate.client.data.restore
 
 import android.content.Context
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import app.logdate.client.data.journals.toModel
@@ -8,7 +9,6 @@ import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.JournalNoteQueries
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
-import app.logdate.client.data.places.OfflineFirstUserPlacesRepository
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.NativeJournalSnapshotScope
 import app.logdate.client.database.captureNativeJournalDatabaseSnapshot
@@ -19,8 +19,10 @@ import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.database.protectDatabaseFile
 import app.logdate.client.database.readNativeJournalSnapshotMediaReferences
 import app.logdate.client.database.verifyNativeJournalDatabaseSnapshot
+import app.logdate.client.datastore.DataStoreKeyValueStorage
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.createAndroidMainDataStore
+import app.logdate.client.device.identity.DefaultCanonicalOwnerProvider
 import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
 import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
 import app.logdate.client.device.restore.NativeJournalMediaInventory
@@ -37,7 +39,9 @@ import app.logdate.client.domain.export.archive.StagingDirectoryArchiveContainer
 import app.logdate.client.domain.restore.archive3.NativeArchive3Original
 import app.logdate.client.domain.restore.archive3.NativeArchive3SnapshotInput
 import app.logdate.client.domain.restore.archive3.NativeArchive3SnapshotWriter
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
+import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.coroutines.CoroutineScope
@@ -58,6 +62,7 @@ import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -77,20 +82,96 @@ internal class NativeJournalTransferSnapshot(
     private var noDatabasePreferencesChecksum: String? = null
     private var noDatabaseDraftChecksum: String? = null
 
-    fun prepare() {
+    fun prepare(includeProfileOnlySource: Boolean = false) {
         selectedMedia = emptyList()
         entryDraftFileChecksum = null
         preferencesChecksum = null
         noDatabaseSource = false
         noDatabasePreferencesChecksum = null
         noDatabaseDraftChecksum = null
+        if (prepareWithoutDatabaseIfPossible(includeProfileOnlySource)) return
+        ownership.discardOwned()
+        check(!current.exists()) { "Incoming native journal inputs must remain in custody" }
+        check(root.mkdirs() || root.isDirectory)
+        val staging = File(root, ".${Uuid.random()}.preparing")
+        ownership.begin(staging)
+        val target = File(staging, "database/logdate").apply { check(checkNotNull(parentFile).mkdirs()) }
+        val keys = sourceKeyCandidates()
+        try {
+            stagePinnedSource(staging, target, keys)
+        } finally {
+            keys.forEach { it.fill(0) }
+            if (staging.exists()) ownership.discardOwned()
+        }
+    }
+
+    private fun stagePinnedSource(
+        staging: File,
+        target: File,
+        keys: List<ByteArray>,
+    ) {
+        val (preferences, acceptedKey) = exportWithAcceptedKey(staging, target, keys)
+        val entryDraftFile = File(context.filesDir, "datastore/entry_drafts.preferences_pb")
+        val beforeDrafts = entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
+        val entryDrafts = runBlocking { AndroidLocalEntryDraftStore(context).getAllDrafts() }
+        check(beforeDrafts == entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)) {
+            "Entry drafts changed during native media selection"
+        }
+        val references =
+            readNativeJournalSnapshotMediaReferences(target, acceptedKey) +
+                nativeTransferDraftMediaReferences(preferences, entryDrafts)
+        val selectedPaths = nativeTransferMediaPaths(references, context.packageName, context.filesDir)
+        val mediaInventory = File(staging, NATIVE_MEDIA_INVENTORY_PATH)
+        writeNativeJournalMediaInventory(mediaInventory, context.filesDir, selectedPaths)
+        val inventory = verifyNativeJournalMediaInventory(mediaInventory, nativeSnapshotChecksum(mediaInventory))
+        selectedPaths.forEach { path ->
+            val source = File(context.filesDir, path.removePrefix("files/"))
+            if (Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                check(inventory.entry(path) != null) { "Referenced native original could not be captured" }
+            }
+        }
+        val receipt = File(staging, NATIVE_SOURCE_RECEIPT_PATH)
+        val pinnedPreferences = File(staging, "files/logdate.preferences_pb")
+        writeNativeJournalSourceReceipt(
+            receipt,
+            preferences,
+            pinnedPreferences,
+            mapOf("database/logdate" to target),
+            mediaInventory = mediaInventory,
+            entryDraftsFile = entryDraftFile,
+        )
+        val selectedPreferencesChecksum = nativeSnapshotChecksum(pinnedPreferences)
+        requirePinnedNativeTransferFile(pinnedPreferences, selectedPreferencesChecksum)
+        staging.walkBottomUp().filter(File::isDirectory).forEach(::syncDirectory)
+        ownership.record(staging)
+        Files.move(staging.toPath(), current.toPath(), StandardCopyOption.ATOMIC_MOVE)
+        syncDirectory(root)
+        prepared = true
+        selectedMedia = inventory.files
+        entryDraftFileChecksum = entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
+        preferencesChecksum = selectedPreferencesChecksum
+        check(entryDraftFileChecksum == beforeDrafts) { "Entry drafts changed during native media selection" }
+        checkPinnedPreferencesUnchanged()
+    }
+
+    private fun prepareWithoutDatabaseIfPossible(includeProfileOnlySource: Boolean): Boolean {
         if (!context.getDatabasePath("logdate").exists()) {
             check(!current.exists()) { "The retained native journal must remain available for recovery" }
+            val dataStore = createAndroidMainDataStore(context)
+            if (includeProfileOnlySource) {
+                val existing = runBlocking { dataStore.data.first() }
+                if (NativeArchive3SourceCensus.hasPreDatabaseIosContent(existing)) {
+                    check(NativeArchive3SourceCensus.unsupportedPreferences(existing).isEmpty()) {
+                        "Native iOS transfer cannot retain these preferences"
+                    }
+                    runBlocking { DefaultCanonicalOwnerProvider(DataStoreKeyValueStorage(dataStore)).getCanonicalOwnerId() }
+                }
+            }
             val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
             val draftFile = File(context.filesDir, "datastore/entry_drafts.preferences_pb")
             val beforePreferences = preferencesFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
             val beforeDrafts = draftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
-            val preferences = runBlocking { createAndroidMainDataStore(context).data.first() }
+            val preferences = runBlocking { dataStore.data.first() }
             val drafts = runBlocking { AndroidLocalEntryDraftStore(context).getAllDrafts() }
             val selectedPaths =
                 nativeTransferMediaPaths(
@@ -100,6 +181,7 @@ internal class NativeJournalTransferSnapshot(
                 )
             prepareNativeDraftOnlyDatabase(context, ::initializeDraftOnlyDatabase) {
                 drafts.isNotEmpty() ||
+                    (includeProfileOnlySource && NativeArchive3SourceCensus.hasPreDatabaseIosContent(preferences)) ||
                     selectedPaths.any { path ->
                         File(context.filesDir, path.removePrefix("files/")).exists()
                     }
@@ -115,63 +197,10 @@ internal class NativeJournalTransferSnapshot(
                 noDatabaseSource = true
                 noDatabasePreferencesChecksum = beforePreferences
                 noDatabaseDraftChecksum = beforeDrafts
-                return
+                return true
             }
         }
-        ownership.discardOwned()
-        check(!current.exists()) { "Incoming native journal inputs must remain in custody" }
-        check(root.mkdirs() || root.isDirectory)
-        val staging = File(root, ".${Uuid.random()}.preparing")
-        ownership.begin(staging)
-        val target = File(staging, "database/logdate").apply { check(checkNotNull(parentFile).mkdirs()) }
-        val keys = sourceKeyCandidates()
-        try {
-            val (preferences, acceptedKey) = exportWithAcceptedKey(staging, target, keys)
-            val entryDraftFile = File(context.filesDir, "datastore/entry_drafts.preferences_pb")
-            val beforeDrafts = entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
-            val entryDrafts = runBlocking { AndroidLocalEntryDraftStore(context).getAllDrafts() }
-            check(beforeDrafts == entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)) {
-                "Entry drafts changed during native media selection"
-            }
-            val references =
-                readNativeJournalSnapshotMediaReferences(target, acceptedKey) +
-                    nativeTransferDraftMediaReferences(preferences, entryDrafts)
-            val selectedPaths = nativeTransferMediaPaths(references, context.packageName, context.filesDir)
-            val mediaInventory = File(staging, NATIVE_MEDIA_INVENTORY_PATH)
-            writeNativeJournalMediaInventory(mediaInventory, context.filesDir, selectedPaths)
-            val inventory = verifyNativeJournalMediaInventory(mediaInventory, nativeSnapshotChecksum(mediaInventory))
-            selectedPaths.forEach { path ->
-                val source = File(context.filesDir, path.removePrefix("files/"))
-                if (Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) {
-                    check(inventory.entry(path) != null) { "Referenced native original could not be captured" }
-                }
-            }
-            val receipt = File(staging, NATIVE_SOURCE_RECEIPT_PATH)
-            val pinnedPreferences = File(staging, "files/logdate.preferences_pb")
-            writeNativeJournalSourceReceipt(
-                receipt,
-                preferences,
-                pinnedPreferences,
-                mapOf("database/logdate" to target),
-                mediaInventory = mediaInventory,
-                entryDraftsFile = entryDraftFile,
-            )
-            val selectedPreferencesChecksum = nativeSnapshotChecksum(pinnedPreferences)
-            requirePinnedNativeTransferFile(pinnedPreferences, selectedPreferencesChecksum)
-            staging.walkBottomUp().filter(File::isDirectory).forEach(::syncDirectory)
-            ownership.record(staging)
-            Files.move(staging.toPath(), current.toPath(), StandardCopyOption.ATOMIC_MOVE)
-            syncDirectory(root)
-            prepared = true
-            selectedMedia = inventory.files
-            entryDraftFileChecksum = entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
-            preferencesChecksum = selectedPreferencesChecksum
-            check(entryDraftFileChecksum == beforeDrafts) { "Entry drafts changed during native media selection" }
-            checkPinnedPreferencesUnchanged()
-        } finally {
-            keys.forEach { it.fill(0) }
-            if (staging.exists()) ownership.discardOwned()
-        }
+        return false
     }
 
     fun finish() {
@@ -205,6 +234,20 @@ internal class NativeJournalTransferSnapshot(
         checkPinnedPreferencesUnchanged()
     }
 
+    /** A never-used installation has no Apple payload; do not manufacture a journal or identity for it. */
+    fun skipEmptyIosTransfer(): Boolean {
+        if (!noDatabaseSource) return false
+        checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
+        val preferences = runBlocking { createAndroidMainDataStore(context).data.first() }
+        check(
+            NativeArchive3SourceCensus.unsupportedPreferences(preferences).isEmpty() &&
+                !NativeArchive3SourceCensus.hasPreDatabaseIosContent(preferences) &&
+                NativeArchive3SourceCensus.hasOnlyEmptyDraftState(preferences),
+        ) { "Database-free source contains content that cannot be skipped" }
+        checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
+        return true
+    }
+
     /** Produces an admitted major-3 directory from the callback's already fenced native snapshot. */
     suspend fun writeArchive3(container: StagingDirectoryArchiveContainer) {
         check(prepared && !noDatabaseSource)
@@ -214,102 +257,173 @@ internal class NativeJournalTransferSnapshot(
         val keyFile = listOf("passphrase_backup", "working_passphrase_backup").mapNotNull { files["files/db_recovery/$it"] }.single()
         val passphrase = Base64.decode(keyFile.readText().trim())
         val databaseKey = passphrase.copyOf()
+        val readWorkspace = File(context.filesDir, "logdate-os-transfer/.read")
+        val readDatabase = File(readWorkspace, "logdate")
         val preferenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         var openedDatabase: LogDateDatabase? = null
         try {
-            val pinnedPreferences =
-                PreferenceDataStoreFactory.createWithPath(scope = preferenceScope, produceFile = { preferencesFile.path.toPath() })
-            val database = getRoomDatabase(getDatabaseBuilder(context, databaseKey, databaseFile), driver = null)
-            openedDatabase = database
-            val unsupported = NativeArchive3SourceCensus.inspect(database.openHelper.readableDatabase).toMutableSet()
-            val prefs = pinnedPreferences.data.first()
-            unsupported += NativeArchive3SourceCensus.unsupportedPreferences(prefs)
-            val entryDrafts = AndroidLocalEntryDraftStore(context).getAllDrafts()
-            if (entryDrafts.isNotEmpty()) unsupported += "entryDrafts"
-            val receipt = Json.decodeFromString<NativeJournalSourceReceipt>(checkNotNull(files[NATIVE_SOURCE_RECEIPT_PATH]).readText())
-            val drafts =
-                NativeArchive3EditorDrafts.read(
-                    prefs,
-                    receipt.canonicalOwnerId,
-                    receipt.canonicalOwnerBound == "true",
-                    receipt.backendOrigin,
-                )
-            val journals = database.journalDao().getAll()
-            if (journals.any { it.deletedAt != null || it.coverImageUri != null }) unsupported += "journalCoversOrDeletion"
-            val queries =
-                JournalNoteQueries(
-                    database.textNoteDao(),
-                    database.imageNoteDao(),
-                    database.audioNoteDao(),
-                    database.videoNoteDao(),
-                    database.journalContentDao(),
-                    database.mediaCaptionDao(),
-                    DatabaseNotePlaceResolver(database.placeDao()),
-                    null,
-                )
-            val notes = queries.allNotesObserved.first()
-            val links = queries.getAllJournalNoteLinks().groupBy({ it.second }, { it.first })
-            val userData = LogdatePreferencesDataSource(pinnedPreferences).userData.first()
-            if (userData.profilePhotoUri != null) unsupported += "profilePhoto"
-            val profile =
-                LogDateProfile(
-                    displayName = userData.displayName,
-                    birthday = userData.birthday.takeIf { it != kotlin.time.Instant.DISTANT_PAST },
-                    bio = userData.bio,
-                    originalBio = userData.originalBio,
-                    createdAt = userData.profileCreatedAt,
-                    lastUpdatedAt = userData.profileLastUpdatedAt,
-                )
-            val places = OfflineFirstUserPlacesRepository(database.userPlaceDao()).getAllPlaces().filterIsInstance<Place.UserDefined>()
-            val location = OfflineFirstLocationHistoryRepository(database.locationHistoryDao()).getAllLocationHistory()
-            val mediaByPath = selectedMedia.associateBy { it.path }
-            val originalReferences = (notes.mapNotNull { it.mediaRefOrNull() } + drafts.flatMap { it.lateMediaReferences() }).distinct()
-            val originals =
-                originalReferences.map { reference ->
-                    val paths = nativeTransferMediaPaths(setOf(reference), context.packageName, context.filesDir)
-                    check(paths.size == 1)
-                    val entry = checkNotNull(mediaByPath[paths.single()]) { "Native original was not pinned" }
-                    val file = File(context.filesDir, entry.path.removePrefix("files/"))
-                    NativeArchive3Original(reference, entry.size, entry.sha256) {
-                        verifySelectedMediaFile(file, entry)
-                        file.source()
+            try {
+                check(!readWorkspace.exists()) { "Native archive reader already exists" }
+                val pinnedChecksum = nativeSnapshotChecksum(databaseFile)
+                copyDurably(databaseFile, readDatabase)
+                requirePinnedNativeTransferFile(databaseFile, pinnedChecksum)
+                requirePinnedNativeTransferFile(readDatabase, pinnedChecksum)
+                val pinnedPreferences =
+                    PreferenceDataStoreFactory.createWithPath(scope = preferenceScope, produceFile = { preferencesFile.path.toPath() })
+                val database = getRoomDatabase(getDatabaseBuilder(context, databaseKey, readDatabase), driver = null)
+                openedDatabase = database
+                val input = sourceArchiveInput(database, pinnedPreferences, files, databaseFile)
+                NativeArchive3SnapshotWriter.write(input, container)
+                checkNotNull(validateNativeJournalTransfer(context))
+            } finally {
+                try {
+                    openedDatabase?.close()
+                } finally {
+                    try {
+                        check(readWorkspace.deleteRecursively()) { "Native archive reader could not be removed" }
+                    } finally {
+                        preferenceScope.cancel()
+                        databaseKey.fill(0)
+                        passphrase.fill(0)
                     }
                 }
-            val marker = File(context.noBackupFilesDir, "native-journal-sender-owner")
-            val markerHash = nativeSnapshotChecksum(marker)
-
-            fun validate() {
-                checkPinnedPreferencesUnchanged()
-                checkEntryDraftFileUnchanged()
-                requirePinnedNativeTransferFile(marker, markerHash)
-                check(current.isDirectory && databaseFile.exists())
             }
-            NativeArchive3SnapshotWriter.write(
-                NativeArchive3SnapshotInput(
-                    exportedAt = Clock.System.now().toString(),
-                    journals = journals.map { it.toModel() },
-                    notes = notes,
-                    journalIdsByNote = links,
-                    drafts = drafts,
-                    profile = profile,
-                    places = places,
-                    locationHistory = location,
-                    originals = originals,
-                    unsupportedPopulatedCategories = unsupported,
-                    validateContext = ::validate,
-                ),
-                container,
-            )
-            checkNotNull(validateNativeJournalTransfer(context))
         } catch (failure: Throwable) {
             runCatching { container.discard() }
             throw failure
-        } finally {
-            openedDatabase?.close()
-            preferenceScope.cancel()
-            databaseKey.fill(0)
-            passphrase.fill(0)
         }
+    }
+
+    private suspend fun sourceArchiveInput(
+        database: LogDateDatabase,
+        pinnedPreferences: DataStore<Preferences>,
+        files: Map<String, File>,
+        databaseFile: File,
+    ): NativeArchive3SnapshotInput {
+        val unsupported = NativeArchive3SourceCensus.inspect(database.openHelper.readableDatabase).toMutableSet()
+        val prefs = pinnedPreferences.data.first()
+        unsupported += NativeArchive3SourceCensus.unsupportedPreferences(prefs)
+        val receipt = Json.decodeFromString<NativeJournalSourceReceipt>(checkNotNull(files[NATIVE_SOURCE_RECEIPT_PATH]).readText())
+        val drafts = archiveDrafts(prefs, receipt)
+        val journals = database.journalDao().getAll()
+        if (journals.any { it.deletedAt != null || it.coverImageUri != null }) unsupported += "journalCoversOrDeletion"
+        val queries =
+            JournalNoteQueries(
+                database.textNoteDao(),
+                database.imageNoteDao(),
+                database.audioNoteDao(),
+                database.videoNoteDao(),
+                database.journalContentDao(),
+                database.mediaCaptionDao(),
+                DatabaseNotePlaceResolver(database.placeDao()),
+                null,
+            )
+        val notes = queries.allNotesObserved.first()
+        val noteLocationMetadata = NativeArchive3SourceCensus.noteLocationMetadata(database.openHelper.readableDatabase)
+        val semanticPlaces = NativeArchive3SourceCensus.semanticPlaceRows(database.openHelper.readableDatabase)
+        val links = queries.getAllJournalNoteLinks().groupBy({ it.second }, { it.first })
+        val userData = LogdatePreferencesDataSource(pinnedPreferences).userData.first()
+        if (userData.profilePhotoUri != null) unsupported += "profilePhoto"
+        val profile =
+            LogDateProfile(
+                displayName = userData.displayName,
+                birthday = userData.birthday.takeIf { it != kotlin.time.Instant.DISTANT_PAST },
+                bio = userData.bio,
+                originalBio = userData.originalBio,
+                createdAt = userData.profileCreatedAt,
+                lastUpdatedAt = userData.profileLastUpdatedAt,
+            )
+        val (places, placeSourceTimes) = archivePlaces(database)
+        val location = OfflineFirstLocationHistoryRepository(database.locationHistoryDao()).getAllLocationHistory()
+        val originals = archiveOriginals(notes, drafts)
+        val marker = File(context.noBackupFilesDir, "native-journal-sender-owner")
+        val markerHash = nativeSnapshotChecksum(marker)
+
+        fun validate() {
+            checkPinnedPreferencesUnchanged()
+            checkEntryDraftFileUnchanged()
+            requirePinnedNativeTransferFile(marker, markerHash)
+            check(current.isDirectory && databaseFile.exists())
+        }
+        return NativeArchive3SnapshotInput(
+            exportedAt = Clock.System.now().toString(),
+            journals = journals.map { it.toModel() },
+            notes = notes,
+            noteSourceLocationMetadata = noteLocationMetadata,
+            journalIdsByNote = links,
+            drafts = drafts,
+            profile = profile,
+            places = places,
+            placeSourceTimes = placeSourceTimes,
+            semanticPlaces = semanticPlaces,
+            locationHistory = location,
+            originals = originals,
+            unsupportedPopulatedCategories = unsupported,
+            validateContext = ::validate,
+        )
+    }
+
+    private suspend fun archiveDrafts(
+        prefs: Preferences,
+        receipt: NativeJournalSourceReceipt,
+    ): List<EditorDraft> {
+        val entryDrafts = AndroidLocalEntryDraftStore(context).getAllDrafts()
+        val modernDrafts =
+            NativeArchive3EditorDrafts.read(
+                prefs,
+                receipt.canonicalOwnerId,
+                receipt.canonicalOwnerBound == "true",
+                receipt.backendOrigin,
+            )
+        val drafts = modernDrafts + NativeArchive3EntryDrafts.convert(entryDrafts, receipt.canonicalOwnerBound == "true")
+        check(drafts.map { it.id }.distinct().size == drafts.size) { "Draft identities conflict across source stores" }
+        return drafts
+    }
+
+    private suspend fun archivePlaces(database: LogDateDatabase): Pair<List<Place.UserDefined>, Map<Uuid, Pair<Long, Long>>> {
+        val placeRows = database.userPlaceDao().getAllPlaces()
+        val places =
+            placeRows.map { row ->
+                Place.UserDefined(
+                    id = Uuid.parse(row.id),
+                    displayName = row.name,
+                    lat = row.latitude,
+                    lng = row.longitude,
+                    radiusMeters = row.radiusMeters,
+                    description = row.description,
+                )
+            }
+        val placeSourceTimes = placeRows.associate { Uuid.parse(it.id) to (it.createdAt to it.updatedAt) }
+        check(placeSourceTimes.size == placeRows.size)
+        return places to placeSourceTimes
+    }
+
+    private fun archiveOriginals(
+        notes: List<JournalNote>,
+        drafts: List<EditorDraft>,
+    ): List<NativeArchive3Original> {
+        val mediaByPath = selectedMedia.associateBy { it.path }
+        val originalReferences = (notes.mapNotNull { it.mediaRefOrNull() } + drafts.flatMap { it.lateMediaReferences() }).distinct()
+        val originals =
+            originalReferences.map { reference ->
+                val paths = nativeTransferMediaPaths(setOf(reference), context.packageName, context.filesDir)
+                check(paths.size == 1)
+                val entry = checkNotNull(mediaByPath[paths.single()]) { "Native original was not pinned" }
+                val file = File(context.filesDir, entry.path.removePrefix("files/"))
+                NativeArchive3Original(reference, entry.size, entry.sha256) {
+                    verifySelectedMediaFile(file, entry)
+                    file.source()
+                }
+            }
+        return originals
+    }
+
+    fun pinnedSourceIdentity(): Pair<NativeJournalSourceReceipt, ByteArray> {
+        check(prepared && !noDatabaseSource)
+        val receiptFile = checkNotNull(validateNativeJournalTransfer(context))[NATIVE_SOURCE_RECEIPT_PATH]
+        val bytes = checkNotNull(receiptFile).readBytes()
+        return Json.decodeFromString<NativeJournalSourceReceipt>(bytes.decodeToString()) to
+            MessageDigest.getInstance("SHA-256").digest(bytes)
     }
 
     private fun checkPinnedPreferencesUnchanged() {
