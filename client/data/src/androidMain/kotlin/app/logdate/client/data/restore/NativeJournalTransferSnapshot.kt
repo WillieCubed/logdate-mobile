@@ -5,7 +5,11 @@ import androidx.datastore.preferences.core.Preferences
 import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.database.NativeJournalSnapshotScope
 import app.logdate.client.database.captureNativeJournalDatabaseSnapshot
+import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import app.logdate.client.database.getDatabaseBuilder
+import app.logdate.client.database.getRoomDatabase
+import app.logdate.client.database.protectDatabaseFile
 import app.logdate.client.database.readNativeJournalSnapshotMediaReferences
 import app.logdate.client.database.verifyNativeJournalDatabaseSnapshot
 import app.logdate.client.datastore.createAndroidMainDataStore
@@ -45,25 +49,50 @@ internal class NativeJournalTransferSnapshot(
     private var selectedMedia: List<NativeJournalMediaInventory.Entry> = emptyList()
     private var entryDraftFileChecksum: String? = null
     private var preferencesChecksum: String? = null
+    private var noDatabaseSource = false
+    private var noDatabasePreferencesChecksum: String? = null
+    private var noDatabaseDraftChecksum: String? = null
 
     fun prepare() {
         selectedMedia = emptyList()
         entryDraftFileChecksum = null
         preferencesChecksum = null
+        noDatabaseSource = false
+        noDatabasePreferencesChecksum = null
+        noDatabaseDraftChecksum = null
         if (!context.getDatabasePath("logdate").exists()) {
             check(!current.exists()) { "The retained native journal must remain available for recovery" }
+            val preferencesFile = File(context.filesDir, "logdate.preferences_pb")
+            val draftFile = File(context.filesDir, "datastore/entry_drafts.preferences_pb")
+            val beforePreferences = preferencesFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
+            val beforeDrafts = draftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
             val preferences = runBlocking { createAndroidMainDataStore(context).data.first() }
             val drafts = runBlocking { AndroidLocalEntryDraftStore(context).getAllDrafts() }
-            check(
+            val selectedPaths =
                 nativeTransferMediaPaths(
                     nativeTransferDraftMediaReferences(preferences, drafts),
                     context.packageName,
                     context.filesDir,
-                ).none { path ->
-                    File(context.filesDir, path.removePrefix("files/")).exists()
-                },
-            ) { "Media-bearing drafts require a native journal snapshot" }
-            return
+                )
+            prepareNativeDraftOnlyDatabase(context, ::initializeDraftOnlyDatabase) {
+                drafts.isNotEmpty() ||
+                    selectedPaths.any { path ->
+                        File(context.filesDir, path.removePrefix("files/")).exists()
+                    }
+            }
+            check(beforePreferences == preferencesFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)) {
+                "Preferences changed during native source selection"
+            }
+            check(beforeDrafts == draftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)) {
+                "Entry drafts changed during native source selection"
+            }
+            if (!context.getDatabasePath("logdate").exists()) {
+                checkNoDatabaseSourceUnchanged(beforePreferences, beforeDrafts)
+                noDatabaseSource = true
+                noDatabasePreferencesChecksum = beforePreferences
+                noDatabaseDraftChecksum = beforeDrafts
+                return
+            }
         }
         ownership.discardOwned()
         check(!current.exists()) { "Incoming native journal inputs must remain in custody" }
@@ -121,15 +150,24 @@ internal class NativeJournalTransferSnapshot(
     }
 
     fun finish() {
+        if (noDatabaseSource) {
+            checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
+        }
         if (prepared) ownership.discardOwned()
         prepared = false
+        noDatabaseSource = false
         selectedMedia = emptyList()
         entryDraftFileChecksum = null
         preferencesChecksum = null
+        noDatabasePreferencesChecksum = null
+        noDatabaseDraftChecksum = null
     }
 
     fun backupSelectedMedia(emit: (File) -> Unit) {
-        if (!prepared) return
+        if (!prepared) {
+            if (noDatabaseSource) checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
+            return
+        }
         checkPreferencesFileUnchanged()
         checkEntryDraftFileUnchanged()
         selectedMedia.forEach { entry ->
@@ -144,6 +182,24 @@ internal class NativeJournalTransferSnapshot(
 
     private fun checkPreferencesFileUnchanged() {
         requirePinnedNativeTransferFile(File(context.filesDir, "logdate.preferences_pb"), checkNotNull(preferencesChecksum))
+    }
+
+    private fun checkNoDatabaseSourceUnchanged(
+        expectedPreferences: String?,
+        expectedDrafts: String?,
+    ) {
+        val database = context.getDatabasePath("logdate")
+        check(listOf("", "-wal", "-shm", "-journal").none { File(database.path + it).exists() }) {
+            "Journal appeared during database-free native transfer"
+        }
+        check(File(context.filesDir, "logdate.preferences_pb").takeIf(File::exists)?.let(::nativeSnapshotChecksum) == expectedPreferences) {
+            "Preferences changed during database-free native transfer"
+        }
+        check(
+            File(context.filesDir, "datastore/entry_drafts.preferences_pb")
+                .takeIf(File::exists)
+                ?.let(::nativeSnapshotChecksum) == expectedDrafts,
+        ) { "Entry drafts changed during database-free native transfer" }
     }
 
     private fun checkEntryDraftFileUnchanged() {
@@ -213,6 +269,30 @@ internal class NativeJournalTransferSnapshot(
         return (listOfNotNull(primary) + PassphraseBackupStore(context) { retainedJournalPassphraseFile(context) }.readCandidates())
             .filter { it.size == 32 }
             .distinctBy { Base64.encode(it) }
+    }
+
+    private fun initializeDraftOnlyDatabase() {
+        val provider =
+            DatabasePassphraseProvider(
+                createAndroidSecureStorage(context),
+                PassphraseBackupStore(context) { retainedJournalPassphraseFile(context) },
+                storageKey = { retainedJournalWorkingKeyName(context) },
+                hasExistingDatabase = { context.getDatabasePath("logdate").exists() },
+            )
+        val candidates = runBlocking { provider.getPassphraseCandidates() }
+        val selected = candidates.first()
+        try {
+            val database = getRoomDatabase(getDatabaseBuilder(context, selected.copyOf()), driver = null)
+            try {
+                database.openHelper.writableDatabase
+                protectDatabaseFile(context)
+                runBlocking { provider.confirmOpenedDatabasePassphrase(selected) }
+            } finally {
+                database.close()
+            }
+        } finally {
+            candidates.forEach { it.fill(0) }
+        }
     }
 }
 

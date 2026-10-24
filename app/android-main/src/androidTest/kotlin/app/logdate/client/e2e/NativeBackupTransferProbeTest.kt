@@ -1,24 +1,36 @@
 package app.logdate.client.e2e
 
 import android.os.Build
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import app.logdate.client.data.notes.drafts.AndroidLocalEntryDraftStore
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.NativeJournalSnapshotScope
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import app.logdate.client.database.verifyNativeJournalDatabaseSnapshot
 import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.datastore.createAndroidMainDataStore
 import app.logdate.client.device.crypto.AndroidIdentityKeyBackupStore
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.IdentityKeyFingerprint
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.device.restore.NATIVE_MEDIA_INVENTORY_PATH
+import app.logdate.client.device.restore.NATIVE_SOURCE_RECEIPT_PATH
 import app.logdate.client.device.restore.PostRestoreDetector
 import app.logdate.client.device.restore.PostRestoreType
+import app.logdate.client.device.restore.verifyNativeJournalMediaInventory
+import app.logdate.client.device.restore.verifyNativeJournalSourceReceipt
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
 import app.logdate.client.ensureLogDateApplicationStarted
+import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
@@ -39,6 +51,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /** Native-transport probe; only runs when the host explicitly selects its disposable fixture. */
@@ -70,11 +83,16 @@ class NativeBackupTransferProbeTest {
                         "recording-policy",
                         "post-backup-mutation",
                         "native-restore-status",
+                        "draft-only-source",
                     ),
             )
             require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") { "Emulator required" }
             require(instrumentation.targetContext.packageName.endsWith(".debug")) { "Isolated debug application required" }
             val context = instrumentation.targetContext
+            if (mode == "draft-only-source") {
+                verifyDraftOnlyNativeSource(context)
+                return@runBlocking
+            }
             if (mode == "native-restore-status") {
                 assertEquals(
                     PostRestoreType.CONTENT_RESTORED,
@@ -83,6 +101,7 @@ class NativeBackupTransferProbeTest {
                 )
                 return@runBlocking
             }
+
             if (mode == "recording-policy") {
                 verifyPhoneRecordingBackupPolicy(instrumentation, context)
                 return@runBlocking
@@ -385,4 +404,70 @@ class NativeBackupTransferProbeTest {
                 if (mode == "verify-restored") fixture.verifyFixture() else fixture.verifyAndEdit()
             }
         }
+
+    /** The harness selects this on a fresh managed device, before normal startup opens Room. */
+    private suspend fun verifyDraftOnlyNativeSource(context: android.content.Context) {
+        val database = context.getDatabasePath("logdate")
+        assertFalse(database.exists(), "Draft-only source must begin before the first journal open")
+        val owner = Uuid.random().toString()
+        createAndroidMainDataStore(context).edit { preferences ->
+            preferences[stringPreferencesKey("identity.canonical_owner_id")] = owner
+            preferences[stringPreferencesKey("backend_url")] = "https://cloud.logdate.app"
+        }
+        val directory = File(context.filesDir, "user_media").apply { check(mkdirs() || isDirectory) }
+        val original = File(directory, "draft-only-original.png").apply { writeBytes(byteArrayOf(1, 2, 3, 4)) }
+        File(directory, "unreferenced-original.png").writeBytes(byteArrayOf(5, 6, 7, 8))
+        val now = Instant.fromEpochMilliseconds(1_700_000_000_000)
+        AndroidLocalEntryDraftStore(context).saveDraft(
+            EntryDraft(
+                Uuid.random(),
+                listOf(JournalNote.Image(creationTimestamp = now, lastUpdated = now, mediaRef = original.toURI().toString())),
+                now,
+                now,
+            ),
+        )
+        val snapshotClass = Class.forName("app.logdate.client.data.restore.NativeJournalTransferSnapshot")
+        val snapshot =
+            snapshotClass
+                .getDeclaredConstructor(
+                    android.content.Context::class.java,
+                ).apply { isAccessible = true }
+                .newInstance(context)
+        try {
+            snapshotClass.getDeclaredMethod("prepare").apply { isAccessible = true }.invoke(snapshot)
+            val current = File(context.filesDir, "native_journal_transfer/current")
+            val source = File(current, "database/logdate")
+            val preferences = File(current, "files/logdate.preferences_pb")
+            val receipt =
+                verifyNativeJournalSourceReceipt(
+                    File(current, NATIVE_SOURCE_RECEIPT_PATH),
+                    preferences,
+                    mapOf("database/logdate" to source),
+                )
+            val key = checkNotNull(PassphraseBackupStore(context).read())
+            try {
+                assertEquals(
+                    NativeJournalSnapshotScope(owner, false, "https://cloud.logdate.app", receipt.preferencesSha256),
+                    verifyNativeJournalDatabaseSnapshot(source, key),
+                )
+            } finally {
+                key.fill(0)
+            }
+            val inventory =
+                verifyNativeJournalMediaInventory(
+                    File(current, NATIVE_MEDIA_INVENTORY_PATH),
+                    checkNotNull(receipt.mediaInventorySha256),
+                )
+            assertNotNull(inventory.entry("files/user_media/draft-only-original.png"))
+            assertNull(inventory.entry("files/user_media/unreferenced-original.png"))
+            val emitted = mutableListOf<File>()
+            snapshotClass
+                .getDeclaredMethod("backupSelectedMedia", Function1::class.java)
+                .apply { isAccessible = true }
+                .invoke(snapshot, { file: File -> emitted += file })
+            assertEquals(listOf(original.canonicalFile), emitted.map(File::getCanonicalFile))
+        } finally {
+            snapshotClass.getDeclaredMethod("finish").apply { isAccessible = true }.invoke(snapshot)
+        }
+    }
 }
