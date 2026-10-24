@@ -22,7 +22,6 @@ import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Password
-import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -81,11 +80,6 @@ import logdate.client.feature.core.generated.resources.account_signed_out_create
 import logdate.client.feature.core.generated.resources.account_signed_out_sign_in
 import logdate.client.feature.core.generated.resources.account_signed_out_title
 import logdate.client.feature.core.generated.resources.account_title
-import logdate.client.feature.core.generated.resources.recovery_key_row_checking
-import logdate.client.feature.core.generated.resources.recovery_key_row_off
-import logdate.client.feature.core.generated.resources.recovery_key_row_on
-import logdate.client.feature.core.generated.resources.recovery_key_row_unknown
-import logdate.client.feature.core.generated.resources.recovery_key_title
 import logdate.client.feature.core.generated.resources.sign_in_methods_detail_pair
 import logdate.client.feature.core.generated.resources.sign_in_methods_google
 import logdate.client.feature.core.generated.resources.sign_in_methods_other_provider
@@ -109,7 +103,6 @@ data class AccountDestinations(
     val onDeleteAccount: () -> Unit,
     val onSignIn: () -> Unit,
     val onCreateAccount: () -> Unit,
-    val onRecoveryKey: () -> Unit = {},
 )
 
 @Composable
@@ -327,22 +320,6 @@ private fun SignInAndRecoverySection(
             },
             onClick = destinations.onRecoveryPhrase,
         )
-        state.recoveryKey?.let { recoveryKey ->
-            SettingsNavigationItem(
-                title = stringResource(Res.string.recovery_key_title),
-                description =
-                    stringResource(
-                        when (recoveryKey) {
-                            RecoveryKeyRow.ON -> Res.string.recovery_key_row_on
-                            RecoveryKeyRow.OFF -> Res.string.recovery_key_row_off
-                            RecoveryKeyRow.CHECKING -> Res.string.recovery_key_row_checking
-                            RecoveryKeyRow.UNKNOWN -> Res.string.recovery_key_row_unknown
-                        },
-                    ),
-                icon = { Icon(Icons.Outlined.VerifiedUser, contentDescription = null) },
-                onClick = destinations.onRecoveryKey,
-            )
-        }
         state.email?.let { email -> EmailItem(email, onOpenEmailVerification) }
     }
 }

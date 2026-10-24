@@ -57,7 +57,10 @@ import logdate.client.feature.core.generated.resources.recovery_phrase_verify_pr
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-/** Shows the 12-word recovery phrase behind the device's screen lock. */
+/**
+ * Shows the 12-word recovery phrase behind the device's screen lock and, where it is offered,
+ * whether the confirmed phrase can also move the account.
+ */
 @Composable
 fun RecoveryPhraseScreen(
     onBack: () -> Unit,
@@ -65,6 +68,7 @@ fun RecoveryPhraseScreen(
     viewModel: RecoveryPhraseViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val accountRecovery by viewModel.accountRecovery.collectAsStateWithLifecycle()
     val prompt =
         RevealPrompt(
             title = stringResource(Res.string.recovery_phrase_prompt_title),
@@ -82,6 +86,9 @@ fun RecoveryPhraseScreen(
         onHide = viewModel::hide,
         onEnterPhrase = onEnterPhrase,
         onVerify = viewModel::verify,
+        accountRecovery = accountRecovery,
+        onFinishAccountRecovery = viewModel::finishAccountRecoverySetup,
+        onRetryAccountRecovery = viewModel::checkAccountRecovery,
     )
 }
 
@@ -93,6 +100,9 @@ fun RecoveryPhraseContent(
     onHide: () -> Unit,
     onEnterPhrase: () -> Unit,
     onVerify: (String) -> Unit = {},
+    accountRecovery: AccountRecoveryUiState? = null,
+    onFinishAccountRecovery: () -> Unit = {},
+    onRetryAccountRecovery: () -> Unit = {},
 ) {
     var isReentering by remember { mutableStateOf(false) }
     var enteredPhrase by remember { mutableStateOf("") }
@@ -132,7 +142,18 @@ fun RecoveryPhraseContent(
                         ShowButton(onReveal)
                     }
 
-                    RecoveryPhraseUiState.Verified -> Text(stringResource(Res.string.recovery_phrase_verified))
+                    RecoveryPhraseUiState.Verified -> {
+                        Intro()
+                        DoneLine(stringResource(Res.string.recovery_phrase_verified))
+                        accountRecovery?.let {
+                            AccountRecoveryNotice(
+                                it,
+                                onFinish = onFinishAccountRecovery,
+                                onRetry = onRetryAccountRecovery,
+                            )
+                        }
+                        ShowButton(onReveal)
+                    }
 
                     RecoveryPhraseUiState.VerificationFailed -> {
                         Text(
