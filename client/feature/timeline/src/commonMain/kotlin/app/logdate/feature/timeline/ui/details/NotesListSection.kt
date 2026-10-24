@@ -63,14 +63,23 @@ internal fun NotesListSection(
                     modifier = Modifier.clickable { onNoteClick(note.noteId) },
                 ) {
                     when (note) {
-                        is TextNoteUiState -> TextNoteSnippet(note)
-                        is ImageNoteUiState -> ImageNoteSnippet(note)
+                        is TextNoteUiState -> {
+                            TextNoteSnippet(note)
+                        }
+
+                        is ImageNoteUiState -> {
+                            ImageNoteSnippet(note)
+                        }
+
                         is AudioNoteUiState -> {
                             AudioNoteSnippet(
                                 uiState = note,
                             )
                         }
-                        is VideoNoteUiState -> VideoNoteSnippet(note)
+
+                        is VideoNoteUiState -> {
+                            VideoNoteSnippet(note)
+                        }
                     }
                     JournalBadgeRow(journals = note.journals, onJournalClick = onJournalClick)
                 }

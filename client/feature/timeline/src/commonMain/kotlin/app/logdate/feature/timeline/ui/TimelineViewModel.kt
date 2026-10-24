@@ -288,15 +288,19 @@ class TimelineViewModel(
 
     private fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionBlock? =
         when (this) {
-            is HomeRecommendation.EmptyDay ->
+            is HomeRecommendation.EmptyDay -> {
                 TimelineSuggestionBlock.EmptyDay(
                     locationName = location?.toUiText(),
                 )
-            is HomeRecommendation.CompleteYourDraft ->
+            }
+
+            is HomeRecommendation.CompleteYourDraft -> {
                 TimelineSuggestionBlock.CompleteDraft(
                     draftId = draftId.toString(),
                 )
-            is HomeRecommendation.MemoryRecall ->
+            }
+
+            is HomeRecommendation.MemoryRecall -> {
                 TimelineSuggestionBlock.MemoryRecall(
                     memoryDate = date,
                     title = summary,
@@ -308,11 +312,24 @@ class TimelineViewModel(
                         },
                     isAiGenerated = isAiGenerated,
                 )
-            is HomeRecommendation.AfterActivity -> TimelineSuggestionBlock.AfterActivity(minutes = minutes, trip = trip)
-            HomeRecommendation.MorningStart -> TimelineSuggestionBlock.MorningStart
-            HomeRecommendation.None -> null
+            }
+
+            is HomeRecommendation.AfterActivity -> {
+                TimelineSuggestionBlock.AfterActivity(minutes = minutes, trip = trip)
+            }
+
+            HomeRecommendation.MorningStart -> {
+                TimelineSuggestionBlock.MorningStart
+            }
+
+            HomeRecommendation.None -> {
+                null
+            }
+
             // No timeline card for upcoming events yet — the events UI block is not built.
-            is HomeRecommendation.UpcomingEvent -> null
+            is HomeRecommendation.UpcomingEvent -> {
+                null
+            }
         }
 
     private fun List<JournalNote>.toUiState(
@@ -324,7 +341,7 @@ class TimelineViewModel(
                     .orEmpty()
                     .map { JournalBadgeUiState(journalId = it.id, title = it.title) }
             when (note) {
-                is JournalNote.Text ->
+                is JournalNote.Text -> {
                     TextNoteUiState(
                         noteId = note.uid,
                         text = note.content,
@@ -333,7 +350,9 @@ class TimelineViewModel(
                         capturedOnWatch = note.isCapturedOnWatch,
                         capturedDuring = note.capturedDuring,
                     )
-                is JournalNote.Image ->
+                }
+
+                is JournalNote.Image -> {
                     ImageNoteUiState(
                         noteId = note.uid,
                         uri = note.mediaRef,
@@ -344,7 +363,9 @@ class TimelineViewModel(
                         capturedOnWatch = note.isCapturedOnWatch,
                         capturedDuring = note.capturedDuring,
                     )
-                is JournalNote.Audio ->
+                }
+
+                is JournalNote.Audio -> {
                     AudioNoteUiState(
                         noteId = note.uid,
                         uri = note.mediaRef,
@@ -354,7 +375,9 @@ class TimelineViewModel(
                         capturedOnWatch = note.isCapturedOnWatch,
                         capturedDuring = note.capturedDuring,
                     )
-                is JournalNote.Video ->
+                }
+
+                is JournalNote.Video -> {
                     VideoNoteUiState(
                         noteId = note.uid,
                         uri = note.mediaRef,
@@ -364,6 +387,7 @@ class TimelineViewModel(
                         capturedOnWatch = note.isCapturedOnWatch,
                         capturedDuring = note.capturedDuring,
                     )
+                }
             }
         }
 
