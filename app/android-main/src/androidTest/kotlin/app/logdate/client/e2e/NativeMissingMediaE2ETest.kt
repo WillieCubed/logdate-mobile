@@ -296,7 +296,7 @@ class NativeMissingMediaE2ETest : CloudArchiveWorkerFixture() {
                         assertIs<AutomaticMediaRecoveryResult.Available>(recovery.recover(id, null, "image", local, local, scope))
                     assertEquals(1, downloads)
                     assertTrue(recovered.reference != local, "Recovery must preserve the existing corrupt path")
-                    val replacement = File(URI(recovered.reference))
+                    val replacement = File(URI(recovered.reference)).canonicalFile
                     assertEquals(target.parentFile, replacement.parentFile)
                     assertTrue(replacement.name.startsWith("${target.name.substringBefore('.')}.retained-"))
                     assertContentEquals(corrupted, target.readBytes())
