@@ -242,7 +242,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 (Path(temporary) / "source-launch-before-native-backup.log").read_bytes(),
             )
             self.assertIn(
-                ("shell", "bmgr", "backupnow", HARNESS.PACKAGE),
+                ("shell", "bmgr", "backupnow", "@pm@", HARNESS.PACKAGE, "--non-incremental"),
                 [arguments.args[1:] for arguments in adb.call_args_list],
             )
 
@@ -365,7 +365,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         prefix = f"apps/{HARNESS.PACKAGE}"
         files = {
             prefix + "/_manifest": b"android app backup manifest",
-            prefix + "/f/db_recovery/passphrase_backup": b"database recovery key",
+            prefix + "/f/native_journal_transfer/current/files/db_recovery/passphrase_backup": b"database recovery key",
             prefix + "/f/identity_recovery/phrase_backup": b"identity recovery phrase",
             prefix + "/f/identity_recovery/media_key_backup": b"media recovery key",
             prefix + "/f/logdate.preferences_pb": HARNESS.length_delimited_field(
@@ -594,7 +594,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             adb_calls = [arguments.args[1:] for arguments in adb.call_args_list]
             self.assertLess(
                 adb_calls.index(("shell", "am", "start", "-W", "-n", f"{HARNESS.PACKAGE}/app.logdate.client.MainActivity")),
-                adb_calls.index(("shell", "bmgr", "backupnow", HARNESS.PACKAGE)),
+                adb_calls.index(("shell", "bmgr", "backupnow", "@pm@", HARNESS.PACKAGE, "--non-incremental")),
             )
             self.assertEqual(
                 HARNESS.json.loads((Path(temporary) / "source-files-before-native-backup.json").read_text()),
@@ -604,7 +604,10 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 HARNESS.json.loads((Path(temporary) / "source-files-after-native-backup.json").read_text()),
                 retained,
             )
-            self.assertIn(("shell", "bmgr", "backupnow", HARNESS.PACKAGE), [call.args[1:] for call in adb.call_args_list])
+            self.assertIn(
+                ("shell", "bmgr", "backupnow", "@pm@", HARNESS.PACKAGE, "--non-incremental"),
+                [call.args[1:] for call in adb.call_args_list],
+            )
 
     def test_native_backup_fails_if_source_journal_changes_during_backup(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(
@@ -666,10 +669,12 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         before = {
             "databases/logdate": {"sha256": "journal-before"},
             "shared_prefs/logdate_secure_storage.xml": {"sha256": "before"},
+            "files/media/original.jpg": {"sha256": "media-before"},
         }
         after = {
             "databases/logdate": {"sha256": "journal-after"},
             "shared_prefs/logdate_secure_storage.xml": {"sha256": "after"},
+            "files/media/original.jpg": {"sha256": "media-after"},
         }
         with tempfile.TemporaryDirectory() as temporary, patch.object(
             HARNESS,
@@ -686,7 +691,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 b"",
             ],
         ) as adb:
-            with self.assertRaisesRegex(RuntimeError, "databases/logdate"):
+            with self.assertRaisesRegex(RuntimeError, "files/media/original.jpg"):
                 HARNESS.backup_source(
                     "emulator-5576",
                     Path(temporary) / "backup.log",
@@ -1065,10 +1070,10 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         long_path = f"apps/{HARNESS.PACKAGE}/f/media/objects/sha256/" + "b" * 90 + "/item.jpg"
         with tarfile.open(fileobj=full_backup, mode="w", format=tarfile.USTAR_FORMAT) as archive:
             for name, contents in [
-                (f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup", b"database key"),
+                (f"apps/{HARNESS.PACKAGE}/f/native_journal_transfer/current/files/db_recovery/passphrase_backup", b"database key"),
                 (f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup", b"identity key"),
                 (f"apps/{HARNESS.PACKAGE}/f/identity_recovery/media_key_backup", b"media key"),
-                (f"apps/{HARNESS.PACKAGE}/db/logdate", b"encrypted journal"),
+                (f"apps/{HARNESS.PACKAGE}/f/native_journal_transfer/current/database/logdate", b"encrypted journal"),
                 (f"apps/{HARNESS.PACKAGE}/f/user_media/original", b"original media"),
                 (f"apps/{HARNESS.PACKAGE}/f/media/objects/sha256/ab/" + "a" * 64 + ".jpg", b"long media path"),
                 (long_path, b"long path"),
@@ -1101,10 +1106,16 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
                 "Android's full-restore parser cannot consume Python PAX extension headers",
             )
 
-        self.assertNotIn(f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup", retained)
+        self.assertNotIn(
+            f"apps/{HARNESS.PACKAGE}/f/native_journal_transfer/current/files/db_recovery/passphrase_backup",
+            retained,
+        )
         self.assertNotIn(f"apps/{HARNESS.PACKAGE}/f/identity_recovery/phrase_backup", retained)
         self.assertNotIn(f"apps/{HARNESS.PACKAGE}/f/identity_recovery/media_key_backup", retained)
-        self.assertEqual(b"encrypted journal", retained[f"apps/{HARNESS.PACKAGE}/db/logdate"])
+        self.assertEqual(
+            b"encrypted journal",
+            retained[f"apps/{HARNESS.PACKAGE}/f/native_journal_transfer/current/database/logdate"],
+        )
         self.assertEqual(b"original media", retained[f"apps/{HARNESS.PACKAGE}/f/user_media/original"])
         self.assertEqual(
             b"long media path",
@@ -1126,10 +1137,11 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
 
         with tarfile.open(fileobj=io.BytesIO(retained), mode="r:") as archive:
             names_after_filter = {item.name for item in archive.getmembers()}
-            contents = {item.name: archive.extractfile(item).read() for item in archive.getmembers()}
+            contents = {item.name: archive.extractfile(item).read() for item in archive.getmembers() if item.isfile()}
         self.assertEqual(
             {
                 prefix + "/_manifest",
+                prefix + "/f/db_recovery",
                 prefix + "/f/db_recovery/passphrase_backup",
                 prefix + "/f/identity_recovery/phrase_backup",
                 prefix + "/f/identity_recovery/media_key_backup",
@@ -1151,7 +1163,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
         self.assertFalse(HARNESS.contains_media_files({"files/datastore/preferences": {"bytes": 1}}))
 
     def test_credentials_only_fixture_rejects_missing_database_recovery_key(self):
-        database_key = f"apps/{HARNESS.PACKAGE}/f/db_recovery/passphrase_backup"
+        database_key = f"apps/{HARNESS.PACKAGE}/f/native_journal_transfer/current/files/db_recovery/passphrase_backup"
         full_backup = self.credentials_backup(omit=(database_key,))
 
         with self.assertRaisesRegex(RuntimeError, "missing required portable recovery keys"):
@@ -1185,6 +1197,7 @@ class NativeAcceptanceSafetyTest(unittest.TestCase):
             self.assertEqual(
                 {
                     prefix + "/_manifest",
+                    prefix + "/f/db_recovery",
                     prefix + "/f/db_recovery/passphrase_backup",
                     prefix + "/f/identity_recovery/phrase_backup",
                     prefix + "/f/identity_recovery/media_key_backup",
