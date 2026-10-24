@@ -1,11 +1,20 @@
 package app.logdate.client.data.restore
 
+import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.sqlite.db.SupportSQLiteOpenHelper
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
+import androidx.test.core.app.ApplicationProvider
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
+@RunWith(RobolectricTestRunner::class)
 class NativeArchive3SourceCensusTest {
     @Test
     fun `content not represented by archive three blocks complete claim`() {
@@ -42,6 +51,45 @@ class NativeArchive3SourceCensusTest {
                 "journal_notes" to 1L,
             )
         assertEquals(setOf("journal_notes"), NativeArchive3SourceCensus.unsupportedPopulatedTables(rows))
+    }
+
+    @Test
+    fun `legacy journal links are safe only when active modern links contain them`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-archive3-legacy-links-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                db.execSQL("CREATE TABLE journal_notes (id TEXT NOT NULL, uid TEXT NOT NULL)")
+                                db.execSQL(
+                                    "CREATE TABLE journal_content_links " +
+                                        "(journal_id TEXT NOT NULL, content_id TEXT NOT NULL, deletedAt INTEGER)",
+                                )
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL("INSERT INTO journal_notes VALUES ('journal', 'note')")
+            assertFalse(NativeArchive3SourceCensus.legacyJournalLinksCovered(database))
+            database.execSQL("INSERT INTO journal_content_links VALUES ('journal', 'note', 1)")
+            assertFalse(NativeArchive3SourceCensus.legacyJournalLinksCovered(database))
+            database.execSQL("UPDATE journal_content_links SET deletedAt = NULL")
+            assertTrue(NativeArchive3SourceCensus.legacyJournalLinksCovered(database))
+        } finally {
+            helper.close()
+        }
     }
 
     @Test

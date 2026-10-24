@@ -55,10 +55,26 @@ internal object NativeArchive3SourceCensus {
                 }
             }
         }
-        return unsupportedPopulatedTables(rows)
+        val unsupported = unsupportedPopulatedTables(rows).toMutableSet()
+        if ("journal_notes" in unsupported && legacyJournalLinksCovered(database)) unsupported.remove("journal_notes")
+        return unsupported
     }
 
     fun reviewedRoomIdentity(identity: String?): Boolean = identity == REVIEWED_ROOM_IDENTITY
+
+    fun legacyJournalLinksCovered(database: SupportSQLiteDatabase): Boolean =
+        database
+            .query(
+                """
+                SELECT 1 FROM journal_notes AS legacy
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM journal_content_links AS current
+                    WHERE current.journal_id = legacy.id
+                      AND current.content_id = legacy.uid
+                      AND current.deletedAt IS NULL
+                ) LIMIT 1
+                """.trimIndent(),
+            ).use { !it.moveToFirst() }
 
     /** Only profile fields are currently represented in the Apple auxiliary payload. */
     fun unsupportedPreferences(preferences: Preferences): Set<String> {
