@@ -1,5 +1,7 @@
 package app.logdate.client.database
 
+import android.database.sqlite.SQLiteDatabaseLockedException
+import android.os.SystemClock
 import net.zetetic.database.sqlcipher.SQLiteDatabase
 import java.io.File
 import java.nio.file.Files
@@ -17,34 +19,55 @@ fun <T> captureNativeJournalDatabaseSnapshot(
     check(!target.exists() && Files.isDirectory(checkNotNull(target.parentFile).toPath(), LinkOption.NOFOLLOW_LINKS))
     System.loadLibrary("sqlcipher")
     val captured =
-        SQLiteDatabase
-            .openDatabase(
+        openSnapshotSourceWhenAvailable(source, key).use { database ->
+            database.execSQL("ATTACH DATABASE ? AS native_journal KEY ?", arrayOf<Any>(target.absolutePath, key))
+            try {
+                database.beginTransactionNonExclusive()
+                try {
+                    requireNativeJournalDatabaseIntegrity(database)
+                    database.rawQuery("SELECT sqlcipher_export('native_journal')", emptyArray<String>()).use { check(it.moveToFirst()) }
+                    database.execSQL("PRAGMA native_journal.user_version = $DATABASE_VERSION")
+                    val result = capturePreferences { scope -> writeNativeJournalSnapshotScope(database, scope) }
+                    database.setTransactionSuccessful()
+                    result
+                } finally {
+                    database.endTransaction()
+                }
+            } finally {
+                database.execSQL("DETACH DATABASE native_journal")
+            }
+        }
+    verifyNativeJournalDatabaseSnapshot(target, key)
+    return captured
+}
+
+private fun openSnapshotSourceWhenAvailable(
+    source: File,
+    key: ByteArray,
+): SQLiteDatabase {
+    val deadline = SystemClock.elapsedRealtime() + 15_000L
+    while (true) {
+        if (Thread.currentThread().isInterrupted) throw InterruptedException("Native snapshot canceled")
+        try {
+            return SQLiteDatabase.openDatabase(
                 source.absolutePath,
                 key,
                 null,
                 SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.CREATE_IF_NECESSARY,
                 null,
                 null,
-            ).use { database ->
-                database.execSQL("ATTACH DATABASE ? AS native_journal KEY ?", arrayOf<Any>(target.absolutePath, key))
-                try {
-                    database.beginTransaction()
-                    try {
-                        requireNativeJournalDatabaseIntegrity(database)
-                        database.rawQuery("SELECT sqlcipher_export('native_journal')", emptyArray<String>()).use { check(it.moveToFirst()) }
-                        database.execSQL("PRAGMA native_journal.user_version = $DATABASE_VERSION")
-                        val result = capturePreferences { scope -> writeNativeJournalSnapshotScope(database, scope) }
-                        database.setTransactionSuccessful()
-                        result
-                    } finally {
-                        database.endTransaction()
-                    }
-                } finally {
-                    database.execSQL("DETACH DATABASE native_journal")
-                }
+            )
+        } catch (locked: SQLiteDatabaseLockedException) {
+            val remaining = deadline - SystemClock.elapsedRealtime()
+            if (remaining <= 0) throw locked
+            try {
+                Thread.sleep(minOf(200L, remaining))
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw interrupted
             }
-    verifyNativeJournalDatabaseSnapshot(target, key)
-    return captured
+        }
+    }
 }
 
 fun verifyNativeJournalDatabaseSnapshot(
