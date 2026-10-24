@@ -107,7 +107,7 @@ internal class NativeIosTransferSender(
                         owner,
                         bundle.checksumsSha256,
                         bundle.manifestSha256,
-                    ) { identity.observeRootlessKeys() != null } ?: throw IOException("Native iOS transfer is unavailable")
+                    ) { identity.observeRootlessKeys() } ?: throw IOException("Native iOS transfer is unavailable")
                 }
             val privateDirectory = File(root, ".logdate-os-private")
             check(privateDirectory.mkdir())
