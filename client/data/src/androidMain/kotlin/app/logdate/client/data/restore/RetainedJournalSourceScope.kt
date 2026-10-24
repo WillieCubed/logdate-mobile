@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.logdate.client.device.identity.sameOwnerId
+import app.logdate.client.device.restore.verifyNativeJournalSourceReceipt
 import app.logdate.shared.model.ServerDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.net.URI
 import java.nio.file.Files
@@ -30,11 +35,12 @@ internal data class RetainedJournalSourceScope(
             preferences: Preferences,
             capturedDefaultOrigin: String? = null,
         ): RetainedJournalSourceScope? {
+            if (preferences[stringPreferencesKey("identity.pending_history_owner_adoption.v1")] != null) return null
             val rawOrigin = preferences[stringPreferencesKey("backend_url")] ?: capturedDefaultOrigin ?: return null
             val origin = normalizeBackendOrigin(rawOrigin) ?: return null
             preferences[stringPreferencesKey("server_descriptor")]?.let { raw ->
                 val descriptor =
-                    runCatching { Json { ignoreUnknownKeys = true }.decodeFromString<ServerDescriptor>(raw) }.getOrNull()
+                    runCatching { scopeDescriptorJson.decodeFromString<ServerDescriptor>(raw) }.getOrNull()
                         ?: return null
                 if (normalizeBackendOrigin(descriptor.serverOrigin) != origin) return null
             }
@@ -91,10 +97,33 @@ internal suspend fun readRetainedJournalSourceScope(
     file: File,
     anchorFile: File,
     scratchRoot: File,
+    databaseFiles: Map<String, File> = emptyMap(),
 ): RetainedJournalSourceScope? {
     require(Files.isRegularFile(anchorFile.toPath(), LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(anchorFile.toPath()))
     require(anchorFile.length() in 1..MAX_SCOPE_ANCHOR_BYTES)
-    val anchor = Json { ignoreUnknownKeys = false }.decodeFromString<RetainedSourceScopeAnchor>(anchorFile.readText())
+    val encoded = anchorFile.readText()
+    val anchor =
+        when (
+            Json
+                .parseToJsonElement(encoded)
+                .jsonObject["version"]
+                ?.jsonPrimitive
+                ?.intOrNull
+        ) {
+            1 -> Json.decodeFromString<RetainedSourceScopeAnchor>(encoded)
+            2, 3 ->
+                verifyNativeJournalSourceReceipt(anchorFile, file, databaseFiles).let {
+                    RetainedSourceScopeAnchor(
+                        version = 1,
+                        readState = it.readState,
+                        canonicalOwnerId = it.canonicalOwnerId,
+                        canonicalOwnerBound = it.canonicalOwnerBound,
+                        backendOrigin = it.backendOrigin,
+                        originProvenance = it.originProvenance,
+                    )
+                }
+            else -> return null
+        }
     if (anchor.version != 1 || anchor.readState != "captured") return null
     val backendOrigin = anchor.backendOrigin ?: return null
     val normalizedOrigin = normalizeBackendOrigin(backendOrigin) ?: return null
@@ -149,3 +178,25 @@ internal suspend fun readRetainedPreferencesSnapshot(
 
 private const val MAX_RETAINED_PREFERENCES_BYTES = 4 * 1024 * 1024
 private const val MAX_SCOPE_ANCHOR_BYTES = 64 * 1024
+
+private val scopeDescriptorJson = Json { ignoreUnknownKeys = true }
+
+/** The source's scope survives only exact continuity or a committed, origin-bound local adoption. */
+internal fun RetainedJournalSourceScope.matchesCurrentOrAdopted(
+    current: RetainedJournalSourceScope,
+    preferences: Preferences,
+): Boolean {
+    if (matchesCurrent(current)) return true
+    if (bound || !current.bound || ownerId.isNullOrBlank() || current.ownerId.isNullOrBlank()) return false
+    val raw = preferences[stringPreferencesKey("identity.completed_history_owner_adoption.v1")] ?: return false
+    val receipt = runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull() ?: return false
+    val oldOwner = receipt["oldOwner"]?.jsonPrimitive?.contentOrNull ?: return false
+    val newOwner = receipt["newOwner"]?.jsonPrimitive?.contentOrNull ?: return false
+    val origin = receipt["origin"]?.jsonPrimitive?.contentOrNull ?: return false
+    val device = receipt["device"]?.jsonPrimitive?.contentOrNull ?: return false
+    return device.isNotBlank() &&
+        sameOwnerId(oldOwner, ownerId) &&
+        sameOwnerId(newOwner, current.ownerId) &&
+        normalizeBackendOrigin(origin) == backendOrigin &&
+        backendOrigin == current.backendOrigin
+}

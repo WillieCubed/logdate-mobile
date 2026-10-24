@@ -30,7 +30,10 @@ open class NativeBackupAgent : BackupAgent() {
     protected open val retainedPreferenceNames: Set<String> = emptySet()
     private val nativeRestoreSession =
         NativeRestoreSessionBoundary {
-            PostRestoreDetector(this).beginNativeRestoreSession(retainPreferences = retainedPreferenceNames.isNotEmpty())
+            val detector = PostRestoreDetector(this)
+            val interrupted = !detector.isNativeRestoreDeliveryComplete()
+            detector.beginNativeRestoreSession(retainPreferences = retainedPreferenceNames.isNotEmpty())
+            NativeJournalRestoreAuthority(this).begin(interrupted)
             retainOptionalPreferences { begin(retainedPreferenceNames) }
         }
     private var incomingGeneration: String? = null
@@ -42,6 +45,7 @@ open class NativeBackupAgent : BackupAgent() {
                     .toString()
         }
     private val callbackLock = Any()
+    private val completedReplay by lazy { NativeJournalReplayCustody(this) }
     private val restoreFormat = NativeRestoreFormatGuard { noBackupFilesDir }
     private var restoreCompletionRecorded = false
     private var installationStateReset = false
@@ -94,7 +98,12 @@ open class NativeBackupAgent : BackupAgent() {
                         canEstablishNativePrivacyDefaults(this@NativeBackupAgent, snapshot)
                     }
                 }
-                super.onFullBackup(data)
+                try {
+                    if (data.transportFlags and FLAG_DEVICE_TO_DEVICE_TRANSFER != 0) prepareNativeJournalTransferBackup()
+                    super.onFullBackup(data)
+                } finally {
+                    finishNativeJournalTransferBackup()
+                }
             }
         }
     }
@@ -106,9 +115,22 @@ open class NativeBackupAgent : BackupAgent() {
                 super.onRestoreFinished()
                 return
             }
+            finishCompletedNativeJournalCleanup()
             if (finishRetainedNativeDelivery()) {
                 // A late delivery must not reset the accepted working installation or its account.
                 scheduleRetainedJournalReconciliationSafely()
+                super.onRestoreFinished()
+                return
+            }
+            if (completedReplay.hasInputs()) {
+                if (NativeJournalRestoreAuthority(this).completedReceipt() == null && !wasNativeJournalTransferStaged()) {
+                    restoreNativeJournalTransferSnapshot()
+                }
+                if (wasNativeJournalTransferStaged()) {
+                    finishStagedNativeJournalTransfer()
+                    return
+                }
+                if (!completedReplay.finish()) scheduleRetainedJournalReconciliationSafely()
                 super.onRestoreFinished()
                 return
             }
@@ -124,11 +146,22 @@ open class NativeBackupAgent : BackupAgent() {
                         false
                     }
                 }
-            super.onRestoreFinished()
             if (duplicateCompletion) {
+                finishNativeJournalTransferRestore()
+                super.onRestoreFinished()
                 retryAccountRecovery()
                 return
             }
+            val journalInstalled = restoreNativeJournalTransferSnapshot()
+            if (wasNativeJournalTransferStaged()) {
+                finishStagedNativeJournalTransfer()
+                return
+            }
+            if (journalInstalled) {
+                PostRestoreDetector(this).markNativeRestorePayloadReceived(databaseDelivered = true)
+                PostRestoreDetector(this).markNativePrivacyPayloadReceived()
+            }
+            super.onRestoreFinished()
             val finalDelivery = restoredPreferences().recordFinalDelivery(retainedPreferenceNames)
             retainOptionalPreferences { finish(retainedPreferenceNames, finalDelivery) }
             val detector = PostRestoreDetector(this)
@@ -138,6 +171,7 @@ open class NativeBackupAgent : BackupAgent() {
                 withTimeout(15_000) { retainAccountRecoveryBeforeCompletion(preferences, admission) }
             }
             detector.recordRestoreCompletedUnderDeliveryLock()
+            finishNativeJournalTransferRestore()
             synchronized(callbackLock) { restoreCompletionRecorded = true }
             try {
                 runBlocking(Dispatchers.IO) {
@@ -162,6 +196,16 @@ open class NativeBackupAgent : BackupAgent() {
             val workspace = retainedJournalWorkspace(this)
             workspace.prepareNativeDelivery().also { if (it) workspace.finishIncomingDelivery() }
         }
+
+    private fun finishStagedNativeJournalTransfer() {
+        super.onRestoreFinished()
+        val detector = PostRestoreDetector(this)
+        detector.markNativeRestorePayloadReceived(databaseDelivered = true)
+        detector.markNativePrivacyPayloadReceived()
+        detector.recordRestoreCompletedUnderDeliveryLock()
+        synchronized(callbackLock) { restoreCompletionRecorded = true }
+        scheduleRetainedJournalReconciliationSafely()
+    }
 
     override fun onRestoreFile(
         data: ParcelFileDescriptor,
@@ -202,6 +246,7 @@ open class NativeBackupAgent : BackupAgent() {
         try {
             synchronized(callbackLock) {
                 restoreFormat.requireNativeFile(nativeFormat)
+                finishCompletedNativeJournalCleanup()
                 restoreCompletionRecorded = false
                 installationStateReset = false
                 val workspace = retainedJournalWorkspace(this)
@@ -216,7 +261,36 @@ open class NativeBackupAgent : BackupAgent() {
                     scheduleRetainedJournalReconciliationSafely()
                     return@synchronized
                 }
+                if (NativeJournalRestoreAuthority(this).completedReceipt() != null || completedReplay.hasInputs()) {
+                    if (fileType == TYPE_DIRECTORY) return@synchronized
+                    if (fileType != TYPE_FILE) throw IOException("Native replay must contain regular files")
+                    ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                        completedReplay.capture(retainedNativeDestination(this, destination), size, input)
+                    }
+                    return@synchronized
+                }
                 beginNativeRestoreSessionOnce()
+                val authority = NativeJournalRestoreAuthority(this)
+                if (authority.requiresCustodyForIncoming()) {
+                    if (fileType == TYPE_DIRECTORY) return@synchronized
+                    if (fileType != TYPE_FILE) throw IOException("Native incoming delivery must contain regular files")
+                    ParcelFileDescriptor.AutoCloseInputStream(ParcelFileDescriptor.dup(data.fileDescriptor)).use { input ->
+                        completedReplay.capture(retainedNativeDestination(this, destination), size, input)
+                    }
+                    scheduleRetainedJournalReconciliationSafely()
+                    return@synchronized
+                }
+                val frameworkDatabase =
+                    listOf("logdate", "logdate-wal", "logdate-shm", "logdate-journal")
+                        .any { destination.canonicalFile == getDatabasePath(it).canonicalFile }
+                if (frameworkDatabase) {
+                    check(fileType == TYPE_FILE) { "Native database delivery must be a regular file" }
+                    authority.requireFrameworkDatabaseWrite(destination)
+                }
+                val transferRoot = File(filesDir, "native_journal_transfer").canonicalFile.toPath()
+                if (destination.canonicalFile.toPath().startsWith(transferRoot)) {
+                    NativeJournalRestoreAuthority(this).requireSnapshot()
+                }
                 val preferenceDelivered =
                     restoredPreferences().restore(
                         destination,
@@ -232,6 +306,8 @@ open class NativeBackupAgent : BackupAgent() {
                 } else if (!preferenceDelivered) {
                     restore(data, destination)
                 }
+                if (frameworkDatabase) authority.recordFrameworkDatabaseWrite(destination)
+                authority.recordFrameworkPortableState()
                 retainOptionalPreferences { capture(destination, retainedPreferenceNames) }
                 val databaseDelivered =
                     runCatching { destination.canonicalFile == getDatabasePath("logdate").canonicalFile }
@@ -326,6 +402,34 @@ open class NativeBackupAgent : BackupAgent() {
     }
 
     protected open fun scheduleRetainedJournalReconciliation() = Unit
+
+    protected open fun prepareNativeJournalTransferBackup() = Unit
+
+    protected open fun finishNativeJournalTransferBackup() = Unit
+
+    protected open fun restoreNativeJournalTransferSnapshot(): Boolean = false
+
+    /** A complete source snapshot was retained for merge because a local journal had prior authority. */
+    protected open fun wasNativeJournalTransferStaged(): Boolean = false
+
+    protected open fun finishNativeJournalTransferRestore() = Unit
+
+    private fun finishCompletedNativeJournalCleanup() {
+        val authority = NativeJournalRestoreAuthority(this)
+        if (PostRestoreDetector(this).hasCompletedNativeRestoreDelivery() &&
+            (authority.installedReceipt() != null || authority.cleanupReceipt() != null)
+        ) {
+            finishNativeJournalTransferRestore()
+        }
+    }
+
+    protected fun restoreNativeJournalPreferences(file: File) {
+        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+            restoreMainPreferences(this, descriptor, file.length()) { input ->
+                super.onRestoreFile(input, file.length(), File(filesDir, "logdate.preferences_pb"), TYPE_FILE, 0x180L, 0L)
+            }
+        }
+    }
 
     protected open suspend fun retainAccountRecoveryBeforeCompletion(
         preferences: DataStore<Preferences>,

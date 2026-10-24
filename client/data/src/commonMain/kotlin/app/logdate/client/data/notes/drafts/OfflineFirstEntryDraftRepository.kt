@@ -97,6 +97,13 @@ class OfflineFirstEntryDraftRepository(
         expected: EntryDraft,
         replacement: EntryDraft,
         canCommit: () -> Boolean,
+    ): Boolean = compareAndSetDraftForScopedRecovery(expected, replacement, canCommit) { commit -> commit() }
+
+    override suspend fun compareAndSetDraftForScopedRecovery(
+        expected: EntryDraft,
+        replacement: EntryDraft,
+        canCommit: () -> Boolean,
+        scopeFence: suspend (commit: suspend () -> Boolean) -> Boolean,
     ): Boolean {
         require(expected.id == replacement.id) { "Recovery cannot change draft identity" }
         initializationComplete.await()
@@ -104,7 +111,7 @@ class OfflineFirstEntryDraftRepository(
             if (!canCommit() || draftsFlow.value[expected.id] != expected) return@withLock false
             val recoveryStore = draftStore as? RecoveryEntryDraftStore ?: error("Draft store cannot commit guarded recovery")
             try {
-                val applied = recoveryStore.compareAndSetForRecovery(expected, replacement, canCommit)
+                val applied = scopeFence { recoveryStore.compareAndSetForRecovery(expected, replacement, canCommit) }
                 if (applied) {
                     draftsFlow.value = draftsFlow.value + (replacement.id to replacement)
                 } else {

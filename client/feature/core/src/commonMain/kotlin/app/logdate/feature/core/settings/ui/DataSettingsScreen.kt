@@ -132,6 +132,7 @@ fun DataSettingsScreen(
         syncStatus = uiState.syncStatus,
         cloudArchiveStatus = uiState.cloudArchiveStatus,
         nativeBackupStatus = nativeBackupStatus,
+        onRetryNativeRecovery = viewModel::retryNativeRecovery,
         isAuthenticated = isAuthenticated,
         onSyncNow = { viewModel.syncNow() },
         onSyncUsingMobileData = { viewModel.syncNow(allowMeteredMedia = true) },

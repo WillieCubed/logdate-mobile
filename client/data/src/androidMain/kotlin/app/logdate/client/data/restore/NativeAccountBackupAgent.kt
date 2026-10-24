@@ -9,7 +9,20 @@ import kotlinx.coroutines.flow.first
 
 /** The restricted callback retains a nonsecret request; the system job performs authentication. */
 class NativeAccountBackupAgent : NativeBackupAgent() {
+    private val journalTransfer by lazy { NativeJournalTransferSnapshot(this) }
+    private val journalRestore by lazy { NativeJournalTransferRestore(this, ::restoreNativeJournalPreferences) }
+
     override val retainedPreferenceNames: Set<String> = setOf("logdate_widget_instances")
+
+    override fun prepareNativeJournalTransferBackup() = journalTransfer.prepare()
+
+    override fun finishNativeJournalTransferBackup() = journalTransfer.finish()
+
+    override fun restoreNativeJournalTransferSnapshot(): Boolean = journalRestore.restore()
+
+    override fun wasNativeJournalTransferStaged(): Boolean = journalRestore.wasStaged()
+
+    override fun finishNativeJournalTransferRestore() = journalRestore.finish()
 
     override fun scheduleRetainedJournalReconciliation() {
         app.logdate.client.data.restore

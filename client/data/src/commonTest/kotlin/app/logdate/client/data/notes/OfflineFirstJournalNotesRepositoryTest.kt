@@ -15,6 +15,7 @@ import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
@@ -273,6 +274,28 @@ class OfflineFirstJournalNotesRepositoryTest {
             repository.create(videoNote)
 
             assertTrue(indexedMediaRepository.isIndexed(videoNote.mediaRef))
+        }
+
+    @Test
+    fun `unavailable image and video originals persist without metadata lookup or indexing`() =
+        runTest {
+            val image =
+                createTestImageNote().copy(
+                    mediaRef = UnavailableMediaReferences.nativeRestore("logdate-media://library/missing-image.jpg"),
+                )
+            val video =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = UnavailableMediaReferences.nativeRestore("logdate-media://library/missing-video.mp4"),
+                )
+
+            assertEquals(image.uid, repository.create(image))
+            assertEquals(video.uid, repository.create(video))
+            assertEquals(image.mediaRef, (repository.getNoteById(image.uid) as JournalNote.Image).mediaRef)
+            assertEquals(video.mediaRef, (repository.getNoteById(video.uid) as JournalNote.Video).mediaRef)
+            assertTrue(indexedMediaRepository.observeAllMedia().first().isEmpty())
         }
 
     @Test

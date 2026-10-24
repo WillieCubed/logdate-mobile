@@ -137,6 +137,7 @@ fun SyncSettingsScreen(
         cloudArchiveStatus = uiState.cloudArchiveStatus,
         nativeBackupStatus = nativeBackupStatus,
         onExportArchive = onNavigateToExport,
+        onRetryNativeRecovery = viewModel::retryNativeRecovery,
         isAuthenticated = isAuthenticated,
         onSyncNow = { viewModel.syncNow() },
         onSyncUsingMobileData = { viewModel.syncNow(allowMeteredMedia = true) },
@@ -157,6 +158,7 @@ fun SyncSettingsContent(
     cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
     nativeBackupStatus: NativeBackupStatus = NativeBackupStatus.Unsupported,
     onExportArchive: () -> Unit = {},
+    onRetryNativeRecovery: () -> Unit = {},
     isAuthenticated: Boolean,
     onSyncNow: () -> Unit,
     onSyncUsingMobileData: () -> Unit = {},
@@ -209,6 +211,8 @@ fun SyncSettingsContent(
                 NativeBackupSettingsSection(
                     nativeBackupStatus,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
+                    onRetryRecovery = onRetryNativeRecovery,
+                    onOpenArchive = onExportArchive,
                 )
             }
         }

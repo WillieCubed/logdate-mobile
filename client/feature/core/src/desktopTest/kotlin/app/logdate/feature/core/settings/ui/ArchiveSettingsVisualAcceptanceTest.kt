@@ -19,6 +19,7 @@ import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Density
 import app.logdate.client.device.restore.NativeBackupQuotaFailure
 import app.logdate.client.device.restore.NativeBackupStatus
+import app.logdate.client.device.restore.NativeRestoreCustodyStatus
 import app.logdate.ui.theme.LogDateTheme
 import java.awt.image.BufferedImage
 import java.io.File
@@ -28,6 +29,45 @@ import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class ArchiveSettingsVisualAcceptanceTest {
+    @Test
+    fun backupRecoveryStatesUseTheSameSettingsCompositionAtPhoneTabletAndLargeText() {
+        listOf(
+            Variant("phone", 411, 891),
+            Variant("tablet", 1280, 800),
+            Variant("phone-200", 411, 891, 2f),
+            Variant("phone-dark", 411, 891),
+        ).forEach { variant ->
+            listOf(
+                NativeRestoreCustodyStatus.RECOVERING to "Finishing device transfer",
+                NativeRestoreCustodyStatus.NEEDS_TRANSFER to "Recover missing files",
+            ).forEach { (custody, label) ->
+                runDesktopComposeUiTest(width = variant.width, height = variant.height) {
+                    setContent {
+                        val density = LocalDensity.current
+                        CompositionLocalProvider(LocalDensity provides Density(density.density, variant.fontScale)) {
+                            LogDateTheme(dynamicColor = false, darkTheme = variant.name.endsWith("dark")) {
+                                SyncSettingsContent(
+                                    onBack = {},
+                                    syncStatus = null,
+                                    isAuthenticated = false,
+                                    onSyncNow = {},
+                                    onNavigateToSignIn = {},
+                                    quotaUsage = StorageQuotaUi(5_000_000_000, 0, 0f, formattedTotal = "5 GB", formattedUsed = "0 GB"),
+                                    isQuotaAvailable = false,
+                                    snackbarHostState = SnackbarHostState(),
+                                    nativeBackupStatus = NativeBackupStatus.Available(custodyStatus = custody),
+                                )
+                            }
+                        }
+                    }
+                    onNode(hasScrollToNodeAction()).performScrollToNode(hasText(label))
+                    onNodeWithText(label).assertIsDisplayed()
+                    save("backup-${custody.name.lowercase()}-${variant.name}", onRoot().captureToImage())
+                }
+            }
+        }
+    }
+
     @Test
     fun archiveActionsRemainReachableInPopulatedDataAndBackupPages() {
         listOf(Variant("phone", 411, 891), Variant("tablet", 1280, 800), Variant("phone-200", 411, 891, 2f)).forEach { variant ->

@@ -11,4 +11,12 @@ interface EntryDraftRecoveryRepository {
         replacement: EntryDraft,
         canCommit: () -> Boolean,
     ): Boolean
+
+    /** Takes the draft mutation lock before the scope fence encloses the durable replacement. */
+    suspend fun compareAndSetDraftForScopedRecovery(
+        expected: EntryDraft,
+        replacement: EntryDraft,
+        canCommit: () -> Boolean,
+        scopeFence: suspend (commit: suspend () -> Boolean) -> Boolean,
+    ): Boolean = false
 }

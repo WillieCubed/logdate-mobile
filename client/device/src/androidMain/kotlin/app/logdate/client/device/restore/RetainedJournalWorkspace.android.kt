@@ -87,6 +87,9 @@ fun requireRetainedJournalBackupReady(
     context: Context,
     deviceTransfer: Boolean,
 ) {
+    check(!NativeJournalReplayCustody(context).hasInputs()) {
+        "Pending native source custody must be preserved before another backup"
+    }
     retainedJournalWorkspace(context).requireBackupReady(
         deviceTransfer,
         context.getDatabasePath("logdate"),
