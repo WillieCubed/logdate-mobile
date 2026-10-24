@@ -125,14 +125,31 @@ internal suspend fun verifyMissingRecoveryKeys(
     )
 }
 
+internal enum class RecordingTransferExpectation {
+    SOURCE,
+    CLOUD_TARGET,
+    DEVICE_TRANSFER,
+}
+
 internal fun verifyRecordingTransferFixture(
     context: android.content.Context,
     inPlace: Boolean,
+    expectation: RecordingTransferExpectation,
 ) {
     val final = File(context.filesDir, "audio_notes/transfer-recording.m4a")
     val inFlight = CrashSafeRecording.inFlightFile(final, isolateForBackup = true)
     val remux = CrashSafeRecording.remuxStagingFile(inFlight, final)
-    assertTrue(final.isFile && final.readBytes().contentEquals("committed recording".encodeToByteArray()))
+    if (expectation == RecordingTransferExpectation.CLOUD_TARGET) {
+        require(!inPlace) { "A cloud target cannot retain source-only recording bytes" }
+        assertFalse(final.exists(), "Cloud backup unexpectedly delivered an original recording")
+    } else {
+        assertTrue(final.isFile, "Native device transfer did not retain the committed recording")
+        assertContentEquals(
+            "committed recording".encodeToByteArray(),
+            final.readBytes(),
+            "Native device transfer lost the committed recording",
+        )
+    }
     if (inPlace) {
         assertContentEquals(
             "unfinished raw recording".encodeToByteArray(),
@@ -147,6 +164,7 @@ internal fun verifyRecordingTransferFixture(
         assertFalse(remux.exists(), "Startup recovery must clear the interrupted remux output")
     } else {
         assertFalse(inFlight.exists(), "An interrupted raw recording must not transfer as committed audio")
+        assertFalse(File(inFlight.parentFile, "${inFlight.name}.ready").exists(), "An interrupted recording marker must not transfer")
         assertFalse(remux.exists(), "An unfinished remux temporary must not transfer")
     }
 }

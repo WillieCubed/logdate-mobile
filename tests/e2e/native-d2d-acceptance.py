@@ -254,7 +254,7 @@ def exercise_d2d(serial, app_apk, test_apk, output):
 
         HARNESS.adb(serial, "install", "-r", "-t", str(test_apk.resolve()))
         HARNESS.probe(serial, "native-restore-status", output / "d2d-callback-status.log")
-        HARNESS.probe(serial, "verify-in-place", output / "d2d-restored-content.log", metadata)
+        HARNESS.probe(serial, "verify-in-place", output / "d2d-restored-content.log", metadata, recording_transport="d2d")
         print("Google D2D test-mode backup, restore callback, and restored content passed", flush=True)
     except Exception:
         capture_transport_failure(serial, output)

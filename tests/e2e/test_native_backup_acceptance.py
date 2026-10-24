@@ -251,6 +251,7 @@ class NativeD2DRestoreEvidenceTest(unittest.TestCase):
         self.assertLess(mutation_probe, restore_call)
         verification = harness.index('HARNESS.probe(serial, "verify-in-place"')
         self.assertLess(restore_call, verification)
+        self.assertIn('recording_transport="d2d"', harness[verification:verification + 180])
         self.assertIn('"post-backup-mutation"', probe)
         self.assertIn("Mutated after native D2D backup", probe)
         self.assertIn('"Native transfer journal"', probe)
@@ -590,6 +591,28 @@ class NativeProbeDiagnosticsTest(unittest.TestCase):
             self.assertEqual(b"synthetic fatal exception\n", output.with_suffix(".logcat.log").read_bytes())
             self.assertEqual(0o600, output.with_suffix(".logcat.log").stat().st_mode & 0o777)
             self.assertEqual(call("emulator-5554", "logcat", "-d", "-b", "crash", "-v", "threadtime"), adb.call_args_list[-1])
+
+
+class RecordingTransferProbeContractTest(unittest.TestCase):
+    def test_cloud_and_d2d_probes_pass_distinct_recording_expectations(self):
+        metadata = {
+            "owner": "synthetic-owner", "device": "synthetic-device", "fingerprint": "synthetic-fingerprint",
+            "mediaNonce": "AAAAAAAAAAAAAAAA", "mediaCiphertext": "synthetic-ciphertext",
+            "recordingTransferFixture": True,
+        }
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            NATIVE_BACKUP_ACCEPTANCE, "adb", return_value=b"OK (1 test)\n"
+        ) as adb:
+            output = Path(directory)
+            NATIVE_BACKUP_ACCEPTANCE.probe("emulator-5554", "verify-restored", output / "cloud.log", metadata)
+            cloud = adb.call_args.args
+            NATIVE_BACKUP_ACCEPTANCE.probe(
+                "emulator-5554", "verify-in-place", output / "d2d.log", metadata,
+                recording_transport="d2d",
+            )
+            d2d = adb.call_args.args
+        self.assertEqual("cloud", cloud[cloud.index("sourceRecordingTransport") + 1])
+        self.assertEqual("d2d", d2d[d2d.index("sourceRecordingTransport") + 1])
 
 
 class CloudRestoreProcessRestartProbeTest(unittest.TestCase):
