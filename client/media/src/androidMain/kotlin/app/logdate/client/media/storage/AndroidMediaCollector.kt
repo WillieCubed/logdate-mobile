@@ -24,7 +24,9 @@ class AndroidMediaCollector(
             journal.pendingCandidates().forEach { candidate ->
                 val canonical = references.storedReference(candidate)
                 if (canonical in liveReferences || canonical in ticketReferences) {
-                    journal.acknowledgeCandidate(candidate)
+                    // A claim can be released after this scan. Keep the durable candidate so a
+                    // later collection can reclaim it once its final owner disappears.
+                    return@forEach
                 } else if (store.deleteOwned(candidate)) {
                     journal.acknowledgeCandidate(candidate)
                     deleted++

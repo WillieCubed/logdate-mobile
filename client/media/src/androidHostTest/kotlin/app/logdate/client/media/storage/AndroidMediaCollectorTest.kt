@@ -11,6 +11,42 @@ import kotlin.test.assertTrue
 
 class AndroidMediaCollectorTest {
     @Test
+    fun `candidate is retained while live and collected after its final owner releases it`() =
+        runBlocking {
+            val root = Files.createTempDirectory("media-collector-live-owner-").toFile()
+            try {
+                val store = AndroidCanonicalMediaStore(File(root, "files"))
+                val uri = store.store("owned bytes".byteInputStream(), "image/jpeg", 11)
+                val mediaRoot = File(root, "files/media")
+                val reference = "logdate-media://library/${File(URI(uri)).relativeTo(mediaRoot).invariantSeparatorsPath}"
+                val owners = mutableSetOf(reference)
+                val journal = AndroidMediaReclamationJournal(File(root, "no-backup"))
+                journal.recordCandidate(reference)
+                val collector =
+                    AndroidMediaCollector(
+                        AndroidMediaClaimFence(File(root, "no-backup")),
+                        MediaOwnerCensus { owners.toSet() },
+                        StoredMediaReferences.Unchanged,
+                        journal,
+                        AndroidMediaPublicationTickets(File(root, "no-backup")),
+                        store,
+                    )
+
+                assertEquals(0, collector.collect())
+                assertEquals(listOf(reference), journal.pendingCandidates())
+                assertTrue(File(URI(uri)).exists())
+
+                owners.clear()
+
+                assertEquals(1, collector.collect())
+                assertFalse(File(URI(uri)).exists())
+                assertTrue(journal.pendingCandidates().isEmpty())
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
+    @Test
     fun `collector keeps live references and deletes only unclaimed owned candidates`() =
         runBlocking {
             val root = Files.createTempDirectory("media-collector-").toFile()
@@ -37,7 +73,7 @@ class AndroidMediaCollectorTest {
                 assertEquals(1, collector.collect())
                 assertTrue(File(URI(live)).exists())
                 assertFalse(File(URI(orphan)).exists())
-                assertTrue(journal.pendingCandidates().isEmpty())
+                assertEquals(listOf(liveReference), journal.pendingCandidates())
             } finally {
                 root.deleteRecursively()
             }
