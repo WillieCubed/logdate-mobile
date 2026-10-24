@@ -50,6 +50,7 @@ cloud_run_env = {
   LOGDATE_PERSONAL_SPACE_ENABLED           = "true"
   LOGDATE_PERSONAL_SPACE_MIGRATION_ENABLED = "true"
   ATPROTO_RECOVERY_KEYS_ENABLED            = "true"
+  ATPROTO_FIREHOSE_ENABLED                 = "true"
 }
 
 # Secret IDs are scoped to this project's Secret Manager namespace (separate
