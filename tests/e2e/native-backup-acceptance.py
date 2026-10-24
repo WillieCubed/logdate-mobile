@@ -239,6 +239,22 @@ def verify_restored_snapshot(restored_files, source_files, *, credentials_only):
         raise RuntimeError("Android completed restore, but the destination database differs before app startup")
 
 
+def verify_missing_keys_snapshot(restored_files):
+    """An invalid selected bundle must leave no source journal or portable recovery material."""
+    if "files/logdate.preferences_pb" not in restored_files:
+        raise RuntimeError("missing-key restore did not deliver the source preferences")
+    rejected_roots = (
+        "databases/logdate",
+        "files/db_recovery/",
+        "files/identity_recovery/",
+        "files/native_journal_transfer/",
+    )
+    if any(path.startswith(rejected_roots) for path in restored_files):
+        raise RuntimeError("missing-key restore exposed an incomplete journal or portable recovery key")
+    if contains_media_files(restored_files):
+        raise RuntimeError("missing-key restore exposed original media without its recovery keys")
+
+
 def emulator_serial(value):
     if not re.fullmatch(r"emulator-[0-9]+", value):
         raise argparse.ArgumentTypeError("an explicit emulator-NNNN serial is required")
@@ -1235,7 +1251,10 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
     restored_files = package_file_snapshot(destination)
     private_file(output / "source-files-before-backup.json", json.dumps(source_files, indent=2).encode())
     private_file(output / "destination-files-after-restore.json", json.dumps(restored_files, indent=2).encode())
-    verify_restored_snapshot(restored_files, selected_source_files, credentials_only=exercise_credentials_only)
+    if exercise_missing_keys:
+        verify_missing_keys_snapshot(restored_files)
+    else:
+        verify_restored_snapshot(restored_files, selected_source_files, credentials_only=exercise_credentials_only)
     print("Launching the restored app through its normal startup path", flush=True)
     launch = adb(destination, "shell", "am", "start", "-W", "-n", PACKAGE + "/app.logdate.client.MainActivity")
     private_file(output / "destination-first-launch.log", launch)
@@ -1265,9 +1284,9 @@ def transfer(source, destination, app_apk, test_apk, output, identity, exercise_
         print("Original native preferences restored journal access without replacing its key", flush=True)
         return
     if exercise_missing_keys:
-        print("Verifying a retained journal remains untouched when portable keys are missing", flush=True)
-        probe(destination, "missing-keys", output / "destination-missing-keys.log")
-        print("Missing-key recovery state and retained database checks passed", flush=True)
+        print("Verifying an incomplete native journal stays unavailable for recovery", flush=True)
+        probe(destination, "missing-keys-rejected", output / "destination-missing-keys.log")
+        print("Incomplete journal remained unavailable and recovery state persisted", flush=True)
         return
     if exercise_credentials_only:
         print("Verifying restored credentials do not synthesize or replace journal content", flush=True)
