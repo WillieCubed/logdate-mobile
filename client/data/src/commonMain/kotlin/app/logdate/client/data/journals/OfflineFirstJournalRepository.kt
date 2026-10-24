@@ -5,6 +5,8 @@ import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.database.entities.journals.JournalMergeEntity
 import app.logdate.client.database.entities.sync.PendingUploadEntity
+import app.logdate.client.media.storage.MediaReclamationJournal
+import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.repository.journals.DraftRecoveryScope
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalMergeOperation
@@ -51,6 +53,7 @@ class OfflineFirstJournalRepository(
     private val mergeTransactionManager: SyncTransactionManager? = null,
     private val mergeScopeChanges: Flow<*> = flowOf(Unit),
     private val recoveryReceipts: ArchiveRecoveryReceipts = ArchiveRecoveryReceipts.None,
+    private val mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
 ) : JournalRepository,
     SyncableDraftRepository,
     SyncableJournalRepository {
@@ -98,6 +101,7 @@ class OfflineFirstJournalRepository(
             ::resolveJournalId,
             syncDebouncer::trigger,
             recoveryReceipts,
+            mediaReclamation,
         )
     }
 
@@ -282,6 +286,13 @@ class OfflineFirstJournalRepository(
     ): Boolean =
         withContext(dispatcher) {
             withJournalTransaction {
+                if (
+                    mediaReclamation !== MediaReclamationJournal.None &&
+                    previous != coverImageUri &&
+                    MediaReference.parse(previous) !is MediaReference.External
+                ) {
+                    mediaReclamation.recordCandidate(previous)
+                }
                 journalDao.updateCoverImageUriIfUnchanged(journalId, previous, coverImageUri)
                 journalDao.getJournalById(journalId)?.coverImageUri == coverImageUri
             }

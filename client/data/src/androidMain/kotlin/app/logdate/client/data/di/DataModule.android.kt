@@ -64,6 +64,7 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.networking.DefaultAccountKeyEnvelopeApi
 import app.logdate.client.networking.EmailVerificationApiClient
@@ -171,6 +172,7 @@ actual val dataModule: Module =
                     app.logdate.client.data.journals.RoomArchiveRecoveryReceipts(
                         get<app.logdate.client.database.LogDateDatabase>().downloadInboxDao(),
                     ),
+                mediaReclamation = get<MediaReclamationJournal>(),
             )
         }
 
@@ -192,6 +194,7 @@ actual val dataModule: Module =
                 syncMetadataService = get(),
                 transcriptionRepository = get(),
                 mediaReferences = get(),
+                mediaReclamation = get<MediaReclamationJournal>(),
                 draftSnapshots = { get<EntryDraftRecoveryRepository>().getDraftSnapshotsForRecovery() },
                 journalCoverUris = { get<app.logdate.client.database.dao.JournalDao>().getAll().map { it.coverImageUri } },
                 currentRecoveryScope = {
@@ -246,7 +249,7 @@ actual val dataModule: Module =
             )
         }
 
-        single { OfflineFirstEntryDraftRepository(get(), get(), get()) }
+        single { OfflineFirstEntryDraftRepository(get(), get(), get(), get<MediaReclamationJournal>()) }
         single<EntryDraftRepository> { get<OfflineFirstEntryDraftRepository>() }
         single<EntryDraftRecoveryRepository> { get<OfflineFirstEntryDraftRepository>() }
         single { NativeEntryDraftMediaQuarantine(get()) }

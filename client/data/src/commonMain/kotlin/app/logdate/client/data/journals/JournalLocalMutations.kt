@@ -1,6 +1,8 @@
 package app.logdate.client.data.journals
 
 import app.logdate.client.database.dao.JournalDao
+import app.logdate.client.media.storage.MediaReclamationJournal
+import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.EntityType
@@ -18,6 +20,7 @@ internal class JournalLocalMutations(
     private val resolve: suspend (Uuid) -> Uuid,
     private val changed: () -> Unit,
     private val receipts: ArchiveRecoveryReceipts,
+    private val mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
 ) {
     suspend fun recoveryScope(): JournalMergeScope? = currentScope().takeIf { it.ownerId.isNotBlank() && it.serverOrigin.isNotBlank() }
 
@@ -46,6 +49,13 @@ internal class JournalLocalMutations(
     suspend fun update(journal: Journal) {
         transaction {
             if (resolve(journal.id) != journal.id) return@transaction
+            if (mediaReclamation !== MediaReclamationJournal.None) {
+                journalDao
+                    .getJournalById(journal.id)
+                    ?.coverImageUri
+                    ?.takeIf { it != journal.coverImageUri }
+                    ?.let { recordCoverCandidate(it) }
+            }
             journalDao.update(journal.toEntity())
             metadata.enqueuePending(journal.id.toString(), EntityType.JOURNAL, PendingOperation.UPDATE)
         }
@@ -56,6 +66,9 @@ internal class JournalLocalMutations(
         transaction {
             val scope = currentScope()
             if (resolve(id) != id) return@transaction
+            if (mediaReclamation !== MediaReclamationJournal.None) {
+                journalDao.getJournalById(id)?.coverImageUri?.let { recordCoverCandidate(it) }
+            }
             receipts.recordLocalDeletion(scope, LocalDeletionType.JOURNAL, id.toString())
             journalDao.delete(id)
             metadata.enqueuePending(id.toString(), EntityType.JOURNAL, PendingOperation.DELETE)
@@ -120,6 +133,12 @@ internal class JournalLocalMutations(
                 if (!retainedSource && expected == null && scope != null) {
                     receipts.clearLocalDeletion(scope, LocalDeletionType.JOURNAL, replacement.id.toString())
                 }
+                if (mediaReclamation !== MediaReclamationJournal.None) {
+                    expected
+                        ?.coverImageUri
+                        ?.takeIf { it != replacement.coverImageUri }
+                        ?.let { recordCoverCandidate(it) }
+                }
                 if (expected == null) journalDao.create(replacement.toEntity()) else journalDao.update(replacement.toEntity())
                 if (scope != null && recoveryId != null) receipts.record(scope, "JOURNAL", recoveryId, replacement.id.toString())
                 check(recoveryScope() == scope) { "Journal recovery account changed" }
@@ -127,5 +146,9 @@ internal class JournalLocalMutations(
             }
         if (saved) changed()
         return saved
+    }
+
+    private suspend fun recordCoverCandidate(reference: String) {
+        if (MediaReference.parse(reference) !is MediaReference.External) mediaReclamation.recordCandidate(reference)
     }
 }

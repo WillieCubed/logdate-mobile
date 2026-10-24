@@ -4,6 +4,7 @@ import app.logdate.client.data.fakes.FakeDraftRepository
 import app.logdate.client.data.fakes.FakeJournalDao
 import app.logdate.client.data.fakes.FakeRemoteJournalDataSource
 import app.logdate.client.data.fakes.FakeSyncMetadataService
+import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.shared.model.EditorDraft
@@ -48,6 +49,42 @@ class OfflineFirstJournalRepositoryTest {
     private lateinit var syncMetadataService: FakeSyncMetadataService
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var repository: OfflineFirstJournalRepository
+
+    @Test
+    fun `removing a journal records its old cover before deletion`() =
+        runTest(testDispatcher) {
+            val recorded = mutableListOf<String>()
+            val local = repositoryWithMediaReclamation(MediaReclamationJournal { recorded += it })
+            val journal = createTestJournal().copy(coverImageUri = "logdate-media://library/cover.jpg")
+            journalDao.create(journal.toEntity())
+
+            local.delete(journal.id)
+
+            assertEquals(listOf("logdate-media://library/cover.jpg"), recorded)
+        }
+
+    @Test
+    fun `failed cover candidate write leaves the journal intact`() =
+        runTest(testDispatcher) {
+            val local = repositoryWithMediaReclamation(MediaReclamationJournal { error("Candidate storage failed") })
+            val journal = createTestJournal().copy(coverImageUri = "logdate-media://library/cover.jpg")
+            journalDao.create(journal.toEntity())
+
+            assertFailsWith<IllegalStateException> { local.delete(journal.id) }
+
+            assertNotNull(journalDao.getJournalById(journal.id))
+        }
+
+    private fun repositoryWithMediaReclamation(journal: MediaReclamationJournal) =
+        OfflineFirstJournalRepository(
+            journalDao = journalDao,
+            remoteDataSource = remoteDataSource,
+            draftRepository = draftRepository,
+            syncMetadataService = syncMetadataService,
+            dispatcher = testDispatcher,
+            externalScope = CoroutineScope(testDispatcher),
+            mediaReclamation = journal,
+        )
 
     @BeforeTest
     fun setup() {

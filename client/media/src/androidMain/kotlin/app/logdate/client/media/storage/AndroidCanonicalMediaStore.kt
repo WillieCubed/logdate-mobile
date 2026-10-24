@@ -128,12 +128,11 @@ class AndroidCanonicalMediaStore(
     }
 
     /**
-     * Deletes a stored object, and reports whether it was there to delete.
-     *
-     * Refuses anything that does not resolve inside this store's own objects directory. That is
-     * the whole safety property: a note's media may be a photo the user picked from their gallery,
-     * and deleting the note must not delete their photo. Symlinks are refused for the same reason,
-     * since one could point anywhere.
+     * Low-level unlink for a caller that already holds exclusive proof that no claim can be added.
+     * Path containment alone does not establish that proof: publication can finish before its
+     * Room or DataStore claim is committed. Normal Android media cleanup must not call this until
+     * every producer and the collector share a cross-process claim fence. Refuse paths outside
+     * this store and symlinks even when that higher-level proof exists.
      */
     suspend fun deleteOwned(uri: String): Boolean =
         withContext(Dispatchers.IO) {

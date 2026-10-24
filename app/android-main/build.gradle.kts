@@ -539,6 +539,7 @@ dependencies {
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    debugImplementation(projects.client.media)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.androidx.datastore.preferences)

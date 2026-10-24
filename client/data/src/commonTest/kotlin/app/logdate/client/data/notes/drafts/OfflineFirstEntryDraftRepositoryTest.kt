@@ -1,6 +1,7 @@
 package app.logdate.client.data.notes.drafts
 
 import app.logdate.client.data.fakes.FakeLocalEntryDraftStore
+import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
@@ -49,6 +50,71 @@ class OfflineFirstEntryDraftRepositoryTest {
     private lateinit var draftStore: FakeLocalEntryDraftStore
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var repository: OfflineFirstEntryDraftRepository
+
+    @Test
+    fun `replaced draft media is journaled before its durable claim changes`() =
+        runTest(testDispatcher) {
+            val recorded = mutableListOf<String>()
+            val journal = MediaReclamationJournal { reference -> recorded += reference }
+            val local = OfflineFirstEntryDraftRepository(draftStore, CoroutineScope(testDispatcher), mediaReclamation = journal)
+            val owned = "file:///data/user/0/studio.hypertext.logdate/files/media/draft.jpg"
+            val draftId = local.createDraft(listOf(createTestImageNote().copy(mediaRef = owned)))
+
+            local.updateDraft(draftId, listOf(createTestTextNote()))
+
+            assertEquals(listOf(owned), recorded)
+            assertTrue(
+                local
+                    .getDraft(draftId)
+                    .first()
+                    .getOrThrow()
+                    .notes
+                    .none { it is JournalNote.Image },
+            )
+        }
+
+    @Test
+    fun `failed candidate journal leaves the original draft intact`() =
+        runTest(testDispatcher) {
+            val journal = MediaReclamationJournal { error("Cannot make candidate durable") }
+            val local = OfflineFirstEntryDraftRepository(draftStore, CoroutineScope(testDispatcher), mediaReclamation = journal)
+            val draftId =
+                local.createDraft(
+                    listOf(createTestImageNote().copy(mediaRef = "file:///data/user/0/studio.hypertext.logdate/files/media/draft.jpg")),
+                )
+
+            assertFailsWith<IllegalStateException> { local.deleteDraft(draftId) }
+
+            assertTrue(
+                local
+                    .getDraft(draftId)
+                    .first()
+                    .getOrThrow()
+                    .notes
+                    .single() is JournalNote.Image,
+            )
+        }
+
+    @Test
+    fun `bulk and expiry deletion record each affected draft original`() =
+        runTest(testDispatcher) {
+            val recorded = mutableListOf<String>()
+            val local =
+                OfflineFirstEntryDraftRepository(
+                    draftStore,
+                    CoroutineScope(testDispatcher),
+                    mediaReclamation = MediaReclamationJournal { recorded += it },
+                )
+            val bulk = "file:///data/user/0/studio.hypertext.logdate/files/media/bulk.jpg"
+            val expired = "file:///data/user/0/studio.hypertext.logdate/files/media/expired.jpg"
+
+            local.createDraft(listOf(createTestImageNote().copy(mediaRef = bulk)))
+            local.deleteAllDrafts()
+            local.createDraft(listOf(createTestImageNote().copy(mediaRef = expired)))
+            local.deleteExpiredDrafts((-1).days)
+
+            assertEquals(setOf(bulk, expired), recorded.toSet())
+        }
 
     @BeforeTest
     fun setup() {

@@ -11,6 +11,7 @@ import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.OnDemandRemoteDisplayManager
 import app.logdate.client.media.display.RemoteDisplayManager
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.MediaReclamationJournal
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.media.video.ExoPlayerPool
@@ -30,6 +31,8 @@ actual val mediaModule: Module =
         single<ContentResolver> { androidContext().contentResolver }
         single { androidMediaFileResolver(androidContext()) }
         single<StoredMediaReferences> { get<MediaFileResolver>() }
+        // Candidate recording remains gated until every media writer and the collector share a claim fence.
+        single<MediaReclamationJournal> { MediaReclamationJournal.None }
         single<MediaManager> {
             AndroidPhotoLibraryMediaManager(AndroidMediaManager(get(), get(), mediaFiles = get()), androidContext())
         }

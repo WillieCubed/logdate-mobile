@@ -172,6 +172,28 @@ requires that:
 4. **Do not store caches.** A file in a cache directory can disappear at any time. Copy it into the library
    first and store the library reference.
 
+### Reclaiming local originals
+
+On Android, deleting a note or draft does not currently unlink its managed original.
+`AndroidMediaManager.deleteOwnedMedia` and `AndroidMediaCleaner` remain disabled because a reference check after
+one deletion is not exclusive ownership: Room notes and covers, DataStore drafts, recording checkpoints, and
+restore work can acquire a claim concurrently. The native transfer snapshot selects files named by live records,
+so an orphaned original is not sent to another device.
+
+The canonical store's publication lock ends when an object is durable, before its caller commits a Room or DataStore
+reference. A collector that checks for zero references in that interval could unlink the object immediately before
+the new reference is saved. A future collector and every producer must hold one cross-process claim fence from the
+start of publication through durable claim commit, and the collector must hold it through its final check and unlink.
+That final check must read the durable Room and DataStore claims rather than a process-local flow snapshot.
+
+`MediaReclamationJournal` can durably record a possible orphan before a repository releases a claim. Its Android
+implementation stores fsynced, idempotent candidates under `noBackupFilesDir`; a candidate is only a request to
+recheck ownership, never permission to delete. Production injection stays on `MediaReclamationJournal.None` until
+every claim writer shares a cross-store fence and a resumable collector has verified all live references under that
+fence. When adding a new media-bearing record, include its claims in that protocol before enabling collection. A
+collector must resolve legacy path spellings, refuse files outside managed storage or reached through symlinks,
+recheck claims immediately before unlink, and keep a candidate pending if verification or unlink is interrupted.
+
 ## Rules for code that reads references
 
 1. **Resolve before opening.** Never strip `file://` by hand or pass a stored string straight to a player,

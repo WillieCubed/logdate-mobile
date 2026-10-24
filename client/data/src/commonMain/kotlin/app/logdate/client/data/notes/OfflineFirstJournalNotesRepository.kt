@@ -12,6 +12,8 @@ import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
+import app.logdate.client.media.storage.MediaReclamationJournal
+import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.UnavailableMediaReferences
 import app.logdate.client.repository.journals.EntryDraft
@@ -64,6 +66,7 @@ class OfflineFirstJournalNotesRepository(
     private val currentRecoveryScope: suspend () -> app.logdate.client.repository.journals.JournalMergeScope? = { null },
     private val draftSnapshots: suspend () -> List<EntryDraft>? = { null },
     private val journalCoverUris: suspend () -> List<String?>? = { null },
+    private val mediaReclamation: MediaReclamationJournal = MediaReclamationJournal.None,
 ) : JournalNotesRepository,
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
@@ -322,6 +325,13 @@ class OfflineFirstJournalNotesRepository(
                 val scope = currentRecoveryScope()
                 val affectedJournals = journalContentDao.getJournalsForContent(noteId).first()
                 val mediaRef = getNoteById(noteId)?.mediaRefOrNull()
+                if (
+                    mediaReclamation !== MediaReclamationJournal.None &&
+                    mediaRef != null &&
+                    MediaReference.parse(mediaRef) !is MediaReference.External
+                ) {
+                    mediaReclamation.recordCandidate(mediaRef)
+                }
                 if (scope != null) {
                     recoveryReceipts.recordLocalDeletion(scope, LocalDeletionType.NOTE, noteId.toString())
                 }
