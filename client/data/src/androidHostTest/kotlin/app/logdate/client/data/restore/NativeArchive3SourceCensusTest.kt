@@ -131,6 +131,85 @@ class NativeArchive3SourceCensusTest {
     }
 
     @Test
+    fun `journal links must resolve to an exported journal and note`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-archive3-link-coverage-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                db.execSQL("CREATE TABLE journals (id TEXT NOT NULL)")
+                                for (table in listOf("text_notes", "image_notes", "audio_notes", "video_notes")) {
+                                    db.execSQL("CREATE TABLE $table (uid TEXT NOT NULL)")
+                                }
+                                db.execSQL("CREATE TABLE journal_content_links (journal_id TEXT NOT NULL, content_id TEXT NOT NULL)")
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL("INSERT INTO journals VALUES ('journal')")
+            database.execSQL("INSERT INTO text_notes VALUES ('note')")
+            database.execSQL("INSERT INTO journal_content_links VALUES ('journal', 'note')")
+            assertFalse(NativeArchive3SourceCensus.hasUnrepresentedJournalLinks(database))
+            database.execSQL("INSERT INTO journal_content_links VALUES ('journal', 'missing')")
+            assertTrue(NativeArchive3SourceCensus.hasUnrepresentedJournalLinks(database))
+            database.execSQL("DELETE FROM journal_content_links WHERE content_id = 'missing'")
+            database.execSQL("INSERT INTO journal_content_links VALUES ('missing-journal', 'note')")
+            assertTrue(NativeArchive3SourceCensus.hasUnrepresentedJournalLinks(database))
+        } finally {
+            helper.close()
+        }
+    }
+
+    @Test
+    fun `media captions must resolve to an exported media note`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val helper =
+            FrameworkSQLiteOpenHelperFactory().create(
+                SupportSQLiteOpenHelper.Configuration
+                    .builder(context)
+                    .name("native-archive3-caption-coverage-${System.nanoTime()}.db")
+                    .callback(
+                        object : SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                for (table in listOf("image_notes", "audio_notes", "video_notes")) {
+                                    db.execSQL("CREATE TABLE $table (uid TEXT NOT NULL)")
+                                }
+                                db.execSQL("CREATE TABLE media_captions (noteId TEXT NOT NULL)")
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) = Unit
+                        },
+                    ).build(),
+            )
+        try {
+            val database = helper.writableDatabase
+            database.execSQL("INSERT INTO image_notes VALUES ('image')")
+            database.execSQL("INSERT INTO media_captions VALUES ('image')")
+            assertFalse(NativeArchive3SourceCensus.hasUnrepresentedMediaCaptions(database))
+            database.execSQL("INSERT INTO media_captions VALUES ('missing')")
+            assertTrue(NativeArchive3SourceCensus.hasUnrepresentedMediaCaptions(database))
+        } finally {
+            helper.close()
+        }
+    }
+
+    @Test
     fun `unreviewed source schema cannot claim a complete archive`() {
         assertEquals(true, NativeArchive3SourceCensus.reviewedRoomIdentity("d8b23ded9a1a82c49e39b8df9ef25e35"))
         assertEquals(false, NativeArchive3SourceCensus.reviewedRoomIdentity("a future schema"))

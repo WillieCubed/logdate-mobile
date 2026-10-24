@@ -57,6 +57,8 @@ internal object NativeArchive3SourceCensus {
         }
         val unsupported = unsupportedPopulatedTables(rows).toMutableSet()
         unsupported += deletedSourceRows(database)
+        if (hasUnrepresentedJournalLinks(database)) unsupported += "journalContentWithoutNote"
+        if (hasUnrepresentedMediaCaptions(database)) unsupported += "mediaCaptionWithoutMediaNote"
         if ("journal_notes" in unsupported && legacyJournalLinksCovered(database)) unsupported.remove("journal_notes")
         return unsupported
     }
@@ -65,6 +67,33 @@ internal object NativeArchive3SourceCensus {
         setOf("text_notes", "image_notes", "audio_notes", "video_notes", "journal_content_links").filterTo(mutableSetOf()) { table ->
             database.query("SELECT 1 FROM $table WHERE deletedAt IS NOT NULL LIMIT 1").use { it.moveToFirst() }
         }
+
+    fun hasUnrepresentedJournalLinks(database: SupportSQLiteDatabase): Boolean =
+        database
+            .query(
+                """
+                SELECT 1 FROM journal_content_links AS link
+                WHERE NOT EXISTS (SELECT 1 FROM journals AS journal WHERE journal.id = link.journal_id)
+                   OR (
+                       NOT EXISTS (SELECT 1 FROM text_notes AS note WHERE note.uid = link.content_id)
+                       AND NOT EXISTS (SELECT 1 FROM image_notes AS note WHERE note.uid = link.content_id)
+                       AND NOT EXISTS (SELECT 1 FROM audio_notes AS note WHERE note.uid = link.content_id)
+                       AND NOT EXISTS (SELECT 1 FROM video_notes AS note WHERE note.uid = link.content_id)
+                   ) LIMIT 1
+                """.trimIndent(),
+            ).use { it.moveToFirst() }
+
+    fun hasUnrepresentedMediaCaptions(database: SupportSQLiteDatabase): Boolean =
+        database
+            .query(
+                """
+                SELECT 1 FROM media_captions AS caption
+                WHERE NOT EXISTS (SELECT 1 FROM image_notes AS note WHERE note.uid = caption.noteId)
+                  AND NOT EXISTS (SELECT 1 FROM audio_notes AS note WHERE note.uid = caption.noteId)
+                  AND NOT EXISTS (SELECT 1 FROM video_notes AS note WHERE note.uid = caption.noteId)
+                LIMIT 1
+                """.trimIndent(),
+            ).use { it.moveToFirst() }
 
     fun reviewedRoomIdentity(identity: String?): Boolean = identity == REVIEWED_ROOM_IDENTITY
 
