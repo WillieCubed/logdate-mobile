@@ -17,20 +17,23 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.net.URI
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import kotlin.uuid.Uuid
 
 /** Stores attachment bytes in an app-private, content-addressed media store. */
 class AndroidCanonicalMediaStore(
     private val filesDir: File,
+    private val syncFile: (File) -> Unit = ::syncExistingFile,
     private val syncDirectory: (File) -> Unit = ::syncDirectoryOnAndroid,
 ) {
     private val objectsDirectory = File(filesDir, "media/objects/sha256")
     private val stagingDirectory = File(filesDir, "media/staging")
-    private val finalizeLock = Mutex()
 
     suspend fun store(
         input: InputStream,
@@ -71,36 +74,48 @@ class AndroidCanonicalMediaStore(
             val hexDigest = digest.digest().toHex()
             val destinationDirectory = File(objectsDirectory, hexDigest.take(2))
             ensurePrivateDirectory(destinationDirectory)
-            return finalizeLock.withLock {
-                var variant = 0L
-                while (true) {
-                    currentCoroutineContext().ensureActive()
-                    if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
-                    val name = if (variant == 0L) "$hexDigest.$extension" else "$hexDigest.retained-$variant.$extension"
-                    val destination = File(destinationDirectory, name)
-                    if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
-                        if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
+            if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
+            return publicationLock.withLock {
+                val lockChannel =
+                    FileChannel.open(
+                        File(stagingDirectory, ".publication.lock").toPath(),
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.WRITE,
+                        LinkOption.NOFOLLOW_LINKS,
+                    )
+                lockChannel.use {
+                    lockChannel.lock().use {
+                        var variant = 0L
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
+                            val name = if (variant == 0L) "$hexDigest.$extension" else "$hexDigest.retained-$variant.$extension"
+                            val destination = File(destinationDirectory, name)
+                            if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                                if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
+                                    syncFile(destination)
+                                    syncDirectory(destinationDirectory)
+                                    currentCoroutineContext().ensureActive()
+                                    return@withLock destination.toURI().toString()
+                                }
+                                // A working entry may still reference this path. Never remove its bytes
+                                // merely because an incoming original claims the same digest path.
+                                variant++
+                                continue
+                            }
+                            try {
+                                publishIntoPlace(stagingFile, destination, copiedBytes)
+                            } catch (_: FileAlreadyExistsException) {
+                                // Another process claimed this path. Recheck it under the lock.
+                                continue
+                            }
                             syncDirectory(destinationDirectory)
                             currentCoroutineContext().ensureActive()
                             return@withLock destination.toURI().toString()
                         }
-                        // A working entry may still reference this path. Never remove its bytes
-                        // merely because an incoming original claims the same digest path.
-                        variant++
-                        continue
+                        error("No available media object path")
                     }
-                    try {
-                        moveIntoPlace(stagingFile, destination)
-                    } catch (_: FileAlreadyExistsException) {
-                        // Another store instance or process claimed this path. Recheck it so
-                        // identical imports still share the same reference.
-                        continue
-                    }
-                    syncDirectory(destinationDirectory)
-                    currentCoroutineContext().ensureActive()
-                    return@withLock destination.toURI().toString()
                 }
-                error("No available media object path")
             }
         } finally {
             withContext(NonCancellable) {
@@ -176,13 +191,30 @@ class AndroidCanonicalMediaStore(
             }
     }
 
-    private fun moveIntoPlace(
+    private suspend fun publishIntoPlace(
         stagingFile: File,
         destination: File,
+        expectedSizeBytes: Long,
     ) {
-        // createLink is atomic and refuses an existing destination across processes. A move with
-        // ATOMIC_MOVE may replace an existing path on some filesystems even without REPLACE_EXISTING.
-        Files.createLink(destination.toPath(), stagingFile.toPath())
+        // Android denies hard links to app-private files. Exclusive creation claims this path
+        // without replacing existing bytes, including a dangling symlink or another process's
+        // incomplete publication. A failed copy leaves its claim for a later retained variant.
+        FileChannel.open(destination.toPath(), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE).use { output ->
+            FileInputStream(stagingFile).use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var copied = 0L
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    val bytes = ByteBuffer.wrap(buffer, 0, read)
+                    while (bytes.hasRemaining()) output.write(bytes)
+                    copied += read
+                }
+                check(copied == expectedSizeBytes) { "Private media staging file changed before publication" }
+            }
+            output.force(true)
+        }
     }
 
     private fun ensurePrivateDirectory(directory: File) {
@@ -230,10 +262,17 @@ class AndroidCanonicalMediaStore(
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
     private companion object {
+        private val publicationLock = Mutex()
         const val STAGING_FILE_MAX_AGE_MILLIS: Long = 24 * 60 * 60 * 1_000L
 
         // Older versions used .corrupt for displaced user bytes. Never expire those files.
         val STAGING_FILE_PATTERN = Regex("[0-9a-fA-F-]{36}\\.tmp")
+
+        fun syncExistingFile(file: File) {
+            FileChannel.open(file.toPath(), StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS).use { channel ->
+                channel.force(true)
+            }
+        }
 
         fun syncDirectoryOnAndroid(directory: File) {
             if (System.getProperty("java.vm.name") != "Dalvik") return
