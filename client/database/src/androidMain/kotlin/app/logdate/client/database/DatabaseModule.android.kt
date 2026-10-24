@@ -2,6 +2,7 @@ package app.logdate.client.database
 
 import app.logdate.client.database.encryption.DatabasePassphraseProvider
 import app.logdate.client.database.encryption.PassphraseBackupStore
+import app.logdate.client.device.restore.NativeJournalRestoreAuthority
 import app.logdate.client.device.restore.NativeRestoreDeliveryGate
 import app.logdate.client.device.restore.NativeRestorePrivacyGuard
 import app.logdate.client.device.restore.PostRestoreDetector
@@ -20,7 +21,11 @@ actual val databaseModule: Module =
         single { PassphraseBackupStore(androidContext()) { retainedJournalPassphraseFile(androidContext()) } }
         single {
             DatabasePassphraseProvider(get(), get(), storageKey = { retainedJournalWorkingKeyName(androidContext()) }) {
-                retainedDatabaseNeedsExistingKey(androidContext().getDatabasePath(DATABASE_NAME))
+                val context = androidContext()
+                retainedDatabaseNeedsExistingKey(
+                    context.getDatabasePath(DATABASE_NAME),
+                    NativeJournalRestoreAuthority(context).isSnapshotRequired(),
+                )
             }
         }
         single { DatabaseStartupMonitor() }
@@ -93,5 +98,7 @@ actual val databaseModule: Module =
         includes(daosModule)
     }
 
-internal fun retainedDatabaseNeedsExistingKey(file: java.io.File): Boolean =
-    file.exists() && file.length() > 0L && !isPlaintextSqliteDatabase(file)
+internal fun retainedDatabaseNeedsExistingKey(
+    file: java.io.File,
+    nativeSnapshotRequired: Boolean = false,
+): Boolean = nativeSnapshotRequired || (file.exists() && file.length() > 0L && !isPlaintextSqliteDatabase(file))

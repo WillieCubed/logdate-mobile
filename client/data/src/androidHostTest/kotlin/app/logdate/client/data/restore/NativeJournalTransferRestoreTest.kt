@@ -59,6 +59,28 @@ class NativeJournalTransferRestoreTest {
         }
 
     @Test
+    fun `original key arriving after missing-content completion installs the retained journal`() =
+        fixture { f ->
+            val originalKey = f.key.readBytes()
+            assertTrue(f.key.delete())
+            val authority = NativeJournalRestoreAuthority(f.context)
+            authority.requireSnapshot()
+            assertFalse(f.restore { throw MissingNativeJournalTransferKeyException() }.restore())
+            PostRestoreDetector(f.context).recordRestoreCompleted()
+            f.restore { throw MissingNativeJournalTransferKeyException() }.finish()
+            assertTrue(authority.isSnapshotRequired())
+            assertFalse(f.database.exists())
+
+            f.key.writeBytes(originalKey)
+            assertTrue(f.restore().restore())
+            assertEquals("immutable sender database", f.database.readText())
+            assertEquals("accepted portable key", File(f.files, "db_recovery/passphrase_backup").readText())
+            f.complete()
+            f.restore().finish()
+            assertFalse(authority.isSnapshotRequired())
+        }
+
+    @Test
     fun `mismatched encrypted snapshot remains rejected without completing delivery`() =
         fixture { f ->
             NativeJournalRestoreAuthority(f.context).requireSnapshot()
