@@ -30,6 +30,7 @@ dependencies {
     testImplementation(projects.shared.model)
     testImplementation(projects.shared.space)
     testImplementation(projects.shared.atprotoXrpc)
+    testImplementation(projects.shared.atprotoRepo)
 
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -45,6 +46,7 @@ dependencies {
     testImplementation(libs.ktor.client.core)
     testImplementation(libs.ktor.client.okhttp)
     testImplementation(libs.ktor.client.content.negotiation)
+    testImplementation(libs.ktor.client.websockets)
 }
 
 // Build once, then launch the local Android fixture without holding a Gradle daemon or runner lock.
@@ -87,7 +89,27 @@ val personalSpaceTest by tasks.registering(Test::class) {
     filter { includeTestsMatching("*PersonalSpace*E2ETest") }
 }
 
+// The repository event stream shows only accounts that keep their journal in a personal space and whose
+// identity other apps can look up, so this task turns on personal spaces, the stream and `did:web` identities
+// (a `did:plc` counts as published only after it is sent to the real PLC directory, which a test never does).
+val publicFirehoseTest by tasks.registering(Test::class) {
+    description = "Runs the public repository event stream tests against a server with the stream enabled."
+    group = "verification"
+    testClassesDirs =
+        sourceSets.test
+            .get()
+            .output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    environment("LOGDATE_PERSONAL_SPACE_ENABLED", "true")
+    environment("ATPROTO_FIREHOSE_ENABLED", "true")
+    environment("ATPROTO_HOSTED_DID_METHOD", "web")
+    filter { includeTestsMatching("*PublicFirehose*E2ETest") }
+}
+
 tasks.test {
-    filter { excludeTestsMatching("*PersonalSpace*E2ETest") }
-    finalizedBy(personalSpaceTest)
+    filter {
+        excludeTestsMatching("*PersonalSpace*E2ETest")
+        excludeTestsMatching("*PublicFirehose*E2ETest")
+    }
+    finalizedBy(personalSpaceTest, publicFirehoseTest)
 }
