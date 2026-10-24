@@ -647,10 +647,12 @@ class NoteEntryMapperTest {
                     out.append(next)
                     index += 2
                 }
+
                 char == '\\' && next == '\n' -> {
                     out.append('\n')
                     index += 2
                 }
+
                 else -> {
                     out.append(char)
                     index++

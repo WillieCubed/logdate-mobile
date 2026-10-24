@@ -99,8 +99,10 @@ internal class SyncDraftMediaRecovery(
             return false
         }
         when (result) {
-            is DraftMediaHydrationResult.Pending ->
+            is DraftMediaHydrationResult.Pending -> {
                 inbox.failed("MEDIA_DRAFT", row.entityId, result.reason.name, row.version, scope, attemptId, source)
+            }
+
             is DraftMediaHydrationResult.Available -> {
                 inbox.applied("MEDIA_DRAFT", row.entityId, row.version, scope)
                 inbox.recordMediaAttempt(row, attemptId, DiagnosticOutcome.SUCCEEDED, source)
