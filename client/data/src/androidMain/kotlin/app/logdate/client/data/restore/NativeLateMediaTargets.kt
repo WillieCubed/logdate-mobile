@@ -155,7 +155,9 @@ internal suspend fun repairNativeLateMedia(
             candidates,
             requireCurrent = targets::requireCurrent,
             available = { media.isRecoveredOriginal(it, StoredMediaReferences.Unchanged) },
-            importOriginal = { importNativeLateMediaOriginal(media, it, isDeliveryCurrent) },
+            importOriginal = { asset ->
+                repositories.references.storedReference(importNativeLateMediaOriginal(media, asset, isDeliveryCurrent))
+            },
             canonicalReference = repositories.references::storedReference,
             authorizeUnreferenced = { reference, asset ->
                 val path = "files/media/" + reference.removePrefix("logdate-media://library/")
@@ -164,7 +166,12 @@ internal suspend fun repairNativeLateMedia(
             },
         )
     val result = repair.repair(targets.read())
-    acknowledgeNativeLateMedia(custody, result.recoveredReferences, media, targets::requireCurrent)
+    acknowledgeNativeLateMedia(
+        custody,
+        result.recoveredSources,
+        verify = { media.isRecoveredOriginal(it, StoredMediaReferences.Unchanged) },
+        requireCurrent = targets::requireCurrent,
+    )
     val legacyRetry =
         if (completedInventory != null && sourceReceiptSha256 != null && legacyReceiptsRoot != null) {
             repairNativeLateLegacyMedia(
@@ -184,20 +191,24 @@ internal suspend fun repairNativeLateMedia(
     return result.copy(retry = result.retry || legacyRetry)
 }
 
-private suspend fun acknowledgeNativeLateMedia(
+internal suspend fun acknowledgeNativeLateMedia(
     custody: NativeJournalReplayCustody,
-    recoveredReferences: Set<String>,
-    media: MediaManager,
+    recoveredSources: Set<NativeLateMediaRepair.RecoveredSource>,
+    verify: suspend (String) -> Boolean,
     requireCurrent: suspend () -> Unit,
 ) {
     val verified = mutableSetOf<String>()
     for (payload in custody.sealedPayloads()) {
         if (!payload.complete || !payload.path.startsWith("files/media/")) continue
         val reference = "logdate-media://library/" + payload.path.removePrefix("files/media/")
-        if (reference !in recoveredReferences) continue
+        val recovered = recoveredSources.firstOrNull { it.path == payload.path && it.file == payload.file.canonicalPath } ?: continue
         requireCurrent()
         val source = RetainedManagedMediaSource(mapOf(payload.path to payload.file))
-        if (source.resolve(reference) != null && media.isRecoveredOriginal(reference, StoredMediaReferences.Unchanged)) {
+        if (
+            source.resolve(reference) != null &&
+            retainedCanonicalMediaDigest(recovered.reference) == retainedCanonicalMediaDigest(reference) &&
+            verify(recovered.reference)
+        ) {
             verified += payload.file.canonicalPath
         }
         requireCurrent()

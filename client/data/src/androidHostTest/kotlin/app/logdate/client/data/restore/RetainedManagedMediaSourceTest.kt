@@ -78,6 +78,25 @@ class RetainedManagedMediaSourceTest {
     }
 
     @Test
+    fun `retained collision variant resolves from a later device transfer only with matching bytes`() {
+        val root = Files.createTempDirectory("retained-variant-media").toFile()
+        try {
+            val bytes = "incoming photo".encodeToByteArray()
+            val digest = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            val relative = "objects/sha256/${digest.take(2)}/$digest.retained-1.jpg"
+            val path = "files/media/$relative"
+            val payload = File(root, "sealed-payload").apply { writeBytes(bytes) }
+            val reference = "logdate-media://library/$relative"
+
+            assertEquals(payload.canonicalFile, RetainedManagedMediaSource(mapOf(path to payload)).resolve(reference)?.file)
+            payload.writeText("different bytes")
+            assertNull(RetainedManagedMediaSource(mapOf(path to payload)).resolve(reference))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `active store verification only receives complete canonical digest references`() =
         runTest {
             val digest = "a".repeat(64)

@@ -188,6 +188,95 @@ class NativeLateMediaRepairTest {
         }
 
     @Test
+    fun `late source media at an occupied path keeps working bytes and commits its alternate reference`() =
+        runTest {
+            fixture { f ->
+                f.write(Document("entry", "keep text", listOf(f.unavailable)))
+                checkNotNull(f.live.parentFile).mkdirs()
+                f.live.writeText("working entry bytes")
+                val alternate = File(f.live.parentFile, "${f.live.nameWithoutExtension}.retained-1.png")
+                val alternateReference = "logdate-media://library/${f.relative.substringBeforeLast('/')}/${alternate.name}"
+                val target = f.target()
+                val result = f.engine(importedReference = alternateReference).repair(listOf(target))
+
+                assertEquals(1, result.repaired)
+                assertEquals(Document("entry", "keep text", listOf(alternateReference)), f.read())
+                assertEquals("working entry bytes", f.live.readText())
+                assertEquals("original bytes", alternate.readText())
+                assertEquals(setOf(alternateReference), result.recoveredReferences)
+                assertTrue(f.payload.exists(), "The caller must verify the committed alternate before ACK")
+            }
+        }
+
+    @Test
+    fun `readable working reference retains incoming custody until a separate row is chosen`() =
+        runTest {
+            fixture { f ->
+                f.orphansAuthenticated = true
+                f.write(Document("entry", "working edit", listOf(f.original)))
+                checkNotNull(f.live.parentFile).mkdirs()
+                f.live.writeText("working entry bytes")
+                val alternate = File(f.live.parentFile, "${f.live.nameWithoutExtension}.retained-1.png")
+                val alternateReference = "logdate-media://library/${f.relative.substringBeforeLast('/')}/${alternate.name}"
+
+                val result = f.engine(importedReference = alternateReference).repair(listOf(f.target()))
+
+                assertEquals(Document("entry", "working edit", listOf(f.original)), f.read())
+                assertEquals("working entry bytes", f.live.readText())
+                assertEquals("original bytes", alternate.readText())
+                assertTrue(result.recoveredReferences.isEmpty())
+                assertTrue(f.payload.exists())
+            }
+        }
+
+    @Test
+    fun `same-byte callbacks keep failed target source pending while successful sibling is recoverable`() =
+        runTest {
+            fixture { f ->
+                val siblingRelative = f.relative.removeSuffix(".png") + ".retained-1.png"
+                val sibling = "logdate-media://library/$siblingRelative"
+                val siblingPayload = File(f.root, "custody/sibling").apply { writeBytes(f.payload.readBytes()) }
+                val a = UnavailableMediaReferences.nativeRestore(f.original)
+                val b = UnavailableMediaReferences.nativeRestore(sibling)
+                var allowA = false
+                val committed = mutableSetOf<String>()
+
+                fun engine(candidates: List<Map<String, File>>) =
+                    NativeLateMediaRepair(
+                        candidates,
+                        requireCurrent = {},
+                        available = { reference -> reference == f.original && f.live.isFile },
+                        importOriginal = { asset ->
+                            checkNotNull(f.live.parentFile).mkdirs()
+                            asset.file.copyTo(f.live, overwrite = true)
+                            f.original
+                        },
+                        authorizeUnreferenced = { _, _ -> true },
+                    )
+                val targetA = NativeLateMediaRepair.Target(setOf(a)) { if (allowA) committed.add("A") else false }
+                val targetB = NativeLateMediaRepair.Target(setOf(b)) { committed.add("B") }
+
+                val first =
+                    engine(listOf(mapOf("files/media/${f.relative}" to f.payload, "files/media/$siblingRelative" to siblingPayload)))
+                        .repair(listOf(targetA, targetB))
+
+                assertEquals(setOf("B"), committed)
+                assertEquals(
+                    setOf(NativeLateMediaRepair.RecoveredSource("files/media/$siblingRelative", siblingPayload.canonicalPath, f.original)),
+                    first.recoveredSources,
+                )
+                assertTrue(first.retry)
+                allowA = true
+                val second = engine(listOf(mapOf("files/media/${f.relative}" to f.payload))).repair(listOf(targetA))
+                assertEquals(setOf("A", "B"), committed)
+                assertEquals(
+                    setOf(NativeLateMediaRepair.RecoveredSource("files/media/${f.relative}", f.payload.canonicalPath, f.original)),
+                    second.recoveredSources,
+                )
+            }
+        }
+
+    @Test
     fun `orphan publication refuses scope revoked during import and retains custody`() =
         runTest {
             fixture { f ->
@@ -225,7 +314,7 @@ class NativeLateMediaRepairTest {
                 f.live.writeText("original bytes")
                 val local = f.live.toURI().toString()
                 f.write(Document("entry", "unchanged", listOf(local)))
-                val engine = f.engine { if (it == local) f.original else it }
+                val engine = f.engine(canonicalReference = { if (it == local) f.original else it })
                 val result = engine.repair(listOf(f.target()))
                 assertEquals(setOf(f.original), result.recoveredReferences)
                 assertEquals(local, f.read().references.single())
@@ -253,7 +342,7 @@ class NativeLateMediaRepairTest {
         val root: File,
     ) {
         private val digest = sha256("original bytes".encodeToByteArray())
-        private val relative = "objects/sha256/${digest.take(2)}/$digest.png"
+        val relative = "objects/sha256/${digest.take(2)}/$digest.png"
         val original = "logdate-media://library/$relative"
         val unavailable = UnavailableMediaReferences.nativeRestore(original)
         val payload =
@@ -289,20 +378,39 @@ class NativeLateMediaRepairTest {
             }
         }
 
-        fun engine(canonicalReference: (String) -> String = { it }) =
-            NativeLateMediaRepair(
-                listOf(mapOf("files/media/$relative" to payload)),
-                requireCurrent = { check(current) },
-                available = { reference -> reference == original && live.exists() && sha256(live.readBytes()) == digest },
-                importOriginal = { asset ->
-                    checkNotNull(live.parentFile).mkdirs()
-                    asset.file.copyTo(live, overwrite = true)
-                    imports++
-                    afterImport()
-                },
-                canonicalReference = canonicalReference,
-                authorizeUnreferenced = { reference, asset -> orphansAuthenticated && reference == original && asset.file == payload },
-            )
+        fun engine(
+            canonicalReference: (String) -> String = { it },
+            importedReference: String = original,
+        ) = NativeLateMediaRepair(
+            listOf(mapOf("files/media/$relative" to payload)),
+            requireCurrent = { check(current) },
+            available = { reference ->
+                val file =
+                    if (reference == original) {
+                        live
+                    } else if (reference == importedReference) {
+                        File(live.parentFile, importedReference.substringAfterLast('/'))
+                    } else {
+                        null
+                    }
+                file?.exists() == true && sha256(file.readBytes()) == digest
+            },
+            importOriginal = { asset ->
+                val destination =
+                    if (importedReference == original) {
+                        live
+                    } else {
+                        File(checkNotNull(live.parentFile), importedReference.substringAfterLast('/'))
+                    }
+                checkNotNull(destination.parentFile).mkdirs()
+                asset.file.copyTo(destination, overwrite = true)
+                imports++
+                afterImport()
+                importedReference
+            },
+            canonicalReference = canonicalReference,
+            authorizeUnreferenced = { reference, asset -> orphansAuthenticated && reference == original && asset.file == payload },
+        )
     }
 }
 

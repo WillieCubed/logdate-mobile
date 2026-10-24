@@ -17,9 +17,9 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.net.URI
-import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import java.nio.file.LinkOption
 import java.security.MessageDigest
 import kotlin.uuid.Uuid
 
@@ -71,22 +71,36 @@ class AndroidCanonicalMediaStore(
             val hexDigest = digest.digest().toHex()
             val destinationDirectory = File(objectsDirectory, hexDigest.take(2))
             ensurePrivateDirectory(destinationDirectory)
-            val destination = File(destinationDirectory, "$hexDigest.$extension")
             return finalizeLock.withLock {
-                currentCoroutineContext().ensureActive()
-                if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
-                if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
+                var variant = 0L
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    if (!canCommit()) throw CancellationException("Media store commit is no longer valid")
+                    val name = if (variant == 0L) "$hexDigest.$extension" else "$hexDigest.retained-$variant.$extension"
+                    val destination = File(destinationDirectory, name)
+                    if (Files.exists(destination.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                        if (isVerifiedObject(destination, hexDigest, copiedBytes)) {
+                            syncDirectory(destinationDirectory)
+                            currentCoroutineContext().ensureActive()
+                            return@withLock destination.toURI().toString()
+                        }
+                        // A working entry may still reference this path. Never remove its bytes
+                        // merely because an incoming original claims the same digest path.
+                        variant++
+                        continue
+                    }
+                    try {
+                        moveIntoPlace(stagingFile, destination)
+                    } catch (_: FileAlreadyExistsException) {
+                        // Another store instance or process claimed this path. Recheck it so
+                        // identical imports still share the same reference.
+                        continue
+                    }
                     syncDirectory(destinationDirectory)
                     currentCoroutineContext().ensureActive()
                     return@withLock destination.toURI().toString()
                 }
-                val quarantinedFile = quarantineCorruptDestination(destination)
-                currentCoroutineContext().ensureActive()
-                moveIntoPlace(stagingFile, destination)
-                syncDirectory(destinationDirectory)
-                quarantinedFile?.delete()
-                currentCoroutineContext().ensureActive()
-                destination.toURI().toString()
+                error("No available media object path")
             }
         } finally {
             withContext(NonCancellable) {
@@ -147,14 +161,6 @@ class AndroidCanonicalMediaStore(
         }
     }
 
-    private fun quarantineCorruptDestination(destination: File): File? {
-        if (!destination.exists()) return null
-        val quarantine = File(stagingDirectory, "${Uuid.random()}.corrupt")
-        check(destination.renameTo(quarantine)) { "Unable to quarantine corrupt media object" }
-        syncDirectory(checkNotNull(destination.parentFile))
-        return quarantine
-    }
-
     private fun removeStaleStagingFiles() {
         val cutoffMillis = System.currentTimeMillis() - STAGING_FILE_MAX_AGE_MILLIS
         stagingDirectory
@@ -174,15 +180,13 @@ class AndroidCanonicalMediaStore(
         stagingFile: File,
         destination: File,
     ) {
-        try {
-            Files.move(stagingFile.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: AtomicMoveNotSupportedException) {
-            check(stagingFile.renameTo(destination)) { "Unable to finalize private media object" }
-        }
+        // createLink is atomic and refuses an existing destination across processes. A move with
+        // ATOMIC_MOVE may replace an existing path on some filesystems even without REPLACE_EXISTING.
+        Files.createLink(destination.toPath(), stagingFile.toPath())
     }
 
     private fun ensurePrivateDirectory(directory: File) {
-        require(directory.isDirectory || directory.mkdirs()) { "Unable to create private media directory" }
+        require(directory.isDirectory || directory.mkdirs() || directory.isDirectory) { "Unable to create private media directory" }
         check(!Files.isSymbolicLink(directory.toPath())) { "Private media directory cannot be a symlink" }
     }
 
@@ -227,7 +231,9 @@ class AndroidCanonicalMediaStore(
 
     private companion object {
         const val STAGING_FILE_MAX_AGE_MILLIS: Long = 24 * 60 * 60 * 1_000L
-        val STAGING_FILE_PATTERN = Regex("[0-9a-fA-F-]{36}\\.(tmp|corrupt)")
+
+        // Older versions used .corrupt for displaced user bytes. Never expire those files.
+        val STAGING_FILE_PATTERN = Regex("[0-9a-fA-F-]{36}\\.tmp")
 
         fun syncDirectoryOnAndroid(directory: File) {
             if (System.getProperty("java.vm.name") != "Dalvik") return

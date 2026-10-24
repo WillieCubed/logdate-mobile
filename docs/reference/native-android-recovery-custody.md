@@ -89,6 +89,19 @@ remain unavailable until verified original bytes arrive. Cross-generation media 
 a canonical content digest and a matching byte checksum; matching filenames or existing URIs
 are insufficient.
 
+A readable working attachment at a canonical media path may contain bytes different from the
+incoming source's digest. Import must keep those working bytes and their reference unchanged.
+Publish the verified incoming bytes under a separate, digest-checked retained variant and use
+that returned reference for the source note or draft. Creation of either object must never
+replace an existing path, including across processes. A late-media callback may be acknowledged
+only after its imported reference is readable and digest-verified, and any required row update
+has committed. Acknowledgement binds the exact source path and sealed file to that returned
+reference; another callback with identical bytes cannot stand in for a failed row update.
+A source-authenticated unreferenced original may instead remain as a portable
+private object. A readable working row whose attachment differs from the incoming source needs
+an explicit Keep both choice before that incoming callback is acknowledged. Retained variants
+are part of the native media inventory and device transfer.
+
 The reconciliation mutex serializes worker instances and scratch cleanup. Resolve and open the
 working database and its repository graph before taking the native delivery gate: database
 initialization takes that same non-reentrant gate. Admit the canonical media root before taking

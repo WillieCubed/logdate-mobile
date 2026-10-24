@@ -63,4 +63,8 @@ suspend fun MediaManager.isRecoveredOriginal(
     }
 
 private const val INTEGRITY_CHUNK_BYTES = 8192L
-private val CANONICAL_OBJECT = Regex("objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})\\.[^/.]+", RegexOption.IGNORE_CASE)
+private val CANONICAL_OBJECT =
+    Regex(
+        "objects/sha256/([a-f0-9]{2})/([a-f0-9]{64})(?:\\.retained-[1-9][0-9]*)?\\.[^/.]+",
+        RegexOption.IGNORE_CASE,
+    )

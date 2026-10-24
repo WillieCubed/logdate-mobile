@@ -28,6 +28,14 @@ class RecoveredMediaIntegrityTest {
         }
 
     @Test
+    fun `retained collision variant remains digest checked after reopening its reference`() =
+        runTest {
+            val retained = canonical.replace(".jpg", ".retained-1.jpg")
+            assertTrue(readable("abc").isRecoveredOriginal(retained, StoredMediaReferences.Unchanged))
+            assertFalse(readable("abd").isRecoveredOriginal(retained, StoredMediaReferences.Unchanged))
+        }
+
+    @Test
     fun `a truncated canonical original is missing even when its current size is accurate`() =
         runTest {
             assertFalse(readable("ab").isRecoveredOriginal(canonical, StoredMediaReferences.Unchanged))
