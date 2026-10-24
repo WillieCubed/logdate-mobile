@@ -412,6 +412,19 @@ class NativeBackupTransferProbeTest {
                     } else {
                         null
                     }
+                val retainedD2dEdit =
+                    mode == "verify-in-place" && recordingExpectation == RecordingTransferExpectation.DEVICE_TRANSFER
+                val expectedJournalTitle =
+                    if (retainedD2dEdit) "Mutated after native D2D backup" else "Native transfer journal"
+                if (retainedD2dEdit) {
+                    val retainedJournal =
+                        koin.get<JournalRepository>().getJournalById(Uuid.parse("00000000-0000-0000-0000-000000000001"))
+                    assertEquals(
+                        expectedJournalTitle,
+                        retainedJournal?.title,
+                        "In-place D2D restore must retain the accepted journal edit",
+                    )
+                }
                 if (recordingExpectation != null) {
                     verifyRecordingTransferFixture(context, inPlace = mode == "verify-in-place", expectation = recordingExpectation)
                 }
@@ -424,7 +437,10 @@ class NativeBackupTransferProbeTest {
                 if (mode == "verify-restored") {
                     fixture.verifyFixture(originalMediaIncluded)
                 } else {
-                    fixture.verifyAndEdit(originalMediaIncluded)
+                    fixture.verifyAndEdit(
+                        originalMediaIncluded,
+                        expectedJournalTitle = expectedJournalTitle,
+                    )
                 }
             }
         }
