@@ -32,15 +32,24 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
             val host = owner as? FragmentActivity ?: return@LifecycleEventObserver
             if (activityRef.get() !== host) return@LifecycleEventObserver
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> challenge.markHostPaused()
-                Lifecycle.Event.ON_RESUME -> deliverPendingSuccess(host)
+                Lifecycle.Event.ON_PAUSE -> {
+                    challenge.markHostPaused()
+                }
+
+                Lifecycle.Event.ON_RESUME -> {
+                    deliverPendingSuccess(host)
+                }
+
                 Lifecycle.Event.ON_DESTROY -> {
                     challenge.invalidate()
                     pendingSuccess = null
                     activityRef.clear()
                     _authState.value = AppAuthState.REQUIRE_PROMPT
                 }
-                else -> Unit
+
+                else -> {
+                    Unit
+                }
             }
         }
 
@@ -139,6 +148,7 @@ class AndroidBiometricGatekeeper : BiometricGatekeeper {
                     BiometricPrompt(host, executor, callback).authenticate(info)
                 }
             }
+
             is AndroidAuthenticationAvailability.Unavailable -> {
                 _authState.value = availability.state
                 onResult(availability.state)

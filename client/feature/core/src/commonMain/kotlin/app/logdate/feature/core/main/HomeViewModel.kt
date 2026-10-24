@@ -451,6 +451,7 @@ private fun autoRequestableTimelineTranscriptionIds(
                 null,
                 TranscriptionStatus.FAILED,
                 -> true
+
                 TranscriptionStatus.COMPLETED,
                 TranscriptionStatus.IN_PROGRESS,
                 TranscriptionStatus.PENDING,

@@ -122,7 +122,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                 .orEmpty()
                 .map { JournalBadgeUiState(journalId = it.id, title = it.title) }
         when (note) {
-            is JournalNote.Text ->
+            is JournalNote.Text -> {
                 TextNoteUiState(
                     noteId = note.uid,
                     text = note.content,
@@ -131,7 +131,9 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     capturedOnWatch = note.isCapturedOnWatch,
                     capturedDuring = note.capturedDuring,
                 )
-            is JournalNote.Image ->
+            }
+
+            is JournalNote.Image -> {
                 ImageNoteUiState(
                     noteId = note.uid,
                     uri = note.mediaRef,
@@ -142,7 +144,9 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     capturedOnWatch = note.isCapturedOnWatch,
                     capturedDuring = note.capturedDuring,
                 )
-            is JournalNote.Audio ->
+            }
+
+            is JournalNote.Audio -> {
                 AudioNoteUiState(
                     noteId = note.uid,
                     uri = note.mediaRef,
@@ -152,7 +156,9 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     capturedOnWatch = note.isCapturedOnWatch,
                     capturedDuring = note.capturedDuring,
                 )
-            is JournalNote.Video ->
+            }
+
+            is JournalNote.Video -> {
                 VideoNoteUiState(
                     noteId = note.uid,
                     uri = note.mediaRef,
@@ -162,20 +168,25 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     capturedOnWatch = note.isCapturedOnWatch,
                     capturedDuring = note.capturedDuring,
                 )
+            }
         }
     }
 
 internal fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionBlock? =
     when (this) {
-        is HomeRecommendation.EmptyDay ->
+        is HomeRecommendation.EmptyDay -> {
             TimelineSuggestionBlock.EmptyDay(
                 locationName = location?.toUiText(),
             )
-        is HomeRecommendation.CompleteYourDraft ->
+        }
+
+        is HomeRecommendation.CompleteYourDraft -> {
             TimelineSuggestionBlock.CompleteDraft(
                 draftId = draftId.toString(),
             )
-        is HomeRecommendation.MemoryRecall ->
+        }
+
+        is HomeRecommendation.MemoryRecall -> {
             TimelineSuggestionBlock.MemoryRecall(
                 memoryDate = date,
                 title = summary,
@@ -183,14 +194,26 @@ internal fun HomeRecommendation.toTimelineSuggestionBlock(): TimelineSuggestionB
                 mediaUris = mediaUris.map { uri -> MediaObjectUiState(uid = uri, uri = uri) },
                 isAiGenerated = isAiGenerated,
             )
-        is HomeRecommendation.UpcomingEvent ->
+        }
+
+        is HomeRecommendation.UpcomingEvent -> {
             TimelineSuggestionBlock.UpcomingEvent(
                 eventId = eventId.toString(),
                 title = title,
                 startTime = startTime,
                 placeName = placeName,
             )
-        is HomeRecommendation.AfterActivity -> TimelineSuggestionBlock.AfterActivity(minutes = minutes, trip = trip)
-        HomeRecommendation.MorningStart -> TimelineSuggestionBlock.MorningStart
-        HomeRecommendation.None -> null
+        }
+
+        is HomeRecommendation.AfterActivity -> {
+            TimelineSuggestionBlock.AfterActivity(minutes = minutes, trip = trip)
+        }
+
+        HomeRecommendation.MorningStart -> {
+            TimelineSuggestionBlock.MorningStart
+        }
+
+        HomeRecommendation.None -> {
+            null
+        }
     }
