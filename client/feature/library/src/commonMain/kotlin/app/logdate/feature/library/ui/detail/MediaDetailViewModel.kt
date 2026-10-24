@@ -175,7 +175,7 @@ class MediaDetailViewModel(
 
             _uiState.value =
                 when {
-                    media.isVideo ->
+                    media.isVideo -> {
                         MediaDetailUiState.VideoContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -184,7 +184,9 @@ class MediaDetailViewModel(
                             locationDisplayName = locationDisplayName,
                             journals = journals,
                         )
-                    media.isAudio ->
+                    }
+
+                    media.isAudio -> {
                         MediaDetailUiState.AudioContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -194,7 +196,9 @@ class MediaDetailViewModel(
                             locationDisplayName = locationDisplayName,
                             journals = journals,
                         )
-                    media.indexedMedia is IndexedMedia.Image ->
+                    }
+
+                    media.indexedMedia is IndexedMedia.Image -> {
                         MediaDetailUiState.ImageContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -204,7 +208,9 @@ class MediaDetailViewModel(
                             journals = journals,
                             exif = exif,
                         )
-                    else ->
+                    }
+
+                    else -> {
                         MediaDetailUiState.ImageContent(
                             mediaId = media.id,
                             mediaRef = media.uri,
@@ -214,6 +220,7 @@ class MediaDetailViewModel(
                             journals = journals,
                             exif = exif,
                         )
+                    }
                 }
         }
 
@@ -265,15 +272,24 @@ class MediaDetailViewModel(
                     )
                 val resolved =
                     when (val result = resolveLocationToPlaceUseCase(location)) {
-                        is PlaceResolutionResult.UserDefinedPlace -> result.place.name
-                        is PlaceResolutionResult.ExternalSuggestion -> result.suggestion.name
+                        is PlaceResolutionResult.UserDefinedPlace -> {
+                            result.place.name
+                        }
+
+                        is PlaceResolutionResult.ExternalSuggestion -> {
+                            result.suggestion.name
+                        }
+
                         is PlaceResolutionResult.CoarseLocation -> {
                             val addr = result.address
                             listOfNotNull(addr.locality, addr.adminArea)
                                 .joinToString(", ")
                                 .ifEmpty { null }
                         }
-                        is PlaceResolutionResult.UnknownLocation -> null
+
+                        is PlaceResolutionResult.UnknownLocation -> {
+                            null
+                        }
                     }
                 if (resolved != null) return resolved
             } catch (e: Exception) {
