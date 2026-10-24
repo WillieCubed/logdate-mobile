@@ -29,6 +29,17 @@ public object DagCborCodec {
      */
     public fun decode(bytes: ByteArray): JsonElement = Decoder(bytes).decodeElement()
 
+    /**
+     * Decodes every DAG-CBOR value in [bytes], one after the other.
+     *
+     * The repository event stream sends a header and a body back to back in one message, so a
+     * single [decode] would read the header and ignore the body.
+     */
+    public fun decodeSequence(bytes: ByteArray): List<JsonElement> {
+        val decoder = Decoder(bytes)
+        return buildList { while (decoder.hasMore()) add(decoder.decodeElement()) }
+    }
+
     internal fun link(cid: Cid): JsonObject =
         buildJsonObject {
             put(LINK_KEY, cid.toString())
@@ -154,6 +165,8 @@ public object DagCborCodec {
         private val bytes: ByteArray,
     ) {
         private var cursor: Int = 0
+
+        fun hasMore(): Boolean = cursor < bytes.size
 
         fun decodeElement(): JsonElement {
             val header = readByte().toInt() and 0xff

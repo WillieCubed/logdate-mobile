@@ -15,6 +15,8 @@
   - PLC directory models and client/runtime behavior
 - `shared/atproto-repo`
   - repo records, deterministic block storage, commits, export/import, and the canonical repo engine
+  - the messages of `com.atproto.sync.subscribeRepos`: what a commit changed (`RepoCommitChanges`),
+    the event types, and the frame encoding (`RepoEventFrames`)
 - `shared/atproto-xrpc`
   - Ktor-backed XRPC client primitives
 - `shared/atproto-lexicon`
@@ -180,6 +182,45 @@ val response: ResolveHandleResponse =
         queryParameter("handle", "alice.example.com")
     }
 ```
+
+### Reading and writing the repository event stream
+
+`com.atproto.sync.subscribeRepos` sends each change to a repository as one WebSocket message: a
+DAG-CBOR header and a DAG-CBOR body, back to back. `RepoEventFrames` writes and reads those
+messages, so a server and a relay can share one definition of them.
+
+```kotlin
+// Server side: work out what a stored commit changed, and announce it.
+val change = RepoCommitChanges.read(blockStore, commit).getOrThrow()
+val frame = RepoEventFrames.encode(
+    RepoCommitEvent(
+        seq = 42,
+        time = Clock.System.now(),
+        repo = commit.commit.repo,
+        commit = commit.cid,
+        rev = Tid.fromLong(commit.commit.revision),
+        since = null,
+        blocks = change.toCommitCar(),
+        ops = change.operations,
+        prevData = change.previous?.commit?.root,
+    ),
+)
+
+// Consumer side: read a frame and open the CAR file it carries.
+val event = RepoEventFrames.decode(frame) as RepoCommitEvent
+val car = CarCodec.readCar(event.blocks)
+```
+
+`change.toCommitCar()` holds the commit, the whole record tree and the records the commit wrote.
+Sending the whole tree, not only the nodes that changed, lets a consumer undo a deletion without
+asking for more. A server that cannot send that much (the lexicon allows 200 operations and 2 MB of
+blocks) sends a `RepoSyncEvent` built from `change.toSyncCar()` instead, which tells the consumer to
+fetch the repository again.
+
+The JVM tests hand these CAR files to the reference implementation through
+[`tools/atproto-repo-verify/verify-event.mjs`](../../tools/atproto-repo-verify/verify-event.mjs),
+which checks the signature, that the blocks reach every change, that the changes are the event's
+operations, and that undoing the operations gives back the previous tree, as a relay does.
 
 ## Publishing
 
