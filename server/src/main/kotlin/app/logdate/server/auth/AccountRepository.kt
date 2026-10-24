@@ -62,6 +62,22 @@ interface AccountRepository {
     suspend fun getAllAccounts(): List<Account>
 
     /**
+     * Up to [limit] active accounts that keep their journal in a personal space and have a DID,
+     * ordered by DID, starting after [afterDid]. The public repository listing pages through these.
+     *
+     * This default reads every account; the PostgreSQL repository overrides it with an indexed query.
+     */
+    suspend fun listPersonalSpaceAccountsAfter(
+        afterDid: String?,
+        limit: Int,
+    ): List<Account> =
+        getAllAccounts()
+            .filter { it.isActive && it.storageMode == AccountStorageMode.PERSONAL_SPACE_V1 && it.did != null }
+            .filter { afterDid == null || checkNotNull(it.did) > afterDid }
+            .sortedBy { it.did }
+            .take(limit)
+
+    /**
      * Active accounts that still lack an AT Protocol handle, DID, or signing key. Only the operator
      * identity backfill reads this; request handling never scans accounts.
      */

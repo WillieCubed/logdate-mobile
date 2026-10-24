@@ -3,6 +3,7 @@ package app.logdate.server.identity
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.logging.IdentityNotices
+import app.logdate.server.logging.RepoEventNotices
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -23,6 +24,14 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+
+/**
+ * Told when an account gets an identity or its identity changes: a new DID, handle or signing key.
+ * The repository event stream uses it to tell relays to look the account up again.
+ */
+fun interface IdentityEvents {
+    suspend fun identityChanged(account: Account)
+}
 
 /**
  * Provisions and resolves AT Protocol identity data for LogDate accounts.
@@ -49,6 +58,27 @@ class AtprotoIdentityService(
         repoCollectionsResolver = resolver
     }
 
+    private var identityEvents: IdentityEvents? = null
+
+    /**
+     * Sets who is told when an account gets an identity or its identity changes, such as a new
+     * signing key. A listener that fails never fails the change itself; the failure is logged.
+     */
+    fun setIdentityEvents(events: IdentityEvents?) {
+        identityEvents = events
+    }
+
+    private suspend fun notifyIdentityChanged(account: Account) {
+        val events = identityEvents ?: return
+        try {
+            events.identityChanged(account)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.e(RepoEventNotices.EVENT_NOT_RECORDED, failure)
+        }
+    }
+
     /**
      * Returns [account] with a canonical handle, DID, and signing key, provisioning whatever is
      * missing. Provisioning always starts from the stored account, read again under a per-account
@@ -60,10 +90,11 @@ class AtprotoIdentityService(
      */
     suspend fun ensureIdentity(account: Account): Account {
         if (hasCanonicalIdentity(account)) return account
-        return provisioningLockFor(account.id).withLock {
-            val current = accountRepository.findById(account.id) ?: throw IdentityAccountMissingException()
-            if (hasCanonicalIdentity(current)) current else ensureIdentityLocked(current)
-        }
+        return provisioningLockFor(account.id)
+            .withLock {
+                val current = accountRepository.findById(account.id) ?: throw IdentityAccountMissingException()
+                if (hasCanonicalIdentity(current)) current else ensureIdentityLocked(current)
+            }.also { notifyIdentityChanged(it) }
     }
 
     private suspend fun ensureIdentityLocked(stored: Account): Account {
@@ -176,7 +207,10 @@ class AtprotoIdentityService(
 
     fun didForHandle(handle: String): AtprotoDid = AtprotoDid.require("did:web:${requireNotNull(canonicalizeHandle(handle))}")
 
-    suspend fun rotateSigningKey(account: Account): RotatedIdentitySigningKey {
+    suspend fun rotateSigningKey(account: Account): RotatedIdentitySigningKey =
+        performSigningKeyRotation(account).also { notifyIdentityChanged(it.account) }
+
+    private suspend fun performSigningKeyRotation(account: Account): RotatedIdentitySigningKey {
         val ensured = ensureIdentity(account)
         val did = requireNotNull(ensured.did)
         val previousPublicKey = requireNotNull(ensured.signingKeyPublic)
@@ -215,6 +249,12 @@ class AtprotoIdentityService(
     }
 
     suspend fun importSigningKey(
+        account: Account,
+        exportedKey: SigningKeyService.ExportedSigningKey,
+        passphrase: String,
+    ): ImportedIdentitySigningKey = performSigningKeyImport(account, exportedKey, passphrase).also { notifyIdentityChanged(it.account) }
+
+    private suspend fun performSigningKeyImport(
         account: Account,
         exportedKey: SigningKeyService.ExportedSigningKey,
         passphrase: String,
@@ -316,6 +356,15 @@ class AtprotoIdentityService(
         exportedKey: SigningKeyService.ExportedSigningKey,
         passphrase: String,
         recoverySignature: String,
+    ): ImportedIdentitySigningKey =
+        performRecoverySigningKeyImport(account, exportedKey, passphrase, recoverySignature)
+            .also { notifyIdentityChanged(it.account) }
+
+    private suspend fun performRecoverySigningKeyImport(
+        account: Account,
+        exportedKey: SigningKeyService.ExportedSigningKey,
+        passphrase: String,
+        recoverySignature: String,
     ): ImportedIdentitySigningKey {
         val ensured = ensureIdentity(account)
         val currentDid =
@@ -386,7 +435,8 @@ class AtprotoIdentityService(
         account: Account,
         preparedKey: String,
         signature: String,
-    ): ImportedIdentitySigningKey = recoveryKeys.completeRecovery(account.id, preparedKey, signature)
+    ): ImportedIdentitySigningKey =
+        recoveryKeys.completeRecovery(account.id, preparedKey, signature).also { notifyIdentityChanged(it.account) }
 
     /** [recoveryDidKey] in canonical form, or `null` when it is not a `did:key` for a supported curve. */
     fun canonicalRecoveryDidKey(recoveryDidKey: String): String? = canonicalizeDidKey(recoveryDidKey)

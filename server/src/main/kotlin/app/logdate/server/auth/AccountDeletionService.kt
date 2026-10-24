@@ -6,13 +6,26 @@ import app.logdate.server.audit.AuditLogger
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateMediaBlobRepository
+import app.logdate.server.logging.RepoEventNotices
 import app.logdate.server.oauth.OAuthGrantRevoker
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
+
+/**
+ * Told when an account is gone from this server, so relays that followed its repository can drop it.
+ */
+fun interface AccountRemovalEvents {
+    /** The account [did] was deleted; [status] is the reason the AT Protocol event stream reports. */
+    suspend fun accountRemoved(
+        did: String,
+        status: String,
+    )
+}
 
 /** Account removal commits durable external cleanup before returning success. */
 @OptIn(ExperimentalUuidApi::class)
@@ -23,6 +36,7 @@ class AccountDeletionService(
     private val blobStorage: LogDateBlobStorage?,
     private val blobCleanup: AccountBlobCleanup? = null,
     private val oauthGrantRevoker: OAuthGrantRevoker? = null,
+    private val removalEvents: AccountRemovalEvents? = null,
 ) {
     data class Summary(
         val mediaBlobsDeleted: Int,
@@ -33,12 +47,14 @@ class AccountDeletionService(
     suspend fun deleteAccount(accountId: Uuid): Summary {
         val owner = accountId.toJavaUuid()
         // Apps the account approved lose access before the account itself goes.
-        accountRepository.findById(accountId)?.did?.let { did -> oauthGrantRevoker?.revokeAllForSubject(did) }
+        val did = accountRepository.findById(accountId)?.did
+        did?.let { oauthGrantRevoker?.revokeAllForSubject(it) }
         // PostgreSQL's BEFORE DELETE trigger captures all references, including soft deletes.
         // Non-database development runs have no durable queue and must enumerate successfully.
         val mediaPaths = if (blobCleanup == null) mediaBlobRepository.listMedia(owner).mapNotNull { it.storagePath } else emptyList()
         val backupPaths = if (blobCleanup == null) backupRepository.listBackups(owner).map { it.storagePath } else emptyList()
         val deleted = accountRepository.deleteAccount(accountId)
+        if (deleted && did != null) announceRemoval(did)
         var mediaDeleted = 0
         var backupDeleted = 0
         withContext(Dispatchers.IO) {
@@ -67,5 +83,20 @@ class AccountDeletionService(
         )
         Napier.i("Account deletion accepted: accountRowDeleted=$deleted")
         return Summary(mediaDeleted, backupDeleted, deleted)
+    }
+
+    private suspend fun announceRemoval(did: String) {
+        val events = removalEvents ?: return
+        try {
+            events.accountRemoved(did, DELETED_STATUS)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.e(RepoEventNotices.EVENT_NOT_RECORDED, failure)
+        }
+    }
+
+    private companion object {
+        const val DELETED_STATUS = "deleted"
     }
 }

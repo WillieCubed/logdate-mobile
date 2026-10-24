@@ -327,6 +327,31 @@ object AtprotoRepoCommitsTable : Table("atproto_repo_commits") {
     }
 }
 
+/** The log `com.atproto.sync.subscribeRepos` replays; see V51 for what each column holds. */
+object AtprotoRepoEventsTable : Table("atproto_repo_events") {
+    val seq = long("seq")
+    val repoDid = varchar("repo_did", 255)
+    val eventType = varchar("event_type", 16)
+    val revision = long("revision").nullable()
+    val frame = binary("frame")
+    val createdAt = timestamp("created_at")
+
+    override val primaryKey = PrimaryKey(seq)
+
+    init {
+        index("idx_atproto_repo_events_repo", false, repoDid, seq)
+        index("idx_atproto_repo_events_created", false, createdAt)
+    }
+}
+
+/** The single row holding the last event number handed out; appending locks it. */
+object AtprotoRepoEventSequenceTable : Table("atproto_repo_event_sequence") {
+    val id = short("id")
+    val lastSeq = long("last_seq")
+
+    override val primaryKey = PrimaryKey(id)
+}
+
 object LogDateCollectionStatesTable : Table("logdate_collection_states") {
     val userId = javaUUID("user_id")
     val repoDid = varchar("repo_did", 255)

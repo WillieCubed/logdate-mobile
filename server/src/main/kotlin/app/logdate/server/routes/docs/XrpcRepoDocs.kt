@@ -4,12 +4,15 @@ import app.logdate.server.openapi.ApiTags
 import app.logdate.server.routes.CreateRecordInput
 import app.logdate.server.routes.DeleteRecordInput
 import app.logdate.server.routes.ErrorCase
+import app.logdate.server.routes.ListReposResponse
+import app.logdate.server.routes.ListedRepo
 import app.logdate.server.routes.PutRecordInput
 import app.logdate.server.routes.bearerOrDpopOperation
 import app.logdate.server.routes.binarySchema
 import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.pdsError
+import app.logdate.server.routes.publicOperation
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -70,8 +73,11 @@ internal object XrpcRepoDocs {
             """
             `com.atproto.sync.getRepo`. Streams the whole repository as a CAR file (a content-addressed
             archive of all its blocks), which is how AT Protocol servers copy and verify each other's data.
-            Pass `since` (a revision) to get only the blocks written after it. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist.
+            Pass `since` (a revision) to get only the blocks written after it. Unless the repository is public, only
+            its owner can read it: send their access token. Asking for any other repository answers exactly as if it
+            did not exist. Public repositories are the exception: with `ATPROTO_FIREHOSE_ENABLED` on, anyone can
+            export a repository whose account keeps its journal in a personal space, with no sign-in, as long as every
+            record in it is public. A repository that holds anything private answers as if it did not exist.
             """,
         )
         request {
@@ -106,8 +112,10 @@ internal object XrpcRepoDocs {
             """
             `com.atproto.sync.getLatestCommit`. Returns the CID and revision of the repository's newest commit.
             Compare it with what you last saw to learn whether anything changed before exporting.
-            Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist.
+            Unless the repository is public, only its owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist. Public repositories are the exception: with
+            `ATPROTO_FIREHOSE_ENABLED` on, anyone can read the latest commit of a repository whose account keeps its
+            journal in a personal space, with no sign-in.
             """,
         )
         request { didParameter() }
@@ -121,6 +129,41 @@ internal object XrpcRepoDocs {
         }
     }
 
+    val listRepos: RouteConfig.() -> Unit = {
+        publicOperation(
+            "listRepos",
+            ApiTags.XRPC,
+            "List the repositories this server shows",
+            """
+            `com.atproto.sync.listRepos`. Lists the repositories this server shows to everyone, ordered by DID, with
+            each one's newest commit. Relays page through it to find repositories to follow. It needs no sign-in and
+            exists only while the repository event stream is turned on (`ATPROTO_FIREHOSE_ENABLED`). An account
+            appears once it keeps its journal in a personal space, has an identity other apps can look up, and has
+            written a record.
+            """,
+        )
+        request {
+            queryParameter<Int>("limit") {
+                description = "Repositories per page. Defaults to 500; clamped to 1…1000."
+                required = false
+                example("Example") { value = 500 }
+            }
+            queryParameter<String>("cursor") {
+                description = "The `cursor` from the previous page."
+                required = false
+                example("Example") { value = DocExamples.DID }
+            }
+        }
+        response {
+            ok(
+                "A page of repositories.",
+                ListReposResponse(
+                    repos = listOf(ListedRepo(did = did, head = Cid.require(COMMIT_CID), rev = Tid.require(REV), active = true)),
+                ),
+            )
+        }
+    }
+
     val getRepoStatus: RouteConfig.() -> Unit = {
         bearerOrDpopOperation(
             "getRepoStatus",
@@ -129,8 +172,10 @@ internal object XrpcRepoDocs {
             """
             `com.atproto.sync.getRepoStatus`. Says whether a repository is active on this server and, if so,
             its current revision. Deactivated or migrated repositories answer `active: false` with a `status`.
-            Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist.
+            Unless the repository is public, only its owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist. Public repositories are the exception: with
+            `ATPROTO_FIREHOSE_ENABLED` on, anyone can read the status of a repository whose account keeps its journal
+            in a personal space, with no sign-in.
             """,
         )
         request { didParameter() }
@@ -155,8 +200,12 @@ internal object XrpcRepoDocs {
             `com.atproto.repo.getRecord`. Fetches one record by repository, collection and record key. A
             *collection* is a lexicon ID such as `studio.hypertext.logdate.content`; the *record key* is the
             record's ID within it. Records are returned as the JSON the writer stored, plus the `at://` URI and
-            the CID (content hash) of this version. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist. An app signed in through OAuth needs
+            the CID (content hash) of this version. Unless the repository is public, only its owner can read it: send
+            their access token. Asking for any other repository answers exactly as if it did not exist. Public records
+            are the exception: with `ATPROTO_FIREHOSE_ENABLED` on, anyone can read a record in a public collection
+            (the profile, sharing keys and published stories) of an account that keeps its journal in a personal
+            space, with no sign-in. A record in any other collection answers `RecordNotFound`. An app signed in
+            through OAuth needs
             `transition:generic`, and a record in a collection that is not open to apps answers `RecordNotFound`.
             No collection is open to apps yet.
             """,
@@ -204,8 +253,11 @@ internal object XrpcRepoDocs {
             """
             `com.atproto.repo.listRecords`. Pages through the records in one collection of one repository.
             Pass the `cursor` from each response to get the next page; an absent cursor means you have reached
-            the end. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist. An app signed in through OAuth needs
+            the end. Unless the repository is public, only its owner can read it: send their access token. Asking for
+            any other repository answers exactly as if it did not exist. Public records are the exception: with
+            `ATPROTO_FIREHOSE_ENABLED` on, anyone can list a public collection (the profile, sharing keys and
+            published stories) of an account that keeps its journal in a personal space, with no sign-in. Any other
+            collection is empty. An app signed in through OAuth needs
             `transition:generic`, and a collection that is not open to apps is always empty. No collection is open
             to apps yet.
             """,
@@ -415,8 +467,11 @@ internal object XrpcRepoDocs {
             "Download a blob",
             """
             `com.atproto.sync.getBlob`. Streams a blob's bytes by repository DID and CID, with the
-            `Content-Type` it was uploaded with. Only the repository's owner can read it: send their access token. Asking for any other
-            repository answers exactly as if it did not exist.
+            `Content-Type` it was uploaded with. Unless the repository is public, only its owner can read it: send
+            their access token. Asking for any other repository answers exactly as if it did not exist. Public blobs
+            are the exception: with `ATPROTO_FIREHOSE_ENABLED` on, anyone can download a blob that a public record of
+            an account in a personal space refers to, with no sign-in. A blob no public record refers to answers as if
+            it did not exist.
             """,
         )
         request {

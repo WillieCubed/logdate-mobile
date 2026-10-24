@@ -11,6 +11,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -235,6 +236,23 @@ class PostgreSQLAccountRepository : AccountRepository {
                 .selectAll()
                 .where { AccountsTable.isActive eq true }
                 .orderBy(AccountsTable.createdAt, SortOrder.DESC)
+                .map { it.toAccount() }
+        }
+
+    override suspend fun listPersonalSpaceAccountsAfter(
+        afterDid: String?,
+        limit: Int,
+    ): List<Account> =
+        transaction {
+            AccountsTable
+                .selectAll()
+                .where {
+                    (AccountsTable.isActive eq true) and
+                        (AccountsTable.storageMode eq AccountStorageMode.PERSONAL_SPACE_V1.wireValue) and
+                        AccountsTable.did.isNotNull() and
+                        (if (afterDid == null) Op.TRUE else AccountsTable.did greater afterDid)
+                }.orderBy(AccountsTable.did, SortOrder.ASC)
+                .limit(limit)
                 .map { it.toAccount() }
         }
 

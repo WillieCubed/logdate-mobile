@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.ktor.server.cors)
     implementation(libs.ktor.server.forwarded.header)
     implementation(libs.ktor.server.http.redirect)
+    implementation(libs.ktor.server.websockets)
     implementation(libs.scalar.core)
     implementation(libs.ktor.openapi)
     implementation(libs.schema.kenerator.core)
@@ -106,6 +107,7 @@ dependencies {
     // Testing
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.ktor.client.websockets)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.h2)

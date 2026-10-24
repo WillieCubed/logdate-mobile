@@ -2,10 +2,13 @@ package app.logdate.server.identity
 
 import app.logdate.server.auth.Account
 import app.logdate.server.logging.IdentityPublishingNotices
+import app.logdate.server.logging.RepoEventNotices
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /** What one run of the identity publishing command is allowed to do. */
 data class IdentityPublishingOptions(
@@ -103,6 +106,7 @@ class IdentityPublishingRun(
     private val loadAccounts: suspend () -> List<Account>,
     private val pacer: PlcWritePacer,
     private val directoryUrl: String,
+    private val onPublished: suspend (Uuid) -> Unit = {},
 ) {
     suspend fun run(options: IdentityPublishingOptions): IdentityPublishingReport {
         Napier.i(IdentityPublishingNotices.RUN_STARTED)
@@ -165,7 +169,21 @@ class IdentityPublishingRun(
             return entryFor(inspection, service.plannedAction(inspection, options.reconcile), inspection.state, failure = null)
         }
         val outcome = service.publish(inspection, options.reconcile, beforeWrite = pacer::awaitTurn)
+        if (!outcome.failed && outcome.action != IdentityPublishAction.NONE && outcome.after == IdentityPublicationState.PUBLISHED) {
+            announcePublished(inspection.account.id)
+        }
         return entryFor(inspection, outcome.action, outcome.after, outcome.failure)
+    }
+
+    /** Tells followers of the repository event stream about an identity that was just published. A failure is logged and never fails the run. */
+    private suspend fun announcePublished(accountId: Uuid) {
+        try {
+            onPublished(accountId)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.e(RepoEventNotices.EVENT_NOT_RECORDED, failure)
+        }
     }
 
     private fun entryFor(

@@ -2,6 +2,7 @@
 
 package app.logdate.server.atproto
 
+import app.logdate.server.atproto.firehose.PublicRepoPolicy
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.database.toJavaUUID
 import app.logdate.server.identity.AtprotoIdentityService
@@ -25,6 +26,7 @@ import app.logdate.server.logdate.requireMatchingId
 import app.logdate.server.logdate.requireMatchingType
 import app.logdate.server.logdate.stringValue
 import app.logdate.server.logdate.toEntryRepoJson
+import app.logdate.shared.model.AccountStorageMode
 import kotlinx.serialization.json.JsonObject
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.Cid
@@ -46,6 +48,7 @@ import studio.hypertext.atproto.repo.UnsupportedCollectionException
 import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 import studio.hypertext.atproto.syntax.Tid
+import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -61,6 +64,7 @@ class LogDateRepoStore(
     signingKeyService: SigningKeyService,
     accountRepository: AccountRepository,
     blockStore: RepoBlockStore,
+    private val publicPolicy: PublicRepoPolicy? = null,
 ) : RepoEngine {
     private val canonicalEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
 
@@ -93,7 +97,7 @@ class LogDateRepoStore(
     ): Result<RepoListPage> =
         runCatching {
             requireKnownRepo(repo)
-            requireSupportedCollection(collection)
+            if (!isPublicCollection(collection)) requireSupportedCollection(collection)
             if (collection == entryCollection) {
                 listEntryAliasRecords(
                     repo = repo,
@@ -120,6 +124,10 @@ class LogDateRepoStore(
         recordKey: RecordKey?,
     ): Result<RepoWriteResult> =
         runCatching {
+            if (isPublicCollection(collection)) {
+                return@runCatching createPublicRecord(repo, collection, value, recordKey)
+            }
+            requireJournalWritableInRepo(repo)
             val definition = requireSupportedCollection(collection)
             val userId = resolveUserId(repo)
             val resolvedRecordKey = recordKey ?: definition.generatedRecordKey(value)
@@ -138,6 +146,10 @@ class LogDateRepoStore(
         swapRecord: String?,
     ): Result<RepoWriteResult> =
         runCatching {
+            if (isPublicCollection(recordId.collection)) {
+                return@runCatching putPublicRecord(recordId, value, swapRecord)
+            }
+            requireJournalWritableInRepo(recordId.repo)
             val definition = requireSupportedCollection(recordId.collection)
             val existingCid =
                 if (recordId.collection == entryCollection) {
@@ -166,6 +178,11 @@ class LogDateRepoStore(
         swapRecord: String?,
     ): Result<Boolean> =
         runCatching {
+            if (isPublicCollection(recordId.collection)) {
+                requirePublicRecordOwner(recordId.repo)
+                return@runCatching canonicalEngine.deleteRecord(recordId, swapRecord).getOrThrow()
+            }
+            requireJournalWritableInRepo(recordId.repo)
             val userId = resolveUserId(recordId.repo)
             val definition = requireSupportedCollection(recordId.collection)
             val existingCid =
@@ -211,6 +228,67 @@ class LogDateRepoStore(
 
     override suspend fun import(export: RepoExport): Result<RepoHead> =
         Result.failure(UnsupportedOperationException("LogDate repo adapter does not support repo imports yet"))
+
+    private fun isPublicCollection(collection: Nsid): Boolean = publicPolicy?.isPublic(collection) == true
+
+    /**
+     * While repositories are public, an account that keeps its journal in its personal space must not
+     * get journal records in its repository: the record tree names every record, so one would keep the
+     * whole repository off the stream and out of every export. The journal's home is the space.
+     */
+    private suspend fun requireJournalWritableInRepo(repo: AtprotoDid) {
+        if (publicPolicy == null) return
+        val account = identityService.findByDid(repo.toString()) ?: return
+        require(account.storageMode != AccountStorageMode.PERSONAL_SPACE_V1) {
+            "This account keeps its journal in its personal space, so journal records cannot be written to its repository"
+        }
+    }
+
+    /**
+     * Public records are written straight into the repository tree, not through the sync adapters,
+     * and only for an account that keeps its journal in its personal space. A legacy account's
+     * repository is erased when its journal moves, which would delete the record, and until then it
+     * is never shown to anyone.
+     */
+    private suspend fun requirePublicRecordOwner(repo: AtprotoDid) {
+        val account = requireNotNull(identityService.findByDid(repo.toString())) { "Unknown repo DID: $repo" }
+        require(account.storageMode == AccountStorageMode.PERSONAL_SPACE_V1) {
+            "Public records can be written once the journal has moved into its personal space"
+        }
+    }
+
+    private suspend fun createPublicRecord(
+        repo: AtprotoDid,
+        collection: Nsid,
+        value: JsonObject,
+        recordKey: RecordKey?,
+    ): RepoWriteResult {
+        requirePublicRecordOwner(repo)
+        requireMatchingType(value = value, collection = collection)
+        val resolvedKey = recordKey ?: RecordKey.require(Tid.fromInstant(Clock.System.now()).toString())
+        requirePublicRecordKey(collection, resolvedKey)
+        return canonicalEngine.putRecordIfAbsent(RepoRecordId(repo, collection, resolvedKey), value).getOrThrow()
+    }
+
+    private suspend fun putPublicRecord(
+        recordId: RepoRecordId,
+        value: JsonObject,
+        swapRecord: String?,
+    ): RepoWriteResult {
+        requirePublicRecordOwner(recordId.repo)
+        requireMatchingType(value = value, collection = recordId.collection)
+        requirePublicRecordKey(recordId.collection, recordId.recordKey)
+        return canonicalEngine.putRecord(recordId, value, swapRecord).getOrThrow()
+    }
+
+    private fun requirePublicRecordKey(
+        collection: Nsid,
+        recordKey: RecordKey,
+    ) {
+        require(collection != PublicRepoPolicy.PROFILE || recordKey.toString() == PROFILE_RECORD_KEY) {
+            "A profile record's key is $PROFILE_RECORD_KEY"
+        }
+    }
 
     private suspend fun resolveUserId(repo: AtprotoDid): java.util.UUID =
         requireNotNull(identityService.findByDid(repo.toString())) { "Unknown repo DID: $repo" }
@@ -306,6 +384,7 @@ class LogDateRepoStore(
             .toString()
 
     companion object {
+        private const val PROFILE_RECORD_KEY = "self"
         val entryCollection: Nsid = ENTRY_LEXICON_NSID
         val contentCollection: Nsid = LogDateCollectionKind.ENTRY.nsid
         val journalCollection: Nsid = LogDateCollectionKind.JOURNAL.nsid

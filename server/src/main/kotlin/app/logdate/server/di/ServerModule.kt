@@ -12,10 +12,12 @@ import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
+import app.logdate.server.atproto.firehose.PublicRepoPolicy
 import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.AccountBlobCleanup
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
+import app.logdate.server.auth.AccountRemovalEvents
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
 import app.logdate.server.auth.DigitalCredentialVerifier
@@ -55,7 +57,6 @@ import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
 import app.logdate.server.database.PostgreSQLOAuthSigningKeyRepository
 import app.logdate.server.database.PostgreSQLPendingEmailVerificationRepository
 import app.logdate.server.database.PostgreSQLRefreshTokenRevocationRepository
-import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLResourceRouteRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
@@ -139,8 +140,6 @@ import studio.hypertext.atproto.pds.runtime.DefaultPdsRepoService
 import studio.hypertext.atproto.pds.runtime.DefaultPdsSyncService
 import studio.hypertext.atproto.pds.runtime.StaticPdsDiscoveryService
 import studio.hypertext.atproto.plc.KtorPlcDirectoryClient
-import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
-import studio.hypertext.atproto.repo.RepoBlockStore
 import studio.hypertext.atproto.repo.RepoEngine
 import studio.hypertext.atproto.repo.RepoRecordStore
 
@@ -324,9 +323,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) DbSyncRepository() else InMemorySyncRepository()
         }
 
-        single<RepoBlockStore> {
-            if (isDatabaseAvailable) PostgreSQLRepoBlockStore() else InMemoryRepoBlockStore()
-        }
+        firehoseDefinitions(isDatabaseAvailable)
 
         single<LogDateCollectionsMetadataStore> {
             if (isDatabaseAvailable) {
@@ -408,6 +405,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                         null
                     },
                 oauthGrantRevoker = get<OAuthAuthorizationService>(),
+                removalEvents = getOrNull<AccountRemovalEvents>(),
             )
         }
 
@@ -461,6 +459,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 signingKeyService = get(),
                 accountRepository = get(),
                 blockStore = get(),
+                publicPolicy = getOrNull<PublicRepoPolicy>(),
             )
         } bind RepoEngine::class bind RepoRecordStore::class
 

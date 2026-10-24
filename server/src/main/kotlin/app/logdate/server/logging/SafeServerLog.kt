@@ -64,6 +64,14 @@ private val approvedNotices =
         SpaceMigrationNotices.CLEANUP_SKIPPED to "SERVER_LEGACY_COPY_CLEANUP_SKIPPED",
         SpaceMigrationNotices.CLEANUP_RUN_FAILED to "SERVER_LEGACY_COPY_CLEANUP_RUN_FAILED",
         SpaceMigrationNotices.CLEANUP_PAUSED to "SERVER_LEGACY_COPY_CLEANUP_PAUSED",
+        RepoEventNotices.COMMIT_UNREADABLE to "SERVER_REPO_EVENT_COMMIT_UNREADABLE",
+        RepoEventNotices.EVENT_NOT_RECORDED to "SERVER_REPO_EVENT_NOT_RECORDED",
+        RepoEventNotices.PRIVATE_RECORDS_HELD_BACK to "SERVER_REPO_EVENT_PRIVATE_RECORDS_HELD_BACK",
+        RepoEventNotices.FOLLOWER_FAILED to "SERVER_REPO_EVENT_FOLLOWER_FAILED",
+        RepoEventNotices.PRUNE_FAILED to "SERVER_REPO_EVENT_PRUNE_FAILED",
+        RepoEventNotices.CRAWL_REQUESTED to "SERVER_RELAY_CRAWL_REQUESTED",
+        RepoEventNotices.CRAWL_REFUSED to "SERVER_RELAY_CRAWL_REFUSED",
+        RepoEventNotices.CRAWL_FAILED to "SERVER_RELAY_CRAWL_FAILED",
         IdentityNotices.HANDLE_RESOLUTION_FAILED to "SERVER_HANDLE_RESOLUTION_FAILED",
         IdentityNotices.BACKFILL_REFUSED_PUBLISHING to "SERVER_IDENTITY_BACKFILL_REFUSED_PUBLISHING",
         IdentityNotices.BACKFILL_FAILED to "SERVER_IDENTITY_BACKFILL_FAILED",
@@ -170,6 +178,24 @@ internal object SpacePurgeNotices {
     const val BLOBS_PURGED = "Purged space blobs that nothing refers to"
     const val BLOB_DELETE_FAILED = "Deleting a space blob from storage failed; the next sweep retries it"
     const val PURGE_FAILED = "Purging space tombstones and blobs failed; the next sweep retries"
+}
+
+/**
+ * Fixed log messages for the repository event stream and for asking relays to follow it. None names
+ * an account or a relay, because production logs carry nothing that identifies either. A failure to
+ * record an event is an error: a relay that missed it learns the repository's state again from the
+ * next event, but only if there is one.
+ */
+internal object RepoEventNotices {
+    const val COMMIT_UNREADABLE =
+        "A repository commit could not be compared with the one before it; announcing the repository's state instead"
+    const val EVENT_NOT_RECORDED = "Announcing a repository change failed; the next change announces the repository's state"
+    const val PRIVATE_RECORDS_HELD_BACK = "A repository that holds private records was not announced"
+    const val FOLLOWER_FAILED = "A follower of the repository event stream stopped after an error"
+    const val PRUNE_FAILED = "Deleting old repository events failed; the next sweep retries"
+    const val CRAWL_REQUESTED = "Asked a relay to crawl this server"
+    const val CRAWL_REFUSED = "A relay refused to crawl this server"
+    const val CRAWL_FAILED = "Asking a relay to crawl this server failed"
 }
 
 /**

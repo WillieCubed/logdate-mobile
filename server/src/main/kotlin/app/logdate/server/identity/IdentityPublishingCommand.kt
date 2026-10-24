@@ -1,10 +1,18 @@
 package app.logdate.server.identity
 
+import app.logdate.server.atproto.firehose.AccountPublicRepoGate
+import app.logdate.server.atproto.firehose.AtprotoFirehoseConfig
+import app.logdate.server.atproto.firehose.PublicRepoAnnouncer
+import app.logdate.server.atproto.firehose.PublicRepoPolicy
+import app.logdate.server.atproto.firehose.RelayCrawler
+import app.logdate.server.atproto.firehose.RepoEventSequencer
 import app.logdate.server.config.AtprotoSigningKeyKek
 import app.logdate.server.config.AtprotoSigningKeyKekDecryptOnly
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
+import app.logdate.server.database.PostgreSQLRepoBlockStore
+import app.logdate.server.database.PostgreSQLRepoEventStore
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
 import app.logdate.server.logging.IdentityPublishingNotices
 import io.github.aakira.napier.Napier
@@ -19,6 +27,8 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermissions
 import kotlin.system.exitProcess
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /** The first server argument that selects the identity publishing command. */
 const val IDENTITY_PUBLISHING_COMMAND: String = "--identity-publishing"
@@ -152,6 +162,7 @@ private val reportJson =
         encodeDefaults = true
     }
 
+@OptIn(ExperimentalUuidApi::class)
 private fun runIdentityPublishingCommand(args: List<String>): Int {
     val invocation =
         try {
@@ -193,6 +204,7 @@ private fun runIdentityPublishingCommand(args: List<String>): Int {
                 loadAccounts = accounts::getAllAccounts,
                 pacer = PlcWritePacer(invocation.options.operationsPerMinute),
                 directoryUrl = config.normalizedPlcDirectoryUrl,
+                onPublished = publishedAnnouncer(accounts, config, httpClient),
             )
         val report = runBlocking { run.run(invocation.options) }
         invocation.reportFile?.let { writeIdentityPublishingReport(it, report) }
@@ -201,6 +213,32 @@ private fun runIdentityPublishingCommand(args: List<String>): Int {
         httpClient.close()
         (dataSource as? AutoCloseable)?.close()
     }
+}
+
+/**
+ * What a publishing run does for each identity it publishes: when the repository event stream is on,
+ * tell its followers about the account and ask the configured relays to crawl the server, as the
+ * server does for an identity it publishes itself. With the stream off, nothing.
+ */
+@OptIn(ExperimentalUuidApi::class)
+private fun publishedAnnouncer(
+    accounts: PostgreSQLAccountRepository,
+    identityConfig: AtprotoIdentityConfig,
+    httpClient: HttpClient,
+): suspend (Uuid) -> Unit {
+    val firehose = AtprotoFirehoseConfig.fromEnvironment()
+    if (!firehose.enabled) return {}
+    val blocks = PostgreSQLRepoBlockStore()
+    val sequencer =
+        RepoEventSequencer(
+            store = PostgreSQLRepoEventStore(),
+            blocks = blocks,
+            gate = AccountPublicRepoGate(accounts, identityConfig),
+            policy = PublicRepoPolicy(),
+        )
+    val crawler = RelayCrawler(httpClient, firehose.relayHosts, RelayCrawler.hostnameFor(identityConfig.pdsServiceEndpoint))
+    val announcer = PublicRepoAnnouncer(accounts, sequencer, crawler)
+    return announcer::accountPublished
 }
 
 /** Writes [report] readable only by its owner, replacing any earlier report at [path] in one step. */
