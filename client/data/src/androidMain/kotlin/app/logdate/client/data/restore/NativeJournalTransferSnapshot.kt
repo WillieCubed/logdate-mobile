@@ -132,7 +132,7 @@ internal class NativeJournalTransferSnapshot(
                 mediaInventory = mediaInventory,
             )
             val selectedPreferencesChecksum = nativeSnapshotChecksum(pinnedPreferences)
-            requirePinnedNativeTransferFile(File(context.filesDir, "logdate.preferences_pb"), selectedPreferencesChecksum)
+            requirePinnedNativeTransferFile(pinnedPreferences, selectedPreferencesChecksum)
             staging.walkBottomUp().filter(File::isDirectory).forEach(::syncDirectory)
             ownership.record(staging)
             Files.move(staging.toPath(), current.toPath(), StandardCopyOption.ATOMIC_MOVE)
@@ -142,7 +142,7 @@ internal class NativeJournalTransferSnapshot(
             entryDraftFileChecksum = entryDraftFile.takeIf(File::exists)?.let(::nativeSnapshotChecksum)
             preferencesChecksum = selectedPreferencesChecksum
             check(entryDraftFileChecksum == beforeDrafts) { "Entry drafts changed during native media selection" }
-            checkPreferencesFileUnchanged()
+            checkPinnedPreferencesUnchanged()
         } finally {
             keys.forEach { it.fill(0) }
             if (staging.exists()) ownership.discardOwned()
@@ -168,7 +168,7 @@ internal class NativeJournalTransferSnapshot(
             if (noDatabaseSource) checkNoDatabaseSourceUnchanged(noDatabasePreferencesChecksum, noDatabaseDraftChecksum)
             return
         }
-        checkPreferencesFileUnchanged()
+        checkPinnedPreferencesUnchanged()
         checkEntryDraftFileUnchanged()
         selectedMedia.forEach { entry ->
             val file = File(context.filesDir, entry.path.removePrefix("files/"))
@@ -177,11 +177,11 @@ internal class NativeJournalTransferSnapshot(
             verifySelectedMediaFile(file, entry)
         }
         checkEntryDraftFileUnchanged()
-        checkPreferencesFileUnchanged()
+        checkPinnedPreferencesUnchanged()
     }
 
-    private fun checkPreferencesFileUnchanged() {
-        requirePinnedNativeTransferFile(File(context.filesDir, "logdate.preferences_pb"), checkNotNull(preferencesChecksum))
+    private fun checkPinnedPreferencesUnchanged() {
+        requirePinnedNativeTransferFile(File(current, "files/logdate.preferences_pb"), checkNotNull(preferencesChecksum))
     }
 
     private fun checkNoDatabaseSourceUnchanged(
